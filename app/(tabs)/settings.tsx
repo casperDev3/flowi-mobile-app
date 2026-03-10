@@ -1,8 +1,9 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -24,6 +25,7 @@ type LangOption = 'uk' | 'en';
 export default function SettingsScreen() {
   const cs = useColorScheme();
   const isDark = cs === 'dark';
+  const router = useRouter();
 
   const [theme, setTheme] = useState<ThemeOption>('system');
   const [lang, setLang] = useState<LangOption>('uk');
@@ -34,27 +36,21 @@ export default function SettingsScreen() {
   const [showLangModal, setShowLangModal] = useState(false);
 
   const c = {
-    bg1: isDark ? '#0C0C14' : '#F5F5FA',
-    bg2: isDark ? '#14121E' : '#EBEBF5',
-    card: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.80)',
+    bg1:    isDark ? '#0C0C14' : '#F5F5FA',
+    bg2:    isDark ? '#14121E' : '#EBEBF5',
+    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.80)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text: isDark ? '#F0EEFF' : '#1A1433',
-    sub: isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    text:   isDark ? '#F0EEFF' : '#1A1433',
+    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
     accent: '#7C3AED',
-    red: '#EF4444',
-    dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet: isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-    green: '#10B981',
+    red:    '#EF4444',
+    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
+    green:  '#10B981',
   };
 
   const THEME_LABELS: Record<ThemeOption, string> = { system: 'Системна', light: 'Світла', dark: 'Темна' };
   const LANG_LABELS: Record<LangOption, string> = { uk: 'Українська', en: 'English' };
-
-  const handleClearData = () =>
-    Alert.alert('Очистити дані', 'Всі дані будуть видалені. Продовжити?', [
-      { text: 'Скасувати', style: 'cancel' },
-      { text: 'Видалити', style: 'destructive', onPress: () => {} },
-    ]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -138,34 +134,34 @@ export default function SettingsScreen() {
           <SectionLabel label="Дані" color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
             <SettingRow
-              icon="icloud.fill"
-              iconColor="#0EA5E9"
-              label="Резервне копіювання"
-              value="iCloud"
-              onPress={() => {}}
+              icon="externaldrive"
+              iconColor="#6366F1"
+              label="Управління даними"
+              value="Експорт · Імпорт"
+              onPress={() => router.push('/data')}
               text={c.text}
               sub={c.sub}
               border={c.border}
-              last={false}
+              last
             />
-            <SettingRow
-              icon="square.and.arrow.up"
-              iconColor="#8B5CF6"
-              label="Експортувати дані"
-              onPress={() => {}}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <TouchableOpacity onPress={handleClearData} style={st.dangerRow}>
-              <View style={[st.iconBox, { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
-                <IconSymbol name="trash.fill" size={17} color="#EF4444" />
-              </View>
-              <Text style={[st.dangerLabel]}>Очистити всі дані</Text>
-              <IconSymbol name="chevron.right" size={16} color="rgba(239,68,68,0.5)" />
-            </TouchableOpacity>
           </BlurView>
+
+          {/* Розробка */}
+          <SectionLabel label="Розробка" color={c.sub} />
+          <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/bugs')}>
+            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.bugBanner, { borderColor: '#EF444440' }]}>
+              <View style={[st.bugBannerIcon, { backgroundColor: '#EF444418' }]}>
+                <IconSymbol name="ladybug.fill" size={20} color="#EF4444" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>Список багів</Text>
+                <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Відстеження помилок та проблем</Text>
+              </View>
+              <View style={[st.bugChevron, { backgroundColor: '#EF444415' }]}>
+                <IconSymbol name="chevron.right" size={14} color="#EF4444" />
+              </View>
+            </BlurView>
+          </TouchableOpacity>
 
           {/* About */}
           <SectionLabel label="Про додаток" color={c.sub} />
@@ -217,59 +213,80 @@ export default function SettingsScreen() {
             <View style={[st.appBadge, { backgroundColor: c.accent }]}>
               <IconSymbol name="checklist" size={20} color="#fff" />
             </View>
-            <Text style={[{ color: c.sub, fontSize: 12, fontWeight: '500', marginTop: 6 }]}>f-tracking app</Text>
-            <Text style={[{ color: c.sub, fontSize: 11 }]}>© 2026</Text>
+            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginTop: 6 }}>f-tracking app</Text>
+            <Text style={{ color: c.sub, fontSize: 11 }}>© 2026</Text>
           </View>
         </ScrollView>
       </SafeAreaView>
 
-      {/* Theme Modal */}
-      <Modal visible={showThemeModal} transparent animationType="fade" statusBarTranslucent>
-        <Pressable style={st.overlay} onPress={() => setShowThemeModal(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-              <View style={[st.handle, { backgroundColor: c.border }]} />
-              <Text style={[st.sheetTitle, { color: c.text }]}>Тема</Text>
-              {(['system', 'light', 'dark'] as ThemeOption[]).map((t, i, arr) => (
-                <TouchableOpacity
-                  key={t}
-                  onPress={() => { setTheme(t); setShowThemeModal(false); }}
-                  style={[st.optionRow, i < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                  <IconSymbol
-                    name={t === 'system' ? 'circle.lefthalf.filled' : t === 'light' ? 'sun.max' : 'moon'}
-                    size={20}
-                    color={theme === t ? c.accent : c.sub}
-                  />
-                  <Text style={[st.optionLabel, { color: theme === t ? c.accent : c.text }]}>{THEME_LABELS[t]}</Text>
-                  {theme === t && <IconSymbol name="checkmark" size={18} color={c.accent} />}
-                </TouchableOpacity>
-              ))}
-            </BlurView>
+      {/* ─── Theme Modal ─── */}
+      <Modal visible={showThemeModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowThemeModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={st.overlay} onPress={() => setShowThemeModal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <View style={st.handleRow}>
+                  <View style={{ flex: 1 }} />
+                  <View style={[st.handle, { backgroundColor: c.border }]} />
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <TouchableOpacity onPress={() => setShowThemeModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <IconSymbol name="xmark" size={17} color={c.sub} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <Text style={[st.sheetTitle, { color: c.text }]}>Тема</Text>
+                {(['system', 'light', 'dark'] as ThemeOption[]).map((t, i, arr) => (
+                  <TouchableOpacity
+                    key={t}
+                    onPress={() => { setTheme(t); setShowThemeModal(false); }}
+                    style={[st.optionRow, i < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                    <IconSymbol
+                      name={t === 'system' ? 'circle.lefthalf.filled' : t === 'light' ? 'sun.max' : 'moon'}
+                      size={20}
+                      color={theme === t ? c.accent : c.sub}
+                    />
+                    <Text style={[st.optionLabel, { color: theme === t ? c.accent : c.text }]}>{THEME_LABELS[t]}</Text>
+                    {theme === t && <IconSymbol name="checkmark" size={18} color={c.accent} />}
+                  </TouchableOpacity>
+                ))}
+              </BlurView>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* Language Modal */}
-      <Modal visible={showLangModal} transparent animationType="fade" statusBarTranslucent>
-        <Pressable style={st.overlay} onPress={() => setShowLangModal(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-              <View style={[st.handle, { backgroundColor: c.border }]} />
-              <Text style={[st.sheetTitle, { color: c.text }]}>Мова</Text>
-              {(['uk', 'en'] as LangOption[]).map((l, i, arr) => (
-                <TouchableOpacity
-                  key={l}
-                  onPress={() => { setLang(l); setShowLangModal(false); }}
-                  style={[st.optionRow, i < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                  <Text style={{ fontSize: 20 }}>{l === 'uk' ? '🇺🇦' : '🇬🇧'}</Text>
-                  <Text style={[st.optionLabel, { color: lang === l ? c.accent : c.text }]}>{LANG_LABELS[l]}</Text>
-                  {lang === l && <IconSymbol name="checkmark" size={18} color={c.accent} />}
-                </TouchableOpacity>
-              ))}
-            </BlurView>
+      {/* ─── Language Modal ─── */}
+      <Modal visible={showLangModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowLangModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={st.overlay} onPress={() => setShowLangModal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <View style={st.handleRow}>
+                  <View style={{ flex: 1 }} />
+                  <View style={[st.handle, { backgroundColor: c.border }]} />
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <TouchableOpacity onPress={() => setShowLangModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <IconSymbol name="xmark" size={17} color={c.sub} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <Text style={[st.sheetTitle, { color: c.text }]}>Мова</Text>
+                {(['uk', 'en'] as LangOption[]).map((l, i, arr) => (
+                  <TouchableOpacity
+                    key={l}
+                    onPress={() => { setLang(l); setShowLangModal(false); }}
+                    style={[st.optionRow, i < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                    <Text style={{ fontSize: 20 }}>{l === 'uk' ? '🇺🇦' : '🇬🇧'}</Text>
+                    <Text style={[st.optionLabel, { color: lang === l ? c.accent : c.text }]}>{LANG_LABELS[l]}</Text>
+                    {lang === l && <IconSymbol name="checkmark" size={18} color={c.accent} />}
+                  </TouchableOpacity>
+                ))}
+              </BlurView>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
+
     </View>
   );
 }
@@ -326,21 +343,26 @@ function InfoRow({ icon, iconColor, label, value, text, sub, border, last }: any
 }
 
 const st = StyleSheet.create({
-  pageTitle: { fontSize: 34, fontWeight: '800', letterSpacing: -0.8 },
-  sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 20, marginLeft: 4 },
-  card: { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
-  dangerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
-  iconBox: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { fontSize: 14, fontWeight: '500' },
-  rowValue: { fontSize: 13, fontWeight: '500' },
+  pageTitle:   { fontSize: 34, fontWeight: '800', letterSpacing: -0.8 },
+  sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 20, marginLeft: 4 },
+  card:        { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
+  dangerRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
+  iconBox:     { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  rowLabel:    { fontSize: 14, fontWeight: '500' },
+  rowValue:    { fontSize: 13, fontWeight: '500' },
   dangerLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: '#EF4444' },
-  appBadge: { width: 52, height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet: { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 18 },
-  sheetTitle: { fontSize: 18, fontWeight: '800', marginBottom: 12 },
-  optionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
+  appBadge:    { width: 52, height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 },
+  bugBanner:   { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1.5, padding: 14, overflow: 'hidden' },
+  bugBannerIcon:{ width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  bugChevron:  { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: '90%' },
+  handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
+  sheetTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 12 },
+  optionRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   optionLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
+  btn:         { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

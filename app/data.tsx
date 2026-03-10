@@ -124,16 +124,14 @@ export default function DataScreen() {
           showsVerticalScrollIndicator={false}>
 
           {/* Header */}
-          <View style={{ marginTop: 14, marginBottom: 28, flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ marginTop: 10, marginBottom: 20, flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
               onPress={() => router.back()}
-              style={[st.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-              <IconSymbol name="chevron.left" size={17} color={c.sub} />
+              style={st.backBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <IconSymbol name="chevron.left" size={20} color={c.text} />
             </TouchableOpacity>
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={[st.pageTitle, { color: c.text }]}>Дані</Text>
-              <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Управління збереженими даними</Text>
-            </View>
+            <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 8 }]}>Управління даними</Text>
           </View>
 
           {/* Stats grid */}
@@ -273,6 +271,7 @@ export default function DataScreen() {
 const st = StyleSheet.create({
   pageTitle:   { fontSize: 28, fontWeight: '800', letterSpacing: -0.7 },
   headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  backBtn:     { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10, marginLeft: 2 },
   statCard:    { borderRadius: 16, borderWidth: 1, padding: 14, overflow: 'hidden' },
   statIcon:    { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

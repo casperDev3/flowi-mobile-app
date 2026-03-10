@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -150,6 +150,8 @@ export default function TasksScreen() {
   const [newEstMins, setNewEstMins] = useState('');
   const [newDeadline, setNewDeadline] = useState<string | null>(null);
   const [newProjectId, setNewProjectId] = useState<string | null>(null);
+  const [showNewProjectDropdown, setShowNewProjectDropdown] = useState(false);
+  const [showDetailProjectDropdown, setShowDetailProjectDropdown] = useState(false);
   const [showDeadlineCal, setShowDeadlineCal] = useState(false);
   const [deadlineCalYear, setDeadlineCalYear] = useState(today.getFullYear());
   const [deadlineCalMonth, setDeadlineCalMonth] = useState(today.getMonth());
@@ -162,12 +164,12 @@ export default function TasksScreen() {
   const [calMonth, setCalMonth] = useState(today.getMonth());
   const [dateFilter, setDateFilter] = useState<string | null>(null);
 
-  // Subtask context menu
-  const [subtaskMenu, setSubtaskMenu] = useState<{ taskId: string; sub: SubTask; idx: number; total: number } | null>(null);
-  const [editSubState, setEditSubState] = useState<{ taskId: string; sub: SubTask; text: string } | null>(null);
+  // Inline subtask editing (no nested Modal — prevents iOS freeze)
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editingSubText, setEditingSubText] = useState('');
 
-  // Load from storage
-  useEffect(() => {
+  // Load from storage (useFocusEffect refreshes when returning from subtasks screen)
+  useFocusEffect(useCallback(() => {
     Promise.all([
       loadData<Task[]>('tasks', []),
       loadData<Project[]>('projects', []),
@@ -176,16 +178,18 @@ export default function TasksScreen() {
       setProjects(p);
       setInitialized(true);
     });
-  }, []);
+  }, []));
 
   // Save to storage
   useEffect(() => {
     if (initialized) saveData('tasks', tasks);
   }, [tasks, initialized]);
 
-  const doneCount   = tasks.filter(t => t.status === 'done').length;
-  const activeCount = tasks.filter(t => t.status === 'active').length;
-  const efficiency  = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
+  const todayStr = today.toDateString();
+  const todayTasks  = tasks.filter(t => new Date(t.createdAt).toDateString() === todayStr);
+  const doneCount   = todayTasks.filter(t => t.status === 'done').length;
+  const activeCount = todayTasks.filter(t => t.status === 'active').length;
+  const efficiency  = todayTasks.length ? Math.round((doneCount / todayTasks.length) * 100) : 0;
   const totalSubtasks = tasks.reduce((acc, t) => acc + t.subtasks.length, 0);
   const doneSubtasks  = tasks.reduce((acc, t) => acc + t.subtasks.filter(s => s.done).length, 0);
 
@@ -285,12 +289,12 @@ export default function TasksScreen() {
     }, ...p]);
     setNewTitle(''); setNewDesc(''); setNewPriority('medium');
     setNewEstHours(''); setNewEstMins(''); setNewDeadline(null);
-    setNewProjectId(null); setShowDeadlineCal(false); setShowAdd(false);
+    setNewProjectId(null); setShowDeadlineCal(false); setShowNewProjectDropdown(false); setShowAdd(false);
   }, [newTitle, newDesc, newPriority, newEstHours, newEstMins, newDeadline, newProjectId]);
 
   const deleteTask = useCallback((id: string) => {
     setTasks(p => p.filter(t => t.id !== id));
-    if (selected?.id === id) setSelected(null);
+    if (selected?.id === id) { setSelected(null); setShowDetailProjectDropdown(false); }
   }, [selected]);
 
   const toggleTask = useCallback((id: string) => {
@@ -356,20 +360,27 @@ export default function TasksScreen() {
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
   }, []);
 
-  const confirmEditSub = useCallback(() => {
-    if (!editSubState || !editSubState.text.trim()) return;
-    const { taskId, sub, text } = editSubState;
+  const saveSubEdit = useCallback((taskId: string, subId: string, text: string) => {
+    if (!text.trim()) { setEditingSubId(null); return; }
     const patch = (t: Task): Task => t.id !== taskId ? t : {
-      ...t, subtasks: t.subtasks.map(s => s.id !== sub.id ? s : { ...s, title: text.trim() }),
+      ...t, subtasks: t.subtasks.map(s => s.id !== subId ? s : { ...s, title: text.trim() }),
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-    setEditSubState(null);
-  }, [editSubState]);
+    setEditingSubId(null);
+  }, []);
 
   const showSubtaskActions = useCallback((taskId: string, sub: SubTask, idx: number, total: number) => {
-    setSubtaskMenu({ taskId, sub, idx, total });
-  }, []);
+    const buttons: any[] = [
+      { text: 'Редагувати', onPress: () => { setEditingSubId(sub.id); setEditingSubText(sub.title); } },
+      { text: 'Дублювати', onPress: () => duplicateSubtask(taskId, sub) },
+      ...(idx > 0 ? [{ text: 'Перемістити вгору', onPress: () => moveSubtask(taskId, sub.id, 'up') }] : []),
+      ...(idx < total - 1 ? [{ text: 'Перемістити вниз', onPress: () => moveSubtask(taskId, sub.id, 'down') }] : []),
+      { text: 'Видалити', style: 'destructive' as const, onPress: () => deleteSubtask(taskId, sub.id) },
+      { text: 'Скасувати', style: 'cancel' as const },
+    ];
+    Alert.alert(sub.title, undefined, buttons);
+  }, [duplicateSubtask, moveSubtask, deleteSubtask]);
 
   const updateTaskProject = useCallback((taskId: string, projectId: string | null) => {
     const patch = (t: Task): Task => t.id !== taskId ? t : { ...t, projectId: projectId ?? undefined };
@@ -552,9 +563,9 @@ export default function TasksScreen() {
           {/* Stats */}
           <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
             <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
-              <StatCell value={activeCount}        label="Активні"      color={c.accent}  sub={c.sub} />
+              <StatCell value={activeCount}        label="Сьогодні"     color={c.accent}  sub={c.sub} />
               <View style={{ width: 1, backgroundColor: c.border }} />
-              <StatCell value={doneCount}          label="Виконані"     color="#10B981"   sub={c.sub} />
+              <StatCell value={doneCount}          label="Виконано"     color="#10B981"   sub={c.sub} />
               <View style={{ width: 1, backgroundColor: c.border }} />
               <StatCell value={`${efficiency}%`}  label="Ефективність" color={c.accent}  sub={c.sub} />
             </View>
@@ -950,24 +961,43 @@ export default function TasksScreen() {
                   {projects.length > 0 && (
                     <>
                       <Text style={[s.label, { color: c.sub }]}>Проект</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={{ flexDirection: 'row', gap: 7 }}>
+                      {/* Dropdown trigger */}
+                      <TouchableOpacity
+                        onPress={() => setShowNewProjectDropdown(v => !v)}
+                        style={[s.dropdownBtn, { backgroundColor: c.dim, borderColor: showNewProjectDropdown ? c.accent : c.border }]}>
+                        {(() => {
+                          const sel = projects.find(p => p.id === newProjectId);
+                          return sel ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
+                              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
+                              <Text style={{ color: sel.color, fontSize: 13, fontWeight: '600', flex: 1 }}>{sel.name}</Text>
+                            </View>
+                          ) : (
+                            <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', flex: 1 }}>Без проекту</Text>
+                          );
+                        })()}
+                        <IconSymbol name={showNewProjectDropdown ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
+                      </TouchableOpacity>
+                      {showNewProjectDropdown && (
+                        <View style={[s.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
                           <TouchableOpacity
-                            onPress={() => setNewProjectId(null)}
-                            style={[s.sortChip, { backgroundColor: !newProjectId ? c.accent + '20' : c.dim, borderColor: !newProjectId ? c.accent : c.border }]}>
-                            <Text style={{ color: !newProjectId ? c.accent : c.sub, fontSize: 12, fontWeight: '600' }}>Без проекту</Text>
+                            onPress={() => { setNewProjectId(null); setShowNewProjectDropdown(false); }}
+                            style={[s.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !newProjectId ? c.accent + '12' : 'transparent' }]}>
+                            <Text style={{ color: !newProjectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>Без проекту</Text>
+                            {!newProjectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
                           </TouchableOpacity>
-                          {projects.map(p => (
+                          {projects.map((p, i) => (
                             <TouchableOpacity
                               key={p.id}
-                              onPress={() => setNewProjectId(p.id === newProjectId ? null : p.id)}
-                              style={[s.sortChip, { backgroundColor: newProjectId === p.id ? p.color + '20' : c.dim, borderColor: newProjectId === p.id ? p.color : c.border }]}>
-                              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: newProjectId === p.id ? p.color : c.sub }} />
-                              <Text style={{ color: newProjectId === p.id ? p.color : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{p.name}</Text>
+                              onPress={() => { setNewProjectId(p.id); setShowNewProjectDropdown(false); }}
+                              style={[s.dropdownItem, { borderBottomWidth: i < projects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: newProjectId === p.id ? p.color + '12' : 'transparent' }]}>
+                              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: p.color, marginRight: 8 }} />
+                              <Text style={{ color: newProjectId === p.id ? p.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{p.name}</Text>
+                              {newProjectId === p.id && <IconSymbol name="checkmark" size={13} color={p.color} />}
                             </TouchableOpacity>
                           ))}
                         </View>
-                      </ScrollView>
+                      )}
                     </>
                   )}
 
@@ -1131,36 +1161,43 @@ export default function TasksScreen() {
                           <IconSymbol name="folder" size={12} color={c.sub} />
                           <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0 }]}>ПРОЕКТ</Text>
                         </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                          <View style={{ flexDirection: 'row', gap: 7 }}>
+                        {/* Dropdown trigger */}
+                        <TouchableOpacity
+                          onPress={() => setShowDetailProjectDropdown(v => !v)}
+                          style={[s.dropdownBtn, { backgroundColor: c.dim, borderColor: showDetailProjectDropdown ? c.accent : c.border }]}>
+                          {(() => {
+                            const sel = projects.find(p => p.id === selectedTask.projectId);
+                            return sel ? (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
+                                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
+                                <Text style={{ color: sel.color, fontSize: 13, fontWeight: '600', flex: 1 }}>{sel.name}</Text>
+                              </View>
+                            ) : (
+                              <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', flex: 1 }}>Без проекту</Text>
+                            );
+                          })()}
+                          <IconSymbol name={showDetailProjectDropdown ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
+                        </TouchableOpacity>
+                        {showDetailProjectDropdown && (
+                          <View style={[s.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
                             <TouchableOpacity
-                              onPress={() => updateTaskProject(selectedTask.id, null)}
-                              style={[s.sortChip, {
-                                backgroundColor: !selectedTask.projectId ? c.accent + '20' : c.dim,
-                                borderColor: !selectedTask.projectId ? c.accent : c.border,
-                              }]}>
-                              {!selectedTask.projectId && <IconSymbol name="checkmark" size={11} color={c.accent} />}
-                              <Text style={{ color: !selectedTask.projectId ? c.accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: !selectedTask.projectId ? 4 : 0 }}>
-                                Без проекту
-                              </Text>
+                              onPress={() => { updateTaskProject(selectedTask.id, null); setShowDetailProjectDropdown(false); }}
+                              style={[s.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !selectedTask.projectId ? c.accent + '12' : 'transparent' }]}>
+                              <Text style={{ color: !selectedTask.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>Без проекту</Text>
+                              {!selectedTask.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
                             </TouchableOpacity>
-                            {projects.map(proj => (
+                            {projects.map((proj, i) => (
                               <TouchableOpacity
                                 key={proj.id}
-                                onPress={() => updateTaskProject(selectedTask.id, proj.id)}
-                                style={[s.sortChip, {
-                                  backgroundColor: selectedTask.projectId === proj.id ? proj.color + '20' : c.dim,
-                                  borderColor: selectedTask.projectId === proj.id ? proj.color : c.border,
-                                }]}>
-                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: selectedTask.projectId === proj.id ? proj.color : c.sub }} />
-                                {selectedTask.projectId === proj.id && <IconSymbol name="checkmark" size={11} color={proj.color} style={{ marginLeft: 4 }} />}
-                                <Text style={{ color: selectedTask.projectId === proj.id ? proj.color : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>
-                                  {proj.name}
-                                </Text>
+                                onPress={() => { updateTaskProject(selectedTask.id, proj.id); setShowDetailProjectDropdown(false); }}
+                                style={[s.dropdownItem, { borderBottomWidth: i < projects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: selectedTask.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
+                                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: proj.color, marginRight: 8 }} />
+                                <Text style={{ color: selectedTask.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
+                                {selectedTask.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
                               </TouchableOpacity>
                             ))}
                           </View>
-                        </ScrollView>
+                        )}
                       </View>
                     )}
 
@@ -1180,42 +1217,89 @@ export default function TasksScreen() {
                       </Text>
                     </View>
 
-                    <View style={{ gap: 7 }}>
-                      {selectedTask.subtasks.map((sub, idx) => (
-                        <TouchableOpacity
-                          key={sub.id}
-                          activeOpacity={0.7}
-                          onPress={() => toggleSubtask(selectedTask.id, sub.id)}
-                          onLongPress={() => showSubtaskActions(selectedTask.id, sub, idx, selectedTask.subtasks.length)}
-                          delayLongPress={350}
-                          style={[s.subRow, { backgroundColor: c.dim, borderColor: sub.done ? '#10B98130' : c.border }]}>
-                          <View style={[s.subCheck, { borderColor: sub.done ? '#10B981' : c.border, backgroundColor: sub.done ? '#10B981' : 'transparent' }]}>
-                            {sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
+                    {(() => {
+                      // completed subtasks go to end
+                      const sortedSubs = [...selectedTask.subtasks].sort((a, b) => Number(a.done) - Number(b.done));
+                      const LIMIT = 4;
+                      const hasMore = sortedSubs.length > LIMIT;
+                      const displaySubs = hasMore ? sortedSubs.slice(0, LIMIT) : sortedSubs;
+                      return (
+                        <View style={{ gap: 7 }}>
+                          {displaySubs.map((sub) => {
+                            const originalIdx = selectedTask.subtasks.findIndex(s => s.id === sub.id);
+                            if (editingSubId === sub.id) {
+                              return (
+                                <View key={sub.id} style={[s.subRow, { backgroundColor: c.dim, borderColor: c.accent + '80' }]}>
+                                  <View style={[s.subCheck, { borderColor: c.accent, backgroundColor: 'transparent' }]} />
+                                  <TextInput
+                                    value={editingSubText}
+                                    onChangeText={setEditingSubText}
+                                    autoFocus
+                                    onSubmitEditing={() => saveSubEdit(selectedTask.id, sub.id, editingSubText)}
+                                    returnKeyType="done"
+                                    style={[s.subTitle, { color: c.text, flex: 1, marginHorizontal: 10 }]}
+                                  />
+                                  <TouchableOpacity onPress={() => saveSubEdit(selectedTask.id, sub.id, editingSubText)}>
+                                    <IconSymbol name="checkmark.circle.fill" size={20} color={c.accent} />
+                                  </TouchableOpacity>
+                                </View>
+                              );
+                            }
+                            return (
+                              <TouchableOpacity
+                                key={sub.id}
+                                activeOpacity={0.7}
+                                onPress={() => toggleSubtask(selectedTask.id, sub.id)}
+                                onLongPress={() => showSubtaskActions(selectedTask.id, sub, originalIdx, selectedTask.subtasks.length)}
+                                delayLongPress={350}
+                                style={[s.subRow, { backgroundColor: c.dim, borderColor: sub.done ? '#10B98130' : c.border }]}>
+                                <View style={[s.subCheck, { borderColor: sub.done ? '#10B981' : c.border, backgroundColor: sub.done ? '#10B981' : 'transparent' }]}>
+                                  {sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
+                                </View>
+                                <Text style={[s.subTitle, { color: sub.done ? c.sub : c.text, textDecorationLine: sub.done ? 'line-through' : 'none', flex: 1, marginHorizontal: 10 }]}>{sub.title}</Text>
+                                <TouchableOpacity onPress={() => showSubtaskActions(selectedTask.id, sub, originalIdx, selectedTask.subtasks.length)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                  <IconSymbol name="ellipsis" size={14} color={c.sub} />
+                                </TouchableOpacity>
+                              </TouchableOpacity>
+                            );
+                          })}
+
+                          {hasMore && (
+                            <TouchableOpacity
+                              onPress={() => {
+                                setSelected(null);
+                                setEditingSubId(null);
+                                router.push({ pathname: '/subtasks', params: { taskId: selectedTask.id } });
+                              }}
+                              style={[s.viewAllBtn, { backgroundColor: c.accent + '12', borderColor: c.accent + '40' }]}>
+                              <IconSymbol name="list.bullet" size={14} color={c.accent} />
+                              <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 8 }}>
+                                Переглянути всі · {selectedTask.subtasks.length}
+                              </Text>
+                              <IconSymbol name="chevron.right" size={12} color={c.accent} />
+                            </TouchableOpacity>
+                          )}
+
+                          <View style={[s.addSubRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+                            <IconSymbol name="plus" size={15} color={c.sub} />
+                            <TextInput
+                              placeholder="Додати підзавдання..."
+                              placeholderTextColor={c.sub}
+                              value={newSubtask}
+                              onChangeText={setNewSubtask}
+                              onSubmitEditing={() => addSubtask(selectedTask.id)}
+                              returnKeyType="done"
+                              style={[s.subInput, { color: c.text, flex: 1, marginLeft: 8 }]}
+                            />
+                            {newSubtask.trim() ? (
+                              <TouchableOpacity onPress={() => addSubtask(selectedTask.id)}>
+                                <IconSymbol name="checkmark.circle.fill" size={20} color={c.accent} />
+                              </TouchableOpacity>
+                            ) : null}
                           </View>
-                          <Text style={[s.subTitle, { color: sub.done ? c.sub : c.text, textDecorationLine: sub.done ? 'line-through' : 'none', flex: 1, marginHorizontal: 10 }]}>{sub.title}</Text>
-                          <TouchableOpacity onPress={() => showSubtaskActions(selectedTask.id, sub, idx, selectedTask.subtasks.length)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <IconSymbol name="ellipsis" size={14} color={c.sub} />
-                          </TouchableOpacity>
-                        </TouchableOpacity>
-                      ))}
-                      <View style={[s.addSubRow, { borderColor: c.border, backgroundColor: c.dim }]}>
-                        <IconSymbol name="plus" size={15} color={c.sub} />
-                        <TextInput
-                          placeholder="Додати підзавдання..."
-                          placeholderTextColor={c.sub}
-                          value={newSubtask}
-                          onChangeText={setNewSubtask}
-                          onSubmitEditing={() => addSubtask(selectedTask.id)}
-                          returnKeyType="done"
-                          style={[s.subInput, { color: c.text, flex: 1, marginLeft: 8 }]}
-                        />
-                        {newSubtask.trim() ? (
-                          <TouchableOpacity onPress={() => addSubtask(selectedTask.id)}>
-                            <IconSymbol name="checkmark.circle.fill" size={20} color={c.accent} />
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-                    </View>
+                        </View>
+                      );
+                    })()}
 
                     {selectedTask.status === 'active' && (
                       <TouchableOpacity
@@ -1247,151 +1331,7 @@ export default function TasksScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ─── Subtask Context Menu ─── */}
-      <Modal visible={!!subtaskMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSubtaskMenu(null)}>
-        <Pressable style={[s.overlay, { justifyContent: 'flex-end' }]} onPress={() => setSubtaskMenu(null)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-            {subtaskMenu && (
-              <BlurView intensity={isDark ? 60 : 80} tint={isDark ? 'dark' : 'light'} style={[s.contextMenu, { borderColor: c.border, backgroundColor: c.sheet }]}>
-                {/* Title */}
-                <View style={[s.contextHeader, { borderBottomColor: c.border }]}>
-                  <View style={[s.subCheck, { borderColor: subtaskMenu.sub.done ? '#10B981' : c.border, backgroundColor: subtaskMenu.sub.done ? '#10B981' : 'transparent' }]}>
-                    {subtaskMenu.sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
-                  </View>
-                  <Text style={[s.contextTitle, { color: c.text }]} numberOfLines={2}>{subtaskMenu.sub.title}</Text>
-                </View>
-
-                {/* Actions */}
-                <View style={{ gap: 2 }}>
-                  <ContextMenuItem
-                    icon="pencil"
-                    label="Редагувати"
-                    color={c.text}
-                    iconColor={c.accent}
-                    bgColor={c.accent + '12'}
-                    onPress={() => {
-                      setSubtaskMenu(null);
-                      setEditSubState({ taskId: subtaskMenu.taskId, sub: subtaskMenu.sub, text: subtaskMenu.sub.title });
-                    }}
-                    c={c}
-                  />
-                  <ContextMenuItem
-                    icon="doc.on.doc"
-                    label="Дублювати"
-                    color={c.text}
-                    iconColor="#6366F1"
-                    bgColor="#6366F112"
-                    onPress={() => {
-                      duplicateSubtask(subtaskMenu.taskId, subtaskMenu.sub);
-                      setSubtaskMenu(null);
-                    }}
-                    c={c}
-                  />
-                  <View style={{ height: 1, backgroundColor: c.border, marginVertical: 4 }} />
-                  <ContextMenuItem
-                    icon="arrow.up"
-                    label="Перемістити вгору"
-                    color={c.text}
-                    iconColor="#F59E0B"
-                    bgColor="#F59E0B12"
-                    disabled={subtaskMenu.idx === 0}
-                    onPress={() => {
-                      moveSubtask(subtaskMenu.taskId, subtaskMenu.sub.id, 'up');
-                      setSubtaskMenu(prev => prev ? { ...prev, idx: prev.idx - 1 } : null);
-                    }}
-                    c={c}
-                  />
-                  <ContextMenuItem
-                    icon="arrow.down"
-                    label="Перемістити вниз"
-                    color={c.text}
-                    iconColor="#F59E0B"
-                    bgColor="#F59E0B12"
-                    disabled={subtaskMenu.idx === subtaskMenu.total - 1}
-                    onPress={() => {
-                      moveSubtask(subtaskMenu.taskId, subtaskMenu.sub.id, 'down');
-                      setSubtaskMenu(prev => prev ? { ...prev, idx: prev.idx + 1 } : null);
-                    }}
-                    c={c}
-                  />
-                  <View style={{ height: 1, backgroundColor: c.border, marginVertical: 4 }} />
-                  <ContextMenuItem
-                    icon="trash"
-                    label="Видалити"
-                    color="#EF4444"
-                    iconColor="#EF4444"
-                    bgColor="#EF444415"
-                    onPress={() => {
-                      deleteSubtask(subtaskMenu.taskId, subtaskMenu.sub.id);
-                      setSubtaskMenu(null);
-                    }}
-                    c={c}
-                  />
-                </View>
-
-                {/* Cancel */}
-                <TouchableOpacity
-                  onPress={() => setSubtaskMenu(null)}
-                  style={[s.contextCancel, { backgroundColor: c.dim, borderColor: c.border }]}>
-                  <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600' }}>Скасувати</Text>
-                </TouchableOpacity>
-              </BlurView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* ─── Edit Subtask Modal ─── */}
-      <Modal visible={!!editSubState} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditSubState(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setEditSubState(null)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-                <Text style={[s.sheetTitle, { color: c.text, marginBottom: 14 }]}>Редагувати підзавдання</Text>
-                <TextInput
-                  value={editSubState?.text ?? ''}
-                  onChangeText={t => setEditSubState(prev => prev ? { ...prev, text: t } : null)}
-                  placeholder="Назва підзавдання"
-                  placeholderTextColor={c.sub}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={confirmEditSub}
-                  style={[s.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border, borderWidth: 1 }]}
-                />
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-                  <TouchableOpacity onPress={() => setEditSubState(null)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={confirmEditSub} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>Зберегти</Text>
-                  </TouchableOpacity>
-                </View>
-              </BlurView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
-  );
-}
-
-// ─── Context Menu Item ────────────────────────────────────────────────────────
-function ContextMenuItem({ icon, label, color, iconColor, bgColor, onPress, disabled, c }: {
-  icon: string; label: string; color: string; iconColor: string; bgColor: string;
-  onPress: () => void; disabled?: boolean; c: any;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.65}
-      style={[s.contextItem, { opacity: disabled ? 0.35 : 1 }]}>
-      <View style={[s.contextIconWrap, { backgroundColor: bgColor }]}>
-        <IconSymbol name={icon as any} size={16} color={iconColor} />
-      </View>
-      <Text style={{ color, fontSize: 15, fontWeight: '500', flex: 1, marginLeft: 13 }}>{label}</Text>
-      <IconSymbol name="chevron.right" size={12} color={c.sub} style={{ opacity: 0.5 }} />
-    </TouchableOpacity>
   );
 }
 
@@ -1403,7 +1343,7 @@ function CompactCard({ task, onPress, onToggle, c, isDark, projects }: {
   const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
-      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.compactCard, { borderColor: overdue ? '#EF444450' : c.border }]}>
+      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={s.compactCard}>
         <TouchableOpacity
           onPress={e => { e.stopPropagation(); onToggle(); }}
           style={[s.subCheck, { borderColor: task.status === 'done' ? '#10B981' : c.border, backgroundColor: task.status === 'done' ? '#10B981' : 'transparent' }]}>
@@ -1412,13 +1352,16 @@ function CompactCard({ task, onPress, onToggle, c, isDark, projects }: {
         <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1, marginHorizontal: 10, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }} numberOfLines={1}>
           {task.title}
         </Text>
-        {proj && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: proj.color, marginRight: 6 }} />}
         {task.deadline && (
           <Text style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 10, fontWeight: '600', marginRight: 8 }}>
             {deadlineLabel(task.deadline)}
           </Text>
         )}
-        <View style={[s.dot, { backgroundColor: PRIORITY[task.priority].color }]} />
+        {/* Grouped dots: priority + project */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={[s.dot, { backgroundColor: PRIORITY[task.priority].color }]} />
+          {proj && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: proj.color }} />}
+        </View>
       </BlurView>
     </TouchableOpacity>
   );
@@ -1431,7 +1374,7 @@ function BoardCard({ task, onPress, onToggle, c, isDark }: {
   const overdue = isOverdue(task);
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={{ marginBottom: 8 }}>
-      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.boardCard, { borderColor: overdue ? '#EF444450' : c.border }]}>
+      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={s.boardCard}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 7 }}>
           <TouchableOpacity
             onPress={e => { e.stopPropagation(); onToggle(); }}
@@ -1531,8 +1474,8 @@ const s = StyleSheet.create({
   sortLabel:      { fontSize: 12, fontWeight: '600' },
   groupLabel:     { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 6 },
   taskCard:       { borderRadius: 16, borderWidth: 1, padding: 14, overflow: 'hidden' },
-  compactCard:    { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  boardCard:      { borderRadius: 13, borderWidth: 1, padding: 11, overflow: 'hidden' },
+  compactCard:    { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  boardCard:      { borderRadius: 13, padding: 11, overflow: 'hidden' },
   taskTitle:      { fontSize: 14, fontWeight: '600' },
   checkbox:       { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   dot:            { width: 8, height: 8, borderRadius: 4 },
@@ -1571,11 +1514,8 @@ const s = StyleSheet.create({
   // Filter sheet
   filterActionBtn:{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
   filterSegBtn:   { paddingVertical: 11, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  // Subtask context menu
-  contextMenu:    { borderRadius: 24, borderWidth: 1, padding: 16, overflow: 'hidden' },
-  contextHeader:  { flexDirection: 'row', alignItems: 'center', paddingBottom: 14, marginBottom: 10, borderBottomWidth: 1 },
-  contextTitle:   { fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 10, lineHeight: 20 },
-  contextItem:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 },
-  contextIconWrap:{ width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  contextCancel:  { marginTop: 12, paddingVertical: 13, borderRadius: 14, borderWidth: 1, alignItems: 'center' },
+  viewAllBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11 },
+  dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
+  dropdownList:   { borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
+  dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 11 },
 });

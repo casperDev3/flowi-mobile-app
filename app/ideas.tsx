@@ -23,135 +23,154 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
 
-type Severity = 'critical' | 'major' | 'minor';
+type IdeaPriority = 'high' | 'medium' | 'low';
+type IdeaStatus = 'idea' | 'planned' | 'done';
 
-interface Bug {
+interface Idea {
   id: string;
   title: string;
   description: string;
-  severity: Severity;
-  fixed: boolean;
+  priority: IdeaPriority;
+  status: IdeaStatus;
   createdAt: string;
 }
 
-const SEVERITY: Record<Severity, { label: string; color: string; icon: string }> = {
-  critical: { label: 'Критичний', color: '#EF4444', icon: 'exclamationmark.triangle.fill' },
-  major:    { label: 'Важливий',  color: '#F59E0B', icon: 'exclamationmark.circle.fill' },
-  minor:    { label: 'Незначний', color: '#6366F1', icon: 'info.circle.fill' },
+const PRIORITY: Record<IdeaPriority, { label: string; color: string; icon: string }> = {
+  high:   { label: 'Важлива',  color: '#8B5CF6', icon: 'bolt.fill' },
+  medium: { label: 'Звичайна', color: '#0EA5E9', icon: 'circle.fill' },
+  low:    { label: 'Колись',   color: '#6B7280', icon: 'clock.fill' },
 };
 
-export default function BugsScreen() {
+const STATUS_CYCLE: Record<IdeaStatus, IdeaStatus> = {
+  idea: 'planned',
+  planned: 'done',
+  done: 'idea',
+};
+
+const STATUS_LABELS: Record<IdeaStatus, string> = {
+  idea: 'Ідея',
+  planned: 'В планах',
+  done: 'Реалізовано',
+};
+
+export default function IdeasScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
-  const [bugs, setBugs] = useState<Bug[]>([]);
+  const [ideas, setIdeas] = useState<Idea[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'open' | 'fixed'>('all');
+  const [filter, setFilter] = useState<'all' | 'idea' | 'planned' | 'done'>('all');
 
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
-  const [newSeverity, setNewSeverity] = useState<Severity>('major');
+  const [newPriority, setNewPriority] = useState<IdeaPriority>('medium');
 
-  // Edit state
   const [showEdit, setShowEdit] = useState(false);
-  const [editingBug, setEditingBug] = useState<Bug | null>(null);
+  const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
-  const [editSeverity, setEditSeverity] = useState<Severity>('major');
+  const [editPriority, setEditPriority] = useState<IdeaPriority>('medium');
 
   const c = {
-    bg1:    isDark ? '#0C0C14' : '#FFF5F5',
-    bg2:    isDark ? '#14121E' : '#FFE8E8',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.80)',
+    bg1:    isDark ? '#0C0C14' : '#F5F0FF',
+    bg2:    isDark ? '#14121E' : '#EDE8FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
     sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
-    accent: '#EF4444',
+    accent: '#8B5CF6',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(255,250,250,0.98)',
+    sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
   };
 
   useEffect(() => {
-    loadData<Bug[]>('bugs', []).then(data => {
-      setBugs(data);
+    loadData<Idea[]>('ideas', []).then(data => {
+      setIdeas(data);
       setInitialized(true);
     });
   }, []);
 
   useEffect(() => {
-    if (initialized) saveData('bugs', bugs);
-  }, [bugs, initialized]);
+    if (initialized) saveData('ideas', ideas);
+  }, [ideas, initialized]);
 
-  const filtered = bugs.filter(b => {
-    if (filter === 'open') return !b.fixed;
-    if (filter === 'fixed') return b.fixed;
-    return true;
-  });
+  const filtered = ideas.filter(i => filter === 'all' || i.status === filter);
 
-  const openCount  = bugs.filter(b => !b.fixed).length;
-  const fixedCount = bugs.filter(b => b.fixed).length;
+  const ideaCount    = ideas.filter(i => i.status === 'idea').length;
+  const plannedCount = ideas.filter(i => i.status === 'planned').length;
+  const doneCount    = ideas.filter(i => i.status === 'done').length;
 
-  const addBug = useCallback(() => {
+  const addIdea = useCallback(() => {
     if (!newTitle.trim()) return;
-    const bug: Bug = {
+    const idea: Idea = {
       id: Date.now().toString(),
       title: newTitle.trim(),
       description: newDesc.trim(),
-      severity: newSeverity,
-      fixed: false,
+      priority: newPriority,
+      status: 'idea',
       createdAt: new Date().toISOString(),
     };
-    setBugs(p => [bug, ...p]);
-    setNewTitle('');
-    setNewDesc('');
-    setNewSeverity('major');
+    setIdeas(p => [idea, ...p]);
+    setNewTitle(''); setNewDesc(''); setNewPriority('medium');
     setShowAdd(false);
-  }, [newTitle, newDesc, newSeverity]);
+  }, [newTitle, newDesc, newPriority]);
 
-  const toggleFixed = useCallback((id: string) => {
-    setBugs(p => p.map(b => b.id === id ? { ...b, fixed: !b.fixed } : b));
+  const cycleStatus = useCallback((id: string) => {
+    setIdeas(p => p.map(i => i.id === id ? { ...i, status: STATUS_CYCLE[i.status] } : i));
   }, []);
 
-  const deleteBug = useCallback((id: string) => {
-    Alert.alert('Видалити баг?', 'Цю дію не можна скасувати.', [
+  const deleteIdea = useCallback((id: string) => {
+    Alert.alert('Видалити ідею?', 'Цю дію не можна скасувати.', [
       { text: 'Скасувати', style: 'cancel' },
-      { text: 'Видалити', style: 'destructive', onPress: () => setBugs(p => p.filter(b => b.id !== id)) },
+      { text: 'Видалити', style: 'destructive', onPress: () => setIdeas(p => p.filter(i => i.id !== id)) },
     ]);
   }, []);
 
-  const openEdit = useCallback((bug: Bug) => {
-    setEditingBug(bug);
-    setEditTitle(bug.title);
-    setEditDesc(bug.description);
-    setEditSeverity(bug.severity);
+  const openEdit = useCallback((idea: Idea) => {
+    setEditingIdea(idea);
+    setEditTitle(idea.title);
+    setEditDesc(idea.description);
+    setEditPriority(idea.priority);
     setShowEdit(true);
   }, []);
 
   const saveEdit = useCallback(() => {
-    if (!editTitle.trim() || !editingBug) return;
-    setBugs(p => p.map(b => b.id === editingBug.id
-      ? { ...b, title: editTitle.trim(), description: editDesc.trim(), severity: editSeverity }
-      : b));
+    if (!editTitle.trim() || !editingIdea) return;
+    setIdeas(p => p.map(i => i.id === editingIdea.id
+      ? { ...i, title: editTitle.trim(), description: editDesc.trim(), priority: editPriority }
+      : i));
     setShowEdit(false);
-    setEditingBug(null);
-  }, [editTitle, editDesc, editSeverity, editingBug]);
+    setEditingIdea(null);
+  }, [editTitle, editDesc, editPriority, editingIdea]);
 
-  const copyToClipboard = useCallback(async (bug: Bug) => {
-    const text = bug.description ? `${bug.title}\n${bug.description}` : bug.title;
+  const copyToClipboard = useCallback(async (idea: Idea) => {
+    const text = idea.description ? `${idea.title}\n${idea.description}` : idea.title;
     await Clipboard.setStringAsync(text);
     Alert.alert('Скопійовано', 'Заголовок та опис скопійовано в буфер обміну.');
   }, []);
 
-  const showBugActions = useCallback((bug: Bug) => {
-    Alert.alert(bug.title, undefined, [
-      { text: 'Редагувати', onPress: () => openEdit(bug) },
-      { text: 'Копіювати текст', onPress: () => copyToClipboard(bug) },
-      { text: bug.fixed ? 'Відкрити знову' : 'Позначити виправленим', onPress: () => toggleFixed(bug.id) },
-      { text: 'Видалити', style: 'destructive', onPress: () => deleteBug(bug.id) },
+  const showIdeaActions = useCallback((idea: Idea) => {
+    const nextLabel = STATUS_LABELS[STATUS_CYCLE[idea.status]];
+    Alert.alert(idea.title, undefined, [
+      { text: 'Редагувати', onPress: () => openEdit(idea) },
+      { text: 'Копіювати текст', onPress: () => copyToClipboard(idea) },
+      { text: `→ ${nextLabel}`, onPress: () => cycleStatus(idea.id) },
+      { text: 'Видалити', style: 'destructive', onPress: () => deleteIdea(idea.id) },
       { text: 'Скасувати', style: 'cancel' },
     ]);
-  }, [openEdit, copyToClipboard, toggleFixed, deleteBug]);
+  }, [openEdit, copyToClipboard, cycleStatus, deleteIdea]);
+
+  const STATUS_COLORS: Record<IdeaStatus, string> = {
+    idea: '#8B5CF6',
+    planned: '#0EA5E9',
+    done: '#10B981',
+  };
+
+  const STATUS_ICONS: Record<IdeaStatus, string> = {
+    idea: 'lightbulb',
+    planned: 'calendar',
+    done: 'checkmark',
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -163,7 +182,7 @@ export default function BugsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={st.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <IconSymbol name="chevron.left" size={20} color={c.text} />
           </TouchableOpacity>
-          <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 8 }]}>Список багів</Text>
+          <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 8 }]}>Ідеї</Text>
           <TouchableOpacity onPress={() => setShowAdd(true)} style={[st.addBtn, { backgroundColor: c.accent }]}>
             <IconSymbol name="plus" size={18} color="#fff" />
           </TouchableOpacity>
@@ -171,30 +190,30 @@ export default function BugsScreen() {
 
         {/* Stats row */}
         <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 14, marginTop: 6 }}>
-          <View style={[st.statCard, { backgroundColor: '#EF444418', borderColor: '#EF444430' }]}>
-            <Text style={{ color: '#EF4444', fontSize: 20, fontWeight: '800' }}>{openCount}</Text>
-            <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Відкритих</Text>
+          <View style={[st.statCard, { backgroundColor: '#8B5CF618', borderColor: '#8B5CF630' }]}>
+            <Text style={{ color: '#8B5CF6', fontSize: 20, fontWeight: '800' }}>{ideaCount}</Text>
+            <Text style={{ color: '#8B5CF6', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Ідей</Text>
           </View>
-          <View style={[st.statCard, { backgroundColor: '#10B98118', borderColor: '#10B98130' }]}>
-            <Text style={{ color: '#10B981', fontSize: 20, fontWeight: '800' }}>{fixedCount}</Text>
-            <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Виправлених</Text>
+          <View style={[st.statCard, { backgroundColor: '#0EA5E918', borderColor: '#0EA5E930' }]}>
+            <Text style={{ color: '#0EA5E9', fontSize: 20, fontWeight: '800' }}>{plannedCount}</Text>
+            <Text style={{ color: '#0EA5E9', fontSize: 11, fontWeight: '600', marginTop: 2 }}>В планах</Text>
           </View>
-          <View style={[st.statCard, { backgroundColor: c.dim, borderColor: c.border, flex: 1 }]}>
-            <Text style={{ color: c.text, fontSize: 20, fontWeight: '800' }}>{bugs.length}</Text>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>Всього</Text>
+          <View style={[st.statCard, { backgroundColor: '#10B98118', borderColor: '#10B98130', flex: 1 }]}>
+            <Text style={{ color: '#10B981', fontSize: 20, fontWeight: '800' }}>{doneCount}</Text>
+            <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Готово</Text>
           </View>
         </View>
 
         {/* Filter */}
         <View style={{ paddingHorizontal: 20, marginBottom: 14 }}>
           <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.filterRow, { borderColor: c.border }]}>
-            {(['all', 'open', 'fixed'] as const).map(f => (
+            {(['all', 'idea', 'planned', 'done'] as const).map(f => (
               <TouchableOpacity
                 key={f}
                 onPress={() => setFilter(f)}
                 style={[st.filterBtn, filter === f && { backgroundColor: c.accent }]}>
                 <Text style={[st.filterLabel, { color: filter === f ? '#fff' : c.sub }]}>
-                  {f === 'all' ? 'Всі' : f === 'open' ? 'Відкриті' : 'Виправлені'}
+                  {f === 'all' ? 'Всі' : STATUS_LABELS[f]}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -207,76 +226,76 @@ export default function BugsScreen() {
 
           {filtered.length === 0 && (
             <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
-              <IconSymbol name="ladybug.fill" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, fontWeight: '600' }}>
-                {filter === 'fixed' ? 'Немає виправлених' : filter === 'open' ? 'Немає відкритих багів' : 'Список порожній'}
-              </Text>
-              {filter !== 'fixed' && (
-                <Text style={{ color: c.sub, fontSize: 13, opacity: 0.7 }}>Натисніть + щоб додати баг</Text>
-              )}
+              <IconSymbol name="lightbulb.fill" size={40} color={c.sub} />
+              <Text style={{ color: c.sub, fontSize: 15, fontWeight: '600' }}>Поки немає ідей</Text>
+              <Text style={{ color: c.sub, fontSize: 13, opacity: 0.7 }}>Натисніть + щоб додати ідею</Text>
             </View>
           )}
 
-          {filtered.map(bug => {
-            const sv = SEVERITY[bug.severity];
+          {filtered.map(idea => {
+            const prio = PRIORITY[idea.priority];
+            const statusColor = STATUS_COLORS[idea.status];
+            const statusIcon = STATUS_ICONS[idea.status];
+            const isDone = idea.status === 'done';
             return (
               <TouchableOpacity
-                key={bug.id}
+                key={idea.id}
                 activeOpacity={0.8}
-                onPress={() => toggleFixed(bug.id)}
-                onLongPress={() => showBugActions(bug)}
+                onPress={() => cycleStatus(idea.id)}
+                onLongPress={() => showIdeaActions(idea)}
                 delayLongPress={350}>
-                <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.bugCard, { borderColor: bug.fixed ? '#10B98130' : sv.color + '40', opacity: bug.fixed ? 0.7 : 1 }]}>
+                <BlurView
+                  intensity={isDark ? 18 : 35}
+                  tint={isDark ? 'dark' : 'light'}
+                  style={[st.ideaCard, { borderColor: isDone ? '#10B98130' : statusColor + '40', opacity: isDone ? 0.7 : 1 }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                    {/* Fixed checkbox */}
+                    {/* Status checkbox */}
                     <TouchableOpacity
-                      onPress={() => toggleFixed(bug.id)}
-                      style={[st.check, { borderColor: bug.fixed ? '#10B981' : sv.color, backgroundColor: bug.fixed ? '#10B981' : 'transparent' }]}>
-                      {bug.fixed && <IconSymbol name="checkmark" size={11} color="#fff" />}
+                      onPress={() => cycleStatus(idea.id)}
+                      style={[st.check, { borderColor: statusColor, backgroundColor: isDone ? statusColor : 'transparent' }]}>
+                      <IconSymbol name={statusIcon as any} size={11} color={isDone ? '#fff' : statusColor} />
                     </TouchableOpacity>
 
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <View style={[st.severityBadge, { backgroundColor: sv.color + '20', borderColor: sv.color + '40' }]}>
-                          <IconSymbol name={sv.icon as any} size={10} color={sv.color} />
-                          <Text style={{ color: sv.color, fontSize: 10, fontWeight: '700', marginLeft: 3 }}>{sv.label}</Text>
+                        <View style={[st.badge, { backgroundColor: statusColor + '20', borderColor: statusColor + '40' }]}>
+                          <Text style={{ color: statusColor, fontSize: 10, fontWeight: '700' }}>{STATUS_LABELS[idea.status]}</Text>
                         </View>
-                        {bug.fixed && (
-                          <View style={[st.severityBadge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
-                            <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>Виправлено</Text>
-                          </View>
-                        )}
+                        <View style={[st.badge, { backgroundColor: prio.color + '18', borderColor: prio.color + '35' }]}>
+                          <IconSymbol name={prio.icon as any} size={9} color={prio.color} />
+                          <Text style={{ color: prio.color, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>{prio.label}</Text>
+                        </View>
                       </View>
 
-                      <Text style={[st.bugTitle, { color: c.text, textDecorationLine: bug.fixed ? 'line-through' : 'none' }]}>
-                        {bug.title}
+                      <Text style={[st.ideaTitle, { color: c.text, textDecorationLine: isDone ? 'line-through' : 'none' }]}>
+                        {idea.title}
                       </Text>
-                      {bug.description ? (
-                        <Text style={[st.bugDesc, { color: c.sub }]} numberOfLines={2}>
-                          {bug.description}
+                      {idea.description ? (
+                        <Text style={[st.ideaDesc, { color: c.sub }]} numberOfLines={2}>
+                          {idea.description}
                         </Text>
                       ) : null}
                       <Text style={{ color: c.sub, fontSize: 10, marginTop: 6 }}>
-                        {new Date(bug.createdAt).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(idea.createdAt).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
                       </Text>
                     </View>
 
                     {/* Action buttons */}
                     <View style={{ flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                       <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); openEdit(bug); }}
+                        onPress={e => { e.stopPropagation(); openEdit(idea); }}
                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         style={[st.actionBtn, { backgroundColor: '#6366F115', borderColor: '#6366F130' }]}>
                         <IconSymbol name="pencil" size={13} color="#6366F1" />
                       </TouchableOpacity>
                       <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); copyToClipboard(bug); }}
+                        onPress={e => { e.stopPropagation(); copyToClipboard(idea); }}
                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         style={[st.actionBtn, { backgroundColor: '#0EA5E915', borderColor: '#0EA5E930' }]}>
                         <IconSymbol name="doc.on.clipboard" size={13} color="#0EA5E9" />
                       </TouchableOpacity>
                       <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); deleteBug(bug.id); }}
+                        onPress={e => { e.stopPropagation(); deleteIdea(idea.id); }}
                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         style={[st.actionBtn, { backgroundColor: '#EF444415', borderColor: '#EF444430' }]}>
                         <IconSymbol name="trash" size={13} color="#EF4444" />
@@ -290,7 +309,7 @@ export default function BugsScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Add Bug Modal */}
+      {/* Add Idea Modal */}
       <Modal visible={showAdd} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowAdd(false)}>
@@ -307,11 +326,11 @@ export default function BugsScreen() {
                     </View>
                   </View>
 
-                  <Text style={[st.sheetTitle, { color: c.text }]}>Новий баг</Text>
+                  <Text style={[st.sheetTitle, { color: c.text }]}>Нова ідея</Text>
 
                   <Text style={[st.label, { color: c.sub }]}>НАЗВА</Text>
                   <TextInput
-                    placeholder="Опис помилки..."
+                    placeholder="Ідея або функція..."
                     placeholderTextColor={c.sub}
                     value={newTitle}
                     onChangeText={setNewTitle}
@@ -321,7 +340,7 @@ export default function BugsScreen() {
 
                   <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов'язково)</Text>
                   <TextInput
-                    placeholder="Де виникає, як відтворити..."
+                    placeholder="Опис, мотивація, приклади..."
                     placeholderTextColor={c.sub}
                     value={newDesc}
                     onChangeText={setNewDesc}
@@ -331,20 +350,18 @@ export default function BugsScreen() {
                     style={[st.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border, minHeight: 72 }]}
                   />
 
-                  <Text style={[st.label, { color: c.sub }]}>КРИТИЧНІСТЬ</Text>
+                  <Text style={[st.label, { color: c.sub }]}>ПРІОРИТЕТ</Text>
                   <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
-                    {(Object.entries(SEVERITY) as [Severity, typeof SEVERITY[Severity]][]).map(([key, sv]) => (
+                    {(Object.entries(PRIORITY) as [IdeaPriority, typeof PRIORITY[IdeaPriority]][]).map(([key, p]) => (
                       <TouchableOpacity
                         key={key}
-                        onPress={() => setNewSeverity(key)}
-                        style={[st.severityBtn, {
-                          backgroundColor: newSeverity === key ? sv.color + '20' : c.dim,
-                          borderColor: newSeverity === key ? sv.color : c.border,
-                          borderWidth: newSeverity === key ? 1.5 : 1,
+                        onPress={() => setNewPriority(key)}
+                        style={[st.priorityBtn, {
+                          backgroundColor: newPriority === key ? p.color + '20' : c.dim,
+                          borderColor: newPriority === key ? p.color : c.border,
+                          borderWidth: newPriority === key ? 1.5 : 1,
                         }]}>
-                        <Text style={{ color: newSeverity === key ? sv.color : c.sub, fontSize: 12, fontWeight: '600' }}>
-                          {sv.label}
-                        </Text>
+                        <Text style={{ color: newPriority === key ? p.color : c.sub, fontSize: 12, fontWeight: '600' }}>{p.label}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -354,13 +371,11 @@ export default function BugsScreen() {
                       <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      onPress={addBug}
+                      onPress={addIdea}
                       disabled={!newTitle.trim()}
                       style={[st.btn, { flex: 2, backgroundColor: newTitle.trim() ? c.accent : c.dim }]}>
-                      <IconSymbol name="ladybug.fill" size={15} color={newTitle.trim() ? '#fff' : c.sub} />
-                      <Text style={{ color: newTitle.trim() ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>
-                        Додати баг
-                      </Text>
+                      <IconSymbol name="lightbulb.fill" size={15} color={newTitle.trim() ? '#fff' : c.sub} />
+                      <Text style={{ color: newTitle.trim() ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>Додати ідею</Text>
                     </TouchableOpacity>
                   </View>
                 </ScrollView>
@@ -370,7 +385,7 @@ export default function BugsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Edit Bug Modal */}
+      {/* Edit Idea Modal */}
       <Modal visible={showEdit} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowEdit(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowEdit(false)}>
@@ -387,11 +402,11 @@ export default function BugsScreen() {
                     </View>
                   </View>
 
-                  <Text style={[st.sheetTitle, { color: c.text }]}>Редагувати баг</Text>
+                  <Text style={[st.sheetTitle, { color: c.text }]}>Редагувати ідею</Text>
 
                   <Text style={[st.label, { color: c.sub }]}>НАЗВА</Text>
                   <TextInput
-                    placeholder="Опис помилки..."
+                    placeholder="Ідея або функція..."
                     placeholderTextColor={c.sub}
                     value={editTitle}
                     onChangeText={setEditTitle}
@@ -401,7 +416,7 @@ export default function BugsScreen() {
 
                   <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов'язково)</Text>
                   <TextInput
-                    placeholder="Де виникає, як відтворити..."
+                    placeholder="Опис, мотивація, приклади..."
                     placeholderTextColor={c.sub}
                     value={editDesc}
                     onChangeText={setEditDesc}
@@ -411,20 +426,18 @@ export default function BugsScreen() {
                     style={[st.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border, minHeight: 72 }]}
                   />
 
-                  <Text style={[st.label, { color: c.sub }]}>КРИТИЧНІСТЬ</Text>
+                  <Text style={[st.label, { color: c.sub }]}>ПРІОРИТЕТ</Text>
                   <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
-                    {(Object.entries(SEVERITY) as [Severity, typeof SEVERITY[Severity]][]).map(([key, sv]) => (
+                    {(Object.entries(PRIORITY) as [IdeaPriority, typeof PRIORITY[IdeaPriority]][]).map(([key, p]) => (
                       <TouchableOpacity
                         key={key}
-                        onPress={() => setEditSeverity(key as Severity)}
-                        style={[st.severityBtn, {
-                          backgroundColor: editSeverity === key ? sv.color + '20' : c.dim,
-                          borderColor: editSeverity === key ? sv.color : c.border,
-                          borderWidth: editSeverity === key ? 1.5 : 1,
+                        onPress={() => setEditPriority(key as IdeaPriority)}
+                        style={[st.priorityBtn, {
+                          backgroundColor: editPriority === key ? p.color + '20' : c.dim,
+                          borderColor: editPriority === key ? p.color : c.border,
+                          borderWidth: editPriority === key ? 1.5 : 1,
                         }]}>
-                        <Text style={{ color: editSeverity === key ? sv.color : c.sub, fontSize: 12, fontWeight: '600' }}>
-                          {sv.label}
-                        </Text>
+                        <Text style={{ color: editPriority === key ? p.color : c.sub, fontSize: 12, fontWeight: '600' }}>{p.label}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -436,11 +449,9 @@ export default function BugsScreen() {
                     <TouchableOpacity
                       onPress={saveEdit}
                       disabled={!editTitle.trim()}
-                      style={[st.btn, { flex: 2, backgroundColor: editTitle.trim() ? '#6366F1' : c.dim }]}>
+                      style={[st.btn, { flex: 2, backgroundColor: editTitle.trim() ? c.accent : c.dim }]}>
                       <IconSymbol name="checkmark" size={15} color={editTitle.trim() ? '#fff' : c.sub} />
-                      <Text style={{ color: editTitle.trim() ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>
-                        Зберегти
-                      </Text>
+                      <Text style={{ color: editTitle.trim() ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>Зберегти</Text>
                     </TouchableOpacity>
                   </View>
                 </ScrollView>
@@ -454,27 +465,27 @@ export default function BugsScreen() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:    { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
-  backBtn:      { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  addBtn:       { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
-  statCard:     { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
-  filterRow:    { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, overflow: 'hidden' },
-  filterBtn:    { flex: 1, paddingVertical: 7, borderRadius: 10, alignItems: 'center' },
-  filterLabel:  { fontSize: 12, fontWeight: '600' },
-  bugCard:      { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden' },
-  bugTitle:     { fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  bugDesc:      { fontSize: 12, lineHeight: 17, marginTop: 3, opacity: 0.8 },
-  check:        { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  severityBadge:{ flexDirection: 'row', alignItems: 'center', borderRadius: 6, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
-  severityBtn:  { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
-  actionBtn:    { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:        { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.88 },
-  handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:   { fontSize: 20, fontWeight: '800', marginBottom: 16 },
-  label:        { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input:        { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500', borderWidth: 1 },
-  btn:          { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  pageTitle:   { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
+  backBtn:     { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  addBtn:      { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
+  statCard:    { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
+  filterRow:   { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, overflow: 'hidden' },
+  filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 10, alignItems: 'center' },
+  filterLabel: { fontSize: 12, fontWeight: '600' },
+  ideaCard:    { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden' },
+  ideaTitle:   { fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  ideaDesc:    { fontSize: 12, lineHeight: 17, marginTop: 3, opacity: 0.8 },
+  check:       { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  badge:       { flexDirection: 'row', alignItems: 'center', borderRadius: 6, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
+  priorityBtn: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
+  actionBtn:   { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.88 },
+  handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
+  sheetTitle:  { fontSize: 20, fontWeight: '800', marginBottom: 16 },
+  label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
+  input:       { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500', borderWidth: 1 },
+  btn:         { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

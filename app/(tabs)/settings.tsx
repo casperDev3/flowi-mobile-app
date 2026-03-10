@@ -65,6 +65,33 @@ export default function SettingsScreen() {
             <Text style={[st.pageTitle, { color: c.text }]}>Налаштування</Text>
           </View>
 
+          {/* Розробка — first */}
+          <SectionLabel label="Розробка" color={c.sub} />
+          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <SettingRow
+              icon="ladybug.fill"
+              iconColor="#EF4444"
+              label="Список багів"
+              value="Помилки"
+              onPress={() => router.push('/bugs')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
+              icon="lightbulb.fill"
+              iconColor="#8B5CF6"
+              label="Ідеї"
+              value="Функції"
+              onPress={() => router.push('/ideas')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last
+            />
+          </BlurView>
+
           {/* Appearance */}
           <SectionLabel label="Зовнішній вигляд" color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
@@ -145,23 +172,6 @@ export default function SettingsScreen() {
               last
             />
           </BlurView>
-
-          {/* Розробка */}
-          <SectionLabel label="Розробка" color={c.sub} />
-          <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/bugs')}>
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.bugBanner, { borderColor: '#EF444440' }]}>
-              <View style={[st.bugBannerIcon, { backgroundColor: '#EF444418' }]}>
-                <IconSymbol name="ladybug.fill" size={20} color="#EF4444" />
-              </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>Список багів</Text>
-                <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Відстеження помилок та проблем</Text>
-              </View>
-              <View style={[st.bugChevron, { backgroundColor: '#EF444415' }]}>
-                <IconSymbol name="chevron.right" size={14} color="#EF4444" />
-              </View>
-            </BlurView>
-          </TouchableOpacity>
 
           {/* About */}
           <SectionLabel label="Про додаток" color={c.sub} />

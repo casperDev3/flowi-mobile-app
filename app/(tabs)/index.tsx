@@ -186,12 +186,14 @@ export default function TasksScreen() {
   }, [tasks, initialized]);
 
   const todayStr = today.toDateString();
-  const todayTasks  = tasks.filter(t => new Date(t.createdAt).toDateString() === todayStr);
-  const doneCount   = todayTasks.filter(t => t.status === 'done').length;
-  const activeCount = todayTasks.filter(t => t.status === 'active').length;
-  const efficiency  = todayTasks.length ? Math.round((doneCount / todayTasks.length) * 100) : 0;
-  const totalSubtasks = tasks.reduce((acc, t) => acc + t.subtasks.length, 0);
-  const doneSubtasks  = tasks.reduce((acc, t) => acc + t.subtasks.filter(s => s.done).length, 0);
+  // Tasks due today (deadline = today) — both done and not done
+  const dueTodayTasks   = tasks.filter(t => t.deadline && new Date(t.deadline).toDateString() === todayStr);
+  const doneCount       = dueTodayTasks.filter(t => t.status === 'done').length;
+  const activeCount     = dueTodayTasks.filter(t => t.status === 'active').length;
+  const efficiency      = dueTodayTasks.length ? Math.round((doneCount / dueTodayTasks.length) * 100) : 0;
+  // Subtasks of tasks due today
+  const totalSubtasks   = dueTodayTasks.reduce((acc, t) => acc + t.subtasks.length, 0);
+  const doneSubtasks    = dueTodayTasks.reduce((acc, t) => acc + t.subtasks.filter(s => s.done).length, 0);
 
   const markedDays = useMemo(() => {
     const set = new Set<string>();
@@ -560,10 +562,13 @@ export default function TasksScreen() {
             </ScrollView>
           )}
 
-          {/* Stats */}
+          {/* Stats — today (deadline = today) */}
           <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
+            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', letterSpacing: 0.4, marginBottom: 2 }}>
+              Сьогодні · {today.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}
+            </Text>
             <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
-              <StatCell value={activeCount}        label="Сьогодні"     color={c.accent}  sub={c.sub} />
+              <StatCell value={activeCount}        label="До виконання" color="#F59E0B"   sub={c.sub} />
               <View style={{ width: 1, backgroundColor: c.border }} />
               <StatCell value={doneCount}          label="Виконано"     color="#10B981"   sub={c.sub} />
               <View style={{ width: 1, backgroundColor: c.border }} />
@@ -572,7 +577,7 @@ export default function TasksScreen() {
             {totalSubtasks > 0 && (
               <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card }]}>
                 <IconSymbol name="list.bullet.circle.fill" size={14} color="#6366F1" />
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 7 }}>Підзавдання</Text>
+                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 7 }}>Підзавдання на сьогодні</Text>
                 <View style={{ flex: 1, marginHorizontal: 12 }}>
                   <View style={[s.progressBg, { flex: 1 }]}>
                     <View style={[s.progressFill, { width: `${Math.round((doneSubtasks / totalSubtasks) * 100)}%`, backgroundColor: '#6366F1' }]} />
@@ -581,6 +586,12 @@ export default function TasksScreen() {
                 <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '700' }}>
                   {doneSubtasks}/{totalSubtasks}
                 </Text>
+              </View>
+            )}
+            {dueTodayTasks.length === 0 && (
+              <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card, justifyContent: 'center' }]}>
+                <IconSymbol name="checkmark.seal" size={13} color={c.sub} />
+                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 6 }}>Немає завдань на сьогодні</Text>
               </View>
             )}
           </View>

@@ -2,6 +2,8 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Dimensions,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -165,19 +167,20 @@ export default function FinanceScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
-          showsVerticalScrollIndicator={false}>
 
-          {/* Header */}
-          <View style={{ marginTop: 14, marginBottom: 24, flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Фінанси</Text>
-            <TouchableOpacity
-              onPress={() => setShowCal(true)}
-              style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
-              <IconSymbol name="calendar" size={17} color={dateFilter ? '#fff' : c.sub} />
-            </TouchableOpacity>
-          </View>
+        {/* Fixed Header */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Фінанси</Text>
+          <TouchableOpacity
+            onPress={() => setShowCal(true)}
+            style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
+            <IconSymbol name="calendar" size={17} color={dateFilter ? '#fff' : c.sub} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          showsVerticalScrollIndicator={false}>
 
           {/* Date filter chip */}
           {dateFilter && (
@@ -293,179 +296,233 @@ export default function FinanceScreen() {
         <IconSymbol name="plus" size={26} color="#fff" />
       </TouchableOpacity>
 
-      {/* Calendar Modal */}
-      <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent>
-        <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-              <View style={[s.handle, { backgroundColor: c.border }]} />
+      {/* ─── Calendar Modal ─── */}
+      <Modal visible={showCal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
 
-              {/* Month nav */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                <TouchableOpacity onPress={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }} style={s.navBtn}>
-                  <IconSymbol name="chevron.left" size={20} color={c.sub} />
-                </TouchableOpacity>
-                <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontWeight: '700' }}>
-                  {MONTHS_UA[calMonth]} {calYear}
-                </Text>
-                <TouchableOpacity onPress={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }} style={s.navBtn}>
-                  <IconSymbol name="chevron.right" size={20} color={c.sub} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Weekdays */}
-              <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                {WEEKDAYS_SHORT.map(d => (
-                  <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
-                ))}
-              </View>
-
-              {/* Days */}
-              {calWeeks.map((week, wi) => (
-                <View key={wi} style={{ flexDirection: 'row', marginBottom: 4 }}>
-                  {week.map((day, di) => {
-                    if (!day) return <View key={di} style={{ flex: 1 }} />;
-                    const dayDate = new Date(calYear, calMonth, day);
-                    const keyStr = `${calYear}-${calMonth}-${day}`;
-                    const isToday = dayDate.toDateString() === today.toDateString();
-                    const isSel = dateFilter === dayDate.toDateString();
-                    const hasMark = markedDays.has(keyStr);
-                    return (
-                      <TouchableOpacity
-                        key={di}
-                        onPress={() => { setDateFilter(isSel ? null : dayDate.toDateString()); setShowCal(false); }}
-                        style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}>
-                        <View style={[s.dayCell, isSel && { backgroundColor: c.accent }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }]}>
-                          <Text style={{ color: isSel ? '#fff' : isToday ? c.accent : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
-                        </View>
-                        {hasMark && !isSel && <View style={[s.daydot, { backgroundColor: c.accent }]} />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ))}
-
-              {dateFilter && (
-                <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { borderColor: c.border }]}>
-                  <IconSymbol name="xmark" size={13} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5 }}>Скинути фільтр</Text>
-                </TouchableOpacity>
-              )}
-            </BlurView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Add Modal */}
-      <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent>
-        <Pressable style={s.overlay} onPress={() => setShowAdd(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-              <View style={[s.handle, { backgroundColor: c.border }]} />
-              <Text style={[s.sheetTitle, { color: c.text }]}>Нова транзакція</Text>
-
-              <View style={[s.typeRow, { backgroundColor: c.dim }]}>
-                {(['income', 'expense'] as TxType[]).map(t => (
-                  <TouchableOpacity
-                    key={t}
-                    onPress={() => { setTxType(t); setCategory(''); }}
-                    style={[s.typeBtn, txType === t && { backgroundColor: t === 'income' ? c.green : c.red }]}>
-                    <IconSymbol name={t === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={14} color={txType === t ? '#fff' : c.sub} />
-                    <Text style={{ fontSize: 13, fontWeight: '700', marginLeft: 5, color: txType === t ? '#fff' : c.sub }}>
-                      {t === 'income' ? 'Дохід' : 'Витрата'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TextInput
-                placeholder="Сума (₴)"
-                placeholderTextColor={c.sub}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-                style={[s.input, { backgroundColor: c.dim, color: c.text, marginTop: 12 }]}
-              />
-
-              <Text style={[s.label, { color: c.sub }]}>Категорія</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: 'row', gap: 7 }}>
-                  {CATEGORIES[txType].map(cat => {
-                    const catIcon: IconSymbolName = CATEGORY_ICONS[cat] ?? 'ellipsis.circle.fill';
-                    const isSelected = category === cat;
-                    return (
-                      <TouchableOpacity
-                        key={cat}
-                        onPress={() => setCategory(cat)}
-                        style={[s.catChip, { backgroundColor: isSelected ? c.accent : c.dim, borderColor: isSelected ? c.accent : c.border }]}>
-                        <IconSymbol name={catIcon} size={13} color={isSelected ? '#fff' : c.sub} />
-                        <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{cat}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-
-              <TextInput
-                placeholder="Нотатка"
-                placeholderTextColor={c.sub}
-                value={note}
-                onChangeText={setNote}
-                style={[s.input, { backgroundColor: c.dim, color: c.text, marginTop: 8 }]}
-              />
-
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
-                <TouchableOpacity onPress={() => setShowAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                  <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={addTx} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>Додати</Text>
-                </TouchableOpacity>
-              </View>
-            </BlurView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Detail Modal */}
-      <Modal visible={!!selected} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
-        <Pressable style={s.overlay} onPress={() => setSelected(null)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-            {selected && (() => {
-              const isIncome = selected.type === 'income';
-              const color = isIncome ? c.green : c.red;
-              const iconName: IconSymbolName = CATEGORY_ICONS[selected.category] ?? (isIncome ? 'arrow.up.trend' : 'arrow.down.trend');
-              return (
-                <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <View style={s.handleRow}>
+                  <View style={{ flex: 1 }} />
                   <View style={[s.handle, { backgroundColor: c.border }]} />
-                  <View style={{ alignItems: 'center', marginBottom: 22 }}>
-                    <View style={[s.detailIcon, { backgroundColor: color + '20' }]}>
-                      <IconSymbol name={iconName} size={28} color={color} />
-                    </View>
-                    <Text style={[s.detailAmount, { color, marginTop: 14 }]}>
-                      {isIncome ? '+' : '−'}{fmt(selected.amount)}
-                    </Text>
-                    <Text style={[s.detailCat, { color: c.text }]}>{selected.category}</Text>
-                  </View>
-                  <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim }]}>
-                    <InfoRow icon="tag" label="Тип" value={isIncome ? 'Дохід' : 'Витрата'} color={color} text={c.text} sub={c.sub} border={c.border} last={!selected.note} />
-                    {selected.note ? <InfoRow icon="doc.text" label="Нотатка" value={selected.note} color={c.sub} text={c.text} sub={c.sub} border={c.border} last={false} /> : null}
-                    <InfoRow icon="calendar" label="Дата" value={new Date(selected.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
-                    <TouchableOpacity onPress={() => deleteTx(selected.id)} style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
-                      <IconSymbol name="trash" size={15} color="#EF4444" />
-                      <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>Видалити</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>Закрити</Text>
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <TouchableOpacity onPress={() => setShowCal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <IconSymbol name="xmark" size={17} color={c.sub} />
                     </TouchableOpacity>
                   </View>
-                </BlurView>
-              );
-            })()}
+                </View>
+
+                {/* Month nav */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                  <TouchableOpacity onPress={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }} style={s.navBtn}>
+                    <IconSymbol name="chevron.left" size={20} color={c.sub} />
+                  </TouchableOpacity>
+                  <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontWeight: '700' }}>
+                    {MONTHS_UA[calMonth]} {calYear}
+                  </Text>
+                  <TouchableOpacity onPress={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }} style={s.navBtn}>
+                    <IconSymbol name="chevron.right" size={20} color={c.sub} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Weekdays */}
+                <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+                  {WEEKDAYS_SHORT.map(d => (
+                    <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
+                  ))}
+                </View>
+
+                {/* Days */}
+                {calWeeks.map((week, wi) => (
+                  <View key={wi} style={{ flexDirection: 'row', marginBottom: 4 }}>
+                    {week.map((day, di) => {
+                      if (!day) return <View key={di} style={{ flex: 1 }} />;
+                      const dayDate = new Date(calYear, calMonth, day);
+                      const keyStr = `${calYear}-${calMonth}-${day}`;
+                      const isToday = dayDate.toDateString() === today.toDateString();
+                      const isSel = dateFilter === dayDate.toDateString();
+                      const hasMark = markedDays.has(keyStr);
+                      return (
+                        <TouchableOpacity
+                          key={di}
+                          onPress={() => { setDateFilter(isSel ? null : dayDate.toDateString()); setShowCal(false); }}
+                          style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}>
+                          <View style={[s.dayCell, isSel && { backgroundColor: c.accent }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }]}>
+                            <Text style={{ color: isSel ? '#fff' : isToday ? c.accent : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
+                          </View>
+                          {hasMark && !isSel && <View style={[s.daydot, { backgroundColor: c.accent }]} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ))}
+
+                {dateFilter && (
+                  <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { borderColor: c.border }]}>
+                    <IconSymbol name="xmark" size={13} color={c.sub} />
+                    <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5 }}>Скинути фільтр</Text>
+                  </TouchableOpacity>
+                )}
+              </BlurView>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── Add Modal ─── */}
+      <Modal visible={showAdd} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={s.overlay} onPress={() => setShowAdd(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                  <View style={s.handleRow}>
+                    <View style={{ flex: 1 }} />
+                    <View style={[s.handle, { backgroundColor: c.border }]} />
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <TouchableOpacity onPress={() => setShowAdd(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                        <IconSymbol name="xmark" size={17} color={c.sub} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Type toggle */}
+                  <View style={[s.typeRow, { backgroundColor: c.dim, marginBottom: 20 }]}>
+                    {(['income', 'expense'] as TxType[]).map(t => (
+                      <TouchableOpacity
+                        key={t}
+                        onPress={() => { setTxType(t); setCategory(''); }}
+                        style={[s.typeBtn, txType === t && { backgroundColor: t === 'income' ? c.green : c.red }]}>
+                        <IconSymbol name={t === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={14} color={txType === t ? '#fff' : c.sub} />
+                        <Text style={{ fontSize: 13, fontWeight: '700', marginLeft: 5, color: txType === t ? '#fff' : c.sub }}>
+                          {t === 'income' ? 'Дохід' : 'Витрата'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Amount display */}
+                  <View style={[s.amountBlock, { backgroundColor: (txType === 'income' ? c.green : c.red) + '12', borderColor: (txType === 'income' ? c.green : c.red) + '30' }]}>
+                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>СУМА (₴)</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ color: txType === 'income' ? c.green : c.red, fontSize: 28, fontWeight: '300' }}>₴</Text>
+                      <TextInput
+                        placeholder="0"
+                        placeholderTextColor={c.sub}
+                        value={amount}
+                        onChangeText={setAmount}
+                        keyboardType="decimal-pad"
+                        style={{ color: txType === 'income' ? c.green : c.red, fontSize: 38, fontWeight: '700', letterSpacing: -1, flex: 1 }}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Category */}
+                  <Text style={[s.label, { color: c.sub }]}>Категорія</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+                    {CATEGORIES[txType].map(cat => {
+                      const catIcon: IconSymbolName = CATEGORY_ICONS[cat] ?? 'ellipsis.circle.fill';
+                      const isSelected = category === cat;
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          onPress={() => setCategory(cat)}
+                          style={[s.catChip, { backgroundColor: isSelected ? c.accent : c.dim, borderColor: isSelected ? c.accent : c.border }]}>
+                          <IconSymbol name={catIcon} size={13} color={isSelected ? '#fff' : c.sub} />
+                          <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{cat}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Note */}
+                  <Text style={[s.label, { color: c.sub }]}>Нотатка</Text>
+                  <TextInput
+                    placeholder="Необов'язково..."
+                    placeholderTextColor={c.sub}
+                    value={note}
+                    onChangeText={setNote}
+                    style={[s.input, { backgroundColor: c.dim, color: c.text }]}
+                  />
+
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+                    <TouchableOpacity onPress={() => setShowAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                      <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={addTx}
+                      disabled={!amount.trim() || !category}
+                      style={[s.btn, { flex: 2, backgroundColor: (!amount.trim() || !category) ? c.dim : c.accent }]}>
+                      <IconSymbol name={txType === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={15} color={(!amount.trim() || !category) ? c.sub : '#fff'} />
+                      <Text style={{ color: (!amount.trim() || !category) ? c.sub : '#fff', fontWeight: '700', marginLeft: 6 }}>Додати</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </BlurView>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── Detail Modal ─── */}
+      <Modal visible={!!selected} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSelected(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={s.overlay} onPress={() => setSelected(null)}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+              {selected && (() => {
+                const isIncome = selected.type === 'income';
+                const color = isIncome ? c.green : c.red;
+                const iconName: IconSymbolName = CATEGORY_ICONS[selected.category] ?? (isIncome ? 'arrow.up.trend' : 'arrow.down.trend');
+                return (
+                  <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                      <View style={s.handleRow}>
+                        <View style={{ flex: 1 }} />
+                        <View style={[s.handle, { backgroundColor: c.border }]} />
+                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                          <TouchableOpacity onPress={() => setSelected(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <IconSymbol name="xmark" size={17} color={c.sub} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Hero */}
+                      <View style={[s.detailHero, { backgroundColor: color + '12', borderColor: color + '25' }]}>
+                        <View style={[s.detailIcon, { backgroundColor: color + '25' }]}>
+                          <IconSymbol name={iconName} size={30} color={color} />
+                        </View>
+                        <Text style={[s.detailAmount, { color, marginTop: 12 }]}>
+                          {isIncome ? '+' : '−'}{fmt(selected.amount)}
+                        </Text>
+                        <Text style={[s.detailCat, { color: c.text, marginTop: 4 }]}>{selected.category}</Text>
+                        <View style={[s.typePill, { backgroundColor: color + '20', borderColor: color + '40', marginTop: 10 }]}>
+                          <IconSymbol name={isIncome ? 'arrow.up.trend' : 'arrow.down.trend'} size={11} color={color} />
+                          <Text style={{ color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{isIncome ? 'Дохід' : 'Витрата'}</Text>
+                        </View>
+                      </View>
+
+                      <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim, marginTop: 14 }]}>
+                        {selected.note ? <InfoRow icon="doc.text" label="Нотатка" value={selected.note} color={c.sub} text={c.text} sub={c.sub} border={c.border} last={false} /> : null}
+                        <InfoRow icon="calendar" label="Дата" value={new Date(selected.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
+                        <TouchableOpacity onPress={() => deleteTx(selected.id)} style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
+                          <IconSymbol name="trash" size={15} color="#EF4444" />
+                          <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>Видалити</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
+                          <Text style={{ color: '#fff', fontWeight: '700' }}>Закрити</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </ScrollView>
+                  </BlurView>
+                );
+              })()}
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -494,43 +551,47 @@ function InfoRow({ icon, label, value, color, text, sub, border, last }: any) {
 }
 
 const s = StyleSheet.create({
-  pageTitle:  { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
-  headerBtn:  { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  dateChip:   { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
-  balCard:    { borderRadius: 20, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  balLabel:   { fontSize: 12, fontWeight: '600', marginBottom: 4 },
-  balAmount:  { fontSize: 36, fontWeight: '800', letterSpacing: -1 },
-  divider:    { height: 1 },
-  miniLabel:  { fontSize: 11, fontWeight: '600' },
-  progressBg: { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
+  pageTitle:   { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
+  headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
+  balCard:     { borderRadius: 20, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  balLabel:    { fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  balAmount:   { fontSize: 36, fontWeight: '800', letterSpacing: -1 },
+  divider:     { height: 1 },
+  miniLabel:   { fontSize: 11, fontWeight: '600' },
+  progressBg:  { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
   progressFill:{ height: '100%', borderRadius: 2 },
-  filterRow:  { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
-  filterBtn:  { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
-  filterLabel:{ fontSize: 12, fontWeight: '600' },
-  groupLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  txCard:     { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  txIcon:     { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  txCategory: { fontSize: 14, fontWeight: '600' },
-  txNote:     { fontSize: 11, marginTop: 2 },
-  txAmount:   { fontSize: 14, fontWeight: '800' },
-  fab:        { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
-  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  filterRow:   { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
+  filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
+  filterLabel: { fontSize: 12, fontWeight: '600' },
+  groupLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  txCard:      { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  txIcon:      { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  txCategory:  { fontSize: 14, fontWeight: '600' },
+  txNote:      { fontSize: 11, marginTop: 2 },
+  txAmount:    { fontSize: 14, fontWeight: '800' },
+  fab:         { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:      { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 18 },
-  sheetTitle: { fontSize: 20, fontWeight: '800', marginBottom: 16 },
-  typeRow:    { flexDirection: 'row', borderRadius: 12, padding: 3 },
-  typeBtn:    { flex: 1, flexDirection: 'row', paddingVertical: 9, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  input:      { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
-  label:      { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  catChip:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9, borderWidth: 1 },
-  btn:        { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  detailIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.88 },
+  amountBlock: { borderRadius: 16, borderWidth: 1, padding: 18, marginBottom: 4 },
+  detailHero:  { borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center' },
+  typePill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
+  handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
+  sheetTitle:  { fontSize: 20, fontWeight: '800', marginBottom: 16 },
+  typeRow:     { flexDirection: 'row', borderRadius: 12, padding: 3 },
+  typeBtn:     { flex: 1, flexDirection: 'row', paddingVertical: 9, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  input:       { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
+  label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
+  catChip:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9, borderWidth: 1 },
+  btn:         { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  detailIcon:  { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   detailAmount:{ fontSize: 32, fontWeight: '800', letterSpacing: -1 },
-  detailCat:  { fontSize: 15, fontWeight: '600', marginTop: 4 },
-  infoBlock:  { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  navBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell:    { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  daydot:     { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
-  clearBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1 },
+  detailCat:   { fontSize: 15, fontWeight: '600', marginTop: 4 },
+  infoBlock:   { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  navBtn:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  dayCell:     { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  daydot:      { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
+  clearBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1 },
 });

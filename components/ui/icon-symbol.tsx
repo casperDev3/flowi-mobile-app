@@ -70,6 +70,7 @@ const MAPPING: Record<string, MaterialIconName> = {
   'hand.raised': 'privacy-tip',
   'info': 'info-outline',
   'heart.fill': 'favorite-border',
+  'drop.fill': 'water-drop',
   'trash.fill': 'delete-outline',
   'icloud.fill': 'backup',
   'moon': 'dark-mode',

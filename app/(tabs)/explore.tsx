@@ -1,5 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Dimensions,
@@ -14,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -66,6 +67,7 @@ const fmt = (n: number) => n.toLocaleString('uk-UA', { style: 'currency', curren
 
 export default function FinanceScreen() {
   const isDark = useColorScheme() === 'dark';
+  const insets = useSafeAreaInsets();
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [filter, setFilter] = useState<'all' | TxType>('all');
@@ -76,6 +78,8 @@ export default function FinanceScreen() {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
+  const [showMenu, setShowMenu] = useState(false);
+  const [compact, setCompact] = useState(false);
 
   const [showCal, setShowCal] = useState(false);
   const [calYear, setCalYear] = useState(today.getFullYear());
@@ -150,17 +154,17 @@ export default function FinanceScreen() {
   }, [txs]);
 
   const c = {
-    bg1:    isDark ? '#080E18' : '#EFF5FF',
-    bg2:    isDark ? '#0F1A2E' : '#E0ECFF',
+    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
+    bg2:    isDark ? '#14121E' : '#EAE6FF',
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(195,215,255,0.5)',
-    text:   isDark ? '#EFF5FF' : '#0A1929',
-    sub:    isDark ? 'rgba(239,245,255,0.45)' : 'rgba(10,25,41,0.45)',
+    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(180,170,240,0.4)',
+    text:   isDark ? '#F4F2FF' : '#0A0818',
+    sub:    isDark ? 'rgba(244,242,255,0.45)' : 'rgba(10,8,24,0.45)',
     green:  '#10B981',
     red:    '#EF4444',
     accent: '#0EA5E9',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(8,14,24,0.98)' : 'rgba(250,253,255,0.98)',
+    sheet:  isDark ? 'rgba(12,12,20,0.98)' : 'rgba(248,246,255,0.98)',
   };
 
   return (
@@ -169,12 +173,17 @@ export default function FinanceScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
         {/* Fixed Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Фінанси</Text>
           <TouchableOpacity
-            onPress={() => setShowCal(true)}
-            style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
-            <IconSymbol name="calendar" size={17} color={dateFilter ? '#fff' : c.sub} />
+            onPress={() => setCompact(v => !v)}
+            style={[s.headerBtn, { backgroundColor: compact ? c.accent + '20' : c.dim, borderColor: compact ? c.accent : c.border }]}>
+            <IconSymbol name={compact ? 'list.bullet' : 'rectangle.stack'} size={17} color={compact ? c.accent : c.sub} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowMenu(true)}
+            style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent + '20' : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
+            <IconSymbol name="ellipsis" size={17} color={dateFilter ? c.accent : c.sub} />
           </TouchableOpacity>
         </View>
 
@@ -201,9 +210,9 @@ export default function FinanceScreen() {
             <Text style={[s.balAmount, { color: balance >= 0 ? c.green : c.red }]}>{fmt(balance)}</Text>
             <View style={[s.divider, { backgroundColor: c.border, marginVertical: 16 }]} />
             <View style={{ flexDirection: 'row' }}>
-              <SummaryItem icon="arrow.up.trend" label="Доходи"  value={fmt(income)}  color={c.green} text={c.text} sub={c.sub} />
+              <SummaryItem label="Доходи"  value={fmt(income)}  color={c.green} sub={c.sub} />
               <View style={{ width: 1, backgroundColor: c.border }} />
-              <SummaryItem icon="arrow.down.trend" label="Витрати" value={fmt(expense)} color={c.red}   text={c.text} sub={c.sub} />
+              <SummaryItem label="Витрати" value={fmt(expense)} color={c.red}   sub={c.sub} />
             </View>
             {income > 0 && (
               <>
@@ -265,11 +274,28 @@ export default function FinanceScreen() {
                 </View>
               </View>
 
-              <View style={{ gap: 8 }}>
+              <View style={{ gap: compact ? 4 : 8 }}>
                 {group.items.map(tx => {
                   const isIncome = tx.type === 'income';
                   const color = isIncome ? c.green : c.red;
                   const iconName: IconSymbolName = CATEGORY_ICONS[tx.category] ?? (isIncome ? 'arrow.up.trend' : 'arrow.down.trend');
+                  if (compact) {
+                    return (
+                      <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => setSelected(tx)}>
+                        <View style={[s.txCompact, { borderColor: c.border, backgroundColor: c.card }]}>
+                          <View style={[s.txAccentBar, { backgroundColor: color }]} />
+                          <View style={[s.txIconSm, { backgroundColor: color + (isDark ? '22' : '15'), marginLeft: 10 }]}>
+                            <IconSymbol name={iconName} size={13} color={color} />
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 9 }}>
+                            <Text style={[s.txCategorySm, { color: c.text }]} numberOfLines={1}>{tx.category}</Text>
+                            {tx.note ? <Text style={[s.txNoteSm, { color: c.sub, marginTop: 1 }]} numberOfLines={1}>{tx.note}</Text> : null}
+                          </View>
+                          <Text style={[s.txAmountSm, { color, marginLeft: 8 }]}>{isIncome ? '+' : '−'}{fmt(tx.amount)}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
                   return (
                     <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => setSelected(tx)}>
                       <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.txCard, { borderColor: c.border }]}>
@@ -296,8 +322,67 @@ export default function FinanceScreen() {
         <IconSymbol name="plus" size={26} color="#fff" />
       </TouchableOpacity>
 
+      {/* ─── Context Menu Modal ─── */}
+      <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
+          onPress={() => setShowMenu(false)}>
+          <Pressable
+            onPress={e => e.stopPropagation()}
+            style={{ position: 'absolute', top: insets.top + 62, right: 16, width: 220 }}>
+            <BlurView intensity={isDark ? 60 : 75} tint={isDark ? 'dark' : 'light'} style={[s.menuBox, { borderColor: c.border }]}>
+
+              {/* Статистика */}
+              <TouchableOpacity
+                onPress={() => { setShowMenu(false); router.push('/finance-stats'); }}
+                style={s.menuItem}>
+                <View style={[s.menuIconBox, { backgroundColor: '#0EA5E9' + '25' }]}>
+                  <IconSymbol name="chart.bar.fill" size={15} color="#0EA5E9" />
+                </View>
+                <Text style={[s.menuLabel, { color: c.text }]}>Статистика</Text>
+                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              </TouchableOpacity>
+
+              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+              {/* Банки */}
+              <TouchableOpacity
+                onPress={() => { setShowMenu(false); router.push('/banks'); }}
+                style={s.menuItem}>
+                <View style={[s.menuIconBox, { backgroundColor: '#10B981' + '25' }]}>
+                  <IconSymbol name="building.columns.fill" size={15} color="#10B981" />
+                </View>
+                <Text style={[s.menuLabel, { color: c.text }]}>Скарбнички</Text>
+                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              </TouchableOpacity>
+
+              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+              {/* Календар */}
+              <TouchableOpacity
+                onPress={() => { setShowMenu(false); setShowCal(true); }}
+                style={s.menuItem}>
+                <View style={[s.menuIconBox, { backgroundColor: dateFilter ? c.accent + '25' : c.dim }]}>
+                  <IconSymbol name="calendar" size={15} color={dateFilter ? c.accent : c.sub} />
+                </View>
+                <Text style={[s.menuLabel, { color: c.text }]}>Календар</Text>
+                {dateFilter
+                  ? <View style={[s.menuPill, { backgroundColor: c.accent + '20', borderColor: c.accent + '40' }]}>
+                      <Text style={[s.menuPillText, { color: c.accent }]}>
+                        {new Date(dateFilter).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                      </Text>
+                    </View>
+                  : <IconSymbol name="chevron.right" size={13} color={c.sub} />
+                }
+              </TouchableOpacity>
+
+            </BlurView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ─── Calendar Modal ─── */}
-      <Modal visible={showCal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
+      <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
@@ -371,7 +456,7 @@ export default function FinanceScreen() {
       </Modal>
 
       {/* ─── Add Modal ─── */}
-      <Modal visible={showAdd} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
+      <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowAdd(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
@@ -466,7 +551,7 @@ export default function FinanceScreen() {
       </Modal>
 
       {/* ─── Detail Modal ─── */}
-      <Modal visible={!!selected} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSelected(null)}>
+      <Modal visible={!!selected} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setSelected(null)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
@@ -528,14 +613,11 @@ export default function FinanceScreen() {
   );
 }
 
-function SummaryItem({ icon, label, value, color, text, sub }: any) {
+function SummaryItem({ label, value, color, sub }: any) {
   return (
     <View style={{ flex: 1, padding: 6 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-        <IconSymbol name={icon} size={13} color={color} />
-        <Text style={{ color: sub, fontSize: 10, fontWeight: '600' }}>{label}</Text>
-      </View>
-      <Text style={{ color: text, fontSize: 16, fontWeight: '800' }}>{value}</Text>
+      <Text style={{ color: sub, fontSize: 10, fontWeight: '600', letterSpacing: 0.3, marginBottom: 5 }}>{label}</Text>
+      <Text style={{ color, fontSize: 17, fontWeight: '800', letterSpacing: -0.4 }}>{value}</Text>
     </View>
   );
 }
@@ -594,4 +676,21 @@ const s = StyleSheet.create({
   dayCell:     { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   daydot:      { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
   clearBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1 },
+  // Context menu
+  menuBox:     { borderRadius: 18, borderWidth: 1, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 10 },
+  menuItem:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+  menuIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  menuLabel:   { flex: 1, fontSize: 14, fontWeight: '600' },
+  menuDivider: { height: 1, marginHorizontal: 14 },
+  menuToggle:  { width: 34, height: 20, borderRadius: 10, borderWidth: 1, padding: 2, justifyContent: 'center' },
+  menuToggleDot:{ width: 14, height: 14, borderRadius: 7 },
+  menuPill:    { borderRadius: 7, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
+  menuPillText:{ fontSize: 11, fontWeight: '700' },
+  // Compact rows
+  txCompact:   { borderRadius: 12, borderWidth: 1, paddingRight: 13, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  txAccentBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginRight: 0 },
+  txIconSm:    { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  txCategorySm:{ fontSize: 13, fontWeight: '600' },
+  txNoteSm:    { fontSize: 11, fontWeight: '400' },
+  txAmountSm:  { fontSize: 13, fontWeight: '800' },
 });

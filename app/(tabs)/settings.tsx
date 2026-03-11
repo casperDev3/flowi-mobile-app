@@ -18,16 +18,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemeOption, useTheme } from '@/store/theme-context';
 
-type ThemeOption = 'system' | 'light' | 'dark';
 type LangOption = 'uk' | 'en';
 
 export default function SettingsScreen() {
   const cs = useColorScheme();
   const isDark = cs === 'dark';
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
 
-  const [theme, setTheme] = useState<ThemeOption>('system');
   const [lang, setLang] = useState<LangOption>('uk');
   const [notifications, setNotifications] = useState(true);
   const [taskReminders, setTaskReminders] = useState(true);
@@ -230,7 +230,7 @@ export default function SettingsScreen() {
       </SafeAreaView>
 
       {/* ─── Theme Modal ─── */}
-      <Modal visible={showThemeModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowThemeModal(false)}>
+      <Modal visible={showThemeModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowThemeModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowThemeModal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
@@ -266,7 +266,7 @@ export default function SettingsScreen() {
       </Modal>
 
       {/* ─── Language Modal ─── */}
-      <Modal visible={showLangModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowLangModal(false)}>
+      <Modal visible={showLangModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowLangModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowLangModal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>

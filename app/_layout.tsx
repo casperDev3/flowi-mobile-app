@@ -1,32 +1,43 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemeProvider } from '@/store/theme-context';
 import { TimerProvider } from '@/store/timer-context';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
+function RootLayoutContent() {
   const colorScheme = useColorScheme();
-
   return (
-    <TimerProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="projects" options={{ headerShown: false }} />
-          <Stack.Screen name="notes" options={{ headerShown: false }} />
-          <Stack.Screen name="archive" options={{ headerShown: false }} />
-          <Stack.Screen name="bugs" options={{ headerShown: false }} />
-          <Stack.Screen name="ideas" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </TimerProvider>
+    <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="projects" options={{ headerShown: false }} />
+        <Stack.Screen name="notes" options={{ headerShown: false }} />
+        <Stack.Screen name="archive" options={{ headerShown: false }} />
+        <Stack.Screen name="bugs" options={{ headerShown: false }} />
+        <Stack.Screen name="ideas" options={{ headerShown: false }} />
+        <Stack.Screen name="finance-stats" options={{ headerShown: false }} />
+        <Stack.Screen name="time-stats" options={{ headerShown: false }} />
+        <Stack.Screen name="banks" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+      </Stack>
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+    </NavigationThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <TimerProvider>
+        <RootLayoutContent />
+      </TimerProvider>
+    </ThemeProvider>
   );
 }

@@ -322,7 +322,7 @@ export default function BugsScreen() {
       </SafeAreaView>
 
       {/* Add Bug Modal */}
-      <Modal visible={showAdd} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
+      <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowAdd(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
@@ -402,7 +402,7 @@ export default function BugsScreen() {
       </Modal>
 
       {/* Edit Bug Modal */}
-      <Modal visible={showEdit} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowEdit(false)}>
+      <Modal visible={showEdit} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowEdit(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowEdit(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>

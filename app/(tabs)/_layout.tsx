@@ -61,9 +61,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="health"
+        options={{
+          title: "Здоров'я",
+          tabBarIcon: ({ color }) => <IconSymbol size={23} name="heart.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
-          title: 'Налаштування',
+          title: 'Опції',
           tabBarIcon: ({ color }) => <IconSymbol size={23} name="gearshape.fill" color={color} />,
         }}
       />

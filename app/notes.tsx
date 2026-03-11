@@ -215,7 +215,7 @@ export default function NotesScreen() {
       <Modal
         visible={!!selected}
         transparent
-        animationType="slide"
+        animationType="fade"
         statusBarTranslucent
         onRequestClose={saveNote}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>

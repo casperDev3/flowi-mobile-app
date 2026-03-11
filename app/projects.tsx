@@ -192,7 +192,7 @@ export default function ProjectsScreen() {
       </SafeAreaView>
 
       {/* Add/Edit Modal */}
-      <Modal visible={showModal} transparent animationType="slide" statusBarTranslucent onRequestClose={closeModal}>
+      <Modal visible={showModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={closeModal}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>

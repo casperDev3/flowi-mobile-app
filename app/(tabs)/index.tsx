@@ -849,7 +849,7 @@ export default function TasksScreen() {
       </Modal>
 
       {/* ─── Filter & Sort Bottom Sheet ─── */}
-      <Modal visible={showFilterSheet} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
+      <Modal visible={showFilterSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
         <Pressable style={s.overlay} onPress={() => setShowFilterSheet(false)}>
           <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
@@ -976,7 +976,7 @@ export default function TasksScreen() {
       </Modal>
 
       {/* ─── Calendar filter Modal ─── */}
-      <Modal visible={showCal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
+      <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
@@ -1014,7 +1014,7 @@ export default function TasksScreen() {
       </Modal>
 
       {/* ─── Add Task Modal ─── */}
-      <Modal visible={showAdd} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
+      <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowAdd(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
@@ -1191,7 +1191,7 @@ export default function TasksScreen() {
       </Modal>
 
       {/* ─── Detail Modal ─── */}
-      <Modal visible={!!selectedTask} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSelected(null)}>
+      <Modal visible={!!selectedTask} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setSelected(null)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>

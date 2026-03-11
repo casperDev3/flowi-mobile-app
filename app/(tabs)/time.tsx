@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
@@ -17,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -67,6 +67,8 @@ const fmtDur = (s: number) => {
 
 export default function TimeScreen() {
   const isDark = useColorScheme() === 'dark';
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { pendingTask, setPendingTask } = useTimerContext();
 
   const [entries, setEntries] = useState<TimeEntry[]>([]);
@@ -84,6 +86,7 @@ export default function TimeScreen() {
 
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [showCal, setShowCal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
 
@@ -169,8 +172,6 @@ export default function TimeScreen() {
 
   const total = entries.reduce((s, e) => s + e.duration, 0);
   const avg   = entries.length > 0 ? Math.round(total / entries.length) : 0;
-  const byShift: Record<Shift, number> = { morning: 0, day: 0, evening: 0, night: 0 };
-  entries.forEach(e => { byShift[e.shift] += e.duration; });
 
   const filteredEntries = useMemo(() => {
     if (!dateFilter) return entries;
@@ -209,8 +210,8 @@ export default function TimeScreen() {
   }, [entries]);
 
   const c = {
-    bg1:    isDark ? '#0A0C18' : '#EEF0FF',
-    bg2:    isDark ? '#121525' : '#E2E5FF',
+    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
+    bg2:    isDark ? '#14121E' : '#EAE6FF',
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,205,255,0.5)',
     text:   isDark ? '#EEF0FF' : '#0D1033',
@@ -230,9 +231,9 @@ export default function TimeScreen() {
         <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
           <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Трекер часу</Text>
           <TouchableOpacity
-            onPress={() => setShowCal(true)}
-            style={[s.headerBtn, { backgroundColor: dateFilter ? c.indigo : c.dim, borderColor: dateFilter ? c.indigo : c.border }]}>
-            <IconSymbol name="calendar" size={17} color={dateFilter ? '#fff' : c.sub} />
+            onPress={() => setShowMenu(true)}
+            style={[s.headerBtn, { backgroundColor: dateFilter ? c.indigo + '20' : c.dim, borderColor: dateFilter ? c.indigo : c.border }]}>
+            <IconSymbol name="slider.horizontal.3" size={17} color={dateFilter ? c.indigo : c.sub} />
           </TouchableOpacity>
         </View>
 
@@ -319,27 +320,6 @@ export default function TimeScreen() {
             <StatCell value={avg > 0 ? fmtDur(avg) : '—'}     label="Середнє" color="#F59E0B" sub={c.sub} />
           </View>
 
-          {/* Shift breakdown */}
-          <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.breakCard, { borderColor: c.border, marginTop: 14 }]}>
-            <Text style={[s.sectionTitle, { color: c.text, marginBottom: 16 }]}>По змінах</Text>
-            {(Object.keys(SHIFTS) as Shift[]).map(sh => {
-              const cfg = SHIFTS[sh]; const dur = byShift[sh]; const pct = total > 0 ? Math.round((dur / total) * 100) : 0;
-              return (
-                <View key={sh} style={{ marginBottom: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                    <IconSymbol name={cfg.icon} size={13} color={dur > 0 ? cfg.color : c.sub} />
-                    <Text style={{ color: dur > 0 ? c.text : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 7, flex: 1 }}>{cfg.label}</Text>
-                    <Text style={{ color: c.sub, fontSize: 10, marginRight: 10 }}>{cfg.hours}</Text>
-                    <Text style={{ color: dur > 0 ? cfg.color : c.sub, fontSize: 12, fontWeight: '700' }}>{dur > 0 ? fmtDur(dur) : '—'}</Text>
-                  </View>
-                  <View style={s.progressBg}>
-                    <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: cfg.color }]} />
-                  </View>
-                </View>
-              );
-            })}
-          </BlurView>
-
           {/* History */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 4 }}>
             <Text style={[s.sectionTitle, { color: c.text, flex: 1 }]}>Історія</Text>
@@ -391,8 +371,54 @@ export default function TimeScreen() {
         <IconSymbol name="plus" size={26} color="#fff" />
       </TouchableOpacity>
 
+      {/* ─── Context Menu Modal ─── */}
+      <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
+          onPress={() => setShowMenu(false)}>
+          <Pressable
+            onPress={e => e.stopPropagation()}
+            style={{ position: 'absolute', top: insets.top + 62, right: 16, width: 220 }}>
+            <BlurView intensity={isDark ? 60 : 75} tint={isDark ? 'dark' : 'light'} style={[s.menuBox, { borderColor: c.border }]}>
+
+              {/* Календар */}
+              <TouchableOpacity
+                onPress={() => { setShowMenu(false); setShowCal(true); }}
+                style={s.menuItem}>
+                <View style={[s.menuIconBox, { backgroundColor: dateFilter ? c.indigo + '25' : c.dim }]}>
+                  <IconSymbol name="calendar" size={15} color={dateFilter ? c.indigo : c.sub} />
+                </View>
+                <Text style={[s.menuLabel, { color: c.text }]}>Календар</Text>
+                {dateFilter
+                  ? <View style={[s.menuPill, { backgroundColor: c.indigo + '20', borderColor: c.indigo + '40' }]}>
+                      <Text style={[s.menuPillText, { color: c.indigo }]}>
+                        {new Date(dateFilter).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                      </Text>
+                    </View>
+                  : <IconSymbol name="chevron.right" size={13} color={c.sub} />
+                }
+              </TouchableOpacity>
+
+              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+              {/* Статистика */}
+              <TouchableOpacity
+                onPress={() => { setShowMenu(false); router.push('/time-stats'); }}
+                style={s.menuItem}>
+                <View style={[s.menuIconBox, { backgroundColor: c.indigo + '25' }]}>
+                  <IconSymbol name="chart.bar.fill" size={15} color={c.indigo} />
+                </View>
+                <Text style={[s.menuLabel, { color: c.text }]}>Статистика</Text>
+                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              </TouchableOpacity>
+
+            </BlurView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ─── Calendar Modal ─── */}
-      <Modal visible={showCal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
+      <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
@@ -463,7 +489,7 @@ export default function TimeScreen() {
       </Modal>
 
       {/* ─── Add Manual ─── */}
-      <Modal visible={showAdd} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
+      <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowAdd(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
@@ -556,7 +582,7 @@ export default function TimeScreen() {
       </Modal>
 
       {/* ─── Detail Modal ─── */}
-      <Modal visible={!!selected} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSelected(null)}>
+      <Modal visible={!!selected} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setSelected(null)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
@@ -651,9 +677,6 @@ const s = StyleSheet.create({
   shiftBadge:  { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
   timerBtn:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 32, paddingVertical: 12, borderRadius: 14 },
   statsRow:    { flexDirection: 'row', borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  breakCard:   { borderRadius: 18, borderWidth: 1, padding: 18, overflow: 'hidden' },
-  progressBg:  { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
-  progressFill:{ height: '100%', borderRadius: 2 },
   sectionTitle:{ fontSize: 17, fontWeight: '800' },
   groupLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   entryCard:   { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
@@ -665,6 +688,14 @@ const s = StyleSheet.create({
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.88 },
+  // Context menu
+  menuBox:     { borderRadius: 18, borderWidth: 1, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 10 },
+  menuItem:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+  menuIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  menuLabel:   { flex: 1, fontSize: 14, fontWeight: '600' },
+  menuDivider: { height: 1, marginHorizontal: 14 },
+  menuPill:    { borderRadius: 7, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
+  menuPillText:{ fontSize: 11, fontWeight: '700' },
   durBlock:    { flexDirection: 'row', borderRadius: 16, borderWidth: 1, padding: 16, alignItems: 'flex-start', marginBottom: 4 },
   detailHero:  { borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },

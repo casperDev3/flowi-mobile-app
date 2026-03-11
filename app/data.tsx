@@ -119,20 +119,21 @@ export default function DataScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+
+        {/* Header */}
+        <View style={st.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[st.backBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
+            <IconSymbol name="chevron.left" size={17} color={c.sub} />
+          </TouchableOpacity>
+          <Text style={[st.title, { color: c.text }]}>Управління даними</Text>
+          <View style={{ width: 36 }} />
+        </View>
+
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}>
-
-          {/* Header */}
-          <View style={{ marginTop: 10, marginBottom: 20, flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={st.backBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <IconSymbol name="chevron.left" size={20} color={c.text} />
-            </TouchableOpacity>
-            <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 8 }]}>Управління даними</Text>
-          </View>
 
           {/* Stats grid */}
           <Text style={[st.sectionLabel, { color: c.sub }]}>СТАТИСТИКА ДАНИХ</Text>
@@ -206,7 +207,7 @@ export default function DataScreen() {
       </SafeAreaView>
 
       {/* ─── Import Modal ─── */}
-      <Modal visible={showImport} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowImport(false)}>
+      <Modal visible={showImport} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowImport(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowImport(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
@@ -269,9 +270,9 @@ export default function DataScreen() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:   { fontSize: 28, fontWeight: '800', letterSpacing: -0.7 },
-  headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  backBtn:     { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  header:      { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' },
+  title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, flex: 1, textAlign: 'center' },
+  backBtn:     { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10, marginLeft: 2 },
   statCard:    { borderRadius: 16, borderWidth: 1, padding: 14, overflow: 'hidden' },
   statIcon:    { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

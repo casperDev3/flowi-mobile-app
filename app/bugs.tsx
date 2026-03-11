@@ -47,7 +47,8 @@ export default function BugsScreen() {
   const [bugs, setBugs] = useState<Bug[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'open' | 'fixed'>('all');
+  const [filter, setFilter] = useState<'all' | 'open' | 'fixed'>('open');
+  const [sort, setSort] = useState<'newest' | 'oldest' | 'severity'>('newest');
 
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -83,11 +84,19 @@ export default function BugsScreen() {
     if (initialized) saveData('bugs', bugs);
   }, [bugs, initialized]);
 
-  const filtered = bugs.filter(b => {
-    if (filter === 'open') return !b.fixed;
-    if (filter === 'fixed') return b.fixed;
-    return true;
-  });
+  const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, major: 1, minor: 2 };
+
+  const filtered = bugs
+    .filter(b => {
+      if (filter === 'open') return !b.fixed;
+      if (filter === 'fixed') return b.fixed;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (sort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
+    });
 
   const openCount  = bugs.filter(b => !b.fixed).length;
   const fixedCount = bugs.filter(b => b.fixed).length;
@@ -186,7 +195,7 @@ export default function BugsScreen() {
         </View>
 
         {/* Filter */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 14 }}>
+        <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
           <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.filterRow, { borderColor: c.border }]}>
             {(['all', 'open', 'fixed'] as const).map(f => (
               <TouchableOpacity
@@ -199,6 +208,28 @@ export default function BugsScreen() {
               </TouchableOpacity>
             ))}
           </BlurView>
+        </View>
+
+        {/* Sort */}
+        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 14 }}>
+          {([
+            { key: 'newest',   label: 'Нові',        icon: 'arrow.down.circle' },
+            { key: 'oldest',   label: 'Старі',       icon: 'arrow.up.circle' },
+            { key: 'severity', label: 'Критичність', icon: 'exclamationmark.triangle' },
+          ] as const).map(opt => (
+            <TouchableOpacity
+              key={opt.key}
+              onPress={() => setSort(opt.key)}
+              style={[st.sortChip, {
+                backgroundColor: sort === opt.key ? c.accent + '20' : c.dim,
+                borderColor: sort === opt.key ? c.accent : c.border,
+              }]}>
+              <IconSymbol name={opt.icon as any} size={11} color={sort === opt.key ? c.accent : c.sub} />
+              <Text style={{ color: sort === opt.key ? c.accent : c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <ScrollView
@@ -461,6 +492,7 @@ const st = StyleSheet.create({
   filterRow:    { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, overflow: 'hidden' },
   filterBtn:    { flex: 1, paddingVertical: 7, borderRadius: 10, alignItems: 'center' },
   filterLabel:  { fontSize: 12, fontWeight: '600' },
+  sortChip:     { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
   bugCard:      { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden' },
   bugTitle:     { fontSize: 14, fontWeight: '600', lineHeight: 20 },
   bugDesc:      { fontSize: 12, lineHeight: 17, marginTop: 3, opacity: 0.8 },

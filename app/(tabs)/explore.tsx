@@ -167,19 +167,20 @@ export default function FinanceScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
-          showsVerticalScrollIndicator={false}>
 
-          {/* Header */}
-          <View style={{ marginTop: 14, marginBottom: 24, flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Фінанси</Text>
-            <TouchableOpacity
-              onPress={() => setShowCal(true)}
-              style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
-              <IconSymbol name="calendar" size={17} color={dateFilter ? '#fff' : c.sub} />
-            </TouchableOpacity>
-          </View>
+        {/* Fixed Header */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Фінанси</Text>
+          <TouchableOpacity
+            onPress={() => setShowCal(true)}
+            style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
+            <IconSymbol name="calendar" size={17} color={dateFilter ? '#fff' : c.sub} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          showsVerticalScrollIndicator={false}>
 
           {/* Date filter chip */}
           {dateFilter && (

@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -126,6 +126,7 @@ function deadlineLabel(iso: string): string {
 export default function TasksScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { setPendingTask } = useTimerContext();
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -134,13 +135,14 @@ export default function TasksScreen() {
   const [filter, setFilter] = useState<Filter>('active');
   const [sort, setSort] = useState<SortBy>('deadline');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [cardDetail, setCardDetail] = useState<CardDetail>('detailed');
+  const [cardDetail, setCardDetail] = useState<CardDetail>('compact');
 
   // Search & extra filters
   const [search, setSearch] = useState('');
   const [filterProject, setFilterProject] = useState<string | null>(null);
   const [filterPriority, setFilterPriority] = useState<Priority | null>(null);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const [showAdd, setShowAdd] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -270,7 +272,7 @@ export default function TasksScreen() {
     return order.map(k => map[k]);
   }, [filtered, sort]);
 
-  const hasActiveFilters = filter !== 'all' || dateFilter || filterProject || filterPriority || search.trim();
+  const hasActiveFilters = filter !== 'active' || sort !== 'deadline' || !!dateFilter || !!filterProject || !!filterPriority || !!search.trim();
 
   const addTask = useCallback(() => {
     if (!newTitle.trim()) return;
@@ -397,7 +399,7 @@ export default function TasksScreen() {
   }, [setPendingTask, router]);
 
   const clearAllFilters = useCallback(() => {
-    setFilter('all');
+    setFilter('active');
     setSort('deadline');
     setFilterProject(null);
     setFilterPriority(null);
@@ -443,38 +445,29 @@ export default function TasksScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+
+        {/* Fixed Header */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Завдання</Text>
+          <View style={{ flexDirection: 'row', gap: 7 }}>
+            {viewMode === 'list' && (
+              <TouchableOpacity
+                onPress={() => setCardDetail(v => v === 'detailed' ? 'compact' : 'detailed')}
+                style={[s.headerBtn, { backgroundColor: cardDetail === 'detailed' ? c.accent + '20' : c.dim, borderColor: cardDetail === 'detailed' ? c.accent : c.border }]}>
+                <IconSymbol name={cardDetail === 'detailed' ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={cardDetail === 'detailed' ? c.accent : c.sub} />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => setShowOptionsMenu(v => !v)}
+              style={[s.headerBtn, { backgroundColor: hasActiveFilters ? c.accent : c.dim, borderColor: hasActiveFilters ? c.accent : c.border }]}>
+              <IconSymbol name="ellipsis" size={17} color={hasActiveFilters ? '#fff' : c.sub} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
           showsVerticalScrollIndicator={false}>
-
-          {/* Header */}
-          <View style={{ marginTop: 14, marginBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Завдання</Text>
-            <View style={{ flexDirection: 'row', gap: 7 }}>
-              <TouchableOpacity
-                onPress={() => router.push('/projects')}
-                style={[s.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-                <IconSymbol name="folder" size={17} color={c.sub} />
-              </TouchableOpacity>
-              {viewMode === 'list' && (
-                <TouchableOpacity
-                  onPress={() => setCardDetail(v => v === 'detailed' ? 'compact' : 'detailed')}
-                  style={[s.headerBtn, { backgroundColor: cardDetail === 'compact' ? c.accent + '20' : c.dim, borderColor: cardDetail === 'compact' ? c.accent : c.border }]}>
-                  <IconSymbol name={cardDetail === 'detailed' ? 'rectangle.stack' : 'rectangle.stack.fill'} size={17} color={cardDetail === 'compact' ? c.accent : c.sub} />
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                onPress={() => setViewMode(v => v === 'list' ? 'board' : 'list')}
-                style={[s.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-                <IconSymbol name={viewMode === 'list' ? 'square.grid.2x2' : 'list.bullet'} size={17} color={c.sub} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setShowFilterSheet(true)}
-                style={[s.headerBtn, { backgroundColor: hasActiveFilters ? c.accent : c.dim, borderColor: hasActiveFilters ? c.accent : c.border }]}>
-                <IconSymbol name="line.3.horizontal.decrease" size={17} color={hasActiveFilters ? '#fff' : c.sub} />
-              </TouchableOpacity>
-            </View>
-          </View>
 
           {/* Search bar */}
           <View style={[s.searchBar, { backgroundColor: c.dim, borderColor: c.border }]}>
@@ -498,12 +491,12 @@ export default function TasksScreen() {
           {hasActiveFilters && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 4 }}>
               <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center' }}>
-                {filter !== 'all' && (
+                {filter !== 'active' && (
                   <TouchableOpacity
-                    onPress={() => setFilter('all')}
+                    onPress={() => setFilter('active')}
                     style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
                     <Text style={[s.activeChipText, { color: c.accent }]}>
-                      {filter === 'active' ? 'Активні' : 'Виконані'}
+                      {filter === 'all' ? 'Всі' : 'Виконані'}
                     </Text>
                     <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
@@ -759,6 +752,101 @@ export default function TasksScreen() {
       <TouchableOpacity onPress={() => setShowAdd(true)} style={[s.fab, { backgroundColor: c.accent }]} activeOpacity={0.85}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </TouchableOpacity>
+
+      {/* ─── Options Dropdown ─── */}
+      <Modal visible={showOptionsMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowOptionsMenu(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
+          onPress={() => setShowOptionsMenu(false)}>
+          <BlurView
+            intensity={isDark ? 55 : 75}
+            tint={isDark ? 'dark' : 'light'}
+            style={{
+              position: 'absolute',
+              top: insets.top + 62,
+              right: 16,
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: c.border,
+              overflow: 'hidden',
+              minWidth: 238,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.2,
+              shadowRadius: 20,
+              elevation: 14,
+            }}>
+            {/* View mode */}
+            <TouchableOpacity
+              onPress={() => { setViewMode(v => v === 'list' ? 'board' : 'list'); setShowOptionsMenu(false); }}
+              style={s.menuItem}>
+              <View style={[s.menuIconBox, { backgroundColor: c.accent + '20' }]}>
+                <IconSymbol name={viewMode === 'list' ? 'square.grid.2x2' : 'list.bullet'} size={15} color={c.accent} />
+              </View>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>
+                {viewMode === 'list' ? 'Режим дошки' : 'Режим списку'}
+              </Text>
+              <View style={[s.menuPill, { backgroundColor: c.dim }]}>
+                <Text style={[s.menuPillText, { color: c.sub }]}>{viewMode === 'list' ? 'Список' : 'Дошка'}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+            {/* Filters */}
+            <TouchableOpacity
+              onPress={() => { setShowOptionsMenu(false); setShowFilterSheet(true); }}
+              style={s.menuItem}>
+              <View style={[s.menuIconBox, { backgroundColor: hasActiveFilters ? '#F59E0B20' : c.dim }]}>
+                <IconSymbol name="line.3.horizontal.decrease" size={15} color={hasActiveFilters ? '#F59E0B' : c.sub} />
+              </View>
+              <Text style={[s.menuItemLabel, { color: hasActiveFilters ? '#F59E0B' : c.text }]}>Фільтри</Text>
+              {hasActiveFilters
+                ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F59E0B' }} />
+                : <IconSymbol name="chevron.right" size={12} color={c.sub} />}
+            </TouchableOpacity>
+
+            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+            {/* Projects */}
+            <TouchableOpacity
+              onPress={() => { setShowOptionsMenu(false); router.push('/projects'); }}
+              style={s.menuItem}>
+              <View style={[s.menuIconBox, { backgroundColor: '#0EA5E920' }]}>
+                <IconSymbol name="folder.fill" size={15} color="#0EA5E9" />
+              </View>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>Проєкти</Text>
+              <IconSymbol name="chevron.right" size={12} color={c.sub} />
+            </TouchableOpacity>
+
+            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+            {/* Notes */}
+            <TouchableOpacity
+              onPress={() => { setShowOptionsMenu(false); router.push('/notes'); }}
+              style={s.menuItem}>
+              <View style={[s.menuIconBox, { backgroundColor: '#F59E0B20' }]}>
+                <IconSymbol name="note.text" size={15} color="#F59E0B" />
+              </View>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>Нотатки</Text>
+              <IconSymbol name="chevron.right" size={12} color={c.sub} />
+            </TouchableOpacity>
+
+            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+            {/* Archive */}
+            <TouchableOpacity
+              onPress={() => { setShowOptionsMenu(false); router.push('/archive'); }}
+              style={s.menuItem}>
+              <View style={[s.menuIconBox, { backgroundColor: '#10B98120' }]}>
+                <IconSymbol name="archivebox.fill" size={15} color="#10B981" />
+              </View>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>Архів</Text>
+              <IconSymbol name="chevron.right" size={12} color={c.sub} />
+            </TouchableOpacity>
+          </BlurView>
+        </Pressable>
+      </Modal>
 
       {/* ─── Filter & Sort Bottom Sheet ─── */}
       <Modal visible={showFilterSheet} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
@@ -1529,4 +1617,10 @@ const s = StyleSheet.create({
   dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
   dropdownList:   { borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
   dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 11 },
+  menuItem:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13 },
+  menuIconBox:    { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  menuItemLabel:  { fontSize: 14, fontWeight: '600', flex: 1 },
+  menuPill:       { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
+  menuPillText:   { fontSize: 11, fontWeight: '600' },
+  menuDivider:    { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
 });

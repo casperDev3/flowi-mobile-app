@@ -3,6 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
+  AppStateStatus,
   Dimensions,
   KeyboardAvoidingView,
   Modal,
@@ -86,6 +88,8 @@ export default function TimeScreen() {
   const [calMonth, setCalMonth] = useState(today.getMonth());
 
   const interval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const backgroundedAt = useRef<number | null>(null);
+  const runningRef = useRef(false);
 
   // Load from storage
   useEffect(() => {
@@ -109,6 +113,10 @@ export default function TimeScreen() {
   }, [pendingTask, running, setPendingTask]));
 
   useEffect(() => {
+    runningRef.current = running;
+  }, [running]);
+
+  useEffect(() => {
     if (running) {
       interval.current = setInterval(() => setElapsed(e => e + 1), 1000);
     } else {
@@ -116,6 +124,27 @@ export default function TimeScreen() {
     }
     return () => { if (interval.current) clearInterval(interval.current); };
   }, [running]);
+
+  // Background timer: save timestamp on background, recover elapsed on foreground
+  useEffect(() => {
+    const handleAppState = (nextState: AppStateStatus) => {
+      if (nextState.match(/inactive|background/)) {
+        if (runningRef.current) {
+          backgroundedAt.current = Date.now();
+          if (interval.current) clearInterval(interval.current);
+        }
+      } else if (nextState === 'active') {
+        if (runningRef.current && backgroundedAt.current !== null) {
+          const secondsInBackground = Math.floor((Date.now() - backgroundedAt.current) / 1000);
+          setElapsed(e => e + secondsInBackground);
+          backgroundedAt.current = null;
+          interval.current = setInterval(() => setElapsed(e => e + 1), 1000);
+        }
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppState);
+    return () => sub.remove();
+  }, []);
 
   const toggle = () => {
     if (running) {
@@ -196,19 +225,20 @@ export default function TimeScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
-          showsVerticalScrollIndicator={false}>
 
-          {/* Header */}
-          <View style={{ marginTop: 14, marginBottom: 24, flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Трекер часу</Text>
-            <TouchableOpacity
-              onPress={() => setShowCal(true)}
-              style={[s.headerBtn, { backgroundColor: dateFilter ? c.indigo : c.dim, borderColor: dateFilter ? c.indigo : c.border }]}>
-              <IconSymbol name="calendar" size={17} color={dateFilter ? '#fff' : c.sub} />
-            </TouchableOpacity>
-          </View>
+        {/* Fixed Header */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Трекер часу</Text>
+          <TouchableOpacity
+            onPress={() => setShowCal(true)}
+            style={[s.headerBtn, { backgroundColor: dateFilter ? c.indigo : c.dim, borderColor: dateFilter ? c.indigo : c.border }]}>
+            <IconSymbol name="calendar" size={17} color={dateFilter ? '#fff' : c.sub} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          showsVerticalScrollIndicator={false}>
 
           {/* Date filter chip */}
           {dateFilter && (

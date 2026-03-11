@@ -61,6 +61,7 @@ export default function IdeasScreen() {
   const [initialized, setInitialized] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [filter, setFilter] = useState<'all' | 'idea' | 'planned' | 'done'>('all');
+  const [sort, setSort] = useState<'newest' | 'oldest' | 'priority'>('newest');
 
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
@@ -94,7 +95,15 @@ export default function IdeasScreen() {
     if (initialized) saveData('ideas', ideas);
   }, [ideas, initialized]);
 
-  const filtered = ideas.filter(i => filter === 'all' || i.status === filter);
+  const PRIORITY_ORDER: Record<IdeaPriority, number> = { high: 0, medium: 1, low: 2 };
+
+  const filtered = ideas
+    .filter(i => filter === 'all' || i.status === filter)
+    .sort((a, b) => {
+      if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (sort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+    });
 
   const ideaCount    = ideas.filter(i => i.status === 'idea').length;
   const plannedCount = ideas.filter(i => i.status === 'planned').length;
@@ -205,7 +214,7 @@ export default function IdeasScreen() {
         </View>
 
         {/* Filter */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 14 }}>
+        <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
           <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.filterRow, { borderColor: c.border }]}>
             {(['all', 'idea', 'planned', 'done'] as const).map(f => (
               <TouchableOpacity
@@ -218,6 +227,28 @@ export default function IdeasScreen() {
               </TouchableOpacity>
             ))}
           </BlurView>
+        </View>
+
+        {/* Sort */}
+        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 14 }}>
+          {([
+            { key: 'newest',   label: 'Нові',      icon: 'arrow.down.circle' },
+            { key: 'oldest',   label: 'Старі',     icon: 'arrow.up.circle' },
+            { key: 'priority', label: 'Пріоритет', icon: 'bolt' },
+          ] as const).map(opt => (
+            <TouchableOpacity
+              key={opt.key}
+              onPress={() => setSort(opt.key)}
+              style={[st.sortChip, {
+                backgroundColor: sort === opt.key ? c.accent + '20' : c.dim,
+                borderColor: sort === opt.key ? c.accent : c.border,
+              }]}>
+              <IconSymbol name={opt.icon as any} size={11} color={sort === opt.key ? c.accent : c.sub} />
+              <Text style={{ color: sort === opt.key ? c.accent : c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <ScrollView
@@ -472,6 +503,7 @@ const st = StyleSheet.create({
   filterRow:   { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, overflow: 'hidden' },
   filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 10, alignItems: 'center' },
   filterLabel: { fontSize: 12, fontWeight: '600' },
+  sortChip:    { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
   ideaCard:    { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden' },
   ideaTitle:   { fontSize: 14, fontWeight: '600', lineHeight: 20 },
   ideaDesc:    { fontSize: 12, lineHeight: 17, marginTop: 3, opacity: 0.8 },

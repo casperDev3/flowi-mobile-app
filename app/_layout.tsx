@@ -28,6 +28,7 @@ function RootLayoutContent() {
         <Stack.Screen name="banks" options={{ headerShown: false }} />
         <Stack.Screen name="data" options={{ headerShown: false }} />
         <Stack.Screen name="donate" options={{ headerShown: false }} />
+        <Stack.Screen name="developer" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />

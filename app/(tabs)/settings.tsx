@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -75,6 +76,17 @@ export default function SettingsScreen() {
               label="Задонатити"
               value="PayPal · Donatello"
               onPress={() => router.push('/donate')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
+              icon="person.fill"
+              iconColor="#7C3AED"
+              label="Розробник"
+              value="Igor Lialiuk"
+              onPress={() => router.push('/developer')}
               text={c.text}
               sub={c.sub}
               border={c.border}
@@ -181,7 +193,7 @@ export default function SettingsScreen() {
               icon="externaldrive"
               iconColor="#6366F1"
               label="Управління даними"
-              value="Експорт · Імпорт"
+              value={undefined}
               onPress={() => router.push('/data')}
               text={c.text}
               sub={c.sub}
@@ -197,17 +209,7 @@ export default function SettingsScreen() {
               icon="info"
               iconColor={c.sub}
               label="Версія"
-              value="1.0.0"
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <InfoRow
-              icon="person.fill"
-              iconColor={c.sub}
-              label="Розробник"
-              value="f-tracking team"
+              value="0.0.1"
               text={c.text}
               sub={c.sub}
               border={c.border}
@@ -217,7 +219,7 @@ export default function SettingsScreen() {
               icon="heart.fill"
               iconColor="#EF4444"
               label="Оцінити додаток"
-              onPress={() => {}}
+              onPress={() => Alert.alert('У розробці', 'Ця функція ще в розробці.')}
               text={c.text}
               sub={c.sub}
               border={c.border}
@@ -227,7 +229,7 @@ export default function SettingsScreen() {
               icon="paperplane.fill"
               iconColor="#0EA5E9"
               label="Надіслати відгук"
-              onPress={() => {}}
+              onPress={() => Alert.alert('У розробці', 'Ця функція ще в розробці.')}
               text={c.text}
               sub={c.sub}
               border={c.border}
@@ -244,7 +246,7 @@ export default function SettingsScreen() {
             />
             <Text style={[st.footerName, { color: c.text }]}>Flowi</Text>
             <View style={[st.footerBadge, { backgroundColor: c.accent + '18' }]}>
-              <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>v1.0.0</Text>
+              <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>v0.0.1</Text>
             </View>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 8 }}>© 2026</Text>
           </View>

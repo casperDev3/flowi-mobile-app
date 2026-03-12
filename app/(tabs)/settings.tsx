@@ -66,7 +66,23 @@ export default function SettingsScreen() {
             <Text style={[st.pageTitle, { color: c.text }]}>Налаштування</Text>
           </View>
 
-          {/* Розробка — first */}
+          {/* Support — first */}
+          <SectionLabel label="Підтримка" color={c.sub} />
+          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <SettingRow
+              icon="heart.fill"
+              iconColor="#EF4444"
+              label="Задонатити"
+              value="PayPal · Donatello"
+              onPress={() => router.push('/donate')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last
+            />
+          </BlurView>
+
+          {/* Розробка */}
           <SectionLabel label="Розробка" color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
             <SettingRow

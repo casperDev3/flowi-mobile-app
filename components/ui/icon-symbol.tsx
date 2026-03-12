@@ -83,6 +83,7 @@ const MAPPING: Record<string, MaterialIconName> = {
   'minus': 'remove',
   'ellipsis': 'more-horiz',
   'magnifyingglass': 'search',
+  'square.grid.2x2': 'grid-view',
   'folder': 'folder-open',
   'folder.fill': 'folder',
   'folder.badge.magnifyingglass': 'folder-open',

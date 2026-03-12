@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -218,13 +219,18 @@ export default function SettingsScreen() {
             />
           </BlurView>
 
-          {/* App badge */}
-          <View style={{ alignItems: 'center', marginTop: 24, gap: 4 }}>
-            <View style={[st.appBadge, { backgroundColor: c.accent }]}>
-              <IconSymbol name="checklist" size={20} color="#fff" />
+          {/* App footer */}
+          <View style={[st.footerCard, { opacity: 0.45 }]}>
+            <Image
+              source={require('@/assets/logo_app.png')}
+              style={st.footerLogo}
+              resizeMode="contain"
+            />
+            <Text style={[st.footerName, { color: c.text }]}>Flowi</Text>
+            <View style={[st.footerBadge, { backgroundColor: c.accent + '18' }]}>
+              <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>v1.0.0</Text>
             </View>
-            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginTop: 6 }}>f-tracking app</Text>
-            <Text style={{ color: c.sub, fontSize: 11 }}>© 2026</Text>
+            <Text style={{ color: c.sub, fontSize: 12, marginLeft: 8 }}>© 2026</Text>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -363,6 +369,10 @@ const st = StyleSheet.create({
   rowValue:    { fontSize: 13, fontWeight: '500' },
   dangerLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: '#EF4444' },
   appBadge:    { width: 52, height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 },
+  footerCard:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28, marginBottom: 8 },
+  footerLogo:  { width: 26, height: 26, borderRadius: 7 },
+  footerName:  { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
+  footerBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   bugBanner:   { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1.5, padding: 14, overflow: 'hidden' },
   bugBannerIcon:{ width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   bugChevron:  { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },

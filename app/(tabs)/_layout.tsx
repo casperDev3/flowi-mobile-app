@@ -24,13 +24,20 @@ export default function TabLayout() {
           backgroundColor: 'transparent',
           height: Platform.OS === 'ios' ? 88 : 68,
         },
-        tabBarBackground: () => (
-          <BlurView
-            intensity={80}
-            tint={isDark ? 'dark' : 'systemChromeMaterial'}
-            style={StyleSheet.absoluteFill}
-          />
-        ),
+        tabBarBackground: () =>
+          Platform.OS === 'android' ? (
+            <BlurView
+              intensity={80}
+              tint={isDark ? 'dark' : 'systemChromeMaterial'}
+              style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? '#0E0C1A' : '#F0EEFF' }]}
+            />
+          ) : (
+            <BlurView
+              intensity={80}
+              tint={isDark ? 'dark' : 'systemChromeMaterial'}
+              style={StyleSheet.absoluteFill}
+            />
+          ),
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',

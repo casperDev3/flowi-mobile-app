@@ -775,6 +775,9 @@ export default function TasksScreen() {
               shadowOpacity: 0.2,
               shadowRadius: 20,
               elevation: 14,
+              ...(Platform.OS === 'android' && {
+                backgroundColor: isDark ? '#1C1A2E' : '#F2EFFF',
+              }),
             }}>
             {/* View mode */}
             <TouchableOpacity

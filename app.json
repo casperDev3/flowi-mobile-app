@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "f-tracking-app",
+    "name": "Flowi",
     "slug": "f-tracking-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,7 +18,8 @@
         "foregroundImage": "./assets/logo_app.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.casper3.ftrackingapp"
     },
     "web": {
       "output": "static",

@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AutoBackupProvider } from '@/store/auto-backup';
 import { ThemeProvider } from '@/store/theme-context';
 import { TimerProvider } from '@/store/timer-context';
 
@@ -25,6 +26,7 @@ function RootLayoutContent() {
         <Stack.Screen name="finance-stats" options={{ headerShown: false }} />
         <Stack.Screen name="time-stats" options={{ headerShown: false }} />
         <Stack.Screen name="banks" options={{ headerShown: false }} />
+        <Stack.Screen name="data" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
@@ -35,9 +37,11 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <TimerProvider>
-        <RootLayoutContent />
-      </TimerProvider>
+      <AutoBackupProvider>
+        <TimerProvider>
+          <RootLayoutContent />
+        </TimerProvider>
+      </AutoBackupProvider>
     </ThemeProvider>
   );
 }

@@ -1,5 +1,11 @@
 import { joinRoom } from 'trystero/torrent';
 import { loadData, saveData } from './storage';
+import {
+  appendConflicts,
+  getLastSyncTime,
+  setLastSyncTime,
+  SyncConflict,
+} from './sync-conflicts';
 
 const SYNC_KEYS = [
   'tasks',
@@ -11,8 +17,15 @@ const SYNC_KEYS = [
   'ideas',
 ] as const;
 
-function mergeArrays(local: any[], remote: any[]): any[] {
+function mergeArraysWithConflicts(
+  local: any[],
+  remote: any[],
+  lastSyncTime: number,
+  dataKey: string,
+): { merged: any[]; conflicts: SyncConflict[] } {
   const map = new Map(local.map((item: any) => [item.id, item]));
+  const conflicts: SyncConflict[] = [];
+
   remote.forEach((item: any) => {
     if (!map.has(item.id)) {
       map.set(item.id, item);
@@ -20,10 +33,19 @@ function mergeArrays(local: any[], remote: any[]): any[] {
       const loc = map.get(item.id);
       const locTime = new Date(loc.updatedAt ?? loc.createdAt ?? 0).getTime();
       const remTime = new Date(item.updatedAt ?? item.createdAt ?? 0).getTime();
-      if (remTime > locTime) map.set(item.id, item);
+      const locModified = locTime > lastSyncTime;
+      const remModified = remTime > lastSyncTime;
+
+      if (locModified && remModified && JSON.stringify(loc) !== JSON.stringify(item)) {
+        conflicts.push({ id: `${dataKey}:${item.id}`, dataKey, local: loc, remote: item });
+        // Keep local until user resolves
+      } else if (remTime > locTime) {
+        map.set(item.id, item);
+      }
     }
   });
-  return Array.from(map.values());
+
+  return { merged: Array.from(map.values()), conflicts };
 }
 
 export async function collectAllData() {
@@ -33,13 +55,21 @@ export async function collectAllData() {
   return payload;
 }
 
-export async function mergeAndSave(remote: Record<string, any[]>) {
+export async function mergeAndSave(remote: Record<string, any[]>): Promise<number> {
+  const lastSyncTime = await getLastSyncTime();
+  const allConflicts: SyncConflict[] = [];
+
   for (const key of SYNC_KEYS) {
     if (!remote[key]) continue;
     const local = await loadData<any[]>(key, []);
-    const merged = mergeArrays(local, remote[key]);
+    const { merged, conflicts } = mergeArraysWithConflicts(local, remote[key], lastSyncTime, key);
     await saveData(key, merged);
+    allConflicts.push(...conflicts);
   }
+
+  await appendConflicts(allConflicts);
+  await setLastSyncTime(Date.now());
+  return allConflicts.length;
 }
 
 export type SyncStatus = 'idle' | 'waiting' | 'connected' | 'syncing' | 'done' | 'error';
@@ -66,13 +96,11 @@ export function startSync(
   roomCode: string,
   onStatus: (s: SyncStatus) => void,
   onPeerCount: (n: number) => void,
+  onConflicts?: (count: number) => void,
 ): SyncSession {
   if (!isSyncSupported()) {
     onStatus('error');
-    return {
-      leave: () => {},
-      getPeerCount: () => 0,
-    };
+    return { leave: () => {}, getPeerCount: () => 0 };
   }
 
   let peerCount = 0;
@@ -98,10 +126,11 @@ export function startSync(
 
   onData(async (data) => {
     onStatus('syncing');
-    await mergeAndSave(data);
+    const conflictCount = await mergeAndSave(data);
     const merged = await collectAllData();
     sendData(merged);
     onStatus('done');
+    onConflicts?.(conflictCount);
   });
 
   return {

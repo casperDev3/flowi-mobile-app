@@ -196,6 +196,17 @@ export default function SettingsScreen() {
           <SectionLabel label="Дані" color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
             <SettingRow
+              icon="arrow.triangle.2.circlepath"
+              iconColor="#7C3AED"
+              label="Синхронізація"
+              value="QR-код"
+              onPress={() => router.push('/sync')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
               icon="externaldrive"
               iconColor="#6366F1"
               label="Управління даними"

@@ -56,6 +56,7 @@ function RootLayoutContent() {
         <Stack.Screen name="archive" options={{ headerShown: false }} />
         <Stack.Screen name="bugs" options={{ headerShown: false }} />
         <Stack.Screen name="ideas" options={{ headerShown: false }} />
+        <Stack.Screen name="subtasks" options={{ headerShown: false }} />
         <Stack.Screen name="finance-stats" options={{ headerShown: false }} />
         <Stack.Screen name="time-stats" options={{ headerShown: false }} />
         <Stack.Screen name="banks" options={{ headerShown: false }} />

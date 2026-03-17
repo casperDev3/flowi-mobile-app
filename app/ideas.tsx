@@ -23,6 +23,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
 
+// Вставте URL після деплою Google Apps Script
+const REPORTER_URL = 'https://script.google.com/macros/s/AKfycbzCOLtFr1M1bu2yU8AjKfLeqIQ7MKlbCthcfiC0bn6Br2f-tEtmjGJtJHoO7w98FPoN/exec';
+
 type IdeaPriority = 'high' | 'medium' | 'low';
 type IdeaStatus = 'idea' | 'planned' | 'done';
 
@@ -33,6 +36,7 @@ interface Idea {
   priority: IdeaPriority;
   status: IdeaStatus;
   createdAt: string;
+  sentToDev?: boolean;
 }
 
 const PRIORITY: Record<IdeaPriority, { label: string; color: string; icon: string }> = {
@@ -60,7 +64,7 @@ export default function IdeasScreen() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'idea' | 'planned' | 'done'>('all');
+  const [filter, setFilter] = useState<'all' | 'idea' | 'planned' | 'done' | 'sent'>('all');
   const [sort, setSort] = useState<'newest' | 'oldest' | 'priority'>('newest');
 
   const [newTitle, setNewTitle] = useState('');
@@ -97,8 +101,14 @@ export default function IdeasScreen() {
 
   const PRIORITY_ORDER: Record<IdeaPriority, number> = { high: 0, medium: 1, low: 2 };
 
+  const sentCount = ideas.filter(i => !!i.sentToDev).length;
+
   const filtered = ideas
-    .filter(i => filter === 'all' || i.status === filter)
+    .filter(i => {
+      if (filter === 'sent') return !!i.sentToDev;
+      if (filter === 'all') return true;
+      return i.status === filter;
+    })
     .sort((a, b) => {
       if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       if (sort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -158,16 +168,27 @@ export default function IdeasScreen() {
     Alert.alert('Скопійовано', 'Заголовок та опис скопійовано в буфер обміну.');
   }, []);
 
+  const sendToDev = useCallback((idea: Idea) => {
+    if (idea.sentToDev) return;
+    fetch(REPORTER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ type: 'Ідея', title: idea.title, desc: idea.description, extra: PRIORITY[idea.priority].label, status: STATUS_LABELS[idea.status] }),
+    }).catch(() => {});
+    setIdeas(p => p.map(i => i.id === idea.id ? { ...i, sentToDev: true } : i));
+  }, []);
+
   const showIdeaActions = useCallback((idea: Idea) => {
     const nextLabel = STATUS_LABELS[STATUS_CYCLE[idea.status]];
     Alert.alert(idea.title, undefined, [
       { text: 'Редагувати', onPress: () => openEdit(idea) },
       { text: 'Копіювати текст', onPress: () => copyToClipboard(idea) },
       { text: `→ ${nextLabel}`, onPress: () => cycleStatus(idea.id) },
-      { text: 'Видалити', style: 'destructive', onPress: () => deleteIdea(idea.id) },
-      { text: 'Скасувати', style: 'cancel' },
+      ...(!idea.sentToDev ? [{ text: '✉️ Надіслати розробнику', onPress: () => sendToDev(idea) }] : []),
+      { text: 'Видалити', style: 'destructive' as const, onPress: () => deleteIdea(idea.id) },
+      { text: 'Скасувати', style: 'cancel' as const },
     ]);
-  }, [openEdit, copyToClipboard, cycleStatus, deleteIdea]);
+  }, [openEdit, copyToClipboard, cycleStatus, sendToDev, deleteIdea]);
 
   const STATUS_COLORS: Record<IdeaStatus, string> = {
     idea: '#8B5CF6',
@@ -201,28 +222,32 @@ export default function IdeasScreen() {
         <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 14, marginTop: 6 }}>
           <View style={[st.statCard, { backgroundColor: '#8B5CF618', borderColor: '#8B5CF630' }]}>
             <Text style={{ color: '#8B5CF6', fontSize: 20, fontWeight: '800' }}>{ideaCount}</Text>
-            <Text style={{ color: '#8B5CF6', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Ідей</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#8B5CF6', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Ідей</Text>
           </View>
           <View style={[st.statCard, { backgroundColor: '#0EA5E918', borderColor: '#0EA5E930' }]}>
             <Text style={{ color: '#0EA5E9', fontSize: 20, fontWeight: '800' }}>{plannedCount}</Text>
-            <Text style={{ color: '#0EA5E9', fontSize: 11, fontWeight: '600', marginTop: 2 }}>В планах</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#0EA5E9', fontSize: 11, fontWeight: '600', marginTop: 2 }}>В планах</Text>
           </View>
-          <View style={[st.statCard, { backgroundColor: '#10B98118', borderColor: '#10B98130', flex: 1 }]}>
+          <View style={[st.statCard, { backgroundColor: '#10B98118', borderColor: '#10B98130' }]}>
             <Text style={{ color: '#10B981', fontSize: 20, fontWeight: '800' }}>{doneCount}</Text>
-            <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Готово</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#10B981', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Готово</Text>
+          </View>
+          <View style={[st.statCard, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B30', flex: 1 }]}>
+            <Text style={{ color: '#F59E0B', fontSize: 20, fontWeight: '800' }}>{sentCount}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#F59E0B', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Надіслано</Text>
           </View>
         </View>
 
         {/* Filter */}
         <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
           <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.filterRow, { borderColor: c.border }]}>
-            {(['all', 'idea', 'planned', 'done'] as const).map(f => (
+            {(['all', 'idea', 'planned', 'done', 'sent'] as const).map(f => (
               <TouchableOpacity
                 key={f}
                 onPress={() => setFilter(f)}
                 style={[st.filterBtn, filter === f && { backgroundColor: c.accent }]}>
-                <Text style={[st.filterLabel, { color: filter === f ? '#fff' : c.sub }]}>
-                  {f === 'all' ? 'Всі' : STATUS_LABELS[f]}
+                <Text style={[st.filterLabel, { color: filter === f ? '#fff' : c.sub, fontSize: 10 }]}>
+                  {f === 'all' ? 'Всі' : f === 'sent' ? 'Надіслані' : STATUS_LABELS[f as IdeaStatus]}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -271,8 +296,7 @@ export default function IdeasScreen() {
             return (
               <TouchableOpacity
                 key={idea.id}
-                activeOpacity={0.8}
-                onPress={() => cycleStatus(idea.id)}
+                activeOpacity={0.95}
                 onLongPress={() => showIdeaActions(idea)}
                 delayLongPress={350}>
                 <BlurView
@@ -296,6 +320,11 @@ export default function IdeasScreen() {
                           <IconSymbol name={prio.icon as any} size={9} color={prio.color} />
                           <Text style={{ color: prio.color, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>{prio.label}</Text>
                         </View>
+                        {idea.sentToDev && (
+                          <View style={[st.badge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
+                            <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>✉️ Надіслано</Text>
+                          </View>
+                        )}
                       </View>
 
                       <Text style={[st.ideaTitle, { color: c.text, textDecorationLine: isDone ? 'line-through' : 'none' }]}>
@@ -333,6 +362,21 @@ export default function IdeasScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
+
+                  {/* Send to dev button */}
+                  <TouchableOpacity
+                    onPress={() => sendToDev(idea)}
+                    disabled={idea.sentToDev}
+                    activeOpacity={0.7}
+                    style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5,
+                      alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 7,
+                      backgroundColor: 'transparent',
+                      borderWidth: 1, borderColor: idea.sentToDev ? '#10B98130' : c.border }}>
+                    <IconSymbol name="paperplane" size={11} color={idea.sentToDev ? '#10B981' : c.sub} />
+                    <Text style={{ color: idea.sentToDev ? '#10B981' : c.sub, fontSize: 11, fontWeight: '600' }}>
+                      {idea.sentToDev ? 'Надіслано розробнику' : 'Надіслати розробнику'}
+                    </Text>
+                  </TouchableOpacity>
                 </BlurView>
               </TouchableOpacity>
             );
@@ -499,7 +543,7 @@ const st = StyleSheet.create({
   pageTitle:   { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
   backBtn:     { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   addBtn:      { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
-  statCard:    { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
+  statCard:    { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
   filterRow:   { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, overflow: 'hidden' },
   filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 10, alignItems: 'center' },
   filterLabel: { fontSize: 12, fontWeight: '600' },

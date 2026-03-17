@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Dimensions,
@@ -21,6 +21,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
+import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import { useTimerContext } from '@/store/timer-context';
 import type { Project } from '../projects';
 
@@ -31,7 +32,7 @@ type Filter = 'all' | 'active' | 'done';
 type ViewMode = 'list' | 'board';
 type CardDetail = 'compact' | 'detailed';
 
-interface SubTask { id: string; title: string; done: boolean; }
+interface SubTask { id: string; title: string; done: boolean; reminderAt?: string; }
 
 interface Task {
   id: string;
@@ -44,6 +45,7 @@ interface Task {
   estimatedMinutes?: number;
   deadline?: string;
   projectId?: string;
+  reminderAt?: string;
 }
 
 const PRIORITY: Record<Priority, { label: string; color: string }> = {
@@ -160,6 +162,7 @@ export default function TasksScreen() {
 
   const [selected, setSelected] = useState<Task | null>(null);
   const [newSubtask, setNewSubtask] = useState('');
+  const detailScrollRef = useRef<ScrollView>(null);
 
   const [showCal, setShowCal] = useState(false);
   const [calYear, setCalYear] = useState(today.getFullYear());
@@ -169,6 +172,26 @@ export default function TasksScreen() {
   // Inline subtask editing (no nested Modal — prevents iOS freeze)
   const [editingSubId, setEditingSubId] = useState<string | null>(null);
   const [editingSubText, setEditingSubText] = useState('');
+
+  // Task editing state
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editPriority, setEditPriority] = useState<Priority>('medium');
+  const [editEstHours, setEditEstHours] = useState('');
+  const [editEstMins, setEditEstMins] = useState('');
+  const [editDeadline, setEditDeadline] = useState<string | null>(null);
+  const [showEditDeadlineCal, setShowEditDeadlineCal] = useState(false);
+  const [editDeadlineCalYear, setEditDeadlineCalYear] = useState(today.getFullYear());
+  const [editDeadlineCalMonth, setEditDeadlineCalMonth] = useState(today.getMonth());
+  const [showEditProjectDropdown, setShowEditProjectDropdown] = useState(false);
+
+  // Reminder picker state (shown inline in detail modal)
+  const [showReminderPicker, setShowReminderPicker] = useState(false);
+  const [reminderPickerTarget, setReminderPickerTarget] = useState<{ taskId: string; subtaskId?: string } | null>(null);
+  const [reminderHours, setReminderHours] = useState('');
+  const [reminderMins, setReminderMins] = useState('');
+  const [reminderDate, setReminderDate] = useState<string | null>(null);
 
   // Load from storage (useFocusEffect refreshes when returning from subtasks screen)
   useFocusEffect(useCallback(() => {
@@ -192,7 +215,10 @@ export default function TasksScreen() {
   const dueTodayTasks   = tasks.filter(t => t.deadline && new Date(t.deadline).toDateString() === todayStr);
   const doneCount       = dueTodayTasks.filter(t => t.status === 'done').length;
   const activeCount     = dueTodayTasks.filter(t => t.status === 'active').length;
-  const efficiency      = dueTodayTasks.length ? Math.round((doneCount / dueTodayTasks.length) * 100) : 0;
+  // Efficiency based on subtasks (if task has subtasks, count subtask progress; otherwise count task status)
+  const effTotalUnits   = dueTodayTasks.reduce((acc, t) => acc + (t.subtasks.length > 0 ? t.subtasks.length : 1), 0);
+  const effDoneUnits    = dueTodayTasks.reduce((acc, t) => acc + (t.subtasks.length > 0 ? t.subtasks.filter(s => s.done).length : (t.status === 'done' ? 1 : 0)), 0);
+  const efficiency      = effTotalUnits > 0 ? Math.round((effDoneUnits / effTotalUnits) * 100) : 0;
   // Subtasks of tasks due today
   const totalSubtasks   = dueTodayTasks.reduce((acc, t) => acc + t.subtasks.length, 0);
   const doneSubtasks    = dueTodayTasks.reduce((acc, t) => acc + t.subtasks.filter(s => s.done).length, 0);
@@ -374,23 +400,111 @@ export default function TasksScreen() {
     setEditingSubId(null);
   }, []);
 
+  const updateTaskProject = useCallback((taskId: string, projectId: string | null) => {
+    const patch = (t: Task): Task => t.id !== taskId ? t : { ...t, projectId: projectId ?? undefined };
+    setTasks(p => p.map(patch));
+    setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
+  }, []);
+
+  const saveTaskEdit = useCallback(() => {
+    if (!editTitle.trim() || !selected) return;
+    const estH = parseInt(editEstHours || '0', 10);
+    const estM = parseInt(editEstMins || '0', 10);
+    const estimatedMinutes = estH * 60 + estM || undefined;
+    const patch = (t: Task): Task => t.id !== selected.id ? t : {
+      ...t,
+      title: editTitle.trim(),
+      description: editDesc.trim(),
+      priority: editPriority,
+      estimatedMinutes,
+      deadline: editDeadline ?? undefined,
+    };
+    setTasks(p => p.map(patch));
+    setSelected(prev => prev?.id === selected.id ? patch(prev) : prev);
+    setIsEditingTask(false);
+    setShowEditDeadlineCal(false);
+    setShowEditProjectDropdown(false);
+  }, [editTitle, editDesc, editPriority, editEstHours, editEstMins, editDeadline, selected]);
+
+  const openReminderPicker = useCallback((taskId: string, subtaskId?: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const existing = subtaskId
+      ? task.subtasks.find(s => s.id === subtaskId)?.reminderAt
+      : task.reminderAt;
+    if (existing) {
+      const d = new Date(existing);
+      setReminderHours(String(d.getHours()).padStart(2, '0'));
+      setReminderMins(String(d.getMinutes()).padStart(2, '0'));
+      setReminderDate(existing);
+    } else {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 30, 0, 0);
+      setReminderHours(String(now.getHours()).padStart(2, '0'));
+      setReminderMins(String(now.getMinutes()).padStart(2, '0'));
+      setReminderDate(now.toISOString());
+    }
+    setReminderPickerTarget({ taskId, subtaskId });
+    setShowReminderPicker(true);
+  }, [tasks]);
+
+  const saveReminder = useCallback(async () => {
+    if (!reminderPickerTarget) return;
+    const { taskId, subtaskId } = reminderPickerTarget;
+    const h = Math.max(0, Math.min(23, parseInt(reminderHours || '0', 10)));
+    const m = Math.max(0, Math.min(59, parseInt(reminderMins || '0', 10)));
+    const base = reminderDate ? new Date(reminderDate) : new Date();
+    base.setHours(h, m, 0, 0);
+    if (base <= new Date()) {
+      base.setDate(base.getDate() + 1);
+    }
+    const isoDate = base.toISOString();
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const name = subtaskId
+      ? task.subtasks.find(s => s.id === subtaskId)?.title ?? task.title
+      : task.title;
+    await scheduleReminder({ type: subtaskId ? 'subtask' : 'task', taskId, subtaskId, title: name }, base);
+    const patch = (t: Task): Task => {
+      if (t.id !== taskId) return t;
+      if (subtaskId) {
+        return { ...t, subtasks: t.subtasks.map(s => s.id === subtaskId ? { ...s, reminderAt: isoDate } : s) };
+      }
+      return { ...t, reminderAt: isoDate };
+    };
+    setTasks(p => p.map(patch));
+    setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
+    setShowReminderPicker(false);
+    setReminderPickerTarget(null);
+  }, [reminderPickerTarget, reminderHours, reminderMins, reminderDate, tasks]);
+
+  const removeReminder = useCallback(async (taskId: string, subtaskId?: string) => {
+    await cancelReminder(taskId, subtaskId);
+    const patch = (t: Task): Task => {
+      if (t.id !== taskId) return t;
+      if (subtaskId) {
+        return { ...t, subtasks: t.subtasks.map(s => s.id === subtaskId ? { ...s, reminderAt: undefined } : s) };
+      }
+      const { reminderAt: _, ...rest } = t;
+      return rest as Task;
+    };
+    setTasks(p => p.map(patch));
+    setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
+  }, []);
+
   const showSubtaskActions = useCallback((taskId: string, sub: SubTask, idx: number, total: number) => {
     const buttons: any[] = [
       { text: 'Редагувати', onPress: () => { setEditingSubId(sub.id); setEditingSubText(sub.title); } },
       { text: 'Дублювати', onPress: () => duplicateSubtask(taskId, sub) },
       ...(idx > 0 ? [{ text: 'Перемістити вгору', onPress: () => moveSubtask(taskId, sub.id, 'up') }] : []),
       ...(idx < total - 1 ? [{ text: 'Перемістити вниз', onPress: () => moveSubtask(taskId, sub.id, 'down') }] : []),
+      { text: sub.reminderAt ? `Нагадування: ${new Date(sub.reminderAt).toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'Додати нагадування', onPress: () => openReminderPicker(taskId, sub.id) },
+      ...(sub.reminderAt ? [{ text: 'Видалити нагадування', onPress: () => removeReminder(taskId, sub.id) }] : []),
       { text: 'Видалити', style: 'destructive' as const, onPress: () => deleteSubtask(taskId, sub.id) },
       { text: 'Скасувати', style: 'cancel' as const },
     ];
     Alert.alert(sub.title, undefined, buttons);
-  }, [duplicateSubtask, moveSubtask, deleteSubtask]);
-
-  const updateTaskProject = useCallback((taskId: string, projectId: string | null) => {
-    const patch = (t: Task): Task => t.id !== taskId ? t : { ...t, projectId: projectId ?? undefined };
-    setTasks(p => p.map(patch));
-    setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, []);
+  }, [duplicateSubtask, moveSubtask, deleteSubtask, openReminderPicker, removeReminder]);
 
   const startTracking = useCallback((task: Task) => {
     setPendingTask(task.title);
@@ -436,6 +550,15 @@ export default function TasksScreen() {
   for (let i = 1; i <= dlDaysInMonth; i++) dlCells.push(i);
   while (dlCells.length % 7 !== 0) dlCells.push(null);
   const dlWeeks = chunk(dlCells, 7);
+
+  // Edit deadline calendar helpers
+  const editDlFirstDay = (() => { const d = new Date(editDeadlineCalYear, editDeadlineCalMonth, 1).getDay(); return d === 0 ? 6 : d - 1; })();
+  const editDlDaysInMonth = new Date(editDeadlineCalYear, editDeadlineCalMonth + 1, 0).getDate();
+  const editDlCells: (number | null)[] = [];
+  for (let i = 0; i < editDlFirstDay; i++) editDlCells.push(null);
+  for (let i = 1; i <= editDlDaysInMonth; i++) editDlCells.push(i);
+  while (editDlCells.length % 7 !== 0) editDlCells.push(null);
+  const editDlWeeks = chunk(editDlCells, 7);
 
   const selectedTask = selected ? tasks.find(t => t.id === selected.id) ?? selected : null;
   const activeTasks = filtered.filter(t => t.status === 'active');
@@ -1200,18 +1323,194 @@ export default function TasksScreen() {
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
               {selectedTask && (
                 <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-                  <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                  <ScrollView ref={detailScrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     <View style={s.handleRow}>
-                      <View style={{ flex: 1 }} />
+                      <View style={{ flex: 1 }}>
+                        {!isEditingTask && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              setEditTitle(selectedTask.title);
+                              setEditDesc(selectedTask.description);
+                              setEditPriority(selectedTask.priority);
+                              const h = selectedTask.estimatedMinutes ? Math.floor(selectedTask.estimatedMinutes / 60) : 0;
+                              const m = selectedTask.estimatedMinutes ? selectedTask.estimatedMinutes % 60 : 0;
+                              setEditEstHours(h > 0 ? String(h) : '');
+                              setEditEstMins(m > 0 ? String(m) : '');
+                              setEditDeadline(selectedTask.deadline ?? null);
+                              setEditDeadlineCalYear(today.getFullYear());
+                              setEditDeadlineCalMonth(today.getMonth());
+                              setShowEditDeadlineCal(false);
+                              setShowEditProjectDropdown(false);
+                              setIsEditingTask(true);
+                            }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <IconSymbol name="pencil" size={17} color={c.sub} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
                       <View style={[s.handle, { backgroundColor: c.border }]} />
                       <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <TouchableOpacity onPress={() => setSelected(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                        <TouchableOpacity onPress={() => { setSelected(null); setIsEditingTask(false); setShowEditDeadlineCal(false); setShowEditProjectDropdown(false); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                           <IconSymbol name="xmark" size={17} color={c.sub} />
                         </TouchableOpacity>
                       </View>
                     </View>
 
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+                    {isEditingTask ? (
+                      <>
+                        <Text style={[s.sheetTitle, { color: c.text }]}>Редагувати завдання</Text>
+
+                        <TextInput
+                          placeholder="Назва"
+                          placeholderTextColor={c.sub}
+                          value={editTitle}
+                          onChangeText={setEditTitle}
+                          style={[s.input, { backgroundColor: c.dim, color: c.text }]}
+                        />
+                        <TextInput
+                          placeholder="Опис (необов'язково)"
+                          placeholderTextColor={c.sub}
+                          value={editDesc}
+                          onChangeText={setEditDesc}
+                          style={[s.input, { backgroundColor: c.dim, color: c.text, marginTop: 8 }]}
+                        />
+
+                        <Text style={[s.label, { color: c.sub }]}>Пріоритет</Text>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          {(['high', 'medium', 'low'] as Priority[]).map(p => (
+                            <TouchableOpacity key={p} onPress={() => setEditPriority(p)} style={[s.priorityBtn, { borderColor: PRIORITY[p].color, backgroundColor: editPriority === p ? PRIORITY[p].color : 'transparent' }]}>
+                              <Text style={{ color: editPriority === p ? '#fff' : PRIORITY[p].color, fontSize: 12, fontWeight: '600' }}>{PRIORITY[p].label}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+
+                        {projects.length > 0 && (
+                          <>
+                            <Text style={[s.label, { color: c.sub }]}>Проект</Text>
+                            <TouchableOpacity
+                              onPress={() => setShowEditProjectDropdown(v => !v)}
+                              style={[s.dropdownBtn, { backgroundColor: c.dim, borderColor: showEditProjectDropdown ? c.accent : c.border }]}>
+                              {(() => {
+                                const sel = projects.find(p => p.id === selectedTask.projectId);
+                                return sel ? (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
+                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
+                                    <Text style={{ color: sel.color, fontSize: 13, fontWeight: '600', flex: 1 }}>{sel.name}</Text>
+                                  </View>
+                                ) : (
+                                  <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', flex: 1 }}>Без проекту</Text>
+                                );
+                              })()}
+                              <IconSymbol name={showEditProjectDropdown ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
+                            </TouchableOpacity>
+                            {showEditProjectDropdown && (
+                              <View style={[s.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
+                                <TouchableOpacity
+                                  onPress={() => { updateTaskProject(selectedTask.id, null); setShowEditProjectDropdown(false); }}
+                                  style={[s.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !selectedTask.projectId ? c.accent + '12' : 'transparent' }]}>
+                                  <Text style={{ color: !selectedTask.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>Без проекту</Text>
+                                  {!selectedTask.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
+                                </TouchableOpacity>
+                                {projects.map((proj, i) => (
+                                  <TouchableOpacity
+                                    key={proj.id}
+                                    onPress={() => { updateTaskProject(selectedTask.id, proj.id); setShowEditProjectDropdown(false); }}
+                                    style={[s.dropdownItem, { borderBottomWidth: i < projects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: selectedTask.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
+                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: proj.color, marginRight: 8 }} />
+                                    <Text style={{ color: selectedTask.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
+                                    {selectedTask.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            )}
+                          </>
+                        )}
+
+                        <Text style={[s.label, { color: c.sub }]}>Оцінка часу</Text>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TextInput
+                            placeholder="Год"
+                            placeholderTextColor={c.sub}
+                            value={editEstHours}
+                            onChangeText={setEditEstHours}
+                            keyboardType="number-pad"
+                            style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
+                          />
+                          <TextInput
+                            placeholder="Хвил"
+                            placeholderTextColor={c.sub}
+                            value={editEstMins}
+                            onChangeText={setEditEstMins}
+                            keyboardType="number-pad"
+                            style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
+                          />
+                        </View>
+
+                        <Text style={[s.label, { color: c.sub }]}>Дедлайн</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                          <View style={{ flexDirection: 'row', gap: 7 }}>
+                            {DEADLINE_PRESETS.map(preset => {
+                              const d = new Date(); d.setDate(d.getDate() + preset.days);
+                              const iso = d.toISOString();
+                              const isSelected = editDeadline && new Date(editDeadline).toDateString() === d.toDateString();
+                              return (
+                                <TouchableOpacity
+                                  key={preset.label}
+                                  onPress={() => setEditDeadline(isSelected ? null : iso)}
+                                  style={[s.sortChip, { backgroundColor: isSelected ? c.accent : c.dim, borderColor: isSelected ? c.accent : c.border }]}>
+                                  <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>{preset.label}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                            <TouchableOpacity
+                              onPress={() => setShowEditDeadlineCal(v => !v)}
+                              style={[s.sortChip, { backgroundColor: showEditDeadlineCal ? c.accent + '20' : c.dim, borderColor: showEditDeadlineCal ? c.accent : c.border }]}>
+                              <IconSymbol name="calendar" size={13} color={showEditDeadlineCal ? c.accent : c.sub} />
+                              <Text style={{ color: showEditDeadlineCal ? c.accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>Вибрати</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </ScrollView>
+
+                        {editDeadline && (
+                          <View style={[s.badge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50', alignSelf: 'flex-start', marginBottom: 8 }]}>
+                            <IconSymbol name="calendar" size={11} color={c.accent} />
+                            <Text style={{ color: c.accent, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
+                              {new Date(editDeadline).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}
+                            </Text>
+                            <TouchableOpacity onPress={() => setEditDeadline(null)} style={{ marginLeft: 6 }}>
+                              <IconSymbol name="xmark" size={11} color={c.accent} />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+
+                        {showEditDeadlineCal && (
+                          <View style={[s.inlineCalendar, { borderColor: c.border, backgroundColor: c.dim }]}>
+                            <CalendarGrid
+                              year={editDeadlineCalYear} month={editDeadlineCalMonth}
+                              markedDays={new Set()}
+                              selectedDate={editDeadline ? new Date(editDeadline).toDateString() : null}
+                              todayDate={today}
+                              weeks={editDlWeeks}
+                              onPrevMonth={() => { if (editDeadlineCalMonth === 0) { setEditDeadlineCalMonth(11); setEditDeadlineCalYear(y => y - 1); } else setEditDeadlineCalMonth(m => m - 1); }}
+                              onNextMonth={() => { if (editDeadlineCalMonth === 11) { setEditDeadlineCalMonth(0); setEditDeadlineCalYear(y => y + 1); } else setEditDeadlineCalMonth(m => m + 1); }}
+                              onSelectDay={(d) => { setEditDeadline(d.toISOString()); setShowEditDeadlineCal(false); }}
+                              c={c}
+                            />
+                          </View>
+                        )}
+
+                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 20, marginBottom: 8 }}>
+                          <TouchableOpacity onPress={() => { setIsEditingTask(false); setShowEditDeadlineCal(false); setShowEditProjectDropdown(false); }} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                            <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={saveTaskEdit} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
+                            <Text style={{ color: '#fff', fontWeight: '700' }}>Зберегти</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    ) : (
+                    <>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
                       <TouchableOpacity
                         onPress={() => toggleTask(selectedTask.id)}
                         style={[s.checkbox, { borderColor: selectedTask.status === 'done' ? '#10B981' : c.border, backgroundColor: selectedTask.status === 'done' ? '#10B981' : 'transparent', marginTop: 2 }]}>
@@ -1229,7 +1528,7 @@ export default function TasksScreen() {
                     {selectedTask.description ? <Text style={[s.detailDesc, { color: c.sub }]}>{selectedTask.description}</Text> : null}
 
                     {/* Meta badges */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10, marginBottom: 4 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 }}>
                       <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
                         <IconSymbol name="calendar" size={11} color={c.sub} />
                         <Text style={{ color: c.sub, fontSize: 11, fontWeight: '500', marginLeft: 4 }}>
@@ -1256,9 +1555,93 @@ export default function TasksScreen() {
                       )}
                     </View>
 
+                    {/* Reminder row */}
+                    <View style={{ marginTop: 7 }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId) {
+                            setShowReminderPicker(false);
+                          } else {
+                            openReminderPicker(selectedTask.id);
+                          }
+                        }}
+                        style={[s.badge, { backgroundColor: selectedTask.reminderAt ? '#F59E0B20' : c.dim, borderColor: selectedTask.reminderAt ? '#F59E0B50' : c.border, alignSelf: 'flex-start' }]}>
+                        <IconSymbol name="bell" size={11} color={selectedTask.reminderAt ? '#F59E0B' : c.sub} />
+                        <Text style={{ color: selectedTask.reminderAt ? '#F59E0B' : c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
+                          {selectedTask.reminderAt
+                            ? `Нагадування: ${new Date(selectedTask.reminderAt).toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                            : 'Додати нагадування'}
+                        </Text>
+                        {selectedTask.reminderAt && (
+                          <TouchableOpacity
+                            onPress={(e) => { e.stopPropagation(); removeReminder(selectedTask.id); }}
+                            style={{ marginLeft: 6 }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <IconSymbol name="xmark" size={10} color="#F59E0B" />
+                          </TouchableOpacity>
+                        )}
+                      </TouchableOpacity>
+
+                      {showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId && (
+                        <View style={[s.reminderPickerBox, { borderColor: c.border, backgroundColor: c.dim }]}>
+                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 8 }}>ДАТА НАГАДУВАННЯ</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                            <View style={{ flexDirection: 'row', gap: 7 }}>
+                              {[{ label: 'Сьогодні', days: 0 }, { label: 'Завтра', days: 1 }, { label: '+2 дні', days: 2 }, { label: '+7 днів', days: 7 }].map(preset => {
+                                const d = new Date(); d.setDate(d.getDate() + preset.days);
+                                const iso = d.toISOString();
+                                const isSelected = reminderDate && new Date(reminderDate).toDateString() === d.toDateString();
+                                return (
+                                  <TouchableOpacity
+                                    key={preset.label}
+                                    onPress={() => {
+                                      const nd = new Date(d);
+                                      nd.setHours(parseInt(reminderHours || '0', 10), parseInt(reminderMins || '0', 10), 0, 0);
+                                      setReminderDate(nd.toISOString());
+                                    }}
+                                    style={[s.sortChip, { backgroundColor: isSelected ? '#F59E0B' : c.dim, borderColor: isSelected ? '#F59E0B' : c.border }]}>
+                                    <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>{preset.label}</Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          </ScrollView>
+                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 8 }}>ЧАС</Text>
+                          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+                            <TextInput
+                              value={reminderHours}
+                              onChangeText={v => setReminderHours(v.replace(/\D/g, '').slice(0, 2))}
+                              keyboardType="number-pad"
+                              placeholder="ГГ"
+                              placeholderTextColor={c.sub}
+                              style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
+                            />
+                            <Text style={{ color: c.sub, fontSize: 18, fontWeight: '700' }}>:</Text>
+                            <TextInput
+                              value={reminderMins}
+                              onChangeText={v => setReminderMins(v.replace(/\D/g, '').slice(0, 2))}
+                              keyboardType="number-pad"
+                              placeholder="ХХ"
+                              placeholderTextColor={c.sub}
+                              style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
+                            />
+                          </View>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <TouchableOpacity onPress={() => setShowReminderPicker(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                              <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={saveReminder} style={[s.btn, { flex: 2, backgroundColor: '#F59E0B' }]}>
+                              <IconSymbol name="bell" size={14} color="#fff" />
+                              <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 6 }}>Встановити</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+
                     {/* Project changer */}
                     {projects.length > 0 && (
-                      <View style={{ marginTop: 12 }}>
+                      <View style={{ marginTop: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                           <IconSymbol name="folder" size={12} color={c.sub} />
                           <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0 }]}>ПРОЕКТ</Text>
@@ -1303,21 +1686,30 @@ export default function TasksScreen() {
                       </View>
                     )}
 
+                    {/* Subtasks section */}
+                    <View style={{ marginTop: 14, borderRadius: 16, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderWidth: 1, borderColor: c.border, padding: 12 }}>
+
                     {selectedTask.subtasks.length > 0 && (
-                      <View style={{ marginTop: 14, marginBottom: 4 }}>
+                      <View style={{ marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                          <IconSymbol name="list.bullet" size={13} color={c.sub} />
+                          <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0, flex: 1 }]}>
+                            ПІДЗАВДАННЯ · {selectedTask.subtasks.filter(x => x.done).length}/{selectedTask.subtasks.length}
+                          </Text>
+                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{getProgress(selectedTask)}%</Text>
+                        </View>
                         <View style={s.progressBg}>
                           <View style={[s.progressFill, { width: `${getProgress(selectedTask)}%`, backgroundColor: selectedTask.status === 'done' ? '#10B981' : c.accent }]} />
                         </View>
-                        <Text style={[s.label, { color: c.sub, marginTop: 5 }]}>{getProgress(selectedTask)}% виконано</Text>
                       </View>
                     )}
 
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
-                      <IconSymbol name="list.bullet" size={13} color={c.sub} />
-                      <Text style={[s.label, { color: c.sub, marginLeft: 5 }]}>
-                        ПІДЗАВДАННЯ · {selectedTask.subtasks.filter(x => x.done).length}/{selectedTask.subtasks.length}
-                      </Text>
-                    </View>
+                    {!selectedTask.subtasks.length && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                        <IconSymbol name="list.bullet" size={13} color={c.sub} />
+                        <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0 }]}>ПІДЗАВДАННЯ</Text>
+                      </View>
+                    )}
 
                     {(() => {
                       // completed subtasks go to end
@@ -1391,6 +1783,7 @@ export default function TasksScreen() {
                               onChangeText={setNewSubtask}
                               onSubmitEditing={() => addSubtask(selectedTask.id)}
                               returnKeyType="done"
+                              onFocus={() => setTimeout(() => detailScrollRef.current?.scrollToEnd({ animated: true }), 300)}
                               style={[s.subInput, { color: c.text, flex: 1, marginLeft: 8 }]}
                             />
                             {newSubtask.trim() ? (
@@ -1403,10 +1796,12 @@ export default function TasksScreen() {
                       );
                     })()}
 
+                    </View>{/* end subtasks block */}
+
                     {selectedTask.status === 'active' && (
                       <TouchableOpacity
                         onPress={() => startTracking(selectedTask)}
-                        style={[s.btn, { marginTop: 18, backgroundColor: '#6366F1EE' }]}>
+                        style={[s.btn, { marginTop: 14, backgroundColor: '#6366F1EE' }]}>
                         <IconSymbol name="timer" size={15} color="#fff" />
                         <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 7 }}>Почати трекінг</Text>
                       </TouchableOpacity>
@@ -1425,6 +1820,8 @@ export default function TasksScreen() {
                         <Text style={{ color: '#fff', fontWeight: '700' }}>{selectedTask.status === 'done' ? 'Відновити' : 'Виконано'}</Text>
                       </TouchableOpacity>
                     </View>
+                    </>
+                    )}
                   </ScrollView>
                 </BlurView>
               )}
@@ -1594,6 +1991,7 @@ const s = StyleSheet.create({
   sheet:          { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.88 },
   detailSheet:    { borderRadius: 24, borderWidth: 1, padding: 20, maxHeight: Dimensions.get('window').height * 0.88, overflow: 'hidden' },
   inlineCalendar: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 8 },
+  reminderPickerBox: { borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 8 },
   handleRow:      { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:         { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   sheetTitle:     { fontSize: 20, fontWeight: '800', marginBottom: 18 },

@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Image,
@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getAllScheduledNotifications } from '@/store/notifications';
 import { ThemeOption, useTheme } from '@/store/theme-context';
 
 type LangOption = 'uk' | 'en';
@@ -36,6 +37,13 @@ export default function SettingsScreen() {
   const [financeAlerts, setFinanceAlerts] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showLangModal, setShowLangModal] = useState(false);
+  const [scheduledCount, setScheduledCount] = useState(0);
+
+  useFocusEffect(useCallback(() => {
+    getAllScheduledNotifications().then(list => {
+      setScheduledCount(list.filter(n => n.identifier.startsWith('reminder_')).length);
+    });
+  }, []));
 
   const c = {
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
@@ -151,15 +159,13 @@ export default function SettingsScreen() {
           {/* Notifications */}
           <SectionLabel label="Сповіщення" color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <ToggleRow
-              icon="bell"
-              iconColor="#F59E0B"
-              label="Push-сповіщення"
-              value={notifications}
-              onChange={setNotifications}
+            <NotifRow
+              scheduledCount={scheduledCount}
+              onPress={() => router.push('/notifications')}
               text={c.text}
               sub={c.sub}
               border={c.border}
+              accent={c.accent}
               last={false}
             />
             <ToggleRow
@@ -361,6 +367,27 @@ function ToggleRow({ icon, iconColor, label, value, onChange, text, sub, border,
         ios_backgroundColor="rgba(128,128,128,0.3)"
       />
     </View>
+  );
+}
+
+function NotifRow({ scheduledCount, onPress, text, sub, border, accent, last }: any) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+      <View style={[st.iconBox, { backgroundColor: '#F59E0B20' }]}>
+        <IconSymbol name="bell.badge" size={17} color="#F59E0B" />
+      </View>
+      <Text style={[st.rowLabel, { color: text, flex: 1 }]}>Сповіщення</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {scheduledCount > 0 && (
+          <View style={{ backgroundColor: accent, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{scheduledCount}</Text>
+          </View>
+        )}
+        <IconSymbol name="chevron.right" size={16} color={sub} />
+      </View>
+    </TouchableOpacity>
   );
 }
 

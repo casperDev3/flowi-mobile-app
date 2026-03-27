@@ -66,7 +66,6 @@ export default function DataScreen() {
   const [openingBackup, setOpeningBackup] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
-
   const c = {
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
@@ -75,6 +74,9 @@ export default function DataScreen() {
     sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
+    overlay:isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
+    sheet:  isDark ? '#1A1830' : '#F8F6FF',
   };
 
   const loadCounts = useCallback(async () => {
@@ -243,32 +245,6 @@ export default function DataScreen() {
 
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
-          {/* ─── Stats compact ─── */}
-          <Text style={[st.sectionLabel, { color: c.sub }]}>СТАТИСТИКА ДАНИХ</Text>
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, marginBottom: 24 }]}>
-            {/* Total */}
-            <View style={[st.statRow, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-              <View style={[st.statDot, { backgroundColor: c.accent + '20' }]}>
-                <IconSymbol name="externaldrive.fill" size={13} color={c.accent} />
-              </View>
-              <Text style={[st.statLabel, { color: c.text }]}>Всього записів</Text>
-              <Text style={[st.statVal, { color: c.accent }]}>{totalItems}</Text>
-            </View>
-            {ALL_KEYS.map((item, i) => (
-              <View
-                key={item.key}
-                style={[st.statRow, i < ALL_KEYS.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                <View style={[st.statDot, { backgroundColor: item.color + '20' }]}>
-                  <IconSymbol name={item.icon as IconSymbolName} size={13} color={item.color} />
-                </View>
-                <Text style={[st.statLabel, { color: c.sub }]}>{item.label}</Text>
-                <Text style={[st.statVal, { color: counts[item.key] ? c.text : c.sub }]}>
-                  {counts[item.key] ?? 0}
-                </Text>
-              </View>
-            ))}
-          </BlurView>
-
           {/* ─── Auto-backup ─── */}
           <Text style={[st.sectionLabel, { color: c.sub }]}>АВТО-РЕЗЕРВУВАННЯ</Text>
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, marginBottom: 24 }]}>
@@ -381,8 +357,34 @@ export default function DataScreen() {
             </TouchableOpacity>
           </BlurView>
 
+          {/* ─── Stats compact ─── */}
+          <Text style={[st.sectionLabel, { color: c.sub, marginTop: 24 }]}>СТАТИСТИКА ДАНИХ</Text>
+          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, marginBottom: 24 }]}>
+            {/* Total */}
+            <View style={[st.statRow, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+              <View style={[st.statDot, { backgroundColor: c.accent + '20' }]}>
+                <IconSymbol name="externaldrive.fill" size={13} color={c.accent} />
+              </View>
+              <Text style={[st.statLabel, { color: c.text }]}>Всього записів</Text>
+              <Text style={[st.statVal, { color: c.accent }]}>{totalItems}</Text>
+            </View>
+            {ALL_KEYS.map((item, i) => (
+              <View
+                key={item.key}
+                style={[st.statRow, i < ALL_KEYS.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                <View style={[st.statDot, { backgroundColor: item.color + '20' }]}>
+                  <IconSymbol name={item.icon as IconSymbolName} size={13} color={item.color} />
+                </View>
+                <Text style={[st.statLabel, { color: c.sub }]}>{item.label}</Text>
+                <Text style={[st.statVal, { color: counts[item.key] ? c.text : c.sub }]}>
+                  {counts[item.key] ?? 0}
+                </Text>
+              </View>
+            ))}
+          </BlurView>
         </ScrollView>
       </SafeAreaView>
+
     </View>
   );
 }

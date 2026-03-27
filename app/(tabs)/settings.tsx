@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Image,
@@ -20,22 +20,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/store/i18n';
+import { getAllScheduledNotifications } from '@/store/notifications';
 import { ThemeOption, useTheme } from '@/store/theme-context';
-
-type LangOption = 'uk' | 'en';
+import { Lang } from '@/store/translations';
 
 export default function SettingsScreen() {
   const cs = useColorScheme();
   const isDark = cs === 'dark';
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { lang, setLang, tr } = useI18n();
 
-  const [lang, setLang] = useState<LangOption>('uk');
   const [notifications, setNotifications] = useState(true);
   const [taskReminders, setTaskReminders] = useState(true);
   const [financeAlerts, setFinanceAlerts] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showLangModal, setShowLangModal] = useState(false);
+  const [scheduledCount, setScheduledCount] = useState(0);
+
+  useFocusEffect(useCallback(() => {
+    getAllScheduledNotifications().then(list => {
+      setScheduledCount(list.filter(n => n.identifier.startsWith('reminder_')).length);
+    });
+  }, []));
 
   const c = {
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
@@ -51,8 +59,8 @@ export default function SettingsScreen() {
     green:  '#10B981',
   };
 
-  const THEME_LABELS: Record<ThemeOption, string> = { system: 'Системна', light: 'Світла', dark: 'Темна' };
-  const LANG_LABELS: Record<LangOption, string> = { uk: 'Українська', en: 'English' };
+  const THEME_LABELS: Record<ThemeOption, string> = { system: tr.themeSystem, light: tr.themeLight, dark: tr.themeDark };
+  const LANG_LABELS: Record<Lang, string> = { uk: tr.langUk, en: tr.langEn };
 
   return (
     <View style={{ flex: 1 }}>
@@ -64,16 +72,16 @@ export default function SettingsScreen() {
           showsVerticalScrollIndicator={false}>
 
           <View style={{ marginTop: 10, marginBottom: 28 }}>
-            <Text style={[st.pageTitle, { color: c.text }]}>Налаштування</Text>
+            <Text style={[st.pageTitle, { color: c.text }]}>{tr.settings}</Text>
           </View>
 
           {/* Support — first */}
-          <SectionLabel label="Підтримка" color={c.sub} />
+          <SectionLabel label={tr.sectionSupport} color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
             <SettingRow
               icon="heart.fill"
               iconColor="#EF4444"
-              label="Задонатити"
+              label={tr.donate}
               value="PayPal · Donatello"
               onPress={() => router.push('/donate')}
               text={c.text}
@@ -84,7 +92,7 @@ export default function SettingsScreen() {
             <SettingRow
               icon="person.fill"
               iconColor="#7C3AED"
-              label="Розробник"
+              label={tr.developer}
               value="Igor Lialiuk"
               onPress={() => router.push('/developer')}
               text={c.text}
@@ -95,13 +103,13 @@ export default function SettingsScreen() {
           </BlurView>
 
           {/* Розробка */}
-          <SectionLabel label="Розробка" color={c.sub} />
+          <SectionLabel label={tr.sectionDev} color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
             <SettingRow
               icon="ladybug.fill"
               iconColor="#EF4444"
-              label="Список багів"
-              value="Помилки"
+              label={tr.bugList}
+              value={tr.bugsValue}
               onPress={() => router.push('/bugs')}
               text={c.text}
               sub={c.sub}
@@ -111,8 +119,8 @@ export default function SettingsScreen() {
             <SettingRow
               icon="lightbulb.fill"
               iconColor="#8B5CF6"
-              label="Ідеї"
-              value="Функції"
+              label={tr.ideas}
+              value={tr.features}
               onPress={() => router.push('/ideas')}
               text={c.text}
               sub={c.sub}
@@ -122,12 +130,12 @@ export default function SettingsScreen() {
           </BlurView>
 
           {/* Appearance */}
-          <SectionLabel label="Зовнішній вигляд" color={c.sub} />
+          <SectionLabel label={tr.sectionAppearance} color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
             <SettingRow
               icon="paintbrush"
               iconColor="#8B5CF6"
-              label="Тема"
+              label={tr.theme}
               value={THEME_LABELS[theme]}
               onPress={() => setShowThemeModal(true)}
               text={c.text}
@@ -138,7 +146,7 @@ export default function SettingsScreen() {
             <SettingRow
               icon="globe"
               iconColor="#0EA5E9"
-              label="Мова"
+              label={tr.language}
               value={LANG_LABELS[lang]}
               onPress={() => setShowLangModal(true)}
               text={c.text}
@@ -149,23 +157,22 @@ export default function SettingsScreen() {
           </BlurView>
 
           {/* Notifications */}
-          <SectionLabel label="Сповіщення" color={c.sub} />
+          <SectionLabel label={tr.sectionNotifications} color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <ToggleRow
-              icon="bell"
-              iconColor="#F59E0B"
-              label="Push-сповіщення"
-              value={notifications}
-              onChange={setNotifications}
+            <NotifRow
+              label={tr.notifications}
+              scheduledCount={scheduledCount}
+              onPress={() => router.push('/notifications')}
               text={c.text}
               sub={c.sub}
               border={c.border}
+              accent={c.accent}
               last={false}
             />
             <ToggleRow
               icon="checklist"
               iconColor="#7C3AED"
-              label="Нагадування по завданнях"
+              label={tr.taskReminders}
               value={taskReminders}
               onChange={setTaskReminders}
               text={c.text}
@@ -176,7 +183,7 @@ export default function SettingsScreen() {
             <ToggleRow
               icon="banknote"
               iconColor="#10B981"
-              label="Фінансові сповіщення"
+              label={tr.financeAlerts}
               value={financeAlerts}
               onChange={setFinanceAlerts}
               text={c.text}
@@ -187,12 +194,23 @@ export default function SettingsScreen() {
           </BlurView>
 
           {/* Data */}
-          <SectionLabel label="Дані" color={c.sub} />
+          <SectionLabel label={tr.sectionData} color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <SettingRow
+              icon="arrow.triangle.2.circlepath"
+              iconColor="#7C3AED"
+              label={tr.sync}
+              value="QR-код"
+              onPress={() => router.push('/sync')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
             <SettingRow
               icon="externaldrive"
               iconColor="#6366F1"
-              label="Управління даними"
+              label={tr.dataManagement}
               value={undefined}
               onPress={() => router.push('/data')}
               text={c.text}
@@ -203,12 +221,12 @@ export default function SettingsScreen() {
           </BlurView>
 
           {/* About */}
-          <SectionLabel label="Про додаток" color={c.sub} />
+          <SectionLabel label={tr.sectionAbout} color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
             <InfoRow
               icon="info"
               iconColor={c.sub}
-              label="Версія"
+              label={tr.version}
               value="0.0.1"
               text={c.text}
               sub={c.sub}
@@ -218,8 +236,8 @@ export default function SettingsScreen() {
             <SettingRow
               icon="heart.fill"
               iconColor="#EF4444"
-              label="Оцінити додаток"
-              onPress={() => Alert.alert('У розробці', 'Ця функція ще в розробці.')}
+              label={tr.rateApp}
+              onPress={() => Alert.alert(tr.inDevelopment, tr.inDevelopmentMsg)}
               text={c.text}
               sub={c.sub}
               border={c.border}
@@ -228,8 +246,8 @@ export default function SettingsScreen() {
             <SettingRow
               icon="paperplane.fill"
               iconColor="#0EA5E9"
-              label="Надіслати відгук"
-              onPress={() => Alert.alert('У розробці', 'Ця функція ще в розробці.')}
+              label={tr.sendFeedback}
+              onPress={() => Alert.alert(tr.inDevelopment, tr.inDevelopmentMsg)}
               text={c.text}
               sub={c.sub}
               border={c.border}
@@ -268,7 +286,7 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
-                <Text style={[st.sheetTitle, { color: c.text }]}>Тема</Text>
+                <Text style={[st.sheetTitle, { color: c.text }]}>{tr.theme}</Text>
                 {(['system', 'light', 'dark'] as ThemeOption[]).map((t, i, arr) => (
                   <TouchableOpacity
                     key={t}
@@ -304,8 +322,8 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
-                <Text style={[st.sheetTitle, { color: c.text }]}>Мова</Text>
-                {(['uk', 'en'] as LangOption[]).map((l, i, arr) => (
+                <Text style={[st.sheetTitle, { color: c.text }]}>{tr.language}</Text>
+                {(['uk', 'en'] as Lang[]).map((l, i, arr) => (
                   <TouchableOpacity
                     key={l}
                     onPress={() => { setLang(l); setShowLangModal(false); }}
@@ -361,6 +379,27 @@ function ToggleRow({ icon, iconColor, label, value, onChange, text, sub, border,
         ios_backgroundColor="rgba(128,128,128,0.3)"
       />
     </View>
+  );
+}
+
+function NotifRow({ label, scheduledCount, onPress, text, sub, border, accent, last }: any) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+      <View style={[st.iconBox, { backgroundColor: '#F59E0B20' }]}>
+        <IconSymbol name="bell.badge" size={17} color="#F59E0B" />
+      </View>
+      <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {scheduledCount > 0 && (
+          <View style={{ backgroundColor: accent, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{scheduledCount}</Text>
+          </View>
+        )}
+        <IconSymbol name="chevron.right" size={16} color={sub} />
+      </View>
+    </TouchableOpacity>
   );
 }
 

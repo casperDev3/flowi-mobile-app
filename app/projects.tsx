@@ -200,7 +200,7 @@ export default function ProjectsScreen() {
                 intensity={isDark ? 50 : 70}
                 tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
@@ -240,7 +240,7 @@ export default function ProjectsScreen() {
                   ))}
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 22 }}>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 22, marginBottom: 4 }}>
                   <TouchableOpacity onPress={closeModal} style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>
                     <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
                   </TouchableOpacity>
@@ -250,6 +250,7 @@ export default function ProjectsScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
+                </ScrollView>
               </BlurView>
             </Pressable>
           </Pressable>

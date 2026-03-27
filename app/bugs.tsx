@@ -23,6 +23,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
 
+// Вставте URL після деплою Google Apps Script
+const REPORTER_URL = 'https://script.google.com/macros/s/AKfycbzCOLtFr1M1bu2yU8AjKfLeqIQ7MKlbCthcfiC0bn6Br2f-tEtmjGJtJHoO7w98FPoN/exec';
+
 type Severity = 'critical' | 'major' | 'minor';
 
 interface Bug {
@@ -32,6 +35,7 @@ interface Bug {
   severity: Severity;
   fixed: boolean;
   createdAt: string;
+  sentToDev?: boolean;
 }
 
 const SEVERITY: Record<Severity, { label: string; color: string; icon: string }> = {
@@ -47,7 +51,7 @@ export default function BugsScreen() {
   const [bugs, setBugs] = useState<Bug[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'open' | 'fixed'>('open');
+  const [filter, setFilter] = useState<'all' | 'open' | 'fixed' | 'sent'>('open');
   const [sort, setSort] = useState<'newest' | 'oldest' | 'severity'>('newest');
 
   const [newTitle, setNewTitle] = useState('');
@@ -86,10 +90,13 @@ export default function BugsScreen() {
 
   const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, major: 1, minor: 2 };
 
+  const sentCount = bugs.filter(b => !!b.sentToDev).length;
+
   const filtered = bugs
     .filter(b => {
       if (filter === 'open') return !b.fixed;
       if (filter === 'fixed') return b.fixed;
+      if (filter === 'sent') return !!b.sentToDev;
       return true;
     })
     .sort((a, b) => {
@@ -152,15 +159,26 @@ export default function BugsScreen() {
     Alert.alert('Скопійовано', 'Заголовок та опис скопійовано в буфер обміну.');
   }, []);
 
+  const sendToDev = useCallback((bug: Bug) => {
+    if (bug.sentToDev) return;
+    fetch(REPORTER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ type: 'Баг', title: bug.title, desc: bug.description, extra: SEVERITY[bug.severity].label }),
+    }).catch(() => {});
+    setBugs(p => p.map(b => b.id === bug.id ? { ...b, sentToDev: true } : b));
+  }, []);
+
   const showBugActions = useCallback((bug: Bug) => {
     Alert.alert(bug.title, undefined, [
       { text: 'Редагувати', onPress: () => openEdit(bug) },
       { text: 'Копіювати текст', onPress: () => copyToClipboard(bug) },
       { text: bug.fixed ? 'Відкрити знову' : 'Позначити виправленим', onPress: () => toggleFixed(bug.id) },
-      { text: 'Видалити', style: 'destructive', onPress: () => deleteBug(bug.id) },
-      { text: 'Скасувати', style: 'cancel' },
+      ...(!bug.sentToDev ? [{ text: '✉️ Надіслати розробнику', onPress: () => sendToDev(bug) }] : []),
+      { text: 'Видалити', style: 'destructive' as const, onPress: () => deleteBug(bug.id) },
+      { text: 'Скасувати', style: 'cancel' as const },
     ]);
-  }, [openEdit, copyToClipboard, toggleFixed, deleteBug]);
+  }, [openEdit, copyToClipboard, toggleFixed, sendToDev, deleteBug]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -182,28 +200,32 @@ export default function BugsScreen() {
         <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 14, marginTop: 6 }}>
           <View style={[st.statCard, { backgroundColor: '#EF444418', borderColor: '#EF444430' }]}>
             <Text style={{ color: '#EF4444', fontSize: 20, fontWeight: '800' }}>{openCount}</Text>
-            <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Відкритих</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#EF4444', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Відкритих</Text>
           </View>
           <View style={[st.statCard, { backgroundColor: '#10B98118', borderColor: '#10B98130' }]}>
             <Text style={{ color: '#10B981', fontSize: 20, fontWeight: '800' }}>{fixedCount}</Text>
-            <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Виправлених</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#10B981', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Виправлених</Text>
+          </View>
+          <View style={[st.statCard, { backgroundColor: '#0EA5E918', borderColor: '#0EA5E930' }]}>
+            <Text style={{ color: '#0EA5E9', fontSize: 20, fontWeight: '800' }}>{sentCount}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#0EA5E9', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Надіслано</Text>
           </View>
           <View style={[st.statCard, { backgroundColor: c.dim, borderColor: c.border, flex: 1 }]}>
             <Text style={{ color: c.text, fontSize: 20, fontWeight: '800' }}>{bugs.length}</Text>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>Всього</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>Всього</Text>
           </View>
         </View>
 
         {/* Filter */}
         <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
           <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.filterRow, { borderColor: c.border }]}>
-            {(['all', 'open', 'fixed'] as const).map(f => (
+            {(['all', 'open', 'fixed', 'sent'] as const).map(f => (
               <TouchableOpacity
                 key={f}
                 onPress={() => setFilter(f)}
                 style={[st.filterBtn, filter === f && { backgroundColor: c.accent }]}>
-                <Text style={[st.filterLabel, { color: filter === f ? '#fff' : c.sub }]}>
-                  {f === 'all' ? 'Всі' : f === 'open' ? 'Відкриті' : 'Виправлені'}
+                <Text style={[st.filterLabel, { color: filter === f ? '#fff' : c.sub, fontSize: 11 }]}>
+                  {f === 'all' ? 'Всі' : f === 'open' ? 'Відкриті' : f === 'fixed' ? 'Виправлені' : 'Надіслані'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -253,8 +275,7 @@ export default function BugsScreen() {
             return (
               <TouchableOpacity
                 key={bug.id}
-                activeOpacity={0.8}
-                onPress={() => toggleFixed(bug.id)}
+                activeOpacity={0.95}
                 onLongPress={() => showBugActions(bug)}
                 delayLongPress={350}>
                 <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.bugCard, { borderColor: bug.fixed ? '#10B98130' : sv.color + '40', opacity: bug.fixed ? 0.7 : 1 }]}>
@@ -275,6 +296,11 @@ export default function BugsScreen() {
                         {bug.fixed && (
                           <View style={[st.severityBadge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
                             <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>Виправлено</Text>
+                          </View>
+                        )}
+                        {bug.sentToDev && (
+                          <View style={[st.severityBadge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
+                            <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>✉️ Надіслано</Text>
                           </View>
                         )}
                       </View>
@@ -314,6 +340,21 @@ export default function BugsScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
+
+                  {/* Send to dev button */}
+                  <TouchableOpacity
+                    onPress={() => sendToDev(bug)}
+                    disabled={bug.sentToDev}
+                    activeOpacity={0.7}
+                    style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5,
+                      alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 7,
+                      backgroundColor: 'transparent',
+                      borderWidth: 1, borderColor: bug.sentToDev ? '#10B98130' : c.border }}>
+                    <IconSymbol name="paperplane" size={11} color={bug.sentToDev ? '#10B981' : c.sub} />
+                    <Text style={{ color: bug.sentToDev ? '#10B981' : c.sub, fontSize: 11, fontWeight: '600' }}>
+                      {bug.sentToDev ? 'Надіслано розробнику' : 'Надіслати розробнику'}
+                    </Text>
+                  </TouchableOpacity>
                 </BlurView>
               </TouchableOpacity>
             );
@@ -350,7 +391,7 @@ export default function BugsScreen() {
                     style={[st.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border }]}
                   />
 
-                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов'язково)</Text>
+                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов’язково)</Text>
                   <TextInput
                     placeholder="Де виникає, як відтворити..."
                     placeholderTextColor={c.sub}
@@ -430,7 +471,7 @@ export default function BugsScreen() {
                     style={[st.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border }]}
                   />
 
-                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов'язково)</Text>
+                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов’язково)</Text>
                   <TextInput
                     placeholder="Де виникає, як відтворити..."
                     placeholderTextColor={c.sub}
@@ -488,7 +529,7 @@ const st = StyleSheet.create({
   pageTitle:    { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
   backBtn:      { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   addBtn:       { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 },
-  statCard:     { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
+  statCard:     { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
   filterRow:    { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, overflow: 'hidden' },
   filterBtn:    { flex: 1, paddingVertical: 7, borderRadius: 10, alignItems: 'center' },
   filterLabel:  { fontSize: 12, fontWeight: '600' },

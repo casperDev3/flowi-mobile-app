@@ -23,22 +23,14 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
 import { useTimerContext } from '@/store/timer-context';
+import { useI18n } from '@/store/i18n';
 
 type Shift = 'morning' | 'day' | 'evening' | 'night';
 
 interface ShiftCfg { label: string; icon: IconSymbolName; color: string; hours: string; }
 
-const SHIFTS: Record<Shift, ShiftCfg> = {
-  morning: { label: 'Ранок',  icon: 'sun.horizon.fill', color: '#F59E0B', hours: '06–12' },
-  day:     { label: 'День',   icon: 'sun.max.fill',     color: '#EF4444', hours: '12–18' },
-  evening: { label: 'Вечір',  icon: 'sunset.fill',      color: '#8B5CF6', hours: '18–24' },
-  night:   { label: 'Ніч',    icon: 'moon.fill',        color: '#0EA5E9', hours: '00–06' },
-};
-
 interface TimeEntry { id: string; task: string; shift: Shift; duration: number; date: string; }
 
-const MONTHS_UA = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
-const WEEKDAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const today = new Date();
 const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
 
@@ -48,10 +40,10 @@ function chunk<T>(arr: T[], n: number): T[][] {
   return out;
 }
 
-function groupLabel(date: Date) {
-  if (date.toDateString() === today.toDateString()) return 'Сьогодні';
-  if (date.toDateString() === yesterday.toDateString()) return 'Вчора';
-  return date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' });
+function groupLabel(date: Date, todayStr: string, yesterdayStr: string, locale: string) {
+  if (date.toDateString() === today.toDateString()) return todayStr;
+  if (date.toDateString() === yesterday.toDateString()) return yesterdayStr;
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 }
 
 const fmtClock = (s: number) => {
@@ -70,6 +62,16 @@ export default function TimeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { pendingTask, setPendingTask } = useTimerContext();
+  const { tr, lang } = useI18n();
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+  const SHIFTS: Record<Shift, ShiftCfg> = {
+    morning: { label: tr.morning, icon: 'sun.horizon.fill', color: '#F59E0B', hours: '06–12' },
+    day:     { label: tr.daytime, icon: 'sun.max.fill',     color: '#EF4444', hours: '12–18' },
+    evening: { label: tr.evening, icon: 'sunset.fill',      color: '#8B5CF6', hours: '18–24' },
+    night:   { label: tr.night,   icon: 'moon.fill',        color: '#0EA5E9', hours: '00–06' },
+  };
+  const MONTHS_UA = tr.months;
+  const WEEKDAYS_SHORT = tr.weekdays;
 
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -152,7 +154,7 @@ export default function TimeScreen() {
   const toggle = () => {
     if (running) {
       if (elapsed > 0) {
-        setEntries(p => [{ id: Date.now().toString(), task: taskName.trim() || 'Без назви', shift: activeShift, duration: elapsed, date: new Date().toISOString() }, ...p]);
+        setEntries(p => [{ id: Date.now().toString(), task: taskName.trim() || (lang === 'uk' ? 'Без назви' : 'Untitled'), shift: activeShift, duration: elapsed, date: new Date().toISOString() }, ...p]);
       }
       setElapsed(0); setRunning(false);
     } else {
@@ -184,7 +186,7 @@ export default function TimeScreen() {
     filteredEntries.forEach(e => {
       const d = new Date(e.date);
       const key = d.toDateString();
-      if (!map[key]) { map[key] = { label: groupLabel(d), items: [], dayTotal: 0 }; order.push(key); }
+      if (!map[key]) { map[key] = { label: groupLabel(d, tr.today, tr.yesterday, locale), items: [], dayTotal: 0 }; order.push(key); }
       map[key].items.push(e);
       map[key].dayTotal += e.duration;
     });
@@ -248,7 +250,7 @@ export default function TimeScreen() {
               style={[s.dateChip, { backgroundColor: c.indigo + '20', borderColor: c.indigo + '60' }]}>
               <IconSymbol name="calendar" size={13} color={c.indigo} />
               <Text style={{ color: c.indigo, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>
-                {new Date(dateFilter).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}
+                {new Date(dateFilter).toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
               </Text>
               <IconSymbol name="xmark" size={13} color={c.indigo} style={{ marginLeft: 4 }} />
             </TouchableOpacity>
@@ -270,7 +272,7 @@ export default function TimeScreen() {
 
             {!running ? (
               <TextInput
-                placeholder="Назва завдання..."
+                placeholder={tr.taskNamePlaceholder2}
                 placeholderTextColor={c.sub}
                 value={taskName}
                 onChangeText={setTaskName}
@@ -278,7 +280,7 @@ export default function TimeScreen() {
                 textAlign="center"
               />
             ) : (
-              <Text style={[s.runLabel, { color: c.sub }]}>{taskName || 'Відстеження...'}</Text>
+              <Text style={[s.runLabel, { color: c.sub }]}>{taskName || tr.tracking}</Text>
             )}
 
             {!running ? (
@@ -307,17 +309,17 @@ export default function TimeScreen() {
 
             <TouchableOpacity onPress={toggle} style={[s.timerBtn, { backgroundColor: c.accent }]} activeOpacity={0.85}>
               <IconSymbol name={running ? 'stop.fill' : 'play.fill'} size={14} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700', marginLeft: 7 }}>{running ? 'Зупинити' : 'Почати'}</Text>
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700', marginLeft: 7 }}>{running ? tr.stop : tr.start}</Text>
             </TouchableOpacity>
           </BlurView>
 
           {/* Stats */}
           <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card, marginTop: 14 }]}>
-            <StatCell value={total > 0 ? fmtDur(total) : '—'} label="Всього"  color={c.indigo} sub={c.sub} />
+            <StatCell value={total > 0 ? fmtDur(total) : '—'} label={tr.totalLabel}    color={c.indigo} sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border }} />
-            <StatCell value={String(entries.length)}           label="Сесій"   color="#10B981" sub={c.sub} />
+            <StatCell value={String(entries.length)}           label={tr.sessionsCount} color="#10B981" sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border }} />
-            <StatCell value={avg > 0 ? fmtDur(avg) : '—'}     label="Середнє" color="#F59E0B" sub={c.sub} />
+            <StatCell value={avg > 0 ? fmtDur(avg) : '—'}     label={tr.avgLabel}      color="#F59E0B" sub={c.sub} />
           </View>
 
           {/* History */}
@@ -328,7 +330,7 @@ export default function TimeScreen() {
           {filteredEntries.length === 0 && (
             <View style={{ alignItems: 'center', paddingVertical: 48 }}>
               <IconSymbol name="clock.fill" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>Ще немає записів</Text>
+              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noRecordsYet}</Text>
               <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>Натисніть + для ручного запису</Text>
             </View>
           )}
@@ -392,7 +394,7 @@ export default function TimeScreen() {
                 {dateFilter
                   ? <View style={[s.menuPill, { backgroundColor: c.indigo + '20', borderColor: c.indigo + '40' }]}>
                       <Text style={[s.menuPillText, { color: c.indigo }]}>
-                        {new Date(dateFilter).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                        {new Date(dateFilter).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                       </Text>
                     </View>
                   : <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -479,7 +481,7 @@ export default function TimeScreen() {
                 {dateFilter && (
                   <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { borderColor: c.border }]}>
                     <IconSymbol name="xmark" size={13} color={c.sub} />
-                    <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5 }}>Скинути фільтр</Text>
+                    <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5 }}>{tr.resetFilter}</Text>
                   </TouchableOpacity>
                 )}
               </BlurView>
@@ -509,7 +511,7 @@ export default function TimeScreen() {
                   {/* Task name */}
                   <Text style={[s.label, { color: c.sub }]}>ЗАВДАННЯ</Text>
                   <TextInput
-                    placeholder="Назва завдання..."
+                    placeholder={tr.taskNamePlaceholder2}
                     placeholderTextColor={c.sub}
                     value={manTask}
                     onChangeText={setManTask}
@@ -528,7 +530,7 @@ export default function TimeScreen() {
                         keyboardType="number-pad"
                         style={{ color: c.indigo, fontSize: 36, fontWeight: '700', textAlign: 'center', letterSpacing: -1 }}
                       />
-                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>год</Text>
+                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.hrs}</Text>
                     </View>
                     <Text style={{ color: c.sub, fontSize: 28, fontWeight: '200', alignSelf: 'center', marginBottom: 16 }}>:</Text>
                     <View style={{ flex: 1, alignItems: 'center' }}>
@@ -540,7 +542,7 @@ export default function TimeScreen() {
                         keyboardType="number-pad"
                         style={{ color: c.indigo, fontSize: 36, fontWeight: '700', textAlign: 'center', letterSpacing: -1 }}
                       />
-                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>хвил</Text>
+                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.mins}</Text>
                     </View>
                   </View>
 
@@ -564,14 +566,14 @@ export default function TimeScreen() {
 
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 22 }}>
                     <TouchableOpacity onPress={() => setShowAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                      <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
+                      <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={addManual}
                       disabled={!manTask.trim()}
                       style={[s.btn, { flex: 2, backgroundColor: manTask.trim() ? c.indigo : c.dim }]}>
                       <IconSymbol name="timer" size={15} color={manTask.trim() ? '#fff' : c.sub} />
-                      <Text style={{ color: manTask.trim() ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>Зберегти</Text>
+                      <Text style={{ color: manTask.trim() ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>{tr.save}</Text>
                     </TouchableOpacity>
                   </View>
                 </ScrollView>
@@ -617,8 +619,8 @@ export default function TimeScreen() {
                       </View>
 
                       <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim, marginTop: 14 }]}>
-                        <InfoRow icon="timer"    label="Тривалість"  value={fmtDur(selected.duration)} text={c.text} sub={c.sub} border={c.border} last={false} />
-                        <InfoRow icon="calendar" label="Дата"        value={new Date(selected.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} text={c.text} sub={c.sub} border={c.border} last />
+                        <InfoRow icon="timer"    label={tr.duration}  value={fmtDur(selected.duration)} text={c.text} sub={c.sub} border={c.border} last={false} />
+                        <InfoRow icon="calendar" label={tr.date}      value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} text={c.text} sub={c.sub} border={c.border} last />
                       </View>
 
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
@@ -626,10 +628,10 @@ export default function TimeScreen() {
                           onPress={() => deleteEntry(selected.id)}
                           style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
                           <IconSymbol name="trash" size={15} color="#EF4444" />
-                          <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>Видалити</Text>
+                          <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 2, backgroundColor: c.indigo }]}>
-                          <Text style={{ color: '#fff', fontWeight: '700' }}>Закрити</Text>
+                          <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.close}</Text>
                         </TouchableOpacity>
                       </View>
                     </ScrollView>

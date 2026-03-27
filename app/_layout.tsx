@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AutoBackupProvider } from '@/store/auto-backup';
+import { I18nProvider } from '@/store/i18n';
 import { ThemeProvider } from '@/store/theme-context';
 import { TimerProvider } from '@/store/timer-context';
 
@@ -59,11 +60,15 @@ function RootLayoutContent() {
         <Stack.Screen name="subtasks" options={{ headerShown: false }} />
         <Stack.Screen name="finance-stats" options={{ headerShown: false }} />
         <Stack.Screen name="time-stats" options={{ headerShown: false }} />
+        <Stack.Screen name="time-records" options={{ headerShown: false }} />
         <Stack.Screen name="banks" options={{ headerShown: false }} />
         <Stack.Screen name="data" options={{ headerShown: false }} />
         <Stack.Screen name="donate" options={{ headerShown: false }} />
         <Stack.Screen name="developer" options={{ headerShown: false }} />
         <Stack.Screen name="sync" options={{ headerShown: false }} />
+        <Stack.Screen name="meetings" options={{ headerShown: false }} />
+        <Stack.Screen name="apple-health" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
@@ -73,12 +78,14 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <AutoBackupProvider>
-        <TimerProvider>
-          <RootLayoutContent />
-        </TimerProvider>
-      </AutoBackupProvider>
-    </ThemeProvider>
+    <I18nProvider>
+      <ThemeProvider>
+        <AutoBackupProvider>
+          <TimerProvider>
+            <RootLayoutContent />
+          </TimerProvider>
+        </AutoBackupProvider>
+      </ThemeProvider>
+    </I18nProvider>
   );
 }

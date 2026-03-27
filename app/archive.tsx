@@ -199,7 +199,7 @@ export default function ArchiveScreen() {
                 <IconSymbol name="archivebox.fill" size={32} color={c.accent} />
               </View>
               <Text style={{ color: c.sub, fontSize: 15, marginTop: 18, fontWeight: '600' }}>Архів порожній</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 5, opacity: 0.7 }}>Виконані завдання з'являться тут</Text>
+              <Text style={{ color: c.sub, fontSize: 13, marginTop: 5, opacity: 0.7 }}>Виконані завдання з’являться тут</Text>
             </View>
           )}
 

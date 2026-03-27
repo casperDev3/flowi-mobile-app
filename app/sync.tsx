@@ -188,7 +188,7 @@ export default function SyncScreen() {
               <View style={[st.corner, { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 }]} />
               <View style={[st.corner, { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 }]} />
             </View>
-            <Text style={st.camHint}>Наведіть на QR-код з екрану комп'ютера</Text>
+            <Text style={st.camHint}>Наведіть на QR-код з екрану комп’ютера</Text>
           </View>
         </SafeAreaView>
       </View>

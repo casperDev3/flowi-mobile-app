@@ -27,7 +27,7 @@ import { loadData, saveData } from '@/store/storage';
 const REPORTER_URL = 'https://script.google.com/macros/s/AKfycbzCOLtFr1M1bu2yU8AjKfLeqIQ7MKlbCthcfiC0bn6Br2f-tEtmjGJtJHoO7w98FPoN/exec';
 
 type IdeaPriority = 'high' | 'medium' | 'low';
-type IdeaStatus = 'idea' | 'planned' | 'done';
+type IdeaStatus = 'idea' | 'done';
 
 interface Idea {
   id: string;
@@ -46,14 +46,12 @@ const PRIORITY: Record<IdeaPriority, { label: string; color: string; icon: strin
 };
 
 const STATUS_CYCLE: Record<IdeaStatus, IdeaStatus> = {
-  idea: 'planned',
-  planned: 'done',
+  idea: 'done',
   done: 'idea',
 };
 
 const STATUS_LABELS: Record<IdeaStatus, string> = {
   idea: 'Ідея',
-  planned: 'В планах',
   done: 'Реалізовано',
 };
 
@@ -64,7 +62,7 @@ export default function IdeasScreen() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'idea' | 'planned' | 'done' | 'sent'>('all');
+  const [filter, setFilter] = useState<'all' | 'idea' | 'done' | 'sent'>('all');
   const [sort, setSort] = useState<'newest' | 'oldest' | 'priority'>('newest');
 
   const [newTitle, setNewTitle] = useState('');
@@ -107,7 +105,7 @@ export default function IdeasScreen() {
     .filter(i => {
       if (filter === 'sent') return !!i.sentToDev;
       if (filter === 'all') return true;
-      return i.status === filter;
+      return i.status === filter || (filter === 'idea' && i.status === ('planned' as any));
     })
     .sort((a, b) => {
       if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -115,9 +113,8 @@ export default function IdeasScreen() {
       return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
     });
 
-  const ideaCount    = ideas.filter(i => i.status === 'idea').length;
-  const plannedCount = ideas.filter(i => i.status === 'planned').length;
-  const doneCount    = ideas.filter(i => i.status === 'done').length;
+  const ideaCount = ideas.filter(i => i.status === 'idea' || i.status === ('planned' as any)).length;
+  const doneCount = ideas.filter(i => i.status === 'done').length;
 
   const addIdea = useCallback(() => {
     if (!newTitle.trim()) return;
@@ -135,7 +132,11 @@ export default function IdeasScreen() {
   }, [newTitle, newDesc, newPriority]);
 
   const cycleStatus = useCallback((id: string) => {
-    setIdeas(p => p.map(i => i.id === id ? { ...i, status: STATUS_CYCLE[i.status] } : i));
+    setIdeas(p => p.map(i => {
+      if (i.id !== id) return i;
+      const cur = (i.status === 'planned' as any) ? 'idea' : i.status;
+      return { ...i, status: STATUS_CYCLE[cur as IdeaStatus] };
+    }));
   }, []);
 
   const deleteIdea = useCallback((id: string) => {
@@ -179,7 +180,8 @@ export default function IdeasScreen() {
   }, []);
 
   const showIdeaActions = useCallback((idea: Idea) => {
-    const nextLabel = STATUS_LABELS[STATUS_CYCLE[idea.status]];
+    const curStatus: IdeaStatus = (idea.status === 'planned' as any) ? 'idea' : idea.status;
+    const nextLabel = STATUS_LABELS[STATUS_CYCLE[curStatus]];
     Alert.alert(idea.title, undefined, [
       { text: 'Редагувати', onPress: () => openEdit(idea) },
       { text: 'Копіювати текст', onPress: () => copyToClipboard(idea) },
@@ -190,15 +192,15 @@ export default function IdeasScreen() {
     ]);
   }, [openEdit, copyToClipboard, cycleStatus, sendToDev, deleteIdea]);
 
-  const STATUS_COLORS: Record<IdeaStatus, string> = {
+  const STATUS_COLORS: Record<string, string> = {
     idea: '#8B5CF6',
-    planned: '#0EA5E9',
+    planned: '#8B5CF6',
     done: '#10B981',
   };
 
-  const STATUS_ICONS: Record<IdeaStatus, string> = {
+  const STATUS_ICONS: Record<string, string> = {
     idea: 'lightbulb',
-    planned: 'calendar',
+    planned: 'lightbulb',
     done: 'checkmark',
   };
 
@@ -224,10 +226,6 @@ export default function IdeasScreen() {
             <Text style={{ color: '#8B5CF6', fontSize: 20, fontWeight: '800' }}>{ideaCount}</Text>
             <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#8B5CF6', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Ідей</Text>
           </View>
-          <View style={[st.statCard, { backgroundColor: '#0EA5E918', borderColor: '#0EA5E930' }]}>
-            <Text style={{ color: '#0EA5E9', fontSize: 20, fontWeight: '800' }}>{plannedCount}</Text>
-            <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#0EA5E9', fontSize: 11, fontWeight: '600', marginTop: 2 }}>В планах</Text>
-          </View>
           <View style={[st.statCard, { backgroundColor: '#10B98118', borderColor: '#10B98130' }]}>
             <Text style={{ color: '#10B981', fontSize: 20, fontWeight: '800' }}>{doneCount}</Text>
             <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: '#10B981', fontSize: 11, fontWeight: '600', marginTop: 2 }}>Готово</Text>
@@ -241,7 +239,7 @@ export default function IdeasScreen() {
         {/* Filter */}
         <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
           <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.filterRow, { borderColor: c.border }]}>
-            {(['all', 'idea', 'planned', 'done', 'sent'] as const).map(f => (
+            {(['all', 'idea', 'done', 'sent'] as const).map(f => (
               <TouchableOpacity
                 key={f}
                 onPress={() => setFilter(f)}
@@ -314,7 +312,7 @@ export default function IdeasScreen() {
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                         <View style={[st.badge, { backgroundColor: statusColor + '20', borderColor: statusColor + '40' }]}>
-                          <Text style={{ color: statusColor, fontSize: 10, fontWeight: '700' }}>{STATUS_LABELS[idea.status]}</Text>
+                          <Text style={{ color: statusColor, fontSize: 10, fontWeight: '700' }}>{STATUS_LABELS[idea.status as IdeaStatus] ?? STATUS_LABELS['idea']}</Text>
                         </View>
                         <View style={[st.badge, { backgroundColor: prio.color + '18', borderColor: prio.color + '35' }]}>
                           <IconSymbol name={prio.icon as any} size={9} color={prio.color} />
@@ -413,7 +411,7 @@ export default function IdeasScreen() {
                     style={[st.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border }]}
                   />
 
-                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов'язково)</Text>
+                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов’язково)</Text>
                   <TextInput
                     placeholder="Опис, мотивація, приклади..."
                     placeholderTextColor={c.sub}
@@ -489,7 +487,7 @@ export default function IdeasScreen() {
                     style={[st.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border }]}
                   />
 
-                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов'язково)</Text>
+                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов’язково)</Text>
                   <TextInput
                     placeholder="Опис, мотивація, приклади..."
                     placeholderTextColor={c.sub}

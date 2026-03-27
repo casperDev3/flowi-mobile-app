@@ -52,6 +52,14 @@
             "backgroundColor": "#163A5F"
           }
         }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Flowi читає дані зі здоров'я для відображення пульсу, кроків та інших метрик.",
+          "NSHealthUpdateUsageDescription": "Flowi зберігає дані здоров'я для персональних звітів.",
+          "background": true
+        }
       ]
     ],
     "experiments": {

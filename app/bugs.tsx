@@ -391,7 +391,7 @@ export default function BugsScreen() {
                     style={[st.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border }]}
                   />
 
-                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов'язково)</Text>
+                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов’язково)</Text>
                   <TextInput
                     placeholder="Де виникає, як відтворити..."
                     placeholderTextColor={c.sub}
@@ -471,7 +471,7 @@ export default function BugsScreen() {
                     style={[st.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border }]}
                   />
 
-                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов'язково)</Text>
+                  <Text style={[st.label, { color: c.sub }]}>ДЕТАЛІ (необов’язково)</Text>
                   <TextInput
                     placeholder="Де виникає, як відтворити..."
                     placeholderTextColor={c.sub}

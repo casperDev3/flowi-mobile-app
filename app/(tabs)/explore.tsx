@@ -19,6 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
 
 type TxType = 'income' | 'expense';
@@ -27,27 +28,59 @@ interface Transaction {
   id: string; type: TxType; category: string; amount: number; note: string; date: string;
 }
 
-const CATEGORIES: Record<TxType, string[]> = {
-  income:  ['Зарплата', 'Фріланс', 'Інвестиції', 'Подарунок', 'Інше'],
-  expense: ['Їжа', 'Транспорт', 'Розваги', "Здоров'я", 'Комунальні', 'Одяг', 'Інше'],
+interface CategoryDef { name: string; icon: IconSymbolName; }
+
+const DEFAULT_CATEGORIES_UK: Record<TxType, CategoryDef[]> = {
+  income: [
+    { name: 'Зарплата',   icon: 'briefcase.fill' },
+    { name: 'Фріланс',    icon: 'laptopcomputer' },
+    { name: 'Інвестиції', icon: 'chart.line.uptrend.xyaxis' },
+    { name: 'Подарунок',  icon: 'gift.fill' },
+    { name: 'Інше',       icon: 'ellipsis.circle.fill' },
+  ],
+  expense: [
+    { name: 'Їжа',        icon: 'fork.knife' },
+    { name: 'Транспорт',  icon: 'car.fill' },
+    { name: 'Розваги',    icon: 'gamecontroller.fill' },
+    { name: "Здоров'я",   icon: 'cross.fill' },
+    { name: 'Комунальні', icon: 'house.fill' },
+    { name: 'Одяг',       icon: 'tag.fill' },
+    { name: 'Інше',       icon: 'ellipsis.circle.fill' },
+  ],
 };
 
-const CATEGORY_ICONS: Record<string, IconSymbolName> = {
-  'Зарплата':    'briefcase.fill',
-  'Фріланс':     'laptopcomputer',
-  'Інвестиції':  'chart.line.uptrend.xyaxis',
-  'Подарунок':   'gift.fill',
-  'Їжа':         'fork.knife',
-  'Транспорт':   'car.fill',
-  'Розваги':     'gamecontroller.fill',
-  "Здоров'я":    'cross.fill',
-  'Комунальні':  'house.fill',
-  'Одяг':        'tag.fill',
-  'Інше':        'ellipsis.circle.fill',
+const DEFAULT_CATEGORIES_EN: Record<TxType, CategoryDef[]> = {
+  income: [
+    { name: 'Salary',      icon: 'briefcase.fill' },
+    { name: 'Freelance',   icon: 'laptopcomputer' },
+    { name: 'Investments', icon: 'chart.line.uptrend.xyaxis' },
+    { name: 'Gift',        icon: 'gift.fill' },
+    { name: 'Other',       icon: 'ellipsis.circle.fill' },
+  ],
+  expense: [
+    { name: 'Food',          icon: 'fork.knife' },
+    { name: 'Transport',     icon: 'car.fill' },
+    { name: 'Entertainment', icon: 'gamecontroller.fill' },
+    { name: 'Health',        icon: 'cross.fill' },
+    { name: 'Utilities',     icon: 'house.fill' },
+    { name: 'Clothing',      icon: 'tag.fill' },
+    { name: 'Other',         icon: 'ellipsis.circle.fill' },
+  ],
 };
 
-const MONTHS_UA = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
-const WEEKDAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+const ICON_SUGGESTIONS: IconSymbolName[] = [
+  'briefcase.fill', 'laptopcomputer', 'chart.line.uptrend.xyaxis', 'gift.fill',
+  'fork.knife', 'car.fill', 'gamecontroller.fill', 'cross.fill', 'house.fill',
+  'tag.fill', 'ellipsis.circle.fill', 'cart.fill', 'bag.fill', 'creditcard.fill',
+  'banknote', 'person.fill', 'airplane', 'heart.fill', 'star.fill', 'flame.fill',
+  'bolt.fill', 'leaf.fill', 'books.vertical.fill', 'graduationcap.fill',
+  'phone.fill', 'camera.fill', 'bicycle', 'figure.walk', 'drop.fill',
+  'pawprint.fill', 'building.2.fill', 'building.columns.fill',
+  'dollarsign.circle.fill', 'chart.pie.fill', 'music.note', 'tv.fill',
+  'doc.fill', 'wrench.fill', 'chart.bar.fill', 'clock.fill',
+];
+
+
 const today = new Date();
 const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
 
@@ -57,17 +90,23 @@ function chunk<T>(arr: T[], n: number): T[][] {
   return out;
 }
 
-function groupLabel(date: Date) {
-  if (date.toDateString() === today.toDateString()) return 'Сьогодні';
-  if (date.toDateString() === yesterday.toDateString()) return 'Вчора';
-  return date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' });
+function groupLabel(date: Date, todayStr: string, yesterdayStr: string, locale: string) {
+  if (date.toDateString() === todayStr) return '__today__';
+  if (date.toDateString() === yesterdayStr) return '__yesterday__';
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 }
 
-const fmt = (n: number) => n.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
+// fmt defined inside component
 
 export default function FinanceScreen() {
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
+  const { tr, lang } = useI18n();
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+  const DEFAULT_CATEGORIES = lang === 'uk' ? DEFAULT_CATEGORIES_UK : DEFAULT_CATEGORIES_EN;
+  const MONTHS_UA = tr.months;
+  const WEEKDAYS_SHORT = tr.weekdays;
+  const fmt = (n: number) => n.toLocaleString(locale, { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [filter, setFilter] = useState<'all' | TxType>('all');
@@ -85,6 +124,15 @@ export default function FinanceScreen() {
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
 
+  // Categories management
+  const [cats, setCats] = useState<Record<TxType, CategoryDef[]>>(DEFAULT_CATEGORIES);
+  const [catsInitialized, setCatsInitialized] = useState(false);
+  const [showCats, setShowCats] = useState(false);
+  const [catTab, setCatTab] = useState<TxType>('expense');
+  const [showAddCat, setShowAddCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatIcon, setNewCatIcon] = useState<IconSymbolName>('ellipsis.circle.fill');
+
   // Load from storage
   useEffect(() => {
     loadData<Transaction[]>('transactions', []).then(data => {
@@ -97,6 +145,32 @@ export default function FinanceScreen() {
   useEffect(() => {
     if (initialized) saveData('transactions', txs);
   }, [txs, initialized]);
+
+  // Load categories
+  useEffect(() => {
+    loadData<Record<TxType, CategoryDef[]>>('categories', DEFAULT_CATEGORIES).then(data => {
+      setCats(data);
+      setCatsInitialized(true);
+    });
+  }, []);
+
+  // Save categories
+  useEffect(() => {
+    if (catsInitialized) saveData('categories', cats);
+  }, [cats, catsInitialized]);
+
+  const getCatIcon = (catName: string, type: TxType): IconSymbolName =>
+    cats[type].find(c => c.name === catName)?.icon ??
+    DEFAULT_CATEGORIES[type].find(c => c.name === catName)?.icon ??
+    (type === 'income' ? 'arrow.up.trend' : 'arrow.down.trend');
+
+  const addCategory = () => {
+    const trimmed = newCatName.trim();
+    if (!trimmed) return;
+    if (cats[catTab].some(c => c.name === trimmed)) return;
+    setCats(prev => ({ ...prev, [catTab]: [...prev[catTab], { name: trimmed, icon: newCatIcon }] }));
+    setNewCatName(''); setNewCatIcon('ellipsis.circle.fill'); setShowAddCat(false);
+  };
 
   const income  = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const expense = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -174,11 +248,11 @@ export default function FinanceScreen() {
 
         {/* Fixed Header */}
         <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Фінанси</Text>
+          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.finance}</Text>
           <TouchableOpacity
             onPress={() => setCompact(v => !v)}
             style={[s.headerBtn, { backgroundColor: compact ? c.accent + '20' : c.dim, borderColor: compact ? c.accent : c.border }]}>
-            <IconSymbol name={compact ? 'list.bullet' : 'rectangle.stack'} size={17} color={compact ? c.accent : c.sub} />
+            <IconSymbol name={compact ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={compact ? c.accent : c.sub} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setShowMenu(true)}
@@ -198,7 +272,7 @@ export default function FinanceScreen() {
               style={[s.dateChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
               <IconSymbol name="calendar" size={13} color={c.accent} />
               <Text style={{ color: c.accent, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>
-                {new Date(dateFilter).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}
+                {new Date(dateFilter).toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
               </Text>
               <IconSymbol name="xmark" size={13} color={c.accent} style={{ marginLeft: 4 }} />
             </TouchableOpacity>
@@ -206,20 +280,20 @@ export default function FinanceScreen() {
 
           {/* Balance Card */}
           <BlurView intensity={isDark ? 25 : 45} tint={isDark ? 'dark' : 'light'} style={[s.balCard, { borderColor: c.border }]}>
-            <Text style={[s.balLabel, { color: c.sub }]}>Баланс</Text>
+            <Text style={[s.balLabel, { color: c.sub }]}>{tr.balance}</Text>
             <Text style={[s.balAmount, { color: balance >= 0 ? c.green : c.red }]}>{fmt(balance)}</Text>
             <View style={[s.divider, { backgroundColor: c.border, marginVertical: 16 }]} />
             <View style={{ flexDirection: 'row' }}>
-              <SummaryItem label="Доходи"  value={fmt(income)}  color={c.green} sub={c.sub} />
+              <SummaryItem label={tr.incomes} value={fmt(income)} color={c.green} sub={c.sub} />
               <View style={{ width: 1, backgroundColor: c.border }} />
-              <SummaryItem label="Витрати" value={fmt(expense)} color={c.red}   sub={c.sub} />
+              <SummaryItem label={tr.expenses} value={fmt(expense)} color={c.red} sub={c.sub} />
             </View>
             {income > 0 && (
               <>
                 <View style={[s.divider, { backgroundColor: c.border, marginTop: 16, marginBottom: 12 }]} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.miniLabel, { color: c.sub, marginBottom: 6 }]}>Заощадження</Text>
+                    <Text style={[s.miniLabel, { color: c.sub, marginBottom: 6 }]}>{tr.savings}</Text>
                     <View style={s.progressBg}>
                       <View style={[s.progressFill, { width: `${savingsPct}%`, backgroundColor: c.green }]} />
                     </View>
@@ -238,7 +312,7 @@ export default function FinanceScreen() {
                 onPress={() => setFilter(f)}
                 style={[s.filterBtn, filter === f && { backgroundColor: f === 'income' ? c.green : f === 'expense' ? c.red : c.accent }]}>
                 <Text style={[s.filterLabel, { color: filter === f ? '#fff' : c.sub }]}>
-                  {f === 'all' ? 'Всі' : f === 'income' ? 'Доходи' : 'Витрати'}
+                  {f === 'all' ? tr.all : f === 'income' ? tr.incomes : tr.expenses}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -248,62 +322,92 @@ export default function FinanceScreen() {
           {groups.length === 0 && (
             <View style={{ alignItems: 'center', paddingVertical: 56 }}>
               <IconSymbol name="banknote" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>Немає транзакцій</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>Натисніть + щоб додати</Text>
+              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noTransactions}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>{tr.pressToAdd}</Text>
             </View>
           )}
 
           {/* Grouped transactions */}
           {groups.map(group => (
-            <View key={group.label} style={{ marginBottom: 8 }}>
+            <View key={group.label} style={{ marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <Text style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{group.label}</Text>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
                   {group.dayIncome > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <IconSymbol name="arrow.up.trend" size={11} color={c.green} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.green + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                      <IconSymbol name="arrow.up" size={9} color={c.green} />
                       <Text style={{ color: c.green, fontSize: 11, fontWeight: '700' }}>{fmt(group.dayIncome)}</Text>
                     </View>
                   )}
                   {group.dayExpense > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <IconSymbol name="arrow.down.trend" size={11} color={c.red} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.red + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                      <IconSymbol name="arrow.down" size={9} color={c.red} />
                       <Text style={{ color: c.red, fontSize: 11, fontWeight: '700' }}>{fmt(group.dayExpense)}</Text>
                     </View>
                   )}
                 </View>
               </View>
 
-              <View style={{ gap: compact ? 4 : 8 }}>
-                {group.items.map(tx => {
+              <View style={{ gap: compact ? 8 : 2 }}>
+                {group.items.map((tx, idx) => {
                   const isIncome = tx.type === 'income';
                   const color = isIncome ? c.green : c.red;
-                  const iconName: IconSymbolName = CATEGORY_ICONS[tx.category] ?? (isIncome ? 'arrow.up.trend' : 'arrow.down.trend');
+                  const iconName: IconSymbolName = getCatIcon(tx.category, tx.type);
+                  const txDate = new Date(tx.date);
+
                   if (compact) {
+                    // ── Детальний режим ──────────────────────────────────────
                     return (
                       <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => setSelected(tx)}>
-                        <View style={[s.txCompact, { borderColor: c.border, backgroundColor: c.card }]}>
-                          <View style={[s.txAccentBar, { backgroundColor: color }]} />
-                          <View style={[s.txIconSm, { backgroundColor: color + (isDark ? '22' : '15'), marginLeft: 10 }]}>
-                            <IconSymbol name={iconName} size={13} color={color} />
+                        <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.txDetail, { borderColor: c.border }]}>
+                          <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: color + '70', borderRadius: 2, marginRight: 12 }} />
+                          <View style={[s.txDetailIcon, { backgroundColor: color + (isDark ? '20' : '12') }]}>
+                            <IconSymbol name={iconName} size={19} color={color} />
                           </View>
-                          <View style={{ flex: 1, marginLeft: 9 }}>
-                            <Text style={[s.txCategorySm, { color: c.text }]} numberOfLines={1}>{tx.category}</Text>
-                            {tx.note ? <Text style={[s.txNoteSm, { color: c.sub, marginTop: 1 }]} numberOfLines={1}>{tx.note}</Text> : null}
+                          <View style={{ flex: 1, marginLeft: 11 }}>
+                            <Text style={[s.txDetailCategory, { color: c.text }]} numberOfLines={1}>{tx.category}</Text>
+                            {tx.note ? (
+                              <Text style={[s.txDetailNote, { color: c.sub, marginTop: 2 }]} numberOfLines={1}>{tx.note}</Text>
+                            ) : null}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}>
+                              <IconSymbol name="clock" size={10} color={c.sub} />
+                              <Text style={{ color: c.sub, fontSize: 10, fontWeight: '500' }}>
+                                {txDate.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
+                              </Text>
+                              <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: c.sub + '80' }} />
+                              <View style={{ backgroundColor: color + '20', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                                <Text style={{ color, fontSize: 9, fontWeight: '700' }}>{isIncome ? tr.income : tr.expense}</Text>
+                              </View>
+                            </View>
                           </View>
-                          <Text style={[s.txAmountSm, { color, marginLeft: 8 }]}>{isIncome ? '+' : '−'}{fmt(tx.amount)}</Text>
-                        </View>
+                          <Text style={[s.txDetailAmount, { color }]}>{isIncome ? '+' : '−'}{fmt(tx.amount)}</Text>
+                        </BlurView>
                       </TouchableOpacity>
                     );
                   }
+
+                  // ── Звичний режим ──────────────────────────────────────────
+                  const isFirst = idx === 0;
+                  const isLast = idx === group.items.length - 1;
                   return (
                     <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => setSelected(tx)}>
-                      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.txCard, { borderColor: c.border }]}>
-                        <View style={[s.txIcon, { backgroundColor: color + (isDark ? '22' : '15') }]}>
-                          <IconSymbol name={iconName} size={17} color={color} />
+                      <BlurView
+                        intensity={isDark ? 16 : 28}
+                        tint={isDark ? 'dark' : 'light'}
+                        style={[
+                          s.txCard,
+                          {
+                            borderTopLeftRadius: isFirst ? 13 : 5,
+                            borderTopRightRadius: isFirst ? 13 : 5,
+                            borderBottomLeftRadius: isLast ? 13 : 5,
+                            borderBottomRightRadius: isLast ? 13 : 5,
+                          }
+                        ]}>
+                        <View style={[s.txIcon, { backgroundColor: color + (isDark ? '20' : '12') }]}>
+                          <IconSymbol name={iconName} size={14} color={color} />
                         </View>
-                        <View style={{ flex: 1, marginLeft: 13 }}>
-                          <Text style={[s.txCategory, { color: c.text }]}>{tx.category}</Text>
+                        <View style={{ flex: 1, marginLeft: 9 }}>
+                          <Text style={[s.txCategory, { color: c.text }]} numberOfLines={1}>{tx.category}</Text>
                           {tx.note ? <Text style={[s.txNote, { color: c.sub }]} numberOfLines={1}>{tx.note}</Text> : null}
                         </View>
                         <Text style={[s.txAmount, { color }]}>{isIncome ? '+' : '−'}{fmt(tx.amount)}</Text>
@@ -339,7 +443,20 @@ export default function FinanceScreen() {
                 <View style={[s.menuIconBox, { backgroundColor: '#0EA5E9' + '25' }]}>
                   <IconSymbol name="chart.bar.fill" size={15} color="#0EA5E9" />
                 </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>Статистика</Text>
+                <Text style={[s.menuLabel, { color: c.text }]}>{tr.statistics}</Text>
+                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              </TouchableOpacity>
+
+              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+              {/* Категорії */}
+              <TouchableOpacity
+                onPress={() => { setShowMenu(false); setShowCats(true); }}
+                style={s.menuItem}>
+                <View style={[s.menuIconBox, { backgroundColor: '#F59E0B25' }]}>
+                  <IconSymbol name="tag.fill" size={15} color="#F59E0B" />
+                </View>
+                <Text style={[s.menuLabel, { color: c.text }]}>{tr.categories}</Text>
                 <IconSymbol name="chevron.right" size={13} color={c.sub} />
               </TouchableOpacity>
 
@@ -352,7 +469,7 @@ export default function FinanceScreen() {
                 <View style={[s.menuIconBox, { backgroundColor: '#10B981' + '25' }]}>
                   <IconSymbol name="building.columns.fill" size={15} color="#10B981" />
                 </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>Скарбнички</Text>
+                <Text style={[s.menuLabel, { color: c.text }]}>{tr.piggyBanks}</Text>
                 <IconSymbol name="chevron.right" size={13} color={c.sub} />
               </TouchableOpacity>
 
@@ -369,7 +486,7 @@ export default function FinanceScreen() {
                 {dateFilter
                   ? <View style={[s.menuPill, { backgroundColor: c.accent + '20', borderColor: c.accent + '40' }]}>
                       <Text style={[s.menuPillText, { color: c.accent }]}>
-                        {new Date(dateFilter).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                        {new Date(dateFilter).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                       </Text>
                     </View>
                   : <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -446,7 +563,7 @@ export default function FinanceScreen() {
                 {dateFilter && (
                   <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { borderColor: c.border }]}>
                     <IconSymbol name="xmark" size={13} color={c.sub} />
-                    <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5 }}>Скинути фільтр</Text>
+                    <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5 }}>{tr.resetFilter}</Text>
                   </TouchableOpacity>
                 )}
               </BlurView>
@@ -481,7 +598,7 @@ export default function FinanceScreen() {
                         style={[s.typeBtn, txType === t && { backgroundColor: t === 'income' ? c.green : c.red }]}>
                         <IconSymbol name={t === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={14} color={txType === t ? '#fff' : c.sub} />
                         <Text style={{ fontSize: 13, fontWeight: '700', marginLeft: 5, color: txType === t ? '#fff' : c.sub }}>
-                          {t === 'income' ? 'Дохід' : 'Витрата'}
+                          {t === 'income' ? tr.income : tr.expense}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -489,7 +606,7 @@ export default function FinanceScreen() {
 
                   {/* Amount display */}
                   <View style={[s.amountBlock, { backgroundColor: (txType === 'income' ? c.green : c.red) + '12', borderColor: (txType === 'income' ? c.green : c.red) + '30' }]}>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>СУМА (₴)</Text>
+                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>{tr.amountUAH}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={{ color: txType === 'income' ? c.green : c.red, fontSize: 28, fontWeight: '300' }}>₴</Text>
                       <TextInput
@@ -506,25 +623,24 @@ export default function FinanceScreen() {
                   {/* Category */}
                   <Text style={[s.label, { color: c.sub }]}>Категорія</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
-                    {CATEGORIES[txType].map(cat => {
-                      const catIcon: IconSymbolName = CATEGORY_ICONS[cat] ?? 'ellipsis.circle.fill';
-                      const isSelected = category === cat;
+                    {cats[txType].map(cat => {
+                      const isSelected = category === cat.name;
                       return (
                         <TouchableOpacity
-                          key={cat}
-                          onPress={() => setCategory(cat)}
+                          key={cat.name}
+                          onPress={() => setCategory(cat.name)}
                           style={[s.catChip, { backgroundColor: isSelected ? c.accent : c.dim, borderColor: isSelected ? c.accent : c.border }]}>
-                          <IconSymbol name={catIcon} size={13} color={isSelected ? '#fff' : c.sub} />
-                          <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{cat}</Text>
+                          <IconSymbol name={cat.icon} size={13} color={isSelected ? '#fff' : c.sub} />
+                          <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{cat.name}</Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
 
                   {/* Note */}
-                  <Text style={[s.label, { color: c.sub }]}>Нотатка</Text>
+                  <Text style={[s.label, { color: c.sub }]}>{tr.note}</Text>
                   <TextInput
-                    placeholder="Необов'язково..."
+                    placeholder={tr.notePlaceholder}
                     placeholderTextColor={c.sub}
                     value={note}
                     onChangeText={setNote}
@@ -533,14 +649,14 @@ export default function FinanceScreen() {
 
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
                     <TouchableOpacity onPress={() => setShowAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                      <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
+                      <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={addTx}
                       disabled={!amount.trim() || !category}
                       style={[s.btn, { flex: 2, backgroundColor: (!amount.trim() || !category) ? c.dim : c.accent }]}>
                       <IconSymbol name={txType === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={15} color={(!amount.trim() || !category) ? c.sub : '#fff'} />
-                      <Text style={{ color: (!amount.trim() || !category) ? c.sub : '#fff', fontWeight: '700', marginLeft: 6 }}>Додати</Text>
+                      <Text style={{ color: (!amount.trim() || !category) ? c.sub : '#fff', fontWeight: '700', marginLeft: 6 }}>{tr.add}</Text>
                     </TouchableOpacity>
                   </View>
                 </ScrollView>
@@ -558,7 +674,7 @@ export default function FinanceScreen() {
               {selected && (() => {
                 const isIncome = selected.type === 'income';
                 const color = isIncome ? c.green : c.red;
-                const iconName: IconSymbolName = CATEGORY_ICONS[selected.category] ?? (isIncome ? 'arrow.up.trend' : 'arrow.down.trend');
+                const iconName: IconSymbolName = getCatIcon(selected.category, selected.type);
                 return (
                   <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
                     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -583,28 +699,156 @@ export default function FinanceScreen() {
                         <Text style={[s.detailCat, { color: c.text, marginTop: 4 }]}>{selected.category}</Text>
                         <View style={[s.typePill, { backgroundColor: color + '20', borderColor: color + '40', marginTop: 10 }]}>
                           <IconSymbol name={isIncome ? 'arrow.up.trend' : 'arrow.down.trend'} size={11} color={color} />
-                          <Text style={{ color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{isIncome ? 'Дохід' : 'Витрата'}</Text>
+                          <Text style={{ color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{isIncome ? tr.income : tr.expense}</Text>
                         </View>
                       </View>
 
                       <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim, marginTop: 14 }]}>
                         {selected.note ? <InfoRow icon="doc.text" label="Нотатка" value={selected.note} color={c.sub} text={c.text} sub={c.sub} border={c.border} last={false} /> : null}
-                        <InfoRow icon="calendar" label="Дата" value={new Date(selected.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
+                        <InfoRow icon="calendar" label="Дата" value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
                       </View>
 
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
                         <TouchableOpacity onPress={() => deleteTx(selected.id)} style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
                           <IconSymbol name="trash" size={15} color="#EF4444" />
-                          <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>Видалити</Text>
+                          <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
-                          <Text style={{ color: '#fff', fontWeight: '700' }}>Закрити</Text>
+                          <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.close}</Text>
                         </TouchableOpacity>
                       </View>
                     </ScrollView>
                   </BlurView>
                 );
               })()}
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── Categories Modal ─── */}
+      <Modal visible={showCats} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { setShowCats(false); setShowAddCat(false); }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={s.overlay} onPress={() => { setShowCats(false); setShowAddCat(false); }}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+                  {/* Handle + close */}
+                  <View style={s.handleRow}>
+                    <View style={{ flex: 1 }} />
+                    <View style={[s.handle, { backgroundColor: c.border }]} />
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <TouchableOpacity onPress={() => { setShowCats(false); setShowAddCat(false); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                        <IconSymbol name="xmark" size={17} color={c.sub} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginBottom: 16 }}>{tr.categories}</Text>
+
+                  {/* Tabs */}
+                  <View style={[s.typeRow, { backgroundColor: c.dim, marginBottom: 18 }]}>
+                    {(['expense', 'income'] as TxType[]).map(t => (
+                      <TouchableOpacity
+                        key={t}
+                        onPress={() => { setCatTab(t); setShowAddCat(false); }}
+                        style={[s.typeBtn, catTab === t && { backgroundColor: t === 'income' ? c.green : c.red }]}>
+                        <IconSymbol name={t === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={13} color={catTab === t ? '#fff' : c.sub} />
+                        <Text style={{ fontSize: 13, fontWeight: '700', marginLeft: 5, color: catTab === t ? '#fff' : c.sub }}>
+                          {t === 'income' ? tr.incomes : tr.expenses}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Category list */}
+                  <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim, marginBottom: 14 }]}>
+                    {cats[catTab].map((cat, idx) => {
+                      const isLast = idx === cats[catTab].length - 1;
+                      const isDefault = DEFAULT_CATEGORIES[catTab].some(d => d.name === cat.name);
+                      return (
+                        <View
+                          key={cat.name}
+                          style={[
+                            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 10 },
+                            !isLast && { borderBottomWidth: 1, borderBottomColor: c.border },
+                          ]}>
+                          <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: c.accent + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                            <IconSymbol name={cat.icon} size={16} color={c.accent} />
+                          </View>
+                          <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{cat.name}</Text>
+                          {isDefault
+                            ? <View style={{ backgroundColor: c.dim, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600' }}>{tr.defaultCategory}</Text>
+                              </View>
+                            : <TouchableOpacity
+                                onPress={() => setCats(prev => ({ ...prev, [catTab]: prev[catTab].filter(cc => cc.name !== cat.name) }))}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                                <IconSymbol name="trash" size={14} color={c.sub} />
+                              </TouchableOpacity>
+                          }
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {/* Add new category */}
+                  {showAddCat ? (
+                    <View style={[{ borderRadius: 16, borderWidth: 1, padding: 14 }, { borderColor: c.border, backgroundColor: c.dim }]}>
+                      <TextInput
+                        placeholder={tr.category}
+                        placeholderTextColor={c.sub}
+                        value={newCatName}
+                        onChangeText={setNewCatName}
+                        style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 12 }]}
+                        autoFocus
+                      />
+
+                      <Text style={[s.label, { color: c.sub, marginTop: 0 }]}>{tr.icon}</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                        {ICON_SUGGESTIONS.map(icon => {
+                          const isSel = newCatIcon === icon;
+                          return (
+                            <TouchableOpacity
+                              key={icon}
+                              onPress={() => setNewCatIcon(icon)}
+                              style={{
+                                width: 42, height: 42, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
+                                backgroundColor: isSel ? c.accent : isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+                                borderWidth: isSel ? 0 : 1,
+                                borderColor: c.border,
+                              }}>
+                              <IconSymbol name={icon} size={18} color={isSel ? '#fff' : c.sub} />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity onPress={() => { setShowAddCat(false); setNewCatName(''); setNewCatIcon('ellipsis.circle.fill'); }} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                          <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={addCategory}
+                          disabled={!newCatName.trim()}
+                          style={[s.btn, { flex: 2, backgroundColor: !newCatName.trim() ? c.dim : c.accent }]}>
+                          <IconSymbol name="plus" size={14} color={!newCatName.trim() ? c.sub : '#fff'} />
+                          <Text style={{ color: !newCatName.trim() ? c.sub : '#fff', fontWeight: '700', marginLeft: 5 }}>{tr.add}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => setShowAddCat(true)}
+                      style={[s.btn, { backgroundColor: c.accent + '15', borderWidth: 1, borderColor: c.accent + '40' }]}>
+                      <IconSymbol name="plus" size={15} color={c.accent} />
+                      <Text style={{ color: c.accent, fontWeight: '700', marginLeft: 6 }}>{tr.newCategory}</Text>
+                    </TouchableOpacity>
+                  )}
+
+                </ScrollView>
+              </BlurView>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -647,11 +891,16 @@ const s = StyleSheet.create({
   filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   filterLabel: { fontSize: 12, fontWeight: '600' },
   groupLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  txCard:      { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  txIcon:      { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  txCategory:  { fontSize: 14, fontWeight: '600' },
-  txNote:      { fontSize: 11, marginTop: 2 },
-  txAmount:    { fontSize: 14, fontWeight: '800' },
+  txCard:      { paddingHorizontal: 10, paddingVertical: 8, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  txIcon:      { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  txCategory:  { fontSize: 13, fontWeight: '600' },
+  txNote:      { fontSize: 11, marginTop: 1 },
+  txAmount:    { fontSize: 13, fontWeight: '800' },
+  txDetail:        { borderRadius: 15, borderWidth: 1, paddingLeft: 10, paddingRight: 13, paddingVertical: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  txDetailIcon:    { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  txDetailCategory:{ fontSize: 14, fontWeight: '700' },
+  txDetailNote:    { fontSize: 12, fontWeight: '400' },
+  txDetailAmount:  { fontSize: 15, fontWeight: '800', marginLeft: 10 },
   fab:         { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },

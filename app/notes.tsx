@@ -1,13 +1,14 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -50,17 +51,25 @@ export default function NotesScreen() {
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [sort, setSort] = useState<'newest' | 'oldest' | 'title'>('newest');
   const [selected, setSelected] = useState<Note | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editBody, setEditBody] = useState('');
   const [isNew, setIsNew] = useState(false);
 
+  const loadNotes = useCallback(async () => {
+    const data = await loadData<Note[]>('notes', []);
+    setNotes(data);
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadNotes().finally(() => setRefreshing(false));
+  }, [loadNotes]);
+
   useEffect(() => {
-    loadData<Note[]>('notes', []).then(data => {
-      setNotes(data);
-      setInitialized(true);
-    });
+    loadNotes().then(() => setInitialized(true));
   }, []);
 
   useEffect(() => {
@@ -169,7 +178,8 @@ export default function NotesScreen() {
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
 
           {notes.length === 0 && (
             <View style={{ alignItems: 'center', paddingVertical: 72 }}>

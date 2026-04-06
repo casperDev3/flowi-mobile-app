@@ -193,6 +193,33 @@ export default function SettingsScreen() {
             />
           </BlurView>
 
+          {/* Tools */}
+          <SectionLabel label="Інструменти" color={c.sub} />
+          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <SettingRow
+              icon="calendar"
+              iconColor="#6366F1"
+              label={tr.meetings}
+              value={undefined}
+              onPress={() => router.push('/meetings')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
+              icon="timer"
+              iconColor="#6366F1"
+              label="Трекер часу"
+              value={undefined}
+              onPress={() => router.push('/(tabs)/time')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last
+            />
+          </BlurView>
+
           {/* Data */}
           <SectionLabel label={tr.sectionData} color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>

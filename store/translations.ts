@@ -25,6 +25,7 @@ export interface Translations {
   tomorrow: string;
   months: string[];
   monthsShort: string[];
+  monthsGenitive: string[];
   weekdays: string[];
   weekdaysFull: string[];
 
@@ -402,6 +403,27 @@ export interface Translations {
 
   // Apple Health
   grantAccess: string;
+
+  // Containers
+  tabContainers: string;
+  containers: string;
+  newContainer: string;
+  containerName: string;
+  containerNamePlaceholder: string;
+  containerLocation: string;
+  containerLocationPlaceholder: string;
+  noContainers: string;
+  searchItems: string;
+  addItem: string;
+  itemName: string;
+  itemNamePlaceholder: string;
+  noItems: string;
+  foundIn: string;
+  editContainer: string;
+  deleteContainer: string;
+  containerItems: string;
+  itemTags: string;
+  itemNote: string;
 }
 
 const uk: Translations = {
@@ -426,6 +448,7 @@ const uk: Translations = {
   tomorrow: 'Завтра',
   months: ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'],
   monthsShort: ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'],
+  monthsGenitive: ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'],
   weekdays: ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'],
   weekdaysFull: ['Понеділок','Вівторок','Середа','Четвер',"П'ятниця",'Субота','Неділя'],
 
@@ -784,6 +807,26 @@ const uk: Translations = {
   noData: 'Немає даних',
 
   grantAccess: 'Надати доступ',
+
+  tabContainers: 'Ящики',
+  containers: 'Контейнери',
+  newContainer: 'Новий контейнер',
+  containerName: 'Назва',
+  containerNamePlaceholder: 'напр. Коробка на антресолях',
+  containerLocation: 'Місцезнаходження',
+  containerLocationPlaceholder: 'напр. Коридор, верхня полиця',
+  noContainers: 'Немає контейнерів',
+  searchItems: 'Пошук речей...',
+  addItem: 'Додати річ',
+  itemName: 'Назва речі',
+  itemNamePlaceholder: 'напр. Зимові рукавиці',
+  noItems: 'Контейнер порожній',
+  foundIn: 'Знаходиться в',
+  editContainer: 'Редагувати контейнер',
+  deleteContainer: 'Видалити контейнер',
+  containerItems: 'Речі',
+  itemTags: 'Теги (через кому)',
+  itemNote: 'Нотатка (необов\'язково)',
 };
 
 const en: Translations = {
@@ -808,6 +851,7 @@ const en: Translations = {
   tomorrow: 'Tomorrow',
   months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
   monthsShort: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+  monthsGenitive: ['January','February','March','April','May','June','July','August','September','October','November','December'],
   weekdays: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
   weekdaysFull: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
 
@@ -1166,6 +1210,26 @@ const en: Translations = {
   noData: 'No data',
 
   grantAccess: 'Grant Access',
+
+  tabContainers: 'Storage',
+  containers: 'Containers',
+  newContainer: 'New Container',
+  containerName: 'Name',
+  containerNamePlaceholder: 'e.g. Box in the attic',
+  containerLocation: 'Location',
+  containerLocationPlaceholder: 'e.g. Hallway, top shelf',
+  noContainers: 'No containers yet',
+  searchItems: 'Search items...',
+  addItem: 'Add Item',
+  itemName: 'Item name',
+  itemNamePlaceholder: 'e.g. Winter gloves',
+  noItems: 'Container is empty',
+  foundIn: 'Found in',
+  editContainer: 'Edit Container',
+  deleteContainer: 'Delete Container',
+  containerItems: 'Items',
+  itemTags: 'Tags (comma separated)',
+  itemNote: 'Note (optional)',
 };
 
 export const allTranslations: Record<Lang, Translations> = { uk, en };

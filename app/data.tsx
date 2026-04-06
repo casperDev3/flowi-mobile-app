@@ -22,23 +22,38 @@ import { useAutoBackup } from '@/store/auto-backup';
 import { loadData, saveData } from '@/store/storage';
 
 const ALL_KEYS = [
-  { key: 'tasks',        label: 'Завдання',    icon: 'checklist',                    color: '#7C3AED' },
-  { key: 'transactions', label: 'Транзакції',  icon: 'banknote',                     color: '#0EA5E9' },
-  { key: 'time_entries', label: 'Записи часу', icon: 'timer',                        color: '#6366F1' },
-  { key: 'notes',        label: 'Нотатки',     icon: 'note.text',                    color: '#F59E0B' },
-  { key: 'projects',     label: 'Проекти',     icon: 'folder.fill',                  color: '#10B981' },
-  { key: 'bugs',         label: 'Баги',        icon: 'ladybug.fill',                 color: '#EF4444' },
-  { key: 'ideas',        label: 'Ідеї',        icon: 'lightbulb.fill',               color: '#8B5CF6' },
+  { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
+  { key: 'transactions',      label: 'Транзакції',  icon: 'banknote',           color: '#0EA5E9' },
+  { key: 'time_entries',      label: 'Записи часу', icon: 'timer',              color: '#6366F1' },
+  { key: 'notes',             label: 'Нотатки',     icon: 'note.text',          color: '#F59E0B' },
+  { key: 'projects',          label: 'Проекти',     icon: 'folder.fill',        color: '#10B981' },
+  { key: 'meetings',          label: 'Зустрічі',    icon: 'calendar',           color: '#6366F1' },
+  { key: 'health_entries_v2', label: 'Здоров\'я',   icon: 'heart.fill',         color: '#10B981' },
+  { key: 'workouts',          label: 'Тренування',  icon: 'figure.run',         color: '#0EA5E9' },
+  { key: 'exercises',         label: 'Вправи',      icon: 'dumbbell.fill',      color: '#0EA5E9' },
+  { key: 'workout_programs',  label: 'Програми',    icon: 'clipboard.fill',     color: '#0EA5E9' },
+  { key: 'savings_jars',      label: 'Скарбнички',  icon: 'creditcard.fill',    color: '#EAB308' },
+  { key: 'containers',        label: 'Ящики',       icon: 'archivebox.fill',    color: '#7C3AED' },
+  { key: 'bugs',              label: 'Баги',        icon: 'ladybug.fill',       color: '#EF4444' },
+  { key: 'ideas',             label: 'Ідеї',        icon: 'lightbulb.fill',     color: '#8B5CF6' },
 ] as const;
 
-// export key maps to storage key (time_entries → timeEntries in JSON)
+// export key maps storage key → JSON key (snake_case → camelCase where needed)
 const EXPORT_KEY_MAP: Record<string, string> = {
   tasks: 'tasks', transactions: 'transactions', time_entries: 'timeEntries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
+  meetings: 'meetings', health_entries_v2: 'healthEntries',
+  workouts: 'workouts', exercises: 'exercises', workout_programs: 'workoutPrograms',
+  savings_jars: 'savingsJars', containers: 'containers',
 };
 const IMPORT_KEY_MAP: Record<string, string> = {
   tasks: 'tasks', transactions: 'transactions', timeEntries: 'time_entries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
+  meetings: 'meetings', healthEntries: 'health_entries_v2',
+  workouts: 'workouts', exercises: 'exercises', workoutPrograms: 'workout_programs',
+  savingsJars: 'savings_jars', containers: 'containers',
+  // categories is an object — handled separately
+  categories: 'categories',
 };
 
 function formatBackupTime(date: Date | null): string {
@@ -102,11 +117,13 @@ export default function DataScreen() {
     setExporting(true);
     try {
       const results = await Promise.all(ALL_KEYS.map(k => loadData(k.key, [])));
+      const categories = await loadData<object>('categories', {});
       const payload: Record<string, unknown> = {
-        version: '1.0',
+        version: '2.0',
         exportedAt: new Date().toISOString(),
       };
       ALL_KEYS.forEach((k, i) => { payload[EXPORT_KEY_MAP[k.key]] = results[i]; });
+      payload['categories'] = categories;
 
       const dateStr = new Date().toISOString().slice(0, 10);
       const fileName = `flowi-export-${dateStr}.json`;
@@ -217,14 +234,24 @@ export default function DataScreen() {
     Alert.alert('Очистити всі дані?', 'Цю дію неможливо скасувати. Всі дані будуть видалені.', [
       { text: 'Скасувати', style: 'cancel' },
       {
-        text: 'Видалити все', style: 'destructive',
-        onPress: async () => {
-          await Promise.all(ALL_KEYS.map(k => saveData(k.key, [])));
-          const empty: Counts = {};
-          ALL_KEYS.forEach(k => { empty[k.key] = 0; });
-          setCounts(empty);
-          Alert.alert('Готово', 'Всі дані видалено. Перезапустіть додаток.');
-        },
+        text: 'Продовжити', style: 'destructive',
+        onPress: () => Alert.alert(
+          'Останнє підтвердження',
+          'Ви впевнені? Після очищення відновлення даних неможливе.',
+          [
+            { text: 'Скасувати', style: 'cancel' },
+            {
+              text: 'Видалити все', style: 'destructive',
+              onPress: async () => {
+                await Promise.all(ALL_KEYS.map(k => saveData(k.key, [])));
+                const empty: Counts = {};
+                ALL_KEYS.forEach(k => { empty[k.key] = 0; });
+                setCounts(empty);
+                Alert.alert('Готово', 'Всі дані видалено. Перезапустіть додаток.');
+              },
+            },
+          ],
+        ),
       },
     ]);
 

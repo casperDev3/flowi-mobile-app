@@ -13,6 +13,13 @@ const SYNC_KEYS = [
   'time_entries',
   'notes',
   'projects',
+  'meetings',
+  'health_entries_v2',
+  'workouts',
+  'exercises',
+  'workout_programs',
+  'savings_jars',
+  'containers',
   'bugs',
   'ideas',
 ] as const;

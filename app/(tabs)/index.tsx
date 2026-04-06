@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,11 +21,13 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MonthPicker } from '@/components/shared/MonthPicker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
+import { filterTasksByMonth } from '@/utils/taskUtils';
 import type { Project } from '../projects';
 
 type Priority = 'high' | 'medium' | 'low';
@@ -259,6 +262,8 @@ export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [activeMonth, setActiveMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('active');
   const [sort, setSort] = useState<SortBy>('deadline');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -347,19 +352,26 @@ export default function TasksScreen() {
   const [timerTick, setTimerTick] = useState(0);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load from storage (useFocusEffect refreshes when returning from subtasks screen)
-  useFocusEffect(useCallback(() => {
-    Promise.all([
+  const loadAll = useCallback(async () => {
+    const [t, p, m] = await Promise.all([
       loadData<Task[]>('tasks', []),
       loadData<Project[]>('projects', []),
       loadData<Meeting[]>('meetings', []),
-    ]).then(([t, p, m]) => {
-      setTasks(t);
-      setProjects(p);
-      setMeetings(m);
-      setInitialized(true);
-      setMeetingsInit(true);
-    });
+    ]);
+    setTasks(t);
+    setProjects(p);
+    setMeetings(m);
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadAll();
+    setRefreshing(false);
+  }, [loadAll]);
+
+  // Load from storage (useFocusEffect refreshes when returning from subtasks screen)
+  useFocusEffect(useCallback(() => {
+    loadAll().then(() => { setInitialized(true); setMeetingsInit(true); });
   }, []));
 
   // Save to storage
@@ -447,7 +459,8 @@ export default function TasksScreen() {
   }, [tasks, sort]);
 
   const filtered = useMemo(() => {
-    return sorted.filter(t => {
+    const monthFiltered = filterTasksByMonth(sorted, activeMonth);
+    return monthFiltered.filter(t => {
       if (filter !== 'all' && t.status !== filter) return false;
       if (dateFilter) {
         const d = new Date(t.createdAt);
@@ -461,7 +474,7 @@ export default function TasksScreen() {
       if (filterPriority && t.priority !== filterPriority) return false;
       return true;
     });
-  }, [sorted, filter, dateFilter, search, filterProject, filterPriority]);
+  }, [sorted, activeMonth, filter, dateFilter, search, filterProject, filterPriority]);
 
   const groups = useMemo(() => {
     const map: Record<string, { label: string; tasks: Task[] }> = {};
@@ -963,27 +976,49 @@ export default function TasksScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
         {/* Fixed Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.tasks}</Text>
-          <View style={{ flexDirection: 'row', gap: 7 }}>
-            {viewMode === 'list' && (
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.tasks}</Text>
+            <View style={{ flexDirection: 'row', gap: 7 }}>
               <TouchableOpacity
-                onPress={() => setCardDetail(v => v === 'detailed' ? 'compact' : 'detailed')}
-                style={[s.headerBtn, { backgroundColor: cardDetail === 'detailed' ? c.accent + '20' : c.dim, borderColor: cardDetail === 'detailed' ? c.accent : c.border }]}>
-                <IconSymbol name={cardDetail === 'detailed' ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={cardDetail === 'detailed' ? c.accent : c.sub} />
+                onPress={() => setViewMode(v => v === 'list' ? 'calendar' : 'list')}
+                style={[s.headerBtn, { backgroundColor: viewMode === 'calendar' ? c.accent + '20' : c.dim, borderColor: viewMode === 'calendar' ? c.accent : c.border }]}>
+                <IconSymbol name={viewMode === 'list' ? 'calendar' : 'list.bullet'} size={17} color={viewMode === 'calendar' ? c.accent : c.sub} />
               </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              onPress={() => setShowOptionsMenu(v => !v)}
-              style={[s.headerBtn, { backgroundColor: hasActiveFilters ? c.accent : c.dim, borderColor: hasActiveFilters ? c.accent : c.border }]}>
-              <IconSymbol name="ellipsis" size={17} color={hasActiveFilters ? '#fff' : c.sub} />
-            </TouchableOpacity>
+              {viewMode === 'list' && (
+                <TouchableOpacity
+                  onPress={() => setCardDetail(v => v === 'detailed' ? 'compact' : 'detailed')}
+                  style={[s.headerBtn, { backgroundColor: cardDetail === 'detailed' ? c.accent + '20' : c.dim, borderColor: cardDetail === 'detailed' ? c.accent : c.border }]}>
+                  <IconSymbol name={cardDetail === 'detailed' ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={cardDetail === 'detailed' ? c.accent : c.sub} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => setShowOptionsMenu(v => !v)}
+                style={[s.headerBtn, { backgroundColor: hasActiveFilters ? c.accent : c.dim, borderColor: hasActiveFilters ? c.accent : c.border }]}>
+                <IconSymbol name="ellipsis" size={17} color={hasActiveFilters ? '#fff' : c.sub} />
+              </TouchableOpacity>
+            </View>
           </View>
+          <MonthPicker
+            month={activeMonth}
+            onChange={m => { setActiveMonth(m); setDateFilter(null); }}
+            months={tr.months}
+            monthsShort={tr.monthsShort}
+            monthsGenitive={tr.monthsGenitive}
+            accentColor={c.accent}
+            textColor={c.text}
+            subColor={c.sub}
+            dimColor={c.dim}
+            borderColor={c.border}
+          />
         </View>
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />
+          }>
 
           {/* Search bar */}
           <View style={[s.searchBar, { backgroundColor: c.dim, borderColor: c.border }]}>
@@ -2082,19 +2117,15 @@ export default function TasksScreen() {
                 backgroundColor: isDark ? '#1C1A2E' : '#F2EFFF',
               }),
             }}>
-            {/* View mode */}
+            {/* Notes */}
             <TouchableOpacity
-              onPress={() => { setViewMode(v => v === 'list' ? 'calendar' : 'list'); setShowOptionsMenu(false); }}
+              onPress={() => { setShowOptionsMenu(false); router.push('/notes'); }}
               style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: c.accent + '20' }]}>
-                <IconSymbol name={viewMode === 'list' ? 'calendar' : 'list.bullet'} size={15} color={c.accent} />
+              <View style={[s.menuIconBox, { backgroundColor: '#F59E0B20' }]}>
+                <IconSymbol name="note.text" size={15} color="#F59E0B" />
               </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>
-                {viewMode === 'list' ? tr.calendarMode : tr.listMode}
-              </Text>
-              <View style={[s.menuPill, { backgroundColor: c.dim }]}>
-                <Text style={[s.menuPillText, { color: c.sub }]}>{viewMode === 'list' ? tr.list : tr.calendar}</Text>
-              </View>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.notes}</Text>
+              <IconSymbol name="chevron.right" size={12} color={c.sub} />
             </TouchableOpacity>
 
             <View style={[s.menuDivider, { backgroundColor: c.border }]} />
@@ -2127,32 +2158,6 @@ export default function TasksScreen() {
 
             <View style={[s.menuDivider, { backgroundColor: c.border }]} />
 
-            {/* Notes */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/notes'); }}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#F59E0B20' }]}>
-                <IconSymbol name="note.text" size={15} color="#F59E0B" />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.notes}</Text>
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-            {/* Archive */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/archive'); }}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#10B98120' }]}>
-                <IconSymbol name="archivebox.fill" size={15} color="#10B981" />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.archive}</Text>
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
             {/* Meetings */}
             <TouchableOpacity
               onPress={() => { setShowOptionsMenu(false); router.push('/meetings'); }}
@@ -2179,6 +2184,19 @@ export default function TasksScreen() {
                 <IconSymbol name="timer" size={15} color="#6366F1" />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.timeRecords}</Text>
+              <IconSymbol name="chevron.right" size={12} color={c.sub} />
+            </TouchableOpacity>
+
+            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+            {/* Archive */}
+            <TouchableOpacity
+              onPress={() => { setShowOptionsMenu(false); router.push('/archive'); }}
+              style={s.menuItem}>
+              <View style={[s.menuIconBox, { backgroundColor: '#10B98120' }]}>
+                <IconSymbol name="archivebox.fill" size={15} color="#10B981" />
+              </View>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.archive}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
             </TouchableOpacity>
           </BlurView>

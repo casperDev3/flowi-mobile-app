@@ -1,11 +1,9 @@
 import { BlurView } from 'expo-blur';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -49,15 +47,11 @@ const STATUS_LABELS: Record<SyncStatus, string> = {
 export default function SyncScreen() {
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
-  const [permission, requestPermission] = useCameraPermissions();
-
-  const [scanning, setScanning] = useState(false);
   const [manualIp, setManualIp] = useState('');
   const [status, setStatus] = useState<SyncStatus>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [newConflictCount, setNewConflictCount] = useState(0);
-  const scannedRef = useRef(false);
 
   const c = {
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
@@ -109,42 +103,6 @@ export default function SyncScreen() {
     }
   }, [refreshConflicts]);
 
-  // ─── QR scanner ───────────────────────────────────────────────────────────
-  const openCamera = async () => {
-    if (!permission?.granted) {
-      const res = await requestPermission();
-      if (!res.granted) {
-        Alert.alert('Немає доступу до камери', 'Надайте дозвіл у налаштуваннях');
-        return;
-      }
-    }
-    scannedRef.current = false;
-    setScanning(true);
-  };
-
-  const handleScanned = useCallback(({ data }: { data: string }) => {
-    if (scannedRef.current) return;
-    scannedRef.current = true;
-    setScanning(false);
-
-    try {
-      const parsed = JSON.parse(data);
-      if (parsed?.app === 'flowi' && parsed?.ip) {
-        syncWithHost(parsed.ip, parsed.port ?? DEFAULT_PORT);
-        return;
-      }
-    } catch { /* not JSON */ }
-
-    // Try as plain IP
-    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(data.trim())) {
-      syncWithHost(data.trim());
-    } else {
-      Alert.alert('Невірний QR-код', 'Це не QR-код синхронізації Flowi', [
-        { text: 'OK', onPress: () => { scannedRef.current = false; setScanning(true); } },
-      ]);
-    }
-  }, [syncWithHost]);
-
   const handleManualConnect = () => {
     const ip = manualIp.trim();
     if (!ip) return;
@@ -161,39 +119,6 @@ export default function SyncScreen() {
     status === 'done' ? c.green :
     status === 'error' ? c.red :
     isLoading ? c.accent : c.sub;
-
-  // ─── Camera screen ────────────────────────────────────────────────────────
-  if (scanning) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#000' }}>
-        <CameraView
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-          onBarcodeScanned={handleScanned}
-        />
-        <SafeAreaView style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <View style={st.camBar}>
-            <TouchableOpacity onPress={() => setScanning(false)} style={st.camClose}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <IconSymbol name="xmark" size={18} color="#fff" />
-            </TouchableOpacity>
-            <Text style={st.camTitle}>Сканування QR-коду</Text>
-            <View style={{ width: 40 }} />
-          </View>
-          <View style={st.frameWrap} pointerEvents="none">
-            <View style={st.frame}>
-              <View style={[st.corner, { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 }]} />
-              <View style={[st.corner, { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 }]} />
-              <View style={[st.corner, { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 }]} />
-              <View style={[st.corner, { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 }]} />
-            </View>
-            <Text style={st.camHint}>Наведіть на QR-код з екрану комп’ютера</Text>
-          </View>
-        </SafeAreaView>
-      </View>
-    );
-  }
 
   // ─── Main screen ──────────────────────────────────────────────────────────
   return (
@@ -236,17 +161,6 @@ export default function SyncScreen() {
                 </Text>
               </View>
 
-              {/* Primary scan button */}
-              <TouchableOpacity
-                onPress={openCamera}
-                disabled={isLoading}
-                style={[st.primaryBtn, { backgroundColor: isLoading ? c.dim : c.accent }]}>
-                <IconSymbol name="qrcode.viewfinder" size={22} color={isLoading ? c.sub : '#fff'} />
-                <Text style={[st.primaryBtnText, { color: isLoading ? c.sub : '#fff' }]}>
-                  {isLoading ? STATUS_LABELS[status] : 'Почати синхронізацію'}
-                </Text>
-              </TouchableOpacity>
-
               {/* Error */}
               {status === 'error' && errorMsg ? (
                 <View style={[st.errorBox, { backgroundColor: c.red + '12', borderColor: c.red + '28' }]}>
@@ -254,13 +168,6 @@ export default function SyncScreen() {
                   <Text style={[st.errorText, { color: c.red }]}>{errorMsg}</Text>
                 </View>
               ) : null}
-
-              {/* Divider */}
-              <View style={st.divRow}>
-                <View style={[st.divLine, { backgroundColor: c.border }]} />
-                <Text style={[st.divLabel, { color: c.sub }]}>або введіть IP вручну</Text>
-                <View style={[st.divLine, { backgroundColor: c.border }]} />
-              </View>
 
               {/* Manual IP input */}
               <View style={[st.ipRow, { borderColor: c.border }]}>
@@ -330,7 +237,7 @@ export default function SyncScreen() {
                   'Відкрийте Flowi на комп\'ютері',
                   'Перейдіть до «Синхронізація» у боковому меню',
                   'Натисніть «Запустити сервер»',
-                  'Натисніть «Почати синхронізацію» вище та відскануйте QR-код',
+                  'Введіть IP-адресу комп\'ютера у поле вище та натисніть →',
                 ].map((text, i) => (
                   <View key={i} style={st.stepRow}>
                     <View style={[st.stepNum, { backgroundColor: c.accent + '18' }]}>
@@ -450,12 +357,6 @@ const st = StyleSheet.create({
   statusText:    { fontSize: 13, fontWeight: '600', flex: 1 },
   wifiNote:      { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, marginBottom: 16 },
   wifiNoteText:  { fontSize: 12, fontWeight: '600', flex: 1 },
-  primaryBtn:    {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    paddingVertical: 15, borderRadius: 14, marginBottom: 16,
-    shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
-  },
-  primaryBtnText:{ fontSize: 16, fontWeight: '700' },
   errorBox:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
   errorText:     { flex: 1, fontSize: 12, lineHeight: 18 },
   divRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
@@ -490,11 +391,4 @@ const st = StyleSheet.create({
   conflictActions:{ flexDirection: 'row', borderTopWidth: 1 },
   resolveBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 13, borderRightWidth: 1 },
   resolveBtnText:{ fontSize: 13, fontWeight: '700' },
-  camBar:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
-  camClose:      { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  camTitle:      { color: '#fff', fontSize: 16, fontWeight: '700' },
-  frameWrap:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  frame:         { width: 240, height: 240, position: 'relative' },
-  corner:        { position: 'absolute', width: 28, height: 28, borderColor: '#7C3AED' },
-  camHint:       { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '500', marginTop: 24, textAlign: 'center', paddingHorizontal: 40 },
 });

@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -10,6 +10,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,11 +20,16 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MiniBarChart } from '@/components/health/MiniBarChart';
+import { RingCell } from '@/components/health/RingCell';
+import { MonthPicker } from '@/components/shared/MonthPicker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { HK_AVAILABLE, HKDayData, fetchTodayData, initHealthKit } from '@/store/healthkit';
 import { loadData, saveData } from '@/store/storage';
 import { useI18n } from '@/store/i18n';
+import { getMonthEntries } from '@/utils/healthUtils';
+import { isSameDay } from '@/utils/dateUtils';
 
 const { width: W } = Dimensions.get('window');
 
@@ -42,11 +48,6 @@ const CAL_GOAL = 2200;
 const STEPS_GOAL = 10000;
 
 
-const isSameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
-
 const fmtSleep = (mins: number) => {
   const h = Math.floor(mins / 60), m = mins % 60;
   if (h > 0 && m > 0) return `${h}г ${m}хв`;
@@ -62,47 +63,15 @@ const ACCENT_MOOD   = '#F59E0B';
 const ACCENT_STEPS  = '#0EA5E9';
 const ACCENT_PULSE  = '#EF4444';
 
+const MOODS = [
+  { value: 1, emoji: '😞', label: 'Погано',    color: '#EF4444' },
+  { value: 2, emoji: '😕', label: 'Не дуже',  color: '#F97316' },
+  { value: 3, emoji: '😐', label: 'Нормально', color: '#F59E0B' },
+  { value: 4, emoji: '🙂', label: 'Добре',     color: '#10B981' },
+  { value: 5, emoji: '😄', label: 'Відмінно',  color: '#6366F1' },
+];
+
 type RadialKey = 'water' | 'calories' | 'weight' | 'steps' | 'pulse';
-
-function MiniBarChart({ values, color, goal, height = 52 }: { values: number[]; color: string; goal?: number; height?: number }) {
-  const max = Math.max(...values, goal ?? 0, 1);
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height }}>
-      {values.map((v, i) => (
-        <View key={i} style={{ flex: 1, height, justifyContent: 'flex-end' }}>
-          <View style={{
-            height: Math.max(3, (v / max) * height),
-            borderRadius: 4,
-            backgroundColor: i === values.length - 1 ? color : color + '55',
-          }} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function RingCell({ pct, color, label, value }: { pct: number; color: string; label: string; value: string }) {
-  const SIZE = 64, STROKE = 5;
-  const angle = Math.min(pct, 1) * 360;
-  return (
-    <View style={{ alignItems: 'center', flex: 1 }}>
-      <View style={{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }}>
-        <View style={{ position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2, borderWidth: STROKE, borderColor: color + '22' }} />
-        <View style={{
-          position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2, borderWidth: STROKE,
-          borderTopColor: angle > 0 ? color : 'transparent',
-          borderRightColor: angle > 90 ? color : 'transparent',
-          borderBottomColor: angle > 180 ? color : 'transparent',
-          borderLeftColor: angle > 270 ? color : 'transparent',
-          transform: [{ rotate: '-45deg' }],
-        }} />
-        <Text style={{ color, fontSize: 10, fontWeight: '800' }}>{Math.round(pct * 100)}%</Text>
-      </View>
-      <Text style={{ color, fontSize: 12, fontWeight: '800', marginTop: 5 }}>{value}</Text>
-      <Text style={{ color: color + '99', fontSize: 10, fontWeight: '600', marginTop: 2 }}>{label}</Text>
-    </View>
-  );
-}
 
 export default function HealthScreen() {
   const isDark = useColorScheme() === 'dark';
@@ -110,13 +79,6 @@ export default function HealthScreen() {
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const MOODS = [
-    { value: 1, emoji: '😞', label: tr.moodBad,   color: '#EF4444' },
-    { value: 2, emoji: '😕', label: tr.moodSoSo,  color: '#F97316' },
-    { value: 3, emoji: '😐', label: tr.moodOk,    color: '#EAB308' },
-    { value: 4, emoji: '🙂', label: tr.moodGood,  color: '#22C55E' },
-    { value: 5, emoji: '😄', label: tr.moodGreat, color: '#10B981' },
-  ];
   const RADIAL_ITEMS = [
     { key: 'water',    label: tr.water,    icon: 'drop.fill',           color: ACCENT },
     { key: 'calories', label: tr.calories, icon: 'flame.fill',          color: ACCENT_CAL },
@@ -128,6 +90,8 @@ export default function HealthScreen() {
 
   const [entries, setEntries] = useState<HealthEntry[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [activeMonth, setActiveMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const [refreshing, setRefreshing] = useState(false);
 
   // HealthKit
   const [hkAuthorized, setHkAuthorized] = useState(false);
@@ -144,11 +108,19 @@ export default function HealthScreen() {
   const [inputNote, setInputNote] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  const loadEntries = useCallback(async () => {
+    const data = await loadData<HealthEntry[]>('health_entries_v2', []);
+    setEntries(data);
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadEntries();
+    setRefreshing(false);
+  }, [loadEntries]);
+
   useEffect(() => {
-    loadData<HealthEntry[]>('health_entries_v2', []).then(data => {
-      setEntries(data);
-      setInitialized(true);
-    });
+    loadEntries().then(() => setInitialized(true));
     if (HK_AVAILABLE) {
       initHealthKit().then(ok => {
         setHkAuthorized(ok);
@@ -169,9 +141,9 @@ export default function HealthScreen() {
     setHkLastSync(new Date());
     // Merge HK data into entries (overwrite today's HK-sourced values)
     setEntries(prev => {
-      const todayStr = new Date().toDateString();
+      const todayDate = new Date();
       const filtered = prev.filter(e => {
-        const isToday = new Date(e.date).toDateString() === todayStr;
+        const isToday = isSameDay(new Date(e.date), todayDate);
         // keep manual entries that aren't from HK-synced types
         return !isToday || (e.note !== '__hk__');
       });
@@ -192,11 +164,11 @@ export default function HealthScreen() {
     setHkSyncing(false);
   };
 
-  const now = useMemo(() => new Date(), []);
+  const now = new Date();
 
   const todayEntries = useMemo(
-    () => entries.filter(e => isSameDay(new Date(e.date), now)),
-    [entries, now],
+    () => entries.filter(e => isSameDay(new Date(e.date), new Date())),
+    [entries],
   );
 
   const todayWater  = useMemo(() => todayEntries.filter(e => e.type === 'water').reduce((s, e) => s + e.value, 0), [todayEntries]);
@@ -204,7 +176,6 @@ export default function HealthScreen() {
   const todaySteps  = useMemo(() => todayEntries.filter(e => e.type === 'steps').reduce((s, e) => s + e.value, 0), [todayEntries]);
   const todayWeight = useMemo(() => { const a = todayEntries.filter(e => e.type === 'weight'); return a.length ? a[a.length - 1].value : null; }, [todayEntries]);
   const todaySleep  = useMemo(() => { const a = todayEntries.filter(e => e.type === 'sleep'); return a.length ? a[a.length - 1].value : null; }, [todayEntries]);
-  const todayMood   = useMemo(() => { const a = todayEntries.filter(e => e.type === 'mood'); return a.length ? a[a.length - 1].value : null; }, [todayEntries]);
   const todayPulse  = useMemo(() => { const a = todayEntries.filter(e => e.type === 'pulse'); return a.length ? a[a.length - 1].value : null; }, [todayEntries]);
 
   const latestWeight = useMemo(() => {
@@ -227,6 +198,13 @@ export default function HealthScreen() {
   const calChart    = useMemo(() => chartData('calories', 'sum'), [entries]);
   const weightChart = useMemo(() => chartData('weight', 'last'), [entries]);
   const stepsChart  = useMemo(() => chartData('steps', 'sum'), [entries]);
+  const sleepChart  = useMemo(() => chartData('sleep', 'last'), [entries]);
+
+  const prevWeight = useMemo(() => {
+    const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+    const old = entries.filter(e => e.type === 'weight' && new Date(e.date) <= weekAgo);
+    return old.length ? old[old.length - 1].value : null;
+  }, [entries]);
 
   const toggleFab = () => {
     const toVal = fabOpen ? 0 : 1;
@@ -266,17 +244,16 @@ export default function HealthScreen() {
   });
 
   const last7Labels = last7.map(d => DAYS_SHORT[d.getDay() === 0 ? 6 : d.getDay() - 1]);
-  const moodCfg = todayMood ? MOODS.find(m => m.value === todayMood) : null;
   const fabRotate = fabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
 
   const c = {
-    bg1: isDark ? '#080F18' : '#EFF8F4',
-    bg2: isDark ? '#0F1A2A' : '#E0F2EE',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(16,185,129,0.15)',
-    text: isDark ? '#E8FFF7' : '#0A2018',
-    sub: isDark ? 'rgba(232,255,247,0.42)' : 'rgba(10,32,24,0.45)',
-    dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet: isDark ? 'rgba(8,15,24,0.98)' : 'rgba(239,248,244,0.98)',
+    bg1:   isDark ? '#0C0C14' : '#F4F2FF',
+    bg2:   isDark ? '#14121E' : '#EAE6FF',
+    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
+    text:  isDark ? '#F0EEFF' : '#1A1433',
+    sub:   isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    dim:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    sheet: isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
   };
 
   return (
@@ -284,71 +261,65 @@ export default function HealthScreen() {
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.pageTitle, { color: c.text }]}>{tr.health}</Text>
-            <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', marginTop: 2 }}>
-              {now.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
-            </Text>
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.health}</Text>
+            <TouchableOpacity onPress={() => setHistoryOpen(true)}
+              style={[s.iconBtnSm, { borderColor: c.border, backgroundColor: c.dim }]}>
+              <IconSymbol name="clock.fill" size={16} color={c.sub} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={() => setHistoryOpen(true)}
-            style={[s.iconBtnSm, { borderColor: c.border, backgroundColor: c.dim }]}>
-            <IconSymbol name="clock.fill" size={16} color={c.sub} />
-          </TouchableOpacity>
+          <MonthPicker
+            month={activeMonth}
+            onChange={setActiveMonth}
+            months={tr.months}
+            monthsShort={tr.monthsShort}
+            monthsGenitive={tr.monthsGenitive}
+            accentColor={ACCENT}
+            textColor={c.text}
+            subColor={c.sub}
+            dimColor={c.dim}
+            borderColor={c.border}
+          />
         </View>
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 120 : 100 }}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />
+          }>
 
-          {/* Apple Health banner — iOS only */}
-          {Platform.OS === 'ios' && (
-            <TouchableOpacity
-              onPress={() => router.push('/apple-health')}
-              activeOpacity={0.85}
-              style={{ marginBottom: 14 }}>
-              <LinearGradient
-                colors={isDark ? ['#1a0a0a', '#2a0f0f'] : ['#fff0f0', '#ffe4e4']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={[s.hkBanner, { borderColor: '#EF444430' }]}>
-                <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: '#EF444420', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="heart.fill" size={18} color="#EF4444" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '800' }}>Apple Health</Text>
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
-                    {hkAuthorized
-                      ? hkLastSync
-                        ? `Синхронізовано ${hkLastSync.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`
-                        : tr.connected
-                      : tr.connectTap}
-                  </Text>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                  {hkAuthorized && (
-                    <TouchableOpacity onPress={e => { e.stopPropagation(); syncHealthKit(); }} disabled={hkSyncing}
-                      style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: '#EF444415', alignItems: 'center', justifyContent: 'center' }}>
-                      {hkSyncing
-                        ? <ActivityIndicator size="small" color="#EF4444" />
-                        : <IconSymbol name="arrow.clockwise" size={14} color="#EF4444" />}
-                    </TouchableOpacity>
-                  )}
-                  <IconSymbol name="chevron.right" size={13} color={c.sub} />
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
+          {/* Тренування banner */}
+          <TouchableOpacity
+            onPress={() => router.push('/workouts')}
+            activeOpacity={0.85}
+            style={{ marginBottom: 14 }}>
+            <LinearGradient
+              colors={isDark ? ['#0a0f1a', '#0f1a2e'] : ['#eff5ff', '#e0ecff']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={[s.hkBanner, { borderColor: ACCENT_STEPS + '30' }]}>
+              <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: ACCENT_STEPS + '20', alignItems: 'center', justifyContent: 'center' }}>
+                <IconSymbol name="figure.run" size={18} color={ACCENT_STEPS} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ color: c.text, fontSize: 14, fontWeight: '800' }}>Тренування</Text>
+                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>Переглянути та додати тренування</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={13} color={c.sub} />
+            </LinearGradient>
+          </TouchableOpacity>
 
           {/* Overview rings */}
           <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
             style={[s.card, { borderColor: c.border, marginBottom: 14 }]}>
             <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 }}>{tr.todayLabel}</Text>
             <View style={{ flexDirection: 'row', gap: 4 }}>
-              <RingCell pct={todayWater / WATER_GOAL} color={ACCENT} label={tr.water}
-                value={todayWater >= 1000 ? `${(todayWater / 1000).toFixed(1)}л` : `${todayWater}мл`} />
               <RingCell pct={todayCal / CAL_GOAL} color={ACCENT_CAL} label={tr.calories} value={`${todayCal}кк`} />
               <RingCell pct={todaySteps / STEPS_GOAL} color={ACCENT_STEPS} label={tr.steps}
                 value={todaySteps >= 1000 ? `${(todaySteps / 1000).toFixed(1)}т` : `${todaySteps}`} />
+              <RingCell pct={todayWater / WATER_GOAL} color={ACCENT} label={tr.water}
+                value={todayWater >= 1000 ? `${(todayWater / 1000).toFixed(1)}л` : `${todayWater}мл`} />
               <RingCell pct={todaySleep ? todaySleep / 480 : 0} color={ACCENT_SLEEP} label={tr.sleep}
                 value={todaySleep ? fmtSleep(todaySleep) : '—'} />
             </View>
@@ -358,127 +329,136 @@ export default function HealthScreen() {
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
             <QuickStatCard value={latestWeight ? `${latestWeight} кг` : '—'} label={tr.weight}
               icon="scalemass.fill" color={ACCENT_WEIGHT} isDark={isDark} border={c.border} sub={c.sub} text={c.text} />
-            <QuickStatCard value={moodCfg ? `${moodCfg.emoji} ${moodCfg.label}` : '—'} label={tr.mood}
-              icon="heart.fill" color={ACCENT_MOOD} isDark={isDark} border={c.border} sub={c.sub} text={c.text} />
             <QuickStatCard value={todayPulse ? `${todayPulse} уд` : '—'} label={tr.pulse}
               icon="waveform.path.ecg" color={ACCENT_PULSE} isDark={isDark} border={c.border} sub={c.sub} text={c.text} />
           </View>
 
-          {/* Water */}
-          <SectionHeader title={tr.water} icon="drop.fill" color={ACCENT} textColor={c.text} />
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 8 }}>
-              <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>
-                {todayWater >= 1000 ? `${(todayWater / 1000).toFixed(1)} л` : `${todayWater} мл`}
-              </Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginLeft: 6, marginBottom: 4 }}>/ {WATER_GOAL} мл</Text>
-              {todayWater >= WATER_GOAL && (
-                <View style={[s.badge, { backgroundColor: ACCENT + '20', borderColor: ACCENT + '40', marginLeft: 'auto' as any }]}>
-                  <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>{tr.target}</Text>
-                </View>
-              )}
-            </View>
-            <View style={[s.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)', marginBottom: 4 }]}>
-              <LinearGradient colors={[ACCENT + 'AA', ACCENT]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={[s.progressFill, { width: `${Math.round(Math.min(todayWater / WATER_GOAL, 1) * 100)}%` as any }]} />
-            </View>
-            <Text style={{ color: c.sub, fontSize: 11, marginBottom: 14 }}>{Math.round(Math.min(todayWater / WATER_GOAL, 1) * 100)}% від норми</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              {[150, 250, 350, 500].map(ml => (
-                <TouchableOpacity key={ml}
-                  onPress={() => setEntries(p => [{ id: Date.now().toString(), type: 'water', value: ml, date: new Date().toISOString() }, ...p])}
-                  style={[s.chipBtn, { borderColor: ACCENT + '50', backgroundColor: ACCENT + '12' }]}>
-                  <IconSymbol name="drop.fill" size={11} color={ACCENT} />
-                  <Text style={{ color: ACCENT, fontSize: 12, fontWeight: '700', marginTop: 2 }}>+{ml}</Text>
-                  <Text style={{ color: ACCENT, fontSize: 9, opacity: 0.7 }}>мл</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 6 }}>{tr.days7}</Text>
-            <MiniBarChart values={waterChart} color={ACCENT} goal={WATER_GOAL} />
-            <View style={{ flexDirection: 'row', marginTop: 4 }}>
-              {last7Labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{l}</Text>)}
-            </View>
-          </BlurView>
-
-          {/* Calories */}
+          {/* Calories — фокус на залишку до цілі */}
           <SectionHeader title={tr.calories} icon="flame.fill" color={ACCENT_CAL} textColor={c.text} />
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 8 }}>
-              <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{todayCal} кк</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginLeft: 6, marginBottom: 4 }}>/ {CAL_GOAL} кк</Text>
+          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, padding: 12 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
+              <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{todayCal}</Text>
+              <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>кк</Text>
+              <View style={{ flex: 1 }} />
+              <View style={[s.badge, { backgroundColor: ACCENT_CAL + '20', borderColor: ACCENT_CAL + '40' }]}>
+                <Text style={{ color: ACCENT_CAL, fontSize: 11, fontWeight: '700' }}>{Math.round(Math.min(todayCal / CAL_GOAL, 1) * 100)}%</Text>
+              </View>
             </View>
-            <View style={[s.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)', marginBottom: 4 }]}>
+            <View style={[s.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)', marginBottom: 6 }]}>
               <LinearGradient colors={[ACCENT_CAL + 'AA', ACCENT_CAL]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={[s.progressFill, { width: `${Math.round(Math.min(todayCal / CAL_GOAL, 1) * 100)}%` as any }]} />
             </View>
-            <Text style={{ color: c.sub, fontSize: 11, marginBottom: 14 }}>{Math.round(Math.min(todayCal / CAL_GOAL, 1) * 100)}% від норми</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+            <Text style={{ color: c.sub, fontSize: 11, marginBottom: 10 }}>
+              {todayCal < CAL_GOAL ? `Залишилось ${CAL_GOAL - todayCal} кк до норми` : 'Добову норму досягнуто'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
               {[200, 350, 500, 700].map(kk => (
                 <TouchableOpacity key={kk}
                   onPress={() => setEntries(p => [{ id: Date.now().toString(), type: 'calories', value: kk, date: new Date().toISOString() }, ...p])}
-                  style={[s.chipBtn, { borderColor: ACCENT_CAL + '50', backgroundColor: ACCENT_CAL + '12' }]}>
-                  <IconSymbol name="flame.fill" size={11} color={ACCENT_CAL} />
-                  <Text style={{ color: ACCENT_CAL, fontSize: 12, fontWeight: '700', marginTop: 2 }}>+{kk}</Text>
-                  <Text style={{ color: ACCENT_CAL, fontSize: 9, opacity: 0.7 }}>кк</Text>
+                  style={[s.chipBtn, { borderColor: ACCENT_CAL + '50', backgroundColor: ACCENT_CAL + '12', paddingVertical: 7 }]}>
+                  <Text style={{ color: ACCENT_CAL, fontSize: 11, fontWeight: '700' }}>+{kk} кк</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 6 }}>{tr.days7}</Text>
-            <MiniBarChart values={calChart} color={ACCENT_CAL} goal={CAL_GOAL} />
-            <View style={{ flexDirection: 'row', marginTop: 4 }}>
-              {last7Labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{l}</Text>)}
-            </View>
           </BlurView>
 
-          {/* Weight */}
-          <SectionHeader title={tr.weight} icon="scalemass.fill" color={ACCENT_WEIGHT} textColor={c.text} />
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-            {latestWeight ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                <View style={[s.iconBox, { backgroundColor: ACCENT_WEIGHT + '20' }]}>
-                  <IconSymbol name="scalemass.fill" size={22} color={ACCENT_WEIGHT} />
+          {/* Steps — акцент на тижневому чарті + відстань */}
+          <SectionHeader title={tr.steps} icon="figure.walk" color={ACCENT_STEPS} textColor={c.text} />
+          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, padding: 12 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -1 }}>{todaySteps.toLocaleString(locale)}</Text>
+                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                  {'\u2248'} {(todaySteps * 0.00075).toFixed(1)} км{todaySteps > 0 ? ` \u00B7 ${Math.round(Math.min(todaySteps / STEPS_GOAL, 1) * 100)}% від мети` : ''}
+                </Text>
+              </View>
+              <View style={{ width: 96 }}>
+                <MiniBarChart values={stepsChart} color={ACCENT_STEPS} goal={STEPS_GOAL} height={46} />
+                <View style={{ flexDirection: 'row', marginTop: 3 }}>
+                  {last7Labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 8, fontWeight: '600' }}>{l}</Text>)}
                 </View>
-                <View style={{ marginLeft: 14, flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{latestWeight} кг</Text>
-                  <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{todayWeight ? tr.recordedToday : tr.lastRecord}</Text>
-                </View>
-                <TouchableOpacity onPress={() => openModal('weight')}
-                  style={[s.iconBtnSm, { borderColor: c.border, backgroundColor: c.dim }]}>
-                  <IconSymbol name="plus" size={14} color={c.sub} />
+              </View>
+            </View>
+            <View style={[s.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)', marginBottom: 8 }]}>
+              <LinearGradient colors={[ACCENT_STEPS + 'AA', ACCENT_STEPS]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={[s.progressFill, { width: `${Math.round(Math.min(todaySteps / STEPS_GOAL, 1) * 100)}%` as any }]} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {[1000, 2000, 3000, 5000].map(st => (
+                <TouchableOpacity key={st}
+                  onPress={() => setEntries(p => [{ id: Date.now().toString(), type: 'steps', value: st, date: new Date().toISOString() }, ...p])}
+                  style={[s.chipBtn, { borderColor: ACCENT_STEPS + '50', backgroundColor: ACCENT_STEPS + '12', paddingVertical: 7 }]}>
+                  <Text style={{ color: ACCENT_STEPS, fontSize: 11, fontWeight: '700' }}>+{st >= 1000 ? `${st / 1000}т` : st}</Text>
                 </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity onPress={() => openModal('weight')}
-                style={[s.emptyRow, { borderColor: c.border, backgroundColor: c.dim, marginBottom: 16 }]}>
-                <IconSymbol name="scalemass.fill" size={18} color={c.sub} />
-                <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 9, flex: 1 }}>{tr.recordWeight}</Text>
-                <IconSymbol name="plus" size={14} color={c.sub} />
-              </TouchableOpacity>
-            )}
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 6 }}>{tr.days7}</Text>
-            <MiniBarChart values={weightChart} color={ACCENT_WEIGHT} height={44} />
-            <View style={{ flexDirection: 'row', marginTop: 4 }}>
-              {last7Labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{l}</Text>)}
+              ))}
             </View>
           </BlurView>
 
-          {/* Sleep */}
+          {/* Water — 8-сегментний індикатор стаканів */}
+          <SectionHeader title={tr.water} icon="drop.fill" color={ACCENT} textColor={c.text} />
+          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, padding: 12 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
+              <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>
+                {todayWater >= 1000 ? `${(todayWater / 1000).toFixed(1)} л` : `${todayWater} мл`}
+              </Text>
+              <Text style={{ color: c.sub, fontSize: 11, marginLeft: 5 }}>/ {WATER_GOAL} мл</Text>
+              <View style={{ flex: 1 }} />
+              {todayWater >= WATER_GOAL
+                ? <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>{tr.target}</Text>
+                : <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>{Math.round(todayWater / WATER_GOAL * 100)}%</Text>
+              }
+            </View>
+            <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
+              {Array.from({ length: 8 }, (_, i) => {
+                const threshold = ((i + 1) / 8) * WATER_GOAL;
+                return (
+                  <View key={i} style={{
+                    flex: 1, height: 6, borderRadius: 3,
+                    backgroundColor: todayWater >= threshold ? ACCENT : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
+                  }} />
+                );
+              })}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {[150, 250, 350, 500].map(ml => (
+                <TouchableOpacity key={ml}
+                  onPress={() => setEntries(p => [{ id: Date.now().toString(), type: 'water', value: ml, date: new Date().toISOString() }, ...p])}
+                  style={[s.chipBtn, { borderColor: ACCENT + '50', backgroundColor: ACCENT + '12', paddingVertical: 7 }]}>
+                  <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>+{ml} мл</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </BlurView>
+
+          {/* Sleep — тривалість + якість + прогрес 8г + 7-денний чарт */}
           <SectionHeader title={tr.sleep} icon="moon.fill" color={ACCENT_SLEEP} textColor={c.text} />
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-            {todaySleep ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={[s.iconBox, { backgroundColor: ACCENT_SLEEP + '20' }]}>
-                  <IconSymbol name="moon.fill" size={22} color={ACCENT_SLEEP} />
-                </View>
-                <View style={{ marginLeft: 14, flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>{fmtSleep(todaySleep)}</Text>
-                  <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
-                    {todaySleep >= 420 ? tr.goodSleep : todaySleep >= 360 ? tr.littleLess : tr.notEnough}
-                  </Text>
-                </View>
-              </View>
-            ) : (
+          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, padding: 12 }]}>
+            {todaySleep ? (() => {
+              const sleepColor = todaySleep >= 420 ? ACCENT_SLEEP : todaySleep >= 360 ? ACCENT_MOOD : ACCENT_PULSE;
+              const sleepLabel = todaySleep >= 420 ? tr.goodSleep : todaySleep >= 360 ? tr.littleLess : tr.notEnough;
+              return (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, flex: 1 }}>{fmtSleep(todaySleep)}</Text>
+                    <View style={[s.badge, { backgroundColor: sleepColor + '20', borderColor: sleepColor + '40' }]}>
+                      <Text style={{ color: sleepColor, fontSize: 11, fontWeight: '700' }}>{sleepLabel}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => openModal('sleep')}
+                      style={[s.iconBtnSm, { borderColor: c.border, backgroundColor: c.dim, marginLeft: 8 }]}>
+                      <IconSymbol name="plus" size={14} color={c.sub} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={[s.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)', marginBottom: 8 }]}>
+                    <LinearGradient colors={[sleepColor + 'AA', sleepColor]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={[s.progressFill, { width: `${Math.round(Math.min(todaySleep / 480, 1) * 100)}%` as any }]} />
+                  </View>
+                  <MiniBarChart values={sleepChart} color={ACCENT_SLEEP} height={34} />
+                  <View style={{ flexDirection: 'row', marginTop: 3 }}>
+                    {last7Labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 8, fontWeight: '600' }}>{l}</Text>)}
+                  </View>
+                </>
+              );
+            })() : (
               <TouchableOpacity onPress={() => openModal('sleep')}
                 style={[s.emptyRow, { borderColor: c.border, backgroundColor: c.dim }]}>
                 <IconSymbol name="moon.fill" size={18} color={c.sub} />
@@ -488,80 +468,85 @@ export default function HealthScreen() {
             )}
           </BlurView>
 
-          {/* Steps */}
-          <SectionHeader title={tr.steps} icon="figure.walk" color={ACCENT_STEPS} textColor={c.text} />
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 8 }}>
-              <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{todaySteps.toLocaleString(locale)}</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginLeft: 6, marginBottom: 4 }}>/ {STEPS_GOAL.toLocaleString(locale)}</Text>
-            </View>
-            <View style={[s.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)', marginBottom: 4 }]}>
-              <LinearGradient colors={[ACCENT_STEPS + 'AA', ACCENT_STEPS]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={[s.progressFill, { width: `${Math.round(Math.min(todaySteps / STEPS_GOAL, 1) * 100)}%` as any }]} />
-            </View>
-            <Text style={{ color: c.sub, fontSize: 11, marginBottom: 14 }}>{Math.round(Math.min(todaySteps / STEPS_GOAL, 1) * 100)}% від мети</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              {[1000, 2000, 3000, 5000].map(st => (
-                <TouchableOpacity key={st}
-                  onPress={() => setEntries(p => [{ id: Date.now().toString(), type: 'steps', value: st, date: new Date().toISOString() }, ...p])}
-                  style={[s.chipBtn, { borderColor: ACCENT_STEPS + '50', backgroundColor: ACCENT_STEPS + '12' }]}>
-                  <IconSymbol name="figure.walk" size={11} color={ACCENT_STEPS} />
-                  <Text style={{ color: ACCENT_STEPS, fontSize: 11, fontWeight: '700', marginTop: 2 }}>+{st >= 1000 ? `${st / 1000}т` : st}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 6 }}>{tr.days7}</Text>
-            <MiniBarChart values={stepsChart} color={ACCENT_STEPS} goal={STEPS_GOAL} />
-            <View style={{ flexDirection: 'row', marginTop: 4 }}>
-              {last7Labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{l}</Text>)}
-            </View>
-          </BlurView>
-
-          {/* Mood */}
-          <SectionHeader title={tr.mood} icon="heart.fill" color={ACCENT_MOOD} textColor={c.text} />
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-            <Text style={{ color: c.sub, fontSize: 12, marginBottom: 12 }}>Як ти почуваєшся сьогодні?</Text>
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              {MOODS.map(mood => {
-                const active = todayMood === mood.value;
-                return (
-                  <TouchableOpacity key={mood.value}
-                    onPress={() => {
-                      const ds = now.toDateString();
-                      setEntries(p => [
-                        { id: Date.now().toString(), type: 'mood', value: mood.value, date: new Date().toISOString() },
-                        ...p.filter(e => !(e.type === 'mood' && new Date(e.date).toDateString() === ds)),
-                      ]);
-                    }}
-                    style={[s.moodBtn, { borderColor: active ? mood.color : c.border, backgroundColor: active ? mood.color + '22' : 'transparent' }]}>
-                    <Text style={{ fontSize: 22 }}>{mood.emoji}</Text>
-                    <Text style={{ color: active ? mood.color : c.sub, fontSize: 9, fontWeight: '700', marginTop: 3, textAlign: 'center' }}>{mood.label}</Text>
+          {/* Weight — значення + тренд за тиждень + чарт */}
+          <SectionHeader title={tr.weight} icon="scalemass.fill" color={ACCENT_WEIGHT} textColor={c.text} />
+          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, padding: 12 }]}>
+            {latestWeight ? (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{latestWeight} кг</Text>
+                  {prevWeight && latestWeight !== prevWeight ? (() => {
+                    const delta = latestWeight - prevWeight;
+                    const up = delta > 0;
+                    return (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
+                        <IconSymbol name={up ? 'arrow.up.right' : 'arrow.down.right'} size={11} color={up ? ACCENT_PULSE : ACCENT} />
+                        <Text style={{ color: up ? ACCENT_PULSE : ACCENT, fontSize: 11, fontWeight: '700', marginLeft: 2 }}>
+                          {up ? '+' : ''}{delta.toFixed(1)} кг/тиж
+                        </Text>
+                      </View>
+                    );
+                  })() : (
+                    <Text style={{ color: c.sub, fontSize: 11, marginLeft: 8 }}>{todayWeight ? tr.recordedToday : tr.lastRecord}</Text>
+                  )}
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity onPress={() => openModal('weight')}
+                    style={[s.iconBtnSm, { borderColor: c.border, backgroundColor: c.dim }]}>
+                    <IconSymbol name="plus" size={14} color={c.sub} />
                   </TouchableOpacity>
-                );
-              })}
-            </View>
+                </View>
+                <MiniBarChart values={weightChart} color={ACCENT_WEIGHT} height={36} />
+                <View style={{ flexDirection: 'row', marginTop: 3 }}>
+                  {last7Labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 8, fontWeight: '600' }}>{l}</Text>)}
+                </View>
+              </>
+            ) : (
+              <TouchableOpacity onPress={() => openModal('weight')}
+                style={[s.emptyRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+                <IconSymbol name="scalemass.fill" size={16} color={c.sub} />
+                <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 8, flex: 1 }}>{tr.recordWeight}</Text>
+                <IconSymbol name="plus" size={14} color={c.sub} />
+              </TouchableOpacity>
+            )}
           </BlurView>
 
-          {/* Pulse */}
+          {/* Pulse — 3-зонний індикатор ЧСС */}
           <SectionHeader title={tr.pulse} icon="waveform.path.ecg" color={ACCENT_PULSE} textColor={c.text} />
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-            {todayPulse ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={[s.iconBox, { backgroundColor: ACCENT_PULSE + '20' }]}>
-                  <IconSymbol name="waveform.path.ecg" size={22} color={ACCENT_PULSE} />
-                </View>
-                <View style={{ marginLeft: 14, flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{todayPulse} уд/хв</Text>
-                  <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
-                    {todayPulse < 60 ? tr.bradycardia : todayPulse <= 100 ? tr.normal : tr.tachycardia}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => openModal('pulse')}
-                  style={[s.iconBtnSm, { borderColor: c.border, backgroundColor: c.dim }]}>
-                  <IconSymbol name="plus" size={14} color={c.sub} />
-                </TouchableOpacity>
-              </View>
-            ) : (
+          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, padding: 12 }]}>
+            {todayPulse ? (() => {
+              const zoneColor = todayPulse < 60 ? ACCENT_STEPS : todayPulse <= 100 ? ACCENT : ACCENT_PULSE;
+              const zoneLabel = todayPulse < 60 ? tr.bradycardia : todayPulse <= 100 ? tr.normal : tr.tachycardia;
+              return (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                    <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{todayPulse}</Text>
+                    <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>уд/хв</Text>
+                    <View style={{ flex: 1 }} />
+                    <View style={[s.badge, { backgroundColor: zoneColor + '20', borderColor: zoneColor + '40' }]}>
+                      <Text style={{ color: zoneColor, fontSize: 11, fontWeight: '700' }}>{zoneLabel}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => openModal('pulse')}
+                      style={[s.iconBtnSm, { borderColor: c.border, backgroundColor: c.dim, marginLeft: 8 }]}>
+                      <IconSymbol name="plus" size={14} color={c.sub} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 4 }}>
+                    {[
+                      { label: tr.bradycardia, range: '< 60',   color: ACCENT_STEPS, active: todayPulse < 60,              flex: 1   },
+                      { label: tr.normal,       range: '60–100', color: ACCENT,        active: todayPulse >= 60 && todayPulse <= 100, flex: 1.4 },
+                      { label: tr.tachycardia,  range: '> 100',  color: ACCENT_PULSE,  active: todayPulse > 100,             flex: 1   },
+                    ].map((z, i) => (
+                      <View key={i} style={{ flex: z.flex, alignItems: 'center' }}>
+                        <View style={{ height: 5, width: '100%', borderRadius: 3, backgroundColor: z.active ? z.color : z.color + '28' }} />
+                        <Text style={{ color: z.active ? z.color : c.sub, fontSize: 9, fontWeight: z.active ? '700' : '500', marginTop: 4 }}>
+                          {z.range}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              );
+            })() : (
               <TouchableOpacity onPress={() => openModal('pulse')}
                 style={[s.emptyRow, { borderColor: c.border, backgroundColor: c.dim }]}>
                 <IconSymbol name="waveform.path.ecg" size={18} color={c.sub} />
@@ -599,8 +584,9 @@ export default function HealthScreen() {
         })}
 
         <TouchableOpacity onPress={toggleFab} activeOpacity={0.85}
-          style={[s.fab, { shadowColor: ACCENT }]}>
-          <LinearGradient colors={[ACCENT, '#059669']} style={s.fabGrad}
+          style={[s.fab, { shadowColor: ACCENT, borderRadius: fabOpen ? 29 : 16 }]}>
+          <LinearGradient colors={[ACCENT, '#059669']}
+            style={[s.fabGrad, { borderRadius: fabOpen ? 29 : 16 }]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
             <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
               <IconSymbol name="plus" size={26} color="#fff" />
@@ -766,16 +752,30 @@ export default function HealthScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={[s.sheetTitle, { color: c.text, marginBottom: 14 }]}>Історія</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                <Text style={[s.sheetTitle, { color: c.text, flex: 1, marginBottom: 0 }]}>Історія</Text>
+                <MonthPicker
+                  month={activeMonth}
+                  onChange={setActiveMonth}
+                  months={tr.months}
+                  accentColor={ACCENT}
+                  textColor={c.text}
+                  subColor={c.sub}
+                  dimColor={c.dim}
+                  borderColor={c.border}
+                />
+              </View>
               <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: Dimensions.get('window').height * 0.58 }}>
-                {entries.length === 0 ? (
+                {(() => {
+                  const monthEntries = getMonthEntries(entries, activeMonth);
+                  return monthEntries.length === 0 ? (
                   <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                     <IconSymbol name="heart.fill" size={38} color={c.sub} />
                     <Text style={{ color: c.sub, fontSize: 15, marginTop: 12, fontWeight: '600' }}>{tr.noEntriesYet}</Text>
                   </View>
                 ) : (
                   <View style={{ gap: 8, paddingBottom: 16 }}>
-                    {entries.slice(0, 60).map(entry => {
+                    {monthEntries.slice(0, 60).map(entry => {
                       const d = new Date(entry.date);
                       const dayStr = isSameDay(d, now) ? tr.today : d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
                       const timeStr = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
@@ -797,7 +797,8 @@ export default function HealthScreen() {
                       );
                     })}
                   </View>
-                )}
+                );
+                })()}
               </ScrollView>
             </BlurView>
           </Pressable>

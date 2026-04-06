@@ -1,13 +1,14 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,10 +18,14 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FinanceSummary } from '@/components/finance/FinanceSummary';
+import { TransactionGroup } from '@/components/finance/TransactionGroup';
+import { MonthPicker } from '@/components/shared/MonthPicker';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
+import { filterByMonth, groupTransactions, calcTotals } from '@/utils/financeUtils';
 
 type TxType = 'income' | 'expense';
 
@@ -81,22 +86,11 @@ const ICON_SUGGESTIONS: IconSymbolName[] = [
 ];
 
 
-const today = new Date();
-const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
-
 function chunk<T>(arr: T[], n: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
   return out;
 }
-
-function groupLabel(date: Date, todayStr: string, yesterdayStr: string, locale: string) {
-  if (date.toDateString() === todayStr) return '__today__';
-  if (date.toDateString() === yesterdayStr) return '__yesterday__';
-  return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-}
-
-// fmt defined inside component
 
 export default function FinanceScreen() {
   const isDark = useColorScheme() === 'dark';
@@ -107,10 +101,13 @@ export default function FinanceScreen() {
   const MONTHS_UA = tr.months;
   const WEEKDAYS_SHORT = tr.weekdays;
   const fmt = (n: number) => n.toLocaleString(locale, { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
+  const now = new Date();
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [filter, setFilter] = useState<'all' | TxType>('all');
   const [dateFilter, setDateFilter] = useState<string | null>(null);
+  const [activeMonth, setActiveMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [txType, setTxType] = useState<TxType>('expense');
@@ -121,8 +118,8 @@ export default function FinanceScreen() {
   const [compact, setCompact] = useState(false);
 
   const [showCal, setShowCal] = useState(false);
-  const [calYear, setCalYear] = useState(today.getFullYear());
-  const [calMonth, setCalMonth] = useState(today.getMonth());
+  const [calYear, setCalYear] = useState(now.getFullYear());
+  const [calMonth, setCalMonth] = useState(now.getMonth());
 
   // Categories management
   const [cats, setCats] = useState<Record<TxType, CategoryDef[]>>(DEFAULT_CATEGORIES);
@@ -133,13 +130,21 @@ export default function FinanceScreen() {
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState<IconSymbolName>('ellipsis.circle.fill');
 
+  const loadTxs = useCallback(async () => {
+    const data = await loadData<Transaction[]>('transactions', []);
+    setTxs(data);
+  }, []);
+
   // Load from storage
   useEffect(() => {
-    loadData<Transaction[]>('transactions', []).then(data => {
-      setTxs(data);
-      setInitialized(true);
-    });
+    loadTxs().then(() => setInitialized(true));
   }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadTxs();
+    setRefreshing(false);
+  }, [loadTxs]);
 
   // Save to storage
   useEffect(() => {
@@ -172,33 +177,24 @@ export default function FinanceScreen() {
     setNewCatName(''); setNewCatIcon('ellipsis.circle.fill'); setShowAddCat(false);
   };
 
-  const income  = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const expense = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const balance = income - expense;
-  const savingsPct = income > 0 ? Math.max(0, Math.round((balance / income) * 100)) : 0;
+  const monthTxs = useMemo(() => filterByMonth(txs, activeMonth), [txs, activeMonth]);
+  const { income, expense, balance, savingsPct } = useMemo(() => calcTotals(monthTxs), [monthTxs]);
 
-  const filtered = useMemo(() => txs.filter(t => {
+  const filtered = useMemo(() => monthTxs.filter(t => {
     if (filter !== 'all' && t.type !== filter) return false;
     if (dateFilter) {
       const d = new Date(t.date);
       if (d.toDateString() !== dateFilter) return false;
     }
     return true;
-  }), [txs, filter, dateFilter]);
+  }), [monthTxs, filter, dateFilter]);
 
-  const groups = useMemo(() => {
-    const map: Record<string, { label: string; items: Transaction[]; dayIncome: number; dayExpense: number }> = {};
-    const order: string[] = [];
-    filtered.forEach(t => {
-      const d = new Date(t.date);
-      const key = d.toDateString();
-      if (!map[key]) { map[key] = { label: groupLabel(d), items: [], dayIncome: 0, dayExpense: 0 }; order.push(key); }
-      map[key].items.push(t);
-      if (t.type === 'income') map[key].dayIncome += t.amount;
-      else map[key].dayExpense += t.amount;
-    });
-    return order.map(k => map[k]);
-  }, [filtered]);
+  const groups = useMemo(() => groupTransactions(
+    filtered,
+    now.toDateString(),
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString(),
+    locale,
+  ), [filtered, locale]);
 
   const addTx = () => {
     const num = parseFloat(amount.replace(',', '.'));
@@ -247,23 +243,40 @@ export default function FinanceScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
         {/* Fixed Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.finance}</Text>
-          <TouchableOpacity
-            onPress={() => setCompact(v => !v)}
-            style={[s.headerBtn, { backgroundColor: compact ? c.accent + '20' : c.dim, borderColor: compact ? c.accent : c.border }]}>
-            <IconSymbol name={compact ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={compact ? c.accent : c.sub} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowMenu(true)}
-            style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent + '20' : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
-            <IconSymbol name="ellipsis" size={17} color={dateFilter ? c.accent : c.sub} />
-          </TouchableOpacity>
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.finance}</Text>
+            <TouchableOpacity
+              onPress={() => setCompact(v => !v)}
+              style={[s.headerBtn, { backgroundColor: compact ? c.accent + '20' : c.dim, borderColor: compact ? c.accent : c.border }]}>
+              <IconSymbol name={compact ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={compact ? c.accent : c.sub} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowMenu(true)}
+              style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent + '20' : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
+              <IconSymbol name="ellipsis" size={17} color={dateFilter ? c.accent : c.sub} />
+            </TouchableOpacity>
+          </View>
+          <MonthPicker
+            month={activeMonth}
+            onChange={m => { setActiveMonth(m); setDateFilter(null); }}
+            months={tr.months}
+            monthsShort={tr.monthsShort}
+            monthsGenitive={tr.monthsGenitive}
+            accentColor={c.accent}
+            textColor={c.text}
+            subColor={c.sub}
+            dimColor={c.dim}
+            borderColor={c.border}
+          />
         </View>
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />
+          }>
 
           {/* Date filter chip */}
           {dateFilter && (
@@ -279,30 +292,19 @@ export default function FinanceScreen() {
           )}
 
           {/* Balance Card */}
-          <BlurView intensity={isDark ? 25 : 45} tint={isDark ? 'dark' : 'light'} style={[s.balCard, { borderColor: c.border }]}>
-            <Text style={[s.balLabel, { color: c.sub }]}>{tr.balance}</Text>
-            <Text style={[s.balAmount, { color: balance >= 0 ? c.green : c.red }]}>{fmt(balance)}</Text>
-            <View style={[s.divider, { backgroundColor: c.border, marginVertical: 16 }]} />
-            <View style={{ flexDirection: 'row' }}>
-              <SummaryItem label={tr.incomes} value={fmt(income)} color={c.green} sub={c.sub} />
-              <View style={{ width: 1, backgroundColor: c.border }} />
-              <SummaryItem label={tr.expenses} value={fmt(expense)} color={c.red} sub={c.sub} />
-            </View>
-            {income > 0 && (
-              <>
-                <View style={[s.divider, { backgroundColor: c.border, marginTop: 16, marginBottom: 12 }]} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.miniLabel, { color: c.sub, marginBottom: 6 }]}>{tr.savings}</Text>
-                    <View style={s.progressBg}>
-                      <View style={[s.progressFill, { width: `${savingsPct}%`, backgroundColor: c.green }]} />
-                    </View>
-                  </View>
-                  <Text style={{ color: c.green, fontSize: 18, fontWeight: '800' }}>{savingsPct}%</Text>
-                </View>
-              </>
-            )}
-          </BlurView>
+          <FinanceSummary
+            income={income}
+            expense={expense}
+            balance={balance}
+            savingsPct={savingsPct}
+            fmt={fmt}
+            isDark={isDark}
+            c={{ border: c.border, sub: c.sub, green: c.green, red: c.red }}
+            incomeLabel={tr.incomes}
+            expenseLabel={tr.expenses}
+            balanceLabel={tr.balance}
+            savingsLabel={tr.savings}
+          />
 
           {/* Filters */}
           <View style={[s.filterRow, { backgroundColor: c.card, borderColor: c.border, marginTop: 16, marginBottom: 22 }]}>
@@ -329,94 +331,20 @@ export default function FinanceScreen() {
 
           {/* Grouped transactions */}
           {groups.map(group => (
-            <View key={group.label} style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                <Text style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{group.label}</Text>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {group.dayIncome > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.green + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                      <IconSymbol name="arrow.up" size={9} color={c.green} />
-                      <Text style={{ color: c.green, fontSize: 11, fontWeight: '700' }}>{fmt(group.dayIncome)}</Text>
-                    </View>
-                  )}
-                  {group.dayExpense > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.red + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                      <IconSymbol name="arrow.down" size={9} color={c.red} />
-                      <Text style={{ color: c.red, fontSize: 11, fontWeight: '700' }}>{fmt(group.dayExpense)}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              <View style={{ gap: compact ? 8 : 2 }}>
-                {group.items.map((tx, idx) => {
-                  const isIncome = tx.type === 'income';
-                  const color = isIncome ? c.green : c.red;
-                  const iconName: IconSymbolName = getCatIcon(tx.category, tx.type);
-                  const txDate = new Date(tx.date);
-
-                  if (compact) {
-                    // ── Детальний режим ──────────────────────────────────────
-                    return (
-                      <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => setSelected(tx)}>
-                        <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.txDetail, { borderColor: c.border }]}>
-                          <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: color + '70', borderRadius: 2, marginRight: 12 }} />
-                          <View style={[s.txDetailIcon, { backgroundColor: color + (isDark ? '20' : '12') }]}>
-                            <IconSymbol name={iconName} size={19} color={color} />
-                          </View>
-                          <View style={{ flex: 1, marginLeft: 11 }}>
-                            <Text style={[s.txDetailCategory, { color: c.text }]} numberOfLines={1}>{tx.category}</Text>
-                            {tx.note ? (
-                              <Text style={[s.txDetailNote, { color: c.sub, marginTop: 2 }]} numberOfLines={1}>{tx.note}</Text>
-                            ) : null}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}>
-                              <IconSymbol name="clock" size={10} color={c.sub} />
-                              <Text style={{ color: c.sub, fontSize: 10, fontWeight: '500' }}>
-                                {txDate.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
-                              </Text>
-                              <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: c.sub + '80' }} />
-                              <View style={{ backgroundColor: color + '20', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                                <Text style={{ color, fontSize: 9, fontWeight: '700' }}>{isIncome ? tr.income : tr.expense}</Text>
-                              </View>
-                            </View>
-                          </View>
-                          <Text style={[s.txDetailAmount, { color }]}>{isIncome ? '+' : '−'}{fmt(tx.amount)}</Text>
-                        </BlurView>
-                      </TouchableOpacity>
-                    );
-                  }
-
-                  // ── Звичний режим ──────────────────────────────────────────
-                  const isFirst = idx === 0;
-                  const isLast = idx === group.items.length - 1;
-                  return (
-                    <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => setSelected(tx)}>
-                      <BlurView
-                        intensity={isDark ? 16 : 28}
-                        tint={isDark ? 'dark' : 'light'}
-                        style={[
-                          s.txCard,
-                          {
-                            borderTopLeftRadius: isFirst ? 13 : 5,
-                            borderTopRightRadius: isFirst ? 13 : 5,
-                            borderBottomLeftRadius: isLast ? 13 : 5,
-                            borderBottomRightRadius: isLast ? 13 : 5,
-                          }
-                        ]}>
-                        <View style={[s.txIcon, { backgroundColor: color + (isDark ? '20' : '12') }]}>
-                          <IconSymbol name={iconName} size={14} color={color} />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: 9 }}>
-                          <Text style={[s.txCategory, { color: c.text }]} numberOfLines={1}>{tx.category}</Text>
-                          {tx.note ? <Text style={[s.txNote, { color: c.sub }]} numberOfLines={1}>{tx.note}</Text> : null}
-                        </View>
-                        <Text style={[s.txAmount, { color }]}>{isIncome ? '+' : '−'}{fmt(tx.amount)}</Text>
-                      </BlurView>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+            <TransactionGroup
+              key={group.dateStr}
+              group={group}
+              compact={compact}
+              isDark={isDark}
+              c={{ sub: c.sub, text: c.text, green: c.green, red: c.red, border: c.border, dim: c.dim }}
+              fmt={fmt}
+              getCatIcon={getCatIcon}
+              onSelect={setSelected}
+              todayLabel={tr.today}
+              yesterdayLabel={tr.yesterday}
+              incomeLabel={tr.income}
+              expenseLabel={tr.expense}
+            />
           ))}
         </ScrollView>
       </SafeAreaView>
@@ -542,7 +470,7 @@ export default function FinanceScreen() {
                       if (!day) return <View key={di} style={{ flex: 1 }} />;
                       const dayDate = new Date(calYear, calMonth, day);
                       const keyStr = `${calYear}-${calMonth}-${day}`;
-                      const isToday = dayDate.toDateString() === today.toDateString();
+                      const isToday = dayDate.toDateString() === now.toDateString();
                       const isSel = dateFilter === dayDate.toDateString();
                       const hasMark = markedDays.has(keyStr);
                       return (
@@ -857,15 +785,6 @@ export default function FinanceScreen() {
   );
 }
 
-function SummaryItem({ label, value, color, sub }: any) {
-  return (
-    <View style={{ flex: 1, padding: 6 }}>
-      <Text style={{ color: sub, fontSize: 10, fontWeight: '600', letterSpacing: 0.3, marginBottom: 5 }}>{label}</Text>
-      <Text style={{ color, fontSize: 17, fontWeight: '800', letterSpacing: -0.4 }}>{value}</Text>
-    </View>
-  );
-}
-
 function InfoRow({ icon, label, value, color, text, sub, border, last }: any) {
   return (
     <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 13 }, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
@@ -880,27 +799,10 @@ const s = StyleSheet.create({
   pageTitle:   { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
   headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
-  balCard:     { borderRadius: 20, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  balLabel:    { fontSize: 12, fontWeight: '600', marginBottom: 4 },
-  balAmount:   { fontSize: 36, fontWeight: '800', letterSpacing: -1 },
-  divider:     { height: 1 },
-  miniLabel:   { fontSize: 11, fontWeight: '600' },
-  progressBg:  { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
-  progressFill:{ height: '100%', borderRadius: 2 },
   filterRow:   { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
   filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   filterLabel: { fontSize: 12, fontWeight: '600' },
   groupLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  txCard:      { paddingHorizontal: 10, paddingVertical: 8, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  txIcon:      { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  txCategory:  { fontSize: 13, fontWeight: '600' },
-  txNote:      { fontSize: 11, marginTop: 1 },
-  txAmount:    { fontSize: 13, fontWeight: '800' },
-  txDetail:        { borderRadius: 15, borderWidth: 1, paddingLeft: 10, paddingRight: 13, paddingVertical: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  txDetailIcon:    { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  txDetailCategory:{ fontSize: 14, fontWeight: '700' },
-  txDetailNote:    { fontSize: 12, fontWeight: '400' },
-  txDetailAmount:  { fontSize: 15, fontWeight: '800', marginLeft: 10 },
   fab:         { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },

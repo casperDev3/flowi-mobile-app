@@ -10,6 +10,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -61,6 +62,7 @@ export default function IdeasScreen() {
 
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [filter, setFilter] = useState<'all' | 'idea' | 'done' | 'sent'>('all');
   const [sort, setSort] = useState<'newest' | 'oldest' | 'priority'>('newest');
@@ -86,11 +88,18 @@ export default function IdeasScreen() {
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
   };
 
+  const loadIdeas = useCallback(async () => {
+    const data = await loadData<Idea[]>('ideas', []);
+    setIdeas(data);
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadIdeas().finally(() => setRefreshing(false));
+  }, [loadIdeas]);
+
   useEffect(() => {
-    loadData<Idea[]>('ideas', []).then(data => {
-      setIdeas(data);
-      setInitialized(true);
-    });
+    loadIdeas().then(() => setInitialized(true));
   }, []);
 
   useEffect(() => {
@@ -276,7 +285,8 @@ export default function IdeasScreen() {
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24, gap: 10 }}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
 
           {filtered.length === 0 && (
             <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>

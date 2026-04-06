@@ -27,13 +27,7 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Flowi потребує доступу до камери для сканування QR-коду синхронізації."
-        }
-      ],
-      [
+[
         "expo-notifications",
         {
           "icon": "./assets/logo_app.png",

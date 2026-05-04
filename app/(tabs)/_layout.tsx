@@ -45,11 +45,15 @@ export default function TabLayout() {
                 tabBarIconStyle: {marginTop: 0},
             }}>
             <Tabs.Screen
-                name="agent"
+                name="shared"
                 options={{
-                    title: 'Agent',
-                    tabBarIcon: ({color}) => <IconSymbol size={28} name="sparkles" color={color}/>,
+                    title: 'Спільне',
+                    tabBarIcon: ({color}) => <IconSymbol size={28} name="person.2.fill" color={color}/>,
                 }}
+            />
+            <Tabs.Screen
+                name="agent"
+                options={{ href: null }}
             />
             <Tabs.Screen
                 name="explore"

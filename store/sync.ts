@@ -1,4 +1,3 @@
-import { joinRoom } from 'trystero/torrent';
 import { loadData, saveData } from './storage';
 import {
   appendConflicts,
@@ -79,74 +78,3 @@ export async function mergeAndSave(remote: Record<string, any[]>): Promise<numbe
   return allConflicts.length;
 }
 
-export type SyncStatus = 'idle' | 'waiting' | 'connected' | 'syncing' | 'done' | 'error';
-
-export interface SyncSession {
-  leave: () => void;
-  getPeerCount: () => number;
-}
-
-export function isSyncSupported(): boolean {
-  const g: any = typeof globalThis !== 'undefined' ? globalThis : undefined;
-  return Boolean(
-    g &&
-    typeof g.RTCPeerConnection !== 'undefined' &&
-    g.crypto &&
-    typeof g.crypto.getRandomValues === 'function' &&
-    g.crypto.subtle &&
-    typeof g.crypto.subtle.importKey === 'function' &&
-    typeof g.crypto.subtle.digest === 'function',
-  );
-}
-
-export function startSync(
-  roomCode: string,
-  onStatus: (s: SyncStatus) => void,
-  onPeerCount: (n: number) => void,
-  onConflicts?: (count: number) => void,
-): SyncSession {
-  if (!isSyncSupported()) {
-    onStatus('error');
-    return { leave: () => {}, getPeerCount: () => 0 };
-  }
-
-  let peerCount = 0;
-  const room = joinRoom({ appId: 'flowi-sync-v1' }, roomCode.toLowerCase());
-  const [sendData, onData] = room.makeAction<Record<string, any[]>>('sync');
-
-  onStatus('waiting');
-
-  room.onPeerJoin(async (peerId) => {
-    peerCount++;
-    onPeerCount(peerCount);
-    onStatus('connected');
-    onStatus('syncing');
-    const data = await collectAllData();
-    sendData(data, peerId);
-  });
-
-  room.onPeerLeave(() => {
-    peerCount = Math.max(0, peerCount - 1);
-    onPeerCount(peerCount);
-    if (peerCount === 0) onStatus('waiting');
-  });
-
-  onData(async (data) => {
-    onStatus('syncing');
-    const conflictCount = await mergeAndSave(data);
-    const merged = await collectAllData();
-    sendData(merged);
-    onStatus('done');
-    onConflicts?.(conflictCount);
-  });
-
-  return {
-    leave: () => room.leave(),
-    getPeerCount: () => peerCount,
-  };
-}
-
-export function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}

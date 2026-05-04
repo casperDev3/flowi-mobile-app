@@ -101,6 +101,11 @@ const MAPPING: Record<string, MaterialIconName> = {
   'line.3.horizontal.decrease': 'filter-list',
   'slider.horizontal.3': 'tune',
   // Settings
+  // AI / Agent
+  'sparkles': 'auto-awesome',
+  'brain': 'psychology',
+  'network': 'hub',
+  // Notifications
   'bell.fill': 'notifications-none',
   'bell': 'notifications-none',
   'globe': 'language',

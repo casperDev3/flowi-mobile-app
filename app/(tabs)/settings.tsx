@@ -216,6 +216,28 @@ export default function SettingsScreen() {
               text={c.text}
               sub={c.sub}
               border={c.border}
+              last={false}
+            />
+            <SettingRow
+              icon="shippingbox.fill"
+              iconColor="#F97316"
+              label={tr.containers}
+              value={undefined}
+              onPress={() => router.push('/containers')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
+              icon="brain"
+              iconColor="#8B5CF6"
+              label="OpenClaw Agent"
+              value={undefined}
+              onPress={() => router.push('/(tabs)/agent')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
               last
             />
           </BlurView>

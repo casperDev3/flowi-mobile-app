@@ -25,7 +25,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'https://flowi-server-app.vercel.app/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,8 +84,8 @@ export default function SharedScreen() {
   const isDark = useColorScheme() === 'dark';
 
   const c = {
-    bg1:    isDark ? '#081418' : '#EFF9FC',
-    bg2:    isDark ? '#0F1E24' : '#D8F3FA',
+    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
+    bg2:    isDark ? '#14121E' : '#EAE6FF',
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.85)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
     text:   isDark ? '#E0F8FF' : '#0C2A33',
@@ -174,7 +174,7 @@ export default function SharedScreen() {
   function connectWs(groupId: string, did: string) {
     if (wsRef.current) return;
     try {
-      const ws = new WebSocket(`ws://localhost:8000/ws/group/${groupId}/?device_id=${did}`);
+      const ws = new WebSocket(`wss://flowi-server-app.vercel.app/ws/group/${groupId}/?device_id=${did}`);
       ws.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);

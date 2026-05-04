@@ -44,6 +44,7 @@ export default function TabLayout() {
                     ),
                 tabBarIconStyle: {marginTop: 0},
             }}>
+
             <Tabs.Screen
                 name="shared"
                 options={{

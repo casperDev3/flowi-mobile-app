@@ -22,7 +22,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { supabase } from '@/store/supabase';
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+const API_BASE = 'http://192.168.0.102:8000/api';
+const WS_BASE  = 'ws://192.168.0.102:8000/ws';
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+
+function randomUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+async function api(path: string, method = 'GET', body?: object) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,19 +75,10 @@ interface GroupData {
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 
-const KEY_DEVICE = 'shared_device_id';
-const KEY_GROUP  = 'shared_group';
+const KEY_DEVICE    = 'shared_device_id';
+const KEY_GROUP     = 'shared_group';
+const KEY_LAST_SYNC = 'shared_last_sync';
 const localItemsKey = (type: SectionType) => `shared_local_items_${type}`;
-
-// ─── Secret generator ─────────────────────────────────────────────────────────
-
-function generateSecret(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const digits = '0123456789';
-  const part1 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  const part2 = Array.from({ length: 4 }, () => digits[Math.floor(Math.random() * digits.length)]).join('');
-  return `${part1}-${part2}`;
-}
 
 // ─── Section meta ─────────────────────────────────────────────────────────────
 
@@ -80,8 +94,8 @@ export default function SharedScreen() {
   const isDark = useColorScheme() === 'dark';
 
   const c = {
-    bg1:    isDark ? '#081418' : '#EFF9FC',
-    bg2:    isDark ? '#0F1E24' : '#D8F3FA',
+    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
+    bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
     text:   isDark ? '#E0F8FF' : '#0C2A33',
     sub:    isDark ? 'rgba(224,248,255,0.45)' : 'rgba(12,42,51,0.45)',
@@ -120,39 +134,27 @@ export default function SharedScreen() {
   const [creating, setCreating]       = useState(false);
   const [joining, setJoining]         = useState(false);
 
-  const realtimeRef = useRef<any>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   // ─── Init ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     (async () => {
-      // Get or create device ID via Supabase anon auth
       let did = await AsyncStorage.getItem(KEY_DEVICE);
       if (!did) {
-        const { data } = await supabase.auth.signInAnonymously();
-        did = data.user?.id ?? crypto.randomUUID();
+        did = randomUUID();
         await AsyncStorage.setItem(KEY_DEVICE, did);
-        // Register device in DB
-        await supabase.from('devices').upsert({ id: did });
-      } else {
-        // Ensure session is still valid
-        const { data: session } = await supabase.auth.getSession();
-        if (!session.session) {
-          const { data } = await supabase.auth.signInAnonymously();
-          if (data.user) {
-            did = data.user.id;
-            await AsyncStorage.setItem(KEY_DEVICE, did);
-          }
-        }
-        await supabase.from('devices').upsert({ id: did });
+      }
+      try {
+        await api('/devices/register/', 'POST', { device_id: did });
+      } catch (e) {
+        if (__DEV__) console.warn('[shared] device register failed:', e);
       }
       setDeviceId(did);
 
-      // Load saved group
       const raw = await AsyncStorage.getItem(KEY_GROUP);
       if (raw) { try { setGroup(JSON.parse(raw)); } catch {} }
 
-      // Load local items
       const [shopping, tasks, notes] = await Promise.all([
         loadLocalItems('shopping'),
         loadLocalItems('tasks'),
@@ -163,49 +165,40 @@ export default function SharedScreen() {
     })();
   }, []);
 
-  // ─── Realtime subscription on focus ───────────────────────────────────────
+  // ─── WebSocket + Sync on focus ────────────────────────────────────────────
 
   useFocusEffect(useCallback(() => {
     if (initialized && group && deviceId) {
-      syncFromSupabase(group, deviceId);
-      subscribeRealtime(group);
+      syncFromAPI(group, deviceId);
+      connectWS(group, deviceId);
     }
     return () => {
-      if (realtimeRef.current) {
-        supabase.removeChannel(realtimeRef.current);
-        realtimeRef.current = null;
-      }
+      wsRef.current?.close();
+      wsRef.current = null;
     };
   }, [initialized, group?.id, deviceId]));
 
-  // ─── Realtime (Supabase Postgres changes) ─────────────────────────────────
+  // ─── WebSocket ────────────────────────────────────────────────────────────
 
-  function subscribeRealtime(g: GroupData) {
-    if (realtimeRef.current) return;
-
-    const sectionIds = g.sections.map(s => s.id);
-    if (sectionIds.length === 0) return;
-
-    const channel = supabase
-      .channel(`group-${g.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shared_items',
-          filter: `section_id=in.(${sectionIds.join(',')})`,
-        },
-        (payload: any) => {
-          const remote = payload.new;
-          if (!remote?.local_id) return;
-          const sec = g.sections.find(s => s.id === remote.section_id);
-          if (sec) applyRemoteItem(sec.type, remote);
-        }
-      )
-      .subscribe();
-
-    realtimeRef.current = channel;
+  function connectWS(g: GroupData, did: string) {
+    if (wsRef.current) return;
+    try {
+      const ws = new WebSocket(`${WS_BASE}/group/${g.id}/?device_id=${did}`);
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'item_updated' && msg.item) {
+            const sec = g.sections.find(s => s.id === msg.section_id);
+            if (sec) applyRemoteItem(sec.type, msg.item);
+          }
+        } catch {}
+      };
+      ws.onerror = () => { wsRef.current = null; };
+      ws.onclose = () => { wsRef.current = null; };
+      wsRef.current = ws;
+    } catch (e) {
+      if (__DEV__) console.warn('[shared] ws connect failed:', e);
+    }
   }
 
   function applyRemoteItem(type: SectionType, remote: any) {
@@ -225,45 +218,37 @@ export default function SharedScreen() {
     });
   }
 
-  // ─── Sync from Supabase ───────────────────────────────────────────────────
+  // ─── Sync from API ────────────────────────────────────────────────────────
 
-  async function syncFromSupabase(g: GroupData, did: string) {
+  async function syncFromAPI(g: GroupData, did: string) {
     setSyncing(true);
     try {
-      for (const sec of g.sections) {
-        const { data, error } = await supabase
-          .from('shared_items')
-          .select('*')
-          .eq('section_id', sec.id)
-          .order('updated_at', { ascending: false });
+      const since = await AsyncStorage.getItem(KEY_LAST_SYNC);
+      const res = await api('/sync/', 'POST', {
+        device_id: did,
+        group_id:  g.id,
+        since:     since ?? undefined,
+        items:     [],
+      });
 
-        if (error || !data) continue;
+      await AsyncStorage.setItem(KEY_LAST_SYNC, res.server_time);
 
-        const list: LocalItem[] = data.map((r: any) => ({
-          local_id:   r.local_id,
-          text:       r.data?.text    ?? '',
-          checked:    r.data?.checked ?? false,
-          deleted:    r.deleted       ?? false,
-          updated_at: r.updated_at,
-        }));
-
-        setItems(prev => {
-          saveLocalItems(sec.type, list);
-          return { ...prev, [sec.type]: list };
-        });
+      for (const remote of res.items ?? []) {
+        const sec = g.sections.find(s => s.id === remote.section_id);
+        if (sec) applyRemoteItem(sec.type, remote);
       }
 
-      // Refresh member count
-      const { count } = await supabase
-        .from('group_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('group_id', g.id);
-
-      if (count !== null) {
-        const updated = { ...g, member_count: count };
-        setGroup(updated);
-        await AsyncStorage.setItem(KEY_GROUP, JSON.stringify(updated));
-      }
+      // Refresh group detail (member count + sections)
+      const groupDetail = await api(`/groups/${g.id}/`);
+      const updated: GroupData = {
+        id:           groupDetail.id,
+        name:         groupDetail.name,
+        secret:       groupDetail.secret,
+        member_count: groupDetail.member_count,
+        sections:     groupDetail.sections.map((s: any) => ({ id: s.id, type: s.type, name: s.name })),
+      };
+      setGroup(updated);
+      await AsyncStorage.setItem(KEY_GROUP, JSON.stringify(updated));
     } catch (e) {
       if (__DEV__) console.warn('[shared] sync failed:', e);
     } finally {
@@ -284,10 +269,10 @@ export default function SharedScreen() {
     await AsyncStorage.setItem(localItemsKey(type), JSON.stringify(list));
   }
 
-  // ─── Persist item locally + push to Supabase ──────────────────────────────
+  // ─── Persist item locally + push to API ───────────────────────────────────
 
   async function persistItem(type: SectionType, item: LocalItem) {
-    // Update local state immediately (optimistic)
+    // Optimistic local update
     setItems(prev => {
       const list = [...prev[type]];
       const idx  = list.findIndex(i => i.local_id === item.local_id);
@@ -296,17 +281,23 @@ export default function SharedScreen() {
       return { ...prev, [type]: list };
     });
 
-    // Push to Supabase if group exists
     if (group && deviceId) {
       const sec = group.sections.find(s => s.type === type);
       if (sec) {
-        await supabase.from('shared_items').upsert({
-          section_id: sec.id,
-          local_id:   item.local_id,
-          device_id:  deviceId,
-          data:       { text: item.text, checked: item.checked },
-          deleted:    item.deleted,
-        }, { onConflict: 'section_id,local_id' });
+        try {
+          await api('/sync/', 'POST', {
+            device_id: deviceId,
+            group_id:  group.id,
+            items: [{
+              section_id: sec.id,
+              local_id:   item.local_id,
+              data:       { text: item.text, checked: item.checked },
+              deleted:    item.deleted,
+            }],
+          });
+        } catch (e) {
+          if (__DEV__) console.warn('[shared] persist failed:', e);
+        }
       }
     }
   }
@@ -317,7 +308,7 @@ export default function SharedScreen() {
     const text = newItemText.trim();
     if (!text) return;
     await persistItem(activeSection, {
-      local_id: crypto.randomUUID(), text, checked: false,
+      local_id: randomUUID(), text, checked: false,
       deleted: false, updated_at: new Date().toISOString(),
     });
     setNewItemText('');
@@ -345,32 +336,15 @@ export default function SharedScreen() {
     if (!deviceId) return;
     setCreating(true);
     try {
-      const secret = generateSecret();
-      const name   = groupName.trim() || 'Спільна група';
-
-      // Create group
-      const { data: groupData, error: gErr } = await supabase
-        .from('flowi_groups')
-        .insert({ name, secret })
-        .select()
-        .single();
-
-      if (gErr || !groupData) throw gErr;
-
-      // Add creator as member
-      await supabase.from('group_members').insert({ device_id: deviceId, group_id: groupData.id });
-
-      // Create default Shopping section
-      const { data: secData } = await supabase
-        .from('shared_sections')
-        .insert({ group_id: groupData.id, type: 'shopping', name: 'Покупки' })
-        .select()
-        .single();
+      const name = groupName.trim() || 'Спільна група';
+      const data = await api('/groups/create/', 'POST', { device_id: deviceId, name });
 
       const g: GroupData = {
-        id: groupData.id, name: groupData.name, secret: groupData.secret,
-        member_count: 1,
-        sections: secData ? [{ id: secData.id, type: 'shopping', name: 'Покупки' }] : [],
+        id:           data.id,
+        name:         data.name,
+        secret:       data.secret,
+        member_count: data.member_count,
+        sections:     data.sections.map((s: any) => ({ id: s.id, type: s.type, name: s.name })),
       };
 
       setGroup(g);
@@ -389,45 +363,26 @@ export default function SharedScreen() {
     if (!deviceId || !secretInput.trim()) return;
     setJoining(true);
     try {
-      const { data: groupData, error } = await supabase
-        .from('flowi_groups')
-        .select('*')
-        .eq('secret', secretInput.trim().toUpperCase())
-        .single();
-
-      if (error || !groupData) {
-        Alert.alert('Помилка', 'Невірний секрет або група не знайдена.');
-        return;
-      }
-
-      await supabase.from('group_members').upsert(
-        { device_id: deviceId, group_id: groupData.id },
-        { onConflict: 'device_id,group_id' }
-      );
-
-      const { data: sections } = await supabase
-        .from('shared_sections')
-        .select('*')
-        .eq('group_id', groupData.id);
-
-      const { count } = await supabase
-        .from('group_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('group_id', groupData.id);
+      const data = await api('/groups/join/', 'POST', {
+        device_id: deviceId,
+        secret:    secretInput.trim().toUpperCase(),
+      });
 
       const g: GroupData = {
-        id: groupData.id, name: groupData.name, secret: groupData.secret,
-        member_count: count ?? 1,
-        sections: (sections ?? []).map((s: any) => ({ id: s.id, type: s.type, name: s.name })),
+        id:           data.id,
+        name:         data.name,
+        secret:       data.secret,
+        member_count: data.member_count,
+        sections:     data.sections.map((s: any) => ({ id: s.id, type: s.type, name: s.name })),
       };
 
       setGroup(g);
       await AsyncStorage.setItem(KEY_GROUP, JSON.stringify(g));
       setShowJoinModal(false);
       setSecretInput('');
-      syncFromSupabase(g, deviceId);
+      syncFromAPI(g, deviceId);
     } catch {
-      Alert.alert('Помилка', 'Не вдалося приєднатися.');
+      Alert.alert('Помилка', 'Невірний секрет або група не знайдена.');
     } finally {
       setJoining(false);
     }
@@ -439,17 +394,13 @@ export default function SharedScreen() {
       {
         text: 'Вийти', style: 'destructive', onPress: async () => {
           if (group && deviceId) {
-            await supabase.from('group_members')
-              .delete()
-              .eq('device_id', deviceId)
-              .eq('group_id', group.id);
+            try { await api(`/groups/${group.id}/leave/`, 'POST', { device_id: deviceId }); } catch {}
           }
-          if (realtimeRef.current) {
-            supabase.removeChannel(realtimeRef.current);
-            realtimeRef.current = null;
-          }
+          wsRef.current?.close();
+          wsRef.current = null;
           setGroup(null);
           await AsyncStorage.removeItem(KEY_GROUP);
+          await AsyncStorage.removeItem(KEY_LAST_SYNC);
         },
       },
     ]);
@@ -460,7 +411,7 @@ export default function SharedScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     if (group && deviceId) {
-      syncFromSupabase(group, deviceId).finally(() => setRefreshing(false));
+      syncFromAPI(group, deviceId).finally(() => setRefreshing(false));
     } else {
       loadLocalItems(activeSection)
         .then(list => setItems(prev => ({ ...prev, [activeSection]: list })))
@@ -891,7 +842,7 @@ const st = StyleSheet.create({
   progressFill:  { height: 6, borderRadius: 3 },
   clearBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderWidth: 1, borderRadius: 12, marginTop: 4 },
   clearLabel:    { fontSize: 13, fontWeight: '500' },
-  fab:           { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowColor: '#06B6D4', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 },
+  fab:           { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheetWrapper:  { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:         { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },

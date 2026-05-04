@@ -33,6 +33,7 @@ function RootLayoutContent() {
         <Stack.Screen name="donate" options={{ headerShown: false }} />
         <Stack.Screen name="developer" options={{ headerShown: false }} />
         <Stack.Screen name="sync" options={{ headerShown: false }} />
+        <Stack.Screen name="containers" options={{ headerShown: false }} />
         <Stack.Screen name="meetings" options={{ headerShown: false }} />
         <Stack.Screen name="apple-health" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />

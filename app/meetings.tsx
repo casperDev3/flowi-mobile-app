@@ -4,19 +4,16 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/shared/MeetingFormSheet';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -34,6 +31,8 @@ interface Meeting {
   link?: string;
   notes?: string;
   color: string;
+  recurrence?: RecurrenceRule;
+  _origId?: string; // runtime-only: set on expanded recurring instances
 }
 
 type Span = 'day' | 'week' | 'month' | 'quarter';
@@ -41,8 +40,6 @@ type Span = 'day' | 'week' | 'month' | 'quarter';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ACCENT = '#6366F1';
-const MEETING_COLORS = ['#6366F1', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
-const DUR_PRESETS = [15, 30, 45, 60, 90, 120];
 const MONTHS_UA = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const MONTHS_UA_GEN = ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
 const WEEKDAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
@@ -68,6 +65,51 @@ function chunk<T>(arr: T[], n: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
   return out;
+}
+
+function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date): Meeting[] {
+  if (!meeting.recurrence) return [meeting];
+  const { freq, interval, daysOfWeek, until } = meeting.recurrence;
+  const instances: Meeting[] = [];
+  const start = new Date(meeting.date + 'T00:00');
+  const limitTs = until
+    ? Math.min(new Date(until + 'T00:00').getTime(), toDate.getTime())
+    : toDate.getTime();
+  const limit = new Date(limitTs);
+
+  if (freq === 'weekly' && daysOfWeek && daysOfWeek.length > 0) {
+    // align cursor to Monday of the week containing `start`
+    const dow0 = start.getDay();
+    const daysBack = dow0 === 0 ? 6 : dow0 - 1;
+    let weekCursor = addDays(start, -daysBack);
+    let safety = 0;
+    while (weekCursor <= limit && safety < 300) {
+      for (const dayIdx of [...daysOfWeek].sort((a, b) => a - b)) {
+        const candidate = addDays(weekCursor, dayIdx);
+        if (candidate >= start && candidate <= limit) {
+          const dateStr = toDateStr(candidate);
+          instances.push({ ...meeting, id: `${meeting.id}_${dateStr}`, date: dateStr, _origId: meeting.id });
+        }
+      }
+      weekCursor = addDays(weekCursor, interval * 7);
+      safety++;
+    }
+  } else {
+    let current = new Date(start);
+    let safety = 0;
+    while (current <= limit && safety < 500) {
+      const dateStr = toDateStr(current);
+      instances.push({ ...meeting, id: `${meeting.id}_${dateStr}`, date: dateStr, _origId: meeting.id });
+      switch (freq) {
+        case 'daily':   current = addDays(current, interval); break;
+        case 'weekly':  current = addDays(current, interval * 7); break;
+        case 'monthly': { const n = new Date(current); n.setMonth(n.getMonth() + interval); current = n; break; }
+        case 'yearly':  { const n = new Date(current); n.setFullYear(n.getFullYear() + interval); current = n; break; }
+      }
+      safety++;
+    }
+  }
+  return instances;
 }
 
 function durLabel(minutes: number): string {
@@ -168,9 +210,9 @@ function CalendarGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNe
 
 // ─── MeetingCard ──────────────────────────────────────────────────────────────
 
-function MeetingCard({ mtg, onPress, onDelete, isDark, c, showDate = false }: {
+function MeetingCard({ mtg, onPress, onDelete, isDark, c, showDate = false, isRecurring = false }: {
   mtg: Meeting; onPress: () => void; onDelete: () => void;
-  isDark: boolean; c: ReturnType<typeof useColors>; showDate?: boolean;
+  isDark: boolean; c: ReturnType<typeof useColors>; showDate?: boolean; isRecurring?: boolean;
 }) {
   const dur = durLabel(mtg.durationMinutes);
   const mtgDt = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
@@ -203,6 +245,7 @@ function MeetingCard({ mtg, onPress, onDelete, isDark, c, showDate = false }: {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
               {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color, flexShrink: 0 }} />}
               <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
+              {isRecurring && <IconSymbol name="repeat" size={11} color={mtg.color + 'CC'} />}
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {mtg.location ? (
@@ -307,19 +350,8 @@ export default function MeetingsScreen() {
 
   // Add/edit modal
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [fTitle, setFTitle] = useState('');
-  const [fDate, setFDate] = useState('');
-  const [fTime, setFTime] = useState('');
-  const [fDuration, setFDuration] = useState(60);
-  const [fLocation, setFLocation] = useState('');
-  const [fLink, setFLink] = useState('');
-  const [fNotes, setFNotes] = useState('');
-  const [fColor, setFColor] = useState(MEETING_COLORS[0]);
-  const [fDurationText, setFDurationText] = useState('60');
-  const [showCal, setShowCal] = useState(false);
-  const [calYear, setCalYear] = useState(today.getFullYear());
-  const [calMonth, setCalMonth] = useState(today.getMonth());
+  const [formInitial, setFormInitial] = useState<MeetingFormData | null>(null);
+  const [formPresetDate, setFormPresetDate] = useState<string | undefined>(undefined);
 
   useFocusEffect(useCallback(() => {
     loadData<Meeting[]>('meetings', []).then(m => { setMeetings(m); setInitialized(true); });
@@ -333,15 +365,29 @@ export default function MeetingsScreen() {
 
   // ─── Computed ─────────────────────────────────────────────────────────────
 
+  const expandedMeetings = useMemo(() => {
+    const past = new Date(today); past.setFullYear(past.getFullYear() - 1);
+    const future = new Date(today); future.setFullYear(future.getFullYear() + 2);
+    const result: Meeting[] = [];
+    meetings.forEach(m => {
+      if (!m.recurrence) {
+        result.push(m);
+      } else {
+        expandRecurring(m, past, future).forEach(inst => result.push(inst));
+      }
+    });
+    return result;
+  }, [meetings]);
+
   const meetingsByDate = useMemo(() => {
     const map: Record<string, Meeting[]> = {};
-    meetings.forEach(m => {
+    expandedMeetings.forEach(m => {
       if (!map[m.date]) map[m.date] = [];
       map[m.date].push(m);
       map[m.date].sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
     });
     return map;
-  }, [meetings]);
+  }, [expandedMeetings]);
 
   const spanRange = useMemo(() => {
     const todayStr = toDateStr(today);
@@ -361,10 +407,10 @@ export default function MeetingsScreen() {
   }, [span, selectedDay, weekStart, viewYear, viewMonth]);
 
   const spanMeetings = useMemo(() => {
-    return meetings
+    return expandedMeetings
       .filter(m => m.date >= spanRange.start && m.date <= spanRange.end)
       .sort((a, b) => `${a.date}T${a.time || '00:00'}`.localeCompare(`${b.date}T${b.time || '00:00'}`));
-  }, [meetings, spanRange]);
+  }, [expandedMeetings, spanRange]);
 
   const groupedMeetings = useMemo(() => {
     const groups: { date: string; label: string; items: Meeting[] }[] = [];
@@ -395,41 +441,31 @@ export default function MeetingsScreen() {
   // ─── CRUD ─────────────────────────────────────────────────────────────────
 
   const openAdd = useCallback((presetDate?: string) => {
-    setEditingId(null);
-    setFTitle(''); setFDate(presetDate ?? toDateStr(today));
-    setFTime(''); setFDuration(60); setFDurationText('60'); setFLocation(''); setFLink(''); setFNotes('');
-    setFColor(MEETING_COLORS[0]); setShowCal(false);
-    const d = presetDate ? new Date(presetDate + 'T00:00') : today;
-    setCalYear(d.getFullYear()); setCalMonth(d.getMonth());
+    setFormInitial(null);
+    setFormPresetDate(presetDate);
     setShowForm(true);
   }, []);
 
   const openEdit = useCallback((m: Meeting) => {
-    setEditingId(m.id); setFTitle(m.title); setFDate(m.date); setFTime(m.time);
-    setFDuration(m.durationMinutes); setFDurationText(String(m.durationMinutes)); setFLocation(m.location ?? ''); setFLink(m.link ?? '');
-    setFNotes(m.notes ?? ''); setFColor(m.color); setShowCal(false);
-    const d = new Date(m.date + 'T00:00');
-    setCalYear(d.getFullYear()); setCalMonth(d.getMonth());
+    setFormInitial({ id: m.id, title: m.title, date: m.date, time: m.time, durationMinutes: m.durationMinutes,
+      location: m.location, link: m.link, notes: m.notes, color: m.color, recurrence: m.recurrence });
+    setFormPresetDate(undefined);
     setShowForm(true);
   }, []);
 
-  const save = useCallback(() => {
-    if (!fTitle.trim() || !fDate) return;
-    if (editingId) {
-      saveMeetings(meetings.map(m => m.id !== editingId ? m : {
-        ...m, title: fTitle.trim(), date: fDate, time: fTime, durationMinutes: fDuration,
-        location: fLocation.trim() || undefined, link: fLink.trim() || undefined,
-        notes: fNotes.trim() || undefined, color: fColor,
+  const handleFormSave = useCallback((data: MeetingFormData) => {
+    if (data.id) {
+      saveMeetings(meetings.map(m => m.id !== data.id ? m : {
+        ...m, title: data.title, date: data.date, time: data.time, durationMinutes: data.durationMinutes,
+        location: data.location, link: data.link, notes: data.notes, color: data.color, recurrence: data.recurrence,
       }));
     } else {
-      saveMeetings([...meetings, {
-        id: Date.now().toString(), title: fTitle.trim(), date: fDate, time: fTime,
-        durationMinutes: fDuration, location: fLocation.trim() || undefined,
-        link: fLink.trim() || undefined, notes: fNotes.trim() || undefined, color: fColor,
-      }]);
+      saveMeetings([...meetings, { id: Date.now().toString(), title: data.title, date: data.date, time: data.time,
+        durationMinutes: data.durationMinutes, location: data.location, link: data.link,
+        notes: data.notes, color: data.color, recurrence: data.recurrence }]);
     }
     setShowForm(false);
-  }, [fTitle, fDate, fTime, fDuration, fLocation, fLink, fNotes, fColor, editingId, meetings, saveMeetings]);
+  }, [meetings, saveMeetings]);
 
   const deleteMeeting = useCallback((id: string) => {
     Alert.alert('Видалити зустріч?', 'Цю дію не можна скасувати.', [
@@ -588,10 +624,14 @@ export default function MeetingsScreen() {
                   </TouchableOpacity>
                 ) : (
                   <View style={{ gap: 8 }}>
-                    {list.map(mtg => (
-                      <MeetingCard key={mtg.id} mtg={mtg} isDark={isDark} c={c}
-                        onPress={() => openEdit(mtg)} onDelete={() => deleteMeeting(mtg.id)} />
-                    ))}
+                    {list.map(mtg => {
+                      const origMtg = mtg._origId ? (meetings.find(m => m.id === mtg._origId) ?? mtg) : mtg;
+                      return (
+                        <MeetingCard key={mtg.id} mtg={mtg} isDark={isDark} c={c}
+                          isRecurring={!!mtg._origId}
+                          onPress={() => openEdit(origMtg)} onDelete={() => deleteMeeting(origMtg.id)} />
+                      );
+                    })}
                     <TouchableOpacity onPress={() => openAdd(selectedDay)} activeOpacity={0.7}
                       style={[s.addMoreBtn, { borderColor: c.border }]}>
                       <IconSymbol name="plus" size={13} color={c.sub} />
@@ -626,10 +666,14 @@ export default function MeetingsScreen() {
                       </View>
                     </View>
                     <View style={{ gap: 8 }}>
-                      {group.items.map(mtg => (
-                        <MeetingCard key={mtg.id} mtg={mtg} isDark={isDark} c={c}
-                          onPress={() => openEdit(mtg)} onDelete={() => deleteMeeting(mtg.id)} />
-                      ))}
+                      {group.items.map(mtg => {
+                        const origMtg = mtg._origId ? (meetings.find(m => m.id === mtg._origId) ?? mtg) : mtg;
+                        return (
+                          <MeetingCard key={mtg.id} mtg={mtg} isDark={isDark} c={c}
+                            isRecurring={!!mtg._origId}
+                            onPress={() => openEdit(origMtg)} onDelete={() => deleteMeeting(origMtg.id)} />
+                        );
+                      })}
                     </View>
                   </View>
                 ))
@@ -646,215 +690,18 @@ export default function MeetingsScreen() {
         <IconSymbol name="plus" size={26} color="#fff" />
       </TouchableOpacity>
 
-      {/* ─── Add / Edit Modal ─── */}
-      <Modal visible={showForm} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowForm(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowForm(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-                style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-
-                {/* Handle + close */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                  <View style={{ flex: 1 }} />
-                  <View style={{ width: 32, height: 3.5, borderRadius: 2, backgroundColor: c.border }} />
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={() => setShowForm(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <IconSymbol name="xmark" size={16} color={c.sub} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* ── Preview strip ── */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 13, backgroundColor: fColor + '12', borderLeftWidth: 3.5, borderLeftColor: fColor, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 12, gap: 10 }}>
-                  {/* Colors */}
-                  <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
-                    {MEETING_COLORS.map(col => (
-                      <TouchableOpacity key={col} onPress={() => setFColor(col)}
-                        style={{ width: col === fColor ? 20 : 14, height: col === fColor ? 20 : 14, borderRadius: 10, backgroundColor: col,
-                          borderWidth: col === fColor ? 2 : 0, borderColor: '#fff',
-                          shadowColor: col, shadowOpacity: col === fColor ? 0.55 : 0, shadowRadius: 4, elevation: col === fColor ? 3 : 0 }}
-                      />
-                    ))}
-                  </View>
-                  <View style={{ width: 1, height: 20, backgroundColor: fColor + '30' }} />
-                  {/* Summary */}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: fTitle.trim() ? c.text : c.sub, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
-                      {fTitle.trim() || 'Назва зустрічі'}
-                    </Text>
-                    <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }} numberOfLines={1}>
-                      {[
-                        fDate ? new Date(fDate + 'T00:00').toLocaleDateString('uk-UA', { weekday: 'short', day: 'numeric', month: 'short' }) : null,
-                        fTime || null,
-                        fDuration >= 60 ? `${fDuration / 60}г${fDuration % 60 ? `${fDuration % 60}хв` : ''}` : `${fDuration}хв`,
-                        fLocation || null,
-                      ].filter(Boolean).join(' · ')}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* ── Назва ── */}
-                <TextInput
-                  placeholder="Назва зустрічі..."
-                  placeholderTextColor={c.sub}
-                  value={fTitle}
-                  onChangeText={setFTitle}
-                  autoFocus
-                  style={[s.inp, { color: c.text, backgroundColor: c.dim, borderColor: fTitle.trim() ? fColor + '65' : c.border, marginBottom: 7 }]}
-                />
-
-                {/* ── Дата · Час ── */}
-                <View style={{ flexDirection: 'row', gap: 7, marginBottom: 7 }}>
-                  <TouchableOpacity onPress={() => { Keyboard.dismiss(); setShowCal(v => !v); }} style={{ flex: 1 }}>
-                    <View style={[s.pill, { borderColor: fDate ? fColor + '55' : c.border, backgroundColor: fDate ? fColor + '10' : c.dim }]}>
-                      <IconSymbol name="calendar" size={13} color={fDate ? fColor : c.sub} />
-                      <Text style={{ color: fDate ? fColor : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1 }} numberOfLines={1}>
-                        {fDate ? new Date(fDate + 'T00:00').toLocaleDateString('uk-UA', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Дата'}
-                      </Text>
-                      <IconSymbol name={showCal ? 'chevron.up' : 'chevron.down'} size={11} color={c.sub} />
-                    </View>
-                  </TouchableOpacity>
-                  <View style={[s.pill, { width: 82, borderColor: c.border, backgroundColor: c.dim }]}>
-                    <IconSymbol name="clock" size={13} color={fTime ? fColor : c.sub} />
-                    <TextInput
-                      placeholder="09:00"
-                      placeholderTextColor={c.sub}
-                      value={fTime}
-                      onChangeText={v => {
-                        const clean = v.replace(/[^0-9:]/g, '').slice(0, 5);
-                        const digits = clean.replace(/:/g, '');
-                        if (!clean.includes(':') && digits.length >= 3) {
-                          setFTime(digits.slice(0, 2) + ':' + digits.slice(2, 4));
-                        } else {
-                          setFTime(clean);
-                        }
-                      }}
-                      keyboardType="numbers-and-punctuation"
-                      maxLength={5}
-                      style={{ color: fTime ? fColor : c.sub, fontSize: 13, fontWeight: '700', marginLeft: 5, flex: 1, padding: 0 }}
-                    />
-                  </View>
-                </View>
-
-                {showCal && (
-                  <View style={{ marginBottom: 8 }}>
-                    <CalendarGrid
-                      year={calYear} month={calMonth} markedDays={markedDays}
-                      selectedDate={fDate}
-                      onPrevMonth={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }}
-                      onNextMonth={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }}
-                      onSelectDay={d => { setFDate(toDateStr(d)); setShowCal(false); }}
-                      c={c}
-                    />
-                  </View>
-                )}
-
-                {/* ── Тривалість ── */}
-                <View style={{ marginBottom: 7 }}>
-                  <View style={{ flexDirection: 'row', gap: 5, marginBottom: 5 }}>
-                    {DUR_PRESETS.map(d => {
-                      const on = fDuration === d;
-                      return (
-                        <TouchableOpacity key={d} onPress={() => { setFDuration(d); setFDurationText(String(d)); }} style={{ flex: 1 }}>
-                          <View style={{ paddingVertical: 8, alignItems: 'center', borderRadius: 10,
-                            backgroundColor: on ? fColor : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                            <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>
-                              {d >= 60 ? `${d / 60}г` : `${d}хв`}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  <View style={[s.pill, { borderColor: !DUR_PRESETS.includes(fDuration) ? fColor + '55' : c.border, backgroundColor: !DUR_PRESETS.includes(fDuration) ? fColor + '10' : c.dim }]}>
-                    <IconSymbol name="timer" size={13} color={!DUR_PRESETS.includes(fDuration) ? fColor : c.sub} />
-                    <TextInput
-                      placeholder="Своя тривалість"
-                      placeholderTextColor={c.sub}
-                      value={fDurationText}
-                      onChangeText={v => {
-                        const clean = v.replace(/[^0-9]/g, '');
-                        setFDurationText(clean);
-                        const n = parseInt(clean, 10);
-                        if (!isNaN(n) && n > 0) setFDuration(n);
-                      }}
-                      keyboardType="number-pad"
-                      style={{ color: !DUR_PRESETS.includes(fDuration) ? fColor : c.text, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1, padding: 0 }}
-                    />
-                    <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>хв</Text>
-                  </View>
-                </View>
-
-                {/* ── Деталі: місце · посилання · нотатки ── */}
-                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 11 }}>
-                  {/* Location */}
-                  <View style={[s.detailRow, { backgroundColor: c.dim, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
-                    <IconSymbol name="mappin" size={13} color={fLocation ? fColor : c.sub} />
-                    <TextInput
-                      placeholder="Місце…"
-                      placeholderTextColor={c.sub}
-                      value={fLocation}
-                      onChangeText={setFLocation}
-                      style={{ color: c.text, fontSize: 13, marginLeft: 8, flex: 1, padding: 0 }}
-                    />
-                    {fLocation ? <TouchableOpacity onPress={() => setFLocation('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><IconSymbol name="xmark.circle.fill" size={14} color={c.sub} /></TouchableOpacity> : null}
-                  </View>
-                  {/* Link */}
-                  <View style={[s.detailRow, { backgroundColor: c.dim, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
-                    <IconSymbol name="link" size={13} color={fLink ? fColor : c.sub} />
-                    <TextInput
-                      placeholder="Zoom / Meet посилання…"
-                      placeholderTextColor={c.sub}
-                      value={fLink}
-                      onChangeText={setFLink}
-                      keyboardType="url"
-                      autoCapitalize="none"
-                      style={{ color: c.text, fontSize: 13, marginLeft: 8, flex: 1, padding: 0 }}
-                    />
-                    {fLink ? <TouchableOpacity onPress={() => setFLink('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><IconSymbol name="xmark.circle.fill" size={14} color={c.sub} /></TouchableOpacity> : null}
-                  </View>
-                  {/* Notes */}
-                  <View style={[s.detailRow, { backgroundColor: c.dim, alignItems: 'flex-start', paddingTop: 10, paddingBottom: 10 }]}>
-                    <IconSymbol name="note.text" size={13} color={fNotes ? fColor : c.sub} style={{ marginTop: 1 }} />
-                    <TextInput
-                      placeholder="Нотатки…"
-                      placeholderTextColor={c.sub}
-                      value={fNotes}
-                      onChangeText={setFNotes}
-                      multiline
-                      textAlignVertical="top"
-                      style={{ color: c.text, fontSize: 13, marginLeft: 8, flex: 1, padding: 0, maxHeight: 60 }}
-                    />
-                  </View>
-                </View>
-
-                {/* ── Кнопки ── */}
-                <View style={{ flexDirection: 'row', gap: 7 }}>
-                  {editingId && (
-                    <TouchableOpacity
-                      onPress={() => { deleteMeeting(editingId); setShowForm(false); }}
-                      style={[s.btn, { backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.22)', paddingHorizontal: 13 }]}>
-                      <IconSymbol name="trash" size={14} color="#EF4444" />
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity onPress={() => setShowForm(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600', fontSize: 13 }}>Скасувати</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={save} disabled={!fTitle.trim() || !fDate}
-                    style={[s.btn, { flex: 2, backgroundColor: fTitle.trim() && fDate ? fColor : c.dim }]}>
-                    <IconSymbol name="calendar.badge.checkmark" size={14} color={fTitle.trim() && fDate ? '#fff' : c.sub} />
-                    <Text style={{ color: fTitle.trim() && fDate ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6, fontSize: 13 }}>
-                      {editingId ? 'Зберегти' : 'Додати'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-              </BlurView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
+      <MeetingFormSheet
+        visible={showForm}
+        initial={formInitial}
+        presetDate={formPresetDate}
+        onClose={() => setShowForm(false)}
+        onSave={handleFormSave}
+        onDelete={formInitial?.id ? () => { deleteMeeting(formInitial!.id!); setShowForm(false); } : undefined}
+        isDark={isDark}
+        lang="uk"
+        tr={{}}
+        markedDays={markedDays}
+      />
     </LinearGradient>
   );
 }

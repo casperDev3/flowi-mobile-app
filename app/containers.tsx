@@ -1,5 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Stack, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -46,11 +47,12 @@ const PALETTE = [
   '#6366F1', '#0EA5E9', '#10B981', '#F59E0B',
 ];
 const { width: SCREEN_W } = Dimensions.get('window');
-const CARD_W = (SCREEN_W - 48) / 2; // 2 columns, 16 padding + 16 gap
+const CARD_W = (SCREEN_W - 48) / 2;
 
 export default function ContainersScreen() {
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
+  const router = useRouter();
 
   const [containers, setContainers] = useState<Container[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -68,7 +70,15 @@ export default function ContainersScreen() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [newItemName, setNewItemName] = useState('');
   const [newItemTags, setNewItemTags] = useState('');
+  const [newItemNote, setNewItemNote] = useState('');
   const addInputRef = useRef<TextInput>(null);
+
+  // Item edit modal
+  const [editItem, setEditItem] = useState<ContainerItem | null>(null);
+  const [editItemContainerId, setEditItemContainerId] = useState<string | null>(null);
+  const [editItemName, setEditItemName] = useState('');
+  const [editItemTags, setEditItemTags] = useState('');
+  const [editItemNote, setEditItemNote] = useState('');
 
   const loadContainers = useCallback(async () => {
     const data = await loadData<Container[]>(STORAGE_KEY, []);
@@ -85,8 +95,8 @@ export default function ContainersScreen() {
   }, [loadContainers]);
 
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
+    bg1:    isDark ? '#100A00' : '#FFF7ED',
+    bg2:    isDark ? '#1A1200' : '#FFEDD5',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
     sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
@@ -100,7 +110,11 @@ export default function ContainersScreen() {
     const q = search.toLowerCase();
     const res: { item: ContainerItem; container: Container }[] = [];
     containers.forEach(con => con.items.forEach(item => {
-      if (item.name.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q)))
+      if (
+        item.name.toLowerCase().includes(q) ||
+        item.tags.some(t => t.toLowerCase().includes(q)) ||
+        (item.note && item.note.toLowerCase().includes(q))
+      )
         res.push({ item, container: con });
     }));
     return res;
@@ -156,12 +170,14 @@ export default function ContainersScreen() {
     const item: ContainerItem = {
       id: Date.now().toString(), name,
       tags: newItemTags.split(',').map(t => t.trim()).filter(Boolean),
+      note: newItemNote.trim() || undefined,
     };
     setContainers(p => p.map(con =>
       con.id === containerId ? { ...con, items: [...con.items, item] } : con
     ));
     setNewItemName('');
     setNewItemTags('');
+    setNewItemNote('');
   };
 
   const deleteItem = (containerId: string, itemId: string) => {
@@ -172,13 +188,51 @@ export default function ContainersScreen() {
     ));
   };
 
+  const openItemEdit = (containerId: string, item: ContainerItem) => {
+    setEditItem(item);
+    setEditItemContainerId(containerId);
+    setEditItemName(item.name);
+    setEditItemTags(item.tags.join(', '));
+    setEditItemNote(item.note ?? '');
+  };
+
+  const saveItemEdit = () => {
+    if (!editItem || !editItemContainerId) return;
+    const name = editItemName.trim();
+    if (!name) return;
+    setContainers(p => p.map(con =>
+      con.id === editItemContainerId
+        ? {
+            ...con,
+            items: con.items.map(i =>
+              i.id === editItem.id
+                ? {
+                    ...i,
+                    name,
+                    tags: editItemTags.split(',').map(t => t.trim()).filter(Boolean),
+                    note: editItemNote.trim() || undefined,
+                  }
+                : i
+            ),
+          }
+        : con
+    ));
+    setEditItem(null);
+    setEditItemContainerId(null);
+  };
+
   return (
     <View style={{ flex: 1 }}>
+      <Stack.Screen options={{ headerShown: false }} />
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
         {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={() => router.back()}
+            style={{ width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.dim, borderColor: c.border }}>
+            <IconSymbol name="chevron.left" size={17} color={c.sub} />
+          </TouchableOpacity>
           <Text style={{ fontSize: 32, fontWeight: '800', letterSpacing: -0.8, color: c.text, flex: 1 }}>{tr.containers}</Text>
           <TouchableOpacity onPress={openNew}
             style={{ width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.dim, borderColor: c.border }}>
@@ -202,7 +256,7 @@ export default function ContainersScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 
@@ -222,6 +276,9 @@ export default function ContainersScreen() {
                     <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: container.color, borderRadius: 2, marginRight: 12 }} />
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{item.name}</Text>
+                      {item.note ? (
+                        <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{item.note}</Text>
+                      ) : null}
                       {item.tags.length > 0 && (
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                           {item.tags.map(tag => (
@@ -369,6 +426,69 @@ export default function ContainersScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* ── Item Edit Modal ───────────────────────────────────────────────────── */}
+      <Modal visible={!!editItem} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditItem(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={s.overlay} onPress={() => setEditItem(null)}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter}>
+              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
+                style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                  <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, marginRight: 'auto', marginLeft: 'auto' }} />
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                  <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', flex: 1 }}>Редагувати річ</Text>
+                  <TouchableOpacity onPress={() => setEditItem(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <IconSymbol name="xmark" size={17} color={c.sub} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={[s.label, { color: c.sub }]}>НАЗВА</Text>
+                <TextInput
+                  placeholder="Назва речі"
+                  placeholderTextColor={c.sub}
+                  value={editItemName}
+                  onChangeText={setEditItemName}
+                  autoFocus
+                  style={[s.input, { backgroundColor: c.dim, color: c.text }]}
+                />
+
+                <Text style={[s.label, { color: c.sub }]}>ТЕГИ</Text>
+                <TextInput
+                  placeholder="зима, одяг, кухня"
+                  placeholderTextColor={c.sub}
+                  value={editItemTags}
+                  onChangeText={setEditItemTags}
+                  style={[s.input, { backgroundColor: c.dim, color: c.text }]}
+                />
+
+                <Text style={[s.label, { color: c.sub }]}>НОТАТКА</Text>
+                <TextInput
+                  placeholder="Де саме лежить, стан, розмір..."
+                  placeholderTextColor={c.sub}
+                  value={editItemNote}
+                  onChangeText={setEditItemNote}
+                  multiline
+                  numberOfLines={3}
+                  style={[s.input, { backgroundColor: c.dim, color: c.text, minHeight: 72, textAlignVertical: 'top' }]}
+                />
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                  <TouchableOpacity onPress={() => setEditItem(null)}
+                    style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={saveItemEdit} disabled={!editItemName.trim()}
+                    style={[s.btn, { flex: 2, backgroundColor: !editItemName.trim() ? c.dim : ACCENT }]}>
+                    <Text style={{ color: !editItemName.trim() ? c.sub : '#fff', fontWeight: '700' }}>{tr.save}</Text>
+                  </TouchableOpacity>
+                </View>
+              </BlurView>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* ── Container Detail Modal ─────────────────────────────────────────────── */}
       <Modal visible={!!detail} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDetailId(null)}>
         {detail && (
@@ -436,7 +556,7 @@ export default function ContainersScreen() {
                       <IconSymbol name="arrow.up" size={18} color={newItemName.trim() ? '#fff' : c.sub} />
                     </TouchableOpacity>
                   </View>
-                  {/* Optional tags input */}
+                  {/* Tags input */}
                   {newItemName.length > 0 && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8,
                       backgroundColor: c.dim, borderRadius: 10, borderWidth: 1, borderColor: c.border,
@@ -449,6 +569,22 @@ export default function ContainersScreen() {
                         onChangeText={setNewItemTags}
                         onSubmitEditing={() => addItem(detail.id)}
                         returnKeyType="done"
+                        style={{ flex: 1, fontSize: 13, color: c.text }}
+                      />
+                    </View>
+                  )}
+                  {/* Note input */}
+                  {newItemName.length > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 6,
+                      backgroundColor: c.dim, borderRadius: 10, borderWidth: 1, borderColor: c.border,
+                      paddingHorizontal: 12, paddingVertical: 8 }}>
+                      <IconSymbol name="text.alignleft" size={12} color={c.sub} style={{ marginTop: 2 }} />
+                      <TextInput
+                        placeholder="Нотатка: де лежить, стан, розмір..."
+                        placeholderTextColor={c.sub}
+                        value={newItemNote}
+                        onChangeText={setNewItemNote}
+                        multiline
                         style={{ flex: 1, fontSize: 13, color: c.text }}
                       />
                     </View>
@@ -485,6 +621,9 @@ export default function ContainersScreen() {
                           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: detail.color, marginTop: 5, marginRight: 12 }} />
                           <View style={{ flex: 1 }}>
                             <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{item.name}</Text>
+                            {item.note ? (
+                              <Text style={{ color: c.sub, fontSize: 12, marginTop: 3, lineHeight: 17 }}>{item.note}</Text>
+                            ) : null}
                             {item.tags.length > 0 && (
                               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
                                 {item.tags.map(tag => (
@@ -495,11 +634,18 @@ export default function ContainersScreen() {
                               </View>
                             )}
                           </View>
-                          <TouchableOpacity
-                            onPress={() => deleteItem(detail.id, item.id)}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                            <IconSymbol name="xmark" size={13} color={c.sub} />
-                          </TouchableOpacity>
+                          <View style={{ flexDirection: 'row', gap: 6, marginLeft: 8 }}>
+                            <TouchableOpacity
+                              onPress={() => openItemEdit(detail.id, item)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                              <IconSymbol name="pencil" size={13} color={c.sub} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => deleteItem(detail.id, item.id)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                              <IconSymbol name="xmark" size={13} color={c.sub} />
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       ))}
                     </>

@@ -45,10 +45,10 @@ export default function TabLayout() {
                 tabBarIconStyle: {marginTop: 0},
             }}>
             <Tabs.Screen
-                name="containers"
+                name="agent"
                 options={{
-                    title: tr.tabContainers,
-                    tabBarIcon: ({color}) => <IconSymbol size={32} name="archivebox.fill" color={color}/>,
+                    title: 'Agent',
+                    tabBarIcon: ({color}) => <IconSymbol size={28} name="sparkles" color={color}/>,
                 }}
             />
             <Tabs.Screen
@@ -87,4 +87,3 @@ export default function TabLayout() {
     );
 }
 
-const styles = StyleSheet.create({});

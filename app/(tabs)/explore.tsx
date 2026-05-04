@@ -130,6 +130,11 @@ export default function FinanceScreen() {
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState<IconSymbolName>('ellipsis.circle.fill');
 
+  // Inline add category inside Add Transaction modal
+  const [showInlineAddCat, setShowInlineAddCat] = useState(false);
+  const [inlineCatName, setInlineCatName] = useState('');
+  const [inlineCatIcon, setInlineCatIcon] = useState<IconSymbolName>('ellipsis.circle.fill');
+
   const loadTxs = useCallback(async () => {
     const data = await loadData<Transaction[]>('transactions', []);
     setTxs(data);
@@ -177,6 +182,15 @@ export default function FinanceScreen() {
     setNewCatName(''); setNewCatIcon('ellipsis.circle.fill'); setShowAddCat(false);
   };
 
+  const addInlineCategory = () => {
+    const trimmed = inlineCatName.trim();
+    if (!trimmed) return;
+    if (cats[txType].some(c => c.name === trimmed)) return;
+    setCats(prev => ({ ...prev, [txType]: [...prev[txType], { name: trimmed, icon: inlineCatIcon }] }));
+    setCategory(trimmed);
+    setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill'); setShowInlineAddCat(false);
+  };
+
   const monthTxs = useMemo(() => filterByMonth(txs, activeMonth), [txs, activeMonth]);
   const { income, expense, balance, savingsPct } = useMemo(() => calcTotals(monthTxs), [monthTxs]);
 
@@ -201,6 +215,7 @@ export default function FinanceScreen() {
     if (!num || num <= 0 || !category) return;
     setTxs(p => [{ id: Date.now().toString(), type: txType, category, amount: num, note: note.trim(), date: new Date().toISOString() }, ...p]);
     setAmount(''); setCategory(''); setNote(''); setShowAdd(false);
+    setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill');
   };
 
   const deleteTx = (id: string) => { setTxs(p => p.filter(t => t.id !== id)); if (selected?.id === id) setSelected(null); };
@@ -522,7 +537,7 @@ export default function FinanceScreen() {
                     {(['income', 'expense'] as TxType[]).map(t => (
                       <TouchableOpacity
                         key={t}
-                        onPress={() => { setTxType(t); setCategory(''); }}
+                        onPress={() => { setTxType(t); setCategory(''); setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill'); }}
                         style={[s.typeBtn, txType === t && { backgroundColor: t === 'income' ? c.green : c.red }]}>
                         <IconSymbol name={t === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={14} color={txType === t ? '#fff' : c.sub} />
                         <Text style={{ fontSize: 13, fontWeight: '700', marginLeft: 5, color: txType === t ? '#fff' : c.sub }}>
@@ -563,7 +578,55 @@ export default function FinanceScreen() {
                         </TouchableOpacity>
                       );
                     })}
+                    <TouchableOpacity
+                      onPress={() => { setShowInlineAddCat(v => !v); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill'); }}
+                      style={[s.catChip, { backgroundColor: showInlineAddCat ? c.accent + '20' : c.dim, borderColor: showInlineAddCat ? c.accent : c.border, borderStyle: 'dashed' }]}>
+                      <IconSymbol name="plus" size={13} color={showInlineAddCat ? c.accent : c.sub} />
+                      <Text style={{ color: showInlineAddCat ? c.accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>Нова</Text>
+                    </TouchableOpacity>
                   </View>
+
+                  {showInlineAddCat && (
+                    <View style={[{ borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 10 }, { borderColor: c.border, backgroundColor: c.dim }]}>
+                      <TextInput
+                        placeholder="Назва категорії"
+                        placeholderTextColor={c.sub}
+                        value={inlineCatName}
+                        onChangeText={setInlineCatName}
+                        style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 10 }]}
+                        autoFocus
+                      />
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 10 }}>
+                        {ICON_SUGGESTIONS.slice(0, 20).map(icon => {
+                          const isSel = inlineCatIcon === icon;
+                          return (
+                            <TouchableOpacity
+                              key={icon}
+                              onPress={() => setInlineCatIcon(icon)}
+                              style={{ width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+                                backgroundColor: isSel ? c.accent : isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+                                borderWidth: isSel ? 0 : 1, borderColor: c.border }}>
+                              <IconSymbol name={icon} size={16} color={isSel ? '#fff' : c.sub} />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 7 }}>
+                        <TouchableOpacity
+                          onPress={() => { setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill'); }}
+                          style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                          <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={addInlineCategory}
+                          disabled={!inlineCatName.trim()}
+                          style={[s.btn, { flex: 2, backgroundColor: !inlineCatName.trim() ? c.dim : c.accent }]}>
+                          <IconSymbol name="plus" size={14} color={!inlineCatName.trim() ? c.sub : '#fff'} />
+                          <Text style={{ color: !inlineCatName.trim() ? c.sub : '#fff', fontWeight: '700', marginLeft: 5 }}>{tr.add}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
 
                   {/* Note */}
                   <Text style={[s.label, { color: c.sub }]}>{tr.note}</Text>
@@ -673,10 +736,10 @@ export default function FinanceScreen() {
                     </View>
                   </View>
 
-                  <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginBottom: 16 }}>{tr.categories}</Text>
+                  <Text style={{ color: c.text, fontSize: 17, fontWeight: '800', marginBottom: 12 }}>{tr.categories}</Text>
 
                   {/* Tabs */}
-                  <View style={[s.typeRow, { backgroundColor: c.dim, marginBottom: 18 }]}>
+                  <View style={[s.typeRow, { backgroundColor: c.dim, marginBottom: 12 }]}>
                     {(['expense', 'income'] as TxType[]).map(t => (
                       <TouchableOpacity
                         key={t}
@@ -699,21 +762,21 @@ export default function FinanceScreen() {
                         <View
                           key={cat.name}
                           style={[
-                            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 10 },
-                            !isLast && { borderBottomWidth: 1, borderBottomColor: c.border },
+                            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7 },
+                            !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
                           ]}>
-                          <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: c.accent + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                            <IconSymbol name={cat.icon} size={16} color={c.accent} />
+                          <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.accent + '18', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                            <IconSymbol name={cat.icon} size={13} color={c.accent} />
                           </View>
-                          <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{cat.name}</Text>
+                          <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{cat.name}</Text>
                           {isDefault
-                            ? <View style={{ backgroundColor: c.dim, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                            ? <View style={{ backgroundColor: c.dim, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
                                 <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600' }}>{tr.defaultCategory}</Text>
                               </View>
                             : <TouchableOpacity
                                 onPress={() => setCats(prev => ({ ...prev, [catTab]: prev[catTab].filter(cc => cc.name !== cat.name) }))}
                                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                                <IconSymbol name="trash" size={14} color={c.sub} />
+                                <IconSymbol name="trash" size={13} color={c.sub} />
                               </TouchableOpacity>
                           }
                         </View>
@@ -734,7 +797,7 @@ export default function FinanceScreen() {
                       />
 
                       <Text style={[s.label, { color: c.sub, marginTop: 0 }]}>{tr.icon}</Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
                         {ICON_SUGGESTIONS.map(icon => {
                           const isSel = newCatIcon === icon;
                           return (
@@ -742,12 +805,12 @@ export default function FinanceScreen() {
                               key={icon}
                               onPress={() => setNewCatIcon(icon)}
                               style={{
-                                width: 42, height: 42, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
+                                width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
                                 backgroundColor: isSel ? c.accent : isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
                                 borderWidth: isSel ? 0 : 1,
                                 borderColor: c.border,
                               }}>
-                              <IconSymbol name={icon} size={18} color={isSel ? '#fff' : c.sub} />
+                              <IconSymbol name={icon} size={15} color={isSel ? '#fff' : c.sub} />
                             </TouchableOpacity>
                           );
                         })}

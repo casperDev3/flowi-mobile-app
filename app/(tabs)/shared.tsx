@@ -28,8 +28,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const API_BASE = 'https://api.flowi.casperdev.site/api';
-const WS_BASE  = 'wss://api.flowi.casperdev.site/ws';
+import { API_BASE, WS_BASE } from '@/store/api-config';
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 

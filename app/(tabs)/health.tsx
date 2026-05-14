@@ -589,7 +589,7 @@ export default function HealthScreen() {
             style={[s.fabGrad, { borderRadius: fabOpen ? 29 : 16 }]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
             <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
-              <IconSymbol name="plus" size={26} color="#fff" />
+              <IconSymbol name="plus" size={22} color="#fff" />
             </Animated.View>
           </LinearGradient>
         </TouchableOpacity>

@@ -405,6 +405,19 @@ export default function FinanceScreen() {
 
               <View style={[s.menuDivider, { backgroundColor: c.border }]} />
 
+              {/* Бюджет */}
+              <TouchableOpacity
+                onPress={() => { setShowMenu(false); router.push('/budget'); }}
+                style={s.menuItem}>
+                <View style={[s.menuIconBox, { backgroundColor: '#0EA5E9' + '25' }]}>
+                  <IconSymbol name="chart.pie.fill" size={15} color="#0EA5E9" />
+                </View>
+                <Text style={[s.menuLabel, { color: c.text }]}>Планування бюджету</Text>
+                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              </TouchableOpacity>
+
+              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
               {/* Банки */}
               <TouchableOpacity
                 onPress={() => { setShowMenu(false); router.push('/banks'); }}

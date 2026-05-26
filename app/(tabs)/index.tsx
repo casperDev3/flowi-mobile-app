@@ -31,6 +31,10 @@ import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import { filterTasksByMonth } from '@/utils/taskUtils';
 import type { Project } from '../projects';
 
+// ─── expo-av conditional (install with: npx expo install expo-av) ────────────
+let AVAudio: any = null;
+try { AVAudio = require('expo-av').Audio; } catch {}
+
 type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
 type SortBy = 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
@@ -72,6 +76,7 @@ interface Task {
   timeEntries?: TaskTimeEntry[];
   history?: TaskHistoryEvent[];
   recurrence?: RecurrenceRule;
+  recordings?: string[];
 }
 
 interface Meeting {
@@ -387,6 +392,15 @@ export default function TasksScreen() {
   const [reminderMins, setReminderMins] = useState('');
   const [reminderDate, setReminderDate] = useState<string | null>(null);
 
+  // Recording
+  const [recordingTaskId, setRecordingTaskId] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [playingUri, setPlayingUri] = useState<string | null>(null);
+  const recordingRef = useRef<any>(null);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const soundRef = useRef<any>(null);
+
   // Detail tab + timer display
   const [detailTab, setDetailTab] = useState<'info' | 'timer' | 'history'>('info');
   const [timerTick, setTimerTick] = useState(0);
@@ -587,6 +601,84 @@ export default function TasksScreen() {
     setTasks(p => p.filter(t => t.id !== id));
     if (selected?.id === id) { setSelected(null); setShowDetailProjectDropdown(false); }
   }, [selected]);
+
+  // ─── Recording ──────────────────────────────────────────────────────────────
+  const startRecording = useCallback(async (taskId: string) => {
+    if (!AVAudio) { Alert.alert('Потрібен пакет', 'Встановіть: npx expo install expo-av'); return; }
+    try {
+      const { granted } = await AVAudio.requestPermissionsAsync();
+      if (!granted) { Alert.alert('Немає дозволу', 'Дозвольте доступ до мікрофону в налаштуваннях.'); return; }
+      await AVAudio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await AVAudio.Recording.createAsync(AVAudio.RecordingOptionsPresets.HIGH_QUALITY);
+      recordingRef.current = recording;
+      setRecordingTaskId(taskId);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+    } catch (e: any) {
+      if (__DEV__) console.warn('[record] start error:', e);
+      Alert.alert('Помилка запису', e?.message);
+    }
+  }, []);
+
+  const stopRecording = useCallback(async () => {
+    if (!recordingRef.current) return;
+    if (recordTimerRef.current) { clearInterval(recordTimerRef.current); recordTimerRef.current = null; }
+    try {
+      await recordingRef.current.stopAndUnloadAsync();
+      await AVAudio.setAudioModeAsync({ allowsRecordingIOS: false });
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+      setIsRecording(false);
+      if (uri && recordingTaskId) {
+        setTasks(prev => prev.map(t => t.id === recordingTaskId
+          ? { ...t, recordings: [...(t.recordings ?? []), uri] }
+          : t
+        ));
+      }
+      setRecordingTaskId(null);
+      setRecordingSeconds(0);
+    } catch (e: any) {
+      if (__DEV__) console.warn('[record] stop error:', e);
+    }
+  }, [recordingTaskId]);
+
+  const playRecording = useCallback(async (uri: string) => {
+    if (!AVAudio) return;
+    try {
+      if (soundRef.current) { await soundRef.current.unloadAsync(); soundRef.current = null; setPlayingUri(null); }
+      if (playingUri === uri) return;
+      const { sound } = await AVAudio.Sound.createAsync({ uri });
+      soundRef.current = sound;
+      setPlayingUri(uri);
+      await sound.playAsync();
+      sound.setOnPlaybackStatusUpdate((status: any) => {
+        if (status.didJustFinish) { setPlayingUri(null); sound.unloadAsync(); soundRef.current = null; }
+      });
+    } catch (e: any) {
+      if (__DEV__) console.warn('[record] play error:', e);
+    }
+  }, [playingUri]);
+
+  const deleteRecording = useCallback((taskId: string, uri: string) => {
+    Alert.alert('Видалити запис?', '', [
+      { text: 'Скасувати', style: 'cancel' },
+      { text: 'Видалити', style: 'destructive', onPress: () => {
+        setTasks(prev => prev.map(t => t.id === taskId
+          ? { ...t, recordings: (t.recordings ?? []).filter(r => r !== uri) }
+          : t
+        ));
+      }},
+    ]);
+  }, []);
+
+  // Cleanup recording on unmount
+  useEffect(() => () => {
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+    recordingRef.current?.stopAndUnloadAsync().catch(() => {});
+    soundRef.current?.unloadAsync().catch(() => {});
+  }, []);
+  // ────────────────────────────────────────────────────────────────────────────
 
   const toggleTask = useCallback((id: string) => {
     const patch = (t: Task): Task => {
@@ -1346,6 +1438,15 @@ export default function TasksScreen() {
                             <Text style={[s.taskTitle, { color: c.text, flex: 1, marginLeft: 10, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none', lineHeight: 20 }]}>
                               {task.title}
                             </Text>
+                            <TouchableOpacity
+                              onPress={e => { e.stopPropagation(); setRecordingTaskId(task.id); }}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              style={{ width: 26, height: 26, borderRadius: 7,
+                                backgroundColor: (task.recordings?.length ?? 0) > 0 ? c.accent + '18' : 'rgba(255,255,255,0.07)',
+                                alignItems: 'center', justifyContent: 'center', marginLeft: 6 }}>
+                              <IconSymbol name={(task.recordings?.length ?? 0) > 0 ? 'waveform' : 'mic'} size={11}
+                                color={(task.recordings?.length ?? 0) > 0 ? c.accent : c.sub} />
+                            </TouchableOpacity>
                           </View>
 
                           {/* Row 2: meta badges */}
@@ -3244,6 +3345,73 @@ export default function TasksScreen() {
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── Recording Modal ─── */}
+      <Modal visible={!!recordingTaskId} transparent animationType="fade" statusBarTranslucent
+        onRequestClose={() => { if (isRecording) stopRecording(); else setRecordingTaskId(null); }}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' }}
+          onPress={() => { if (!isRecording) setRecordingTaskId(null); }}>
+          <Pressable onPress={e => e.stopPropagation()}
+            style={{ backgroundColor: isDark ? '#12121E' : '#FFFFFF', borderRadius: 24, padding: 28,
+              alignItems: 'center', width: 280, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20 }}>
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: isRecording ? '#EF4444' + '20' : c.dim,
+              alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+              borderWidth: 2, borderColor: isRecording ? '#EF4444' : c.border }}>
+              <IconSymbol name={isRecording ? 'stop.fill' : 'mic.fill'} size={32} color={isRecording ? '#EF4444' : c.sub} />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#fff' : '#000', marginBottom: 6 }}>
+              {isRecording ? 'Запис...' : 'Аудіозапис'}
+            </Text>
+            <Text style={{ fontSize: 28, fontWeight: '800', color: isRecording ? '#EF4444' : c.accent,
+              letterSpacing: 2, marginBottom: 24, fontVariant: ['tabular-nums'] }}>
+              {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}
+            </Text>
+            {isRecording ? (
+              <TouchableOpacity onPress={stopRecording}
+                style={{ backgroundColor: '#EF4444', borderRadius: 16, paddingVertical: 14,
+                  paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <IconSymbol name="stop.fill" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Зупинити</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={() => recordingTaskId && startRecording(recordingTaskId)}
+                style={{ backgroundColor: c.accent, borderRadius: 16, paddingVertical: 14,
+                  paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <IconSymbol name="mic.fill" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Почати запис</Text>
+              </TouchableOpacity>
+            )}
+            {/* Recordings list */}
+            {(() => {
+              const task = tasks.find(t => t.id === recordingTaskId);
+              if (!task?.recordings?.length) return null;
+              return (
+                <View style={{ width: '100%', marginTop: 20, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 14 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: c.sub, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                    ЗАПИСИ ({task.recordings.length})
+                  </Text>
+                  {task.recordings.map((uri, idx) => (
+                    <View key={uri} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6,
+                      backgroundColor: c.accent + '10', borderRadius: 10, padding: 8,
+                      borderWidth: 1, borderColor: c.accent + '25' }}>
+                      <IconSymbol name="waveform" size={14} color={c.accent} />
+                      <Text style={{ flex: 1, fontSize: 13, color: isDark ? '#fff' : '#000', marginLeft: 8 }}>Запис {idx + 1}</Text>
+                      <TouchableOpacity onPress={() => playRecording(uri)}
+                        style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.accent + '20', alignItems: 'center', justifyContent: 'center' }}>
+                        <IconSymbol name={playingUri === uri ? 'pause.fill' : 'play.fill'} size={11} color={c.accent} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => { deleteRecording(recordingTaskId!, uri); }}
+                        style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#EF444415', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
+                        <IconSymbol name="trash" size={11} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
+          </Pressable>
+        </Pressable>
       </Modal>
 
     </View>

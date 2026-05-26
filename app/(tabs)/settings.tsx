@@ -219,6 +219,17 @@ export default function SettingsScreen() {
               last={false}
             />
             <SettingRow
+              icon="chart.pie.fill"
+              iconColor="#0EA5E9"
+              label="Планування бюджету"
+              value={undefined}
+              onPress={() => router.push('/budget')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
               icon="shippingbox.fill"
               iconColor="#F97316"
               label={tr.containers}

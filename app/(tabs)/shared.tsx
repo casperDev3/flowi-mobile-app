@@ -103,7 +103,7 @@ const PRIORITY_LABEL: Record<Priority, string> = {
 };
 
 const SORT_LABEL: Record<SortMode, string> = {
-  newest: 'Нові↓', oldest: 'Старі↑', alpha: 'А-Я', priority: 'Пріор.',
+  newest: 'Нові', oldest: 'Старі', alpha: 'А-Я', priority: 'Пріор.',
 };
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
@@ -112,6 +112,7 @@ const KEY_DEVICE        = 'shared_device_id';
 const KEY_GROUPS        = 'shared_groups_list';
 const KEY_LAST_SYNC     = (gid: string) => `shared_sync_${gid}`;
 const KEY_SECTION_ITEMS = (sid: string) => `shared_items_${sid}`;
+const KEY_SECTION_COUNTS = 'shared_section_counts';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -123,16 +124,16 @@ export default function SharedScreen() {
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#E0F8FF' : '#0C2A33',
-    sub:    isDark ? 'rgba(224,248,255,0.45)' : 'rgba(12,42,51,0.45)',
+    text:   isDark ? '#F0EEFF' : '#1A1433',
+    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
     accent: '#06B6D4',
     green:  '#10B981',
     red:    '#EF4444',
     amber:  '#F59E0B',
-    sheet:  isDark ? 'rgba(10,22,28,0.98)' : 'rgba(245,252,255,0.98)',
+    sheet:  isDark ? 'rgba(12,12,20,0.98)' : 'rgba(244,242,255,0.98)',
     input:  isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
     dim:    isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-    sidebar: isDark ? '#0A1018' : '#F5F9FF',
+    sidebar: isDark ? '#0C0C14' : '#F4F2FF',
     toolbar: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
   };
 
@@ -156,22 +157,40 @@ export default function SharedScreen() {
   const [sbSort, setSbSort]             = useState<SortMode>('newest');
   const [sbSearch, setSbSearch]         = useState('');
   const [sbSearchOpen, setSbSearchOpen] = useState(false);
-  const [showDone, setShowDone]         = useState(false);
-  const [sbMenuOpen, setSbMenuOpen]     = useState(false);
+  const [sbMenuOpen, setSbMenuOpen]         = useState(false);
   const [showUnitPicker, setShowUnitPicker] = useState(false);
 
   // Add-item form
-  const [addText, setAddText]       = useState('');
-  const [addQty, setAddQty]         = useState('1');
-  const [addUnit, setAddUnit]       = useState('шт');
+  const [addText, setAddText]         = useState('');
+  const [addQty, setAddQty]           = useState('1');
+  const [addUnit, setAddUnit]         = useState('шт');
   const [addPriority, setAddPriority] = useState<Priority>('medium');
-  const [addNote, setAddNote]       = useState('');
+  const [addNote, setAddNote]         = useState('');
+
+  // ─── Edit item state ──────────────────────────────────────────────────────
+
+  const [editItem, setEditItem]           = useState<LocalItem | null>(null);
+  const [editText, setEditText]           = useState('');
+  const [editQty, setEditQty]             = useState('1');
+  const [editUnit, setEditUnit]           = useState('шт');
+  const [editPriority, setEditPriority]   = useState<Priority>('medium');
+  const [editNote, setEditNote]           = useState('');
+
+  // ─── Section management ───────────────────────────────────────────────────
+
+  const [showSectionMenu, setShowSectionMenu]     = useState<SharedSection | null>(null);
+  const [showRenameModal, setShowRenameModal]     = useState(false);
+  const [renameText, setRenameText]               = useState('');
+
+  // ─── Section item counts cache ────────────────────────────────────────────
+
+  const [sectionCounts, setSectionCounts] = useState<Record<string, { active: number; done: number }>>({});
 
   // ─── Group / section search ────────────────────────────────────────────────
 
-  const [groupSearch, setGroupSearch]         = useState('');
-  const [groupSearchOpen, setGroupSearchOpen] = useState(false);
-  const [sectionSearch, setSectionSearch]     = useState('');
+  const [groupSearch, setGroupSearch]             = useState('');
+  const [groupSearchOpen, setGroupSearchOpen]     = useState(false);
+  const [sectionSearch, setSectionSearch]         = useState('');
   const [sectionSearchOpen, setSectionSearchOpen] = useState(false);
 
   // ─── Animations ───────────────────────────────────────────────────────────
@@ -181,8 +200,8 @@ export default function SharedScreen() {
 
   // ─── Loading ──────────────────────────────────────────────────────────────
 
-  const [refreshing, setRefreshing] = useState(false);
-  const [syncing, setSyncing]       = useState(false);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [syncing, setSyncing]         = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
 
   // ─── Modals ───────────────────────────────────────────────────────────────
@@ -235,6 +254,13 @@ export default function SharedScreen() {
         }
       }
       setGroups(loadedGroups);
+
+      // Load section counts cache
+      try {
+        const raw = await AsyncStorage.getItem(KEY_SECTION_COUNTS);
+        if (raw) setSectionCounts(JSON.parse(raw));
+      } catch {}
+
       setInitialized(true);
     })();
   }, []);
@@ -266,7 +292,6 @@ export default function SharedScreen() {
       ws.onopen = () => {
         wsReconnectAttempts.current = 0;
         setWsConnected(true);
-        // pull any missed updates on reconnect
         if (deviceIdRef.current) syncGroup(g, deviceIdRef.current);
       };
 
@@ -279,7 +304,6 @@ export default function SharedScreen() {
       ws.onclose = () => {
         wsRef.current = null;
         setWsConnected(false);
-        // reconnect with exponential backoff while still in this group
         if (activeGroupRef.current?.id === g.id) {
           const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts.current), 30000);
           wsReconnectAttempts.current++;
@@ -300,21 +324,16 @@ export default function SharedScreen() {
   function handleWSMessage(msg: any) {
     if (msg.type === 'item_updated' && msg.item && msg.section_id) {
       const item = remoteToLocal(msg.item);
-      // Save to local cache
       saveItemToSection(msg.section_id, item);
-      // Instant UI update if that section is open in sidebar
       setSidebarSection(prev => {
         if (prev?.id === msg.section_id) {
-          setSidebarItems(prevItems => {
-            const next = mergeItem(prevItems, item);
-            return next;
-          });
+          setSidebarItems(prevItems => mergeItem(prevItems, item));
         }
         return prev;
       });
+      updateSectionCount(msg.section_id);
     }
     if (msg.type === 'section_created') {
-      // Refresh group so new section appears
       const ag = activeGroupRef.current;
       const d  = deviceIdRef.current;
       if (ag && d) refreshGroupDetail(ag, d);
@@ -348,6 +367,10 @@ export default function SharedScreen() {
         });
       }
       await refreshGroupDetail(g, did);
+      // Update counts for all sections
+      for (const sec of g.sections) {
+        await updateSectionCount(sec.id);
+      }
     } catch (e) {
       if (__DEV__) console.warn('[shared] sync failed:', e);
     } finally {
@@ -406,6 +429,17 @@ export default function SharedScreen() {
     await AsyncStorage.setItem(KEY_SECTION_ITEMS(sid), JSON.stringify(merged));
   }
 
+  async function updateSectionCount(sid: string) {
+    const items = await loadSectionItems(sid);
+    const active = items.filter(i => !i.deleted && !i.checked).length;
+    const done = items.filter(i => !i.deleted && i.checked).length;
+    setSectionCounts(prev => {
+      const next = { ...prev, [sid]: { active, done } };
+      AsyncStorage.setItem(KEY_SECTION_COUNTS, JSON.stringify(next));
+      return next;
+    });
+  }
+
   function updateGroupInList(updated: GroupData) {
     setGroups(prev => {
       const next = prev.map(g => g.id === updated.id ? updated : g);
@@ -417,7 +451,6 @@ export default function SharedScreen() {
   // ─── Item persistence ─────────────────────────────────────────────────────
 
   async function persistItem(section: SharedSection, item: LocalItem) {
-    // Optimistic local update
     setSidebarItems(prev => {
       const next = mergeItem(prev, item);
       AsyncStorage.setItem(KEY_SECTION_ITEMS(section.id), JSON.stringify(next));
@@ -445,6 +478,7 @@ export default function SharedScreen() {
         if (__DEV__) console.warn('[shared] persist failed:', e);
       }
     }
+    updateSectionCount(section.id);
   }
 
   // ─── Item actions ─────────────────────────────────────────────────────────
@@ -476,6 +510,32 @@ export default function SharedScreen() {
   async function deleteItem(item: LocalItem) {
     if (!sidebarSection) return;
     await persistItem(sidebarSection, { ...item, deleted: true, updated_at: new Date().toISOString() });
+  }
+
+  // ─── Edit item ────────────────────────────────────────────────────────────
+
+  function openEditItem(item: LocalItem) {
+    setEditItem(item);
+    setEditText(item.text);
+    setEditQty(item.qty ?? '1');
+    setEditUnit(item.unit ?? 'шт');
+    setEditPriority(item.priority ?? 'medium');
+    setEditNote(item.note ?? '');
+  }
+
+  async function saveEditItem() {
+    if (!editItem || !sidebarSection || !editText.trim()) return;
+    const type = sidebarSection.type;
+    const updated: LocalItem = {
+      ...editItem,
+      text: editText.trim(),
+      updated_at: new Date().toISOString(),
+      ...(type === 'shopping' && { qty: editQty || '1', unit: editUnit }),
+      ...(type === 'tasks'    && { priority: editPriority }),
+      note: editNote.trim() || undefined,
+    };
+    setEditItem(null);
+    await persistItem(sidebarSection, updated);
   }
 
   // ─── Group actions ────────────────────────────────────────────────────────
@@ -554,6 +614,35 @@ export default function SharedScreen() {
     } catch { Alert.alert('Помилка', 'Не вдалося створити список.'); }
   }
 
+  async function renameSection(section: SharedSection) {
+    if (!activeGroup || !renameText.trim()) return;
+    try {
+      await api(`/sections/${section.id}/`, 'PATCH', { name: renameText.trim() });
+      const updated = {
+        ...activeGroup,
+        sections: activeGroup.sections.map(s => s.id === section.id ? { ...s, name: renameText.trim() } : s),
+      };
+      setActiveGroup(updated); updateGroupInList(updated);
+      setShowRenameModal(false); setShowSectionMenu(null); setRenameText('');
+    } catch { Alert.alert('Помилка', 'Не вдалося перейменувати.'); }
+  }
+
+  async function deleteSection(section: SharedSection) {
+    if (!activeGroup) return;
+    Alert.alert('Видалити список', `Видалити «${section.name}» та всі елементи?`, [
+      { text: 'Скасувати', style: 'cancel' },
+      { text: 'Видалити', style: 'destructive', onPress: async () => {
+        try {
+          await api(`/sections/${section.id}/`, 'DELETE');
+          const updated = { ...activeGroup, sections: activeGroup.sections.filter(s => s.id !== section.id) };
+          setActiveGroup(updated); updateGroupInList(updated);
+          setShowSectionMenu(null);
+          await AsyncStorage.removeItem(KEY_SECTION_ITEMS(section.id));
+        } catch { Alert.alert('Помилка', 'Не вдалося видалити.'); }
+      }},
+    ]);
+  }
+
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   function enterGroup(g: GroupData) {
@@ -570,10 +659,9 @@ export default function SharedScreen() {
   }
 
   async function openSidebar(section: SharedSection) {
-    // Reset sidebar state
     setSbFilter('active'); setSbSort('newest'); setSbSearch(''); setSbSearchOpen(false);
     setSbMenuOpen(false); setShowUnitPicker(false);
-    setShowDone(false); setAddText(''); setAddQty('1'); setAddNote('');
+    setAddText(''); setAddQty('1'); setAddNote('');
     setSidebarSection(section);
     setSidebarSyncing(true);
 
@@ -581,13 +669,11 @@ export default function SharedScreen() {
     setSidebarItems(localItems);
     setSidebarSyncing(false);
 
-    // Animate in
     Animated.parallel([
       Animated.spring(sidebarAnim,  { toValue: 0, useNativeDriver: true, tension: 80, friction: 11 }),
       Animated.timing(backdropAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
     ]).start();
 
-    // Fetch fresh from server in background
     try {
       const data: any[] = await api(`/sections/${section.id}/items/`);
       const merged = [...localItems];
@@ -598,6 +684,14 @@ export default function SharedScreen() {
       }
       await AsyncStorage.setItem(KEY_SECTION_ITEMS(section.id), JSON.stringify(merged));
       setSidebarItems(merged);
+      // Update counts
+      const active = merged.filter(i => !i.deleted && !i.checked).length;
+      const done = merged.filter(i => !i.deleted && i.checked).length;
+      setSectionCounts(prev => {
+        const next = { ...prev, [section.id]: { active, done } };
+        AsyncStorage.setItem(KEY_SECTION_COUNTS, JSON.stringify(next));
+        return next;
+      });
     } catch {}
   }
 
@@ -672,19 +766,20 @@ export default function SharedScreen() {
       .filter(s => s.type === tab && (!q || s.name.toLowerCase().includes(q)));
   }
 
-  // ─── Cycle sort ───────────────────────────────────────────────────────────
-
-  function cycleSbSort() {
-    const opts: SortMode[] = sidebarSection?.type === 'tasks'
-      ? ['newest', 'oldest', 'alpha', 'priority']
-      : ['newest', 'oldest', 'alpha'];
-    const idx = opts.indexOf(sbSort);
-    setSbSort(opts[(idx + 1) % opts.length]);
-  }
-
   // ─── Refresh ──────────────────────────────────────────────────────────────
 
-  const onRefresh = useCallback(() => {
+  const onRefreshGroups = useCallback(() => {
+    setRefreshing(true);
+    // Re-load groups from storage and re-sync active group if any
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(KEY_GROUPS);
+        if (raw) setGroups(JSON.parse(raw));
+      } catch {}
+    })().finally(() => setRefreshing(false));
+  }, []);
+
+  const onRefreshGroup = useCallback(() => {
     if (!activeGroup || !deviceId) { setRefreshing(false); return; }
     setRefreshing(true);
     syncGroup(activeGroup, deviceId).finally(() => setRefreshing(false));
@@ -734,7 +829,8 @@ export default function SharedScreen() {
 
             <ScrollView
               contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
-              showsVerticalScrollIndicator={false}>
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroups} tintColor={c.accent} />}>
 
               {filteredGroups.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 64 }}>
@@ -768,10 +864,13 @@ export default function SharedScreen() {
                 <TouchableOpacity key={g.id} onPress={() => enterGroup(g)} activeOpacity={0.75} style={{ marginBottom: 12 }}>
                   <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
                     style={[st.groupCard, { borderColor: c.border }]}>
+                    <View style={[st.groupIconBox, { backgroundColor: c.accent + '15' }]}>
+                      <IconSymbol name="person.2.fill" size={20} color={c.accent} />
+                    </View>
                     <View style={{ flex: 1, gap: 4 }}>
                       <Text style={[st.groupName, { color: c.text }]}>{g.name}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <View style={[st.dot, { backgroundColor: c.accent }]} />
+                        <View style={[st.dot, { backgroundColor: c.green }]} />
                         <Text style={{ fontSize: 13, color: c.sub }}>
                           {g.member_count} {pluralMember(g.member_count)}
                           {g.sections.length > 0 ? ` · ${g.sections.length} списків` : ''}
@@ -783,7 +882,7 @@ export default function SharedScreen() {
                             const cnt = g.sections.filter(s => s.type === type).length;
                             if (!cnt) return null;
                             return (
-                              <View key={type} style={[st.pill, { backgroundColor: c.accent + '18' }]}>
+                              <View key={type} style={[st.pill, { backgroundColor: c.accent + '12' }]}>
                                 <IconSymbol name={SECTION_META[type].icon as any} size={11} color={c.accent} />
                                 <Text style={{ fontSize: 11, color: c.accent, fontWeight: '600' }}>{cnt}</Text>
                               </View>
@@ -812,7 +911,6 @@ export default function SharedScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={[st.groupHeaderName, { color: c.text }]} numberOfLines={1}>{activeGroup?.name}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    {/* WS status dot */}
                     <View style={[st.dot, { backgroundColor: wsConnected ? c.green : c.amber }]} />
                     <Text style={{ fontSize: 12, color: c.sub }}>
                       {activeGroup?.member_count} {pluralMember(activeGroup?.member_count ?? 1)}
@@ -876,29 +974,57 @@ export default function SharedScreen() {
             <ScrollView
               contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
               showsVerticalScrollIndicator={false}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroup} tintColor={c.accent} />}>
 
               {tabSections(activeTab).length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 56 }}>
-                  <IconSymbol name={SECTION_META[activeTab].icon as any} size={44} color={c.sub} />
+                  <View style={[st.emptyIconBox, { backgroundColor: c.accent + '12', width: 64, height: 64, borderRadius: 20 }]}>
+                    <IconSymbol name={SECTION_META[activeTab].icon as any} size={30} color={c.accent + '80'} />
+                  </View>
                   <Text style={[st.emptyTitle, { color: c.text }]}>
                     {sectionSearch ? 'Нічого не знайдено' : 'Немає списків'}
                   </Text>
                   {!sectionSearch && <Text style={[st.emptyDesc, { color: c.sub }]}>Натисніть + щоб додати</Text>}
                 </View>
-              ) : tabSections(activeTab).map(section => (
-                <TouchableOpacity key={section.id} onPress={() => openSidebar(section)}
-                  activeOpacity={0.75} style={{ marginBottom: 10 }}>
-                  <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-                    style={[st.sectionCard, { borderColor: c.border }]}>
-                    <View style={[st.sectionIconBox, { backgroundColor: c.accent + '18' }]}>
-                      <IconSymbol name={SECTION_META[activeTab].icon as any} size={18} color={c.accent} />
-                    </View>
-                    <Text style={[st.sectionCardName, { color: c.text, flex: 1 }]}>{section.name}</Text>
-                    <IconSymbol name="chevron.right" size={16} color={c.sub} />
-                  </BlurView>
-                </TouchableOpacity>
-              ))}
+              ) : tabSections(activeTab).map(section => {
+                const counts = sectionCounts[section.id];
+                const total = counts ? counts.active + counts.done : 0;
+                const progress = total > 0 ? Math.round((counts!.done / total) * 100) : 0;
+                return (
+                  <TouchableOpacity key={section.id} onPress={() => openSidebar(section)}
+                    onLongPress={() => setShowSectionMenu(section)}
+                    activeOpacity={0.75} style={{ marginBottom: 10 }}>
+                    <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
+                      style={[st.sectionCard, { borderColor: c.border }]}>
+                      <View style={[st.sectionIconBox, { backgroundColor: c.accent + '18' }]}>
+                        <IconSymbol name={SECTION_META[activeTab].icon as any} size={18} color={c.accent} />
+                      </View>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={[st.sectionCardName, { color: c.text }]}>{section.name}</Text>
+                        {total > 0 && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <View style={[st.progressTrack, { backgroundColor: c.dim, flex: 1, maxWidth: 80 }]}>
+                              <View style={[st.progressFill, {
+                                backgroundColor: progress === 100 ? c.green : c.accent,
+                                width: `${progress}%` as any,
+                              }]} />
+                            </View>
+                            <Text style={{ fontSize: 11, color: c.sub, fontWeight: '500' }}>
+                              {counts!.done}/{total}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      {counts && counts.active > 0 && (
+                        <View style={[st.badge, { backgroundColor: c.accent + '20' }]}>
+                          <Text style={[st.badgeText, { color: c.accent }]}>{counts.active}</Text>
+                        </View>
+                      )}
+                      <IconSymbol name="chevron.right" size={16} color={c.sub} />
+                    </BlurView>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </>
         )}
@@ -1070,6 +1196,7 @@ export default function SharedScreen() {
                   c={c}
                   onToggle={() => toggleItem(item)}
                   onDelete={() => deleteItem(item)}
+                  onEdit={() => openEditItem(item)}
                 />
               ))}
 
@@ -1098,6 +1225,7 @@ export default function SharedScreen() {
                       c={c}
                       onToggle={() => toggleItem(item)}
                       onDelete={() => deleteItem(item)}
+                      onEdit={() => openEditItem(item)}
                     />
                   ))}
                 </>
@@ -1219,6 +1347,148 @@ export default function SharedScreen() {
           </View>
         </Animated.View>
         )}
+      </Modal>
+
+      {/* ══════════════════════════════ EDIT ITEM MODAL ══════════════════════════════ */}
+
+      <Modal visible={!!editItem} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setEditItem(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={st.overlay} onPress={() => setEditItem(null)}>
+            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
+                style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <HandleRow c={c} onClose={() => setEditItem(null)} />
+                <Text style={[st.sheetTitle, { color: c.text }]}>Редагувати</Text>
+
+                <TextInput
+                  placeholder="Текст" placeholderTextColor={c.sub}
+                  value={editText} onChangeText={setEditText}
+                  multiline={sidebarSection?.type === 'notes'}
+                  style={[st.input, { backgroundColor: c.input, color: c.text, borderColor: c.border },
+                    sidebarSection?.type === 'notes' && { minHeight: 80, textAlignVertical: 'top' }]}
+                />
+
+                {sidebarSection?.type === 'shopping' && (
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                    <TextInput
+                      placeholder="К-сть" placeholderTextColor={c.sub}
+                      value={editQty} onChangeText={setEditQty}
+                      keyboardType="decimal-pad"
+                      style={[st.input, { backgroundColor: c.input, color: c.text, borderColor: c.border, flex: 1, marginBottom: 0 }]}
+                    />
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                      contentContainerStyle={{ gap: 6, alignItems: 'center' }}>
+                      {UNITS.map(u => (
+                        <TouchableOpacity key={u} onPress={() => setEditUnit(u)}
+                          style={{
+                            paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+                            backgroundColor: editUnit === u ? c.accent + '20' : c.dim,
+                            borderWidth: 1, borderColor: editUnit === u ? c.accent : c.border,
+                          }}>
+                          <Text style={{ fontSize: 13, fontWeight: '600',
+                            color: editUnit === u ? c.accent : c.text }}>{u}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {sidebarSection?.type === 'tasks' && (
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                    {(['high', 'medium', 'low'] as Priority[]).map(p => (
+                      <TouchableOpacity key={p} onPress={() => setEditPriority(p)}
+                        style={{
+                          flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+                          paddingVertical: 10, borderRadius: 12, borderWidth: 1,
+                          backgroundColor: editPriority === p ? PRIORITY_COLOR[p] + '20' : 'transparent',
+                          borderColor: editPriority === p ? PRIORITY_COLOR[p] : c.border,
+                        }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: PRIORITY_COLOR[p] }} />
+                        <Text style={{ fontSize: 13, fontWeight: '600',
+                          color: editPriority === p ? PRIORITY_COLOR[p] : c.sub }}>
+                          {PRIORITY_LABEL[p]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                <TextInput
+                  placeholder="Нотатка (необов'язково)" placeholderTextColor={c.sub}
+                  value={editNote} onChangeText={setEditNote}
+                  multiline numberOfLines={2}
+                  style={[st.input, { backgroundColor: c.input, color: c.text, borderColor: c.border, minHeight: 56, textAlignVertical: 'top' }]}
+                />
+
+                <TouchableOpacity onPress={saveEditItem} disabled={!editText.trim()}
+                  style={[st.btn, { backgroundColor: editText.trim() ? c.accent : c.dim, marginTop: 4 }]}>
+                  <Text style={[st.btnLabel, { color: editText.trim() ? '#fff' : c.sub }]}>Зберегти</Text>
+                </TouchableOpacity>
+              </BlurView>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ══════════════════════════════ SECTION MENU MODAL ══════════════════════════════ */}
+
+      <Modal visible={!!showSectionMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowSectionMenu(null)}>
+        <Pressable style={st.overlay} onPress={() => setShowSectionMenu(null)}>
+          <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
+              style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <HandleRow c={c} onClose={() => setShowSectionMenu(null)} />
+              <Text style={[st.sheetTitle, { color: c.text }]}>{showSectionMenu?.name}</Text>
+
+              <TouchableOpacity onPress={() => {
+                if (showSectionMenu) { setRenameText(showSectionMenu.name); setShowRenameModal(true); }
+              }} style={[st.sheetAction, { borderBottomColor: c.border }]}>
+                <View style={[st.iconBox, { backgroundColor: c.accent + '18' }]}>
+                  <IconSymbol name="pencil" size={20} color={c.accent} />
+                </View>
+                <Text style={{ flex: 1, fontSize: 16, fontWeight: '600', color: c.text }}>Перейменувати</Text>
+                <IconSymbol name="chevron.right" size={15} color={c.sub} />
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={() => { if (showSectionMenu) deleteSection(showSectionMenu); }}
+                style={st.sheetAction}>
+                <View style={[st.iconBox, { backgroundColor: c.red + '18' }]}>
+                  <IconSymbol name="trash" size={20} color={c.red} />
+                </View>
+                <Text style={{ flex: 1, fontSize: 16, fontWeight: '600', color: c.red }}>Видалити список</Text>
+                <IconSymbol name="chevron.right" size={15} color={c.sub} />
+              </TouchableOpacity>
+            </BlurView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ══════════════════════════════ RENAME MODAL ══════════════════════════════ */}
+
+      <Modal visible={showRenameModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowRenameModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={st.overlay} onPress={() => setShowRenameModal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
+                style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <HandleRow c={c} onClose={() => setShowRenameModal(false)} />
+                <Text style={[st.sheetTitle, { color: c.text }]}>Перейменувати</Text>
+                <TextInput autoFocus placeholder="Нова назва" placeholderTextColor={c.sub}
+                  value={renameText} onChangeText={setRenameText}
+                  returnKeyType="done"
+                  onSubmitEditing={() => { if (showSectionMenu) renameSection(showSectionMenu); }}
+                  style={[st.input, { backgroundColor: c.input, color: c.text, borderColor: c.border }]}
+                />
+                <TouchableOpacity onPress={() => { if (showSectionMenu) renameSection(showSectionMenu); }}
+                  disabled={!renameText.trim()}
+                  style={[st.btn, { backgroundColor: renameText.trim() ? c.accent : c.dim, marginTop: 4 }]}>
+                  <Text style={[st.btnLabel, { color: renameText.trim() ? '#fff' : c.sub }]}>Зберегти</Text>
+                </TouchableOpacity>
+              </BlurView>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ══════════════════════════════ MODALS ══════════════════════════════ */}
@@ -1391,13 +1661,13 @@ export default function SharedScreen() {
 
 // ─── ItemRow component ────────────────────────────────────────────────────────
 
-function ItemRow({ item, isLast, type, c, onToggle, onDelete }: {
+function ItemRow({ item, isLast, type, c, onToggle, onDelete, onEdit }: {
   item: LocalItem; isLast: boolean; type: SectionType;
-  c: any; onToggle: () => void; onDelete: () => void;
+  c: any; onToggle: () => void; onDelete: () => void; onEdit: () => void;
 }) {
   const checkColor = type === 'shopping' ? c.green : c.accent;
   return (
-    <View style={[
+    <TouchableOpacity activeOpacity={0.7} onPress={onEdit} style={[
       st.itemRow,
       !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
       type === 'tasks' && item.priority && !item.checked && {
@@ -1454,7 +1724,7 @@ function ItemRow({ item, isLast, type, c, onToggle, onDelete }: {
           <IconSymbol name="xmark" size={13} color={c.sub + '80'} />
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -1490,6 +1760,7 @@ const st = StyleSheet.create({
   dot:             { width: 7, height: 7, borderRadius: 4 },
   searchInput:     { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
   groupCard:       { borderRadius: 18, borderWidth: 1, overflow: 'hidden', padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  groupIconBox:    { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   groupName:       { fontSize: 18, fontWeight: '700', letterSpacing: -0.3 },
   groupHeaderName: { fontSize: 17, fontWeight: '700', letterSpacing: -0.3 },
   pill:            { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },

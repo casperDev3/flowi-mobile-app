@@ -35,6 +35,7 @@ const MAPPING: Record<string, MaterialIconName> = {
   'arrow.up.trend': 'trending-up',
   'arrow.down.trend': 'trending-down',
   'arrow.up.arrow.down': 'swap-vert',
+  'arrow.left.arrow.right': 'swap-horiz',
   // Status / indicators
   'flag': 'outlined-flag',
   'flag.fill': 'flag',

@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AutoBackupProvider } from '@/store/auto-backup';
 import { I18nProvider } from '@/store/i18n';
@@ -48,14 +49,16 @@ function RootLayoutContent() {
 
 export default function RootLayout() {
   return (
-    <I18nProvider>
-      <ThemeProvider>
-        <AutoBackupProvider>
-          <TimerProvider>
-            <RootLayoutContent />
-          </TimerProvider>
-        </AutoBackupProvider>
-      </ThemeProvider>
-    </I18nProvider>
+    <ErrorBoundary>
+      <I18nProvider>
+        <ThemeProvider>
+          <AutoBackupProvider>
+            <TimerProvider>
+              <RootLayoutContent />
+            </TimerProvider>
+          </AutoBackupProvider>
+        </ThemeProvider>
+      </I18nProvider>
+    </ErrorBoundary>
   );
 }

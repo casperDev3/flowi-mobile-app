@@ -186,6 +186,106 @@ export interface Translations {
   catHealth: string;
   catUtilities: string;
   catClothing: string;
+  carryover: string;
+  currency: string;
+  newCurrency: string;
+  currencyTicker: string;
+  currencySymbol: string;
+  // Finance — primary currency picker
+  primaryCurrency: string;
+  primaryCurrencyDesc: string;
+  primaryBadge: string;
+  cryptoBadge: string;
+  cryptoKind: string;
+  fiatKind: string;
+  // Finance — balance split
+  balanceSplit: string;
+  balanceSplitDesc: string;
+  fromTransactions: string;
+  addCrypto: string;
+  removeCurrencyTitle: string;
+  removeCurrencyMsg: string;
+  remove: string;
+  // Finance — others
+  otherCurrencies: string;
+  showAllCount: string;          // "Показати всі ({count})"
+  allCurrencies: string;
+  // Shared
+  sharedTitle: string;
+  noGroups: string;
+  noGroupsHint: string;
+  createGroup: string;
+  joinByCode: string;
+  searchGroups: string;
+  searchSections: string;
+  noListsFound: string;
+  noLists: string;
+  pressPlusToAdd: string;
+  syncingShort: string;
+  participants: string;        // pluralized helper handles UA forms
+  notifyMembers: string;
+  notifyMembersDesc: string;
+  notifyButton: string;
+  notifyMessagePh: string;
+  notifyThrottleMsg: string;
+  notifyForegroundHint: string;
+  leaveGroupTitle: string;
+  leaveGroupMsg: string;
+  leave: string;
+  refreshCodeNow: string;
+  shareCode: string;
+  shareCodeDesc: string;
+  joinTitle: string;
+  joinDesc: string;
+  joinAction: string;
+  newGroupTitle: string;
+  newGroupDesc: string;
+  groupNamePh: string;
+  newListTitle: string;
+  newListType: string;
+  createList: string;
+  deleteListTitle: string;
+  deleteListMsg: string;
+  rename: string;
+  renamePh: string;
+  emptyListTitle: string;
+  emptyListHint: string;
+  showCompleted: string;        // "Показати виконані ({n})"
+  hideCompleted: string;
+  clearCompleted: string;
+  ofPurchased: string;          // "{done} з {total} куплено"
+  priorities: { high: string; medium: string; low: string };
+  addPlaceholder: string;
+  notePlaceholderShort: string;
+  errGeneric: string;
+  errCreateGroup: string;
+  errCreateList: string;
+  errRename: string;
+  errDelete: string;
+  errInvalidCode: string;
+  errNotifyFailed: string;
+  offlineBanner: string;
+  // Format helpers
+  amountWithCurrency: string;   // "СУМА ({symbol})"
+  // Filter dropdown
+  compactView: string;
+  filterTitle: string;
+  sortTitle: string;
+  filterActive: string;
+  filterAll: string;
+  filterDone: string;
+  sortPriorityShort: string;
+  // Misc Shared
+  qtyShort: string;
+  textLabel: string;
+  inGroup: string;
+  edit_: string;
+  close_: string;
+  newCodeAction: string;
+  joinCodePh: string;
+  noteFullPh: string;
+  notifChangesInSection: string; // "Зміни у «{name}»"
+  notifChangesInGroup: string;   // "У групі зʼявились зміни"
 
   // Archive
   archiveEmpty: string;
@@ -605,6 +705,99 @@ const uk: Translations = {
   catHealth: "Здоров'я",
   catUtilities: 'Комунальні',
   catClothing: 'Одяг',
+  carryover: 'Перенесено з минулого',
+  currency: 'Валюта',
+  newCurrency: 'Нова валюта',
+  currencyTicker: 'Тікер (BTC, ETH, USDT...)',
+  currencySymbol: 'Символ (необовʼязково)',
+  primaryCurrency: 'Основна валюта',
+  primaryCurrencyDesc: 'Валюта, що відображається у верхній картці балансу. Інші валюти показуються нижче дрібніше.',
+  primaryBadge: 'ОСНОВНА',
+  cryptoBadge: 'CRYPTO',
+  cryptoKind: 'Криптовалюта',
+  fiatKind: 'Фіат',
+  balanceSplit: 'Розподіл балансу',
+  balanceSplitDesc: 'Вкажіть, скільки накопиченого залишку у кожній валюті. Корисно, якщо частина гривневих заощаджень фактично у доларах чи криптовалюті. Місячні доходи та витрати не змінюються.',
+  fromTransactions: 'З транзакцій',
+  addCrypto: 'Додати криптовалюту',
+  removeCurrencyTitle: 'Видалити {code}?',
+  removeCurrencyMsg: 'Транзакції залишаться, але валюта зникне з фільтрів.',
+  remove: 'Видалити',
+  otherCurrencies: 'Інші валюти',
+  showAllCount: 'Показати всі ({count})',
+  allCurrencies: 'Всі валюти',
+  sharedTitle: 'Спільне',
+  noGroups: 'Немає груп',
+  noGroupsHint: 'Створіть групу або приєднайтесь за кодом',
+  createGroup: 'Створити',
+  joinByCode: 'Ввести код',
+  searchGroups: 'Пошук груп...',
+  searchSections: 'Пошук списків...',
+  noListsFound: 'Нічого не знайдено',
+  noLists: 'Немає списків',
+  pressPlusToAdd: 'Натисніть + щоб додати',
+  syncingShort: 'синхр...',
+  participants: 'учасників',
+  notifyMembers: 'Сповістити учасників',
+  notifyMembersDesc: 'Всі учасники з відкритим додатком отримають push-сповіщення.',
+  notifyButton: 'Сповістити',
+  notifyMessagePh: 'Повідомлення (необовʼязково)...',
+  notifyThrottleMsg: 'Сповіщення можна надсилати раз на 10 секунд.',
+  notifyForegroundHint: 'Сповіщення доходять учасникам з відкритим додатком.',
+  leaveGroupTitle: 'Вийти з групи',
+  leaveGroupMsg: 'Покинути «{name}»?',
+  leave: 'Вийти',
+  refreshCodeNow: 'Оновити код зараз',
+  shareCode: 'Код для приєднання',
+  shareCodeDesc: 'Поділіться кодом — «{name}»',
+  joinTitle: 'Приєднатись до групи',
+  joinDesc: 'Введіть секретний код (ABCD-1234). Дійсний 24 год.',
+  joinAction: 'Приєднатись',
+  newGroupTitle: 'Нова спільна група',
+  newGroupDesc: 'Після створення отримаєте код (дійсний 24 год).',
+  groupNamePh: 'Назва групи',
+  newListTitle: 'Новий список',
+  newListType: 'Тип: {type}',
+  createList: 'Створити список',
+  deleteListTitle: 'Видалити список',
+  deleteListMsg: 'Видалити «{name}» та всі елементи?',
+  rename: 'Перейменувати',
+  renamePh: 'Нова назва',
+  emptyListTitle: 'Список порожній',
+  emptyListHint: 'Додайте перший елемент нижче',
+  showCompleted: 'Показати виконані ({n})',
+  hideCompleted: 'Сховати виконані',
+  clearCompleted: 'Очистити',
+  ofPurchased: '{done} з {total} куплено',
+  priorities: { high: 'Висока', medium: 'Середня', low: 'Низька' },
+  addPlaceholder: 'Додати...',
+  notePlaceholderShort: 'Нотатка...',
+  errGeneric: 'Помилка',
+  errCreateGroup: 'Не вдалося створити групу.',
+  errCreateList: 'Не вдалося створити список.',
+  errRename: 'Не вдалося перейменувати.',
+  errDelete: 'Не вдалося видалити.',
+  errInvalidCode: 'Невірний або застарілий код.',
+  errNotifyFailed: 'Не вдалося надіслати сповіщення.',
+  offlineBanner: 'Офлайн — зміни синхронізуються після відновлення мережі.',
+  amountWithCurrency: 'СУМА ({symbol})',
+  compactView: 'Компактний вигляд',
+  filterTitle: 'ФІЛЬТР',
+  sortTitle: 'СОРТУВАННЯ',
+  filterActive: 'Активні',
+  filterAll: 'Всі',
+  filterDone: 'Виконані',
+  sortPriorityShort: 'Пріор.',
+  qtyShort: 'К-сть',
+  textLabel: 'Текст',
+  inGroup: 'у групі',
+  edit_: 'Редагувати',
+  close_: 'Закрити',
+  newCodeAction: 'Оновити код зараз',
+  joinCodePh: 'XXXX-0000',
+  noteFullPh: 'Нотатка (необовʼязково)',
+  notifChangesInSection: 'Зміни у «{name}»',
+  notifChangesInGroup: 'У групі зʼявились зміни',
 
   archiveEmpty: 'Архів порожній',
   completedTasksAppear: "Виконані завдання з'являться тут",
@@ -1008,6 +1201,99 @@ const en: Translations = {
   catHealth: 'Health',
   catUtilities: 'Utilities',
   catClothing: 'Clothing',
+  carryover: 'Carried over',
+  currency: 'Currency',
+  newCurrency: 'New currency',
+  currencyTicker: 'Ticker (BTC, ETH, USDT...)',
+  currencySymbol: 'Symbol (optional)',
+  primaryCurrency: 'Primary currency',
+  primaryCurrencyDesc: 'Currency shown in the main balance card. Others appear smaller below.',
+  primaryBadge: 'PRIMARY',
+  cryptoBadge: 'CRYPTO',
+  cryptoKind: 'Cryptocurrency',
+  fiatKind: 'Fiat',
+  balanceSplit: 'Balance split',
+  balanceSplitDesc: 'Specify how much of the carried-over savings is in each currency. Useful when part of your hryvnia savings is actually in USD or crypto. Monthly income and expenses are not affected.',
+  fromTransactions: 'From transactions',
+  addCrypto: 'Add cryptocurrency',
+  removeCurrencyTitle: 'Remove {code}?',
+  removeCurrencyMsg: 'Existing transactions remain, but the currency disappears from filters.',
+  remove: 'Remove',
+  otherCurrencies: 'Other currencies',
+  showAllCount: 'Show all ({count})',
+  allCurrencies: 'All currencies',
+  sharedTitle: 'Shared',
+  noGroups: 'No groups',
+  noGroupsHint: 'Create a group or join with a code',
+  createGroup: 'Create',
+  joinByCode: 'Enter code',
+  searchGroups: 'Search groups...',
+  searchSections: 'Search lists...',
+  noListsFound: 'Nothing found',
+  noLists: 'No lists',
+  pressPlusToAdd: 'Press + to add',
+  syncingShort: 'syncing…',
+  participants: 'members',
+  notifyMembers: 'Notify members',
+  notifyMembersDesc: 'All members with the app open will receive a push notification.',
+  notifyButton: 'Notify',
+  notifyMessagePh: 'Message (optional)...',
+  notifyThrottleMsg: 'You can send a notification once per 10 seconds.',
+  notifyForegroundHint: 'Notifications reach members with the app open.',
+  leaveGroupTitle: 'Leave group',
+  leaveGroupMsg: 'Leave «{name}»?',
+  leave: 'Leave',
+  refreshCodeNow: 'Refresh code now',
+  shareCode: 'Join code',
+  shareCodeDesc: 'Share the code — «{name}»',
+  joinTitle: 'Join group',
+  joinDesc: 'Enter secret code (ABCD-1234). Valid 24h.',
+  joinAction: 'Join',
+  newGroupTitle: 'New shared group',
+  newGroupDesc: 'After creation you receive a code (valid 24h).',
+  groupNamePh: 'Group name',
+  newListTitle: 'New list',
+  newListType: 'Type: {type}',
+  createList: 'Create list',
+  deleteListTitle: 'Delete list',
+  deleteListMsg: 'Delete «{name}» and all items?',
+  rename: 'Rename',
+  renamePh: 'New name',
+  emptyListTitle: 'Empty list',
+  emptyListHint: 'Add the first item below',
+  showCompleted: 'Show completed ({n})',
+  hideCompleted: 'Hide completed',
+  clearCompleted: 'Clear',
+  ofPurchased: '{done} of {total} bought',
+  priorities: { high: 'High', medium: 'Medium', low: 'Low' },
+  addPlaceholder: 'Add...',
+  notePlaceholderShort: 'Note...',
+  errGeneric: 'Error',
+  errCreateGroup: 'Failed to create group.',
+  errCreateList: 'Failed to create list.',
+  errRename: 'Failed to rename.',
+  errDelete: 'Failed to delete.',
+  errInvalidCode: 'Invalid or expired code.',
+  errNotifyFailed: 'Failed to send notification.',
+  offlineBanner: 'Offline — changes will sync once back online.',
+  amountWithCurrency: 'AMOUNT ({symbol})',
+  compactView: 'Compact view',
+  filterTitle: 'FILTER',
+  sortTitle: 'SORT',
+  filterActive: 'Active',
+  filterAll: 'All',
+  filterDone: 'Completed',
+  sortPriorityShort: 'Prio.',
+  qtyShort: 'Qty',
+  textLabel: 'Text',
+  inGroup: 'in group',
+  edit_: 'Edit',
+  close_: 'Close',
+  newCodeAction: 'Refresh code now',
+  joinCodePh: 'XXXX-0000',
+  noteFullPh: 'Note (optional)',
+  notifChangesInSection: 'Changes in «{name}»',
+  notifChangesInGroup: 'New changes in the group',
 
   archiveEmpty: 'Archive is empty',
   completedTasksAppear: 'Completed tasks will appear here',

@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   KeyboardAvoidingView,
   Modal,
@@ -25,12 +26,19 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
-import { filterByMonth, groupTransactions, calcTotals } from '@/utils/financeUtils';
+import {
+  filterByMonth, groupTransactions,
+  calcTotalsByCurrency, formatCurrency,
+  BUILTIN_CURRENCIES, txCurrency,
+  type Currency, type CurrencyTotals,
+} from '@/utils/financeUtils';
+import { isSameDay } from '@/utils/dateUtils';
 
 type TxType = 'income' | 'expense';
 
 interface Transaction {
   id: string; type: TxType; category: string; amount: number; note: string; date: string;
+  currency?: string;
 }
 
 interface CategoryDef { name: string; icon: IconSymbolName; }
@@ -100,12 +108,12 @@ export default function FinanceScreen() {
   const DEFAULT_CATEGORIES = lang === 'uk' ? DEFAULT_CATEGORIES_UK : DEFAULT_CATEGORIES_EN;
   const MONTHS_UA = tr.months;
   const WEEKDAYS_SHORT = tr.weekdays;
-  const fmt = (n: number) => n.toLocaleString(locale, { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
+  const fmtCur = (n: number, cur: Currency) => formatCurrency(n, cur, locale);
   const now = new Date();
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [filter, setFilter] = useState<'all' | TxType>('all');
-  const [dateFilter, setDateFilter] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<Date | null>(null);
   const [activeMonth, setActiveMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
   const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -134,6 +142,39 @@ export default function FinanceScreen() {
   const [showInlineAddCat, setShowInlineAddCat] = useState(false);
   const [inlineCatName, setInlineCatName] = useState('');
   const [inlineCatIcon, setInlineCatIcon] = useState<IconSymbolName>('ellipsis.circle.fill');
+
+  // Currency state
+  const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
+  const [currenciesInitialized, setCurrenciesInitialized] = useState(false);
+  const [txCur, setTxCur] = useState<string>('UAH');
+  const [showInlineAddCur, setShowInlineAddCur] = useState(false);
+  const [inlineCurTicker, setInlineCurTicker] = useState('');
+  const [inlineCurSymbol, setInlineCurSymbol] = useState('');
+
+  // Manual balance adjustments per currency — used to split the historical
+  // carryover between currencies (e.g. mark part of UAH savings as USD/BTC).
+  const [balanceAdj, setBalanceAdj] = useState<Record<string, number>>({});
+  const [balanceAdjInitialized, setBalanceAdjInitialized] = useState(false);
+  const [showSplit, setShowSplit] = useState(false);
+
+  // Primary currency for the main Finance card
+  const [primaryCurrency, setPrimaryCurrency] = useState<string>('UAH');
+  const [primaryCurrencyInitialized, setPrimaryCurrencyInitialized] = useState(false);
+  const [showPrimaryPicker, setShowPrimaryPicker] = useState(false);
+
+  const allCurrencies = useMemo<Currency[]>(
+    () => [...BUILTIN_CURRENCIES, ...customCurrencies],
+    [customCurrencies],
+  );
+  const currencyByCode = useMemo<Record<string, Currency>>(() => {
+    const m: Record<string, Currency> = {};
+    allCurrencies.forEach(c => { m[c.code] = c; });
+    return m;
+  }, [allCurrencies]);
+  const curOf = useCallback(
+    (code: string): Currency => currencyByCode[code] ?? { code, symbol: code, kind: 'fiat', decimals: 2 },
+    [currencyByCode],
+  );
 
   const loadTxs = useCallback(async () => {
     const data = await loadData<Transaction[]>('transactions', []);
@@ -169,6 +210,56 @@ export default function FinanceScreen() {
     if (catsInitialized) saveData('categories', cats);
   }, [cats, catsInitialized]);
 
+  // Load custom currencies
+  useEffect(() => {
+    loadData<Currency[]>('finance_currencies', []).then(data => {
+      setCustomCurrencies(Array.isArray(data) ? data : []);
+      setCurrenciesInitialized(true);
+    });
+  }, []);
+
+  // Save custom currencies
+  useEffect(() => {
+    if (currenciesInitialized) saveData('finance_currencies', customCurrencies);
+  }, [customCurrencies, currenciesInitialized]);
+
+  // Load / save manual balance adjustments
+  useEffect(() => {
+    loadData<Record<string, number>>('finance_balance_adjustments', {}).then(data => {
+      setBalanceAdj(data && typeof data === 'object' ? data : {});
+      setBalanceAdjInitialized(true);
+    });
+  }, []);
+  useEffect(() => {
+    if (balanceAdjInitialized) saveData('finance_balance_adjustments', balanceAdj);
+  }, [balanceAdj, balanceAdjInitialized]);
+
+  // Load / save primary currency
+  useEffect(() => {
+    loadData<string>('finance_primary_currency', 'UAH').then(code => {
+      setPrimaryCurrency(typeof code === 'string' && code ? code : 'UAH');
+      setPrimaryCurrencyInitialized(true);
+    });
+  }, []);
+  useEffect(() => {
+    if (primaryCurrencyInitialized) saveData('finance_primary_currency', primaryCurrency);
+  }, [primaryCurrency, primaryCurrencyInitialized]);
+
+  const addInlineCurrency = () => {
+    const code = inlineCurTicker.trim().toUpperCase();
+    if (!code) return;
+    if (allCurrencies.some(c => c.code === code)) {
+      setTxCur(code);
+      setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol('');
+      return;
+    }
+    const symbol = (inlineCurSymbol.trim() || code);
+    const newCur: Currency = { code, symbol, kind: 'crypto', decimals: 8 };
+    setCustomCurrencies(prev => [...prev, newCur]);
+    setTxCur(code);
+    setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol('');
+  };
+
   const getCatIcon = (catName: string, type: TxType): IconSymbolName =>
     cats[type].find(c => c.name === catName)?.icon ??
     DEFAULT_CATEGORIES[type].find(c => c.name === catName)?.icon ??
@@ -192,14 +283,14 @@ export default function FinanceScreen() {
   };
 
   const monthTxs = useMemo(() => filterByMonth(txs, activeMonth), [txs, activeMonth]);
-  const { income, expense, balance, savingsPct } = useMemo(() => calcTotals(monthTxs), [monthTxs]);
+  const totalsByCurrency = useMemo(
+    () => calcTotalsByCurrency(txs, activeMonth, balanceAdj),
+    [txs, activeMonth, balanceAdj],
+  );
 
   const filtered = useMemo(() => monthTxs.filter(t => {
     if (filter !== 'all' && t.type !== filter) return false;
-    if (dateFilter) {
-      const d = new Date(t.date);
-      if (d.toDateString() !== dateFilter) return false;
-    }
+    if (dateFilter && !isSameDay(new Date(t.date), dateFilter)) return false;
     return true;
   }), [monthTxs, filter, dateFilter]);
 
@@ -213,9 +304,13 @@ export default function FinanceScreen() {
   const addTx = () => {
     const num = parseFloat(amount.replace(',', '.'));
     if (!num || num <= 0 || !category) return;
-    setTxs(p => [{ id: Date.now().toString(), type: txType, category, amount: num, note: note.trim(), date: new Date().toISOString() }, ...p]);
+    setTxs(p => [{
+      id: Date.now().toString(), type: txType, category, amount: num,
+      note: note.trim(), date: new Date().toISOString(), currency: txCur,
+    }, ...p]);
     setAmount(''); setCategory(''); setNote(''); setShowAdd(false);
     setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill');
+    setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol('');
   };
 
   const deleteTx = (id: string) => { setTxs(p => p.filter(t => t.id !== id)); if (selected?.id === id) setSelected(null); };
@@ -244,7 +339,7 @@ export default function FinanceScreen() {
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(180,170,240,0.4)',
     text:   isDark ? '#F4F2FF' : '#0A0818',
-    sub:    isDark ? 'rgba(244,242,255,0.45)' : 'rgba(10,8,24,0.45)',
+    sub:    isDark ? 'rgba(244,242,255,0.62)' : 'rgba(10,8,24,0.60)',
     green:  '#10B981',
     red:    '#EF4444',
     accent: '#0EA5E9',
@@ -263,11 +358,17 @@ export default function FinanceScreen() {
             <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.finance}</Text>
             <TouchableOpacity
               onPress={() => setCompact(v => !v)}
+              accessibilityRole="button"
+              accessibilityLabel={compact ? tr.listMode : tr.compactView}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={[s.headerBtn, { backgroundColor: compact ? c.accent + '20' : c.dim, borderColor: compact ? c.accent : c.border }]}>
               <IconSymbol name={compact ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={compact ? c.accent : c.sub} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setShowMenu(true)}
+              accessibilityRole="button"
+              accessibilityLabel={tr.filtersAndSort}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent + '20' : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
               <IconSymbol name="ellipsis" size={17} color={dateFilter ? c.accent : c.sub} />
             </TouchableOpacity>
@@ -300,25 +401,31 @@ export default function FinanceScreen() {
               style={[s.dateChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
               <IconSymbol name="calendar" size={13} color={c.accent} />
               <Text style={{ color: c.accent, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>
-                {new Date(dateFilter).toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
+                {dateFilter.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
               </Text>
               <IconSymbol name="xmark" size={13} color={c.accent} style={{ marginLeft: 4 }} />
             </TouchableOpacity>
           )}
 
-          {/* Balance Card */}
+          {/* Balance Cards — one per active currency */}
           <FinanceSummary
-            income={income}
-            expense={expense}
-            balance={balance}
-            savingsPct={savingsPct}
-            fmt={fmt}
+            currencies={allCurrencies}
+            totalsByCurrency={totalsByCurrency}
+            primaryCode={primaryCurrency}
+            onPickPrimary={() => setShowPrimaryPicker(true)}
+            fmt={fmtCur}
             isDark={isDark}
             c={{ border: c.border, sub: c.sub, green: c.green, red: c.red }}
             incomeLabel={tr.incomes}
             expenseLabel={tr.expenses}
             balanceLabel={tr.balance}
             savingsLabel={tr.savings}
+            carryoverLabel={tr.carryover}
+            otherCurrenciesLabel={tr.otherCurrencies}
+            primaryBadgeLabel={tr.primaryBadge}
+            showAllLabel={(n) => tr.showAllCount.replace('{count}', String(n))}
+            allCurrenciesLabel={tr.allCurrencies}
+            onSelectPrimary={setPrimaryCurrency}
           />
 
           {/* Filters */}
@@ -335,12 +442,22 @@ export default function FinanceScreen() {
             ))}
           </View>
 
-          {/* Empty state */}
+          {/* Empty state with CTA */}
           {groups.length === 0 && (
-            <View style={{ alignItems: 'center', paddingVertical: 56 }}>
-              <IconSymbol name="banknote" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noTransactions}</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>{tr.pressToAdd}</Text>
+            <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+              <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.accent + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                <IconSymbol name="banknote" size={32} color={c.accent} />
+              </View>
+              <Text style={{ color: c.text, fontSize: 16, marginTop: 6, fontWeight: '700' }}>{tr.noTransactions}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.85 }}>{tr.pressToAdd}</Text>
+              <TouchableOpacity
+                onPress={() => setShowAdd(true)}
+                accessibilityRole="button"
+                accessibilityLabel={tr.add}
+                style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <IconSymbol name="plus" size={15} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.add}</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -352,7 +469,9 @@ export default function FinanceScreen() {
               compact={compact}
               isDark={isDark}
               c={{ sub: c.sub, text: c.text, green: c.green, red: c.red, border: c.border, dim: c.dim }}
-              fmt={fmt}
+              fmt={fmtCur}
+              currencyByCode={currencyByCode}
+              primaryCode={primaryCurrency}
               getCatIcon={getCatIcon}
               onSelect={setSelected}
               todayLabel={tr.today}
@@ -418,6 +537,19 @@ export default function FinanceScreen() {
 
               <View style={[s.menuDivider, { backgroundColor: c.border }]} />
 
+              {/* Розподіл балансу */}
+              <TouchableOpacity
+                onPress={() => { setShowMenu(false); setShowSplit(true); }}
+                style={s.menuItem}>
+                <View style={[s.menuIconBox, { backgroundColor: '#8B5CF625' }]}>
+                  <IconSymbol name="arrow.left.arrow.right" size={15} color="#8B5CF6" />
+                </View>
+                <Text style={[s.menuLabel, { color: c.text }]}>{tr.balanceSplit}</Text>
+                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              </TouchableOpacity>
+
+              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
               {/* Банки */}
               <TouchableOpacity
                 onPress={() => { setShowMenu(false); router.push('/banks'); }}
@@ -442,7 +574,7 @@ export default function FinanceScreen() {
                 {dateFilter
                   ? <View style={[s.menuPill, { backgroundColor: c.accent + '20', borderColor: c.accent + '40' }]}>
                       <Text style={[s.menuPillText, { color: c.accent }]}>
-                        {new Date(dateFilter).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+                        {dateFilter.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                       </Text>
                     </View>
                   : <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -498,13 +630,13 @@ export default function FinanceScreen() {
                       if (!day) return <View key={di} style={{ flex: 1 }} />;
                       const dayDate = new Date(calYear, calMonth, day);
                       const keyStr = `${calYear}-${calMonth}-${day}`;
-                      const isToday = dayDate.toDateString() === now.toDateString();
-                      const isSel = dateFilter === dayDate.toDateString();
+                      const isToday = isSameDay(dayDate, now);
+                      const isSel = !!dateFilter && isSameDay(dayDate, dateFilter);
                       const hasMark = markedDays.has(keyStr);
                       return (
                         <TouchableOpacity
                           key={di}
-                          onPress={() => { setDateFilter(isSel ? null : dayDate.toDateString()); setShowCal(false); }}
+                          onPress={() => { setDateFilter(isSel ? null : dayDate); setShowCal(false); }}
                           style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}>
                           <View style={[s.dayCell, isSel && { backgroundColor: c.accent }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }]}>
                             <Text style={{ color: isSel ? '#fff' : isToday ? c.accent : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
@@ -562,22 +694,101 @@ export default function FinanceScreen() {
 
                   {/* Amount display */}
                   <View style={[s.amountBlock, { backgroundColor: (txType === 'income' ? c.green : c.red) + '12', borderColor: (txType === 'income' ? c.green : c.red) + '30' }]}>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>{tr.amountUAH}</Text>
+                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>
+                      {tr.amountUAH.replace('₴', curOf(txCur).symbol).replace('UAH', curOf(txCur).code)}
+                    </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ color: txType === 'income' ? c.green : c.red, fontSize: 28, fontWeight: '300' }}>₴</Text>
+                      <Text style={{ color: txType === 'income' ? c.green : c.red, fontSize: 28, fontWeight: '300' }}>{curOf(txCur).symbol}</Text>
                       <TextInput
                         placeholder="0"
                         placeholderTextColor={c.sub}
                         value={amount}
-                        onChangeText={setAmount}
+                        onChangeText={(t) => {
+                          // Allow only digits and a single separator (. or ,).
+                          // Strip anything else silently so paste from clipboard is forgiving.
+                          const cleaned = t.replace(/[^0-9.,]/g, '');
+                          // collapse multiple separators to the first one
+                          const i = cleaned.search(/[.,]/);
+                          const next = i < 0 ? cleaned : cleaned.slice(0, i + 1) + cleaned.slice(i + 1).replace(/[.,]/g, '');
+                          setAmount(next);
+                        }}
                         keyboardType="decimal-pad"
                         style={{ color: txType === 'income' ? c.green : c.red, fontSize: 38, fontWeight: '700', letterSpacing: -1, flex: 1 }}
                       />
                     </View>
                   </View>
 
+                  {/* Currency picker — horizontal scroll keeps it 1 row even with many cryptos */}
+                  <Text style={[s.label, { color: c.sub }]}>{tr.currency}</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{ flexDirection: 'row', gap: 7, paddingRight: 8 }}>
+                    {allCurrencies.map(curr => {
+                      const isSelected = txCur === curr.code;
+                      return (
+                        <TouchableOpacity
+                          key={curr.code}
+                          onPress={() => setTxCur(curr.code)}
+                          accessibilityRole="button"
+                          accessibilityLabel={curr.code}
+                          accessibilityState={{ selected: isSelected }}
+                          style={[s.catChip, { backgroundColor: isSelected ? c.accent : c.dim, borderColor: isSelected ? c.accent : c.border }]}>
+                          <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '800' }}>{curr.symbol}</Text>
+                          <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{curr.code}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    <TouchableOpacity
+                      onPress={() => { setShowInlineAddCur(v => !v); setInlineCurTicker(''); setInlineCurSymbol(''); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.newCurrency}
+                      style={[s.catChip, { backgroundColor: showInlineAddCur ? c.accent + '20' : c.dim, borderColor: showInlineAddCur ? c.accent : c.border, borderStyle: 'dashed' }]}>
+                      <IconSymbol name="plus" size={13} color={showInlineAddCur ? c.accent : c.sub} />
+                      <Text style={{ color: showInlineAddCur ? c.accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{tr.newCurrency}</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+
+                  {showInlineAddCur && (
+                    <View style={[{ borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 10 }, { borderColor: c.border, backgroundColor: c.dim }]}>
+                      <TextInput
+                        placeholder={tr.currencyTicker}
+                        placeholderTextColor={c.sub}
+                        value={inlineCurTicker}
+                        onChangeText={t => setInlineCurTicker(t.toUpperCase())}
+                        autoCapitalize="characters"
+                        maxLength={8}
+                        style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 10 }]}
+                        autoFocus
+                      />
+                      <TextInput
+                        placeholder={tr.currencySymbol}
+                        placeholderTextColor={c.sub}
+                        value={inlineCurSymbol}
+                        onChangeText={setInlineCurSymbol}
+                        maxLength={4}
+                        style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 10 }]}
+                      />
+                      <View style={{ flexDirection: 'row', gap: 7 }}>
+                        <TouchableOpacity
+                          onPress={() => { setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol(''); }}
+                          style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                          <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={addInlineCurrency}
+                          disabled={!inlineCurTicker.trim()}
+                          style={[s.btn, { flex: 2, backgroundColor: !inlineCurTicker.trim() ? c.dim : c.accent }]}>
+                          <IconSymbol name="plus" size={14} color={!inlineCurTicker.trim() ? c.sub : '#fff'} />
+                          <Text style={{ color: !inlineCurTicker.trim() ? c.sub : '#fff', fontWeight: '700', marginLeft: 5 }}>{tr.add}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
                   {/* Category */}
-                  <Text style={[s.label, { color: c.sub }]}>Категорія</Text>
+                  <Text style={[s.label, { color: c.sub }]}>{tr.category}</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
                     {cats[txType].map(cat => {
                       const isSelected = category === cat.name;
@@ -602,7 +813,7 @@ export default function FinanceScreen() {
                   {showInlineAddCat && (
                     <View style={[{ borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 10 }, { borderColor: c.border, backgroundColor: c.dim }]}>
                       <TextInput
-                        placeholder="Назва категорії"
+                        placeholder={tr.category}
                         placeholderTextColor={c.sub}
                         value={inlineCatName}
                         onChangeText={setInlineCatName}
@@ -670,6 +881,76 @@ export default function FinanceScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* ─── Primary Currency Picker ─── */}
+      <Modal visible={showPrimaryPicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowPrimaryPicker(false)}>
+        <Pressable style={s.overlay} onPress={() => setShowPrimaryPicker(false)}>
+          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={s.handleRow}>
+                <View style={{ flex: 1 }} />
+                <View style={[s.handle, { backgroundColor: c.border }]} />
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <TouchableOpacity onPress={() => setShowPrimaryPicker(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <IconSymbol name="xmark" size={17} color={c.sub} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 6 }}>{tr.primaryCurrency}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, lineHeight: 18, marginBottom: 14 }}>
+                {tr.primaryCurrencyDesc}
+              </Text>
+              {allCurrencies.map((curr, idx) => {
+                const isSelected = primaryCurrency === curr.code;
+                return (
+                  <TouchableOpacity
+                    key={curr.code}
+                    onPress={() => { setPrimaryCurrency(curr.code); setShowPrimaryPicker(false); }}
+                    style={[{
+                      flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4,
+                    }, idx < allCurrencies.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                    <View style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: isSelected ? c.accent : c.dim,
+                      borderWidth: 1, borderColor: isSelected ? c.accent : c.border }}>
+                      <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 14, fontWeight: '800' }}>{curr.symbol}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{curr.code}</Text>
+                      <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                        {curr.kind === 'crypto' ? tr.cryptoKind : tr.fiatKind}
+                      </Text>
+                    </View>
+                    {isSelected && <IconSymbol name="checkmark" size={16} color={c.accent} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </BlurView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── Balance Split Modal ─── */}
+      <BalanceSplitModal
+        visible={showSplit}
+        onClose={() => setShowSplit(false)}
+        currencies={allCurrencies}
+        totalsByCurrency={totalsByCurrency}
+        adjustments={balanceAdj}
+        onApply={(next) => { setBalanceAdj(next); setShowSplit(false); }}
+        onAddCurrency={(cur) => setCustomCurrencies(prev => prev.some(p => p.code === cur.code) ? prev : [...prev, cur])}
+        onRemoveCurrency={(code) => {
+          setCustomCurrencies(prev => prev.filter(p => p.code !== code));
+          setBalanceAdj(prev => {
+            const next = { ...prev }; delete next[code]; return next;
+          });
+        }}
+        c={c}
+        isDark={isDark}
+        fmtCur={fmtCur}
+        tr={tr}
+        locale={locale}
+        styles={s}
+      />
+
       {/* ─── Detail Modal ─── */}
       <Modal visible={!!selected} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -698,18 +979,25 @@ export default function FinanceScreen() {
                           <IconSymbol name={iconName} size={30} color={color} />
                         </View>
                         <Text style={[s.detailAmount, { color, marginTop: 12 }]}>
-                          {isIncome ? '+' : '−'}{fmt(selected.amount)}
+                          {isIncome ? '+' : '−'}{fmtCur(selected.amount, curOf(txCurrency(selected)))}
                         </Text>
                         <Text style={[s.detailCat, { color: c.text, marginTop: 4 }]}>{selected.category}</Text>
-                        <View style={[s.typePill, { backgroundColor: color + '20', borderColor: color + '40', marginTop: 10 }]}>
-                          <IconSymbol name={isIncome ? 'arrow.up.trend' : 'arrow.down.trend'} size={11} color={color} />
-                          <Text style={{ color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{isIncome ? tr.income : tr.expense}</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 10 }}>
+                          <View style={[s.typePill, { backgroundColor: color + '20', borderColor: color + '40' }]}>
+                            <IconSymbol name={isIncome ? 'arrow.up.trend' : 'arrow.down.trend'} size={11} color={color} />
+                            <Text style={{ color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{isIncome ? tr.income : tr.expense}</Text>
+                          </View>
+                          <View style={[s.typePill, { backgroundColor: c.dim, borderColor: c.border }]}>
+                            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>
+                              {curOf(txCurrency(selected)).code}
+                            </Text>
+                          </View>
                         </View>
                       </View>
 
                       <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim, marginTop: 14 }]}>
-                        {selected.note ? <InfoRow icon="doc.text" label="Нотатка" value={selected.note} color={c.sub} text={c.text} sub={c.sub} border={c.border} last={false} /> : null}
-                        <InfoRow icon="calendar" label="Дата" value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
+                        {selected.note ? <InfoRow icon="doc.text" label={tr.note} value={selected.note} color={c.sub} text={c.text} sub={c.sub} border={c.border} last={false} /> : null}
+                        <InfoRow icon="calendar" label={tr.creationDate} value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
                       </View>
 
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
@@ -858,6 +1146,236 @@ export default function FinanceScreen() {
         </KeyboardAvoidingView>
       </Modal>
     </View>
+  );
+}
+
+function BalanceSplitModal({
+  visible, onClose, currencies, totalsByCurrency, adjustments, onApply,
+  onAddCurrency, onRemoveCurrency,
+  c, isDark, fmtCur, tr, locale, styles: s,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  currencies: Currency[];
+  totalsByCurrency: Record<string, CurrencyTotals>;
+  adjustments: Record<string, number>;
+  onApply: (next: Record<string, number>) => void;
+  onAddCurrency: (cur: Currency) => void;
+  onRemoveCurrency: (code: string) => void;
+  c: any;
+  isDark: boolean;
+  fmtCur: (n: number, cur: Currency) => string;
+  tr: any;
+  locale: string;
+  styles: any;
+}) {
+  // Per-currency string drafts for the inputs. Seeded from currently shown
+  // carryover (computed + existing adjustment).
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [showAddCur, setShowAddCur] = useState(false);
+  const [newTicker, setNewTicker] = useState('');
+  const [newSymbol, setNewSymbol] = useState('');
+
+  useEffect(() => {
+    if (!visible) return;
+    const next: Record<string, string> = {};
+    currencies.forEach(curr => {
+      const cur = totalsByCurrency[curr.code];
+      const v = cur ? cur.carryover : (adjustments[curr.code] ?? 0);
+      next[curr.code] = v === 0 ? '' : String(v);
+    });
+    setDraft(next);
+    setShowAddCur(false); setNewTicker(''); setNewSymbol('');
+  }, [visible]);
+
+  const addCurrency = () => {
+    const code = newTicker.trim().toUpperCase();
+    if (!code) return;
+    if (currencies.some(c => c.code === code)) {
+      setShowAddCur(false); setNewTicker(''); setNewSymbol('');
+      return;
+    }
+    onAddCurrency({
+      code,
+      symbol: newSymbol.trim() || code,
+      kind: 'crypto',
+      decimals: 8,
+    });
+    setShowAddCur(false); setNewTicker(''); setNewSymbol('');
+  };
+
+  const isBuiltin = (code: string) => code === 'UAH' || code === 'USD';
+
+  const apply = () => {
+    const next: Record<string, number> = { ...adjustments };
+    currencies.forEach(curr => {
+      const raw = (draft[curr.code] ?? '').replace(',', '.').trim();
+      const desired = raw === '' ? 0 : parseFloat(raw);
+      if (Number.isNaN(desired)) return;
+      const existing = totalsByCurrency[curr.code];
+      const txCarry = (existing?.carryover ?? 0) - (adjustments[curr.code] ?? 0);
+      const newAdj = desired - txCarry;
+      if (Math.abs(newAdj) < 1e-9) delete next[curr.code];
+      else next[curr.code] = newAdj;
+    });
+    onApply(next);
+  };
+
+  const reset = () => {
+    onApply({});
+  };
+
+  const hasAdjustments = Object.values(adjustments).some(v => Math.abs(v) > 1e-9);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <Pressable style={s.overlay} onPress={onClose}>
+          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <View style={s.handleRow}>
+                  <View style={{ flex: 1 }} />
+                  <View style={[s.handle, { backgroundColor: c.border }]} />
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <IconSymbol name="xmark" size={17} color={c.sub} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginBottom: 6 }}>
+                  {tr.balanceSplit}
+                </Text>
+                <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>
+                  {tr.balanceSplitDesc}
+                </Text>
+
+                {currencies.map(curr => {
+                  const tot = totalsByCurrency[curr.code];
+                  const currentAdj = adjustments[curr.code] ?? 0;
+                  const txOnlyCarry = (tot?.carryover ?? 0) - currentAdj;
+                  const removable = !isBuiltin(curr.code);
+                  return (
+                    <View key={curr.code} style={{ marginBottom: 14, borderRadius: 14, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: c.accent + '20', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                          <Text style={{ color: c.accent, fontSize: 14, fontWeight: '800' }}>{curr.symbol}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{curr.code}</Text>
+                            {curr.kind === 'crypto' && (
+                              <View style={{ backgroundColor: c.accent + '20', borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 }}>
+                                <Text style={{ color: c.accent, fontSize: 9, fontWeight: '700' }}>{tr.cryptoBadge}</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={{ color: c.sub, fontSize: 11 }}>
+                            {tr.fromTransactions}: {fmtCur(txOnlyCarry, curr)}
+                          </Text>
+                        </View>
+                        {removable && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              Alert.alert(
+                                (tr.removeCurrencyTitle as string).replace('{code}', curr.code),
+                                tr.removeCurrencyMsg,
+                                [
+                                  { text: tr.cancel, style: 'cancel' },
+                                  { text: tr.remove, style: 'destructive', onPress: () => onRemoveCurrency(curr.code) },
+                                ],
+                              );
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel={(tr.removeCurrencyTitle as string).replace('{code}', curr.code)}
+                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                            <IconSymbol name="trash" size={14} color={c.sub} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ color: c.sub, fontSize: 16, fontWeight: '700', width: 16, textAlign: 'center' }}>{curr.symbol}</Text>
+                        <TextInput
+                          placeholder="0"
+                          placeholderTextColor={c.sub}
+                          value={draft[curr.code] ?? ''}
+                          onChangeText={(t) => setDraft(prev => ({ ...prev, [curr.code]: t }))}
+                          keyboardType="numbers-and-punctuation"
+                          style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, flex: 1, marginBottom: 0 }]}
+                        />
+                      </View>
+                    </View>
+                  );
+                })}
+
+                {/* Inline add crypto */}
+                {showAddCur ? (
+                  <View style={{ marginBottom: 14, borderRadius: 14, borderWidth: 1, borderColor: c.accent + '60', borderStyle: 'dashed', backgroundColor: c.accent + '08', padding: 12 }}>
+                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>{tr.newCurrency}</Text>
+                    <TextInput
+                      placeholder={tr.currencyTicker}
+                      placeholderTextColor={c.sub}
+                      value={newTicker}
+                      onChangeText={t => setNewTicker(t.toUpperCase())}
+                      autoCapitalize="characters"
+                      maxLength={8}
+                      style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 8 }]}
+                      autoFocus
+                    />
+                    <TextInput
+                      placeholder={tr.currencySymbol}
+                      placeholderTextColor={c.sub}
+                      value={newSymbol}
+                      onChangeText={setNewSymbol}
+                      maxLength={4}
+                      style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 8 }]}
+                    />
+                    <View style={{ flexDirection: 'row', gap: 7 }}>
+                      <TouchableOpacity
+                        onPress={() => { setShowAddCur(false); setNewTicker(''); setNewSymbol(''); }}
+                        style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                        <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={addCurrency}
+                        disabled={!newTicker.trim()}
+                        style={[s.btn, { flex: 2, backgroundColor: !newTicker.trim() ? c.dim : c.accent }]}>
+                        <IconSymbol name="plus" size={14} color={!newTicker.trim() ? c.sub : '#fff'} />
+                        <Text style={{ color: !newTicker.trim() ? c.sub : '#fff', fontWeight: '700', marginLeft: 5 }}>{tr.add}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => setShowAddCur(true)}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 14, borderRadius: 14, borderWidth: 1, borderColor: c.accent + '40', borderStyle: 'dashed', backgroundColor: c.accent + '10', paddingVertical: 13 }}>
+                    <IconSymbol name="plus" size={15} color={c.accent} />
+                    <Text style={{ color: c.accent, fontSize: 13, fontWeight: '700' }}>{tr.addCrypto}</Text>
+                  </TouchableOpacity>
+                )}
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  {hasAdjustments && (
+                    <TouchableOpacity onPress={reset} style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
+                      <IconSymbol name="arrow.uturn.backward" size={14} color="#EF4444" />
+                      <Text style={{ color: '#EF4444', fontWeight: '700', marginLeft: 6 }}>{tr.reset}</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={apply} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
+                    <IconSymbol name="checkmark" size={14} color="#fff" />
+                    <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 6 }}>{tr.save}</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </BlurView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 

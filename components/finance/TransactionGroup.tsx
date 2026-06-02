@@ -3,7 +3,8 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
-import type { TxGroup, Transaction } from '@/utils/financeUtils';
+import type { Currency, TxGroup, Transaction } from '@/utils/financeUtils';
+import { txCurrency } from '@/utils/financeUtils';
 
 interface Colors {
   sub: string;
@@ -19,7 +20,9 @@ interface TransactionGroupProps {
   compact: boolean;
   isDark: boolean;
   c: Colors;
-  fmt: (n: number) => string;
+  fmt: (n: number, cur: Currency) => string;
+  currencyByCode: Record<string, Currency>;
+  primaryCode?: string;
   getCatIcon: (cat: string, type: 'income' | 'expense') => IconSymbolName;
   onSelect: (tx: Transaction) => void;
   todayLabel: string;
@@ -29,7 +32,8 @@ interface TransactionGroupProps {
 }
 
 export function TransactionGroup({
-  group, compact, isDark, c, fmt, getCatIcon, onSelect,
+  group, compact, isDark, c, fmt, currencyByCode, primaryCode = 'UAH',
+  getCatIcon, onSelect,
   todayLabel, yesterdayLabel, incomeLabel, expenseLabel,
 }: TransactionGroupProps) {
   const displayLabel =
@@ -37,26 +41,36 @@ export function TransactionGroup({
     group.label === '__yesterday__' ? yesterdayLabel :
     group.label;
 
+  const curOf = (code: string): Currency =>
+    currencyByCode[code] ?? { code, symbol: code, kind: 'fiat', decimals: 2 };
+
+  const incomeCodes = Object.keys(group.dayIncomeByCur).filter(k => group.dayIncomeByCur[k] > 0);
+  const expenseCodes = Object.keys(group.dayExpenseByCur).filter(k => group.dayExpenseByCur[k] > 0);
+
   return (
     <View style={{ marginBottom: 16 }}>
       {/* Group header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1, minWidth: 80 }}>
           {displayLabel}
         </Text>
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          {group.dayIncome > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.green + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {incomeCodes.map(code => (
+            <View key={'in_' + code} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.green + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
               <IconSymbol name="arrow.up" size={9} color={c.green} />
-              <Text style={{ color: c.green, fontSize: 11, fontWeight: '700' }}>{fmt(group.dayIncome)}</Text>
+              <Text style={{ color: c.green, fontSize: 11, fontWeight: '700' }}>
+                {fmt(group.dayIncomeByCur[code], curOf(code))}
+              </Text>
             </View>
-          )}
-          {group.dayExpense > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.red + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+          ))}
+          {expenseCodes.map(code => (
+            <View key={'ex_' + code} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.red + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
               <IconSymbol name="arrow.down" size={9} color={c.red} />
-              <Text style={{ color: c.red, fontSize: 11, fontWeight: '700' }}>{fmt(group.dayExpense)}</Text>
+              <Text style={{ color: c.red, fontSize: 11, fontWeight: '700' }}>
+                {fmt(group.dayExpenseByCur[code], curOf(code))}
+              </Text>
             </View>
-          )}
+          ))}
         </View>
       </View>
 
@@ -69,6 +83,7 @@ export function TransactionGroup({
           const txDate = new Date(tx.date);
           const isFirst = idx === 0;
           const isLast = idx === group.items.length - 1;
+          const cur = curOf(txCurrency(tx));
 
           if (compact) {
             return (
@@ -93,10 +108,15 @@ export function TransactionGroup({
                       <View style={{ backgroundColor: color + '20', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
                         <Text style={{ color, fontSize: 9, fontWeight: '700' }}>{isIncome ? incomeLabel : expenseLabel}</Text>
                       </View>
+                      {cur.code !== primaryCode && (
+                        <View style={{ backgroundColor: c.dim, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                          <Text style={{ color: c.sub, fontSize: 9, fontWeight: '700' }}>{cur.code}</Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                   <Text style={{ fontSize: 15, fontWeight: '800', color, marginLeft: 10 }}>
-                    {isIncome ? '+' : '−'}{fmt(tx.amount)}
+                    {isIncome ? '+' : '−'}{fmt(tx.amount, cur)}
                   </Text>
                 </BlurView>
               </TouchableOpacity>
@@ -124,7 +144,7 @@ export function TransactionGroup({
                   {tx.note ? <Text style={{ fontSize: 11, marginTop: 1, color: c.sub }} numberOfLines={1}>{tx.note}</Text> : null}
                 </View>
                 <Text style={{ fontSize: 13, fontWeight: '800', color }}>
-                  {isIncome ? '+' : '−'}{fmt(tx.amount)}
+                  {isIncome ? '+' : '−'}{fmt(tx.amount, cur)}
                 </Text>
               </BlurView>
             </TouchableOpacity>

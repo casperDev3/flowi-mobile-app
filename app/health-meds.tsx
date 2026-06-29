@@ -13,6 +13,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { cancelMedReminders, scheduleMedReminders } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { useI18n } from '@/store/i18n';
+import { Events, track } from '@/utils/analytics';
 import { HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
 import { MEDS_KEY, Medication, genId, medAdherence, medTakenToday, parseTimes } from '@/utils/preventionUtils';
 
@@ -44,6 +45,7 @@ export default function MedsScreen() {
       startDate: new Date().toISOString(), active: true, log: [], notifIds, createdAt: new Date().toISOString(),
     };
     setMeds(p => [med, ...p]);
+    track(Events.PreventionReminderSet, { times: t.length });
     setName(''); setDose(''); setTimes('08:00'); setAdd(false);
   };
 

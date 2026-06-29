@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { HK_AVAILABLE, HKDayData, fetchTodayData, initHealthKit } from '@/store/healthkit';
 import { cancelDailyReminder, scheduleDailyReminder } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
+import { Events, track } from '@/utils/analytics';
 import { isSameDay } from '@/utils/dateUtils';
 import {
   EntryType,
@@ -130,6 +131,7 @@ export function useHealthEntries() {
   // ─── Дії ────────────────────────────────────────────────────────────────
   const addEntry = useCallback((e: NewEntry) => {
     setEntries(p => [{ id: genId(), date: new Date().toISOString(), ...e }, ...p]);
+    track(Events.HealthEntryAdded, { type: e.type });
   }, []);
 
   const addQuick = useCallback((type: EntryType, value: number) => {

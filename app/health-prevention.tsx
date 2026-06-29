@@ -11,6 +11,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
 import { loadData } from '@/store/storage';
 import { useI18n } from '@/store/i18n';
+import { Events, track } from '@/utils/analytics';
 import { ACCENT, ACCENT_CAL, ACCENT_PROT, ACCENT_PULSE, HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
 import {
   CHECKUPS_KEY, Checkup, HABITS_KEY, Habit, MEDS_KEY, Medication, VACCINES_KEY, Vaccine,
@@ -50,7 +51,7 @@ export default function PreventionScreen() {
       meds, checkups, vaccines,
       latestWeight: h.latestWeight, bmi: h.bmi, todayPulse: h.today.pulse, locale,
     });
-    try { await Share.share({ message: text }); } catch {}
+    try { await Share.share({ message: text }); track(Events.ReportExported); } catch {}
   };
 
   return (

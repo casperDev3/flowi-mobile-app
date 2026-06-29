@@ -26,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
+import { Events, track } from '@/utils/analytics';
 import { uuid } from '@/utils/uuid';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -420,6 +421,7 @@ export default function SharedScreen() {
     if (!group?.secret) return;
     try {
       await Share.share({ message: tr.shInvite.replace('{name}', group.name).replace('{code}', group.secret) });
+      track(Events.SharedSecretShared);
     } catch {}
   }
 
@@ -447,6 +449,7 @@ export default function SharedScreen() {
       };
       setGroup(g);
       await AsyncStorage.setItem(KEY_GROUP, JSON.stringify(g));
+      track(Events.SharedGroupCreated);
       setShowCreateModal(false);
       setGroupName('');
       setShowSecretModal(true);

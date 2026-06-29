@@ -20,7 +20,7 @@ app/
     _layout.tsx            — таб-навігація: Finance | Tasks | Health | Settings
     index.tsx              — екран Завдань (~3400 lines)
     explore.tsx            — екран Фінансів (~850 lines)
-    health.tsx             — екран Здоров'я (~900 lines)
+    health.tsx             — ХАБ Здоров'я: зведена статистика + плитки розділів (FAB, історія-модалка)
     time.tsx               — Трекер часу (прихована вкладка, href:null)
     settings.tsx           — Налаштування (~445 lines)
   containers.tsx           — Контейнери/зберігання (Stack, ~580 lines)
@@ -42,6 +42,33 @@ app/
   donate.tsx               — Підтримати (Stack)
   apple-health.tsx         — Apple Health (Stack)
   modal.tsx                — Загальний модал (Stack)
+
+  # Здоров'я — модулі (Stack, відкриваються з хабу health.tsx)
+  health-profile.tsx       — Профіль (стать/вік/зріст/активність/ціль → персональні цілі TDEE)
+  health-nutrition.tsx     — Харчування (калорії-баланс, білок/БЖВ, вода, нагадування, журнал їжі)
+  health-activity.tsx      — Активність (кроки, дистанція, активні калорії)
+  health-sleep.tsx         — Сон і відновлення (тривалість, якість, пульс спокою)
+  health-vitals.tsx        — Показники тіла (вага, ІМТ, тренд, зони пульсу)
+  health-prevention.tsx    — Профілактика (суб-хаб) + експорт звіту для лікаря (Share)
+  health-meds.tsx          — Ліки/добавки (час прийому, відмітка, дотримання, нотифікації)
+  health-checkups.tsx      — Медогляди/аналізи (+нагадування про наступний)
+  health-vaccines.tsx      — Щеплення (дози, наступна дата)
+  health-habits.tsx        — Звички + серії (streaks), щоденні нагадування
+
+hooks/
+  use-health-entries.ts    — ЄДИНЕ джерело даних здоров'я: записи+профіль+нагадування+HealthKit,
+                             агрегати/цілі/чарти, addEntry/addQuick. Використовують хаб і всі модулі.
+
+components/health/
+  HealthEntryModal.tsx     — спільна модалка вводу (water/cal/weight/sleep/steps/pulse + макроси)
+  HubTile.tsx              — плитка розділу на хабі (icon, stat, badge)
+  HealthBits.tsx           — SectionHeader, QuickStatCard, CalStat
+  FormBits.tsx             — Empty, Field, Segment (для CRUD-екранів профілактики)
+
+utils/
+  healthTheme.ts           — кольори/акценти/ModalKey/fmtSleep екранів здоров'я
+  healthUtils.ts           — типи, профіль, TDEE/цілі (Mifflin-St Jeor), ІМТ, sumForDay/lastForDay
+  preventionUtils.ts       — типи Medication/Checkup/Vaccine/Habit, adherence/streak, buildHealthReport
 
 store/
   timer-context.tsx        — контекст Tasks→Time (pendingTask)
@@ -93,7 +120,13 @@ constants/
 | `'notes'` | `Note[]` | Нотатки |
 | `'containers'` | `Container[]` | Контейнери зі списком речей |
 | `'projects'` | `Project[]` | Проєкти |
-| `'health_entries'` | `HealthEntry[]` | Записи здоров'я |
+| `'health_entries_v2'` | `HealthEntry[]` | Записи здоров'я (calories=їжа, calories_out=спалені, +макроси) |
+| `'health_profile'` | `HealthProfile` | Профіль для персональних цілей (стать/вік/зріст/активність/ціль) — локально, не синхронізується |
+| `'health_reminders'` | `{water,sleep}` | Перемикачі щоденних нагадувань — локально |
+| `'health_meds'` | `Medication[]` | Профілактика: ліки/добавки (час прийому, лог, нотифікації) |
+| `'health_checkups'` | `Checkup[]` | Профілактика: медогляди/аналізи |
+| `'health_vaccines'` | `Vaccine[]` | Профілактика: щеплення |
+| `'health_habits'` | `Habit[]` | Профілактика: звички + серії (streaks) |
 | `'categories'` | `Category[]` | Кастомні категорії фінансів |
 | `'ideas'` | `Idea[]` | Ідеї |
 | `'bugs'` | `Bug[]` | Баги |

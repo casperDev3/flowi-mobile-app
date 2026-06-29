@@ -21,6 +21,10 @@ const SYNC_KEYS = [
   'containers',
   'bugs',
   'ideas',
+  'health_meds',
+  'health_checkups',
+  'health_vaccines',
+  'health_habits',
 ] as const;
 
 function mergeArraysWithConflicts(

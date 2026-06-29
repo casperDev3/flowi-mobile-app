@@ -1,17 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +25,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/store/i18n';
+import { uuid } from '@/utils/uuid';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -72,16 +77,18 @@ async function apiFetch(path: string, opts?: RequestInit) {
 
 // ─── Section meta ─────────────────────────────────────────────────────────────
 
-const SECTIONS: { type: SectionType; label: string; icon: string }[] = [
-  { type: 'shopping', label: 'Покупки', icon: 'cart.fill' },
-  { type: 'tasks',    label: 'Завдання', icon: 'checklist' },
-  { type: 'notes',    label: 'Нотатки', icon: 'note.text' },
+const SECTIONS: { type: SectionType; labelKey: 'shShopping' | 'shTasks' | 'shNotes'; icon: string }[] = [
+  { type: 'shopping', labelKey: 'shShopping', icon: 'cart.fill' },
+  { type: 'tasks',    labelKey: 'shTasks',    icon: 'checklist' },
+  { type: 'notes',    labelKey: 'shNotes',    icon: 'note.text' },
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SharedScreen() {
   const isDark = useColorScheme() === 'dark';
+  const { tr, lang } = useI18n();
+  const memberLabel = (n: number) => (lang === 'uk' ? pluralMember(n) : tr.participants);
 
   const c = {
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
@@ -110,6 +117,7 @@ export default function SharedScreen() {
 
   const [refreshing, setRefreshing]         = useState(false);
   const [syncing, setSyncing]               = useState(false);
+  const [syncError, setSyncError]           = useState(false);
   const [lastSync, setLastSync]             = useState<string | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -125,8 +133,12 @@ export default function SharedScreen() {
   const [editText, setEditText]       = useState('');
   const [creating, setCreating]       = useState(false);
   const [joining, setJoining]         = useState(false);
+  const [copied, setCopied]           = useState(false);
+  const [undoItem, setUndoItem]       = useState<{ type: SectionType; item: LocalItem } | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -135,7 +147,7 @@ export default function SharedScreen() {
       // load or create device ID
       let did = await AsyncStorage.getItem(KEY_DEVICE);
       if (!did) {
-        did = crypto.randomUUID();
+        did = uuid();
         await AsyncStorage.setItem(KEY_DEVICE, did);
       }
       setDeviceId(did);
@@ -156,12 +168,23 @@ export default function SharedScreen() {
     })();
   }, []);
 
+  // Очищення таймера undo при розмонтуванні
+  useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
+
   // ─── Sync on focus ────────────────────────────────────────────────────────
 
   useFocusEffect(useCallback(() => {
     if (initialized && group && deviceId) {
       syncWithServer(group, deviceId);
       connectWs(group.id, deviceId);
+      // Polling-fallback: WS на Vercel ненадійний, тож періодично підтягуємо дельту,
+      // поки екран у фокусі. Це гарантує оновлення навіть без realtime.
+      const iv = setInterval(() => syncWithServer(group, deviceId), 25000);
+      return () => {
+        clearInterval(iv);
+        wsRef.current?.close();
+        wsRef.current = null;
+      };
     }
     return () => {
       wsRef.current?.close();
@@ -207,10 +230,18 @@ export default function SharedScreen() {
         deleted: remote.deleted ?? false,
         updated_at: remote.updated_at,
       };
-      if (idx >= 0) list[idx] = merged;
-      else list.unshift(merged);
+      if (idx >= 0) {
+        // Conflict-resolution: застосовуємо віддалене лише якщо воно не старіше
+        // за локальне (last-write-wins за updated_at) — щоб не затерти свіжі локальні правки.
+        const local = list[idx];
+        const localT = local.updated_at ? new Date(local.updated_at).getTime() : 0;
+        const remoteT = remote.updated_at ? new Date(remote.updated_at).getTime() : 0;
+        if (localT > remoteT) return prev; // локальне свіжіше — не чіпаємо
+        list[idx] = merged;
+      } else {
+        list.unshift(merged);
+      }
       const next = { ...prev, [type]: list };
-      // persist locally
       saveLocalItems(type, list);
       return next;
     });
@@ -259,8 +290,10 @@ export default function SharedScreen() {
       setGroup(updated);
       await AsyncStorage.setItem(KEY_GROUP, JSON.stringify(updated));
 
+      setSyncError(false);
     } catch (e) {
       if (__DEV__) console.warn('[shared] sync failed:', e);
+      setSyncError(true);
     } finally {
       setSyncing(false);
     }
@@ -315,7 +348,7 @@ export default function SharedScreen() {
     const text = newItemText.trim();
     if (!text) return;
     const item: LocalItem = {
-      local_id: crypto.randomUUID(),
+      local_id: uuid(),
       text,
       checked: false,
       deleted: false,
@@ -336,6 +369,60 @@ export default function SharedScreen() {
     await persistItem(activeSection, updated);
   }
 
+  // Видалення з можливістю «Скасувати» (для кнопки кошика в рядку)
+  function deleteWithUndo(item: LocalItem) {
+    const type = activeSection;
+    deleteItem(item);
+    setUndoItem({ type, item });
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    Animated.timing(toastAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    undoTimer.current = setTimeout(hideUndo, 4000);
+  }
+
+  function hideUndo() {
+    Animated.timing(toastAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setUndoItem(null));
+  }
+
+  async function restoreUndo() {
+    if (!undoItem) return;
+    const restored = { ...undoItem.item, deleted: false, updated_at: new Date().toISOString() };
+    const type = undoItem.type;
+    setItems(prev => {
+      const list = [...prev[type]];
+      const idx = list.findIndex(i => i.local_id === restored.local_id);
+      if (idx >= 0) list[idx] = restored; else list.unshift(restored);
+      saveLocalItems(type, list);
+      return { ...prev, [type]: list };
+    });
+    if (group && deviceId) {
+      const sec = group.sections.find(s => s.type === type);
+      if (sec) {
+        try {
+          await apiFetch(`/sections/${sec.id}/items/`, {
+            method: 'POST',
+            body: JSON.stringify({ device_id: deviceId, local_id: restored.local_id, data: { text: restored.text, checked: restored.checked }, deleted: false }),
+          });
+        } catch {}
+      }
+    }
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    hideUndo();
+  }
+
+  async function copySecret() {
+    if (!group?.secret) return;
+    await Clipboard.setStringAsync(group.secret);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function shareSecret() {
+    if (!group?.secret) return;
+    try {
+      await Share.share({ message: tr.shInvite.replace('{name}', group.name).replace('{code}', group.secret) });
+    } catch {}
+  }
+
   async function saveEditItem() {
     if (!editItem || !editText.trim()) return;
     const updated = { ...editItem, text: editText.trim(), updated_at: new Date().toISOString() };
@@ -352,7 +439,7 @@ export default function SharedScreen() {
     try {
       const data = await apiFetch('/groups/create/', {
         method: 'POST',
-        body: JSON.stringify({ device_id: deviceId, name: groupName.trim() || 'Спільна група' }),
+        body: JSON.stringify({ device_id: deviceId, name: groupName.trim() || tr.sharedTitle }),
       });
       const g: GroupData = {
         id: data.id, name: data.name, secret: data.secret,
@@ -366,7 +453,7 @@ export default function SharedScreen() {
       // sync local items to server
       setTimeout(() => syncWithServer(g, deviceId), 500);
     } catch {
-      Alert.alert('Помилка', 'Не вдалося створити групу. Перевірте підключення до сервера.');
+      Alert.alert(tr.errGeneric, tr.errCreateGroup);
     } finally {
       setCreating(false);
     }
@@ -390,17 +477,17 @@ export default function SharedScreen() {
       setSecretInput('');
       syncWithServer(g, deviceId);
     } catch {
-      Alert.alert('Помилка', 'Неправильний секрет або сервер недоступний.');
+      Alert.alert(tr.errGeneric, tr.errInvalidCode);
     } finally {
       setJoining(false);
     }
   }
 
   async function leaveGroup() {
-    Alert.alert('Вийти з групи', 'Ваші локальні дані залишаться. Покинути групу?', [
-      { text: 'Скасувати', style: 'cancel' },
+    Alert.alert(tr.leaveGroupTitle, tr.leaveGroupMsg.replace('{name}', group?.name ?? ''), [
+      { text: tr.cancel, style: 'cancel' },
       {
-        text: 'Вийти', style: 'destructive', onPress: async () => {
+        text: tr.leave, style: 'destructive', onPress: async () => {
           if (group && deviceId) {
             try {
               await apiFetch(`/groups/${group.id}/leave/`, {
@@ -451,23 +538,26 @@ export default function SharedScreen() {
         {/* ── Header ── */}
         <View style={st.header}>
           <View>
-            <Text style={[st.title, { color: c.text }]}>Спільне</Text>
+            <Text style={[st.title, { color: c.text }]}>{tr.sharedTitle}</Text>
             {group ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <View style={[st.dot, { backgroundColor: c.accent }]} />
+                <View style={[st.dot, { backgroundColor: syncError ? c.red : c.green }]} />
                 <Text style={[st.subtitle, { color: c.sub }]}>
-                  {group.name} · {group.member_count} {pluralMember(group.member_count)}
+                  {group.name} · {group.member_count} {memberLabel(group.member_count)}
                 </Text>
-                {syncing && <ActivityIndicator size="small" color={c.accent} style={{ marginLeft: 4 }} />}
+                {syncing
+                  ? <ActivityIndicator size="small" color={c.accent} style={{ marginLeft: 4 }} />
+                  : syncError && <Text style={[st.subtitle, { color: c.red, marginLeft: 2 }]}>· {tr.shOffline}</Text>}
               </View>
             ) : (
-              <Text style={[st.subtitle, { color: c.sub }]}>Локальні дані</Text>
+              <Text style={[st.subtitle, { color: c.sub }]}>{tr.shLocalData}</Text>
             )}
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {group && (
               <TouchableOpacity
                 onPress={() => setShowSecretModal(true)}
+                accessibilityRole="button" accessibilityLabel={tr.shSecretTitle}
                 style={[st.headerBtn, { backgroundColor: c.accent + '20' }]}>
                 <IconSymbol name="person.badge.key.fill" size={18} color={c.accent} />
               </TouchableOpacity>
@@ -475,12 +565,14 @@ export default function SharedScreen() {
             {group ? (
               <TouchableOpacity
                 onPress={leaveGroup}
+                accessibilityRole="button" accessibilityLabel={tr.leave}
                 style={[st.headerBtn, { backgroundColor: c.red + '18' }]}>
                 <IconSymbol name="rectangle.portrait.and.arrow.right" size={18} color={c.red} />
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
                 onPress={() => setShowCreateModal(true)}
+                accessibilityRole="button" accessibilityLabel={tr.createGroup}
                 style={[st.headerBtn, { backgroundColor: c.accent + '20' }]}>
                 <IconSymbol name="person.2.badge.plus" size={18} color={c.accent} />
               </TouchableOpacity>
@@ -508,7 +600,7 @@ export default function SharedScreen() {
                     : { backgroundColor: c.dim, borderColor: c.border, borderWidth: 1 },
                 ]}>
                 <IconSymbol name={s.icon as any} size={15} color={active ? '#fff' : c.sub} />
-                <Text style={[st.tabLabel, { color: active ? '#fff' : c.sub }]}>{s.label}</Text>
+                <Text style={[st.tabLabel, { color: active ? '#fff' : c.sub }]}>{tr[s.labelKey]}</Text>
                 {!active && items[s.type].filter(i => !i.deleted && !i.checked).length > 0 && (
                   <View style={[st.badge, { backgroundColor: c.accent }]}>
                     <Text style={st.badgeText}>{items[s.type].filter(i => !i.deleted && !i.checked).length}</Text>
@@ -519,9 +611,19 @@ export default function SharedScreen() {
           })}
         </ScrollView>
 
+        {/* ── Sync error banner ── */}
+        {group && syncError && (
+          <View style={[st.syncBanner, { backgroundColor: c.red + '18', borderColor: c.red + '30' }]}>
+            <IconSymbol name="exclamationmark.triangle.fill" size={12} color={c.red} />
+            <Text style={{ color: c.red, fontSize: 12, fontWeight: '600', marginLeft: 6, flex: 1 }}>
+              {tr.offlineBanner}
+            </Text>
+          </View>
+        )}
+
         {/* ── Items list ── */}
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
 
@@ -534,23 +636,23 @@ export default function SharedScreen() {
                   <View style={[st.iconBox, { backgroundColor: c.accent + '20' }]}>
                     <IconSymbol name="person.2.fill" size={18} color={c.accent} />
                   </View>
-                  <Text style={[st.cardTitle, { color: c.text }]}>Спільний доступ</Text>
+                  <Text style={[st.cardTitle, { color: c.text }]}>{tr.shShareAccess}</Text>
                 </View>
                 <Text style={[st.cardDesc, { color: c.sub }]}>
-                  Дані зберігаються локально. Щоб поділитись з іншим пристроєм — створіть групу або введіть секрет.
+                  {tr.shLocalDesc}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
                   <TouchableOpacity
                     onPress={() => setShowCreateModal(true)}
                     style={[st.btn, { backgroundColor: c.accent, flex: 1 }]}>
                     <IconSymbol name="plus" size={15} color="#fff" />
-                    <Text style={[st.btnLabel, { color: '#fff' }]}>Створити групу</Text>
+                    <Text style={[st.btnLabel, { color: '#fff' }]}>{tr.createGroup}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setShowJoinModal(true)}
                     style={[st.btn, { backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, flex: 1 }]}>
                     <IconSymbol name="key.fill" size={15} color={c.accent} />
-                    <Text style={[st.btnLabel, { color: c.accent }]}>Ввести секрет</Text>
+                    <Text style={[st.btnLabel, { color: c.accent }]}>{tr.joinByCode}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -561,7 +663,7 @@ export default function SharedScreen() {
           {activeSection === 'shopping' && visibleItems.length > 0 && (
             <View style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={[st.progressLabel, { color: c.sub }]}>Куплено</Text>
+                <Text style={[st.progressLabel, { color: c.sub }]}>{tr.shBought}</Text>
                 <Text style={[st.progressLabel, { color: c.sub }]}>{checkedCount} / {visibleItems.length}</Text>
               </View>
               <View style={[st.progressTrack, { backgroundColor: c.dim }]}>
@@ -577,8 +679,8 @@ export default function SharedScreen() {
           {visibleItems.length === 0 && (
             <View style={{ alignItems: 'center', paddingVertical: 48 }}>
               <IconSymbol name={SECTIONS.find(s => s.type === activeSection)!.icon as any} size={44} color={c.sub} />
-              <Text style={[st.emptyTitle, { color: c.text }]}>Список порожній</Text>
-              <Text style={[st.emptyDesc, { color: c.sub }]}>Натисніть + щоб додати</Text>
+              <Text style={[st.emptyTitle, { color: c.text }]}>{tr.emptyListTitle}</Text>
+              <Text style={[st.emptyDesc, { color: c.sub }]}>{tr.pressPlusToAdd}</Text>
             </View>
           )}
 
@@ -586,38 +688,43 @@ export default function SharedScreen() {
           {visibleItems.length > 0 && (
             <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
               style={[st.card, { borderColor: c.border }]}>
-              {visibleItems.map((item, idx) => (
-                <View
-                  key={item.local_id}
-                  style={[st.itemRow, idx < visibleItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                  <TouchableOpacity onPress={() => toggleItem(item)} style={st.checkbox}>
-                    <View style={[
-                      st.checkCircle,
-                      {
-                        borderColor: item.checked ? c.green : c.border,
-                        backgroundColor: item.checked ? c.green : 'transparent',
-                      },
-                    ]}>
-                      {item.checked && <IconSymbol name="checkmark" size={11} color="#fff" />}
-                    </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{ flex: 1 }}
-                    onPress={() => {
-                      setEditItem(item);
-                      setEditText(item.text);
-                      setShowEditModal(true);
-                    }}>
-                    <Text style={[st.itemText, {
-                      color: item.checked ? c.sub : c.text,
-                      textDecorationLine: item.checked ? 'line-through' : 'none',
-                    }]}>{item.text}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => deleteItem(item)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <IconSymbol name="trash" size={16} color={c.red} />
-                  </TouchableOpacity>
-                </View>
-              ))}
+              {visibleItems.map((item, idx) => {
+                const isNotes = activeSection === 'notes';
+                return (
+                  <View
+                    key={item.local_id}
+                    style={[st.itemRow, idx < visibleItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                    {!isNotes && (
+                      <TouchableOpacity onPress={() => toggleItem(item)} style={st.checkbox}>
+                        <View style={[
+                          st.checkCircle,
+                          {
+                            borderColor: item.checked ? c.green : c.border,
+                            backgroundColor: item.checked ? c.green : 'transparent',
+                          },
+                        ]}>
+                          {item.checked && <IconSymbol name="checkmark" size={11} color="#fff" />}
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={() => {
+                        setEditItem(item);
+                        setEditText(item.text);
+                        setShowEditModal(true);
+                      }}>
+                      <Text style={[st.itemText, {
+                        color: !isNotes && item.checked ? c.sub : c.text,
+                        textDecorationLine: !isNotes && item.checked ? 'line-through' : 'none',
+                      }]}>{item.text}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => deleteWithUndo(item)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <IconSymbol name="trash" size={16} color={c.red} />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </BlurView>
           )}
 
@@ -625,11 +732,14 @@ export default function SharedScreen() {
           {activeSection === 'shopping' && checkedCount > 0 && (
             <TouchableOpacity
               onPress={() => {
-                visibleItems.filter(i => i.checked).forEach(i => deleteItem(i));
+                Alert.alert(tr.shClearBought, tr.shClearBoughtMsg.replace('{n}', String(checkedCount)), [
+                  { text: tr.cancel, style: 'cancel' },
+                  { text: tr.delete, style: 'destructive', onPress: () => visibleItems.filter(i => i.checked).forEach(i => deleteItem(i)) },
+                ]);
               }}
               style={[st.clearBtn, { borderColor: c.border }]}>
               <IconSymbol name="trash" size={14} color={c.sub} />
-              <Text style={[st.clearLabel, { color: c.sub }]}>Очистити куплені ({checkedCount})</Text>
+              <Text style={[st.clearLabel, { color: c.sub }]}>{tr.shClearBought} ({checkedCount})</Text>
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -638,9 +748,28 @@ export default function SharedScreen() {
       {/* ── FAB ── */}
       <TouchableOpacity
         onPress={() => setShowAddModal(true)}
-        style={[st.fab, { backgroundColor: c.accent, bottom: Platform.OS === 'ios' ? 48 : 28 }]}>
+        accessibilityRole="button" accessibilityLabel={tr.add}
+        style={[st.fab, { backgroundColor: c.accent, bottom: Platform.OS === 'ios' ? 108 : 88 }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </TouchableOpacity>
+
+      {/* ── Undo toast ── */}
+      {undoItem && (
+        <Animated.View pointerEvents="box-none"
+          style={[st.toast, {
+            bottom: Platform.OS === 'ios' ? 116 : 96,
+            opacity: toastAnim,
+            transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+          }]}>
+          <BlurView intensity={isDark ? 60 : 85} tint={isDark ? 'dark' : 'light'} style={[st.toastInner, { borderColor: c.border }]}>
+            <IconSymbol name="trash" size={14} color={c.sub} />
+            <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 8 }}>{tr.shDeleted}</Text>
+            <TouchableOpacity onPress={restoreUndo} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={{ color: c.accent, fontSize: 13, fontWeight: '800' }}>{tr.shUndo}</Text>
+            </TouchableOpacity>
+          </BlurView>
+        </Animated.View>
+      )}
 
       {/* ── Add Item Modal ── */}
       <Modal visible={showAddModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowAddModal(false)}>
@@ -651,11 +780,11 @@ export default function SharedScreen() {
                 style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <HandleRow c={c} onClose={() => setShowAddModal(false)} />
                 <Text style={[st.sheetTitle, { color: c.text }]}>
-                  Додати до «{SECTIONS.find(s => s.type === activeSection)!.label}»
+                  {tr.shAddTo.replace('{name}', tr[SECTIONS.find(s => s.type === activeSection)!.labelKey])}
                 </Text>
                 <TextInput
                   autoFocus
-                  placeholder="Введіть текст..."
+                  placeholder={tr.shTextPh}
                   placeholderTextColor={c.sub}
                   value={newItemText}
                   onChangeText={setNewItemText}
@@ -667,7 +796,7 @@ export default function SharedScreen() {
                   onPress={addItem}
                   disabled={!newItemText.trim()}
                   style={[st.btn, { backgroundColor: newItemText.trim() ? c.accent : c.dim, marginTop: 4 }]}>
-                  <Text style={[st.btnLabel, { color: newItemText.trim() ? '#fff' : c.sub }]}>Додати</Text>
+                  <Text style={[st.btnLabel, { color: newItemText.trim() ? '#fff' : c.sub }]}>{tr.add}</Text>
                 </TouchableOpacity>
               </BlurView>
             </Pressable>
@@ -683,10 +812,10 @@ export default function SharedScreen() {
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <HandleRow c={c} onClose={() => setShowEditModal(false)} />
-                <Text style={[st.sheetTitle, { color: c.text }]}>Редагувати</Text>
+                <Text style={[st.sheetTitle, { color: c.text }]}>{tr.edit}</Text>
                 <TextInput
                   autoFocus
-                  placeholder="Текст..."
+                  placeholder={tr.shTextPh}
                   placeholderTextColor={c.sub}
                   value={editText}
                   onChangeText={setEditText}
@@ -698,7 +827,7 @@ export default function SharedScreen() {
                   onPress={saveEditItem}
                   disabled={!editText.trim()}
                   style={[st.btn, { backgroundColor: editText.trim() ? c.accent : c.dim, marginTop: 4 }]}>
-                  <Text style={[st.btnLabel, { color: editText.trim() ? '#fff' : c.sub }]}>Зберегти</Text>
+                  <Text style={[st.btnLabel, { color: editText.trim() ? '#fff' : c.sub }]}>{tr.save}</Text>
                 </TouchableOpacity>
               </BlurView>
             </Pressable>
@@ -714,12 +843,12 @@ export default function SharedScreen() {
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <HandleRow c={c} onClose={() => setShowCreateModal(false)} />
-                <Text style={[st.sheetTitle, { color: c.text }]}>Нова спільна група</Text>
+                <Text style={[st.sheetTitle, { color: c.text }]}>{tr.newGroupTitle}</Text>
                 <Text style={[st.sheetDesc, { color: c.sub }]}>
-                  Після створення ви отримаєте секретний код. Поділіться ним з іншим пристроєм.
+                  {tr.newGroupDesc}
                 </Text>
                 <TextInput
-                  placeholder="Назва групи (необов'язково)"
+                  placeholder={tr.groupNamePh}
                   placeholderTextColor={c.sub}
                   value={groupName}
                   onChangeText={setGroupName}
@@ -732,7 +861,7 @@ export default function SharedScreen() {
                   style={[st.btn, { backgroundColor: c.accent, marginTop: 4 }]}>
                   {creating
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={[st.btnLabel, { color: '#fff' }]}>Створити групу</Text>}
+                    : <Text style={[st.btnLabel, { color: '#fff' }]}>{tr.createGroup}</Text>}
                 </TouchableOpacity>
               </BlurView>
             </Pressable>
@@ -748,9 +877,9 @@ export default function SharedScreen() {
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <HandleRow c={c} onClose={() => setShowJoinModal(false)} />
-                <Text style={[st.sheetTitle, { color: c.text }]}>Приєднатись до групи</Text>
+                <Text style={[st.sheetTitle, { color: c.text }]}>{tr.joinTitle}</Text>
                 <Text style={[st.sheetDesc, { color: c.sub }]}>
-                  Введіть секретний код який вам надіслали (формат: ABCD-1234)
+                  {tr.joinDesc}
                 </Text>
                 <TextInput
                   autoFocus
@@ -772,7 +901,7 @@ export default function SharedScreen() {
                   style={[st.btn, { backgroundColor: secretInput.trim() ? c.accent : c.dim, marginTop: 4 }]}>
                   {joining
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={[st.btnLabel, { color: secretInput.trim() ? '#fff' : c.sub }]}>Приєднатись</Text>}
+                    : <Text style={[st.btnLabel, { color: secretInput.trim() ? '#fff' : c.sub }]}>{tr.joinAction}</Text>}
                 </TouchableOpacity>
               </BlurView>
             </Pressable>
@@ -791,21 +920,33 @@ export default function SharedScreen() {
                 <View style={[st.secretIcon, { backgroundColor: c.accent + '20' }]}>
                   <IconSymbol name="key.fill" size={28} color={c.accent} />
                 </View>
-                <Text style={[st.sheetTitle, { color: c.text, marginTop: 14 }]}>Секрет групи</Text>
+                <Text style={[st.sheetTitle, { color: c.text, marginTop: 14 }]}>{tr.shSecretTitle}</Text>
                 <Text style={[st.sheetDesc, { color: c.sub, textAlign: 'center' }]}>
-                  Поділіться цим кодом щоб інший пристрій приєднався до групи «{group?.name}»
+                  {tr.shareCodeDesc.replace('{name}', group?.name ?? '')}
                 </Text>
                 <View style={[st.secretBox, { backgroundColor: c.accent + '15', borderColor: c.accent + '40' }]}>
                   <Text style={[st.secretText, { color: c.accent }]}>{group?.secret}</Text>
                 </View>
-                <Text style={[{ color: c.sub, fontSize: 12, marginTop: 10 }]}>
-                  {group?.member_count} {pluralMember(group?.member_count ?? 1)} у групі
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 14, alignSelf: 'stretch' }}>
+                  <TouchableOpacity onPress={copySecret}
+                    style={[st.btn, { flex: 1, backgroundColor: copied ? c.green : c.accent + '20' }]}>
+                    <IconSymbol name={copied ? 'checkmark' : 'doc.on.clipboard'} size={15} color={copied ? '#fff' : c.accent} />
+                    <Text style={[st.btnLabel, { color: copied ? '#fff' : c.accent }]}>{copied ? tr.shCopied : tr.shCopy}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={shareSecret}
+                    style={[st.btn, { flex: 1, backgroundColor: c.accent }]}>
+                    <IconSymbol name="square.and.arrow.up" size={15} color="#fff" />
+                    <Text style={[st.btnLabel, { color: '#fff' }]}>{tr.shShareBtn}</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[{ color: c.sub, fontSize: 12, marginTop: 12 }]}>
+                  {group?.member_count} {memberLabel(group?.member_count ?? 1)}
                 </Text>
               </View>
               <TouchableOpacity
                 onPress={() => setShowSecretModal(false)}
                 style={[st.btn, { backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, marginTop: 8 }]}>
-                <Text style={[st.btnLabel, { color: c.sub }]}>Закрити</Text>
+                <Text style={[st.btnLabel, { color: c.sub }]}>{tr.close}</Text>
               </TouchableOpacity>
             </BlurView>
           </Pressable>
@@ -867,6 +1008,9 @@ const st = StyleSheet.create({
   clearBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderWidth: 1, borderRadius: 12, marginTop: 4 },
   clearLabel:    { fontSize: 13, fontWeight: '500' },
   fab:           { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowColor: '#06B6D4', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 },
+  toast:         { position: 'absolute', left: 16, right: 16 },
+  toastInner:    { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 12, overflow: 'hidden' },
+  syncBanner:    { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 8, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheetWrapper:  { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:         { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },

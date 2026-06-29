@@ -212,6 +212,26 @@ export interface Translations {
   allCurrencies: string;
   // Shared
   sharedTitle: string;
+  // Shared (legacy collaboration screen)
+  shLocalData: string;
+  shShopping: string;
+  shTasks: string;
+  shNotes: string;
+  shShareAccess: string;
+  shLocalDesc: string;
+  shBought: string;
+  shClearBought: string;
+  shClearBoughtMsg: string;
+  shAddTo: string;
+  shTextPh: string;
+  shSecretTitle: string;
+  shCopy: string;
+  shCopied: string;
+  shShareBtn: string;
+  shOffline: string;
+  shDeleted: string;
+  shUndo: string;
+  shInvite: string;
   noGroups: string;
   noGroupsHint: string;
   createGroup: string;
@@ -439,6 +459,103 @@ export interface Translations {
   addWater: string;
   hrs: string;
   mins: string;
+  // Health profile & personalized goals
+  healthProfile: string;
+  profileSub: string;
+  profileHint: string;
+  sexLabel: string;
+  male: string;
+  female: string;
+  ageLabel: string;
+  heightLabel: string;
+  activityLabel: string;
+  actSedentary: string;
+  actLight: string;
+  actModerate: string;
+  actActive: string;
+  actVeryActive: string;
+  goalLabel: string;
+  goalLose: string;
+  goalMaintain: string;
+  goalGain: string;
+  saveProfile: string;
+  yearsShort: string;
+  // Calories balance & macros
+  consumed: string;
+  burned: string;
+  deficit: string;
+  surplus: string;
+  dailyLimit: string;
+  overLimit: string;
+  withinLimit: string;
+  protein: string;
+  fats: string;
+  carbs: string;
+  proteinShort: string;
+  macrosOptional: string;
+  // BMI
+  bmi: string;
+  bmiUnderweight: string;
+  bmiNormal: string;
+  bmiOverweight: string;
+  bmiObese: string;
+  // Reminders
+  reminders: string;
+  waterReminder: string;
+  sleepReminder: string;
+  remindersSub: string;
+  // Health hub & modules
+  summary: string;
+  sections: string;
+  workoutsLabel: string;
+  workoutsSub: string;
+  nutrition: string;
+  activity: string;
+  sleepRecovery: string;
+  bodyMetrics: string;
+  prevention: string;
+  dueToday: string;
+  restingPulse: string;
+  insights: string;
+  thisWeek: string;
+  // Prevention sub-modules
+  meds: string;
+  medsSub: string;
+  checkups: string;
+  checkupsSub: string;
+  vaccines: string;
+  vaccinesSub: string;
+  habits: string;
+  habitsSub: string;
+  // Meds
+  addMed: string;
+  medName: string;
+  medDose: string;
+  medTimes: string;
+  taken: string;
+  takeNow: string;
+  medActive: string;
+  finished: string;
+  adherence: string;
+  // Checkups / vaccines
+  addCheckup: string;
+  addVaccine: string;
+  title: string;
+  result: string;
+  nextDate: string;
+  kindAnalysis: string;
+  kindVisit: string;
+  kindProcedure: string;
+  doseNo: string;
+  upcoming: string;
+  past: string;
+  // Habits
+  addHabit: string;
+  streak: string;
+  daysStreak: string;
+  // Report export
+  exportReport: string;
+  reportSub: string;
 
   // Data screen
   autoBackup: string;
@@ -727,6 +844,25 @@ const uk: Translations = {
   showAllCount: 'Показати всі ({count})',
   allCurrencies: 'Всі валюти',
   sharedTitle: 'Спільне',
+  shLocalData: 'Локальні дані',
+  shShopping: 'Покупки',
+  shTasks: 'Завдання',
+  shNotes: 'Нотатки',
+  shShareAccess: 'Спільний доступ',
+  shLocalDesc: 'Дані зберігаються локально. Щоб поділитись з іншим пристроєм — створіть групу або введіть код.',
+  shBought: 'Куплено',
+  shClearBought: 'Очистити куплені',
+  shClearBoughtMsg: 'Видалити {n} позначених?',
+  shAddTo: 'Додати до «{name}»',
+  shTextPh: 'Текст...',
+  shSecretTitle: 'Секрет групи',
+  shCopy: 'Копіювати',
+  shCopied: 'Скопійовано',
+  shShareBtn: 'Поділитися',
+  shOffline: 'офлайн',
+  shDeleted: 'Видалено',
+  shUndo: 'Скасувати',
+  shInvite: 'Приєднуйся до спільної групи «{name}» у Flowi. Секретний код: {code}',
   noGroups: 'Немає груп',
   noGroupsHint: 'Створіть групу або приєднайтесь за кодом',
   createGroup: 'Створити',
@@ -942,6 +1078,93 @@ const uk: Translations = {
   addWater: 'Додати воду',
   hrs: 'год',
   mins: 'хвил',
+  healthProfile: 'Профіль здоров\'я',
+  profileSub: 'Стать, вік, зріст і ціль для персональних норм',
+  profileHint: 'Заповніть профіль для персональних цілей',
+  sexLabel: 'СТАТЬ',
+  male: 'Чоловіча',
+  female: 'Жіноча',
+  ageLabel: 'ВІК',
+  heightLabel: 'ЗРІСТ (СМ)',
+  activityLabel: 'РІВЕНЬ АКТИВНОСТІ',
+  actSedentary: 'Сидячий',
+  actLight: 'Легкий',
+  actModerate: 'Помірний',
+  actActive: 'Активний',
+  actVeryActive: 'Дуже активний',
+  goalLabel: 'ЦІЛЬ',
+  goalLose: 'Схуднути',
+  goalMaintain: 'Підтримка',
+  goalGain: 'Набрати',
+  saveProfile: 'Зберегти профіль',
+  yearsShort: 'р.',
+  consumed: 'Спожито',
+  burned: 'Спалено',
+  deficit: 'дефіцит',
+  surplus: 'профіцит',
+  dailyLimit: 'Денний ліміт',
+  overLimit: 'Перевищено',
+  withinLimit: 'У межах норми',
+  protein: 'Білки',
+  fats: 'Жири',
+  carbs: 'Вуглеводи',
+  proteinShort: 'б',
+  macrosOptional: 'БЖВ (г, необов\'язково)',
+  bmi: 'ІМТ',
+  bmiUnderweight: 'Недостатня',
+  bmiNormal: 'Норма',
+  bmiOverweight: 'Надмірна',
+  bmiObese: 'Ожиріння',
+  reminders: 'Нагадування',
+  waterReminder: 'Нагадувати пити воду',
+  sleepReminder: 'Нагадувати про сон',
+  remindersSub: 'Щоденні нагадування про звички',
+  summary: 'Зведена статистика',
+  sections: 'Розділи',
+  workoutsLabel: 'Тренування',
+  workoutsSub: 'Переглянути та додати',
+  nutrition: 'Харчування',
+  activity: 'Активність',
+  sleepRecovery: 'Сон і відновлення',
+  bodyMetrics: 'Показники тіла',
+  prevention: 'Профілактика',
+  dueToday: 'сьогодні',
+  restingPulse: 'Пульс спокою',
+  insights: 'Інсайти',
+  thisWeek: 'цього тижня',
+  meds: 'Ліки та добавки',
+  medsSub: 'Нагадування про прийом',
+  checkups: 'Медогляди',
+  checkupsSub: 'Аналізи та візити',
+  vaccines: 'Щеплення',
+  vaccinesSub: 'Календар вакцинації',
+  habits: 'Звички',
+  habitsSub: 'Щоденні чек-лісти',
+  addMed: 'Додати ліки',
+  medName: 'НАЗВА',
+  medDose: 'ДОЗА',
+  medTimes: 'ЧАС ПРИЙОМУ',
+  taken: 'Прийнято',
+  takeNow: 'Прийняти',
+  medActive: 'Активні',
+  finished: 'Завершені',
+  adherence: 'Дотримання',
+  addCheckup: 'Додати огляд',
+  addVaccine: 'Додати щеплення',
+  title: 'НАЗВА',
+  result: 'РЕЗУЛЬТАТ',
+  nextDate: 'НАСТУПНА ДАТА',
+  kindAnalysis: 'Аналіз',
+  kindVisit: 'Візит',
+  kindProcedure: 'Процедура',
+  doseNo: 'ДОЗА №',
+  upcoming: 'Майбутні',
+  past: 'Минулі',
+  addHabit: 'Додати звичку',
+  streak: 'Серія',
+  daysStreak: 'дн.',
+  exportReport: 'Експорт звіту для лікаря',
+  reportSub: 'Поділитися зведенням здоров\'я',
 
   autoBackup: 'Авто-резервування',
   lastBackup: 'Остання копія',
@@ -1223,6 +1446,25 @@ const en: Translations = {
   showAllCount: 'Show all ({count})',
   allCurrencies: 'All currencies',
   sharedTitle: 'Shared',
+  shLocalData: 'Local data',
+  shShopping: 'Shopping',
+  shTasks: 'Tasks',
+  shNotes: 'Notes',
+  shShareAccess: 'Shared access',
+  shLocalDesc: 'Data is stored locally. To share with another device — create a group or enter a code.',
+  shBought: 'Bought',
+  shClearBought: 'Clear bought',
+  shClearBoughtMsg: 'Delete {n} selected?',
+  shAddTo: 'Add to «{name}»',
+  shTextPh: 'Text...',
+  shSecretTitle: 'Group secret',
+  shCopy: 'Copy',
+  shCopied: 'Copied',
+  shShareBtn: 'Share',
+  shOffline: 'offline',
+  shDeleted: 'Deleted',
+  shUndo: 'Undo',
+  shInvite: 'Join my shared group «{name}» in Flowi. Secret code: {code}',
   noGroups: 'No groups',
   noGroupsHint: 'Create a group or join with a code',
   createGroup: 'Create',
@@ -1438,6 +1680,93 @@ const en: Translations = {
   addWater: 'Add water',
   hrs: 'hrs',
   mins: 'min',
+  healthProfile: 'Health profile',
+  profileSub: 'Sex, age, height & goal for personal targets',
+  profileHint: 'Set up your profile for personalized goals',
+  sexLabel: 'SEX',
+  male: 'Male',
+  female: 'Female',
+  ageLabel: 'AGE',
+  heightLabel: 'HEIGHT (CM)',
+  activityLabel: 'ACTIVITY LEVEL',
+  actSedentary: 'Sedentary',
+  actLight: 'Light',
+  actModerate: 'Moderate',
+  actActive: 'Active',
+  actVeryActive: 'Very active',
+  goalLabel: 'GOAL',
+  goalLose: 'Lose',
+  goalMaintain: 'Maintain',
+  goalGain: 'Gain',
+  saveProfile: 'Save profile',
+  yearsShort: 'y',
+  consumed: 'Consumed',
+  burned: 'Burned',
+  deficit: 'deficit',
+  surplus: 'surplus',
+  dailyLimit: 'Daily limit',
+  overLimit: 'Over limit',
+  withinLimit: 'Within limit',
+  protein: 'Protein',
+  fats: 'Fats',
+  carbs: 'Carbs',
+  proteinShort: 'p',
+  macrosOptional: 'Macros (g, optional)',
+  bmi: 'BMI',
+  bmiUnderweight: 'Underweight',
+  bmiNormal: 'Normal',
+  bmiOverweight: 'Overweight',
+  bmiObese: 'Obese',
+  reminders: 'Reminders',
+  waterReminder: 'Water reminder',
+  sleepReminder: 'Sleep reminder',
+  remindersSub: 'Daily habit reminders',
+  summary: 'Summary',
+  sections: 'Sections',
+  workoutsLabel: 'Workouts',
+  workoutsSub: 'View and add',
+  nutrition: 'Nutrition',
+  activity: 'Activity',
+  sleepRecovery: 'Sleep & recovery',
+  bodyMetrics: 'Body metrics',
+  prevention: 'Prevention',
+  dueToday: 'today',
+  restingPulse: 'Resting pulse',
+  insights: 'Insights',
+  thisWeek: 'this week',
+  meds: 'Meds & supplements',
+  medsSub: 'Intake reminders',
+  checkups: 'Checkups',
+  checkupsSub: 'Tests & visits',
+  vaccines: 'Vaccines',
+  vaccinesSub: 'Vaccination calendar',
+  habits: 'Habits',
+  habitsSub: 'Daily checklists',
+  addMed: 'Add medication',
+  medName: 'NAME',
+  medDose: 'DOSE',
+  medTimes: 'INTAKE TIMES',
+  taken: 'Taken',
+  takeNow: 'Take',
+  medActive: 'Active',
+  finished: 'Finished',
+  adherence: 'Adherence',
+  addCheckup: 'Add checkup',
+  addVaccine: 'Add vaccine',
+  title: 'TITLE',
+  result: 'RESULT',
+  nextDate: 'NEXT DATE',
+  kindAnalysis: 'Analysis',
+  kindVisit: 'Visit',
+  kindProcedure: 'Procedure',
+  doseNo: 'DOSE No',
+  upcoming: 'Upcoming',
+  past: 'Past',
+  addHabit: 'Add habit',
+  streak: 'Streak',
+  daysStreak: 'd',
+  exportReport: 'Export report for doctor',
+  reportSub: 'Share your health summary',
 
   autoBackup: 'Auto-backup',
   lastBackup: 'Last backup',

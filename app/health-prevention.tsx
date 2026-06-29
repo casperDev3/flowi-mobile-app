@@ -9,6 +9,7 @@ import { HubTile } from '@/components/health/HubTile';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { loadData } from '@/store/storage';
 import { useI18n } from '@/store/i18n';
 import { Events, track } from '@/utils/analytics';
@@ -24,6 +25,7 @@ export default function PreventionScreen() {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const c = getHealthColors(isDark);
+  useScreenView('health_prevention');
   const h = useHealthEntries();
 
   const [meds, setMeds] = useState<Medication[]>([]);
@@ -59,7 +61,7 @@ export default function PreventionScreen() {
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={tr.back} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <IconSymbol name="chevron.left" size={20} color={c.text} />
           </TouchableOpacity>
           <Text style={[s.title, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.prevention}</Text>

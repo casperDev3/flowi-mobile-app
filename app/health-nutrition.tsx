@@ -12,6 +12,7 @@ import { CalStat, SectionHeader } from '@/components/health/HealthBits';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
 import { isSameDay } from '@/utils/dateUtils';
 import {
@@ -23,6 +24,7 @@ export default function NutritionScreen() {
   const router = useRouter();
   const { tr } = useI18n();
   const c = getHealthColors(isDark);
+  useScreenView('health_nutrition');
 
   const h = useHealthEntries();
   const { today, goals, cal } = h;
@@ -39,7 +41,7 @@ export default function NutritionScreen() {
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={tr.back} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <IconSymbol name="chevron.left" size={20} color={c.text} />
           </TouchableOpacity>
           <Text style={[s.title, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.nutrition}</Text>

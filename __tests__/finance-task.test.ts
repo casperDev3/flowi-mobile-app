@@ -1,5 +1,5 @@
-import { Transaction, calcTotals, filterByMonth } from '@/utils/financeUtils';
-import { PRIORITY_ORDER, Task, getProgress, isOverdue, sortTasks } from '@/utils/taskUtils';
+import { Transaction, calcTotals, filterByMonth, groupTransactions, txCurrency } from '@/utils/financeUtils';
+import { PRIORITY_ORDER, Task, applyTaskFilters, deadlineDiff, getProgress, isOverdue, sortTasks } from '@/utils/taskUtils';
 
 const tx = (over: Partial<Transaction> = {}): Transaction => ({
   id: 't', type: 'expense', category: 'food', amount: 100, note: '', date: '2026-06-15', ...over,
@@ -38,6 +38,26 @@ describe('financeUtils.calcTotals', () => {
   });
 });
 
+describe('financeUtils — валюта та групування', () => {
+  test('txCurrency дефолтиться на UAH', () => {
+    expect(txCurrency(tx())).toBe('UAH');
+    expect(txCurrency(tx({ currency: 'USD' }))).toBe('USD');
+  });
+
+  test('groupTransactions групує за днем і сумує по валюті', () => {
+    const txs = [
+      tx({ date: '2026-06-15', type: 'expense', amount: 100 }),
+      tx({ date: '2026-06-15', type: 'income', amount: 500 }),
+      tx({ date: '2026-06-14', type: 'expense', amount: 30 }),
+    ];
+    const groups = groupTransactions(txs, 'X', 'Y', 'uk-UA');
+    expect(groups).toHaveLength(2);
+    const day15 = groups.find(g => g.items.length === 2)!;
+    expect(day15.dayExpenseByCur.UAH).toBe(100);
+    expect(day15.dayIncomeByCur.UAH).toBe(500);
+  });
+});
+
 describe('taskUtils', () => {
   test('PRIORITY_ORDER', () => {
     expect(PRIORITY_ORDER.high).toBeLessThan(PRIORITY_ORDER.medium);
@@ -65,5 +85,31 @@ describe('taskUtils', () => {
       ],
     }))).toBe(50);
     expect(getProgress(task({ status: 'done', subtasks: [] }))).toBe(100);
+  });
+
+  test('sortTasks за назвою / newest / oldest', () => {
+    const a = task({ title: 'Banana', createdAt: '2026-06-01' });
+    const b = task({ title: 'Apple', createdAt: '2026-06-03' });
+    expect(sortTasks([a, b], 'name').map(t => t.title)).toEqual(['Apple', 'Banana']);
+    expect(sortTasks([a, b], 'newest').map(t => t.createdAt)).toEqual(['2026-06-03', '2026-06-01']);
+    expect(sortTasks([a, b], 'oldest').map(t => t.createdAt)).toEqual(['2026-06-01', '2026-06-03']);
+  });
+
+  test('applyTaskFilters: статус, пошук, пріоритет, проєкт', () => {
+    const tasks = [
+      task({ id: '1', title: 'Buy milk', status: 'active', priority: 'high', projectId: 'p1' }),
+      task({ id: '2', title: 'Pay bill', status: 'done', priority: 'low', projectId: 'p2' }),
+    ];
+    const base = { filter: 'all' as const, search: '' };
+    expect(applyTaskFilters(tasks, { ...base, filter: 'done' })).toHaveLength(1);
+    expect(applyTaskFilters(tasks, { ...base, search: 'milk' })).toHaveLength(1);
+    expect(applyTaskFilters(tasks, { ...base, priority: 'high' })).toHaveLength(1);
+    expect(applyTaskFilters(tasks, { ...base, projectId: 'p2' }).map(t => t.id)).toEqual(['2']);
+    expect(applyTaskFilters(tasks, base)).toHaveLength(2);
+  });
+
+  test('deadlineDiff знак', () => {
+    expect(deadlineDiff('2999-01-01')).toBeGreaterThan(0);
+    expect(deadlineDiff('2000-01-01')).toBeLessThan(0);
   });
 });

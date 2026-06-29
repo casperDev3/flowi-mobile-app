@@ -24,6 +24,7 @@ import { MonthPicker } from '@/components/shared/MonthPicker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { loadData } from '@/store/storage';
 import { useI18n } from '@/store/i18n';
 import { isSameDay } from '@/utils/dateUtils';
@@ -49,6 +50,7 @@ export default function HealthHubScreen() {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const c = getHealthColors(isDark);
+  useScreenView('health_hub');
 
   const h = useHealthEntries();
   const { today, goals, cal, latestWeight, bmi, bmiCategory, profile } = h;

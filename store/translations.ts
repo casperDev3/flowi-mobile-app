@@ -518,6 +518,7 @@ export interface Translations {
   restingPulse: string;
   insights: string;
   thisWeek: string;
+  back: string;
   // Prevention sub-modules
   meds: string;
   medsSub: string;
@@ -1132,6 +1133,7 @@ const uk: Translations = {
   restingPulse: 'Пульс спокою',
   insights: 'Інсайти',
   thisWeek: 'цього тижня',
+  back: 'Назад',
   meds: 'Ліки та добавки',
   medsSub: 'Нагадування про прийом',
   checkups: 'Медогляди',
@@ -1734,6 +1736,7 @@ const en: Translations = {
   restingPulse: 'Resting pulse',
   insights: 'Insights',
   thisWeek: 'this week',
+  back: 'Back',
   meds: 'Meds & supplements',
   medsSub: 'Intake reminders',
   checkups: 'Checkups',

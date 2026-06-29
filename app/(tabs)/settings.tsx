@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
 import { getAllScheduledNotifications } from '@/store/notifications';
 import { ThemeOption, useTheme } from '@/store/theme-context';
@@ -27,6 +28,7 @@ import { Lang } from '@/store/translations';
 
 export default function SettingsScreen() {
   const cs = useColorScheme();
+  useScreenView('settings');
   const isDark = cs === 'dark';
   const router = useRouter();
   const { theme, setTheme } = useTheme();

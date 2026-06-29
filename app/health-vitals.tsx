@@ -50,7 +50,7 @@ export default function VitalsScreen() {
             <IconSymbol name="chevron.left" size={20} color={c.text} />
           </TouchableOpacity>
           <Text style={[s.title, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.bodyMetrics}</Text>
-          <TouchableOpacity onPress={() => setModal('weight')} style={[s.addBtn, { backgroundColor: ACCENT_WEIGHT }]}>
+          <TouchableOpacity onPress={() => setModal('weight')} accessibilityRole="button" accessibilityLabel={tr.add} style={[s.addBtn, { backgroundColor: ACCENT_WEIGHT }]}>
             <IconSymbol name="plus" size={18} color="#fff" />
           </TouchableOpacity>
         </View>

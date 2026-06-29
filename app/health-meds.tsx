@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Empty, Field } from '@/components/health/FormBits';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { cancelMedReminders, scheduleMedReminders } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { useI18n } from '@/store/i18n';
@@ -24,6 +25,7 @@ export default function MedsScreen() {
   const router = useRouter();
   const { tr } = useI18n();
   const c = getHealthColors(isDark);
+  useScreenView('health_meds');
 
   const [meds, setMeds] = useState<Medication[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -73,7 +75,7 @@ export default function MedsScreen() {
             <IconSymbol name="xmark" size={18} color={c.text} />
           </TouchableOpacity>
           <Text style={[s.title, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.meds}</Text>
-          <TouchableOpacity onPress={() => setAdd(true)} style={[s.addBtn, { backgroundColor: ACC }]}>
+          <TouchableOpacity onPress={() => setAdd(true)} accessibilityRole="button" accessibilityLabel={tr.add} style={[s.addBtn, { backgroundColor: ACC }]}>
             <IconSymbol name="plus" size={18} color="#fff" />
           </TouchableOpacity>
         </View>

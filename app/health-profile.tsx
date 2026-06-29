@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
 import {
@@ -37,6 +38,7 @@ export default function HealthProfileScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
+  useScreenView('health_profile');
 
   const [profile, setProfile] = useState<HealthProfile>(DEFAULT_PROFILE);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);

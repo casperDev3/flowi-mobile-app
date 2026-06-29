@@ -44,7 +44,7 @@ export default function ActivityScreen() {
             <IconSymbol name="chevron.left" size={20} color={c.text} />
           </TouchableOpacity>
           <Text style={[s.title, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.activity}</Text>
-          <TouchableOpacity onPress={() => setModal('steps')} style={[s.addBtn, { backgroundColor: ACCENT_STEPS }]}>
+          <TouchableOpacity onPress={() => setModal('steps')} accessibilityRole="button" accessibilityLabel={tr.add} style={[s.addBtn, { backgroundColor: ACCENT_STEPS }]}>
             <IconSymbol name="plus" size={18} color="#fff" />
           </TouchableOpacity>
         </View>

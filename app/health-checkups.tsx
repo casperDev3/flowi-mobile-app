@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Empty, Field, Segment } from '@/components/health/FormBits';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { cancelById, scheduleDateReminder } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { useI18n } from '@/store/i18n';
@@ -22,6 +23,7 @@ export default function CheckupsScreen() {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const c = getHealthColors(isDark);
+  useScreenView('health_checkups');
 
   const [items, setItems] = useState<Checkup[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -68,7 +70,7 @@ export default function CheckupsScreen() {
             <IconSymbol name="xmark" size={18} color={c.text} />
           </TouchableOpacity>
           <Text style={[s.title, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.checkups}</Text>
-          <TouchableOpacity onPress={() => setAdd(true)} style={[s.addBtn, { backgroundColor: ACCENT_PULSE }]}>
+          <TouchableOpacity onPress={() => setAdd(true)} accessibilityRole="button" accessibilityLabel={tr.add} style={[s.addBtn, { backgroundColor: ACCENT_PULSE }]}>
             <IconSymbol name="plus" size={18} color="#fff" />
           </TouchableOpacity>
         </View>

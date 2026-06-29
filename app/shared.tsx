@@ -26,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { Events, track } from '@/utils/analytics';
 import { uuid } from '@/utils/uuid';
 
@@ -90,6 +91,7 @@ export default function SharedScreen() {
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
   const memberLabel = (n: number) => (lang === 'uk' ? pluralMember(n) : tr.participants);
+  useScreenView('shared');
 
   const c = {
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',

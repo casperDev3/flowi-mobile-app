@@ -45,7 +45,7 @@ export default function NutritionScreen() {
             <IconSymbol name="chevron.left" size={20} color={c.text} />
           </TouchableOpacity>
           <Text style={[s.title, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.nutrition}</Text>
-          <TouchableOpacity onPress={() => setModal('calories')} style={[s.addBtn, { backgroundColor: ACCENT_CAL }]}>
+          <TouchableOpacity onPress={() => setModal('calories')} accessibilityRole="button" accessibilityLabel={tr.add} style={[s.addBtn, { backgroundColor: ACCENT_CAL }]}>
             <IconSymbol name="plus" size={18} color="#fff" />
           </TouchableOpacity>
         </View>

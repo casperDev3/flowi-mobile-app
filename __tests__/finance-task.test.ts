@@ -1,4 +1,4 @@
-import { Transaction, filterByMonth } from '@/utils/financeUtils';
+import { Transaction, calcTotals, filterByMonth } from '@/utils/financeUtils';
 import { PRIORITY_ORDER, Task, getProgress, isOverdue, sortTasks } from '@/utils/taskUtils';
 
 const tx = (over: Partial<Transaction> = {}): Transaction => ({
@@ -15,6 +15,26 @@ describe('financeUtils.filterByMonth', () => {
     const txs = [tx({ date: '2026-06-10' }), tx({ date: '2026-05-30' }), tx({ date: '2026-06-28' })];
     const res = filterByMonth(txs, new Date(2026, 5, 1));
     expect(res).toHaveLength(2);
+  });
+});
+
+describe('financeUtils.calcTotals', () => {
+  test('баланс і % заощаджень', () => {
+    const r = calcTotals([
+      tx({ type: 'income', amount: 1000 }),
+      tx({ type: 'expense', amount: 400 }),
+      tx({ type: 'expense', amount: 100 }),
+    ]);
+    expect(r.income).toBe(1000);
+    expect(r.expense).toBe(500);
+    expect(r.balance).toBe(500);
+    expect(r.savingsPct).toBe(50);
+  });
+
+  test('без доходу savingsPct = 0; від’ємний баланс не валить', () => {
+    const r = calcTotals([tx({ type: 'expense', amount: 200 })]);
+    expect(r.balance).toBe(-200);
+    expect(r.savingsPct).toBe(0);
   });
 });
 

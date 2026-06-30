@@ -6,6 +6,14 @@ export interface Translations {
   tabFinance: string;
   tabHealth: string;
   tabOptions: string;
+  tabToday: string;
+  todayOverdue: string;
+  todayActive: string;
+  todayTracked: string;
+  todayGreetMorning: string;
+  todayGreetDay: string;
+  todayGreetEvening: string;
+  todayGreetNight: string;
 
   // Common
   cancel: string;
@@ -694,6 +702,14 @@ const uk: Translations = {
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
   tabOptions: 'Опції',
+  tabToday: 'Сьогодні',
+  todayOverdue: 'прострочено',
+  todayActive: 'активних',
+  todayTracked: 'відстежено',
+  todayGreetMorning: 'Доброго ранку',
+  todayGreetDay: 'Доброго дня',
+  todayGreetEvening: 'Доброго вечора',
+  todayGreetNight: 'Доброї ночі',
 
   cancel: 'Скасувати',
   delete: 'Видалити',
@@ -1336,6 +1352,14 @@ const uk: Translations = {
 
 const en: Translations = {
   tabTasks: 'Tasks',
+  tabToday: 'Today',
+  todayOverdue: 'overdue',
+  todayActive: 'active',
+  todayTracked: 'tracked',
+  todayGreetMorning: 'Good morning',
+  todayGreetDay: 'Good afternoon',
+  todayGreetEvening: 'Good evening',
+  todayGreetNight: 'Good night',
   tabFinance: 'Finance',
   tabHealth: 'Health',
   tabOptions: 'Options',

@@ -8,6 +8,8 @@ import {IconSymbol} from '@/components/ui/icon-symbol';
 import {useColorScheme} from '@/hooks/use-color-scheme';
 import {useI18n} from '@/store/i18n';
 
+export const unstable_settings = { initialRouteName: 'today' };
+
 export default function TabLayout() {
     const isDark = useColorScheme() === 'dark';
     const {tr} = useI18n();
@@ -45,6 +47,13 @@ export default function TabLayout() {
                 tabBarIconStyle: {marginTop: 0},
             }}>
 
+            <Tabs.Screen
+                name="today"
+                options={{
+                    title: tr.tabToday,
+                    tabBarIcon: ({color}) => <IconSymbol size={28} name="house.fill" color={color}/>,
+                }}
+            />
             <Tabs.Screen
                 name="shared"
                 options={{

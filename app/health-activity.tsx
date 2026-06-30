@@ -8,6 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
+import { MetricTrend } from '@/components/health/MetricTrend';
 import { SectionHeader } from '@/components/health/HealthBits';
 import { MiniBarChart } from '@/components/health/MiniBarChart';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -82,6 +83,12 @@ export default function ActivityScreen() {
               ))}
             </View>
           </BlurView>
+
+          {/* Динаміка кроків */}
+          <View style={{ marginTop: 14 }}>
+            <MetricTrend entries={h.entries} type="steps" agg="sum" color={ACCENT_STEPS} goal={goals.steps}
+              format={v => (v >= 1000 ? `${(v / 1000).toFixed(1)}т` : `${Math.round(v)}`)} isDark={isDark} c={c} tr={tr} />
+          </View>
 
           {/* Активні калорії */}
           <SectionHeader title={tr.burned} icon="flame" color={ACCENT_CAL} textColor={c.text} />

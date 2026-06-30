@@ -6,6 +6,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
+import { MetricTrend } from '@/components/health/MetricTrend';
 import { SectionHeader } from '@/components/health/HealthBits';
 import { MiniBarChart } from '@/components/health/MiniBarChart';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -99,6 +100,12 @@ export default function VitalsScreen() {
               </TouchableOpacity>
             )}
           </BlurView>
+
+          {/* Динаміка ваги */}
+          <View style={{ marginTop: 14 }}>
+            <MetricTrend entries={h.entries} type="weight" agg="avg" color={ACCENT_WEIGHT}
+              format={v => `${v.toFixed(1)} кг`} isDark={isDark} c={c} tr={tr} />
+          </View>
 
           {/* Пульс */}
           <SectionHeader title={tr.pulse} icon="waveform.path.ecg" color={ACCENT_PULSE} textColor={c.text} />

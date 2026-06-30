@@ -8,6 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
+import { MetricTrend } from '@/components/health/MetricTrend';
 import { CalStat, SectionHeader } from '@/components/health/HealthBits';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -84,6 +85,12 @@ export default function NutritionScreen() {
               ))}
             </View>
           </BlurView>
+
+          {/* Динаміка калорій */}
+          <View style={{ marginTop: 14 }}>
+            <MetricTrend entries={h.entries} type="calories" agg="sum" color={ACCENT_CAL} goal={goals.calories}
+              format={v => `${Math.round(v)} кк`} isDark={isDark} c={c} tr={tr} />
+          </View>
 
           {/* Білок */}
           <SectionHeader title={tr.protein} icon="bolt.fill" color={ACCENT_PROT} textColor={c.text} />

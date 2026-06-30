@@ -6,6 +6,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
+import { MetricTrend } from '@/components/health/MetricTrend';
 import { SectionHeader } from '@/components/health/HealthBits';
 import { MiniBarChart } from '@/components/health/MiniBarChart';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -82,6 +83,12 @@ export default function SleepScreen() {
               </TouchableOpacity>
             )}
           </BlurView>
+
+          {/* Динаміка сну */}
+          <View style={{ marginTop: 14 }}>
+            <MetricTrend entries={h.entries} type="sleep" agg="avg" color={ACCENT_SLEEP} goal={goals.sleep}
+              format={v => fmtSleep(Math.round(v))} isDark={isDark} c={c} tr={tr} />
+          </View>
 
           {/* Пульс спокою */}
           <SectionHeader title={tr.restingPulse} icon="waveform.path.ecg" color={ACCENT_PULSE} textColor={c.text} />

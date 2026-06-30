@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -12,15 +12,26 @@ import { useI18n } from '@/store/i18n';
  * поверх — картка «Недоступно в офлайн-режимі» + кнопка «Увімкнути онлайн».
  */
 export function OfflineOverlay({ children }: { children: React.ReactNode }) {
-  const { online, setOnline } = useAppMode();
+  const { online, ready, setOnline } = useAppMode();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
+
+  const accent = '#0EA5E9';
+
+  // Поки режим не завантажено зі сховища — нейтральний лоадер (щоб не блимати
+  // онлайн-контентом, якщо збережено офлайн).
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? '#0C0C14' : '#F4F2FF' }}>
+        <ActivityIndicator color={accent} />
+      </View>
+    );
+  }
 
   if (online) return <>{children}</>;
 
   const text = isDark ? '#F0EEFF' : '#1A1433';
   const sub = isDark ? 'rgba(240,238,255,0.55)' : 'rgba(26,20,51,0.55)';
-  const accent = '#0EA5E9';
 
   return (
     <View style={{ flex: 1 }}>

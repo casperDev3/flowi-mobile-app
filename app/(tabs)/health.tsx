@@ -1,9 +1,8 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Animated,
   Dimensions,
   Modal,
   Platform,
@@ -17,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
+import { QuickAddSheet, QuickRecord } from '@/components/health/QuickAddSheet';
 import { HubTile } from '@/components/health/HubTile';
 import { RingCell } from '@/components/health/RingCell';
 import { MonthPicker } from '@/components/shared/MonthPicker';
@@ -30,17 +29,9 @@ import { useI18n } from '@/store/i18n';
 import { isSameDay } from '@/utils/dateUtils';
 import {
   ACCENT, ACCENT_CAL, ACCENT_MOOD, ACCENT_PROT, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
-  HEALTH_ACCENTS, ModalKey, fmtSleep, getHealthColors,
+  HEALTH_ACCENTS, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
 import { HealthEntry, getMonthEntries, getWeeklyInsights } from '@/utils/healthUtils';
-
-const RADIAL_ITEMS = [
-  { key: 'water',    icon: 'drop.fill',         color: ACCENT },
-  { key: 'calories', icon: 'flame.fill',        color: ACCENT_CAL },
-  { key: 'weight',   icon: 'scalemass.fill',    color: ACCENT_WEIGHT },
-  { key: 'steps',    icon: 'figure.walk',       color: ACCENT_STEPS },
-  { key: 'pulse',    icon: 'waveform.path.ecg', color: ACCENT_PULSE },
-] as const;
 
 export default function HealthHubScreen() {
   const isDark = useColorScheme() === 'dark';
@@ -56,7 +47,7 @@ export default function HealthHubScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeMonth, setActiveMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [modal, setModal] = useState<ModalKey | null>(null);
+  const [quickOpen, setQuickOpen] = useState(false);
 
   // Лічильник «на сьогодні» для плитки Профілактики (невипиті ліки)
   const [medsDue, setMedsDue] = useState(0);
@@ -79,28 +70,12 @@ export default function HealthHubScreen() {
     setRefreshing(false);
   }, [h, loadMedsDue]);
 
-  const onSubmit = (e: NewEntryPayload) => { h.addEntry(e); setModal(null); };
+  const onQuickSubmit = (records: QuickRecord[]) => records.forEach(r => h.addEntry({ type: r.type, value: r.value }));
 
   const bmiColor = (b: number) => {
     const cat = bmiCategory(b);
     return cat === 'normal' ? ACCENT : cat === 'underweight' ? ACCENT_STEPS : cat === 'overweight' ? ACCENT_MOOD : ACCENT_PULSE;
   };
-
-  // Radial FAB
-  const [fabOpen, setFabOpen] = useState(false);
-  const fabAnim = useRef(new Animated.Value(0)).current;
-  const toggleFab = () => {
-    const to = fabOpen ? 0 : 1; setFabOpen(!fabOpen);
-    Animated.spring(fabAnim, { toValue: to, useNativeDriver: true, friction: 5, tension: 80 }).start();
-  };
-  const closeFab = () => { setFabOpen(false); Animated.spring(fabAnim, { toValue: 0, useNativeDriver: true, friction: 6 }).start(); };
-  const openModal = (key: ModalKey) => { closeFab(); setModal(key); };
-  const RADIUS = 112;
-  const radialPositions = RADIAL_ITEMS.map((_, i) => {
-    const angle = Math.PI + (Math.PI * i) / (RADIAL_ITEMS.length - 1);
-    return { x: Math.cos(angle) * RADIUS, y: -Math.abs(Math.sin(angle)) * RADIUS };
-  });
-  const fabRotate = fabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
 
   const stepsStat = today.steps >= 1000 ? `${(today.steps / 1000).toFixed(1)}т кр` : `${today.steps} кр`;
 
@@ -114,11 +89,6 @@ export default function HealthHubScreen() {
 
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
           <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.health}</Text>
-          <TouchableOpacity onPress={() => setHistoryOpen(true)}
-            accessibilityRole="button" accessibilityLabel={tr.history}
-            style={[s.iconBtnSm, { borderColor: c.border, backgroundColor: c.dim }]}>
-            <IconSymbol name="clock.fill" size={16} color={c.sub} />
-          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -229,38 +199,18 @@ export default function HealthHubScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* FAB backdrop */}
-      {fabOpen && <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} onPress={closeFab} />}
-
-      {/* Radial FAB */}
+      {/* FAB → нижній попап швидкого вводу */}
       <View style={[s.fabContainer, { bottom: Platform.OS === 'ios' ? 108 : 88 }]} pointerEvents="box-none">
-        {RADIAL_ITEMS.map((item, i) => {
-          const pos = radialPositions[i];
-          const translateX = fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, pos.x] });
-          const translateY = fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, pos.y] });
-          const opacity = fabAnim.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 0, 1] });
-          const scale = fabAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.2, 0.2, 1] });
-          return (
-            <Animated.View key={item.key} style={[s.radialItem, { transform: [{ translateX }, { translateY }, { scale }], opacity }]}>
-              <TouchableOpacity onPress={() => openModal(item.key as ModalKey)}
-                style={[s.radialBtn, { backgroundColor: item.color, shadowColor: item.color }]}>
-                <IconSymbol name={item.icon as any} size={19} color="#fff" />
-              </TouchableOpacity>
-            </Animated.View>
-          );
-        })}
-        <TouchableOpacity onPress={toggleFab} activeOpacity={0.85}
+        <TouchableOpacity onPress={() => setQuickOpen(true)} activeOpacity={0.85}
           accessibilityRole="button" accessibilityLabel={tr.add}
-          style={[s.fab, { shadowColor: ACCENT, borderRadius: fabOpen ? 29 : 16 }]}>
-          <LinearGradient colors={[ACCENT, '#059669']} style={[s.fabGrad, { borderRadius: fabOpen ? 29 : 16 }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
-              <IconSymbol name="plus" size={22} color="#fff" />
-            </Animated.View>
+          style={[s.fab, { shadowColor: ACCENT }]}>
+          <LinearGradient colors={[ACCENT, '#059669']} style={s.fabGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <IconSymbol name="plus" size={24} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
-      <HealthEntryModal modalKey={modal} onClose={() => setModal(null)} onSubmit={onSubmit} isDark={isDark} tr={tr} />
+      <QuickAddSheet visible={quickOpen} onClose={() => setQuickOpen(false)} onSubmit={onQuickSubmit} isDark={isDark} tr={tr} />
 
       <HistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)}
         entries={h.entries} activeMonth={activeMonth} setActiveMonth={setActiveMonth}
@@ -367,8 +317,6 @@ const s = StyleSheet.create({
   fabContainer: { position: 'absolute', right: 20, alignItems: 'center', justifyContent: 'center' },
   fab:          { width: 58, height: 58, borderRadius: 29, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
   fabGrad:      { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
-  radialItem:   { position: 'absolute', alignItems: 'center' },
-  radialBtn:    { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.45, shadowRadius: 8, elevation: 6 },
   overlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },

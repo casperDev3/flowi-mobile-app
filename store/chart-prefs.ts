@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { loadData, saveData } from './storage';
 
@@ -31,13 +31,20 @@ export function setChartType(metric: string, type: ChartType): void {
   emit();
 }
 
-/** Реактивний тип графіка для метрики (синхронізується між усіма екранами). */
+/**
+ * Реактивний тип графіка для метрики (синхронізується між усіма екранами).
+ * Значення тримається в React-стані (а не лише в модульному кеші), щоб
+ * React Compiler коректно перемальовував графік при зміні.
+ */
 export function useChartType(metric: string): [ChartType, (t: ChartType) => void] {
-  const [, force] = useReducer((x: number) => x + 1, 0);
+  const [type, setType] = useState<ChartType>(() => getChartType(metric));
   useEffect(() => {
-    loadChartPrefs();
-    listeners.add(force);
-    return () => { listeners.delete(force); };
-  }, []);
-  return [getChartType(metric), (t: ChartType) => setChartType(metric, t)];
+    let mounted = true;
+    loadChartPrefs().then(() => { if (mounted) setType(getChartType(metric)); });
+    const listener = () => { if (mounted) setType(getChartType(metric)); };
+    listeners.add(listener);
+    return () => { mounted = false; listeners.delete(listener); };
+  }, [metric]);
+  const set = useCallback((t: ChartType) => setChartType(metric, t), [metric]);
+  return [type, set];
 }

@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import { Onboarding } from '@/components/onboarding/Onboarding';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { initReporting } from '@/utils/reporting';
@@ -70,6 +71,7 @@ function RootLayoutContent() {
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
+      <Onboarding />
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </NavigationThemeProvider>
   );

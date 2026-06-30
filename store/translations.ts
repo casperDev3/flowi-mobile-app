@@ -549,6 +549,21 @@ export interface Translations {
   enableOnline: string;
   offlineBadge: string;
   sendUnavailableOffline: string;
+  // Onboarding
+  onbWelcomeTitle: string;
+  onbWelcomeDesc: string;
+  onbStart: string;
+  onbSkip: string;
+  onbProfileTitle: string;
+  onbProfileDesc: string;
+  onbNext: string;
+  onbNotifTitle: string;
+  onbNotifDesc: string;
+  onbAllow: string;
+  onbLater: string;
+  onbDoneTitle: string;
+  onbDoneDesc: string;
+  onbBegin: string;
   // Prevention sub-modules
   meds: string;
   medsSub: string;
@@ -1192,6 +1207,20 @@ const uk: Translations = {
   enableOnline: 'Увімкнути онлайн',
   offlineBadge: 'Офлайн',
   sendUnavailableOffline: 'Надсилання недоступне в офлайн-режимі',
+  onbWelcomeTitle: 'Вітаємо у Flowi',
+  onbWelcomeDesc: 'Завдання, фінанси, здоров\'я, час — в одному приватному застосунку. Дані лишаються на вашому пристрої.',
+  onbStart: 'Почати',
+  onbSkip: 'Пропустити',
+  onbProfileTitle: 'Трохи про вас',
+  onbProfileDesc: 'Для персональних цілей здоров\'я (калорії, білок, вода). Можна пропустити.',
+  onbNext: 'Далі',
+  onbNotifTitle: 'Нагадування',
+  onbNotifDesc: 'Дозвольте сповіщення, щоб отримувати нагадування про воду, сон, ліки та завдання.',
+  onbAllow: 'Дозволити',
+  onbLater: 'Пізніше',
+  onbDoneTitle: 'Готово!',
+  onbDoneDesc: 'Усе налаштовано. Почніть із першого запису — і Flowi візьме решту на себе.',
+  onbBegin: 'Розпочати',
   meds: 'Ліки та добавки',
   medsSub: 'Нагадування про прийом',
   checkups: 'Медогляди',
@@ -1823,6 +1852,20 @@ const en: Translations = {
   enableOnline: 'Go online',
   offlineBadge: 'Offline',
   sendUnavailableOffline: 'Sending is unavailable offline',
+  onbWelcomeTitle: 'Welcome to Flowi',
+  onbWelcomeDesc: 'Tasks, finance, health, time — in one private app. Your data stays on your device.',
+  onbStart: 'Get started',
+  onbSkip: 'Skip',
+  onbProfileTitle: 'A bit about you',
+  onbProfileDesc: 'For personal health goals (calories, protein, water). You can skip this.',
+  onbNext: 'Next',
+  onbNotifTitle: 'Reminders',
+  onbNotifDesc: 'Allow notifications to get reminders for water, sleep, meds and tasks.',
+  onbAllow: 'Allow',
+  onbLater: 'Later',
+  onbDoneTitle: 'All set!',
+  onbDoneDesc: 'Everything is ready. Start with your first entry — Flowi handles the rest.',
+  onbBegin: 'Start',
   meds: 'Meds & supplements',
   medsSub: 'Intake reminders',
   checkups: 'Checkups',

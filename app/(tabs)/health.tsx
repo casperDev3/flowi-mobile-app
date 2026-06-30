@@ -143,8 +143,15 @@ export default function HealthHubScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Зведена статистика */}
-          <Text style={[s.kicker, { color: c.sub }]}>{tr.summary}</Text>
+          {/* Зведена статистика → окрема сторінка з графіками */}
+          <TouchableOpacity onPress={() => router.push('/health-summary')} activeOpacity={0.85}
+            accessibilityRole="button" accessibilityLabel={tr.healthSummary}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <Text style={[s.kicker, { color: c.sub, marginBottom: 0 }]}>{tr.summary}</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700', marginRight: 2 }}>{tr.dynamics}</Text>
+            <IconSymbol name="chevron.right" size={12} color={ACCENT} />
+          </View>
           <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 16 }]}>
             <View style={{ flexDirection: 'row', gap: 4 }}>
               <RingCell pct={goals.calories ? Math.max(0, cal.net) / goals.calories : 0} color={ACCENT_CAL} label={tr.calories} value={`${cal.net}кк`} />
@@ -162,6 +169,7 @@ export default function HealthHubScreen() {
               <VitalMini label={tr.protein} value={`${Math.round(today.protein)}г`} color={ACCENT_PROT} sub={c.sub} text={c.text} />
             </View>
           </BlurView>
+          </TouchableOpacity>
 
           {/* Інсайти тижня */}
           {insights.length > 0 && (

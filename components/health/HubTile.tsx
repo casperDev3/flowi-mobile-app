@@ -20,7 +20,7 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ flex: 1 }}>
       <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-        style={{ borderRadius: 18, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14, minHeight: 104 }}>
+        style={{ borderRadius: 18, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14, height: 112 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name={icon as any} size={19} color={color} />
@@ -32,9 +32,9 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
             </View>
           )}
         </View>
-        <Text style={{ color: text, fontSize: 15, fontWeight: '800', marginTop: 12 }}>{title}</Text>
-        {stat ? <Text style={{ color, fontSize: 13, fontWeight: '700', marginTop: 3 }}>{stat}</Text>
-              : hint ? <Text style={{ color: sub, fontSize: 11, fontWeight: '600', marginTop: 3 }}>{hint}</Text> : null}
+        <Text numberOfLines={1} style={{ color: text, fontSize: 15, fontWeight: '800', marginTop: 12 }}>{title}</Text>
+        {stat ? <Text numberOfLines={1} style={{ color, fontSize: 13, fontWeight: '700', marginTop: 3 }}>{stat}</Text>
+              : hint ? <Text numberOfLines={1} style={{ color: sub, fontSize: 11, fontWeight: '600', marginTop: 3 }}>{hint}</Text> : null}
       </BlurView>
     </TouchableOpacity>
   );

@@ -526,6 +526,17 @@ export interface Translations {
   measurementsReminderBody: string;
   noMeasurements: string;
   perMonth: string;
+  // Periods + summary page
+  pDay: string;
+  pWeek: string;
+  pMonth: string;
+  pQuarter: string;
+  pYear: string;
+  healthSummary: string;
+  total: string;
+  average: string;
+  dynamics: string;
+  noDataPeriod: string;
   // Prevention sub-modules
   meds: string;
   medsSub: string;
@@ -1148,6 +1159,16 @@ const uk: Translations = {
   measurementsReminderBody: 'Час зробити заміри тіла 📏',
   noMeasurements: 'Ще немає вимірів',
   perMonth: 'за міс',
+  pDay: 'День',
+  pWeek: 'Тиж',
+  pMonth: 'Міс',
+  pQuarter: '3 міс',
+  pYear: 'Рік',
+  healthSummary: 'Зведена статистика',
+  total: 'Усього',
+  average: 'Середнє',
+  dynamics: 'Динаміка',
+  noDataPeriod: 'Немає даних за період',
   meds: 'Ліки та добавки',
   medsSub: 'Нагадування про прийом',
   checkups: 'Медогляди',
@@ -1758,6 +1779,16 @@ const en: Translations = {
   measurementsReminderBody: 'Time to take body measurements 📏',
   noMeasurements: 'No measurements yet',
   perMonth: '/mo',
+  pDay: 'Day',
+  pWeek: 'Week',
+  pMonth: 'Month',
+  pQuarter: '3 mo',
+  pYear: 'Year',
+  healthSummary: 'Summary',
+  total: 'Total',
+  average: 'Average',
+  dynamics: 'Dynamics',
+  noDataPeriod: 'No data for period',
   meds: 'Meds & supplements',
   medsSub: 'Intake reminders',
   checkups: 'Checkups',

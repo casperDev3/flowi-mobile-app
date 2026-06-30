@@ -212,26 +212,6 @@ export interface Translations {
   allCurrencies: string;
   // Shared
   sharedTitle: string;
-  // Shared (legacy collaboration screen)
-  shLocalData: string;
-  shShopping: string;
-  shTasks: string;
-  shNotes: string;
-  shShareAccess: string;
-  shLocalDesc: string;
-  shBought: string;
-  shClearBought: string;
-  shClearBoughtMsg: string;
-  shAddTo: string;
-  shTextPh: string;
-  shSecretTitle: string;
-  shCopy: string;
-  shCopied: string;
-  shShareBtn: string;
-  shOffline: string;
-  shDeleted: string;
-  shUndo: string;
-  shInvite: string;
   noGroups: string;
   noGroupsHint: string;
   createGroup: string;
@@ -846,25 +826,6 @@ const uk: Translations = {
   showAllCount: 'Показати всі ({count})',
   allCurrencies: 'Всі валюти',
   sharedTitle: 'Спільне',
-  shLocalData: 'Локальні дані',
-  shShopping: 'Покупки',
-  shTasks: 'Завдання',
-  shNotes: 'Нотатки',
-  shShareAccess: 'Спільний доступ',
-  shLocalDesc: 'Дані зберігаються локально. Щоб поділитись з іншим пристроєм — створіть групу або введіть код.',
-  shBought: 'Куплено',
-  shClearBought: 'Очистити куплені',
-  shClearBoughtMsg: 'Видалити {n} позначених?',
-  shAddTo: 'Додати до «{name}»',
-  shTextPh: 'Текст...',
-  shSecretTitle: 'Секрет групи',
-  shCopy: 'Копіювати',
-  shCopied: 'Скопійовано',
-  shShareBtn: 'Поділитися',
-  shOffline: 'офлайн',
-  shDeleted: 'Видалено',
-  shUndo: 'Скасувати',
-  shInvite: 'Приєднуйся до спільної групи «{name}» у Flowi. Секретний код: {code}',
   noGroups: 'Немає груп',
   noGroupsHint: 'Створіть групу або приєднайтесь за кодом',
   createGroup: 'Створити',
@@ -1450,25 +1411,6 @@ const en: Translations = {
   showAllCount: 'Show all ({count})',
   allCurrencies: 'All currencies',
   sharedTitle: 'Shared',
-  shLocalData: 'Local data',
-  shShopping: 'Shopping',
-  shTasks: 'Tasks',
-  shNotes: 'Notes',
-  shShareAccess: 'Shared access',
-  shLocalDesc: 'Data is stored locally. To share with another device — create a group or enter a code.',
-  shBought: 'Bought',
-  shClearBought: 'Clear bought',
-  shClearBoughtMsg: 'Delete {n} selected?',
-  shAddTo: 'Add to «{name}»',
-  shTextPh: 'Text...',
-  shSecretTitle: 'Group secret',
-  shCopy: 'Copy',
-  shCopied: 'Copied',
-  shShareBtn: 'Share',
-  shOffline: 'offline',
-  shDeleted: 'Deleted',
-  shUndo: 'Undo',
-  shInvite: 'Join my shared group «{name}» in Flowi. Secret code: {code}',
   noGroups: 'No groups',
   noGroupsHint: 'Create a group or join with a code',
   createGroup: 'Create',

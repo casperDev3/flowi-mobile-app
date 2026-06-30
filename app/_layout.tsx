@@ -50,7 +50,6 @@ function RootLayoutContent() {
         <Stack.Screen name="developer" options={{ headerShown: false }} />
         <Stack.Screen name="sync" options={{ headerShown: false }} />
         <Stack.Screen name="containers" options={{ headerShown: false }} />
-        <Stack.Screen name="shared" options={{ headerShown: false }} />
         <Stack.Screen name="meetings" options={{ headerShown: false }} />
         <Stack.Screen name="budget" options={{ headerShown: false }} />
         <Stack.Screen name="apple-health" options={{ headerShown: false }} />

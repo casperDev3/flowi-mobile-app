@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { collectAllData, mergeAndSave } from '@/store/sync';
@@ -122,6 +123,7 @@ export default function SyncScreen() {
 
   // ─── Main screen ──────────────────────────────────────────────────────────
   return (
+    <OfflineOverlay>
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -253,6 +255,7 @@ export default function SyncScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
+    </OfflineOverlay>
   );
 }
 

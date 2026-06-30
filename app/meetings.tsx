@@ -23,6 +23,7 @@ import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { isOnlineMode } from '@/store/app-mode';
 import { loadData, saveData } from '@/store/storage';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
@@ -537,6 +538,7 @@ export default function MeetingsScreen() {
   }, []);
 
   const connectGoogleCalendar = useCallback(async () => {
+    if (!isOnlineMode()) { Alert.alert('Офлайн', 'Недоступно в офлайн-режимі'); return; }
     const clientId = gcalClientIdRef.current;
     if (!clientId) return;
     try {
@@ -615,6 +617,7 @@ export default function MeetingsScreen() {
   }, []);
 
   const importFromGoogleCalendar = useCallback(async (token?: string) => {
+    if (!isOnlineMode()) return;
     const accessToken = token ?? await getValidGcalToken();
     if (!accessToken) {
       Alert.alert('Потрібна авторизація', 'Підключіть Google Calendar.');

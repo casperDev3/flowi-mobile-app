@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { initReporting } from '@/utils/reporting';
+import { AppModeProvider } from '@/store/app-mode';
 import { AutoBackupProvider } from '@/store/auto-backup';
 import { I18nProvider } from '@/store/i18n';
 import { ThemeProvider } from '@/store/theme-context';
@@ -78,13 +79,15 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <I18nProvider>
-        <ThemeProvider>
-          <AutoBackupProvider>
-            <TimerProvider>
-              <RootLayoutContent />
-            </TimerProvider>
-          </AutoBackupProvider>
-        </ThemeProvider>
+        <AppModeProvider>
+          <ThemeProvider>
+            <AutoBackupProvider>
+              <TimerProvider>
+                <RootLayoutContent />
+              </TimerProvider>
+            </AutoBackupProvider>
+          </ThemeProvider>
+        </AppModeProvider>
       </I18nProvider>
     </ErrorBoundary>
   );

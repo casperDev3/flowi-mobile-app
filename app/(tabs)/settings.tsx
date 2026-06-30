@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
+import { useAppMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
 import { getAllScheduledNotifications } from '@/store/notifications';
 import { ThemeOption, useTheme } from '@/store/theme-context';
@@ -33,6 +34,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { lang, setLang, tr } = useI18n();
+  const { online, setOnline } = useAppMode();
 
   const [notifications, setNotifications] = useState(true);
   const [taskReminders, setTaskReminders] = useState(true);
@@ -76,6 +78,25 @@ export default function SettingsScreen() {
           <View style={{ marginTop: 10, marginBottom: 28 }}>
             <Text style={[st.pageTitle, { color: c.text }]}>{tr.settings}</Text>
           </View>
+
+          {/* Режим роботи */}
+          <SectionLabel label={tr.workMode} color={c.sub} />
+          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <ToggleRow
+              icon={online ? 'wifi' : 'icloud.slash'}
+              iconColor="#0EA5E9"
+              label={online ? tr.modeOnline : tr.modeOffline}
+              value={online}
+              onChange={setOnline}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last
+            />
+          </BlurView>
+          <Text style={{ color: c.sub, fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 6, marginBottom: 18 }}>
+            {tr.offlineDesc}
+          </Text>
 
           {/* Support — first */}
           <SectionLabel label={tr.sectionSupport} color={c.sub} />

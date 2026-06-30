@@ -24,8 +24,10 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { isOnlineMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
 import { requestNotificationPermissions } from '@/store/notifications';
 
@@ -290,7 +292,7 @@ export default function SharedScreen() {
   // ─── Focus / WS ───────────────────────────────────────────────────────────
 
   useFocusEffect(useCallback(() => {
-    if (initialized && activeGroup && deviceId) {
+    if (initialized && activeGroup && deviceId && isOnlineMode()) {
       syncGroup(activeGroup, deviceId);
       connectWS(activeGroup, deviceId);
       // Pre-request notification permission so incoming WS pushes display.
@@ -927,6 +929,7 @@ export default function SharedScreen() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
+    <OfflineOverlay>
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
@@ -1898,6 +1901,7 @@ export default function SharedScreen() {
         </KeyboardAvoidingView>
       </Modal>
     </View>
+    </OfflineOverlay>
   );
 }
 

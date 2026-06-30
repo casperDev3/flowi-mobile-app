@@ -540,6 +540,15 @@ export interface Translations {
   chartBar: string;
   chartLine: string;
   chartDots: string;
+  // Online / offline mode
+  workMode: string;
+  modeOnline: string;
+  modeOffline: string;
+  offlineDesc: string;
+  unavailableOffline: string;
+  enableOnline: string;
+  offlineBadge: string;
+  sendUnavailableOffline: string;
   // Prevention sub-modules
   meds: string;
   medsSub: string;
@@ -1175,6 +1184,14 @@ const uk: Translations = {
   chartBar: 'Стовпці',
   chartLine: 'Лінія',
   chartDots: 'Крапки',
+  workMode: 'Режим роботи',
+  modeOnline: 'Онлайн',
+  modeOffline: 'Офлайн',
+  offlineDesc: 'Дані лише на пристрої. Онлайн-функції (Спільне, синхронізація, AI, інтеграції) вимкнено.',
+  unavailableOffline: 'Недоступно в офлайн-режимі',
+  enableOnline: 'Увімкнути онлайн',
+  offlineBadge: 'Офлайн',
+  sendUnavailableOffline: 'Надсилання недоступне в офлайн-режимі',
   meds: 'Ліки та добавки',
   medsSub: 'Нагадування про прийом',
   checkups: 'Медогляди',
@@ -1798,6 +1815,14 @@ const en: Translations = {
   chartBar: 'Bars',
   chartLine: 'Line',
   chartDots: 'Dots',
+  workMode: 'Mode',
+  modeOnline: 'Online',
+  modeOffline: 'Offline',
+  offlineDesc: 'Data stays on device only. Online features (Shared, sync, AI, integrations) are off.',
+  unavailableOffline: 'Unavailable in offline mode',
+  enableOnline: 'Go online',
+  offlineBadge: 'Offline',
+  sendUnavailableOffline: 'Sending is unavailable offline',
   meds: 'Meds & supplements',
   medsSub: 'Intake reminders',
   checkups: 'Checkups',

@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { isOnlineMode } from '@/store/app-mode';
 import { loadData, saveData } from '@/store/storage';
 
 // Вставте URL після деплою Google Apps Script
@@ -161,6 +162,7 @@ export default function BugsScreen() {
 
   const sendToDev = useCallback((bug: Bug) => {
     if (bug.sentToDev) return;
+    if (!isOnlineMode()) { Alert.alert('Офлайн', 'Надсилання недоступне в офлайн-режимі'); return; }
     fetch(REPORTER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },

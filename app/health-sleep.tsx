@@ -14,7 +14,7 @@ import { useHealthEntries } from '@/hooks/use-health-entries';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
 import {
-  ACCENT, ACCENT_MOOD, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ModalKey, fmtSleep, getHealthColors,
+  ACCENT, ACCENT_MOOD, ACCENT_PULSE, ACCENT_SLEEP, ModalKey, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
 
 export default function SleepScreen() {

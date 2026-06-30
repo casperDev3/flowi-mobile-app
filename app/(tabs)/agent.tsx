@@ -409,7 +409,7 @@ export default function AgentScreen() {
                     OpenClaw готовий
                   </Text>
                   <Text style={{ color: c.sub, fontSize: 14, textAlign: 'center', lineHeight: 21 }}>
-                    Напиши що-небудь і агент виконає завдання на твоєму комп'ютері
+                    Напиши що-небудь і агент виконає завдання на твоєму комп&apos;ютері
                   </Text>
 
                   {/* Suggestions */}

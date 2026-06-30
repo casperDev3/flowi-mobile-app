@@ -5,5 +5,8 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
+  // Вимкнено watchman: у деяких середовищах він не може створити state-каталог
+  // (Permission denied) і валить запуск. Jest використає власний crawler.
+  watchman: false,
   // jest-expo вже задає transformIgnorePatterns для RN/Expo-модулів
 };

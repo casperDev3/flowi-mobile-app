@@ -34,8 +34,6 @@ import {
 } from '@/utils/healthTheme';
 import { HealthEntry, getMonthEntries, getWeeklyInsights } from '@/utils/healthUtils';
 
-const { width: W } = Dimensions.get('window');
-
 const RADIAL_ITEMS = [
   { key: 'water',    icon: 'drop.fill',         color: ACCENT },
   { key: 'calories', icon: 'flame.fill',        color: ACCENT_CAL },

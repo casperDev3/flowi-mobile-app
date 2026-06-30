@@ -125,6 +125,30 @@ export async function cancelDailyReminder(key: string): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(dailyReminderId(key)).catch(() => {});
 }
 
+/**
+ * Щотижневе нагадування. weekday: 1=неділя … 7=субота (формат expo-notifications).
+ * Використовує той самий id, що й dailyReminderId(key) — тож cancelDailyReminder() його скасовує.
+ */
+export async function scheduleWeeklyReminder(
+  key: string,
+  weekday: number,
+  hour: number,
+  minute: number,
+  title: string,
+  body: string,
+): Promise<boolean> {
+  const granted = await requestNotificationPermissions();
+  if (!granted) return false;
+  const id = dailyReminderId(key);
+  await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  await Notifications.scheduleNotificationAsync({
+    identifier: id,
+    content: { title, body, sound: true, data: { weeklyKey: key } },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday, hour, minute },
+  });
+  return true;
+}
+
 // ─── Профілактика: ліки (кілька разів/день) ─────────────────────────────────
 
 /**

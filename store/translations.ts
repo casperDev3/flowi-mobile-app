@@ -500,6 +500,32 @@ export interface Translations {
   insights: string;
   thisWeek: string;
   back: string;
+  // Body measurements
+  bodyMeasurements: string;
+  bodyMeasurementsSub: string;
+  addBodyEntry: string;
+  bodyEntryTitle: string;
+  mWaist: string;
+  mHips: string;
+  mChest: string;
+  mThigh: string;
+  mBiceps: string;
+  mNeck: string;
+  mCalf: string;
+  mBodyfat: string;
+  whtr: string;
+  whr: string;
+  leanMass: string;
+  bodyfatEst: string;
+  whtrHealthy: string;
+  whtrIncreased: string;
+  whtrHigh: string;
+  weightReminder: string;
+  weightReminderBody: string;
+  measurementsReminder: string;
+  measurementsReminderBody: string;
+  noMeasurements: string;
+  perMonth: string;
   // Prevention sub-modules
   meds: string;
   medsSub: string;
@@ -1097,6 +1123,31 @@ const uk: Translations = {
   insights: 'Інсайти',
   thisWeek: 'цього тижня',
   back: 'Назад',
+  bodyMeasurements: 'Заміри тіла',
+  bodyMeasurementsSub: 'Вага та обводи',
+  addBodyEntry: 'Запис тіла',
+  bodyEntryTitle: 'Новий запис',
+  mWaist: 'Талія',
+  mHips: 'Стегна',
+  mChest: 'Груди',
+  mThigh: 'Стегно',
+  mBiceps: 'Біцепс',
+  mNeck: 'Шия',
+  mCalf: 'Литка',
+  mBodyfat: '% жиру',
+  whtr: 'Талія/зріст',
+  whr: 'Талія/стегна',
+  leanMass: 'Суха маса',
+  bodyfatEst: '% жиру (оцінка)',
+  whtrHealthy: 'Норма',
+  whtrIncreased: 'Підвищений',
+  whtrHigh: 'Високий',
+  weightReminder: 'Нагадувати зважуватись',
+  weightReminderBody: 'Час зважитись 🏋️',
+  measurementsReminder: 'Нагадувати про заміри',
+  measurementsReminderBody: 'Час зробити заміри тіла 📏',
+  noMeasurements: 'Ще немає вимірів',
+  perMonth: 'за міс',
   meds: 'Ліки та добавки',
   medsSub: 'Нагадування про прийом',
   checkups: 'Медогляди',
@@ -1682,6 +1733,31 @@ const en: Translations = {
   insights: 'Insights',
   thisWeek: 'this week',
   back: 'Back',
+  bodyMeasurements: 'Body measurements',
+  bodyMeasurementsSub: 'Weight & circumferences',
+  addBodyEntry: 'Body entry',
+  bodyEntryTitle: 'New entry',
+  mWaist: 'Waist',
+  mHips: 'Hips',
+  mChest: 'Chest',
+  mThigh: 'Thigh',
+  mBiceps: 'Biceps',
+  mNeck: 'Neck',
+  mCalf: 'Calf',
+  mBodyfat: 'Body fat %',
+  whtr: 'Waist/height',
+  whr: 'Waist/hips',
+  leanMass: 'Lean mass',
+  bodyfatEst: 'Body fat % (est.)',
+  whtrHealthy: 'Healthy',
+  whtrIncreased: 'Increased',
+  whtrHigh: 'High',
+  weightReminder: 'Weight reminder',
+  weightReminderBody: 'Time to weigh in 🏋️',
+  measurementsReminder: 'Measurements reminder',
+  measurementsReminderBody: 'Time to take body measurements 📏',
+  noMeasurements: 'No measurements yet',
+  perMonth: '/mo',
   meds: 'Meds & supplements',
   medsSub: 'Intake reminders',
   checkups: 'Checkups',

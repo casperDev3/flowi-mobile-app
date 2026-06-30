@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { HK_AVAILABLE, HKDayData, fetchTodayData, initHealthKit } from '@/store/healthkit';
-import { cancelDailyReminder, scheduleDailyReminder } from '@/store/notifications';
+import { cancelDailyReminder, scheduleDailyReminder, scheduleWeeklyReminder } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { Events, track } from '@/utils/analytics';
 import { isSameDay } from '@/utils/dateUtils';
@@ -22,10 +22,12 @@ import {
 export const ENTRIES_KEY = 'health_entries_v2';
 export const REMINDERS_KEY = 'health_reminders';
 
-export interface Reminders { water: boolean; sleep: boolean; }
-const DEFAULT_REMINDERS: Reminders = { water: false, sleep: false };
-const WATER_REMINDER_HOUR = 14;
-const SLEEP_REMINDER_HOUR = 22;
+export interface Reminders { water: boolean; sleep: boolean; weight: boolean; measurements: boolean; }
+const DEFAULT_REMINDERS: Reminders = { water: false, sleep: false, weight: false, measurements: false };
+// Години щоденних нагадувань; заміри — щотижня (неділя)
+const DAILY_HOURS: Record<'water' | 'sleep' | 'weight', number> = { water: 14, sleep: 22, weight: 8 };
+const MEASUREMENTS_WEEKDAY = 1; // 1 = неділя
+const MEASUREMENTS_HOUR = 9;
 
 export interface NewEntry {
   type: EntryType;
@@ -140,9 +142,9 @@ export function useHealthEntries() {
 
   const setReminder = useCallback(async (key: keyof Reminders, on: boolean, title: string, body: string) => {
     setReminders(curr => { const next = { ...curr, [key]: on }; saveData(REMINDERS_KEY, next); return next; });
-    const hour = key === 'water' ? WATER_REMINDER_HOUR : SLEEP_REMINDER_HOUR;
-    if (on) await scheduleDailyReminder(key, hour, 0, title, body);
-    else await cancelDailyReminder(key);
+    if (!on) { await cancelDailyReminder(key); return; }
+    if (key === 'measurements') await scheduleWeeklyReminder(key, MEASUREMENTS_WEEKDAY, MEASUREMENTS_HOUR, 0, title, body);
+    else await scheduleDailyReminder(key, DAILY_HOURS[key], 0, title, body);
   }, []);
 
   // ─── Агрегати (сьогодні) ──────────────────────────────────────────────────
@@ -161,7 +163,7 @@ export function useHealthEntries() {
 
   const latestWeight = useMemo(() => {
     const all = entries.filter(e => e.type === 'weight');
-    return all.length ? all[all.length - 1].value : null;
+    return all.length ? all[0].value : null; // newest-first
   }, [entries]);
 
   const goals = useMemo(() => computeGoals(profile, latestWeight ?? FALLBACK_WEIGHT), [profile, latestWeight]);
@@ -190,7 +192,7 @@ export function useHealthEntries() {
   const prevWeight = useMemo(() => {
     const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
     const old = entries.filter(e => e.type === 'weight' && new Date(e.date) <= weekAgo);
-    return old.length ? old[old.length - 1].value : null;
+    return old.length ? old[0].value : null; // newest серед записів ≤ тиждень тому
   }, [entries]);
 
   return {

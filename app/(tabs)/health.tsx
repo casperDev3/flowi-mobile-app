@@ -209,10 +209,12 @@ export default function HealthHubScreen() {
                 onPress={() => router.push('/health-prevention')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
             </View>
             <View style={{ flexDirection: 'row', gap: 12 }}>
+              <HubTile title={tr.bodyMeasurements} icon="ruler.fill" color={ACCENT_WEIGHT}
+                stat={latestWeight ? `${latestWeight} кг` : tr.bodyMeasurementsSub}
+                onPress={() => router.push('/health-body')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               <HubTile title={tr.healthProfile} icon="person.fill" color={ACCENT_PROT}
                 hint={profile ? `${goals.calories} кк · ${goals.protein} г` : tr.profileHint}
                 onPress={() => router.push('/health-profile')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-              <View style={{ flex: 1 }} />
             </View>
           </View>
 

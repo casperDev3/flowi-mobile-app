@@ -59,6 +59,7 @@ function RootLayoutContent() {
         <Stack.Screen name="health-activity" options={{ headerShown: false }} />
         <Stack.Screen name="health-sleep" options={{ headerShown: false }} />
         <Stack.Screen name="health-vitals" options={{ headerShown: false }} />
+        <Stack.Screen name="health-body" options={{ headerShown: false }} />
         <Stack.Screen name="health-prevention" options={{ headerShown: false }} />
         <Stack.Screen name="health-meds" options={SHEET_OPTIONS} />
         <Stack.Screen name="health-checkups" options={SHEET_OPTIONS} />

@@ -8,7 +8,21 @@ export type EntryType =
   | 'calories'      // спожиті калорії (їжа)
   | 'calories_out'  // спалені калорії (активність / HealthKit)
   | 'steps'
-  | 'pulse';
+  | 'pulse'
+  // ─── Заміри тіла (см; bodyfat — у %) ───
+  | 'chest'
+  | 'waist'
+  | 'hips'
+  | 'thigh'
+  | 'biceps'
+  | 'neck'
+  | 'calf'
+  | 'bodyfat';
+
+export type MeasurementType = 'chest' | 'waist' | 'hips' | 'thigh' | 'biceps' | 'neck' | 'calf' | 'bodyfat';
+
+/** Перелік вимірів тіла (без ваги — вона окремий тип) для форми/списку */
+export const MEASUREMENT_TYPES: MeasurementType[] = ['waist', 'hips', 'chest', 'biceps', 'thigh', 'neck', 'calf', 'bodyfat'];
 
 export interface HealthEntry {
   id: string;
@@ -154,10 +168,19 @@ export function sumForDay(entries: HealthEntry[], type: EntryType, day: Date): n
     .reduce((s, e) => s + e.value, 0);
 }
 
-/** Останнє записане значення типу за день (weight/pulse/sleep/mood) */
+/**
+ * Останнє записане значення типу за день. Масив зберігається newest-first
+ * (addEntry/HK-sync роблять prepend), тож найсвіжіше — це pool[0].
+ */
 export function lastForDay(entries: HealthEntry[], type: EntryType, day: Date): number | null {
   const pool = entries.filter(e => e.type === type && isSameDay(new Date(e.date), day));
-  return pool.length ? pool[pool.length - 1].value : null;
+  return pool.length ? pool[0].value : null;
+}
+
+/** Останнє значення типу серед усіх записів (newest-first → [0]) */
+export function latestValue(entries: HealthEntry[], type: EntryType): number | null {
+  const pool = entries.filter(e => e.type === type);
+  return pool.length ? pool[0].value : null;
 }
 
 // ─── Тижневі інсайти (тиждень-до-тижня) ───────────────────────────────────────
@@ -201,4 +224,51 @@ export function getWeeklyInsights(entries: HealthEntry[]): WeeklyInsight[] {
   }
   out.sort((a, b) => Math.abs(b.deltaPct) - Math.abs(a.deltaPct));
   return out;
+}
+
+// ─── Заміри тіла: похідні метрики ─────────────────────────────────────────────
+
+/** Талія/зріст (WHtR). < 0.5 — здорово; 0.5–0.6 — підвищений; ≥ 0.6 — високий ризик */
+export function waistToHeightRatio(waistCm: number | null, heightCm: number): number | null {
+  return waistCm && heightCm ? waistCm / heightCm : null;
+}
+export type WHtRCategory = 'healthy' | 'increased' | 'high';
+export function whtrCategory(whtr: number): WHtRCategory {
+  if (whtr < 0.5) return 'healthy';
+  if (whtr < 0.6) return 'increased';
+  return 'high';
+}
+
+/** Талія/стегна (WHR). Норма: ч < 0.9, ж < 0.85 */
+export function waistToHipRatio(waistCm: number | null, hipsCm: number | null): number | null {
+  return waistCm && hipsCm ? waistCm / hipsCm : null;
+}
+export function whrHealthy(whr: number, sex: Sex): boolean {
+  return sex === 'male' ? whr < 0.9 : whr < 0.85;
+}
+
+/** Суха (безжирова) маса, кг */
+export function leanMass(weightKg: number, bodyfatPct: number): number {
+  return weightKg * (1 - bodyfatPct / 100);
+}
+
+/**
+ * Оцінка % жиру за методом US Navy з обводів (см). Працює без терезів.
+ * Ч: 495 / (1.0324 − 0.19077·log10(талія−шия) + 0.15456·log10(зріст)) − 450
+ * Ж: 495 / (1.29579 − 0.35004·log10(талія+стегна−шия) + 0.22100·log10(зріст)) − 450
+ */
+export function estimateBodyFatNavy(
+  sex: Sex, heightCm: number, neck: number | null, waist: number | null, hips: number | null,
+): number | null {
+  if (!heightCm || !neck || !waist) return null;
+  const log10 = (x: number) => Math.log10(x);
+  let v: number;
+  if (sex === 'male') {
+    if (waist - neck <= 0) return null;
+    v = 495 / (1.0324 - 0.19077 * log10(waist - neck) + 0.15456 * log10(heightCm)) - 450;
+  } else {
+    if (!hips || waist + hips - neck <= 0) return null;
+    v = 495 / (1.29579 - 0.35004 * log10(waist + hips - neck) + 0.22100 * log10(heightCm)) - 450;
+  }
+  return v > 0 && v < 70 ? Math.round(v * 10) / 10 : null;
 }

@@ -1,7 +1,8 @@
 import {
   HealthEntry, HealthProfile,
   bmiCategory, calcBMI, calcBMR, calcCalorieTarget, calcProteinTarget, calcTDEE, calcWaterTarget,
-  computeGoals, getWeeklyInsights, lastForDay, maxHR, stepsToKm, sumForDay,
+  computeGoals, estimateBodyFatNavy, getWeeklyInsights, lastForDay, leanMass, maxHR, stepsToKm, sumForDay,
+  waistToHeightRatio, waistToHipRatio, whrHealthy, whtrCategory,
 } from '@/utils/healthUtils';
 
 const maleProfile: HealthProfile = { sex: 'male', age: 30, heightCm: 180, activity: 'moderate', goal: 'maintain' };
@@ -67,11 +68,12 @@ describe('healthUtils — розрахунки', () => {
 
 describe('healthUtils — агрегати', () => {
   const today = new Date();
+  // newest-first (як зберігає addEntry): найсвіжіша вага 79.5 — перша
   const entries: HealthEntry[] = [
+    { id: '4', type: 'weight', value: 79.5, date: today.toISOString() },
+    { id: '3', type: 'weight', value: 80, date: today.toISOString() },
     { id: '1', type: 'water', value: 250, date: today.toISOString() },
     { id: '2', type: 'water', value: 500, date: today.toISOString() },
-    { id: '3', type: 'weight', value: 80, date: today.toISOString() },
-    { id: '4', type: 'weight', value: 79.5, date: today.toISOString() },
     { id: '5', type: 'water', value: 999, date: daysAgoIso(3) },
   ];
 
@@ -79,7 +81,7 @@ describe('healthUtils — агрегати', () => {
     expect(sumForDay(entries, 'water', today)).toBe(750);
   });
 
-  test('lastForDay повертає останнє значення дня', () => {
+  test('lastForDay повертає найсвіжіше значення дня (newest-first)', () => {
     expect(lastForDay(entries, 'weight', today)).toBe(79.5);
     expect(lastForDay(entries, 'pulse', today)).toBeNull();
   });
@@ -105,5 +107,39 @@ describe('healthUtils — тижневі інсайти', () => {
     for (let i = 0; i < 7; i++) entries.push({ id: `c${i}`, type: 'water', value: 2050, date: daysAgoIso(i) });
     for (let i = 7; i < 14; i++) entries.push({ id: `p${i}`, type: 'water', value: 2000, date: daysAgoIso(i) });
     expect(getWeeklyInsights(entries).find(i => i.type === 'water')).toBeUndefined();
+  });
+});
+
+describe('healthUtils — заміри тіла', () => {
+  test('WHtR і категорія', () => {
+    expect(waistToHeightRatio(85, 170)).toBeCloseTo(0.5, 5);
+    expect(waistToHeightRatio(null, 170)).toBeNull();
+    expect(whtrCategory(0.45)).toBe('healthy');
+    expect(whtrCategory(0.55)).toBe('increased');
+    expect(whtrCategory(0.65)).toBe('high');
+  });
+
+  test('WHR і норма за статтю', () => {
+    expect(waistToHipRatio(85, 100)).toBeCloseTo(0.85, 5);
+    expect(waistToHipRatio(85, null)).toBeNull();
+    expect(whrHealthy(0.85, 'male')).toBe(true);    // < 0.9
+    expect(whrHealthy(0.85, 'female')).toBe(false); // не < 0.85
+  });
+
+  test('суха маса', () => {
+    expect(leanMass(80, 20)).toBeCloseTo(64, 5);
+  });
+
+  test('оцінка % жиру US Navy (ч)', () => {
+    const bf = estimateBodyFatNavy('male', 180, 38, 85, null);
+    expect(bf).not.toBeNull();
+    expect(bf!).toBeGreaterThan(13);
+    expect(bf!).toBeLessThan(19);
+  });
+
+  test('US Navy повертає null за браку даних / нелогічних обводів', () => {
+    expect(estimateBodyFatNavy('male', 180, null, 85, null)).toBeNull();
+    expect(estimateBodyFatNavy('male', 180, 90, 85, null)).toBeNull(); // шия ≥ талія
+    expect(estimateBodyFatNavy('female', 170, 34, 70, null)).toBeNull(); // ж без стегон
   });
 });

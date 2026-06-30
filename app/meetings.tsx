@@ -958,7 +958,7 @@ export default function MeetingsScreen() {
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }} showsVerticalScrollIndicator={false}>
 
           {/* Day view: timeline */}
-          {(span === 'day' || (span === 'week' && selectedDay)) && span !== 'month' && span !== 'quarter' && (() => {
+          {(span === 'day' || (span === 'week' && selectedDay)) && (() => {
             const list = span === 'day' ? (meetingsByDate[selectedDay] ?? []) : dayMeetings;
             return (
               <View>

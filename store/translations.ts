@@ -420,6 +420,7 @@ export interface Translations {
   noRecordsYet: string;
   taskNamePlaceholder2: string;
   duration: string;
+  repeat: string;
   morning: string;
   daytime: string;
   evening: string;
@@ -1041,6 +1042,7 @@ const uk: Translations = {
   noRecordsYet: 'Ще немає записів',
   taskNamePlaceholder2: 'Назва завдання...',
   duration: 'Тривалість',
+  repeat: 'Повторювати',
   morning: 'Ранок',
   daytime: 'День',
   evening: 'Вечір',
@@ -1644,6 +1646,7 @@ const en: Translations = {
   noRecordsYet: 'No records yet',
   taskNamePlaceholder2: 'Task name...',
   duration: 'Duration',
+  repeat: 'Repeat',
   morning: 'Morning',
   daytime: 'Day',
   evening: 'Evening',

@@ -537,6 +537,9 @@ export interface Translations {
   average: string;
   dynamics: string;
   noDataPeriod: string;
+  chartBar: string;
+  chartLine: string;
+  chartDots: string;
   // Prevention sub-modules
   meds: string;
   medsSub: string;
@@ -1169,6 +1172,9 @@ const uk: Translations = {
   average: 'Середнє',
   dynamics: 'Динаміка',
   noDataPeriod: 'Немає даних за період',
+  chartBar: 'Стовпці',
+  chartLine: 'Лінія',
+  chartDots: 'Крапки',
   meds: 'Ліки та добавки',
   medsSub: 'Нагадування про прийом',
   checkups: 'Медогляди',
@@ -1789,6 +1795,9 @@ const en: Translations = {
   average: 'Average',
   dynamics: 'Dynamics',
   noDataPeriod: 'No data for period',
+  chartBar: 'Bars',
+  chartLine: 'Line',
+  chartDots: 'Dots',
   meds: 'Meds & supplements',
   medsSub: 'Intake reminders',
   checkups: 'Checkups',

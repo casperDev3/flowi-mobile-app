@@ -5,19 +5,28 @@ import React, { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PeriodSelector, TrendChart } from '@/components/health/PeriodChart';
+import { ChartTypeToggle, PeriodSelector, TrendChart } from '@/components/health/PeriodChart';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
 import { useScreenView } from '@/hooks/use-screen-view';
+import { useChartType } from '@/store/chart-prefs';
 import { useI18n } from '@/store/i18n';
 import {
   ACCENT, ACCENT_CAL, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
 import { Agg, Period, buildTrend } from '@/utils/healthPeriods';
-import { EntryType } from '@/utils/healthUtils';
+import { EntryType, HealthEntry } from '@/utils/healthUtils';
 
 interface Metric { type: EntryType; label: string; color: string; agg: Agg; unit: string; goal?: number; }
+
+function fmtMetric(m: Metric, v: number): string {
+  if (m.unit === 'sleep') return fmtSleep(Math.round(v));
+  if (m.type === 'steps') return v >= 1000 ? `${(v / 1000).toFixed(1)}т` : `${Math.round(v)}`;
+  if (m.type === 'water') return v >= 1000 ? `${(v / 1000).toFixed(1)} л` : `${Math.round(v)} мл`;
+  if (m.type === 'weight') return `${v.toFixed(1)} кг`;
+  return `${Math.round(v)}${m.unit ? ' ' + m.unit : ''}`;
+}
 
 export default function HealthSummaryScreen() {
   const isDark = useColorScheme() === 'dark';
@@ -40,14 +49,6 @@ export default function HealthSummaryScreen() {
     { type: 'pulse',    label: tr.pulse,    color: ACCENT_PULSE,  agg: 'avg', unit: 'уд' },
   ];
 
-  const fmt = (m: Metric, v: number) => {
-    if (m.unit === 'sleep') return fmtSleep(Math.round(v));
-    if (m.type === 'steps') return v >= 1000 ? `${(v / 1000).toFixed(1)}т` : `${Math.round(v)}`;
-    if (m.type === 'water') return v >= 1000 ? `${(v / 1000).toFixed(1)} л` : `${Math.round(v)} мл`;
-    if (m.type === 'weight') return `${v.toFixed(1)} кг`;
-    return `${Math.round(v)}${m.unit ? ' ' + m.unit : ''}`;
-  };
-
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
@@ -65,34 +66,45 @@ export default function HealthSummaryScreen() {
 
         <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
-          {metrics.map(m => {
-            const d = buildTrend(h.entries, m.type, period, m.agg, tr.weekdays, tr.monthsShort);
-            const hasAny = d.hasData.some(Boolean);
-            const headline = m.agg === 'sum' ? d.total : (d.latest ?? d.avg);
-            const sub2 = m.agg === 'sum'
-              ? `${tr.average}: ${fmt(m, d.avg)}`
-              : (d.delta != null && d.delta !== 0 ? `${tr.dynamics}: ${d.delta > 0 ? '+' : ''}${m.type === 'weight' ? d.delta.toFixed(1) : Math.round(d.delta)}` : tr.average + ' ' + fmt(m, d.avg));
-            return (
-              <BlurView key={m.type} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
-                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: m.color, marginRight: 8, alignSelf: 'center' }} />
-                  <Text style={{ color: c.text, fontSize: 15, fontWeight: '800', flex: 1 }}>{m.label}</Text>
-                  <Text style={{ color: m.color, fontSize: 17, fontWeight: '800' }}>{hasAny ? fmt(m, headline) : '—'}</Text>
-                </View>
-                {hasAny ? (
-                  <>
-                    <TrendChart data={d} color={m.color} sub={c.sub} goal={m.goal} height={90} />
-                    <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>{sub2}</Text>
-                  </>
-                ) : (
-                  <Text style={{ color: c.sub, fontSize: 12, paddingVertical: 16, textAlign: 'center' }}>{tr.noDataPeriod}</Text>
-                )}
-              </BlurView>
-            );
-          })}
+          {metrics.map(m => (
+            <SummaryCard key={m.type} m={m} period={period} entries={h.entries} isDark={isDark} c={c} tr={tr} />
+          ))}
         </ScrollView>
       </SafeAreaView>
     </View>
+  );
+}
+
+function SummaryCard({ m, period, entries, isDark, c, tr }: {
+  m: Metric; period: Period; entries: HealthEntry[]; isDark: boolean; c: any; tr: any;
+}) {
+  const [chartType, setChartType] = useChartType(m.type);
+  const d = buildTrend(entries, m.type, period, m.agg, tr.weekdays, tr.monthsShort);
+  const hasAny = d.hasData.some(Boolean);
+  const headline = m.agg === 'sum' ? d.total : (d.latest ?? d.avg);
+  const sub2 = m.agg === 'sum'
+    ? `${tr.average}: ${fmtMetric(m, d.avg)}`
+    : (d.delta != null && d.delta !== 0
+        ? `${tr.dynamics}: ${d.delta > 0 ? '+' : ''}${m.type === 'weight' ? d.delta.toFixed(1) : Math.round(d.delta)}`
+        : `${tr.average}: ${fmtMetric(m, d.avg)}`);
+
+  return (
+    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: m.color, marginRight: 8 }} />
+        <Text style={{ color: c.text, fontSize: 15, fontWeight: '800', flex: 1 }}>{m.label}</Text>
+        <Text style={{ color: m.color, fontSize: 17, fontWeight: '800', marginRight: 10 }}>{hasAny ? fmtMetric(m, headline) : '—'}</Text>
+        <ChartTypeToggle value={chartType} onChange={setChartType} color={m.color} c={c} tr={tr} />
+      </View>
+      {hasAny ? (
+        <>
+          <TrendChart data={d} color={m.color} sub={c.sub} goal={m.goal} height={90} chartType={chartType} />
+          <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>{sub2}</Text>
+        </>
+      ) : (
+        <Text style={{ color: c.sub, fontSize: 12, paddingVertical: 16, textAlign: 'center' }}>{tr.noDataPeriod}</Text>
+      )}
+    </BlurView>
   );
 }
 

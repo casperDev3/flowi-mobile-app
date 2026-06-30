@@ -66,6 +66,7 @@ const MAPPING: Record<string, MaterialIconName> = {
   'wallet.pass': 'account-balance-wallet',
   'chart.bar.fill': 'bar-chart',
   'chart.line.uptrend.xyaxis': 'show-chart',
+  'chart.dots.scatter': 'scatter-plot',
   'building.columns.fill': 'account-balance',
   'briefcase.fill': 'work',
   'laptopcomputer': 'laptop',

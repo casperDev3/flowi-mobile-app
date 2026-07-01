@@ -74,10 +74,7 @@ export default function TabLayout() {
             />
             <Tabs.Screen
                 name="index"
-                options={{
-                    title: tr.tabTasks,
-                    tabBarIcon: ({color}) => <IconSymbol size={32} name="checklist" color={color}/>,
-                }}
+                options={{href: null}}
             />
             <Tabs.Screen
                 name="time"

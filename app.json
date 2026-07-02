@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.casper3.f-tracking-app"
+      "bundleIdentifier": "com.casper3.f-tracking-app",
+      "appleTeamId": "D28SUT8PH4"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +28,7 @@
     },
     "plugins": [
       "expo-router",
-[
+      [
         "expo-notifications",
         {
           "icon": "./assets/logo_app.png",

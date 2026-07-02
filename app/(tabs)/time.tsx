@@ -21,6 +21,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { loadData, saveData } from '@/store/storage';
 import { useTimerContext } from '@/store/timer-context';
 import { useI18n } from '@/store/i18n';
@@ -59,6 +60,7 @@ const fmtDur = (s: number) => {
 
 export default function TimeScreen() {
   const isDark = useColorScheme() === 'dark';
+  useScreenView('time');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { pendingTask, setPendingTask } = useTimerContext();

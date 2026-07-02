@@ -14,6 +14,9 @@ export interface HKDayData {
   weight: number | null;
   distanceKm: number | null;
   sleepMinutes: number | null;
+  flightsClimbed?: number | null;
+  hrv?: number | null;
+  spo2?: number | null;
 }
 
 export interface HKWeekDay {

@@ -84,3 +84,128 @@ export async function cancelReminder(taskId: string, subtaskId?: string): Promis
 export async function getAllScheduledNotifications() {
   return Notifications.getAllScheduledNotificationsAsync();
 }
+
+// ─── Щоденні нагадування (вода / сон тощо) ──────────────────────────────────
+
+/** Стабільний id для щоденного нагадування за ключем */
+export function dailyReminderId(key: string): string {
+  return `daily_${key}`;
+}
+
+/**
+ * Планує щоденне повторюване нагадування о вказаній годині/хвилині.
+ * Якщо вже існує нагадування з таким ключем — перепланує його.
+ */
+export async function scheduleDailyReminder(
+  key: string,
+  hour: number,
+  minute: number,
+  title: string,
+  body: string,
+): Promise<boolean> {
+  const granted = await requestNotificationPermissions();
+  if (!granted) return false;
+
+  const id = dailyReminderId(key);
+  await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: id,
+    content: { title, body, sound: true, data: { dailyKey: key } },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      hour,
+      minute,
+    },
+  });
+  return true;
+}
+
+export async function cancelDailyReminder(key: string): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(dailyReminderId(key)).catch(() => {});
+}
+
+/**
+ * Щотижневе нагадування. weekday: 1=неділя … 7=субота (формат expo-notifications).
+ * Використовує той самий id, що й dailyReminderId(key) — тож cancelDailyReminder() його скасовує.
+ */
+export async function scheduleWeeklyReminder(
+  key: string,
+  weekday: number,
+  hour: number,
+  minute: number,
+  title: string,
+  body: string,
+): Promise<boolean> {
+  const granted = await requestNotificationPermissions();
+  if (!granted) return false;
+  const id = dailyReminderId(key);
+  await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  await Notifications.scheduleNotificationAsync({
+    identifier: id,
+    content: { title, body, sound: true, data: { weeklyKey: key } },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday, hour, minute },
+  });
+  return true;
+}
+
+// ─── Профілактика: ліки (кілька разів/день) ─────────────────────────────────
+
+/**
+ * Планує щоденні нагадування для ліків на кожен час прийому.
+ * Повертає масив id запланованих нотифікацій (зберегти у med.notifIds).
+ */
+export async function scheduleMedReminders(
+  medId: string,
+  times: string[],          // ["08:00","20:00"]
+  title: string,
+  body: string,
+): Promise<string[]> {
+  const granted = await requestNotificationPermissions();
+  if (!granted) return [];
+  const ids: string[] = [];
+  for (let i = 0; i < times.length; i++) {
+    const m = times[i].match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) continue;
+    const hour = parseInt(m[1], 10), minute = parseInt(m[2], 10);
+    const id = `med_${medId}_${i}`;
+    await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+    await Notifications.scheduleNotificationAsync({
+      identifier: id,
+      content: { title, body, sound: true, data: { medId } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute },
+    });
+    ids.push(id);
+  }
+  return ids;
+}
+
+export async function cancelMedReminders(ids?: string[]): Promise<void> {
+  if (!ids) return;
+  await Promise.all(ids.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+}
+
+// ─── Профілактика: разові нагадування (огляди/щеплення) ──────────────────────
+
+export async function scheduleDateReminder(
+  id: string,
+  date: Date,
+  title: string,
+  body: string,
+): Promise<string | null> {
+  if (date <= new Date()) return null;
+  const granted = await requestNotificationPermissions();
+  if (!granted) return null;
+  await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  await Notifications.scheduleNotificationAsync({
+    identifier: id,
+    content: { title, body, sound: true },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
+  });
+  return id;
+}
+
+export async function cancelById(id?: string | null): Promise<void> {
+  if (!id) return;
+  await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+}

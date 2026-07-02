@@ -6,6 +6,14 @@ export interface Translations {
   tabFinance: string;
   tabHealth: string;
   tabOptions: string;
+  tabToday: string;
+  todayOverdue: string;
+  todayActive: string;
+  todayTracked: string;
+  todayGreetMorning: string;
+  todayGreetDay: string;
+  todayGreetEvening: string;
+  todayGreetNight: string;
 
   // Common
   cancel: string;
@@ -400,6 +408,7 @@ export interface Translations {
   noRecordsYet: string;
   taskNamePlaceholder2: string;
   duration: string;
+  repeat: string;
   morning: string;
   daytime: string;
   evening: string;
@@ -439,6 +448,168 @@ export interface Translations {
   addWater: string;
   hrs: string;
   mins: string;
+  // Health profile & personalized goals
+  healthProfile: string;
+  profileSub: string;
+  profileHint: string;
+  sexLabel: string;
+  male: string;
+  female: string;
+  ageLabel: string;
+  heightLabel: string;
+  activityLabel: string;
+  actSedentary: string;
+  actLight: string;
+  actModerate: string;
+  actActive: string;
+  actVeryActive: string;
+  goalLabel: string;
+  goalLose: string;
+  goalMaintain: string;
+  goalGain: string;
+  saveProfile: string;
+  yearsShort: string;
+  // Calories balance & macros
+  consumed: string;
+  burned: string;
+  deficit: string;
+  surplus: string;
+  dailyLimit: string;
+  overLimit: string;
+  withinLimit: string;
+  protein: string;
+  fats: string;
+  carbs: string;
+  proteinShort: string;
+  macrosOptional: string;
+  // BMI
+  bmi: string;
+  bmiUnderweight: string;
+  bmiNormal: string;
+  bmiOverweight: string;
+  bmiObese: string;
+  // Reminders
+  reminders: string;
+  waterReminder: string;
+  sleepReminder: string;
+  remindersSub: string;
+  // Health hub & modules
+  summary: string;
+  sections: string;
+  workoutsLabel: string;
+  workoutsSub: string;
+  nutrition: string;
+  activity: string;
+  sleepRecovery: string;
+  bodyMetrics: string;
+  prevention: string;
+  dueToday: string;
+  restingPulse: string;
+  insights: string;
+  thisWeek: string;
+  back: string;
+  // Body measurements
+  bodyMeasurements: string;
+  bodyMeasurementsSub: string;
+  addBodyEntry: string;
+  bodyEntryTitle: string;
+  mWaist: string;
+  mHips: string;
+  mChest: string;
+  mThigh: string;
+  mBiceps: string;
+  mNeck: string;
+  mCalf: string;
+  mBodyfat: string;
+  whtr: string;
+  whr: string;
+  leanMass: string;
+  bodyfatEst: string;
+  whtrHealthy: string;
+  whtrIncreased: string;
+  whtrHigh: string;
+  weightReminder: string;
+  weightReminderBody: string;
+  measurementsReminder: string;
+  measurementsReminderBody: string;
+  noMeasurements: string;
+  perMonth: string;
+  // Periods + summary page
+  pDay: string;
+  pWeek: string;
+  pMonth: string;
+  pQuarter: string;
+  pYear: string;
+  healthSummary: string;
+  total: string;
+  average: string;
+  dynamics: string;
+  noDataPeriod: string;
+  chartBar: string;
+  chartLine: string;
+  chartDots: string;
+  // Online / offline mode
+  workMode: string;
+  modeOnline: string;
+  modeOffline: string;
+  offlineDesc: string;
+  unavailableOffline: string;
+  enableOnline: string;
+  offlineBadge: string;
+  sendUnavailableOffline: string;
+  // Onboarding
+  onbWelcomeTitle: string;
+  onbWelcomeDesc: string;
+  onbStart: string;
+  onbSkip: string;
+  onbProfileTitle: string;
+  onbProfileDesc: string;
+  onbNext: string;
+  onbNotifTitle: string;
+  onbNotifDesc: string;
+  onbAllow: string;
+  onbLater: string;
+  onbDoneTitle: string;
+  onbDoneDesc: string;
+  onbBegin: string;
+  // Prevention sub-modules
+  meds: string;
+  medsSub: string;
+  checkups: string;
+  checkupsSub: string;
+  vaccines: string;
+  vaccinesSub: string;
+  habits: string;
+  habitsSub: string;
+  // Meds
+  addMed: string;
+  medName: string;
+  medDose: string;
+  medTimes: string;
+  taken: string;
+  takeNow: string;
+  medActive: string;
+  finished: string;
+  adherence: string;
+  // Checkups / vaccines
+  addCheckup: string;
+  addVaccine: string;
+  title: string;
+  result: string;
+  nextDate: string;
+  kindAnalysis: string;
+  kindVisit: string;
+  kindProcedure: string;
+  doseNo: string;
+  upcoming: string;
+  past: string;
+  // Habits
+  addHabit: string;
+  streak: string;
+  daysStreak: string;
+  // Report export
+  exportReport: string;
+  reportSub: string;
 
   // Data screen
   autoBackup: string;
@@ -531,6 +702,14 @@ const uk: Translations = {
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
   tabOptions: 'Опції',
+  tabToday: 'Сьогодні',
+  todayOverdue: 'прострочено',
+  todayActive: 'активних',
+  todayTracked: 'відстежено',
+  todayGreetMorning: 'Доброго ранку',
+  todayGreetDay: 'Доброго дня',
+  todayGreetEvening: 'Доброго вечора',
+  todayGreetNight: 'Доброї ночі',
 
   cancel: 'Скасувати',
   delete: 'Видалити',
@@ -904,6 +1083,7 @@ const uk: Translations = {
   noRecordsYet: 'Ще немає записів',
   taskNamePlaceholder2: 'Назва завдання...',
   duration: 'Тривалість',
+  repeat: 'Повторювати',
   morning: 'Ранок',
   daytime: 'День',
   evening: 'Вечір',
@@ -942,6 +1122,154 @@ const uk: Translations = {
   addWater: 'Додати воду',
   hrs: 'год',
   mins: 'хвил',
+  healthProfile: 'Профіль здоров\'я',
+  profileSub: 'Стать, вік, зріст і ціль для персональних норм',
+  profileHint: 'Заповніть профіль для персональних цілей',
+  sexLabel: 'СТАТЬ',
+  male: 'Чоловіча',
+  female: 'Жіноча',
+  ageLabel: 'ВІК',
+  heightLabel: 'ЗРІСТ (СМ)',
+  activityLabel: 'РІВЕНЬ АКТИВНОСТІ',
+  actSedentary: 'Сидячий',
+  actLight: 'Легкий',
+  actModerate: 'Помірний',
+  actActive: 'Активний',
+  actVeryActive: 'Дуже активний',
+  goalLabel: 'ЦІЛЬ',
+  goalLose: 'Схуднути',
+  goalMaintain: 'Підтримка',
+  goalGain: 'Набрати',
+  saveProfile: 'Зберегти профіль',
+  yearsShort: 'р.',
+  consumed: 'Спожито',
+  burned: 'Спалено',
+  deficit: 'дефіцит',
+  surplus: 'профіцит',
+  dailyLimit: 'Денний ліміт',
+  overLimit: 'Перевищено',
+  withinLimit: 'У межах норми',
+  protein: 'Білки',
+  fats: 'Жири',
+  carbs: 'Вуглеводи',
+  proteinShort: 'б',
+  macrosOptional: 'БЖВ (г, необов\'язково)',
+  bmi: 'ІМТ',
+  bmiUnderweight: 'Недостатня',
+  bmiNormal: 'Норма',
+  bmiOverweight: 'Надмірна',
+  bmiObese: 'Ожиріння',
+  reminders: 'Нагадування',
+  waterReminder: 'Нагадувати пити воду',
+  sleepReminder: 'Нагадувати про сон',
+  remindersSub: 'Щоденні нагадування про звички',
+  summary: 'Зведена статистика',
+  sections: 'Розділи',
+  workoutsLabel: 'Тренування',
+  workoutsSub: 'Переглянути та додати',
+  nutrition: 'Харчування',
+  activity: 'Активність',
+  sleepRecovery: 'Сон і відновлення',
+  bodyMetrics: 'Показники тіла',
+  prevention: 'Профілактика',
+  dueToday: 'сьогодні',
+  restingPulse: 'Пульс спокою',
+  insights: 'Інсайти',
+  thisWeek: 'цього тижня',
+  back: 'Назад',
+  bodyMeasurements: 'Заміри тіла',
+  bodyMeasurementsSub: 'Вага та обводи',
+  addBodyEntry: 'Запис тіла',
+  bodyEntryTitle: 'Новий запис',
+  mWaist: 'Талія',
+  mHips: 'Стегна',
+  mChest: 'Груди',
+  mThigh: 'Стегно',
+  mBiceps: 'Біцепс',
+  mNeck: 'Шия',
+  mCalf: 'Литка',
+  mBodyfat: '% жиру',
+  whtr: 'Талія/зріст',
+  whr: 'Талія/стегна',
+  leanMass: 'Суха маса',
+  bodyfatEst: '% жиру (оцінка)',
+  whtrHealthy: 'Норма',
+  whtrIncreased: 'Підвищений',
+  whtrHigh: 'Високий',
+  weightReminder: 'Нагадувати зважуватись',
+  weightReminderBody: 'Час зважитись 🏋️',
+  measurementsReminder: 'Нагадувати про заміри',
+  measurementsReminderBody: 'Час зробити заміри тіла 📏',
+  noMeasurements: 'Ще немає вимірів',
+  perMonth: 'за міс',
+  pDay: 'День',
+  pWeek: 'Тиж',
+  pMonth: 'Міс',
+  pQuarter: '3 міс',
+  pYear: 'Рік',
+  healthSummary: 'Зведена статистика',
+  total: 'Усього',
+  average: 'Середнє',
+  dynamics: 'Динаміка',
+  noDataPeriod: 'Немає даних за період',
+  chartBar: 'Стовпці',
+  chartLine: 'Лінія',
+  chartDots: 'Крапки',
+  workMode: 'Режим роботи',
+  modeOnline: 'Онлайн',
+  modeOffline: 'Офлайн',
+  offlineDesc: 'Дані лише на пристрої. Онлайн-функції (Спільне, синхронізація, AI, інтеграції) вимкнено.',
+  unavailableOffline: 'Недоступно в офлайн-режимі',
+  enableOnline: 'Увімкнути онлайн',
+  offlineBadge: 'Офлайн',
+  sendUnavailableOffline: 'Надсилання недоступне в офлайн-режимі',
+  onbWelcomeTitle: 'Вітаємо у Flowi',
+  onbWelcomeDesc: 'Завдання, фінанси, здоров\'я, час — в одному приватному застосунку. Дані лишаються на вашому пристрої.',
+  onbStart: 'Почати',
+  onbSkip: 'Пропустити',
+  onbProfileTitle: 'Трохи про вас',
+  onbProfileDesc: 'Для персональних цілей здоров\'я (калорії, білок, вода). Можна пропустити.',
+  onbNext: 'Далі',
+  onbNotifTitle: 'Нагадування',
+  onbNotifDesc: 'Дозвольте сповіщення, щоб отримувати нагадування про воду, сон, ліки та завдання.',
+  onbAllow: 'Дозволити',
+  onbLater: 'Пізніше',
+  onbDoneTitle: 'Готово!',
+  onbDoneDesc: 'Усе налаштовано. Почніть із першого запису — і Flowi візьме решту на себе.',
+  onbBegin: 'Розпочати',
+  meds: 'Ліки та добавки',
+  medsSub: 'Нагадування про прийом',
+  checkups: 'Медогляди',
+  checkupsSub: 'Аналізи та візити',
+  vaccines: 'Щеплення',
+  vaccinesSub: 'Календар вакцинації',
+  habits: 'Звички',
+  habitsSub: 'Щоденні чек-лісти',
+  addMed: 'Додати ліки',
+  medName: 'НАЗВА',
+  medDose: 'ДОЗА',
+  medTimes: 'ЧАС ПРИЙОМУ',
+  taken: 'Прийнято',
+  takeNow: 'Прийняти',
+  medActive: 'Активні',
+  finished: 'Завершені',
+  adherence: 'Дотримання',
+  addCheckup: 'Додати огляд',
+  addVaccine: 'Додати щеплення',
+  title: 'НАЗВА',
+  result: 'РЕЗУЛЬТАТ',
+  nextDate: 'НАСТУПНА ДАТА',
+  kindAnalysis: 'Аналіз',
+  kindVisit: 'Візит',
+  kindProcedure: 'Процедура',
+  doseNo: 'ДОЗА №',
+  upcoming: 'Майбутні',
+  past: 'Минулі',
+  addHabit: 'Додати звичку',
+  streak: 'Серія',
+  daysStreak: 'дн.',
+  exportReport: 'Експорт звіту для лікаря',
+  reportSub: 'Поділитися зведенням здоров\'я',
 
   autoBackup: 'Авто-резервування',
   lastBackup: 'Остання копія',
@@ -1024,6 +1352,14 @@ const uk: Translations = {
 
 const en: Translations = {
   tabTasks: 'Tasks',
+  tabToday: 'Today',
+  todayOverdue: 'overdue',
+  todayActive: 'active',
+  todayTracked: 'tracked',
+  todayGreetMorning: 'Good morning',
+  todayGreetDay: 'Good afternoon',
+  todayGreetEvening: 'Good evening',
+  todayGreetNight: 'Good night',
   tabFinance: 'Finance',
   tabHealth: 'Health',
   tabOptions: 'Options',
@@ -1400,6 +1736,7 @@ const en: Translations = {
   noRecordsYet: 'No records yet',
   taskNamePlaceholder2: 'Task name...',
   duration: 'Duration',
+  repeat: 'Repeat',
   morning: 'Morning',
   daytime: 'Day',
   evening: 'Evening',
@@ -1438,6 +1775,154 @@ const en: Translations = {
   addWater: 'Add water',
   hrs: 'hrs',
   mins: 'min',
+  healthProfile: 'Health profile',
+  profileSub: 'Sex, age, height & goal for personal targets',
+  profileHint: 'Set up your profile for personalized goals',
+  sexLabel: 'SEX',
+  male: 'Male',
+  female: 'Female',
+  ageLabel: 'AGE',
+  heightLabel: 'HEIGHT (CM)',
+  activityLabel: 'ACTIVITY LEVEL',
+  actSedentary: 'Sedentary',
+  actLight: 'Light',
+  actModerate: 'Moderate',
+  actActive: 'Active',
+  actVeryActive: 'Very active',
+  goalLabel: 'GOAL',
+  goalLose: 'Lose',
+  goalMaintain: 'Maintain',
+  goalGain: 'Gain',
+  saveProfile: 'Save profile',
+  yearsShort: 'y',
+  consumed: 'Consumed',
+  burned: 'Burned',
+  deficit: 'deficit',
+  surplus: 'surplus',
+  dailyLimit: 'Daily limit',
+  overLimit: 'Over limit',
+  withinLimit: 'Within limit',
+  protein: 'Protein',
+  fats: 'Fats',
+  carbs: 'Carbs',
+  proteinShort: 'p',
+  macrosOptional: 'Macros (g, optional)',
+  bmi: 'BMI',
+  bmiUnderweight: 'Underweight',
+  bmiNormal: 'Normal',
+  bmiOverweight: 'Overweight',
+  bmiObese: 'Obese',
+  reminders: 'Reminders',
+  waterReminder: 'Water reminder',
+  sleepReminder: 'Sleep reminder',
+  remindersSub: 'Daily habit reminders',
+  summary: 'Summary',
+  sections: 'Sections',
+  workoutsLabel: 'Workouts',
+  workoutsSub: 'View and add',
+  nutrition: 'Nutrition',
+  activity: 'Activity',
+  sleepRecovery: 'Sleep & recovery',
+  bodyMetrics: 'Body metrics',
+  prevention: 'Prevention',
+  dueToday: 'today',
+  restingPulse: 'Resting pulse',
+  insights: 'Insights',
+  thisWeek: 'this week',
+  back: 'Back',
+  bodyMeasurements: 'Body measurements',
+  bodyMeasurementsSub: 'Weight & circumferences',
+  addBodyEntry: 'Body entry',
+  bodyEntryTitle: 'New entry',
+  mWaist: 'Waist',
+  mHips: 'Hips',
+  mChest: 'Chest',
+  mThigh: 'Thigh',
+  mBiceps: 'Biceps',
+  mNeck: 'Neck',
+  mCalf: 'Calf',
+  mBodyfat: 'Body fat %',
+  whtr: 'Waist/height',
+  whr: 'Waist/hips',
+  leanMass: 'Lean mass',
+  bodyfatEst: 'Body fat % (est.)',
+  whtrHealthy: 'Healthy',
+  whtrIncreased: 'Increased',
+  whtrHigh: 'High',
+  weightReminder: 'Weight reminder',
+  weightReminderBody: 'Time to weigh in 🏋️',
+  measurementsReminder: 'Measurements reminder',
+  measurementsReminderBody: 'Time to take body measurements 📏',
+  noMeasurements: 'No measurements yet',
+  perMonth: '/mo',
+  pDay: 'Day',
+  pWeek: 'Week',
+  pMonth: 'Month',
+  pQuarter: '3 mo',
+  pYear: 'Year',
+  healthSummary: 'Summary',
+  total: 'Total',
+  average: 'Average',
+  dynamics: 'Dynamics',
+  noDataPeriod: 'No data for period',
+  chartBar: 'Bars',
+  chartLine: 'Line',
+  chartDots: 'Dots',
+  workMode: 'Mode',
+  modeOnline: 'Online',
+  modeOffline: 'Offline',
+  offlineDesc: 'Data stays on device only. Online features (Shared, sync, AI, integrations) are off.',
+  unavailableOffline: 'Unavailable in offline mode',
+  enableOnline: 'Go online',
+  offlineBadge: 'Offline',
+  sendUnavailableOffline: 'Sending is unavailable offline',
+  onbWelcomeTitle: 'Welcome to Flowi',
+  onbWelcomeDesc: 'Tasks, finance, health, time — in one private app. Your data stays on your device.',
+  onbStart: 'Get started',
+  onbSkip: 'Skip',
+  onbProfileTitle: 'A bit about you',
+  onbProfileDesc: 'For personal health goals (calories, protein, water). You can skip this.',
+  onbNext: 'Next',
+  onbNotifTitle: 'Reminders',
+  onbNotifDesc: 'Allow notifications to get reminders for water, sleep, meds and tasks.',
+  onbAllow: 'Allow',
+  onbLater: 'Later',
+  onbDoneTitle: 'All set!',
+  onbDoneDesc: 'Everything is ready. Start with your first entry — Flowi handles the rest.',
+  onbBegin: 'Start',
+  meds: 'Meds & supplements',
+  medsSub: 'Intake reminders',
+  checkups: 'Checkups',
+  checkupsSub: 'Tests & visits',
+  vaccines: 'Vaccines',
+  vaccinesSub: 'Vaccination calendar',
+  habits: 'Habits',
+  habitsSub: 'Daily checklists',
+  addMed: 'Add medication',
+  medName: 'NAME',
+  medDose: 'DOSE',
+  medTimes: 'INTAKE TIMES',
+  taken: 'Taken',
+  takeNow: 'Take',
+  medActive: 'Active',
+  finished: 'Finished',
+  adherence: 'Adherence',
+  addCheckup: 'Add checkup',
+  addVaccine: 'Add vaccine',
+  title: 'TITLE',
+  result: 'RESULT',
+  nextDate: 'NEXT DATE',
+  kindAnalysis: 'Analysis',
+  kindVisit: 'Visit',
+  kindProcedure: 'Procedure',
+  doseNo: 'DOSE No',
+  upcoming: 'Upcoming',
+  past: 'Past',
+  addHabit: 'Add habit',
+  streak: 'Streak',
+  daysStreak: 'd',
+  exportReport: 'Export report for doctor',
+  reportSub: 'Share your health summary',
 
   autoBackup: 'Auto-backup',
   lastBackup: 'Last backup',

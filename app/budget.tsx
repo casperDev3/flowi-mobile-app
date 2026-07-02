@@ -353,7 +353,7 @@ export default function BudgetScreen() {
                 Бюджет не налаштовано
               </Text>
               <Text style={{ fontSize: 14, color: c.sub, marginTop: 6, textAlign: 'center' }}>
-                Категорії з'являться автоматично{'\n'}після додавання витрат у Фінансах
+                Категорії з&apos;являться автоматично{'\n'}після додавання витрат у Фінансах
               </Text>
               <TouchableOpacity
                 onPress={() => setShowAddModal(true)}

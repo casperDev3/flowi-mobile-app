@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
@@ -235,6 +236,7 @@ export default function AgentScreen() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
+    <OfflineOverlay>
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
@@ -409,7 +411,7 @@ export default function AgentScreen() {
                     OpenClaw готовий
                   </Text>
                   <Text style={{ color: c.sub, fontSize: 14, textAlign: 'center', lineHeight: 21 }}>
-                    Напиши що-небудь і агент виконає завдання на твоєму комп'ютері
+                    Напиши що-небудь і агент виконає завдання на твоєму комп&apos;ютері
                   </Text>
 
                   {/* Suggestions */}
@@ -536,6 +538,7 @@ export default function AgentScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
+    </OfflineOverlay>
   );
 }
 

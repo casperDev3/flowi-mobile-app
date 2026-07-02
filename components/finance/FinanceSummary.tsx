@@ -246,16 +246,16 @@ function PrimaryBlock({
         </View>
       )}
 
-      <View style={{ flexDirection: 'row', gap: 14, marginTop: 12, alignItems: 'center' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 6, marginTop: 12, alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.green }} />
           <Text style={{ color: c.sub, fontSize: 11 }}>{labels.income}</Text>
-          <Text style={{ color: c.green, fontSize: 13, fontWeight: '800', marginLeft: 2 }}>{fmt(income, primary)}</Text>
+          <Text numberOfLines={1} style={{ color: c.green, fontSize: 13, fontWeight: '800', marginLeft: 2, flexShrink: 1 }}>{fmt(income, primary)}</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.red }} />
           <Text style={{ color: c.sub, fontSize: 11 }}>{labels.expense}</Text>
-          <Text style={{ color: c.red, fontSize: 13, fontWeight: '800', marginLeft: 2 }}>{fmt(expense, primary)}</Text>
+          <Text numberOfLines={1} style={{ color: c.red, fontSize: 13, fontWeight: '800', marginLeft: 2, flexShrink: 1 }}>{fmt(expense, primary)}</Text>
         </View>
         {income > 0 && (
           <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4 }}>

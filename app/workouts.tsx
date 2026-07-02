@@ -152,7 +152,7 @@ function ExerciseModal({
             <Text style={sectionLabel(c)}>Назва вправи *</Text>
             <TextInput style={inp} value={name} onChangeText={setName} placeholder="Наприклад: Жим лежачи" placeholderTextColor={c.sub} />
 
-            <Text style={[sectionLabel(c), { marginTop: 16 }]}>Група м'язів</Text>
+            <Text style={[sectionLabel(c), { marginTop: 16 }]}>Група м&apos;язів</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
                 {MUSCLE_GROUPS.map(mg => (

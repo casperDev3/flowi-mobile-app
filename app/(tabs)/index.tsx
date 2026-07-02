@@ -25,6 +25,7 @@ import { MonthPicker } from '@/components/shared/MonthPicker';
 import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/shared/MeetingFormSheet';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
@@ -262,6 +263,7 @@ function historyEventColor(type: HistoryEventType): string {
 
 export default function TasksScreen() {
   const isDark = useColorScheme() === 'dark';
+  useScreenView('tasks');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tr, lang } = useI18n();

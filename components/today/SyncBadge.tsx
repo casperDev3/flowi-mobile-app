@@ -2,6 +2,8 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { Radius } from '@/constants/tokens';
+
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppMode } from '@/store/app-mode';
@@ -23,7 +25,7 @@ export function SyncBadge() {
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
-  const { state, lastSyncAt, conflictsCount } = useSync();
+  const { state, lastSyncAt, pendingCount, conflictsCount } = useSync();
 
   const handlePress = () => {
     if (state === 'error' || conflictsCount > 0) {
@@ -35,7 +37,7 @@ export function SyncBadge() {
 
   // ── Офлайн ──────────────────────────────────────────────────────────────────
   if (!online) {
-    const offlineSubColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
+    const offlineSubColor = isDark ? 'rgba(255,255,255,0.62)' : 'rgba(0,0,0,0.58)';
     const offlineBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
     return (
       <TouchableOpacity
@@ -97,6 +99,21 @@ export function SyncBadge() {
     );
   }
 
+  // ── Очікує синхронізації (idle + pendingCount > 0) ───────────────────────
+  if (pendingCount > 0 && state === 'idle') {
+    return (
+      <TouchableOpacity
+        onPress={handlePress}
+        activeOpacity={0.7}
+        style={[s.pill, { backgroundColor: '#D9770618' }]}
+        accessibilityRole="button"
+        accessibilityLabel={`${pendingCount} ${tr.syncPending}`}>
+        <IconSymbol name="arrow.triangle.2.circlepath" size={12} color="#D97706" />
+        <Text style={[s.text, { color: '#D97706', marginLeft: 4 }]}>{pendingCount} {tr.syncPending}</Text>
+      </TouchableOpacity>
+    );
+  }
+
   // ── Ок — зелена + відносний час ───────────────────────────────────────────
   const timeLabel = lastSyncAt ? fmtRelative(lastSyncAt) : '';
   return (
@@ -118,7 +135,7 @@ const s = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
+    borderRadius: Radius.xxl,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },

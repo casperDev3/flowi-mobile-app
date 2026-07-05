@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   KeyboardAvoidingView,
   Modal,
@@ -18,8 +19,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import Animated, { FadeInDown, FadeOutUp, LinearTransition } from 'react-native-reanimated';
+import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useMotion } from '@/hooks/use-motion';
+import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 
@@ -49,6 +54,8 @@ function relativeDate(iso: string): string {
 export default function NotesScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  const { tr } = useI18n();
+  const motion = useMotion();
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -76,6 +83,9 @@ export default function NotesScreen() {
   useEffect(() => {
     if (initialized) void saveSynced('notes', notes);
   }, [notes, initialized]);
+
+  // Undo-тост (Stack-скрін — нижнє положення)
+  const { show: showUndo, element: undoElement } = useUndoToast(false);
 
   const openNew = () => {
     setEditTitle('');
@@ -117,8 +127,28 @@ export default function NotesScreen() {
   };
 
   const deleteNote = (id: string) => {
-    setNotes(prev => prev.filter(n => n.id !== id));
-    setSelected(null);
+    const noteToDelete = notes.find(n => n.id === id);
+    Alert.alert(
+      tr.deletePermanently,
+      noteToDelete?.title ? `«${noteToDelete.title}»\n${tr.cannotUndo}` : tr.cannotUndo,
+      [
+        { text: tr.cancel, style: 'cancel' },
+        {
+          text: tr.delete,
+          style: 'destructive',
+          onPress: () => {
+            setNotes(prev => prev.filter(n => n.id !== id));
+            setSelected(null);
+            // Undo: повернути нотатку
+            if (noteToDelete) {
+              showUndo(tr.noteDeleted, () => {
+                setNotes(prev => [...prev, noteToDelete]);
+              });
+            }
+          },
+        },
+      ],
+    );
   };
 
   const c = {
@@ -126,7 +156,7 @@ export default function NotesScreen() {
     bg2:    isDark ? '#1A1510' : '#FFF3DC',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(245,158,11,0.2)',
     text:   isDark ? '#FFF8E7' : '#1C1209',
-    sub:    isDark ? 'rgba(255,248,231,0.45)' : 'rgba(28,18,9,0.45)',
+    sub:    isDark ? 'rgba(255,248,231,0.62)' : 'rgba(28,18,9,0.58)',
     accent: '#F59E0B',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(16,13,8,0.98)' : 'rgba(255,251,245,0.98)',
@@ -185,8 +215,16 @@ export default function NotesScreen() {
           {notes.length === 0 && (
             <View style={{ alignItems: 'center', paddingVertical: 72 }}>
               <IconSymbol name="note.text" size={44} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 16, fontWeight: '600' }}>Немає нотаток</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 5, opacity: 0.7 }}>Натисніть + щоб створити</Text>
+              <Text style={{ color: c.sub, fontSize: 15, marginTop: 16, fontWeight: '600' }}>{tr.noNotes}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, marginTop: 5, opacity: 0.7 }}>{tr.pressToAdd}</Text>
+              <TouchableOpacity
+                onPress={openNew}
+                accessibilityRole="button"
+                accessibilityLabel={tr.addNote}
+                style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <IconSymbol name="plus" size={15} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addNote}</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -195,20 +233,26 @@ export default function NotesScreen() {
               if (sort === 'newest') return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
               if (sort === 'oldest') return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
               return (a.title || 'Без назви').localeCompare(b.title || 'Без назви', 'uk');
-            }).map(note => (
-              <TouchableOpacity key={note.id} activeOpacity={0.75} onPress={() => openEdit(note)}>
-                <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[ns.noteCard, { borderColor: c.border }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: note.body ? 7 : 0 }}>
-                    <Text style={[ns.noteTitle, { color: c.text, flex: 1 }]} numberOfLines={1}>
-                      {note.title || 'Без назви'}
-                    </Text>
-                    <Text style={[ns.noteDate, { color: c.sub }]}>{relativeDate(note.updatedAt)}</Text>
-                  </View>
-                  {note.body ? (
-                    <Text style={[ns.noteBody, { color: c.sub }]} numberOfLines={3}>{note.body}</Text>
-                  ) : null}
-                </BlurView>
-              </TouchableOpacity>
+            }).map((note, i) => (
+              <Animated.View
+                key={note.id}
+                entering={motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40))}
+                exiting={motion.entering(FadeOutUp.duration(150))}
+                layout={motion.entering(LinearTransition.springify())}>
+                <TouchableOpacity activeOpacity={0.75} onPress={() => openEdit(note)}>
+                  <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[ns.noteCard, { borderColor: c.border }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: note.body ? 7 : 0 }}>
+                      <Text style={[ns.noteTitle, { color: c.text, flex: 1 }]} numberOfLines={1}>
+                        {note.title || 'Без назви'}
+                      </Text>
+                      <Text style={[ns.noteDate, { color: c.sub }]}>{relativeDate(note.updatedAt)}</Text>
+                    </View>
+                    {note.body ? (
+                      <Text style={[ns.noteBody, { color: c.sub }]} numberOfLines={3}>{note.body}</Text>
+                    ) : null}
+                  </BlurView>
+                </TouchableOpacity>
+              </Animated.View>
             ))}
           </View>
         </ScrollView>
@@ -242,7 +286,9 @@ export default function NotesScreen() {
                     {!isNew && (
                       <TouchableOpacity
                         onPress={() => selected && deleteNote(selected.id)}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr.delete}>
                         <IconSymbol name="trash" size={17} color="#EF4444" />
                       </TouchableOpacity>
                     )}
@@ -286,6 +332,9 @@ export default function NotesScreen() {
           </Pressable>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Undo-тост */}
+      {undoElement}
     </View>
   );
 }

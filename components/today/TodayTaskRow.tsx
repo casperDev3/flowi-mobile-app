@@ -1,8 +1,12 @@
 import { BlurView } from 'expo-blur';
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
+import { PressableScale } from '@/components/shared/PressableScale';
+import { Motion } from '@/constants/motion';
+import { useMotion } from '@/hooks/use-motion';
 import type { Translations } from '@/store/translations';
 import { isSameDay } from '@/utils/dateUtils';
 import { PRIORITY_COLORS, Task, isOverdue } from '@/utils/taskUtils';
@@ -15,8 +19,72 @@ interface Props {
   onToggle: (id: string) => void;
 }
 
-export function TodayTaskRow({ tasks, isDark, c, tr, onToggle }: Props) {
+// ─── Per-task row component (manages local checked state for animation) ────────
+
+interface RowProps {
+  task: Task;
+  isDark: boolean;
+  c: { border: string; text: string; sub: string };
+  onToggle: (id: string) => void;
+}
+
+function TodayTaskItem({ task, isDark, c, onToggle }: RowProps) {
+  const { reduced } = useMotion();
+
+  // Local checked state drives the animation; the task disappears from
+  // the filtered list after onToggle propagates, so this is transient.
+  const [localChecked, setLocalChecked] = useState(false);
+
+  const titleOpacity = useSharedValue(1);
+  const titleStyle   = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
+
+  const handlePress = () => {
+    setLocalChecked(true);
+    titleOpacity.value = withTiming(0.45, {
+      duration: reduced ? 0 : Motion.duration.normal,
+    });
+    onToggle(task.id);
+  };
+
+  return (
+    <PressableScale
+      onPress={handlePress}
+      style={{ marginBottom: 6 }}
+      accessibilityRole="checkbox"
+      accessibilityLabel={task.title}
+      accessibilityState={{ checked: localChecked }}>
+      <BlurView
+        intensity={isDark ? 18 : 36}
+        tint={isDark ? 'dark' : 'light'}
+        style={[s.row, { borderColor: c.border }]}>
+        <View style={[s.priorityBar, { backgroundColor: PRIORITY_COLORS[task.priority] }]} />
+        <AnimatedCheck
+          checked={localChecked}
+          size={20}
+          color="#10B981"
+          borderColor={c.sub + '60'}
+          radius={10}  /* circle */
+        />
+        <Animated.Text
+          style={[s.title, { color: c.text }, titleStyle]}
+          numberOfLines={1}>
+          {task.title}
+        </Animated.Text>
+        {isOverdue(task) && (
+          <View style={s.overdueBadge}>
+            <Text style={s.overdueText}>!</Text>
+          </View>
+        )}
+      </BlurView>
+    </PressableScale>
+  );
+}
+
+// ─── Public component ─────────────────────────────────────────────────────────
+
+export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle }: Props) {
   const today = new Date();
+  const motion = useMotion();
 
   const relevant = tasks
     .filter(t =>
@@ -33,32 +101,17 @@ export function TodayTaskRow({ tasks, isDark, c, tr, onToggle }: Props) {
 
   return (
     <View style={{ marginBottom: 4 }}>
-      {relevant.map(task => (
-        <TouchableOpacity
+      {relevant.map((task, i) => (
+        <Animated.View
           key={task.id}
-          onPress={() => onToggle(task.id)}
-          activeOpacity={0.8}
-          style={{ marginBottom: 6 }}
-          accessibilityRole="checkbox"
-          accessibilityLabel={task.title}>
-          <BlurView
-            intensity={isDark ? 18 : 36}
-            tint={isDark ? 'dark' : 'light'}
-            style={[s.row, { borderColor: c.border }]}>
-            <View style={[s.priorityBar, { backgroundColor: PRIORITY_COLORS[task.priority] }]} />
-            <IconSymbol
-              name="circle"
-              size={20}
-              color={c.sub}
-            />
-            <Text style={[s.title, { color: c.text }]} numberOfLines={1}>{task.title}</Text>
-            {isOverdue(task) && (
-              <View style={s.overdueBadge}>
-                <Text style={s.overdueText}>!</Text>
-              </View>
-            )}
-          </BlurView>
-        </TouchableOpacity>
+          entering={motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40))}>
+          <TodayTaskItem
+            task={task}
+            isDark={isDark}
+            c={c}
+            onToggle={onToggle}
+          />
+        </Animated.View>
       ))}
     </View>
   );

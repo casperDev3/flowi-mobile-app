@@ -175,7 +175,7 @@ export default function AppleHealthScreen() {
     bg2: isDark ? '#0F1A2A' : '#E0F2EE',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(16,185,129,0.15)',
     text: isDark ? '#E8FFF7' : '#0A2018',
-    sub: isDark ? 'rgba(232,255,247,0.42)' : 'rgba(10,32,24,0.45)',
+    sub: isDark ? 'rgba(232,255,247,0.62)' : 'rgba(10,32,24,0.58)',
     dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
   };
 

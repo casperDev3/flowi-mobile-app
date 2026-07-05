@@ -82,6 +82,15 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
   const timeoutId = setTimeout(() => controller.abort(), 15_000);
   try {
     return await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal });
+  } catch (e) {
+    // Нормалізуємо мережеві помилки в ApiError з розпізнаваним кодом
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new ApiError(0, 'timeout', 'Request timed out');
+    }
+    if (e instanceof TypeError) {
+      throw new ApiError(0, 'network', 'Network request failed');
+    }
+    throw e;
   } finally {
     clearTimeout(timeoutId);
   }

@@ -24,6 +24,7 @@ import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { isOnlineMode } from '@/store/app-mode';
+import { cancelMeetingNotification, scheduleMeetingNotification } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 
@@ -191,7 +192,7 @@ function useColors(isDark: boolean) {
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)',
     dim:    isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
     text:   isDark ? '#F2F0FF' : '#1A1830',
-    sub:    isDark ? 'rgba(210,205,255,0.45)' : 'rgba(80,70,140,0.55)',
+    sub:    isDark ? 'rgba(210,205,255,0.62)' : 'rgba(80,70,140,0.58)',
     accent: ACCENT,
   };
 }
@@ -799,15 +800,24 @@ export default function MeetingsScreen() {
   }, []);
 
   const handleFormSave = useCallback((data: MeetingFormData) => {
+    let savedId: string;
     if (data.id) {
+      // Cancel old notification before re-scheduling
+      cancelMeetingNotification(data.id);
       saveMeetings(meetings.map(m => m.id !== data.id ? m : {
         ...m, title: data.title, date: data.date, time: data.time, durationMinutes: data.durationMinutes,
         location: data.location, link: data.link, notes: data.notes, color: data.color, recurrence: data.recurrence,
       }));
+      savedId = data.id;
     } else {
-      saveMeetings([...meetings, { id: Date.now().toString(), title: data.title, date: data.date, time: data.time,
+      savedId = Date.now().toString();
+      saveMeetings([...meetings, { id: savedId, title: data.title, date: data.date, time: data.time,
         durationMinutes: data.durationMinutes, location: data.location, link: data.link,
         notes: data.notes, color: data.color, recurrence: data.recurrence }]);
+    }
+    // Schedule notification 15 min before (non-recurring meetings with a specific time only)
+    if (!data.recurrence && data.time) {
+      scheduleMeetingNotification(savedId, data.title, data.date, data.time);
     }
     setShowForm(false);
   }, [meetings, saveMeetings]);
@@ -815,7 +825,10 @@ export default function MeetingsScreen() {
   const deleteMeeting = useCallback((id: string) => {
     Alert.alert('Видалити зустріч?', 'Цю дію не можна скасувати.', [
       { text: 'Скасувати', style: 'cancel' },
-      { text: 'Видалити', style: 'destructive', onPress: () => saveMeetings(meetings.filter(m => m.id !== id)) },
+      { text: 'Видалити', style: 'destructive', onPress: () => {
+        cancelMeetingNotification(id);
+        saveMeetings(meetings.filter(m => m.id !== id));
+      }},
     ]);
   }, [meetings, saveMeetings]);
 

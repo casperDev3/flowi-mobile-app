@@ -34,6 +34,8 @@ export interface HealthEntry {
   protein?: number;
   fat?: number;
   carbs?: number;
+  // Джерело запису: 'healthkit' — синк з Apple Health, 'manual'/відсутнє — ручний ввід
+  source?: 'manual' | 'healthkit';
 }
 
 // ─── Дефолтні (запасні) цілі, якщо профіль не заповнено ──────────────────────
@@ -161,11 +163,26 @@ export function getMonthEntries(entries: HealthEntry[], month: Date): HealthEntr
   return entries.filter(e => isSameMonth(new Date(e.date), month));
 }
 
-/** Сума значень типу за конкретний день (water/calories/steps) */
+/**
+ * Сума значень типу за конкретний день (water/calories/steps/calories_out).
+ *
+ * Дедуплікація для кумулятивних типів (steps, calories_out):
+ *   якщо за день є записи і від HealthKit, і ручні — використовується MAX(hk-сума, manual-сума),
+ *   бо HealthKit уже містить повний добовий агрегат і складати їх не можна.
+ * Для некумулятивних (вага, пульс, сон) використовується lastForDay, ця функція не застосовується.
+ */
 export function sumForDay(entries: HealthEntry[], type: EntryType, day: Date): number {
-  return entries
-    .filter(e => e.type === type && isSameDay(new Date(e.date), day))
-    .reduce((s, e) => s + e.value, 0);
+  const pool = entries.filter(e => e.type === type && isSameDay(new Date(e.date), day));
+  if (pool.length === 0) return 0;
+
+  const hasHk     = pool.some(e => e.source === 'healthkit');
+  const hasManual = pool.some(e => e.source !== 'healthkit');
+  if (hasHk && hasManual) {
+    const hkSum     = pool.filter(e => e.source === 'healthkit').reduce((s, e) => s + e.value, 0);
+    const manualSum = pool.filter(e => e.source !== 'healthkit').reduce((s, e) => s + e.value, 0);
+    return Math.max(hkSum, manualSum);
+  }
+  return pool.reduce((s, e) => s + e.value, 0);
 }
 
 /**

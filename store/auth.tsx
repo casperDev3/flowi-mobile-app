@@ -13,7 +13,9 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { router } from 'expo-router';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 
 import {
   ApiError,
@@ -24,6 +26,7 @@ import {
   setTokens,
 } from './api';
 import { isOnlineMode, setOnlineImperative, useAppMode } from './app-mode';
+import { useI18n } from './i18n';
 import { setIsAuthed, triggerFullSync } from './sync-engine';
 
 // ─── Типи ────────────────────────────────────────────────────────────────────
@@ -41,6 +44,9 @@ interface AuthCtx {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (name: string) => Promise<void>;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
 }
 
 // ─── Контекст ─────────────────────────────────────────────────────────────────
@@ -50,6 +56,9 @@ const Ctx = createContext<AuthCtx>({
   login: async () => {},
   register: async () => {},
   logout: async () => {},
+  updateProfile: async () => {},
+  changePassword: async () => {},
+  deleteAccount: async () => {},
 });
 
 const USER_CACHE_KEY = 'auth_user';
@@ -59,17 +68,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
   const { ready: modeReady } = useAppMode();
+  const { tr } = useI18n();
   const bgRefreshDone = useRef(false);
+
+  // Refs to avoid stale closures and alert spam on multiple 401s
+  const trRef = useRef(tr);
+  useEffect(() => { trRef.current = tr; }, [tr]);
+  const alertShownRef = useRef(false);
 
   // ── Початкова ініціалізація ─────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
 
     const unsub = onSessionExpired(() => {
-      if (mounted) {
-        setIsAuthed(false);
-        setUser(null);
-        setStatus('guest');
+      if (!mounted) return;
+      setIsAuthed(false);
+      setUser(null);
+      setStatus('guest');
+
+      // Show Alert once per session-expiry event (guard against multiple 401 responses)
+      if (!alertShownRef.current) {
+        alertShownRef.current = true;
+        const t = trRef.current;
+        Alert.alert(
+          t.sessionExpired,
+          t.sessionExpiredMsg,
+          [
+            {
+              text: t.authLogin,
+              onPress: () => router.push('/login'),
+            },
+            {
+              text: t.later,
+              style: 'cancel',
+            },
+          ],
+        );
       }
     });
 
@@ -163,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(u);
     setStatus('authed');
     setIsAuthed(true);
+    alertShownRef.current = false; // Reset so Alert can show again if session expires
     void triggerFullSync();
 
     // Прив'язати device до акаунта (для «Спільного»)
@@ -195,6 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(u);
     setStatus('authed');
     setIsAuthed(true);
+    alertShownRef.current = false; // Reset so Alert can show again if session expires
     void triggerFullSync();
 
     // Прив'язати device до акаунта (для «Спільного»)
@@ -234,8 +270,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus('guest');
   }, []);
 
+  // ── updateProfile ──────────────────────────────────────────────────────────
+  const updateProfile = useCallback(async (name: string) => {
+    const updated = await apiFetch<{ id: number | string; email: string; name: string }>(
+      '/auth/me/',
+      { method: 'PATCH', body: { name: name.trim() } },
+    );
+    const u: AuthUser = {
+      id: String(updated.id),
+      email: updated.email,
+      name: updated.name ?? '',
+    };
+    await AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(u));
+    setUser(u);
+  }, []);
+
+  // ── changePassword ─────────────────────────────────────────────────────────
+  const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
+    const data = await apiFetch<{ access: string; refresh: string }>(
+      '/auth/password/change/',
+      { method: 'POST', body: { old_password: oldPassword, new_password: newPassword } },
+    );
+    // Зберігаємо нові токени, що повертає сервер після зміни пароля
+    await setTokens(data.access, data.refresh);
+  }, []);
+
+  // ── deleteAccount ──────────────────────────────────────────────────────────
+  const deleteAccount = useCallback(async (password: string) => {
+    await apiFetch('/auth/me/', { method: 'DELETE', body: { password } });
+    // Очищуємо локальну auth без API-виклику (аккаунт вже видалено)
+    await clearTokens();
+    await AsyncStorage.removeItem(USER_CACHE_KEY);
+    setIsAuthed(false);
+    setOnlineImperative(false);
+    setUser(null);
+    setStatus('guest');
+  }, []);
+
   return (
-    <Ctx.Provider value={{ user, status, login, register, logout }}>
+    <Ctx.Provider value={{ user, status, login, register, logout, updateProfile, changePassword, deleteAccount }}>
       {children}
     </Ctx.Provider>
   );

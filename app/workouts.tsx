@@ -527,7 +527,7 @@ function makeColors(isDark: boolean) {
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
   };
 }
 

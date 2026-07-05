@@ -21,8 +21,22 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { MonthPicker } from '@/components/shared/MonthPicker';
+import Animated, {
+  FadeInDown,
+  FadeOutUp,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { useMotion } from '@/hooks/use-motion';
 import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/shared/MeetingFormSheet';
+import { PressableScale } from '@/components/shared/PressableScale';
+import { SheetModal } from '@/components/shared/SheetModal';
+import { SkeletonRow } from '@/components/shared/Skeleton';
+import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
@@ -31,6 +45,7 @@ import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import { filterTasksByMonth } from '@/utils/taskUtils';
+import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
@@ -270,6 +285,8 @@ export default function TasksScreen() {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
+  const motion = useMotion();
+
   const PRIORITY: Record<Priority, { label: string; color: string }> = {
     high:   { label: tr.priorityHigh,   color: PRIORITY_COLORS.high   },
     medium: { label: tr.priorityMedium, color: PRIORITY_COLORS.medium },
@@ -449,6 +466,13 @@ export default function TasksScreen() {
     if (meetingsInit) void saveSynced('meetings', meetings);
   }, [meetings, meetingsInit]);
 
+  // Ref для синхронного читання поточних tasks (використовується в callbacks без deps)
+  const tasksRef = useRef<Task[]>([]);
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+
+  // Undo-тост (таб — над таб-баром)
+  const { show: showUndo, element: undoElement } = useUndoToast(true);
+
   // Reset detail tab when opening a different task
   useEffect(() => {
     setDetailTab('info');
@@ -542,10 +566,24 @@ export default function TasksScreen() {
     });
   }, [sorted, activeMonth, filter, dateFilter, search, filterProject, filterPriority]);
 
+  // Overdue tasks pulled into a dedicated top section (list view, active/all filter only)
+  const overdueItems = useMemo(
+    () => (filter !== 'done' && viewMode === 'list')
+      ? filtered.filter(t => isOverdue(t))
+      : [],
+    [filtered, filter, viewMode],
+  );
+
+  // For groups we exclude overdue tasks when the overdue section is shown
+  const groupsSource = useMemo(
+    () => overdueItems.length > 0 ? filtered.filter(t => !isOverdue(t)) : filtered,
+    [filtered, overdueItems],
+  );
+
   const groups = useMemo(() => {
     const map: Record<string, { label: string; tasks: Task[] }> = {};
     const order: string[] = [];
-    filtered.forEach(t => {
+    groupsSource.forEach(t => {
       let key: string;
       let label: string;
       if (sort === 'deadline') {
@@ -571,7 +609,7 @@ export default function TasksScreen() {
       order.push('__no_deadline__');
     }
     return order.map(k => map[k]);
-  }, [filtered, sort]);
+  }, [groupsSource, sort]);
 
   const hasActiveFilters = filter !== 'active' || sort !== 'deadline' || !!dateFilter || !!filterProject || !!filterPriority || !!search.trim();
 
@@ -606,13 +644,34 @@ export default function TasksScreen() {
     setNewProjectId(null); setShowDeadlineCal(false); setShowNewProjectDropdown(false); setShowAdd(false);
     setNewRepeat(false); setNewRepeatFreq('weekly'); setNewRepeatInterval(1);
     setNewRepeatDays([]); setNewRepeatEndType('never'); setNewRepeatUntil('');
+    haptic.success();
   }, [newTitle, newDesc, newPriority, newEstHours, newEstMins, newDeadline, newProjectId,
       newRepeat, newRepeatFreq, newRepeatInterval, newRepeatDays, newRepeatEndType, newRepeatUntil]);
 
-  const deleteTask = useCallback((id: string) => {
-    setTasks(p => p.filter(t => t.id !== id));
-    if (selected?.id === id) { setSelected(null); setShowDetailProjectDropdown(false); }
-  }, [selected]);
+  const deleteTask = useCallback((id: string, title?: string) => {
+    const taskToDelete = tasksRef.current.find(t => t.id === id);
+    Alert.alert(
+      tr.deletePermanently,
+      title ? `«${title}»\n${tr.cannotUndo}` : tr.cannotUndo,
+      [
+        { text: tr.cancel, style: 'cancel' },
+        {
+          text: tr.delete,
+          style: 'destructive',
+          onPress: () => {
+            setTasks(p => p.filter(t => t.id !== id));
+            if (selected?.id === id) { setSelected(null); setShowDetailProjectDropdown(false); }
+            // Undo: повернути задачу до списку
+            if (taskToDelete) {
+              showUndo(tr.taskDeleted, () => {
+                setTasks(prev => [...prev, taskToDelete]);
+              });
+            }
+          },
+        },
+      ],
+    );
+  }, [selected, tr, showUndo]);
 
   // ─── Recording ──────────────────────────────────────────────────────────────
   const startRecording = useCallback(async (taskId: string) => {
@@ -693,6 +752,11 @@ export default function TasksScreen() {
   // ────────────────────────────────────────────────────────────────────────────
 
   const toggleTask = useCallback((id: string) => {
+    haptic.light();
+    // Знімок поточного стану задачі для undo
+    const prevTask = tasksRef.current.find(t => t.id === id);
+    const becomingDone = prevTask?.status === 'active';
+
     const patch = (t: Task): Task => {
       if (t.id !== id) return t;
       const status: Status = t.status === 'done' ? 'active' : 'done';
@@ -734,7 +798,16 @@ export default function TasksScreen() {
       return updated;
     });
     setSelected(prev => prev?.id === id ? patch(prev) : prev);
-  }, []);
+
+    // Тост undo лише при позначенні виконаним
+    if (becomingDone && prevTask) {
+      const snapshot = prevTask;
+      showUndo(tr.taskMarkedDone, () => {
+        setTasks(prev => prev.map(t => t.id === id ? snapshot : t));
+        setSelected(prev => prev?.id === id ? snapshot : prev);
+      });
+    }
+  }, [showUndo, tr.taskMarkedDone]);
 
   const addSubtask = useCallback((taskId: string) => {
     if (!newSubtask.trim()) return;
@@ -940,15 +1013,35 @@ export default function TasksScreen() {
     if (!selected) return;
     const now = new Date();
     const evt = makeHistoryEvent('timer_stop');
+    // sessionDuration is captured inside the setTasks updater (runs synchronously)
+    // so we can read it immediately after setTasks returns.
+    let sessionDuration = 0;
+
     setTasks(p => p.map(t => {
       if (t.id !== selected.id) return t;
       const timeEntries = (t.timeEntries ?? []).map(e => {
         if (e.endedAt) return e;
         const duration = Math.max(0, Math.floor((now.getTime() - new Date(e.startedAt).getTime()) / 1000));
+        sessionDuration = duration; // capture for time_entries write
         return { ...e, endedAt: now.toISOString(), duration };
       });
       return { ...t, timeEntries, history: [...(t.history ?? []), evt] };
     }));
+
+    // Mirror session to shared 'time_entries' so time-stats/time-records see it
+    if (sessionDuration > 0) {
+      const hour = now.getHours();
+      const shift: 'morning' | 'day' | 'evening' | 'night' =
+        hour >= 6 && hour < 12 ? 'morning'
+        : hour >= 12 && hour < 18 ? 'day'
+        : hour >= 18 ? 'evening'
+        : 'night';
+      type _TimeEntry = { id: string; task: string; shift: string; duration: number; date: string };
+      const tEntry: _TimeEntry = { id: `task_${Date.now()}`, task: selected.title, shift, duration: sessionDuration, date: now.toISOString() };
+      void loadData<_TimeEntry[]>('time_entries', []).then(existing =>
+        saveSynced('time_entries', [tEntry, ...existing]),
+      );
+    }
   }, [selected]);
 
   const clearAllFilters = useCallback(() => {
@@ -966,7 +1059,7 @@ export default function TasksScreen() {
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
@@ -1133,18 +1226,27 @@ export default function TasksScreen() {
             <View style={{ flexDirection: 'row', gap: 7 }}>
               <TouchableOpacity
                 onPress={() => setViewMode(v => v === 'list' ? 'calendar' : 'list')}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                accessibilityRole="button"
+                accessibilityLabel={viewMode === 'list' ? tr.calendarMode : tr.listMode}
                 style={[s.headerBtn, { backgroundColor: viewMode === 'calendar' ? c.accent + '20' : c.dim, borderColor: viewMode === 'calendar' ? c.accent : c.border }]}>
                 <IconSymbol name={viewMode === 'list' ? 'calendar' : 'list.bullet'} size={17} color={viewMode === 'calendar' ? c.accent : c.sub} />
               </TouchableOpacity>
               {viewMode === 'list' && (
                 <TouchableOpacity
                   onPress={() => setCardDetail(v => v === 'detailed' ? 'compact' : 'detailed')}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.a11yViewMode}
                   style={[s.headerBtn, { backgroundColor: cardDetail === 'detailed' ? c.accent + '20' : c.dim, borderColor: cardDetail === 'detailed' ? c.accent : c.border }]}>
                   <IconSymbol name={cardDetail === 'detailed' ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={cardDetail === 'detailed' ? c.accent : c.sub} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity
                 onPress={() => setShowOptionsMenu(v => !v)}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                accessibilityRole="button"
+                accessibilityLabel={tr.a11yOptions}
                 style={[s.headerBtn, { backgroundColor: hasActiveFilters ? c.accent : c.dim, borderColor: hasActiveFilters ? c.accent : c.border }]}>
                 <IconSymbol name="ellipsis" size={17} color={hasActiveFilters ? '#fff' : c.sub} />
               </TouchableOpacity>
@@ -1170,6 +1272,15 @@ export default function TasksScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />
           }>
+
+          {/* Skeleton — перший завантаження */}
+          {!initialized && (
+            <>
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </>
+          )}
 
           {/* Search bar */}
           <View style={[s.searchBar, { backgroundColor: c.dim, borderColor: c.border }]}>
@@ -1393,6 +1504,102 @@ export default function TasksScreen() {
               <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>
                 {search.trim() ? tr.tryAnotherQuery : tr.pressToAdd}
               </Text>
+              {!search.trim() && (
+                <TouchableOpacity
+                  onPress={() => setShowAdd(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.addTask}
+                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <IconSymbol name="plus" size={15} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addTask}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Overdue section (list view, active/all filter) */}
+          {viewMode === 'list' && overdueItems.length > 0 && (
+            <View style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                <Text style={[s.groupLabel, { color: '#EF4444', marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
+                <View style={{ backgroundColor: '#EF444420', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>{overdueItems.length}</Text>
+                </View>
+              </View>
+              <View style={{ gap: cardDetail === 'compact' ? 6 : 10 }}>
+                {overdueItems.map((task, i) => {
+                  const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
+                  const animExiting  = motion.entering(FadeOutUp.duration(150));
+                  const animLayout   = motion.entering(LinearTransition.springify());
+                  if (cardDetail === 'compact') {
+                    return (
+                      <Animated.View
+                        key={task.id}
+                        entering={animEntering}
+                        exiting={animExiting}
+                        layout={animLayout}>
+                        <CompactCard
+                          task={task}
+                          onPress={() => setSelected(task)}
+                          onToggle={() => toggleTask(task.id)}
+                          c={c}
+                          isDark={isDark}
+                          projects={projects}
+                          todayLabel={tr.today}
+                          yesterdayLabel={tr.yesterday}
+                          tomorrowLabel={tr.tomorrow}
+                          locale={locale}
+                        />
+                      </Animated.View>
+                    );
+                  }
+                  const prioColor = PRIORITY[task.priority].color;
+                  const cardBorder = '#EF444450';
+                  return (
+                    <Animated.View
+                      key={task.id}
+                      entering={animEntering}
+                      exiting={animExiting}
+                      layout={animLayout}>
+                      <TouchableOpacity activeOpacity={0.75} onPress={() => setSelected(task)}>
+                      <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[s.taskCard, { borderColor: cardBorder }]}>
+                        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: prioColor, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
+                        <View style={{ marginLeft: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 9 }}>
+                            <AnimatedCheck
+                              checked={task.status === 'done'}
+                              color="#EF4444"
+                              borderColor="#EF4444"
+                              size={22}
+                              radius={7}
+                              onPress={() => toggleTask(task.id)}
+                              hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+                              accessibilityRole="checkbox"
+                              accessibilityLabel={task.title}
+                              accessibilityState={{ checked: task.status === 'done' }}
+                              style={{ marginTop: 1 }}
+                            />
+                            <Text style={[s.taskTitle, { color: c.text, flex: 1, marginLeft: 10, lineHeight: 20 }]}>
+                              {task.title}
+                            </Text>
+                          </View>
+                          {task.deadline && (
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 32, marginBottom: 4 }}>
+                              <View style={[s.badge, { backgroundColor: '#EF444418', borderColor: '#EF444440' }]}>
+                                <IconSymbol name="flag" size={11} color="#EF4444" />
+                                <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
+                                  {deadlineLabel(task.deadline, tr.today, tr.yesterday, tr.tomorrow, locale)}
+                                </Text>
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      </BlurView>
+                      </TouchableOpacity>
+                    </Animated.View>
+                  );
+                })}
+              </View>
             </View>
           )}
 
@@ -1401,22 +1608,30 @@ export default function TasksScreen() {
             <View key={group.label}>
               <Text style={[s.groupLabel, { color: c.sub }]}>{group.label}</Text>
               <View style={{ gap: cardDetail === 'compact' ? 6 : 10 }}>
-                {group.tasks.map(task => {
+                {group.tasks.map((task, i) => {
+                  const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
+                  const animExiting  = motion.entering(FadeOutUp.duration(150));
+                  const animLayout   = motion.entering(LinearTransition.springify());
                   if (cardDetail === 'compact') {
                     return (
-                      <CompactCard
+                      <Animated.View
                         key={task.id}
-                        task={task}
-                        onPress={() => setSelected(task)}
-                        onToggle={() => toggleTask(task.id)}
-                        c={c}
-                        isDark={isDark}
-                        projects={projects}
-                        todayLabel={tr.today}
-                        yesterdayLabel={tr.yesterday}
-                        tomorrowLabel={tr.tomorrow}
-                        locale={locale}
-                      />
+                        entering={animEntering}
+                        exiting={animExiting}
+                        layout={animLayout}>
+                        <CompactCard
+                          task={task}
+                          onPress={() => setSelected(task)}
+                          onToggle={() => toggleTask(task.id)}
+                          c={c}
+                          isDark={isDark}
+                          projects={projects}
+                          todayLabel={tr.today}
+                          yesterdayLabel={tr.yesterday}
+                          tomorrowLabel={tr.tomorrow}
+                          locale={locale}
+                        />
+                      </Animated.View>
                     );
                   }
                   const prog = getProgress(task);
@@ -1434,7 +1649,12 @@ export default function TasksScreen() {
                   const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
                   const prioColor = PRIORITY[task.priority].color;
                   return (
-                    <TouchableOpacity key={task.id} activeOpacity={0.75} onPress={() => setSelected(task)}>
+                    <Animated.View
+                      key={task.id}
+                      entering={animEntering}
+                      exiting={animExiting}
+                      layout={animLayout}>
+                      <TouchableOpacity activeOpacity={0.75} onPress={() => setSelected(task)}>
                       <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[s.taskCard, { borderColor: cardBorder }]}>
                         {/* Priority accent stripe */}
                         <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: task.status === 'done' ? '#10B981' : prioColor, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
@@ -1442,11 +1662,19 @@ export default function TasksScreen() {
                         <View style={{ marginLeft: 8 }}>
                           {/* Row 1: checkbox + title */}
                           <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 9 }}>
-                            <TouchableOpacity
-                              onPress={e => { e.stopPropagation(); toggleTask(task.id); }}
-                              style={[s.checkbox, { borderColor: task.status === 'done' ? '#10B981' : c.border, backgroundColor: task.status === 'done' ? '#10B981' : 'transparent', marginTop: 1 }]}>
-                              {task.status === 'done' && <IconSymbol name="checkmark" size={12} color="#fff" />}
-                            </TouchableOpacity>
+                            <AnimatedCheck
+                              checked={task.status === 'done'}
+                              color="#10B981"
+                              borderColor={c.border}
+                              size={22}
+                              radius={7}
+                              onPress={() => toggleTask(task.id)}
+                              hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+                              accessibilityRole="checkbox"
+                              accessibilityLabel={task.title}
+                              accessibilityState={{ checked: task.status === 'done' }}
+                              style={{ marginTop: 1 }}
+                            />
                             <Text style={[s.taskTitle, { color: c.text, flex: 1, marginLeft: 10, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none', lineHeight: 20 }]}>
                               {task.title}
                             </Text>
@@ -1518,7 +1746,8 @@ export default function TasksScreen() {
                           </View>
                         </View>
                       </BlurView>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    </Animated.View>
                   );
                 })}
               </View>
@@ -1663,11 +1892,16 @@ export default function TasksScreen() {
                                 <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: task.status === 'done' ? '#10B981' : prioColor, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
                                 <View style={{ marginLeft: 8 }}>
                                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                                    <TouchableOpacity
-                                      onPress={e => { e.stopPropagation(); toggleTask(task.id); }}
-                                      style={{ width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', borderColor: task.status === 'done' ? '#10B981' : c.border, backgroundColor: task.status === 'done' ? '#10B981' : 'transparent', marginTop: 1, flexShrink: 0 }}>
-                                      {task.status === 'done' && <IconSymbol name="checkmark" size={12} color="#fff" />}
-                                    </TouchableOpacity>
+                                    <AnimatedCheck
+                                      checked={task.status === 'done'}
+                                      color="#10B981"
+                                      borderColor={c.border}
+                                      size={22}
+                                      radius={7}
+                                      onPress={() => toggleTask(task.id)}
+                                      hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+                                      style={{ marginTop: 1, flexShrink: 0 }}
+                                    />
                                     <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600', lineHeight: 20, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }}>
                                       {task.title}
                                     </Text>
@@ -1879,9 +2113,9 @@ export default function TasksScreen() {
       </SafeAreaView>
 
       {/* FAB */}
-      <TouchableOpacity onPress={() => setShowAdd(true)} style={[s.fab, { backgroundColor: c.accent }]} activeOpacity={0.85}>
+      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { backgroundColor: c.accent }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
-      </TouchableOpacity>
+      </PressableScale>
 
       <MeetingFormSheet
         visible={showMeetingForm}
@@ -2326,21 +2560,9 @@ export default function TasksScreen() {
       </Modal>
 
       {/* ─── Add Task Modal ─── */}
-      <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                  <View style={s.handleRow}>
-                    <View style={{ flex: 1 }} />
-                    <View style={[s.handle, { backgroundColor: c.border }]} />
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <TouchableOpacity onPress={() => setShowAdd(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                        <IconSymbol name="xmark" size={17} color={c.sub} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+      <SheetModal visible={showAdd} onClose={() => setShowAdd(false)}>
+        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <Text style={[s.sheetTitle, { color: c.text }]}>{tr.newTask}</Text>
 
                   <TextInput
@@ -2594,12 +2816,9 @@ export default function TasksScreen() {
                       <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.add}</Text>
                     </TouchableOpacity>
                   </View>
-                </ScrollView>
-              </BlurView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
+          </ScrollView>
+        </BlurView>
+      </SheetModal>
 
       {/* ─── Detail Modal ─── */}
       <Modal visible={!!selectedTask} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
@@ -3025,11 +3244,16 @@ export default function TasksScreen() {
                     ) : detailTab === 'info' ? (
                     <>
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
-                      <TouchableOpacity
+                      <AnimatedCheck
+                        checked={selectedTask.status === 'done'}
+                        color="#10B981"
+                        borderColor={c.border}
+                        size={22}
+                        radius={7}
                         onPress={() => toggleTask(selectedTask.id)}
-                        style={[s.checkbox, { borderColor: selectedTask.status === 'done' ? '#10B981' : c.border, backgroundColor: selectedTask.status === 'done' ? '#10B981' : 'transparent', marginTop: 2 }]}>
-                        {selectedTask.status === 'done' && <IconSymbol name="checkmark" size={12} color="#fff" />}
-                      </TouchableOpacity>
+                        hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+                        style={{ marginTop: 2 }}
+                      />
                       <Text style={[s.detailTitle, { color: c.text, flex: 1, marginHorizontal: 10 }]}>{selectedTask.title}</Text>
                       <View style={[s.prioBadge, { backgroundColor: PRIORITY[selectedTask.priority].color + '22' }]}>
                         <View style={[s.dot, { backgroundColor: PRIORITY[selectedTask.priority].color }]} />
@@ -3338,7 +3562,7 @@ export default function TasksScreen() {
 
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                       <TouchableOpacity
-                        onPress={() => deleteTask(selectedTask.id)}
+                        onPress={() => deleteTask(selectedTask.id, selectedTask.title)}
                         style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
                         <IconSymbol name="trash" size={15} color="#EF4444" />
                         <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
@@ -3426,11 +3650,15 @@ export default function TasksScreen() {
         </Pressable>
       </Modal>
 
+      {/* Undo-тост */}
+      {undoElement}
     </View>
   );
 }
 
 // ─── Compact Card ────────────────────────────────────────────────────────────
+const AnimatedText = Animated.createAnimatedComponent(Text);
+
 function CompactCard({ task, onPress, onToggle, c, isDark, projects, todayLabel, yesterdayLabel, tomorrowLabel, locale }: {
   task: Task;
   onPress: () => void;
@@ -3445,17 +3673,36 @@ function CompactCard({ task, onPress, onToggle, c, isDark, projects, todayLabel,
 }) {
   const overdue = isOverdue(task);
   const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
+  const isDone = task.status === 'done';
+
+  /* Animate text opacity when done state changes */
+  const titleOpacity = useSharedValue(isDone ? 0.45 : 1);
+  useEffect(() => {
+    titleOpacity.value = withTiming(isDone ? 0.45 : 1, { duration: 250 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDone]);
+  const titleAnimStyle = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
+
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
+    <PressableScale onPress={onPress}>
       <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={s.compactCard}>
-        <TouchableOpacity
-          onPress={e => { e.stopPropagation(); onToggle(); }}
-          style={[s.subCheck, { borderColor: task.status === 'done' ? '#10B981' : c.border, backgroundColor: task.status === 'done' ? '#10B981' : 'transparent' }]}>
-          {task.status === 'done' && <IconSymbol name="checkmark" size={10} color="#fff" />}
-        </TouchableOpacity>
-        <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1, marginHorizontal: 10, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }} numberOfLines={1}>
+        <AnimatedCheck
+          checked={isDone}
+          color="#10B981"
+          borderColor={c.border}
+          size={18}
+          radius={5}
+          onPress={onToggle}
+          hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+          accessibilityRole="checkbox"
+          accessibilityLabel={task.title}
+          accessibilityState={{ checked: isDone }}
+        />
+        <AnimatedText
+          style={[{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1, marginHorizontal: 10, textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
+          numberOfLines={1}>
           {task.title}
-        </Text>
+        </AnimatedText>
         {task.deadline && (
           <Text style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 10, fontWeight: '600', marginRight: 8 }}>
             {deadlineLabel(task.deadline!, todayLabel, yesterdayLabel, tomorrowLabel, locale)}
@@ -3467,7 +3714,7 @@ function CompactCard({ task, onPress, onToggle, c, isDark, projects, todayLabel,
           {proj && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: proj.color }} />}
         </View>
       </BlurView>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -3484,17 +3731,23 @@ function BoardCard({ task, onPress, onToggle, c, isDark, todayLabel, yesterdayLa
   locale: string;
 }) {
   const overdue = isOverdue(task);
+  const isDone = task.status === 'done';
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={{ marginBottom: 8 }}>
+    <PressableScale onPress={onPress} style={{ marginBottom: 8 }}>
       <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={s.boardCard}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 7 }}>
-          <TouchableOpacity
-            onPress={e => { e.stopPropagation(); onToggle(); }}
-            style={[s.subCheck, { borderColor: task.status === 'done' ? '#10B981' : c.border, backgroundColor: task.status === 'done' ? '#10B981' : 'transparent', marginTop: 1 }]}>
-            {task.status === 'done' && <IconSymbol name="checkmark" size={10} color="#fff" />}
-          </TouchableOpacity>
+          <AnimatedCheck
+            checked={isDone}
+            color="#10B981"
+            borderColor={c.border}
+            size={18}
+            radius={5}
+            onPress={onToggle}
+            hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
+            style={{ marginTop: 1 }}
+          />
           <View style={{ flex: 1 }}>
-            <Text numberOfLines={3} style={{ color: c.text, fontSize: 12, fontWeight: '600', lineHeight: 17, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }}>
+            <Text numberOfLines={3} style={{ color: c.text, fontSize: 12, fontWeight: '600', lineHeight: 17, opacity: isDone ? 0.45 : 1, textDecorationLine: isDone ? 'line-through' : 'none' }}>
               {task.title}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 7, gap: 5 }}>
@@ -3508,7 +3761,7 @@ function BoardCard({ task, onPress, onToggle, c, isDark, todayLabel, yesterdayLa
           </View>
         </View>
       </BlurView>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

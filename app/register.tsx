@@ -16,10 +16,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ApiError, OfflineError } from '@/store/api';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { saveData } from '@/store/storage';
+import { haptic } from '@/utils/haptics';
+
+// ─── Простий валідатор формату email ─────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterScreen() {
   const cs = useColorScheme();
@@ -32,35 +38,58 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordRepeat, setPasswordRepeat] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordRepeat, setShowPasswordRepeat] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [generalError, setGeneralError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const c = {
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    card:   isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.85)',
-    border: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.50)' : 'rgba(26,20,51,0.50)',
-    accent: '#7C3AED',
-    red:    '#EF4444',
+    ...getScreenColors('auth', isDark),
+    errorBorder: '#EF4444',
+    red:         '#EF4444',
+  };
+
+  const validateEmailFormat = (val: string): boolean => {
+    const trimmed = val.trim();
+    if (trimmed && !EMAIL_RE.test(trimmed)) {
+      setEmailError(tr.authInvalidEmail);
+      return false;
+    }
+    setEmailError('');
+    return true;
+  };
+
+  const clearErrors = () => {
+    setGeneralError('');
+    setEmailError('');
+    setPasswordError('');
   };
 
   const handleRegister = async () => {
-    setErrorMsg('');
-
-    if (password.length < 8) {
-      setErrorMsg(tr.authWeakPassword);
-      return;
-    }
-    if (password !== passwordRepeat) {
-      setErrorMsg(tr.authPasswordsMismatch);
-      return;
-    }
+    clearErrors();
 
     const trimEmail = email.trim().toLowerCase();
     if (!trimEmail) {
-      setErrorMsg(tr.authInvalidCreds);
+      haptic.error();
+      setEmailError(tr.authInvalidEmail);
+      return;
+    }
+    if (!EMAIL_RE.test(trimEmail)) {
+      haptic.error();
+      setEmailError(tr.authInvalidEmail);
+      return;
+    }
+
+    if (password.length < 8) {
+      haptic.error();
+      setPasswordError(tr.authWeakPassword);
+      return;
+    }
+    if (password !== passwordRepeat) {
+      haptic.error();
+      setPasswordError(tr.authPasswordsMismatch);
       return;
     }
 
@@ -70,13 +99,23 @@ export default function RegisterScreen() {
       await saveData('welcome_done', true);
       router.replace('/(tabs)');
     } catch (e: unknown) {
-      const code = (e as { code?: string }).code ?? '';
-      if (code === 'email_taken' || code === '409') {
-        setErrorMsg(tr.authEmailTaken);
-      } else if (code === 'password_too_common' || code === 'password_too_short') {
-        setErrorMsg(tr.authWeakPassword);
+      haptic.error();
+      if (e instanceof OfflineError) {
+        setGeneralError(tr.authOfflineError);
+      } else if (e instanceof ApiError) {
+        if (e.status === 409 || e.code === 'email_taken') {
+          setEmailError(tr.authEmailTaken);
+        } else if (e.code === 'password_too_common' || e.code === 'password_too_short') {
+          setPasswordError(tr.authWeakPassword);
+        } else if (e.code === 'timeout' || e.code === 'network') {
+          setGeneralError(tr.authNetworkError);
+        } else if (e.status >= 500) {
+          setGeneralError(tr.authServerError);
+        } else {
+          setGeneralError(tr.authInvalidCreds);
+        }
       } else {
-        setErrorMsg(tr.authInvalidCreds);
+        setGeneralError(tr.authNetworkError);
       }
     } finally {
       setLoading(false);
@@ -134,49 +173,87 @@ export default function RegisterScreen() {
                   placeholderTextColor={c.sub}
                   placeholder="you@example.com"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={v => { setEmail(v); if (emailError) setEmailError(''); }}
+                  onBlur={() => validateEmailFormat(email)}
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="email-address"
                   textContentType="emailAddress"
+                  autoComplete="email"
                   returnKeyType="next"
                 />
               </View>
+              {emailError ? (
+                <Text style={[st.fieldError, { color: c.red }]}>{emailError}</Text>
+              ) : null}
 
               {/* Password */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPassword.toUpperCase()}</Text>
-                <TextInput
-                  style={[st.input, { color: c.text }]}
-                  placeholderTextColor={c.sub}
-                  placeholder="••••••••"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  textContentType="newPassword"
-                  returnKeyType="next"
-                />
+                <View style={st.passwordRow}>
+                  <TextInput
+                    style={[st.input, { color: c.text, flex: 1 }]}
+                    placeholderTextColor={c.sub}
+                    placeholder="••••••••"
+                    value={password}
+                    onChangeText={v => { setPassword(v); if (passwordError) setPasswordError(''); }}
+                    secureTextEntry={!showPassword}
+                    textContentType="newPassword"
+                    autoComplete="new-password"
+                    returnKeyType="next"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(v => !v)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Сховати пароль' : 'Показати пароль'}
+                  >
+                    <IconSymbol
+                      name={showPassword ? 'eye.slash' : 'eye'}
+                      size={18}
+                      color={c.sub}
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Repeat password */}
               <View style={st.fieldWrap}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPasswordRepeat.toUpperCase()}</Text>
-                <TextInput
-                  style={[st.input, { color: c.text }]}
-                  placeholderTextColor={c.sub}
-                  placeholder="••••••••"
-                  value={passwordRepeat}
-                  onChangeText={setPasswordRepeat}
-                  secureTextEntry
-                  textContentType="newPassword"
-                  returnKeyType="done"
-                  onSubmitEditing={handleRegister}
-                />
+                <View style={st.passwordRow}>
+                  <TextInput
+                    style={[st.input, { color: c.text, flex: 1 }]}
+                    placeholderTextColor={c.sub}
+                    placeholder="••••••••"
+                    value={passwordRepeat}
+                    onChangeText={v => { setPasswordRepeat(v); if (passwordError) setPasswordError(''); }}
+                    secureTextEntry={!showPasswordRepeat}
+                    textContentType="newPassword"
+                    autoComplete="new-password"
+                    returnKeyType="done"
+                    onSubmitEditing={handleRegister}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPasswordRepeat(v => !v)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPasswordRepeat ? 'Сховати пароль' : 'Показати пароль'}
+                  >
+                    <IconSymbol
+                      name={showPasswordRepeat ? 'eye.slash' : 'eye'}
+                      size={18}
+                      color={c.sub}
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
             </BlurView>
 
-            {errorMsg ? (
-              <Text style={[st.error, { color: c.red }]}>{errorMsg}</Text>
+            {passwordError ? (
+              <Text style={[st.error, { color: c.red }]}>{passwordError}</Text>
+            ) : null}
+            {generalError ? (
+              <Text style={[st.error, { color: c.red }]}>{generalError}</Text>
             ) : null}
 
             <TouchableOpacity
@@ -240,6 +317,16 @@ const st = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     marginBottom: 4,
+  },
+  fieldError: {
+    fontSize: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    marginTop: -4,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   input: {
     fontSize: 16,

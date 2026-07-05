@@ -269,7 +269,7 @@ export default function FinanceStatsScreen() {
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(140,180,240,0.35)',
     text:   isDark ? '#F0F5FF' : '#0A1020',
-    sub:    isDark ? 'rgba(240,245,255,0.45)' : 'rgba(10,16,32,0.45)',
+    sub:    isDark ? 'rgba(240,245,255,0.62)' : 'rgba(10,16,32,0.58)',
     green:  '#10B981',
     red:    '#EF4444',
     accent: '#0EA5E9',

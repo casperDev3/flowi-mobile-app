@@ -19,7 +19,9 @@ import { useI18n } from '@/store/i18n';
 /**
  * Реюзабельна обгортка для онлайн-екранів. Два режими через `reason`:
  *
- * - `'offline'` (дефолт): показує оверлей коли `!online`.
+ * - `'offline'` (дефолт): показує оверлей/банер коли `!online`.
+ *   mode='block' (дефолт): повний blur-оверлей, контент не доступний.
+ *   mode='banner': контент видимий і інтерактивний, зверху компактний банер.
  *   Кнопка «Увімкнути онлайн»:
  *     • гість  → Alert з кнопками Увійти / Зареєструватись / Скасувати
  *     • authed → setOnline(true)
@@ -30,9 +32,11 @@ import { useI18n } from '@/store/i18n';
 export function OfflineOverlay({
   children,
   reason = 'offline',
+  mode = 'block',
 }: {
   children: React.ReactNode;
   reason?: 'offline' | 'guest';
+  mode?: 'block' | 'banner';
 }) {
   const { online, ready, setOnline } = useAppMode();
   const { status } = useAuth();
@@ -63,7 +67,7 @@ export function OfflineOverlay({
 
   // ── Колір ─────────────────────────────────────────────────────────────────
   const text = isDark ? '#F0EEFF' : '#1A1433';
-  const sub  = isDark ? 'rgba(240,238,255,0.55)' : 'rgba(26,20,51,0.55)';
+  const sub  = isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)';
 
   const isGuestCard = reason === 'guest';
 
@@ -83,6 +87,28 @@ export function OfflineOverlay({
       setOnline(true);
     }
   };
+
+  // ── Банер-режим: контент повністю видимий, лише компактна смуга зверху ────
+  if (mode === 'banner' && !isGuestCard) {
+    const bannerBg   = isDark ? 'rgba(12,12,20,0.92)' : 'rgba(255,255,255,0.92)';
+    const bannerBord = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+    return (
+      <View style={{ flex: 1 }}>
+        {/* Компактний банер «Офлайн: лише перегляд» */}
+        <TouchableOpacity
+          onPress={handleEnableOnline}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={tr.offlineReadOnly}
+          style={[s.banner, { backgroundColor: bannerBg, borderBottomColor: bannerBord }]}>
+          <IconSymbol name="icloud.slash" size={13} color={accent} />
+          <Text style={[s.bannerText, { color: accent }]}>{tr.offlineReadOnly}</Text>
+          <IconSymbol name="wifi" size={13} color={sub} style={{ marginLeft: 'auto' }} />
+        </TouchableOpacity>
+        {children}
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -157,12 +183,14 @@ export function OfflineOverlay({
 }
 
 const s = StyleSheet.create({
-  center:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  card:      { width: '100%', maxWidth: 340, borderRadius: 22, borderWidth: 1, padding: 24, alignItems: 'center' },
-  iconBox:   { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  title:     { fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
-  desc:      { fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 18 },
-  btn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14 },
-  btnOutline:{ backgroundColor: 'transparent', borderWidth: 1 },
-  btnLabel:  { color: '#fff', fontWeight: '800', fontSize: 14, marginLeft: 6 },
+  center:     { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  card:       { width: '100%', maxWidth: 340, borderRadius: 22, borderWidth: 1, padding: 24, alignItems: 'center' },
+  iconBox:    { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  title:      { fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  desc:       { fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 18 },
+  btn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14 },
+  btnOutline: { backgroundColor: 'transparent', borderWidth: 1 },
+  btnLabel:   { color: '#fff', fontWeight: '800', fontSize: 14, marginLeft: 6 },
+  banner:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1 },
+  bannerText: { fontSize: 12, fontWeight: '700' },
 });

@@ -15,23 +15,59 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/store/i18n';
+import { getAllScheduledNotifications, requestNotificationPermissions } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
-import { cancelReminder, getAllScheduledNotifications, requestNotificationPermissions } from '@/store/notifications';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ScheduledItem {
   identifier: string;
   title: string;
   body: string;
-  taskId: string | null;
-  subtaskId: string | null;
   fireDate: Date | null;
+  isRecurring: boolean;
 }
+
+type NotifGroup = 'tasks' | 'meetings' | 'daily' | 'meds' | 'checkups' | 'vaccines' | 'habits' | 'other';
+
+function getGroup(id: string): NotifGroup {
+  if (id.startsWith('reminder_')) return 'tasks';
+  if (id.startsWith('meeting_')) return 'meetings';
+  if (id.startsWith('daily_')) return 'daily';
+  if (id.startsWith('med_')) return 'meds';
+  if (id.startsWith('checkup_')) return 'checkups';
+  if (id.startsWith('vaccine_')) return 'vaccines';
+  if (id.startsWith('habit_')) return 'habits';
+  return 'other';
+}
+
+const GROUP_ORDER: NotifGroup[] = ['tasks', 'meetings', 'daily', 'meds', 'checkups', 'vaccines', 'habits', 'other'];
+
+interface GroupMeta {
+  icon: IconSymbolName;
+  color: string;
+}
+
+const GROUP_ICONS: Record<NotifGroup, GroupMeta> = {
+  tasks:    { icon: 'list.bullet',       color: '#7C3AED' },
+  meetings: { icon: 'calendar',          color: '#6366F1' },
+  daily:    { icon: 'clock.fill',        color: '#0EA5E9' },
+  meds:     { icon: 'cross.case.fill',   color: '#10B981' },
+  checkups: { icon: 'stethoscope',       color: '#10B981' },
+  vaccines: { icon: 'syringe.fill',      color: '#10B981' },
+  habits:   { icon: 'star.fill',         color: '#F59E0B' },
+  other:    { icon: 'bell.fill',         color: '#7C3AED' },
+};
+
+// ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function NotificationsScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  const { tr } = useI18n();
   const [items, setItems] = useState<ScheduledItem[]>([]);
   const [permGranted, setPermGranted] = useState<boolean | null>(null);
   const [globalEnabled, setGlobalEnabled] = useState(true);
@@ -41,46 +77,70 @@ export default function NotificationsScreen() {
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-    warn:   '#F59E0B',
+  };
+
+  // Group label lookup — must be inside component to use tr
+  const GROUP_LABELS: Record<NotifGroup, string> = {
+    tasks:    tr.tasks,
+    meetings: tr.meetings,
+    daily:    tr.notifGroupDaily,
+    meds:     tr.meds,
+    checkups: tr.checkups,
+    vaccines: tr.vaccines,
+    habits:   tr.habits,
+    other:    tr.catOther,
   };
 
   const load = useCallback(async () => {
-    // Check permission status
     const { status } = await Notifications.getPermissionsAsync();
     setPermGranted(status === 'granted');
 
-    // Load global toggle from storage
     const enabled = await loadData<boolean>('notificationsEnabled', true);
     setGlobalEnabled(enabled);
 
-    // Load scheduled notifications
     const scheduled = await getAllScheduledNotifications();
-    const mapped: ScheduledItem[] = scheduled
-      .filter(n => n.identifier.startsWith('reminder_'))
-      .map(n => {
-        const trigger = n.trigger as any;
-        let fireDate: Date | null = null;
-        if (trigger?.value) fireDate = new Date(trigger.value * 1000);
-        else if (trigger?.date) fireDate = new Date(trigger.date);
-        const data = n.content.data as any;
-        return {
-          identifier: n.identifier,
-          title: n.content.title ?? '',
-          body: n.content.body ?? '',
-          taskId: data?.taskId ?? null,
-          subtaskId: data?.subtaskId ?? null,
-          fireDate,
-        };
-      })
-      .sort((a, b) => {
-        if (!a.fireDate) return 1;
-        if (!b.fireDate) return -1;
-        return a.fireDate.getTime() - b.fireDate.getTime();
-      });
+    const mapped: ScheduledItem[] = scheduled.map(n => {
+      const trigger = n.trigger as Record<string, unknown> | null;
+      let fireDate: Date | null = null;
+      let isRecurring = false;
+
+      if (trigger) {
+        const triggerType = trigger.type as string | undefined;
+        if (triggerType === 'date') {
+          if (typeof trigger.value === 'number') {
+            fireDate = new Date((trigger.value as number) * 1000);
+          } else if (trigger.date instanceof Date) {
+            fireDate = trigger.date as Date;
+          } else if (typeof trigger.date === 'number') {
+            fireDate = new Date((trigger.date as number) * 1000);
+          }
+        } else {
+          // daily, weekly, calendar — recurring
+          isRecurring = true;
+        }
+      } else {
+        isRecurring = true;
+      }
+
+      return {
+        identifier: n.identifier,
+        title: n.content.title ?? '',
+        body: n.content.body ?? '',
+        fireDate,
+        isRecurring,
+      };
+    }).sort((a, b) => {
+      // Recurring first within groups, then by date
+      if (a.isRecurring && !b.isRecurring) return -1;
+      if (!a.isRecurring && b.isRecurring) return 1;
+      if (!a.fireDate) return 1;
+      if (!b.fireDate) return -1;
+      return a.fireDate.getTime() - b.fireDate.getTime();
+    });
+
     setItems(mapped);
   }, []);
 
@@ -89,20 +149,45 @@ export default function NotificationsScreen() {
   const requestPerm = async () => {
     const granted = await requestNotificationPermissions();
     setPermGranted(granted);
-    if (!granted) Alert.alert('Дозвіл відхилено', 'Увімкніть сповіщення у Налаштуваннях пристрою.');
+    if (!granted) Alert.alert(tr.notifDisabled, tr.notifDisabledSub);
   };
 
-  const toggleGlobal = async (val: boolean) => {
-    setGlobalEnabled(val);
-    await saveData('notificationsEnabled', val);
+  const toggleGlobal = (val: boolean) => {
+    if (!val) {
+      // Confirm before disabling and cancelling all
+      Alert.alert(
+        tr.pushNotifications,
+        tr.notifDisableConfirm,
+        [
+          { text: tr.cancel, style: 'cancel' },
+          {
+            text: tr.deleteAll,
+            style: 'destructive',
+            onPress: async () => {
+              await Notifications.cancelAllScheduledNotificationsAsync();
+              setGlobalEnabled(false);
+              await saveData('notificationsEnabled', false);
+              setItems([]);
+            },
+          },
+        ],
+      );
+      // Don't update globalEnabled yet — wait for user confirmation
+    } else {
+      setGlobalEnabled(true);
+      saveData('notificationsEnabled', true);
+      Alert.alert(tr.pushNotifications, tr.notifReenableHint, [{ text: 'OK' }]);
+    }
   };
 
-  const cancelItem = async (item: ScheduledItem) => {
-    Alert.alert('Видалити нагадування?', item.body, [
-      { text: 'Скасувати', style: 'cancel' },
+  const cancelItem = (item: ScheduledItem) => {
+    Alert.alert(tr.deleteReminder, item.body || item.title, [
+      { text: tr.cancel, style: 'cancel' },
       {
-        text: 'Видалити', style: 'destructive', onPress: async () => {
-          await cancelReminder(item.taskId ?? '', item.subtaskId ?? undefined);
+        text: tr.delete,
+        style: 'destructive',
+        onPress: async () => {
+          await Notifications.cancelScheduledNotificationAsync(item.identifier);
           setItems(prev => prev.filter(i => i.identifier !== item.identifier));
         },
       },
@@ -110,10 +195,12 @@ export default function NotificationsScreen() {
   };
 
   const cancelAll = () => {
-    Alert.alert('Видалити всі нагадування?', `${items.length} сповіщень буде видалено.`, [
-      { text: 'Скасувати', style: 'cancel' },
+    Alert.alert(tr.deleteAllReminders, `${items.length} ${tr.totalNotif.toLowerCase()}.`, [
+      { text: tr.cancel, style: 'cancel' },
       {
-        text: 'Видалити всі', style: 'destructive', onPress: async () => {
+        text: tr.deleteAll,
+        style: 'destructive',
+        onPress: async () => {
           await Notifications.cancelAllScheduledNotificationsAsync();
           setItems([]);
         },
@@ -121,19 +208,22 @@ export default function NotificationsScreen() {
     ]);
   };
 
-  const formatDate = (d: Date | null) => {
+  const formatDate = (item: ScheduledItem): string => {
+    if (item.isRecurring) return tr.notifRecurring;
+    const d = item.fireDate;
     if (!d) return '—';
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
     const tom = new Date(now); tom.setDate(tom.getDate() + 1);
     const isTomorrow = d.toDateString() === tom.toDateString();
     const timeStr = d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-    if (isToday) return `Сьогодні · ${timeStr}`;
-    if (isTomorrow) return `Завтра · ${timeStr}`;
+    if (isToday) return `${tr.today} · ${timeStr}`;
+    if (isTomorrow) return `${tr.tomorrow} · ${timeStr}`;
     return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' }) + ` · ${timeStr}`;
   };
 
-  const isPast = (d: Date | null) => d ? d < new Date() : false;
+  const oneTimeCount = items.filter(i => !i.isRecurring).length;
+  const recurringCount = items.filter(i => i.isRecurring).length;
 
   return (
     <View style={{ flex: 1 }}>
@@ -147,13 +237,17 @@ export default function NotificationsScreen() {
           <View style={{ marginTop: 14, marginBottom: 24, flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
               onPress={() => router.back()}
+              accessibilityLabel={tr.back}
               style={[ns.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
               <IconSymbol name="chevron.left" size={17} color={c.sub} />
             </TouchableOpacity>
-            <Text style={[ns.pageTitle, { color: c.text, flex: 1, marginLeft: 12 }]}>Сповіщення</Text>
+            <Text style={[ns.pageTitle, { color: c.text, flex: 1, marginLeft: 12 }]}>
+              {tr.notifications}
+            </Text>
             {items.length > 0 && (
               <TouchableOpacity
                 onPress={cancelAll}
+                accessibilityLabel={tr.deleteAllReminders}
                 style={[ns.headerBtn, { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.3)' }]}>
                 <IconSymbol name="trash" size={16} color="#EF4444" />
               </TouchableOpacity>
@@ -162,25 +256,36 @@ export default function NotificationsScreen() {
 
           {/* Permission banner */}
           {permGranted === false && (
-            <TouchableOpacity onPress={requestPerm} style={[ns.banner, { backgroundColor: '#EF444415', borderColor: '#EF444440' }]}>
+            <TouchableOpacity
+              onPress={requestPerm}
+              style={[ns.banner, { backgroundColor: '#EF444415', borderColor: '#EF444440' }]}>
               <View style={[ns.bannerIcon, { backgroundColor: '#EF444420' }]}>
                 <IconSymbol name="bell.slash" size={20} color="#EF4444" />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: '#EF4444', fontSize: 14, fontWeight: '700' }}>Сповіщення вимкнено</Text>
-                <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 2, opacity: 0.8 }}>Натисніть щоб надати дозвіл</Text>
+                <Text style={{ color: '#EF4444', fontSize: 14, fontWeight: '700' }}>
+                  {tr.notifDisabled}
+                </Text>
+                <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 2, opacity: 0.8 }}>
+                  {tr.notifDisabledSub}
+                </Text>
               </View>
               <IconSymbol name="chevron.right" size={15} color="#EF4444" />
             </TouchableOpacity>
           )}
 
           {/* Global toggle */}
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[ns.card, { borderColor: c.border, marginBottom: 20 }]}>
+          <BlurView
+            intensity={isDark ? 20 : 40}
+            tint={isDark ? 'dark' : 'light'}
+            style={[ns.card, { borderColor: c.border, marginBottom: 20 }]}>
             <View style={ns.toggleRow}>
               <View style={[ns.iconBox, { backgroundColor: '#F59E0B20' }]}>
                 <IconSymbol name="bell.badge" size={17} color="#F59E0B" />
               </View>
-              <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 12 }}>Push-сповіщення</Text>
+              <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 12 }}>
+                {tr.pushNotifications}
+              </Text>
               <Switch
                 value={globalEnabled}
                 onValueChange={toggleGlobal}
@@ -194,81 +299,92 @@ export default function NotificationsScreen() {
           {/* Stats */}
           {items.length > 0 && (
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[ns.statCard, { borderColor: c.border, flex: 1 }]}>
+              <BlurView
+                intensity={isDark ? 20 : 40}
+                tint={isDark ? 'dark' : 'light'}
+                style={[ns.statCard, { borderColor: c.border, flex: 1 }]}>
                 <Text style={{ color: c.accent, fontSize: 24, fontWeight: '800' }}>{items.length}</Text>
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>Всього</Text>
+                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                  {tr.totalNotif}
+                </Text>
               </BlurView>
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[ns.statCard, { borderColor: c.border, flex: 1 }]}>
-                <Text style={{ color: '#10B981', fontSize: 24, fontWeight: '800' }}>{items.filter(i => !isPast(i.fireDate)).length}</Text>
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>Активних</Text>
+              <BlurView
+                intensity={isDark ? 20 : 40}
+                tint={isDark ? 'dark' : 'light'}
+                style={[ns.statCard, { borderColor: c.border, flex: 1 }]}>
+                <Text style={{ color: '#10B981', fontSize: 24, fontWeight: '800' }}>{oneTimeCount}</Text>
+                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                  {tr.activeNotif}
+                </Text>
               </BlurView>
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[ns.statCard, { borderColor: c.border, flex: 1 }]}>
-                <Text style={{ color: '#EF4444', fontSize: 24, fontWeight: '800' }}>{items.filter(i => isPast(i.fireDate)).length}</Text>
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>Минулих</Text>
+              <BlurView
+                intensity={isDark ? 20 : 40}
+                tint={isDark ? 'dark' : 'light'}
+                style={[ns.statCard, { borderColor: c.border, flex: 1 }]}>
+                <Text style={{ color: '#0EA5E9', fontSize: 24, fontWeight: '800' }}>{recurringCount}</Text>
+                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                  {tr.notifRecurring}
+                </Text>
               </BlurView>
             </View>
           )}
 
-          {/* Section: active */}
-          {items.filter(i => !isPast(i.fireDate)).length > 0 && (
-            <>
-              <Text style={[ns.sectionLabel, { color: c.sub }]}>ЗАПЛАНОВАНІ</Text>
-              <View style={{ gap: 8, marginBottom: 16 }}>
-                {items.filter(i => !isPast(i.fireDate)).map(item => (
-                  <BlurView key={item.identifier} intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[ns.itemCard, { borderColor: c.border }]}>
-                    <View style={[ns.iconBox, { backgroundColor: '#F59E0B20' }]}>
-                      <IconSymbol name={item.subtaskId ? 'checkmark.circle' : 'list.bullet'} size={17} color="#F59E0B" />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{item.body}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
-                        <IconSymbol name="clock" size={11} color="#F59E0B" />
-                        <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '600' }}>{formatDate(item.fireDate)}</Text>
+          {/* Grouped sections */}
+          {GROUP_ORDER.map(group => {
+            const groupItems = items.filter(i => getGroup(i.identifier) === group);
+            if (groupItems.length === 0) return null;
+            const meta = GROUP_ICONS[group];
+            const label = GROUP_LABELS[group];
+            return (
+              <React.Fragment key={group}>
+                <Text style={[ns.sectionLabel, { color: c.sub }]}>
+                  {label.toUpperCase()}
+                </Text>
+                <View style={{ gap: 8, marginBottom: 16 }}>
+                  {groupItems.map(item => (
+                    <BlurView
+                      key={item.identifier}
+                      intensity={isDark ? 20 : 40}
+                      tint={isDark ? 'dark' : 'light'}
+                      style={[ns.itemCard, { borderColor: c.border }]}>
+                      <View style={[ns.iconBox, { backgroundColor: meta.color + '20' }]}>
+                        <IconSymbol name={meta.icon} size={17} color={meta.color} />
                       </View>
-                      <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
-                        {item.subtaskId ? 'Підзавдання' : 'Завдання'}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => cancelItem(item)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      style={[ns.deleteBtn, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
-                      <IconSymbol name="xmark" size={13} color="#EF4444" />
-                    </TouchableOpacity>
-                  </BlurView>
-                ))}
-              </View>
-            </>
-          )}
-
-          {/* Section: past */}
-          {items.filter(i => isPast(i.fireDate)).length > 0 && (
-            <>
-              <Text style={[ns.sectionLabel, { color: c.sub }]}>МИНУЛІ</Text>
-              <View style={{ gap: 8, marginBottom: 16 }}>
-                {items.filter(i => isPast(i.fireDate)).map(item => (
-                  <BlurView key={item.identifier} intensity={isDark ? 15 : 30} tint={isDark ? 'dark' : 'light'} style={[ns.itemCard, { borderColor: c.border, opacity: 0.6 }]}>
-                    <View style={[ns.iconBox, { backgroundColor: c.dim }]}>
-                      <IconSymbol name={item.subtaskId ? 'checkmark.circle' : 'list.bullet'} size={17} color={c.sub} />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{item.body}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
-                        <IconSymbol name="clock" size={11} color={c.sub} />
-                        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{formatDate(item.fireDate)}</Text>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        {item.title ? (
+                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 1 }}
+                            numberOfLines={1}>
+                            {item.title}
+                          </Text>
+                        ) : null}
+                        <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}
+                          numberOfLines={2}>
+                          {item.body || item.title}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
+                          <IconSymbol
+                            name={item.isRecurring ? 'arrow.clockwise' : 'clock'}
+                            size={11}
+                            color={meta.color}
+                          />
+                          <Text style={{ color: meta.color, fontSize: 12, fontWeight: '600' }}>
+                            {formatDate(item)}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => cancelItem(item)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      style={[ns.deleteBtn, { backgroundColor: 'rgba(239,68,68,0.08)' }]}>
-                      <IconSymbol name="xmark" size={13} color="#EF4444" />
-                    </TouchableOpacity>
-                  </BlurView>
-                ))}
-              </View>
-            </>
-          )}
+                      <TouchableOpacity
+                        onPress={() => cancelItem(item)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        accessibilityLabel={tr.delete}
+                        style={[ns.deleteBtn, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+                        <IconSymbol name="xmark" size={13} color="#EF4444" />
+                      </TouchableOpacity>
+                    </BlurView>
+                  ))}
+                </View>
+              </React.Fragment>
+            );
+          })}
 
           {/* Empty state */}
           {items.length === 0 && permGranted !== false && (
@@ -276,9 +392,11 @@ export default function NotificationsScreen() {
               <View style={[ns.emptyIcon, { backgroundColor: c.accent + '18' }]}>
                 <IconSymbol name="bell.slash" size={32} color={c.accent} />
               </View>
-              <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontWeight: '700' }}>Немає сповіщень</Text>
+              <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontWeight: '700' }}>
+                {tr.noNotifications}
+              </Text>
               <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }}>
-                Відкрийте завдання або підзавдання{'\n'}щоб встановити нагадування
+                {tr.noNotifSub}
               </Text>
             </View>
           )}

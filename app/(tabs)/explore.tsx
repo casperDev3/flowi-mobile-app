@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -22,6 +22,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FinanceSummary } from '@/components/finance/FinanceSummary';
 import { TransactionGroup } from '@/components/finance/TransactionGroup';
 import { MonthPicker } from '@/components/shared/MonthPicker';
+import { PressableScale } from '@/components/shared/PressableScale';
+import { SheetModal } from '@/components/shared/SheetModal';
+import { SkeletonCard } from '@/components/shared/Skeleton';
+import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
@@ -34,7 +38,10 @@ import {
   BUILTIN_CURRENCIES, txCurrency,
   type Currency, type CurrencyTotals,
 } from '@/utils/financeUtils';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { useMotion } from '@/hooks/use-motion';
 import { isSameDay } from '@/utils/dateUtils';
+import { haptic } from '@/utils/haptics';
 
 type TxType = 'income' | 'expense';
 
@@ -112,6 +119,7 @@ export default function FinanceScreen() {
   const MONTHS_UA = tr.months;
   const WEEKDAYS_SHORT = tr.weekdays;
   const fmtCur = (n: number, cur: Currency) => formatCurrency(n, cur, locale);
+  const motion = useMotion();
   const now = new Date();
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -184,10 +192,15 @@ export default function FinanceScreen() {
     setTxs(data);
   }, []);
 
-  // Load from storage
-  useEffect(() => {
-    loadTxs().then(() => setInitialized(true));
-  }, []);
+  // Load from storage — useFocusEffect ensures reload after data import or navigation
+  const [txsInitialized, setTxsInitialized] = useState(false);
+  useFocusEffect(useCallback(() => {
+    if (!txsInitialized) {
+      loadTxs().then(() => { setTxsInitialized(true); setInitialized(true); });
+    } else {
+      loadTxs();
+    }
+  }, [txsInitialized, loadTxs]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -208,6 +221,9 @@ export default function FinanceScreen() {
   useEffect(() => {
     if (initialized) void saveSynced('transactions', txs);
   }, [txs, initialized]);
+
+  // Undo-тост (таб — над таб-баром)
+  const { show: showUndo, element: undoElement } = useUndoToast(true);
 
   // Load categories
   useEffect(() => {
@@ -323,9 +339,20 @@ export default function FinanceScreen() {
     setAmount(''); setCategory(''); setNote(''); setShowAdd(false);
     setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill');
     setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol('');
+    haptic.success();
   };
 
-  const deleteTx = (id: string) => { setTxs(p => p.filter(t => t.id !== id)); if (selected?.id === id) setSelected(null); };
+  const deleteTx = (id: string) => {
+    const txToDelete = txs.find(t => t.id === id);
+    setTxs(p => p.filter(t => t.id !== id));
+    if (selected?.id === id) setSelected(null);
+    // Undo: повернути транзакцію
+    if (txToDelete) {
+      showUndo(tr.transactionDeleted, () => {
+        setTxs(prev => [...prev, txToDelete]);
+      });
+    }
+  };
 
   // Calendar helpers
   const firstDay = (() => { const d = new Date(calYear, calMonth, 1).getDay(); return d === 0 ? 6 : d - 1; })();
@@ -406,6 +433,15 @@ export default function FinanceScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />
           }>
 
+          {/* Skeleton — перший завантаження */}
+          {!initialized && (
+            <>
+              <SkeletonCard style={{ marginTop: 4 }} />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
+          )}
+
           {/* Date filter chip */}
           {dateFilter && (
             <TouchableOpacity
@@ -474,31 +510,38 @@ export default function FinanceScreen() {
           )}
 
           {/* Grouped transactions */}
-          {groups.map(group => (
-            <TransactionGroup
+          {groups.map((group, i) => (
+            <Animated.View
               key={group.dateStr}
-              group={group}
-              compact={compact}
-              isDark={isDark}
-              c={{ sub: c.sub, text: c.text, green: c.green, red: c.red, border: c.border, dim: c.dim }}
-              fmt={fmtCur}
-              currencyByCode={currencyByCode}
-              primaryCode={primaryCurrency}
-              getCatIcon={getCatIcon}
-              onSelect={setSelected}
-              todayLabel={tr.today}
-              yesterdayLabel={tr.yesterday}
-              incomeLabel={tr.income}
-              expenseLabel={tr.expense}
-            />
+              entering={motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40))}
+              layout={motion.entering(LinearTransition.springify())}>
+              <TransactionGroup
+                group={group}
+                compact={compact}
+                isDark={isDark}
+                c={{ sub: c.sub, text: c.text, green: c.green, red: c.red, border: c.border, dim: c.dim }}
+                fmt={fmtCur}
+                currencyByCode={currencyByCode}
+                primaryCode={primaryCurrency}
+                getCatIcon={getCatIcon}
+                onSelect={setSelected}
+                todayLabel={tr.today}
+                yesterdayLabel={tr.yesterday}
+                incomeLabel={tr.income}
+                expenseLabel={tr.expense}
+              />
+            </Animated.View>
           ))}
         </ScrollView>
       </SafeAreaView>
 
       {/* FAB */}
-      <TouchableOpacity onPress={() => setShowAdd(true)} style={[s.fab, { backgroundColor: c.accent }]} activeOpacity={0.85}>
+      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { backgroundColor: c.accent }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
-      </TouchableOpacity>
+      </PressableScale>
+
+      {/* Undo-тост */}
+      {undoElement}
 
       {/* ─── Context Menu Modal ─── */}
       <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>
@@ -673,21 +716,9 @@ export default function FinanceScreen() {
       </Modal>
 
       {/* ─── Add Modal ─── */}
-      <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                  <View style={s.handleRow}>
-                    <View style={{ flex: 1 }} />
-                    <View style={[s.handle, { backgroundColor: c.border }]} />
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <TouchableOpacity onPress={() => setShowAdd(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                        <IconSymbol name="xmark" size={17} color={c.sub} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+      <SheetModal visible={showAdd} onClose={() => setShowAdd(false)}>
+        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                   {/* Type toggle */}
                   <View style={[s.typeRow, { backgroundColor: c.dim, marginBottom: 20 }]}>
@@ -886,12 +917,9 @@ export default function FinanceScreen() {
                       <Text style={{ color: (!amount.trim() || !category) ? c.sub : '#fff', fontWeight: '700', marginLeft: 6 }}>{tr.add}</Text>
                     </TouchableOpacity>
                   </View>
-                </ScrollView>
-              </BlurView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
+          </ScrollView>
+        </BlurView>
+      </SheetModal>
 
       {/* ─── Primary Currency Picker ─── */}
       <Modal visible={showPrimaryPicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowPrimaryPicker(false)}>

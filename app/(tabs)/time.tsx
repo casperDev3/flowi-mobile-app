@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PressableScale } from '@/components/shared/PressableScale';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
@@ -26,6 +27,7 @@ import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
 import { useI18n } from '@/store/i18n';
+import { haptic } from '@/utils/haptics';
 
 type Shift = 'morning' | 'day' | 'evening' | 'night';
 
@@ -220,7 +222,7 @@ export default function TimeScreen() {
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,205,255,0.5)',
     text:   isDark ? '#EEF0FF' : '#0D1033',
-    sub:    isDark ? 'rgba(238,240,255,0.45)' : 'rgba(13,16,51,0.45)',
+    sub:    isDark ? 'rgba(238,240,255,0.62)' : 'rgba(13,16,51,0.58)',
     accent: running ? '#EF4444' : '#6366F1',
     indigo: '#6366F1',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
@@ -372,9 +374,9 @@ export default function TimeScreen() {
       </SafeAreaView>
 
       {/* FAB */}
-      <TouchableOpacity onPress={() => setShowAdd(true)} style={[s.fab, { backgroundColor: c.indigo }]} activeOpacity={0.85}>
+      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { backgroundColor: c.indigo }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
-      </TouchableOpacity>
+      </PressableScale>
 
       {/* ─── Context Menu Modal ─── */}
       <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>

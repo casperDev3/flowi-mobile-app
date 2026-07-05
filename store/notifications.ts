@@ -2,6 +2,8 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { loadData } from './storage';
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -47,11 +49,28 @@ export function reminderId(taskId: string, subtaskId?: string): string {
   return subtaskId ? `reminder_${taskId}_${subtaskId}` : `reminder_${taskId}`;
 }
 
+/** Returns false when the global notifications toggle is disabled. */
+async function isNotificationsEnabled(): Promise<boolean> {
+  return loadData<boolean>('notificationsEnabled', true);
+}
+
 export async function scheduleReminder(
   meta: ReminderMeta,
   date: Date,
 ): Promise<boolean> {
   if (date <= new Date()) return false;
+
+  const globalEnabled = await isNotificationsEnabled();
+  if (!globalEnabled) {
+    if (__DEV__) console.warn('[notifications] scheduleReminder: globally disabled');
+    return false;
+  }
+  const taskRemindersEnabled = await loadData<boolean>('pref_task_reminders', true);
+  if (!taskRemindersEnabled) {
+    if (__DEV__) console.warn('[notifications] scheduleReminder: task reminders disabled');
+    return false;
+  }
+
   const granted = await requestNotificationPermissions();
   if (!granted) return false;
 
@@ -103,6 +122,11 @@ export async function scheduleDailyReminder(
   title: string,
   body: string,
 ): Promise<boolean> {
+  const globalEnabled = await isNotificationsEnabled();
+  if (!globalEnabled) {
+    if (__DEV__) console.warn('[notifications] scheduleDailyReminder: globally disabled');
+    return false;
+  }
   const granted = await requestNotificationPermissions();
   if (!granted) return false;
 
@@ -137,6 +161,11 @@ export async function scheduleWeeklyReminder(
   title: string,
   body: string,
 ): Promise<boolean> {
+  const globalEnabled = await isNotificationsEnabled();
+  if (!globalEnabled) {
+    if (__DEV__) console.warn('[notifications] scheduleWeeklyReminder: globally disabled');
+    return false;
+  }
   const granted = await requestNotificationPermissions();
   if (!granted) return false;
   const id = dailyReminderId(key);
@@ -161,6 +190,11 @@ export async function scheduleMedReminders(
   title: string,
   body: string,
 ): Promise<string[]> {
+  const globalEnabled = await isNotificationsEnabled();
+  if (!globalEnabled) {
+    if (__DEV__) console.warn('[notifications] scheduleMedReminders: globally disabled');
+    return [];
+  }
   const granted = await requestNotificationPermissions();
   if (!granted) return [];
   const ids: string[] = [];
@@ -194,6 +228,11 @@ export async function scheduleDateReminder(
   body: string,
 ): Promise<string | null> {
   if (date <= new Date()) return null;
+  const globalEnabled = await isNotificationsEnabled();
+  if (!globalEnabled) {
+    if (__DEV__) console.warn('[notifications] scheduleDateReminder: globally disabled');
+    return null;
+  }
   const granted = await requestNotificationPermissions();
   if (!granted) return null;
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
@@ -207,5 +246,60 @@ export async function scheduleDateReminder(
 
 export async function cancelById(id?: string | null): Promise<void> {
   if (!id) return;
+  await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+}
+
+// ─── Зустрічі: нагадування за 15 хв до початку ───────────────────────────────
+
+/** Стабільний id нотифікації для зустрічі */
+export function meetingNotifId(meetingId: string): string {
+  return `meeting_${meetingId}`;
+}
+
+/**
+ * Планує одноразове нагадування за 15 хвилин до зустрічі.
+ * Якщо зустріч уже пройшла (або до неї ≤15 хв) — не планує.
+ * Безпечно викликати повторно при редагуванні: скасовує стару нотифікацію.
+ */
+export async function scheduleMeetingNotification(
+  meetingId: string,
+  title: string,
+  dateStr: string,  // 'YYYY-MM-DD'
+  timeStr: string,  // 'HH:MM'
+): Promise<boolean> {
+  const dt = new Date(`${dateStr}T${timeStr || '00:00'}`);
+  const fireAt = new Date(dt.getTime() - 15 * 60 * 1000);
+  if (fireAt <= new Date()) return false;
+
+  const globalEnabled = await isNotificationsEnabled();
+  if (!globalEnabled) {
+    if (__DEV__) console.warn('[notifications] scheduleMeetingNotification: globally disabled');
+    return false;
+  }
+
+  const granted = await requestNotificationPermissions();
+  if (!granted) return false;
+
+  const id = meetingNotifId(meetingId);
+  await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  await Notifications.scheduleNotificationAsync({
+    identifier: id,
+    content: {
+      title: '📅 Зустріч через 15 хв',
+      body: title,
+      sound: true,
+      data: { meetingId },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: fireAt,
+    },
+  });
+  return true;
+}
+
+/** Скасовує нагадування для зустрічі (при видаленні або зміні). */
+export async function cancelMeetingNotification(meetingId: string): Promise<void> {
+  const id = meetingNotifId(meetingId);
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
 }

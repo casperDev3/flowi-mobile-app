@@ -23,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { isOnlineMode } from '@/store/app-mode';
+import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 
@@ -61,6 +62,7 @@ const STATUS_LABELS: Record<IdeaStatus, string> = {
 export default function IdeasScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  const { tr } = useI18n();
 
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -84,7 +86,7 @@ export default function IdeasScreen() {
     bg2:    isDark ? '#14121E' : '#EDE8FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#8B5CF6',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
@@ -355,19 +357,25 @@ export default function IdeasScreen() {
                     <View style={{ flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                       <TouchableOpacity
                         onPress={e => { e.stopPropagation(); openEdit(idea); }}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr.edit}
                         style={[st.actionBtn, { backgroundColor: '#6366F115', borderColor: '#6366F130' }]}>
                         <IconSymbol name="pencil" size={13} color="#6366F1" />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={e => { e.stopPropagation(); copyToClipboard(idea); }}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr.copyText}
                         style={[st.actionBtn, { backgroundColor: '#0EA5E915', borderColor: '#0EA5E930' }]}>
                         <IconSymbol name="doc.on.clipboard" size={13} color="#0EA5E9" />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={e => { e.stopPropagation(); deleteIdea(idea.id); }}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr.delete}
                         style={[st.actionBtn, { backgroundColor: '#EF444415', borderColor: '#EF444430' }]}>
                         <IconSymbol name="trash" size={13} color="#EF4444" />
                       </TouchableOpacity>
@@ -406,7 +414,7 @@ export default function IdeasScreen() {
                     <View style={{ flex: 1 }} />
                     <View style={[st.handle, { backgroundColor: c.border }]} />
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <TouchableOpacity onPress={() => setShowAdd(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <TouchableOpacity onPress={() => setShowAdd(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={tr.close}>
                         <IconSymbol name="xmark" size={17} color={c.sub} />
                       </TouchableOpacity>
                     </View>
@@ -482,7 +490,7 @@ export default function IdeasScreen() {
                     <View style={{ flex: 1 }} />
                     <View style={[st.handle, { backgroundColor: c.border }]} />
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <TouchableOpacity onPress={() => setShowEdit(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <TouchableOpacity onPress={() => setShowEdit(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={tr.close}>
                         <IconSymbol name="xmark" size={17} color={c.sub} />
                       </TouchableOpacity>
                     </View>

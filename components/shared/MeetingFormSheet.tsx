@@ -148,7 +148,7 @@ export function MeetingFormSheet({
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)',
     dim:    isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
     text:   isDark ? '#F2F0FF' : '#1A1830',
-    sub:    isDark ? 'rgba(210,205,255,0.45)' : 'rgba(80,70,140,0.55)',
+    sub:    isDark ? 'rgba(210,205,255,0.62)' : 'rgba(80,70,140,0.58)',
     sheet:  isDark ? 'rgba(18,18,32,0.96)' : 'rgba(245,244,255,0.97)',
   };
 

@@ -20,6 +20,7 @@ import { QuickAddSheet, QuickRecord } from '@/components/health/QuickAddSheet';
 import { HubTile } from '@/components/health/HubTile';
 import { RingCell } from '@/components/health/RingCell';
 import { MonthPicker } from '@/components/shared/MonthPicker';
+import { SkeletonCard } from '@/components/shared/Skeleton';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
@@ -53,22 +54,36 @@ export default function HealthHubScreen() {
   const [medsDue, setMedsDue] = useState(0);
   const loadMedsDue = useCallback(async () => {
     const meds = await loadData<any[]>('health_meds', []);
-    const todayIso = new Date().toDateString();
+    const today = new Date();
     let due = 0;
     meds.forEach(m => {
       if (!m.active) return;
-      const takenToday = (m.log ?? []).filter((l: any) => new Date(l.date).toDateString() === todayIso).length;
+      const takenToday = (m.log ?? []).filter((l: any) => isSameDay(new Date(l.date), today)).length;
       due += Math.max(0, (m.times?.length ?? 0) - takenToday);
     });
     setMedsDue(due);
   }, []);
   useEffect(() => { loadMedsDue(); }, [loadMedsDue]);
 
+  // Лічильник звичок «сьогодні» для плитки Звичок
+  const [habitsTotal, setHabitsTotal] = useState(0);
+  const [habitsDone, setHabitsDone] = useState(0);
+  const loadHabits = useCallback(async () => {
+    const habits = await loadData<any[]>('health_habits', []);
+    const todayDate = new Date();
+    const done = habits.filter(h =>
+      (h.log ?? []).some((l: string) => isSameDay(new Date(l), todayDate))
+    ).length;
+    setHabitsTotal(habits.length);
+    setHabitsDone(done);
+  }, []);
+  useEffect(() => { loadHabits(); }, [loadHabits]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([h.reload(), loadMedsDue()]);
+    await Promise.all([h.reload(), loadMedsDue(), loadHabits()]);
     setRefreshing(false);
-  }, [h, loadMedsDue]);
+  }, [h, loadMedsDue, loadHabits]);
 
   const onQuickSubmit = (records: QuickRecord[]) => records.forEach(r => h.addEntry({ type: r.type, value: r.value }));
 
@@ -95,6 +110,15 @@ export default function HealthHubScreen() {
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 120 : 100 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+          {/* Skeleton — перший завантаження */}
+          {!h.initialized && (
+            <>
+              <SkeletonCard style={{ marginTop: 4 }} />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
+          )}
 
           {/* Профіль-підказка */}
           {h.initialized && !profile && (
@@ -193,6 +217,12 @@ export default function HealthHubScreen() {
               <HubTile title={tr.healthProfile} icon="person.fill" color={ACCENT_PROT}
                 hint={profile ? `${goals.calories} кк · ${goals.protein} г` : tr.profileHint}
                 onPress={() => router.push('/health-profile')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <HubTile title={tr.habits} icon="star.fill" color="#F59E0B"
+                stat={habitsTotal > 0 ? `${habitsDone}/${habitsTotal}` : undefined}
+                hint={habitsTotal === 0 ? tr.habitsSub : undefined}
+                onPress={() => router.push('/health-habits')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
             </View>
           </View>
 

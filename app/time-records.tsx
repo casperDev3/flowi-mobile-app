@@ -231,7 +231,7 @@ export default function TimeRecordsScreen() {
     bg2:    isDark ? '#121525' : '#E2E5FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(180,175,255,0.4)',
     text:   isDark ? '#EEEEFF' : '#1A1B33',
-    sub:    isDark ? 'rgba(238,238,255,0.45)' : 'rgba(26,27,51,0.45)',
+    sub:    isDark ? 'rgba(238,238,255,0.62)' : 'rgba(26,27,51,0.58)',
     accent: '#6366F1',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
   };

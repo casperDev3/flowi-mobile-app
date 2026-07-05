@@ -22,6 +22,7 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
+import { BUILTIN_CURRENCIES } from '@/utils/financeUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ type TxType = 'income' | 'expense';
 
 interface Transaction {
   id: string; type: TxType; category: string; amount: number; note: string; date: string;
+  currency?: string;
 }
 
 interface BudgetLimit {
@@ -67,8 +69,13 @@ function isSameMonth(dateStr: string, month: Date): boolean {
   return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth();
 }
 
-function formatCurrency(n: number): string {
-  return n.toLocaleString('uk-UA', { maximumFractionDigits: 0 });
+function getCurrencySymbol(code: string): string {
+  return BUILTIN_CURRENCIES.find(c => c.code === code)?.symbol ?? code;
+}
+
+function formatCurrency(n: number, symbol?: string): string {
+  const formatted = n.toLocaleString('uk-UA', { maximumFractionDigits: 0 });
+  return symbol ? `${formatted} ${symbol}` : formatted;
 }
 
 function chunk<T>(arr: T[], n: number): T[][] {
@@ -90,7 +97,7 @@ export default function BudgetScreen() {
     card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.80)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
     text:   isDark ? '#EEF4FF' : '#0A1628',
-    sub:    isDark ? 'rgba(220,235,255,0.45)' : 'rgba(10,22,40,0.45)',
+    sub:    isDark ? 'rgba(220,235,255,0.62)' : 'rgba(10,22,40,0.58)',
     dim:    isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(8,14,24,0.98)' : 'rgba(239,245,255,0.98)',
     input:  isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
@@ -104,6 +111,7 @@ export default function BudgetScreen() {
   const [initialized, setInitialized] = useState(false);
   const [budgets, setBudgets]         = useState<BudgetLimit[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [primaryCurrency, setPrimaryCurrency] = useState<string>('UAH');
   const [activeMonth, setActiveMonth] = useState(() => {
     const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1);
   });
@@ -123,10 +131,12 @@ export default function BudgetScreen() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [savedBudgets, txs] = await Promise.all([
+      const [savedBudgets, txs, primCur] = await Promise.all([
         loadData<BudgetLimit[]>('budget_limits', []),
         loadData<Transaction[]>('transactions', []),
+        loadData<string>('finance_primary_currency', 'UAH'),
       ]);
+      setPrimaryCurrency(primCur || 'UAH');
 
       // Merge saved budgets with defaults (add new default categories that don't exist yet)
       const merged = [...savedBudgets];
@@ -148,16 +158,34 @@ export default function BudgetScreen() {
 
   // ─── Computed ─────────────────────────────────────────────────────────────
 
-  // Actual spending per category for selected month
+  // Currency symbol for primary currency
+  const currencySymbol = useMemo(() => getCurrencySymbol(primaryCurrency), [primaryCurrency]);
+
+  // Actual spending per category for selected month — only primary currency transactions
   const actualByCategory = useMemo(() => {
     const map: Record<string, number> = {};
     transactions
-      .filter(tx => tx.type === 'expense' && isSameMonth(tx.date, activeMonth))
+      .filter(tx =>
+        tx.type === 'expense' &&
+        isSameMonth(tx.date, activeMonth) &&
+        (tx.currency == null || tx.currency === primaryCurrency),
+      )
       .forEach(tx => {
         map[tx.category] = (map[tx.category] ?? 0) + tx.amount;
       });
     return map;
-  }, [transactions, activeMonth]);
+  }, [transactions, activeMonth, primaryCurrency]);
+
+  // Count of expense transactions in OTHER currencies this month (for info badge)
+  const otherCurrencyCount = useMemo(() => {
+    return transactions.filter(
+      tx =>
+        tx.type === 'expense' &&
+        isSameMonth(tx.date, activeMonth) &&
+        tx.currency != null &&
+        tx.currency !== primaryCurrency,
+    ).length;
+  }, [transactions, activeMonth, primaryCurrency]);
 
   // Merged display list: saved budgets + auto-added from transactions
   const displayBudgets = useMemo(() => {
@@ -261,6 +289,18 @@ export default function BudgetScreen() {
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}>
 
+          {/* Info: other-currency transactions excluded */}
+          {otherCurrencyCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
+              backgroundColor: ACCENT + '15', borderRadius: 12, marginBottom: 12,
+              borderWidth: 1, borderColor: ACCENT + '30' }}>
+              <IconSymbol name="info.circle" size={15} color={ACCENT} />
+              <Text style={{ flex: 1, fontSize: 12, color: c.sub, lineHeight: 17 }}>
+                {tr.budgetOtherCurrenciesHint.replace('{n}', String(otherCurrencyCount))}
+              </Text>
+            </View>
+          )}
+
           {/* Total summary card */}
           {totals.totalBudget > 0 && (
             <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
@@ -269,13 +309,13 @@ export default function BudgetScreen() {
                 <View>
                   <Text style={{ fontSize: 12, color: c.sub, fontWeight: '600' }}>ВИТРАЧЕНО</Text>
                   <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, marginTop: 2, letterSpacing: -0.5 }}>
-                    {formatCurrency(totals.totalSpent)} ₴
+                    {formatCurrency(totals.totalSpent, currencySymbol)}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={{ fontSize: 12, color: c.sub, fontWeight: '600' }}>БЮДЖЕТ</Text>
                   <Text style={{ fontSize: 22, fontWeight: '800', color: ACCENT, marginTop: 2, letterSpacing: -0.5 }}>
-                    {formatCurrency(totals.totalBudget)} ₴
+                    {formatCurrency(totals.totalBudget, currencySymbol)}
                   </Text>
                 </View>
               </View>
@@ -283,7 +323,7 @@ export default function BudgetScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
                 <Text style={{ fontSize: 12, color: c.sub }}>
                   Залишилось: <Text style={{ fontWeight: '700', color: totals.totalSpent > totals.totalBudget ? c.red : c.green }}>
-                    {formatCurrency(Math.max(0, totals.totalBudget - totals.totalSpent))} ₴
+                    {formatCurrency(Math.max(0, totals.totalBudget - totals.totalSpent), currencySymbol)}
                   </Text>
                 </Text>
                 <Text style={{ fontSize: 12, color: c.sub }}>
@@ -318,9 +358,9 @@ export default function BudgetScreen() {
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{item.category}</Text>
                           <Text style={{ fontSize: 13, fontWeight: '700', color: isOver ? c.red : c.text }}>
-                            {formatCurrency(spent)} ₴
+                            {formatCurrency(spent, currencySymbol)}
                             {item.limit > 0 && (
-                              <Text style={{ color: c.sub, fontWeight: '400' }}> / {formatCurrency(item.limit)} ₴</Text>
+                              <Text style={{ color: c.sub, fontWeight: '400' }}> / {formatCurrency(item.limit, currencySymbol)}</Text>
                             )}
                           </Text>
                         </View>
@@ -403,13 +443,13 @@ export default function BudgetScreen() {
                   <View style={[st.spentRow, { backgroundColor: c.dim, borderColor: c.border }]}>
                     <Text style={{ fontSize: 13, color: c.sub }}>Фактично витрачено:</Text>
                     <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>
-                      {formatCurrency(actualByCategory[editItem.category] ?? 0)} ₴
+                      {formatCurrency(actualByCategory[editItem.category] ?? 0, currencySymbol)}
                     </Text>
                   </View>
                 )}
 
                 {/* Limit input */}
-                <Text style={{ fontSize: 13, color: c.sub, marginBottom: 6, fontWeight: '500' }}>Заплановано на місяць (₴)</Text>
+                <Text style={{ fontSize: 13, color: c.sub, marginBottom: 6, fontWeight: '500' }}>Заплановано на місяць ({currencySymbol})</Text>
                 <TextInput
                   autoFocus
                   placeholder="0"
@@ -487,7 +527,7 @@ export default function BudgetScreen() {
 
                   {/* Limit */}
                   <Text style={{ fontSize: 13, color: c.sub, marginTop: 14, marginBottom: 6, fontWeight: '500' }}>
-                    Заплановано на місяць (₴)
+                    Заплановано на місяць ({currencySymbol})
                   </Text>
                   <TextInput
                     placeholder="0"

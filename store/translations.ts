@@ -135,6 +135,9 @@ export interface Translations {
   stopTimer: string;
   nothingFound: string;
   noTasks: string;
+  overdueSection: string;
+  addTask: string;
+  addNote: string;
   tryAnotherQuery: string;
   pressToAdd: string;
   searchPlaceholder: string;
@@ -663,6 +666,10 @@ export interface Translations {
   deleteReminder: string;
   deleteAllReminders: string;
   deleteAll: string;
+  notifGroupDaily: string;
+  notifDisableConfirm: string;
+  notifReenableHint: string;
+  notifRecurring: string;
 
   // Banks
   noPiggyBanks: string;
@@ -676,6 +683,8 @@ export interface Translations {
   withdrawSign: string;
   depositBtn: string;
   withdrawBtn: string;
+  bankCreateTx: string;
+  bankCreateTxHint: string;
 
   // Finance stats
   balanceTrend: string;
@@ -706,6 +715,13 @@ export interface Translations {
   itemTags: string;
   itemNote: string;
 
+  // Undo toast
+  undo: string;
+  taskMarkedDone: string;
+  taskDeleted: string;
+  noteDeleted: string;
+  transactionDeleted: string;
+
   // Auth & Account
   sectionAccount: string;
   authLogin: string;
@@ -716,17 +732,23 @@ export interface Translations {
   authPassword: string;
   authPasswordRepeat: string;
   authName: string;
+  authInvalidEmail: string;
   authInvalidCreds: string;
   authEmailTaken: string;
   authWeakPassword: string;
   authPasswordsMismatch: string;
   authNoAccount: string;
   authHaveAccount: string;
+  authOfflineError: string;
+  authNetworkError: string;
+  authServerError: string;
+  budgetOtherCurrenciesHint: string;
   welcomeSubtitle: string;
   startOffline: string;
   onlineNeedsAccount: string;
   onlineNeedsAccountMsg: string;
   sessionExpired: string;
+  sessionExpiredMsg: string;
 
   // Sync — cloud
   syncNowTitle: string;
@@ -741,6 +763,44 @@ export interface Translations {
   syncGuestHint: string;
   syncOfflineHint: string;
   localDesktopSync: string;
+
+  // Offline banner (read-only mode)
+  offlineReadOnly: string;
+
+  // Accessibility labels (icon-only buttons)
+  a11yOptions: string;
+  a11yViewMode: string;
+
+  // Forgot / Reset password
+  authForgotPassword: string;
+  authForgotPasswordTitle: string;
+  authSendCode: string;
+  authCodeSentHint: string;
+  authEnterCode: string;
+  authNewPassword: string;
+  authChangePasswordBtn: string;
+  authCodeInvalid: string;
+  authCodeExpired: string;
+  authTooManyAttempts: string;
+
+  // Account management
+  accountManage: string;
+  accountDisplayName: string;
+  accountSaveName: string;
+  accountNameSaved: string;
+  accountOldPassword: string;
+  accountChangePassword: string;
+  accountPasswordChanged: string;
+  accountDangerZone: string;
+  accountDeleteAccount: string;
+  accountDeleteConfirmTitle: string;
+  accountDeleteConfirmMsg: string;
+  accountDeletedMsg: string;
+  accountDeleteConfirmPwd: string;
+
+  // Shared screen — invite deeplink
+  shareInviteBtn: string;
+  shareInviteText: string;
 }
 
 const uk: Translations = {
@@ -872,6 +932,9 @@ const uk: Translations = {
   stopTimer: 'Зупинити',
   nothingFound: 'Нічого не знайдено',
   noTasks: 'Немає завдань',
+  overdueSection: 'Прострочені',
+  addTask: 'Додати завдання',
+  addNote: 'Створити нотатку',
   tryAnotherQuery: 'Спробуйте інший запит',
   pressToAdd: 'Натисніть + щоб додати',
   searchPlaceholder: 'Пошук завдань...',
@@ -1365,6 +1428,10 @@ const uk: Translations = {
   deleteReminder: 'Видалити нагадування?',
   deleteAllReminders: 'Видалити всі нагадування?',
   deleteAll: 'Видалити всі',
+  notifGroupDaily: 'Щоденні',
+  notifDisableConfirm: 'Усі заплановані нагадування буде скасовано',
+  notifReenableHint: 'Нагадування потрібно налаштувати заново у відповідних розділах',
+  notifRecurring: 'Регулярне',
 
   noPiggyBanks: 'Немає скарбничок',
   donePiggy: '✓ Виконано',
@@ -1377,6 +1444,8 @@ const uk: Translations = {
   withdrawSign: 'Зняття',
   depositBtn: 'Поповнити',
   withdrawBtn: 'Зняти',
+  bankCreateTx: 'Створювати транзакцію',
+  bankCreateTxHint: 'Депозит → витрата • зняття → дохід',
 
   balanceTrend: 'Тренд балансу',
   currentBalance: 'Поточний баланс',
@@ -1404,6 +1473,12 @@ const uk: Translations = {
   itemTags: 'Теги (через кому)',
   itemNote: 'Нотатка (необов\'язково)',
 
+  undo: 'Скасувати',
+  taskMarkedDone: 'Завдання виконано',
+  taskDeleted: 'Завдання видалено',
+  noteDeleted: 'Нотатку видалено',
+  transactionDeleted: 'Транзакцію видалено',
+
   sectionAccount: 'Акаунт',
   authLogin: 'Увійти',
   authRegister: 'Зареєструватись',
@@ -1413,17 +1488,23 @@ const uk: Translations = {
   authPassword: 'Пароль',
   authPasswordRepeat: 'Повторіть пароль',
   authName: "Ім'я (необов'язково)",
+  authInvalidEmail: 'Невірний формат email',
   authInvalidCreds: 'Невірний email або пароль',
   authEmailTaken: 'Цей email вже зайнятий',
   authWeakPassword: 'Пароль занадто слабкий (мін 8 символів)',
   authPasswordsMismatch: 'Паролі не збігаються',
   authNoAccount: 'Немає акаунта? Зареєструватись',
   authHaveAccount: 'Вже є акаунт? Увійти',
+  authOfflineError: 'Увімкніть онлайн-режим для входу',
+  authNetworkError: 'Перевірте підключення до мережі',
+  authServerError: 'Помилка сервера. Спробуйте пізніше',
+  budgetOtherCurrenciesHint: 'Транзакції в інших валютах ({n}) не враховано',
   welcomeSubtitle: 'Завдання, фінанси, здоров\'я — приватно і офлайн-first',
   startOffline: 'Розпочати офлайн',
   onlineNeedsAccount: 'Для онлайн-функцій потрібен акаунт',
   onlineNeedsAccountMsg: 'Увійдіть або зареєструйтесь, щоб увімкнути онлайн-режим.',
   sessionExpired: 'Сесію завершено. Увійдіть знову.',
+  sessionExpiredMsg: 'Увійдіть знову, щоб продовжити синхронізацію. Локальні дані збережено.',
 
   syncNowTitle: 'Синхронізувати дані?',
   syncNowMsg: 'Завантажити зміни на сервер і отримати актуальні дані.',
@@ -1437,6 +1518,37 @@ const uk: Translations = {
   syncGuestHint: 'Увійдіть або зареєструйтесь для синхронізації',
   syncOfflineHint: 'Увімкніть онлайн-режим для синхронізації',
   localDesktopSync: 'Локальна синхронізація з десктопом',
+  offlineReadOnly: 'Офлайн: лише перегляд',
+  a11yOptions: 'Опції',
+  a11yViewMode: 'Режим перегляду',
+
+  authForgotPassword: 'Забули пароль?',
+  authForgotPasswordTitle: 'Відновлення пароля',
+  authSendCode: 'Надіслати код',
+  authCodeSentHint: 'Введіть 6-значний код із листа та новий пароль',
+  authEnterCode: 'Код підтвердження',
+  authNewPassword: 'Новий пароль',
+  authChangePasswordBtn: 'Змінити пароль',
+  authCodeInvalid: 'Невірний код підтвердження',
+  authCodeExpired: 'Код протермінований. Запросіть новий',
+  authTooManyAttempts: 'Забагато спроб. Спробуйте пізніше',
+
+  accountManage: 'Керування акаунтом',
+  accountDisplayName: "Ім'я",
+  accountSaveName: "Зберегти ім'я",
+  accountNameSaved: "Ім'я збережено",
+  accountOldPassword: 'Старий пароль',
+  accountChangePassword: 'Зміна пароля',
+  accountPasswordChanged: 'Пароль успішно змінено',
+  accountDangerZone: 'Небезпечна зона',
+  accountDeleteAccount: 'Видалити акаунт',
+  accountDeleteConfirmTitle: 'Видалити акаунт?',
+  accountDeleteConfirmMsg: 'Ця дія незворотна. Синхронізовані дані буде видалено з сервера.',
+  accountDeletedMsg: 'Акаунт видалено. Локальні дані залишились на пристрої.',
+  accountDeleteConfirmPwd: 'Введіть пароль для підтвердження',
+
+  shareInviteBtn: 'Поділитись запрошенням',
+  shareInviteText: '{name} запрошує тебе у спільну групу!\nКод: {code}\n{link}',
 };
 
 const en: Translations = {
@@ -1568,6 +1680,9 @@ const en: Translations = {
   stopTimer: 'Stop',
   nothingFound: 'Nothing found',
   noTasks: 'No tasks',
+  overdueSection: 'Overdue',
+  addTask: 'Add task',
+  addNote: 'Create note',
   tryAnotherQuery: 'Try another query',
   pressToAdd: 'Press + to add',
   searchPlaceholder: 'Search tasks...',
@@ -2061,6 +2176,10 @@ const en: Translations = {
   deleteReminder: 'Delete reminder?',
   deleteAllReminders: 'Delete all reminders?',
   deleteAll: 'Delete all',
+  notifGroupDaily: 'Daily',
+  notifDisableConfirm: 'All scheduled reminders will be cancelled',
+  notifReenableHint: 'Reminders must be configured again in each section',
+  notifRecurring: 'Recurring',
 
   noPiggyBanks: 'No piggy banks',
   donePiggy: '✓ Done',
@@ -2073,6 +2192,8 @@ const en: Translations = {
   withdrawSign: 'Withdraw',
   depositBtn: 'Deposit',
   withdrawBtn: 'Withdraw',
+  bankCreateTx: 'Create transaction',
+  bankCreateTxHint: 'Deposit → expense • withdrawal → income',
 
   balanceTrend: 'Balance Trend',
   currentBalance: 'Current balance',
@@ -2100,6 +2221,12 @@ const en: Translations = {
   itemTags: 'Tags (comma separated)',
   itemNote: 'Note (optional)',
 
+  undo: 'Undo',
+  taskMarkedDone: 'Task completed',
+  taskDeleted: 'Task deleted',
+  noteDeleted: 'Note deleted',
+  transactionDeleted: 'Transaction deleted',
+
   sectionAccount: 'Account',
   authLogin: 'Sign In',
   authRegister: 'Register',
@@ -2109,17 +2236,23 @@ const en: Translations = {
   authPassword: 'Password',
   authPasswordRepeat: 'Repeat password',
   authName: 'Name (optional)',
+  authInvalidEmail: 'Invalid email format',
   authInvalidCreds: 'Invalid email or password',
   authEmailTaken: 'This email is already taken',
   authWeakPassword: 'Password too weak (min 8 characters)',
   authPasswordsMismatch: 'Passwords do not match',
   authNoAccount: 'No account? Register',
   authHaveAccount: 'Already have an account? Sign in',
+  authOfflineError: 'Enable online mode to sign in',
+  authNetworkError: 'Check your network connection',
+  authServerError: 'Server error. Please try again later',
+  budgetOtherCurrenciesHint: 'Transactions in other currencies ({n}) not included',
   welcomeSubtitle: 'Tasks, finance, health — private and offline-first',
   startOffline: 'Start offline',
   onlineNeedsAccount: 'Online features require an account',
   onlineNeedsAccountMsg: 'Sign in or register to enable online mode.',
   sessionExpired: 'Session expired. Please sign in again.',
+  sessionExpiredMsg: 'Sign in again to continue syncing. Your local data is preserved.',
 
   syncNowTitle: 'Sync data?',
   syncNowMsg: 'Upload local changes to the server and fetch the latest data.',
@@ -2133,6 +2266,37 @@ const en: Translations = {
   syncGuestHint: 'Sign in or register to sync',
   syncOfflineHint: 'Enable online mode to sync',
   localDesktopSync: 'Local desktop sync',
+  offlineReadOnly: 'Offline: read only',
+  a11yOptions: 'Options',
+  a11yViewMode: 'View mode',
+
+  authForgotPassword: 'Forgot password?',
+  authForgotPasswordTitle: 'Password recovery',
+  authSendCode: 'Send code',
+  authCodeSentHint: 'Enter the 6-digit code from the email and your new password',
+  authEnterCode: 'Verification code',
+  authNewPassword: 'New password',
+  authChangePasswordBtn: 'Change password',
+  authCodeInvalid: 'Invalid verification code',
+  authCodeExpired: 'Code expired. Request a new one',
+  authTooManyAttempts: 'Too many attempts. Please try again later',
+
+  accountManage: 'Manage account',
+  accountDisplayName: 'Display name',
+  accountSaveName: 'Save name',
+  accountNameSaved: 'Name saved',
+  accountOldPassword: 'Current password',
+  accountChangePassword: 'Change password',
+  accountPasswordChanged: 'Password changed successfully',
+  accountDangerZone: 'Danger zone',
+  accountDeleteAccount: 'Delete account',
+  accountDeleteConfirmTitle: 'Delete account?',
+  accountDeleteConfirmMsg: 'This action is irreversible. Synced server data will be deleted.',
+  accountDeletedMsg: 'Account deleted. Local data remains on this device.',
+  accountDeleteConfirmPwd: 'Enter your password to confirm',
+
+  shareInviteBtn: 'Share invitation',
+  shareInviteText: '{name} invites you to a shared group!\nCode: {code}\n{link}',
 };
 
 export const allTranslations: Record<Lang, Translations> = { uk, en };

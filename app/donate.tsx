@@ -30,7 +30,7 @@ export default function DonateScreen() {
     bg2:    isDark ? '#14121E' : '#EBEBF5',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
   };

@@ -16,10 +16,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ApiError, OfflineError } from '@/store/api';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { saveData } from '@/store/storage';
+import { haptic } from '@/utils/haptics';
+
+// ─── Простий валідатор формату email ─────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
   const cs = useColorScheme();
@@ -30,26 +36,46 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [generalError, setGeneralError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const c = {
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    card:   isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.85)',
-    border: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.50)' : 'rgba(26,20,51,0.50)',
-    input:  isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-    accent: '#7C3AED',
-    red:    '#EF4444',
+    ...getScreenColors('auth', isDark),
+    input:       isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+    errorBorder: '#EF4444',
+    red:         '#EF4444',
+  };
+
+  const validateEmailFormat = (val: string): boolean => {
+    const trimmed = val.trim();
+    if (trimmed && !EMAIL_RE.test(trimmed)) {
+      setEmailError(tr.authInvalidEmail);
+      return false;
+    }
+    setEmailError('');
+    return true;
+  };
+
+  const clearErrors = () => {
+    setGeneralError('');
+    setEmailError('');
+    setPasswordError('');
   };
 
   const handleLogin = async () => {
-    setErrorMsg('');
+    clearErrors();
     const trimEmail = email.trim().toLowerCase();
     if (!trimEmail || !password) {
-      setErrorMsg(tr.authInvalidCreds);
+      haptic.error();
+      setPasswordError(tr.authInvalidCreds);
+      return;
+    }
+    if (!EMAIL_RE.test(trimEmail)) {
+      haptic.error();
+      setEmailError(tr.authInvalidEmail);
       return;
     }
     setLoading(true);
@@ -58,11 +84,21 @@ export default function LoginScreen() {
       await saveData('welcome_done', true);
       router.replace('/(tabs)');
     } catch (e: unknown) {
-      const code = (e as { code?: string }).code ?? '';
-      if (code === '401' || code === 'no_active_account' || (e instanceof Error && e.message.includes('401'))) {
-        setErrorMsg(tr.authInvalidCreds);
+      haptic.error();
+      if (e instanceof OfflineError) {
+        setGeneralError(tr.authOfflineError);
+      } else if (e instanceof ApiError) {
+        if (e.status === 401 || e.code === 'no_active_account') {
+          setPasswordError(tr.authInvalidCreds);
+        } else if (e.code === 'timeout' || e.code === 'network') {
+          setGeneralError(tr.authNetworkError);
+        } else if (e.status >= 500) {
+          setGeneralError(tr.authServerError);
+        } else {
+          setPasswordError(tr.authInvalidCreds);
+        }
       } else {
-        setErrorMsg(tr.authInvalidCreds);
+        setGeneralError(tr.authNetworkError);
       }
     } finally {
       setLoading(false);
@@ -95,7 +131,7 @@ export default function LoginScreen() {
             <BlurView
               intensity={isDark ? 20 : 40}
               tint={isDark ? 'dark' : 'light'}
-              style={[st.card, { borderColor: c.border }]}
+              style={[st.card, { borderColor: emailError ? c.errorBorder : c.border }]}
             >
               {/* Email */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
@@ -105,34 +141,57 @@ export default function LoginScreen() {
                   placeholderTextColor={c.sub}
                   placeholder="you@example.com"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={v => { setEmail(v); if (emailError) setEmailError(''); }}
+                  onBlur={() => validateEmailFormat(email)}
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="email-address"
                   textContentType="emailAddress"
+                  autoComplete="email"
                   returnKeyType="next"
                 />
               </View>
+              {emailError ? (
+                <Text style={[st.fieldError, { color: c.red }]}>{emailError}</Text>
+              ) : null}
 
               {/* Password */}
-              <View style={st.fieldWrap}>
+              <View style={[st.fieldWrap, { borderTopColor: emailError ? c.border : 'transparent' }]}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPassword.toUpperCase()}</Text>
-                <TextInput
-                  style={[st.input, { color: c.text }]}
-                  placeholderTextColor={c.sub}
-                  placeholder="••••••••"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                  textContentType="password"
-                  returnKeyType="done"
-                  onSubmitEditing={handleLogin}
-                />
+                <View style={st.passwordRow}>
+                  <TextInput
+                    style={[st.input, { color: c.text, flex: 1 }]}
+                    placeholderTextColor={c.sub}
+                    placeholder="••••••••"
+                    value={password}
+                    onChangeText={v => { setPassword(v); if (passwordError) setPasswordError(''); }}
+                    secureTextEntry={!showPassword}
+                    textContentType="password"
+                    autoComplete="current-password"
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(v => !v)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Сховати пароль' : 'Показати пароль'}
+                  >
+                    <IconSymbol
+                      name={showPassword ? 'eye.slash' : 'eye'}
+                      size={18}
+                      color={c.sub}
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
             </BlurView>
 
-            {errorMsg ? (
-              <Text style={[st.error, { color: c.red }]}>{errorMsg}</Text>
+            {passwordError ? (
+              <Text style={[st.error, { color: c.red }]}>{passwordError}</Text>
+            ) : null}
+            {generalError ? (
+              <Text style={[st.error, { color: c.red }]}>{generalError}</Text>
             ) : null}
 
             <TouchableOpacity
@@ -146,6 +205,13 @@ export default function LoginScreen() {
               ) : (
                 <Text style={st.primaryBtnText}>{tr.authLogin}</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={st.linkBtn}
+              onPress={() => router.push('/forgot-password')}
+            >
+              <Text style={[st.linkText, { color: c.accent }]}>{tr.authForgotPassword}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -196,6 +262,16 @@ const st = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     marginBottom: 4,
+  },
+  fieldError: {
+    fontSize: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    marginTop: -4,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   input: {
     fontSize: 16,

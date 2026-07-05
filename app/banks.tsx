@@ -17,10 +17,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PressableScale } from '@/components/shared/PressableScale';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadData } from '@/store/storage';
+import { useI18n } from '@/store/i18n';
+import { loadData, saveData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { haptic } from '@/utils/haptics';
+import type { Transaction } from '@/utils/financeUtils';
 
 interface SavingsJar {
   id: string;
@@ -50,8 +54,12 @@ const fmt = (n: number) =>
 
 export default function BanksScreen() {
   const isDark = useColorScheme() === 'dark';
+  const { tr } = useI18n();
   const [jars, setJars] = useState<SavingsJar[]>([]);
   const [initialized, setInitialized] = useState(false);
+  // Opt-in: create a finance transaction on every deposit/withdrawal
+  const [createTx, setCreateTx] = useState(false);
+  const [primaryCurrency, setPrimaryCurrency] = useState('UAH');
 
   // Screens: 'list' | 'add' | 'edit' | 'deposit'
   const [showForm, setShowForm] = useState(false);
@@ -70,8 +78,14 @@ export default function BanksScreen() {
   const [selColor, setSelColor] = useState(JAR_COLORS[0]);
 
   useEffect(() => {
-    loadData<SavingsJar[]>('savings_jars', []).then(data => {
+    Promise.all([
+      loadData<SavingsJar[]>('savings_jars', []),
+      loadData<boolean>('banks_create_tx', false),
+      loadData<string>('finance_primary_currency', 'UAH'),
+    ]).then(([data, tx, cur]) => {
       setJars(data);
+      setCreateTx(tx);
+      setPrimaryCurrency(cur);
       setInitialized(true);
     });
   }, []);
@@ -142,7 +156,31 @@ export default function BanksScreen() {
       ? { ...j, saved: Math.max(0, j.saved + delta), updatedAt: new Date().toISOString() }
       : j
     ));
+
+    // Opt-in: mirror operation to finance transactions
+    if (createTx) {
+      const tx: Transaction = {
+        id: Date.now().toString(),
+        // deposit = expense (money leaves wallet → goes to savings)
+        // withdrawal = income (money returns from savings → wallet)
+        type: depositSign === '+' ? 'expense' : 'income',
+        category: tr.savings, // 'Заощадження' / 'Savings'
+        amount: num,
+        note: depositJar.name,
+        date: new Date().toISOString(),
+        currency: primaryCurrency,
+      };
+      void loadData<Transaction[]>('transactions', []).then(existing =>
+        saveSynced('transactions', [tx, ...existing]),
+      );
+    }
+
     setShowDeposit(false);
+  };
+
+  const toggleCreateTx = (val: boolean) => {
+    setCreateTx(val);
+    void saveData('banks_create_tx', val);
   };
 
   const deleteJar = (id: string) => {
@@ -156,7 +194,7 @@ export default function BanksScreen() {
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(100,160,240,0.3)',
     text:   isDark ? '#EFF5FF' : '#071524',
-    sub:    isDark ? 'rgba(239,245,255,0.45)' : 'rgba(7,21,36,0.45)',
+    sub:    isDark ? 'rgba(239,245,255,0.62)' : 'rgba(7,21,36,0.58)',
     accent: '#0EA5E9',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(8,14,24,0.98)' : 'rgba(239,245,255,0.98)',
@@ -285,9 +323,9 @@ export default function BanksScreen() {
       </SafeAreaView>
 
       {/* FAB */}
-      <TouchableOpacity onPress={openAdd} style={[s.fab, { backgroundColor: c.accent }]} activeOpacity={0.85}>
+      <PressableScale onPress={() => { haptic.medium(); openAdd(); }} scaleTo={0.92} style={[s.fab, { backgroundColor: c.accent }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
-      </TouchableOpacity>
+      </PressableScale>
 
       {/* ─── Add / Edit Modal ─── */}
       <Modal visible={showForm} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowForm(false)}>
@@ -480,7 +518,21 @@ export default function BanksScreen() {
                     </View>
                   </View>
 
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+                  {/* Create-transaction toggle */}
+                  <TouchableOpacity
+                    onPress={() => toggleCreateTx(!createTx)}
+                    activeOpacity={0.75}
+                    style={{ flexDirection: 'row', alignItems: 'center', marginTop: 18, gap: 10, paddingVertical: 4 }}>
+                    <View style={[s.toggle, { backgroundColor: createTx ? c.accent : c.dim, borderColor: createTx ? c.accent : c.border }]}>
+                      <View style={[s.toggleKnob, { transform: [{ translateX: createTx ? 14 : 0 }] }]} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{tr.bankCreateTx}</Text>
+                      <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{tr.bankCreateTxHint}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
                     <TouchableOpacity onPress={() => setShowDeposit(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                       <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
                     </TouchableOpacity>
@@ -536,4 +588,6 @@ const s = StyleSheet.create({
   btn:          { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   typeRow:      { flexDirection: 'row', borderRadius: 12, padding: 3 },
   typeBtn:      { flex: 1, flexDirection: 'row', paddingVertical: 9, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  toggle:       { width: 32, height: 18, borderRadius: 9, borderWidth: 1, justifyContent: 'center', paddingHorizontal: 2 },
+  toggleKnob:   { width: 14, height: 14, borderRadius: 7, backgroundColor: '#fff' },
 });

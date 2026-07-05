@@ -50,23 +50,33 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { status: authStatus } = useAuth();
   const { ready: modeReady } = useAppMode();
   const [welcomeDone, setWelcomeDone] = useState<boolean | null>(null);
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
   const router = useRouter();
   const hasRedirected = useRef(false);
 
   useEffect(() => {
-    loadData<boolean>('welcome_done', false).then(v => setWelcomeDone(Boolean(v)));
+    Promise.all([
+      loadData<boolean>('welcome_done', false),
+      loadData<boolean>('onboarding_done', false),
+    ]).then(([wd, od]) => {
+      setWelcomeDone(Boolean(wd));
+      setOnboardingDone(Boolean(od));
+    });
   }, []);
 
-  const allReady = modeReady && authStatus !== 'loading' && welcomeDone !== null;
+  const allReady = modeReady && authStatus !== 'loading' && welcomeDone !== null && onboardingDone !== null;
 
   useEffect(() => {
     if (!allReady) return;
     if (hasRedirected.current) return;
+    // Якщо онбординг не завершено — Onboarding-модал покаже себе сам
+    // і після завершення сам перейде на /welcome. Не редіректимо тут.
+    if (!onboardingDone) return;
     if (!welcomeDone && authStatus === 'guest') {
       hasRedirected.current = true;
       router.replace('/welcome');
     }
-  }, [allReady, welcomeDone, authStatus, router]);
+  }, [allReady, welcomeDone, onboardingDone, authStatus, router]);
 
   // Поки не готові — показуємо порожній фон (уникаємо миготіння)
   if (!allReady) {
@@ -90,6 +100,8 @@ function RootLayoutContent() {
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
+          <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+          <Stack.Screen name="account" options={{ headerShown: false }} />
           <Stack.Screen name="projects" options={{ headerShown: false }} />
           <Stack.Screen name="notes" options={{ headerShown: false }} />
           <Stack.Screen name="archive" options={{ headerShown: false }} />

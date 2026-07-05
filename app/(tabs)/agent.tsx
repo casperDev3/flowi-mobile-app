@@ -110,7 +110,7 @@ export default function AgentScreen() {
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.80)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(139,92,246,0.2)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(139,92,246,0.07)',
     userBubble:  ACCENT,
     aiBubble:    isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)',

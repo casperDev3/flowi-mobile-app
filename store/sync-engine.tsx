@@ -78,6 +78,11 @@ let _isAuthed = false;
 
 export function setIsAuthed(v: boolean): void {
   _isAuthed = v;
+  if (!v) {
+    // Вийшли з акаунта — скасовуємо автоматичні повторні спроби
+    clearRetryTimer();
+    _retryAttempt = 0;
+  }
 }
 
 // ─── Ключ останнього серверного синку ─────────────────────────────────────────
@@ -90,6 +95,32 @@ async function getLastServerSync(): Promise<number> {
 
 async function setLastServerSync(t: number): Promise<void> {
   await saveData(LAST_SERVER_SYNC_KEY, t);
+}
+
+// ─── Auto-retry backoff при помилці синхронізації ────────────────────────────
+
+/** Затримки повторних спроб: 30с → 2хв → 5хв (cap) */
+const RETRY_DELAYS = [30_000, 2 * 60_000, 5 * 60_000] as const;
+
+let _retryAttempt = 0;
+let _retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearRetryTimer(): void {
+  if (_retryTimer) {
+    clearTimeout(_retryTimer);
+    _retryTimer = null;
+  }
+}
+
+function scheduleRetry(): void {
+  clearRetryTimer();
+  const delay = RETRY_DELAYS[Math.min(_retryAttempt, RETRY_DELAYS.length - 1)];
+  _retryAttempt++;
+  _retryTimer = setTimeout(() => {
+    _retryTimer = null;
+    void doSync();
+  }, delay);
+  if (__DEV__) console.log(`[sync-engine] retry scheduled in ${delay / 1000}s (attempt ${_retryAttempt})`);
 }
 
 // ─── Debounce sync ────────────────────────────────────────────────────────────
@@ -316,14 +347,18 @@ async function doSync(): Promise<void> {
     const allConflicts = await loadConflicts();
     updateConflictsCount(allConflicts.length);
 
+    clearRetryTimer();
+    _retryAttempt = 0;
     updateSyncState('idle');
   } catch (e) {
     if (e instanceof OfflineError) {
-      // Тихо переходимо в idle — пристрій офлайн
+      // Тихо переходимо в idle — пристрій офлайн, retry не плануємо
+      clearRetryTimer();
       updateSyncState('idle');
     } else {
       if (__DEV__) console.warn('[sync-engine] syncNow error:', e);
       updateSyncState('error');
+      scheduleRetry();
     }
   } finally {
     _syncing = false;
@@ -380,6 +415,9 @@ export async function syncNow(): Promise<void> {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
   }
+  // Ручний тригер — скидаємо backoff
+  clearRetryTimer();
+  _retryAttempt = 0;
   await doSync();
 }
 
@@ -411,10 +449,17 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
     };
   }, []);
 
-  // Синхронізуємо auth-стан у модульну змінну
+  // Синхронізуємо auth-стан у модульну змінну + очищуємо retry при деавторизації
   useEffect(() => {
     setIsAuthed(isAuthed);
   }, [isAuthed]);
+
+  // Очищуємо retry-таймер при unmount
+  useEffect(() => {
+    return () => {
+      clearRetryTimer();
+    };
+  }, []);
 
   // Реєструємо scheduleSync у synced-storage
   useEffect(() => {

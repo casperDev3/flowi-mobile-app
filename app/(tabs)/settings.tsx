@@ -26,6 +26,7 @@ import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { useSync } from '@/store/sync-engine';
 import { getAllScheduledNotifications } from '@/store/notifications';
+import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
 import { Lang } from '@/store/translations';
 
@@ -38,19 +39,24 @@ export default function SettingsScreen() {
   const { lang, setLang, tr } = useI18n();
   const { online, setOnline } = useAppMode();
   const { user, status, logout } = useAuth();
-  const { syncNow } = useSync();
+  const { syncNow, state: syncState, lastSyncAt, pendingCount } = useSync();
 
   const [taskReminders, setTaskReminders] = useState(true);
-  const [financeAlerts, setFinanceAlerts] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showLangModal, setShowLangModal] = useState(false);
   const [scheduledCount, setScheduledCount] = useState(0);
 
   useFocusEffect(useCallback(() => {
     getAllScheduledNotifications().then(list => {
-      setScheduledCount(list.filter(n => n.identifier.startsWith('reminder_')).length);
+      setScheduledCount(list.length);
     });
+    loadData<boolean>('pref_task_reminders', true).then(v => setTaskReminders(v));
   }, []));
+
+  const handleTaskRemindersToggle = (val: boolean) => {
+    setTaskReminders(val);
+    saveData('pref_task_reminders', val);
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -95,7 +101,7 @@ export default function SettingsScreen() {
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.80)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#7C3AED',
     red:    '#EF4444',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
@@ -105,6 +111,24 @@ export default function SettingsScreen() {
 
   const THEME_LABELS: Record<ThemeOption, string> = { system: tr.themeSystem, light: tr.themeLight, dark: tr.themeDark };
   const LANG_LABELS: Record<Lang, string> = { uk: tr.langUk, en: tr.langEn };
+
+  // ── Динамічне значення рядку Синхронізації ──────────────────────────────────
+  const syncValue = (() => {
+    if (!online) return tr.offlineBadge;
+    if (status !== 'authed') return tr.syncGuestHint.slice(0, 18) + '…';
+    if (syncState === 'error') return tr.syncError;
+    if (pendingCount > 0) return `${pendingCount} ${tr.syncPending}`;
+    if (lastSyncAt) {
+      const diff = Date.now() - lastSyncAt;
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return lang === 'uk' ? 'щойно' : 'just now';
+      if (mins < 60) return lang === 'uk' ? `${mins}хв тому` : `${mins}min ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return lang === 'uk' ? `${hrs}год тому` : `${hrs}hr ago`;
+      return new Date(lastSyncAt).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: '2-digit', month: '2-digit' });
+    }
+    return undefined;
+  })();
 
   return (
     <View style={{ flex: 1 }}>
@@ -130,6 +154,15 @@ export default function SettingsScreen() {
                   </View>
                   <Text style={[st.rowLabel, { color: c.text, flex: 1 }]} numberOfLines={1}>{user.email}</Text>
                 </View>
+                <TouchableOpacity
+                  onPress={() => router.push('/account')}
+                  style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                  <View style={[st.iconBox, { backgroundColor: '#7C3AED20' }]}>
+                    <IconSymbol name="person.crop.circle" size={17} color="#7C3AED" />
+                  </View>
+                  <Text style={[st.rowLabel, { color: c.text, flex: 1 }]}>{tr.accountManage}</Text>
+                  <IconSymbol name="chevron.right" size={16} color={c.sub} />
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleLogout}
                   style={st.row}>
@@ -281,18 +314,7 @@ export default function SettingsScreen() {
               iconColor="#7C3AED"
               label={tr.taskReminders}
               value={taskReminders}
-              onChange={setTaskReminders}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <ToggleRow
-              icon="banknote"
-              iconColor="#10B981"
-              label={tr.financeAlerts}
-              value={financeAlerts}
-              onChange={setFinanceAlerts}
+              onChange={handleTaskRemindersToggle}
               text={c.text}
               sub={c.sub}
               border={c.border}
@@ -348,6 +370,17 @@ export default function SettingsScreen() {
               last={false}
             />
             <SettingRow
+              icon="person.2.fill"
+              iconColor="#7C3AED"
+              label={tr.sharedTitle}
+              value={undefined}
+              onPress={() => router.push('/(tabs)/shared')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
               icon="brain"
               iconColor="#8B5CF6"
               label="OpenClaw Agent"
@@ -367,7 +400,7 @@ export default function SettingsScreen() {
               icon="arrow.triangle.2.circlepath"
               iconColor="#7C3AED"
               label={tr.sync}
-              value="QR-код"
+              value={syncValue}
               onPress={() => router.push('/sync')}
               text={c.text}
               sub={c.sub}
@@ -448,7 +481,11 @@ export default function SettingsScreen() {
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={() => setShowThemeModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => setShowThemeModal(false)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.close}>
                       <IconSymbol name="xmark" size={17} color={c.sub} />
                     </TouchableOpacity>
                   </View>
@@ -484,7 +521,11 @@ export default function SettingsScreen() {
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={() => setShowLangModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => setShowLangModal(false)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.close}>
                       <IconSymbol name="xmark" size={17} color={c.sub} />
                     </TouchableOpacity>
                   </View>
@@ -518,6 +559,8 @@ function SettingRow({ icon, iconColor, label, value, onPress, text, sub, border,
   return (
     <TouchableOpacity
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
         <IconSymbol name={icon as IconSymbolName} size={17} color={iconColor} />

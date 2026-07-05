@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import * as Clipboard from 'expo-clipboard';
+import * as Linking from 'expo-linking';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect } from 'expo-router';
@@ -16,6 +17,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -27,13 +29,14 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { apiFetch } from '@/store/api';
 import { isOnlineMode, useAppMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
 import { requestNotificationPermissions } from '@/store/notifications';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-import { API_BASE, WS_BASE } from '@/store/api-config';
+import { WS_BASE } from '@/store/api-config';
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -44,17 +47,11 @@ function randomUUID(): string {
   });
 }
 
-async function api(path: string, method = 'GET', body?: object) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) {
-    const json = await res.json().catch(() => ({}));
-    throw Object.assign(new Error(`API ${res.status}`), { status: res.status, json });
-  }
-  return res.json();
+// Обгортка зі збереженою сигнатурою (path, method, body).
+// Тепер використовує apiFetch: Bearer-токен, офлайн-гейт, таймаут 15 с.
+// API_BASE вже є в apiFetch — шляхи залишаються без змін.
+async function api(path: string, method = 'GET', body?: object): Promise<any> {
+  return apiFetch<any>(path, { method, body });
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -157,6 +154,38 @@ export default function SharedScreen() {
     sidebar: isDark ? '#0C0C14' : '#F4F2FF',
     toolbar: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
   };
+
+  // ─── Deeplink — вхідний invite URL ────────────────────────────────────────
+
+  const incomingUrl = Linking.useURL();
+  const lastHandledUrl = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!incomingUrl) return;
+    if (lastHandledUrl.current === incomingUrl) return;
+
+    try {
+      const parsed = Linking.parse(incomingUrl);
+      const secret = parsed.queryParams?.secret;
+      if (!secret || typeof secret !== 'string') return;
+      if (parsed.hostname !== 'join' && parsed.path !== 'join') return;
+
+      lastHandledUrl.current = incomingUrl;
+      const upperSecret = secret.toUpperCase();
+
+      if (!online) {
+        // Гостьовий або офлайн режим — показуємо підказку без авто-join
+        Alert.alert('', tr.unavailableOffline);
+        return;
+      }
+
+      // Авто-відкрити join флоу з попередньо заповненим секретом
+      setSecretInput(upperSecret);
+      setShowJoinModal(true);
+    } catch {
+      // Невалідний URL — ігноруємо
+    }
+  }, [incomingUrl, online, tr.unavailableOffline]);
 
   // ─── Core state ───────────────────────────────────────────────────────────
 
@@ -662,6 +691,7 @@ export default function SharedScreen() {
 
   async function createGroup() {
     if (!deviceId) return;
+    if (!requireOnline()) return;
     setCreating(true);
     try {
       const name = groupName.trim() || 'Спільна група';
@@ -678,6 +708,7 @@ export default function SharedScreen() {
 
   async function joinGroup() {
     if (!deviceId || !secretInput.trim()) return;
+    if (!requireOnline()) return;
     setJoining(true);
     try {
       const g = mapGroupData(await api('/groups/join/', 'POST', {
@@ -723,6 +754,7 @@ export default function SharedScreen() {
 
   async function createSection() {
     if (!activeGroup || !deviceId) return;
+    if (!requireOnline()) return;
     const name = newSectionName.trim() || sectionPh(activeTab);
     try {
       const data = await api(`/groups/${activeGroup.id}/sections/`, 'POST', {
@@ -942,8 +974,17 @@ export default function SharedScreen() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
+  // ── Офлайн-гард для мережевих мутацій ────────────────────────────────────
+  const requireOnline = (): boolean => {
+    if (!online) {
+      Alert.alert('', tr.unavailableOffline);
+      return false;
+    }
+    return true;
+  };
+
   return (
-    <OfflineOverlay reason='offline'>
+    <OfflineOverlay reason='offline' mode='banner'>
     <OfflineOverlay reason='guest'>
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
@@ -969,7 +1010,7 @@ export default function SharedScreen() {
                   <IconSymbol name="magnifyingglass" size={17} color={groupSearchOpen ? c.accent : c.sub} />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => setShowGroupSheet(true)}
+                  onPress={() => { if (requireOnline()) setShowGroupSheet(true); }}
                   accessibilityRole="button"
                   accessibilityLabel={tr.createGroup}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1179,7 +1220,19 @@ export default function SharedScreen() {
                   <Text style={[st.emptyTitle, { color: c.text }]}>
                     {sectionSearch ? tr.nothingFound : tr.noLists}
                   </Text>
-                  {!sectionSearch && <Text style={[st.emptyDesc, { color: c.sub }]}>{tr.pressPlusToAdd}</Text>}
+                  {!sectionSearch && (
+                    <>
+                      <Text style={[st.emptyDesc, { color: c.sub }]}>{tr.pressPlusToAdd}</Text>
+                      <TouchableOpacity
+                        onPress={() => setShowAddSectionModal(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr.createList}
+                        style={[st.btn, { backgroundColor: c.accent, paddingHorizontal: 20, marginTop: 20 }]}>
+                        <IconSymbol name="plus" size={15} color="#fff" />
+                        <Text style={[st.btnLabel, { color: '#fff' }]}>{tr.createList}</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </View>
               ) : tabSections(activeTab).map(section => {
                 const counts = sectionCounts[section.id];
@@ -1828,8 +1881,22 @@ export default function SharedScreen() {
                   {activeGroup?.member_count ?? 0} {pluralMember(activeGroup?.member_count ?? 1, lang)} {tr.inGroup}
                 </Text>
               </View>
+              <TouchableOpacity
+                onPress={async () => {
+                  if (!activeGroup?.secret) return;
+                  const link = `ftrackingapp://join?secret=${activeGroup.secret}`;
+                  const text = tr.shareInviteText
+                    .replace('{name}', activeGroup.name)
+                    .replace('{code}', activeGroup.secret)
+                    .replace('{link}', link);
+                  try { await Share.share({ message: text }); } catch {}
+                }}
+                style={[st.btn, { backgroundColor: c.accent + '18', borderWidth: 1, borderColor: c.accent + '40', marginTop: 12 }]}>
+                <IconSymbol name="square.and.arrow.up" size={15} color={c.accent} />
+                <Text style={[st.btnLabel, { color: c.accent }]}>{tr.shareInviteBtn}</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={rotateSecret}
-                style={[st.btn, { backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, marginTop: 12 }]}>
+                style={[st.btn, { backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, marginTop: 8 }]}>
                 <IconSymbol name="arrow.clockwise" size={15} color={c.accent} />
                 <Text style={[st.btnLabel, { color: c.accent }]}>{tr.newCodeAction}</Text>
               </TouchableOpacity>

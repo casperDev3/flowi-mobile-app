@@ -1,7 +1,11 @@
-import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, {
+  interpolateColor, useAnimatedStyle, useSharedValue, withTiming,
+} from 'react-native-reanimated';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useMotion } from '@/hooks/use-motion';
 
 export function Empty({ c, text, icon = 'tray' }: { c: any; text: string; icon?: string }) {
   return (
@@ -26,7 +30,46 @@ export function Field({ label, value, onChange, placeholder, autoFocus, c, keybo
   );
 }
 
-/** Прості сегментні кнопки вибору */
+// ─── Animated segment option ──────────────────────────────────────────────────
+function SegmentOption<T extends string>({
+  option, isActive, onChange, color, c,
+}: {
+  option: { key: T; label: string };
+  isActive: boolean;
+  onChange: (v: T) => void;
+  color: string;
+  c: any;
+}) {
+  const { reduced } = useMotion();
+  const progress = useSharedValue(isActive ? 1 : 0);
+
+  useEffect(() => {
+    progress.value = withTiming(isActive ? 1 : 0, { duration: reduced ? 0 : 200 });
+  }, [isActive, reduced]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const animStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(progress.value, [0, 1], [c.dim, color + '20']),
+    borderColor:     interpolateColor(progress.value, [0, 1], [c.border, color]),
+  }));
+
+  return (
+    <Pressable
+      onPress={() => onChange(option.key)}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isActive }}
+      accessibilityLabel={option.label}
+      style={{ flex: 1 }}
+    >
+      <Animated.View style={[s.seg, animStyle]}>
+        <Text style={{ color: isActive ? color : c.text, fontWeight: '700', fontSize: 13 }}>
+          {option.label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+/** Прості сегментні кнопки вибору з анімованим переходом між варіантами */
 export function Segment<T extends string>({ label, options, value, onChange, color, c }: {
   label: string; options: { key: T; label: string }[]; value: T; onChange: (v: T) => void; color: string; c: any;
 }) {
@@ -35,12 +78,14 @@ export function Segment<T extends string>({ label, options, value, onChange, col
       <Text style={[s.label, { color: c.sub }]}>{label}</Text>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {options.map(o => (
-          <View key={o.key} style={{ flex: 1 }}>
-            <Text onPress={() => onChange(o.key)}
-              style={[s.seg, { color: value === o.key ? color : c.text, borderColor: value === o.key ? color : c.border, backgroundColor: value === o.key ? color + '20' : c.dim }]}>
-              {o.label}
-            </Text>
-          </View>
+          <SegmentOption
+            key={o.key}
+            option={o}
+            isActive={o.key === value}
+            onChange={onChange}
+            color={color}
+            c={c}
+          />
         ))}
       </View>
     </>
@@ -50,5 +95,5 @@ export function Segment<T extends string>({ label, options, value, onChange, col
 const s = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
   input: { fontSize: 15, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
-  seg:   { textAlign: 'center', fontSize: 13, fontWeight: '700', borderRadius: 12, borderWidth: 1.5, paddingVertical: 11, overflow: 'hidden' },
+  seg:   { textAlign: 'center', borderRadius: 12, borderWidth: 1.5, paddingVertical: 11, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
 });

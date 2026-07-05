@@ -1,7 +1,8 @@
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { PressableScale } from '@/components/shared/PressableScale';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark, border, text, sub }: {
@@ -18,7 +19,7 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
   sub: string;
 }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ flex: 1 }}>
+    <PressableScale onPress={onPress} style={{ flex: 1 }}>
       <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
         style={{ borderRadius: 18, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14, height: 112 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -36,6 +37,6 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
         {stat ? <Text numberOfLines={1} style={{ color, fontSize: 13, fontWeight: '700', marginTop: 3 }}>{stat}</Text>
               : hint ? <Text numberOfLines={1} style={{ color: sub, fontSize: 11, fontWeight: '600', marginTop: 3 }}>{hint}</Text> : null}
       </BlurView>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

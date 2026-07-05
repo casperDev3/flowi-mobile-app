@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
@@ -19,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAutoBackup } from '@/store/auto-backup';
+import { BACKUP_KEYS } from '@/store/backup-keys';
 import { loadData, saveData } from '@/store/storage';
 import { SYNC_ARRAY_KEYS, saveSynced } from '@/store/synced-storage';
 
@@ -65,6 +67,16 @@ const IMPORT_KEY_MAP: Record<string, string> = {
   categories: 'categories',
 };
 
+// Службові ключі синхронізації — очищуються разом з даними, але НЕ: auth, app_mode, onboarding, lang, notificationsEnabled
+const SERVICE_CLEAR_KEYS = [
+  'sync_outbox',
+  'sync_tombstones',
+  'last_server_sync_at',
+  'sync_pending_conflicts',
+  'last_sync_timestamp',
+  'last_backup_at',
+] as const;
+
 function formatBackupTime(date: Date | null): string {
   if (!date) return 'Ще не було';
   const diff = Date.now() - date.getTime();
@@ -88,6 +100,7 @@ export default function DataScreen() {
   const [autoBackup, setAutoBackup] = useState(true);
   const [backingUp, setBackingUp] = useState(false);
   const [openingBackup, setOpeningBackup] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const c = {
@@ -95,7 +108,7 @@ export default function DataScreen() {
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
@@ -197,7 +210,9 @@ export default function DataScreen() {
                     })
                 );
                 await loadCounts();
-                Alert.alert('Успішно', 'Дані завантажено. Перезапустіть додаток для оновлення.');
+                Alert.alert('Успішно', 'Дані завантажено.', [
+                  { text: 'OK', onPress: () => router.back() },
+                ]);
               } catch {
                 Alert.alert('Помилка', 'Не вдалося зберегти дані.');
               } finally {
@@ -245,30 +260,109 @@ export default function DataScreen() {
     }
   };
 
-  const handleClear = () =>
-    Alert.alert('Очистити всі дані?', 'Цю дію неможливо скасувати. Всі дані будуть видалені.', [
-      { text: 'Скасувати', style: 'cancel' },
-      {
-        text: 'Продовжити', style: 'destructive',
-        onPress: () => Alert.alert(
-          'Останнє підтвердження',
-          'Ви впевнені? Після очищення відновлення даних неможливе.',
-          [
-            { text: 'Скасувати', style: 'cancel' },
-            {
-              text: 'Видалити все', style: 'destructive',
-              onPress: async () => {
-                await Promise.all(ALL_KEYS.map(k => saveData(k.key, [])));
-                const empty: Counts = {};
-                ALL_KEYS.forEach(k => { empty[k.key] = 0; });
-                setCounts(empty);
-                Alert.alert('Готово', 'Всі дані видалено. Перезапустіть додаток.');
-              },
+  const handleRestoreFromBackup = async () => {
+    if (restoring) return;
+    setRestoring(true);
+    try {
+      const uri = await getLastBackupUri();
+      if (!uri) {
+        Alert.alert('Немає копії', 'Резервний файл не знайдено. Спочатку створіть копію.');
+        setRestoring(false);
+        return;
+      }
+      Alert.alert(
+        'Відновити з бекапу?',
+        'Поточні дані буде замінено даними з резервної копії.',
+        [
+          { text: 'Скасувати', style: 'cancel', onPress: () => setRestoring(false) },
+          {
+            text: 'Відновити', style: 'destructive',
+            onPress: async () => {
+              try {
+                const file = new File(uri);
+                const parsed = JSON.parse(await file.text());
+                if (!parsed || typeof parsed !== 'object') throw new Error('Bad format');
+
+                // v2.0 backup: keys stored under their storage key names directly
+                // v1.0 / manual export (camelCase): handled via IMPORT_KEY_MAP
+                const saves: Promise<void>[] = [];
+
+                // Direct storage key format (v2.0 flowi-backup-* files)
+                for (const key of BACKUP_KEYS) {
+                  if (parsed[key] !== undefined) {
+                    const isSyncArray = (SYNC_ARRAY_KEYS as readonly string[]).includes(key);
+                    saves.push(
+                      isSyncArray && Array.isArray(parsed[key])
+                        ? saveSynced(key, parsed[key])
+                        : saveData(key, parsed[key])
+                    );
+                  }
+                }
+
+                // camelCase format fallback (v1.0 f-tracking-* or manual export files)
+                for (const [exportKey, storageKey] of Object.entries(IMPORT_KEY_MAP)) {
+                  if (parsed[exportKey] !== undefined && parsed[storageKey] === undefined) {
+                    const isSyncArray = (SYNC_ARRAY_KEYS as readonly string[]).includes(storageKey);
+                    saves.push(
+                      isSyncArray && Array.isArray(parsed[exportKey])
+                        ? saveSynced(storageKey, parsed[exportKey])
+                        : saveData(storageKey, parsed[exportKey])
+                    );
+                  }
+                }
+
+                await Promise.all(saves);
+                await loadCounts();
+                Alert.alert('Успішно', 'Дані відновлено.', [
+                  { text: 'OK', onPress: () => router.back() },
+                ]);
+              } catch {
+                Alert.alert('Помилка', 'Не вдалося відновити дані.');
+              } finally {
+                setRestoring(false);
+              }
             },
-          ],
-        ),
-      },
-    ]);
+          },
+        ],
+      );
+    } catch {
+      Alert.alert('Помилка', 'Не вдалося прочитати файл резервної копії.');
+      setRestoring(false);
+    }
+  };
+
+  const handleClear = () =>
+    Alert.alert(
+      'Очистити всі дані?',
+      'Цю дію неможливо скасувати. Всі записи будуть видалені.\nАкаунт і налаштування залишаться.',
+      [
+        { text: 'Скасувати', style: 'cancel' },
+        {
+          text: 'Продовжити', style: 'destructive',
+          onPress: () => Alert.alert(
+            'Останнє підтвердження',
+            'Ви впевнені? Після очищення відновлення даних неможливе.\nАкаунт і налаштування залишаться без змін.',
+            [
+              { text: 'Скасувати', style: 'cancel' },
+              {
+                text: 'Видалити все', style: 'destructive',
+                onPress: async () => {
+                  // Remove all BACKUP_KEYS data + service/sync keys
+                  await AsyncStorage.multiRemove([
+                    ...(BACKUP_KEYS as readonly string[]),
+                    ...(SERVICE_CLEAR_KEYS as readonly string[]),
+                  ]);
+                  const empty: Counts = {};
+                  ALL_KEYS.forEach(k => { empty[k.key] = 0; });
+                  setCounts(empty);
+                  Alert.alert('Готово', 'Всі дані видалено. Акаунт і налаштування збережено.\nПерезапустіть додаток.');
+                },
+              },
+            ],
+          ),
+        },
+      ],
+    );
 
   const totalItems = Object.values(counts).reduce((s, v) => s + v, 0);
 
@@ -330,7 +424,7 @@ export default function DataScreen() {
               <IconSymbol name="chevron.right" size={16} color={c.sub} />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={handleOpenLastBackup} disabled={openingBackup} style={st.row}>
+            <TouchableOpacity onPress={handleOpenLastBackup} disabled={openingBackup} style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
               <View style={[st.iconBox, { backgroundColor: '#10B98120' }]}>
                 <IconSymbol name="folder.badge.magnifyingglass" size={17} color="#10B981" />
               </View>
@@ -339,6 +433,19 @@ export default function DataScreen() {
                   {openingBackup ? 'Відкриття...' : 'Відкрити останню копію'}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Переглянути або поділитись файлом</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color={c.sub} />
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleRestoreFromBackup} disabled={restoring} style={st.row}>
+              <View style={[st.iconBox, { backgroundColor: '#6366F120' }]}>
+                <IconSymbol name="arrow.triangle.2.circlepath" size={17} color="#6366F1" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ color: restoring ? c.sub : '#6366F1', fontSize: 14, fontWeight: '600' }}>
+                  {restoring ? 'Відновлення...' : 'Відновити з останнього бекапу'}
+                </Text>
+                <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Замінити поточні дані даними з копії</Text>
               </View>
               <IconSymbol name="chevron.right" size={16} color={c.sub} />
             </TouchableOpacity>

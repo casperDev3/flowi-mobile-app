@@ -4,6 +4,7 @@ import React from 'react';
 import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Radius, getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
@@ -16,15 +17,7 @@ export default function WelcomeScreen() {
   const { tr } = useI18n();
   const { setOnline } = useAppMode();
 
-  const c = {
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    card:   isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.85)',
-    border: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.50)' : 'rgba(26,20,51,0.50)',
-    accent: '#7C3AED',
-  };
+  const c = getScreenColors('auth', isDark);
 
   const handleStartOffline = async () => {
     await saveData('welcome_done', true);
@@ -110,7 +103,7 @@ const st = StyleSheet.create({
     maxWidth: 280,
   },
   card: {
-    borderRadius: 20,
+    borderRadius: Radius.xxl,
     borderWidth: 1,
     padding: 20,
     gap: 12,

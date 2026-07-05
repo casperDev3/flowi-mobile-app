@@ -13,10 +13,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { isSameDay } from '@/utils/dateUtils';
 
 type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
@@ -37,7 +40,7 @@ function deadlineLabel(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
   const diff = Math.ceil((d.getTime() - now.getTime()) / 86400000);
-  if (d.toDateString() === now.toDateString()) return 'Сьогодні';
+  if (isSameDay(d, now)) return 'Сьогодні';
   if (diff === 1) return 'Завтра';
   if (diff < 0) return `${Math.abs(diff)} дн тому`;
   return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
@@ -50,6 +53,7 @@ const PRIORITY_ORDER: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 export default function ArchiveScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  const { tr } = useI18n();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filterPriority, setFilterPriority] = useState<Priority | null>(null);
   const [sort, setSort] = useState<SortBy>('newest');
@@ -70,7 +74,7 @@ export default function ArchiveScreen() {
   const restore = (id: string) => {
     const updated = tasks.map(t =>
       t.id === id
-        ? { ...t, status: 'active' as Status, subtasks: t.subtasks.map(s => ({ ...s, done: false })) }
+        ? { ...t, status: 'active' as Status }
         : t
     );
     setTasks(updated);
@@ -113,7 +117,7 @@ export default function ArchiveScreen() {
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#10B981',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
   };
@@ -139,6 +143,8 @@ export default function ArchiveScreen() {
               </View>
               <TouchableOpacity
                 onPress={clearAll}
+                accessibilityRole="button"
+                accessibilityLabel={tr.clearArchive}
                 style={[ar.clearBtn, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', marginLeft: 8 }]}>
                 <IconSymbol name="trash" size={14} color="#EF4444" />
               </TouchableOpacity>
@@ -219,9 +225,13 @@ export default function ArchiveScreen() {
                   <View style={{ marginLeft: 8, flex: 1 }}>
                     {/* Title row */}
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7 }}>
-                      <View style={ar.doneCheck}>
-                        <IconSymbol name="checkmark" size={10} color="#fff" />
-                      </View>
+                      <AnimatedCheck
+                        checked={true}
+                        size={18}
+                        radius={5}
+                        color="#10B981"
+                        /* read-only: no onPress */
+                      />
                       <Text
                         style={{ color: c.sub, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 9, textDecorationLine: 'line-through', lineHeight: 18 }}
                         numberOfLines={2}>
@@ -260,11 +270,17 @@ export default function ArchiveScreen() {
                   <View style={{ flexDirection: 'row', gap: 6, marginLeft: 10 }}>
                     <TouchableOpacity
                       onPress={() => restore(task.id)}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.restore}
                       style={[ar.iconBtn, { backgroundColor: c.accent + '18', borderColor: c.accent + '40' }]}>
                       <IconSymbol name="arrow.uturn.backward" size={14} color={c.accent} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => deleteForever(task.id)}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.delete}
                       style={[ar.iconBtn, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.28)' }]}>
                       <IconSymbol name="trash" size={14} color="#EF4444" />
                     </TouchableOpacity>

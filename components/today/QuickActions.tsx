@@ -1,7 +1,8 @@
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { PressableScale } from '@/components/shared/PressableScale';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 
@@ -26,10 +27,9 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
   return (
     <View style={s.row}>
       {actions.map(a => (
-        <TouchableOpacity
+        <PressableScale
           key={a.label}
           onPress={a.onPress}
-          activeOpacity={0.75}
           style={{ flex: 1 }}
           accessibilityRole="button"
           accessibilityLabel={a.label}>
@@ -42,7 +42,7 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
             </View>
             <Text style={[s.label, { color: c.sub }]} numberOfLines={1}>{a.label}</Text>
           </BlurView>
-        </TouchableOpacity>
+        </PressableScale>
       ))}
     </View>
   );

@@ -101,11 +101,11 @@ export function useHealthEntries() {
       });
       const iso = new Date().toISOString();
       const hk: HealthEntry[] = [];
-      if (data.steps > 0)         hk.push({ id: genId(), type: 'steps', value: data.steps, note: '__hk__', date: iso });
-      if (data.heartRateAvg)      hk.push({ id: genId(), type: 'pulse', value: data.heartRateAvg, note: '__hk__', date: iso });
-      if (data.weight)            hk.push({ id: genId(), type: 'weight', value: data.weight, note: '__hk__', date: iso });
-      if (data.activeCalories > 0) hk.push({ id: genId(), type: 'calories_out', value: data.activeCalories, note: '__hk__', date: iso });
-      if (data.sleepMinutes)      hk.push({ id: genId(), type: 'sleep', value: data.sleepMinutes, note: '__hk__', date: iso });
+      if (data.steps > 0)          hk.push({ id: genId(), type: 'steps',        value: data.steps,           note: '__hk__', source: 'healthkit', date: iso });
+      if (data.heartRateAvg)       hk.push({ id: genId(), type: 'pulse',        value: data.heartRateAvg,    note: '__hk__', source: 'healthkit', date: iso });
+      if (data.weight)             hk.push({ id: genId(), type: 'weight',       value: data.weight,          note: '__hk__', source: 'healthkit', date: iso });
+      if (data.activeCalories > 0) hk.push({ id: genId(), type: 'calories_out', value: data.activeCalories,  note: '__hk__', source: 'healthkit', date: iso });
+      if (data.sleepMinutes)       hk.push({ id: genId(), type: 'sleep',        value: data.sleepMinutes,    note: '__hk__', source: 'healthkit', date: iso });
       return [...hk, ...filtered];
     });
     setHkSyncing(false);

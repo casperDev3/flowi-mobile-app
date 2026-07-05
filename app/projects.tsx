@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 
@@ -37,6 +38,7 @@ const PROJECT_COLORS = ['#7C3AED', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '
 export default function ProjectsScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  const { tr } = useI18n();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -111,7 +113,7 @@ export default function ProjectsScreen() {
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.45)' : 'rgba(26,20,51,0.45)',
+    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
@@ -147,10 +149,18 @@ export default function ProjectsScreen() {
               <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
                 <IconSymbol name="folder" size={32} color={c.accent} />
               </View>
-              <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontWeight: '700' }}>Немає проектів</Text>
+              <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontWeight: '700' }}>{tr.noProjects}</Text>
               <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }}>
-                Натисніть + щоб створити перший проект
+                {tr.pressToAdd}
               </Text>
+              <TouchableOpacity
+                onPress={openAdd}
+                accessibilityRole="button"
+                accessibilityLabel={tr.newProject}
+                style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <IconSymbol name="plus" size={15} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.newProject}</Text>
+              </TouchableOpacity>
             </View>
           )}
 

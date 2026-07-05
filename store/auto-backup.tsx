@@ -2,6 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import React, { createContext, useCallback, useContext, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
+import { BACKUP_KEYS } from './backup-keys';
 import { loadData, saveData } from './storage';
 
 const AUTO_BACKUP_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 години
@@ -29,28 +30,16 @@ export function AutoBackupProvider({ children }: { children: React.ReactNode }) 
 
   const doBackup = useCallback(async (): Promise<string | null> => {
     try {
-      const [tasks, transactions, timeEntries, projects, notes, bugs, ideas] = await Promise.all([
-        loadData('tasks', []),
-        loadData('transactions', []),
-        loadData('time_entries', []),
-        loadData('projects', []),
-        loadData('notes', []),
-        loadData('bugs', []),
-        loadData('ideas', []),
-      ]);
-      const payload = {
-        version: '1.0',
+      const values = await Promise.all(BACKUP_KEYS.map(k => loadData(k, null)));
+      const payload: Record<string, unknown> = {
+        version: '2.0',
         exportedAt: new Date().toISOString(),
-        tasks,
-        transactions,
-        timeEntries,
-        projects,
-        notes,
-        bugs,
-        ideas,
       };
+      BACKUP_KEYS.forEach((k, i) => {
+        if (values[i] !== null) payload[k] = values[i];
+      });
       const dateStr = new Date().toISOString().slice(0, 10);
-      const fileName = `f-tracking-backup-${dateStr}.json`;
+      const fileName = `flowi-backup-${dateStr}.json`;
       const file = new File(Paths.document, fileName);
       file.create({ overwrite: true });
       file.write(JSON.stringify(payload, null, 2));
@@ -99,8 +88,11 @@ export function AutoBackupProvider({ children }: { children: React.ReactNode }) 
     const raw = await loadData<string | null>(LAST_BACKUP_KEY, null);
     if (!raw) return null;
     const dateStr = new Date(raw).toISOString().slice(0, 10);
-    const file = new File(Paths.document, `f-tracking-backup-${dateStr}.json`);
-    return file.exists ? file.uri : null;
+    // Prefer new naming convention; fall back to legacy f-tracking-* files
+    const newFile = new File(Paths.document, `flowi-backup-${dateStr}.json`);
+    if (newFile.exists) return newFile.uri;
+    const oldFile = new File(Paths.document, `f-tracking-backup-${dateStr}.json`);
+    return oldFile.exists ? oldFile.uri : null;
   }, []);
 
   const isAutoBackupEnabled = useCallback(async (): Promise<boolean> => {

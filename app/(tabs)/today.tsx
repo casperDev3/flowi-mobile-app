@@ -1,25 +1,27 @@
 import { BlurView } from 'expo-blur';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { RingCell } from '@/components/health/RingCell';
+import { PressableScale } from '@/components/shared/PressableScale';
+import { SkeletonCard } from '@/components/shared/Skeleton';
 import { SyncBadge } from '@/components/today/SyncBadge';
 import { QuickActions } from '@/components/today/QuickActions';
 import { TodayTaskRow } from '@/components/today/TodayTaskRow';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useMotion } from '@/hooks/use-motion';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
@@ -32,6 +34,7 @@ import {
 import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, computeGoals, lastForDay, sumForDay } from '@/utils/healthUtils';
 import { Habit, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { Task, isOverdue } from '@/utils/taskUtils';
+import { haptic } from '@/utils/haptics';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -59,6 +62,7 @@ export default function TodayScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
+  const motion = useMotion();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const c = getHealthColors(isDark);
   useScreenView('today');
@@ -71,6 +75,8 @@ export default function TodayScreen() {
   const [meetings, setMeetings] = useState<TodayMeeting[]>([]);
   const [habits,   setHabits]   = useState<Habit[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const firstLoadDone = useRef(false);
 
   const load = useCallback(async () => {
     const [t, x, tm, h, p, m, hb] = await Promise.all([
@@ -86,7 +92,16 @@ export default function TodayScreen() {
     setMeetings(m); setHabits(hb);
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    const doLoad = async () => {
+      await load();
+      if (!firstLoadDone.current) {
+        firstLoadDone.current = true;
+        setLoaded(true);
+      }
+    };
+    doLoad();
+  }, [load]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -151,7 +166,7 @@ export default function TodayScreen() {
     });
     await saveSynced('tasks', updated);
     setTasks(updated);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptic.light();
   }, []);
 
   const handleAddWater = useCallback(async () => {
@@ -165,7 +180,7 @@ export default function TodayScreen() {
     const updated  = [newEntry, ...current];
     await saveSynced('health_entries_v2', updated);
     setHealth(updated);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptic.success();
   }, []);
 
   const handleToggleHabit = useCallback(async (id: string) => {
@@ -181,7 +196,7 @@ export default function TodayScreen() {
     });
     await saveSynced('health_habits', updated);
     setHabits(updated);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptic.light();
   }, []);
 
   // ─── Formatters ────────────────────────────────────────────────────────────
@@ -216,7 +231,17 @@ export default function TodayScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 
-          {/* Quick Actions */}
+          {/* Skeleton — перший завантаження */}
+          {!loaded && (
+            <>
+              <SkeletonCard style={{ marginTop: 4 }} />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
+          )}
+
+          {/* Quick Actions + основний контент (після першого завантаження) */}
+          {loaded && <>
           <QuickActions
             isDark={isDark}
             c={c}
@@ -263,10 +288,9 @@ export default function TodayScreen() {
             <View style={{ marginBottom: 12 }}>
               <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayMeetings}</Text>
               {todayMeetings.map(m => (
-                <TouchableOpacity
+                <PressableScale
                   key={m.id}
                   onPress={() => router.push('/meetings')}
-                  activeOpacity={0.8}
                   style={{ marginBottom: 6 }}>
                   <BlurView
                     intensity={isDark ? 18 : 36}
@@ -276,7 +300,7 @@ export default function TodayScreen() {
                     <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
                     <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
                   </BlurView>
-                </TouchableOpacity>
+                </PressableScale>
               ))}
             </View>
           )}
@@ -285,35 +309,37 @@ export default function TodayScreen() {
           {habits.length > 0 && (
             <View style={{ marginBottom: 12 }}>
               <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayHabits}</Text>
-              {habits.map(h => {
+              {habits.map((h, i) => {
                 const done   = habitDoneToday(h);
                 const streak = habitStreak(h);
                 return (
-                  <TouchableOpacity
+                  <Animated.View
                     key={h.id}
-                    onPress={() => handleToggleHabit(h.id)}
-                    activeOpacity={0.8}
-                    style={{ marginBottom: 6 }}
-                    accessibilityRole="checkbox"
-                    accessibilityLabel={h.title}>
-                    <BlurView
-                      intensity={isDark ? 18 : 36}
-                      tint={isDark ? 'dark' : 'light'}
-                      style={[s.habitRow, { borderColor: c.border }]}>
-                      <View style={[s.habitBar, { backgroundColor: h.color || ACCENT }]} />
-                      <IconSymbol
-                        name={done ? 'checkmark.circle.fill' : 'circle'}
-                        size={20}
-                        color={done ? (h.color || ACCENT) : c.sub}
-                      />
-                      <Text style={[s.habitTitle, { color: c.text }]} numberOfLines={1}>{h.title}</Text>
-                      {streak > 0 && (
-                        <Text style={[s.streakBadge, { color: h.color || ACCENT }]}>
-                          🔥{streak}
-                        </Text>
-                      )}
-                    </BlurView>
-                  </TouchableOpacity>
+                    entering={motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40))}>
+                    <PressableScale
+                      onPress={() => handleToggleHabit(h.id)}
+                      style={{ marginBottom: 6 }}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={h.title}>
+                      <BlurView
+                        intensity={isDark ? 18 : 36}
+                        tint={isDark ? 'dark' : 'light'}
+                        style={[s.habitRow, { borderColor: c.border }]}>
+                        <View style={[s.habitBar, { backgroundColor: h.color || ACCENT }]} />
+                        <IconSymbol
+                          name={done ? 'checkmark.circle.fill' : 'circle'}
+                          size={20}
+                          color={done ? (h.color || ACCENT) : c.sub}
+                        />
+                        <Text style={[s.habitTitle, { color: c.text }]} numberOfLines={1}>{h.title}</Text>
+                        {streak > 0 && (
+                          <Text style={[s.streakBadge, { color: h.color || ACCENT }]}>
+                            🔥{streak}
+                          </Text>
+                        )}
+                      </BlurView>
+                    </PressableScale>
+                  </Animated.View>
                 );
               })}
             </View>
@@ -355,6 +381,7 @@ export default function TodayScreen() {
           <Card onPress={() => router.push('/time')} c={c} isDark={isDark} title={tr.tabToday + ' · ' + fmtTime(trackedSec)} icon="timer" color={ACCENT_TIME}>
             <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{tr.todayTracked}</Text>
           </Card>
+          </>}
 
         </ScrollView>
       </SafeAreaView>
@@ -374,7 +401,7 @@ function Card({ onPress, c, isDark, title, icon, color, children }: {
   children?: React.ReactNode;
 }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={title} style={{ marginBottom: 12 }}>
+    <PressableScale onPress={onPress} accessibilityRole="button" accessibilityLabel={title} style={{ marginBottom: 12 }}>
       <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
@@ -385,7 +412,7 @@ function Card({ onPress, c, isDark, title, icon, color, children }: {
         </View>
         {children}
       </BlurView>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

@@ -20,6 +20,7 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAutoBackup } from '@/store/auto-backup';
 import { loadData, saveData } from '@/store/storage';
+import { SYNC_ARRAY_KEYS, saveSynced } from '@/store/synced-storage';
 
 const ALL_KEYS = [
   { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
@@ -187,7 +188,13 @@ export default function DataScreen() {
                 await Promise.all(
                   Object.entries(IMPORT_KEY_MAP)
                     .filter(([exportKey]) => parsed[exportKey] !== undefined)
-                    .map(([exportKey, storageKey]) => saveData(storageKey, parsed[exportKey]))
+                    .map(([exportKey, storageKey]) => {
+                      const isSyncArray = (SYNC_ARRAY_KEYS as readonly string[]).includes(storageKey);
+                      if (isSyncArray && Array.isArray(parsed[exportKey])) {
+                        return saveSynced(storageKey, parsed[exportKey]);
+                      }
+                      return saveData(storageKey, parsed[exportKey]);
+                    })
                 );
                 await loadCounts();
                 Alert.alert('Успішно', 'Дані завантажено. Перезапустіть додаток для оновлення.');

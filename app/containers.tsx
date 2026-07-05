@@ -22,7 +22,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 
 interface ContainerItem {
   id: string;
@@ -86,7 +87,7 @@ export default function ContainersScreen() {
   }, []);
 
   useEffect(() => { loadContainers().then(() => setInitialized(true)); }, []);
-  useEffect(() => { if (initialized) saveData(STORAGE_KEY, containers); }, [containers, initialized]);
+  useEffect(() => { if (initialized) void saveSynced(STORAGE_KEY, containers); }, [containers, initialized]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

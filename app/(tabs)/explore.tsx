@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -26,7 +26,8 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
 import {
   filterByMonth, groupTransactions,
   calcTotalsByCurrency, formatCurrency,
@@ -194,9 +195,18 @@ export default function FinanceScreen() {
     setRefreshing(false);
   }, [loadTxs]);
 
+  // Open add-transaction modal when navigated with ?create=1 (e.g. from Today quick actions)
+  const { create: createParam } = useLocalSearchParams<{ create?: string }>();
+  useEffect(() => {
+    if (createParam === '1') {
+      setShowAdd(true);
+      router.setParams({ create: '' });
+    }
+  }, [createParam]);
+
   // Save to storage
   useEffect(() => {
-    if (initialized) saveData('transactions', txs);
+    if (initialized) void saveSynced('transactions', txs);
   }, [txs, initialized]);
 
   // Load categories
@@ -209,7 +219,7 @@ export default function FinanceScreen() {
 
   // Save categories
   useEffect(() => {
-    if (catsInitialized) saveData('categories', cats);
+    if (catsInitialized) void saveSyncedValue('categories', cats);
   }, [cats, catsInitialized]);
 
   // Load custom currencies
@@ -222,7 +232,7 @@ export default function FinanceScreen() {
 
   // Save custom currencies
   useEffect(() => {
-    if (currenciesInitialized) saveData('finance_currencies', customCurrencies);
+    if (currenciesInitialized) void saveSyncedValue('finance_currencies', customCurrencies);
   }, [customCurrencies, currenciesInitialized]);
 
   // Load / save manual balance adjustments
@@ -233,7 +243,7 @@ export default function FinanceScreen() {
     });
   }, []);
   useEffect(() => {
-    if (balanceAdjInitialized) saveData('finance_balance_adjustments', balanceAdj);
+    if (balanceAdjInitialized) void saveSyncedValue('finance_balance_adjustments', balanceAdj);
   }, [balanceAdj, balanceAdjInitialized]);
 
   // Load / save primary currency
@@ -244,7 +254,7 @@ export default function FinanceScreen() {
     });
   }, []);
   useEffect(() => {
-    if (primaryCurrencyInitialized) saveData('finance_primary_currency', primaryCurrency);
+    if (primaryCurrencyInitialized) void saveSyncedValue('finance_primary_currency', primaryCurrency);
   }, [primaryCurrency, primaryCurrencyInitialized]);
 
   const addInlineCurrency = () => {

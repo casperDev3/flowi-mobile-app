@@ -22,7 +22,9 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useAppMode } from '@/store/app-mode';
+import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
+import { useSync } from '@/store/sync-engine';
 import { getAllScheduledNotifications } from '@/store/notifications';
 import { ThemeOption, useTheme } from '@/store/theme-context';
 import { Lang } from '@/store/translations';
@@ -35,8 +37,9 @@ export default function SettingsScreen() {
   const { theme, setTheme } = useTheme();
   const { lang, setLang, tr } = useI18n();
   const { online, setOnline } = useAppMode();
+  const { user, status, logout } = useAuth();
+  const { syncNow } = useSync();
 
-  const [notifications, setNotifications] = useState(true);
   const [taskReminders, setTaskReminders] = useState(true);
   const [financeAlerts, setFinanceAlerts] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -48,6 +51,43 @@ export default function SettingsScreen() {
       setScheduledCount(list.filter(n => n.identifier.startsWith('reminder_')).length);
     });
   }, []));
+
+  const handleLogout = () => {
+    Alert.alert(
+      tr.authLogout,
+      tr.logoutConfirm,
+      [
+        { text: tr.cancel, style: 'cancel' },
+        { text: tr.authLogout, style: 'destructive', onPress: () => void logout() },
+      ],
+    );
+  };
+
+  const handleOnlineToggle = (v: boolean) => {
+    if (v && status !== 'authed') {
+      Alert.alert(
+        tr.onlineNeedsAccount,
+        tr.onlineNeedsAccountMsg,
+        [
+          { text: tr.authLogin, onPress: () => router.push('/login') },
+          { text: tr.authRegister, onPress: () => router.push('/register') },
+          { text: tr.cancel, style: 'cancel' },
+        ],
+      );
+      return;
+    }
+    setOnline(v);
+    if (v && status === 'authed') {
+      Alert.alert(
+        tr.syncNowTitle,
+        tr.syncNowMsg,
+        [
+          { text: tr.yes, onPress: () => void syncNow() },
+          { text: tr.later, style: 'cancel' },
+        ],
+      );
+    }
+  };
 
   const c = {
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
@@ -79,6 +119,50 @@ export default function SettingsScreen() {
             <Text style={[st.pageTitle, { color: c.text }]}>{tr.settings}</Text>
           </View>
 
+          {/* Акаунт */}
+          <SectionLabel label={tr.sectionAccount} color={c.sub} />
+          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            {status === 'authed' && user ? (
+              <>
+                <View style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                  <View style={[st.iconBox, { backgroundColor: '#7C3AED20' }]}>
+                    <IconSymbol name="person.fill" size={17} color="#7C3AED" />
+                  </View>
+                  <Text style={[st.rowLabel, { color: c.text, flex: 1 }]} numberOfLines={1}>{user.email}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleLogout}
+                  style={st.row}>
+                  <View style={[st.iconBox, { backgroundColor: '#EF444420' }]}>
+                    <IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color="#EF4444" />
+                  </View>
+                  <Text style={[st.rowLabel, { color: '#EF4444', flex: 1 }]}>{tr.authLogout}</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  onPress={() => router.push('/login')}
+                  style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                  <View style={[st.iconBox, { backgroundColor: '#7C3AED20' }]}>
+                    <IconSymbol name="person.fill" size={17} color="#7C3AED" />
+                  </View>
+                  <Text style={[st.rowLabel, { color: c.text, flex: 1 }]}>{tr.authLogin}</Text>
+                  <IconSymbol name="chevron.right" size={16} color={c.sub} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push('/register')}
+                  style={st.row}>
+                  <View style={[st.iconBox, { backgroundColor: '#0EA5E920' }]}>
+                    <IconSymbol name="person.badge.plus" size={17} color="#0EA5E9" />
+                  </View>
+                  <Text style={[st.rowLabel, { color: c.text, flex: 1 }]}>{tr.authRegister}</Text>
+                  <IconSymbol name="chevron.right" size={16} color={c.sub} />
+                </TouchableOpacity>
+              </>
+            )}
+          </BlurView>
+
           {/* Режим роботи */}
           <SectionLabel label={tr.workMode} color={c.sub} />
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
@@ -87,7 +171,7 @@ export default function SettingsScreen() {
               iconColor="#0EA5E9"
               label={online ? tr.modeOnline : tr.modeOffline}
               value={online}
-              onChange={setOnline}
+              onChange={handleOnlineToggle}
               text={c.text}
               sub={c.sub}
               border={c.border}

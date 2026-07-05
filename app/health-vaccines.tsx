@@ -12,7 +12,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { cancelById, scheduleDateReminder } from '@/store/notifications';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { ACCENT_CAL, getHealthColors } from '@/utils/healthTheme';
 import { VACCINES_KEY, Vaccine, genId } from '@/utils/preventionUtils';
@@ -34,7 +35,7 @@ export default function VaccinesScreen() {
   const [nextDate, setNextDate] = useState('');
 
   useEffect(() => { loadData<Vaccine[]>(VACCINES_KEY, []).then(d => { setItems(d); setInitialized(true); }); }, []);
-  useEffect(() => { if (initialized) saveData(VACCINES_KEY, items); }, [items, initialized]);
+  useEffect(() => { if (initialized) void saveSynced(VACCINES_KEY, items); }, [items, initialized]);
 
   const create = async () => {
     if (!name.trim()) return;

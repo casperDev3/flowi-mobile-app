@@ -23,7 +23,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { isOnlineMode } from '@/store/app-mode';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 
 // Вставте URL після деплою Google Apps Script
 const REPORTER_URL = 'https://script.google.com/macros/s/AKfycbzCOLtFr1M1bu2yU8AjKfLeqIQ7MKlbCthcfiC0bn6Br2f-tEtmjGJtJHoO7w98FPoN/exec';
@@ -104,7 +105,7 @@ export default function IdeasScreen() {
   }, []);
 
   useEffect(() => {
-    if (initialized) saveData('ideas', ideas);
+    if (initialized) void saveSynced('ideas', ideas);
   }, [ideas, initialized]);
 
   const PRIORITY_ORDER: Record<IdeaPriority, number> = { high: 0, medium: 1, low: 2 };

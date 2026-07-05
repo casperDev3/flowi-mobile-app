@@ -20,7 +20,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 
 export interface Project {
   id: string;
@@ -65,7 +66,7 @@ export default function ProjectsScreen() {
   }, []);
 
   useEffect(() => {
-    if (initialized) saveData('projects', projects);
+    if (initialized) void saveSynced('projects', projects);
   }, [projects, initialized]);
 
   const openAdd = () => {

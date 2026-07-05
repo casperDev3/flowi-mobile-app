@@ -12,7 +12,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { cancelById, scheduleDateReminder } from '@/store/notifications';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { ACCENT_PULSE, getHealthColors } from '@/utils/healthTheme';
 import { CHECKUPS_KEY, Checkup, CheckupKind, genId } from '@/utils/preventionUtils';
@@ -35,7 +36,7 @@ export default function CheckupsScreen() {
   const [nextDate, setNextDate] = useState('');
 
   useEffect(() => { loadData<Checkup[]>(CHECKUPS_KEY, []).then(d => { setItems(d); setInitialized(true); }); }, []);
-  useEffect(() => { if (initialized) saveData(CHECKUPS_KEY, items); }, [items, initialized]);
+  useEffect(() => { if (initialized) void saveSynced(CHECKUPS_KEY, items); }, [items, initialized]);
 
   const kindLabel = (k: CheckupKind) => k === 'analysis' ? tr.kindAnalysis : k === 'visit' ? tr.kindVisit : tr.kindProcedure;
 

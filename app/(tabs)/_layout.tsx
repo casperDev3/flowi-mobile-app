@@ -55,15 +55,11 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="shared"
+                name="index"
                 options={{
-                    title: 'Спільне',
-                    tabBarIcon: ({color}) => <IconSymbol size={28} name="person.2.fill" color={color}/>,
+                    title: tr.tabTasks,
+                    tabBarIcon: ({color}) => <IconSymbol size={28} name="checklist" color={color}/>,
                 }}
-            />
-            <Tabs.Screen
-                name="agent"
-                options={{ href: null }}
             />
             <Tabs.Screen
                 name="explore"
@@ -71,14 +67,6 @@ export default function TabLayout() {
                     title: tr.tabFinance,
                     tabBarIcon: ({color}) => <IconSymbol size={32} name="banknote" color={color}/>,
                 }}
-            />
-            <Tabs.Screen
-                name="index"
-                options={{href: null}}
-            />
-            <Tabs.Screen
-                name="time"
-                options={{href: null}}
             />
             <Tabs.Screen
                 name="health"
@@ -93,6 +81,18 @@ export default function TabLayout() {
                     title: tr.tabOptions,
                     tabBarIcon: ({color}) => <IconSymbol size={32} name="gearshape.fill" color={color}/>,
                 }}
+            />
+            <Tabs.Screen
+                name="shared"
+                options={{ href: null }}
+            />
+            <Tabs.Screen
+                name="agent"
+                options={{ href: null }}
+            />
+            <Tabs.Screen
+                name="time"
+                options={{ href: null }}
             />
         </Tabs>
     );

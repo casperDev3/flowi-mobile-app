@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -27,7 +27,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import { filterTasksByMonth } from '@/utils/taskUtils';
 import type { Project } from '../projects';
@@ -430,13 +431,22 @@ export default function TasksScreen() {
     loadAll().then(() => { setInitialized(true); setMeetingsInit(true); });
   }, []));
 
+  // Open create-task modal when navigated with ?create=1 (e.g. from Today quick actions)
+  const { create: createParam } = useLocalSearchParams<{ create?: string }>();
+  useEffect(() => {
+    if (createParam === '1') {
+      setShowAdd(true);
+      router.setParams({ create: '' });
+    }
+  }, [createParam, router]);
+
   // Save to storage
   useEffect(() => {
-    if (initialized) saveData('tasks', tasks);
+    if (initialized) void saveSynced('tasks', tasks);
   }, [tasks, initialized]);
 
   useEffect(() => {
-    if (meetingsInit) saveData('meetings', meetings);
+    if (meetingsInit) void saveSynced('meetings', meetings);
   }, [meetings, meetingsInit]);
 
   // Reset detail tab when opening a different task

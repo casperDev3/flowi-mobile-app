@@ -9,6 +9,19 @@ type Mode = 'online' | 'offline';
 let _online = true;
 export function isOnlineMode(): boolean { return _online; }
 
+// Зберігаємо посилання на React-сеттер, щоб imperativeSetOffline міг оновити UI.
+let _setOnlineStateRef: ((v: boolean) => void) | null = null;
+
+/**
+ * Перемикає режим ззовні React-дерева (наприклад, із store/auth.tsx під час logout).
+ * Оновлює модульний кеш, React-стан (якщо провайдер змонтовано) і AsyncStorage.
+ */
+export function setOnlineImperative(v: boolean): void {
+  _online = v;
+  _setOnlineStateRef?.(v);
+  saveData(KEY, v ? 'online' : 'offline');
+}
+
 interface AppModeCtx {
   online: boolean;
   ready: boolean;
@@ -20,6 +33,11 @@ const Ctx = createContext<AppModeCtx>({ online: true, ready: false, setOnline: (
 export function AppModeProvider({ children }: { children: React.ReactNode }) {
   const [online, setOnlineState] = useState(true);
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    _setOnlineStateRef = setOnlineState;
+    return () => { _setOnlineStateRef = null; };
+  }, []);
 
   useEffect(() => {
     loadData<Mode>(KEY, 'online').then(m => {

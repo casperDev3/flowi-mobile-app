@@ -20,7 +20,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { requestNotificationPermissions } from '@/store/notifications';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
 
 const ACCENT = '#0EA5E9';
@@ -580,9 +581,9 @@ export default function WorkoutsScreen() {
 
   useEffect(() => {
     if (!initialized) return;
-    saveData('workouts', workouts);
-    saveData('exercises', exercises);
-    saveData('workout_programs', programs);
+    void saveSynced('workouts', workouts);
+    void saveSynced('exercises', exercises);
+    void saveSynced('workout_programs', programs);
   }, [workouts, exercises, programs, initialized]);
 
   const scheduleNotifs = useCallback(async (prog: WorkoutProgram): Promise<string[]> => {

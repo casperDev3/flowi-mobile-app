@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { HK_AVAILABLE, HKDayData, fetchTodayData, initHealthKit } from '@/store/healthkit';
 import { cancelDailyReminder, scheduleDailyReminder, scheduleWeeklyReminder } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 import { Events, track } from '@/utils/analytics';
 import { isSameDay } from '@/utils/dateUtils';
 import {
@@ -128,7 +129,7 @@ export function useHealthEntries() {
   useFocusEffect(useCallback(() => { if (initialized) reload(); }, [initialized, reload]));
 
   // Зберігати записи після ініціалізації
-  useEffect(() => { if (initialized) saveData(ENTRIES_KEY, entries); }, [entries, initialized]);
+  useEffect(() => { if (initialized) void saveSynced(ENTRIES_KEY, entries); }, [entries, initialized]);
 
   // ─── Дії ────────────────────────────────────────────────────────────────
   const addEntry = useCallback((e: NewEntry) => {

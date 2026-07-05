@@ -112,6 +112,7 @@ const MAPPING: Record<string, MaterialIconName> = {
   'bell': 'notifications-none',
   'globe': 'language',
   'person.fill': 'person-outline',
+  'person.2.fill': 'group',
   'shield.fill': 'security',
   'hand.raised': 'privacy-tip',
   'info': 'info-outline',

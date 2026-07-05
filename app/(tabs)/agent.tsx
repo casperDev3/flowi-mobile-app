@@ -236,7 +236,7 @@ export default function AgentScreen() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <OfflineOverlay>
+    <OfflineOverlay reason='offline'>
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 

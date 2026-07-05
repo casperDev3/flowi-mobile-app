@@ -15,7 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 
 type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
@@ -73,7 +74,7 @@ export default function ArchiveScreen() {
         : t
     );
     setTasks(updated);
-    saveData('tasks', updated);
+    void saveSynced('tasks', updated);
   };
 
   const deleteForever = (id: string) => {
@@ -85,7 +86,7 @@ export default function ArchiveScreen() {
         { text: 'Видалити', style: 'destructive', onPress: () => {
           const updated = tasks.filter(t => t.id !== id);
           setTasks(updated);
-          saveData('tasks', updated);
+          void saveSynced('tasks', updated);
         }},
       ]
     );
@@ -101,7 +102,7 @@ export default function ArchiveScreen() {
         { text: 'Очистити', style: 'destructive', onPress: () => {
           const updated = tasks.filter(t => t.status !== 'done');
           setTasks(updated);
-          saveData('tasks', updated);
+          void saveSynced('tasks', updated);
         }},
       ]
     );

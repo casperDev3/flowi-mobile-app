@@ -27,7 +27,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { isOnlineMode } from '@/store/app-mode';
+import { isOnlineMode, useAppMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
 import { requestNotificationPermissions } from '@/store/notifications';
 
@@ -127,6 +127,7 @@ export default function SharedScreen() {
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const { tr, lang } = useI18n();
+  const { online } = useAppMode();
   const sectionLabel = useCallback((t: SectionType) => {
     if (t === 'shopping') return lang === 'uk' ? 'Покупки' : 'Shopping';
     if (t === 'tasks')    return lang === 'uk' ? 'Завдання' : 'Tasks';
@@ -260,7 +261,9 @@ export default function SharedScreen() {
     (async () => {
       let did = await AsyncStorage.getItem(KEY_DEVICE);
       if (!did) { did = randomUUID(); await AsyncStorage.setItem(KEY_DEVICE, did); }
-      try { await api('/devices/register/', 'POST', { device_id: did }); } catch {}
+      if (isOnlineMode()) {
+        try { await api('/devices/register/', 'POST', { device_id: did }); } catch {}
+      }
       setDeviceId(did);
 
       let loadedGroups: GroupData[] = [];
@@ -288,6 +291,17 @@ export default function SharedScreen() {
       setInitialized(true);
     })();
   }, []);
+
+  // ─── Зупинити WS при перемиканні в офлайн ────────────────────────────────
+
+  useEffect(() => {
+    if (!online) {
+      if (wsReconnectTimer.current) { clearTimeout(wsReconnectTimer.current); wsReconnectTimer.current = null; }
+      wsRef.current?.close();
+      wsRef.current = null;
+      setWsConnected(false);
+    }
+  }, [online]);
 
   // ─── Focus / WS ───────────────────────────────────────────────────────────
 
@@ -929,7 +943,8 @@ export default function SharedScreen() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <OfflineOverlay>
+    <OfflineOverlay reason='offline'>
+    <OfflineOverlay reason='guest'>
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
@@ -1901,6 +1916,7 @@ export default function SharedScreen() {
         </KeyboardAvoidingView>
       </Modal>
     </View>
+    </OfflineOverlay>
     </OfflineOverlay>
   );
 }

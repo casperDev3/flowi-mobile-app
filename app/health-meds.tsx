@@ -12,7 +12,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { cancelMedReminders, scheduleMedReminders } from '@/store/notifications';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { Events, track } from '@/utils/analytics';
 import { HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
@@ -35,7 +36,7 @@ export default function MedsScreen() {
   const [times, setTimes] = useState('08:00');
 
   useEffect(() => { loadData<Medication[]>(MEDS_KEY, []).then(d => { setMeds(d); setInitialized(true); }); }, []);
-  useEffect(() => { if (initialized) saveData(MEDS_KEY, meds); }, [meds, initialized]);
+  useEffect(() => { if (initialized) void saveSynced(MEDS_KEY, meds); }, [meds, initialized]);
 
   const create = async () => {
     const t = parseTimes(times);

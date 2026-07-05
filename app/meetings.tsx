@@ -24,7 +24,8 @@ import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { isOnlineMode } from '@/store/app-mode';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
 let AVAudio: any = null;
@@ -449,7 +450,7 @@ export default function MeetingsScreen() {
   // Save on change
   const saveMeetings = useCallback((updated: Meeting[]) => {
     setMeetings(updated);
-    if (initialized) saveData('meetings', updated);
+    if (initialized) void saveSynced('meetings', updated);
   }, [initialized]);
 
   // ─── Computed ─────────────────────────────────────────────────────────────

@@ -56,7 +56,8 @@
           "NSHealthUpdateUsageDescription": "Flowi зберігає дані здоров'я для персональних звітів.",
           "background": true
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

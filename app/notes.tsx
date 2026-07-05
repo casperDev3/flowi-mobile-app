@@ -20,7 +20,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 
 interface Note {
   id: string;
@@ -73,7 +74,7 @@ export default function NotesScreen() {
   }, []);
 
   useEffect(() => {
-    if (initialized) saveData('notes', notes);
+    if (initialized) void saveSynced('notes', notes);
   }, [notes, initialized]);
 
   const openNew = () => {

@@ -12,7 +12,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { cancelDailyReminder, scheduleDailyReminder } from '@/store/notifications';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
 import { HABITS_KEY, Habit, genId, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
@@ -37,7 +38,7 @@ export default function HabitsScreen() {
   const [remAt, setRemAt] = useState('');
 
   useEffect(() => { loadData<Habit[]>(HABITS_KEY, []).then(d => { setHabits(d); setInitialized(true); }); }, []);
-  useEffect(() => { if (initialized) saveData(HABITS_KEY, habits); }, [habits, initialized]);
+  useEffect(() => { if (initialized) void saveSynced(HABITS_KEY, habits); }, [habits, initialized]);
 
   const create = async () => {
     if (!title.trim()) return;

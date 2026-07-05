@@ -22,7 +22,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
 import { useI18n } from '@/store/i18n';
 
@@ -108,7 +109,7 @@ export default function TimeScreen() {
 
   // Save to storage
   useEffect(() => {
-    if (initialized) saveData('time_entries', entries);
+    if (initialized) void saveSynced('time_entries', entries);
   }, [entries, initialized]);
 
   // Pick up task from tasks screen

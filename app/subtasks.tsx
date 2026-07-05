@@ -15,7 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 
 type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
@@ -54,7 +55,7 @@ export default function SubtasksScreen() {
   const persistTask = useCallback(async (updated: Task) => {
     setTask(updated);
     const tasks = await loadData<Task[]>('tasks', []);
-    await saveData('tasks', tasks.map(t => t.id === updated.id ? updated : t));
+    await saveSynced('tasks', tasks.map(t => t.id === updated.id ? updated : t));
   }, []);
 
   const toggleSubtask = useCallback(async (subId: string) => {

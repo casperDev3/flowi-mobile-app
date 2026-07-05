@@ -556,7 +556,17 @@ export interface Translations {
   unavailableOffline: string;
   enableOnline: string;
   offlineBadge: string;
+  onlineBadge: string;
   sendUnavailableOffline: string;
+  // Today screen — new sections
+  sharedSubtitle: string;
+  quickAddTask: string;
+  quickAddExpense: string;
+  quickAddWater: string;
+  quickTimer: string;
+  todayTasks: string;
+  todayMeetings: string;
+  todayHabits: string;
   // Onboarding
   onbWelcomeTitle: string;
   onbWelcomeDesc: string;
@@ -695,6 +705,42 @@ export interface Translations {
   containerItems: string;
   itemTags: string;
   itemNote: string;
+
+  // Auth & Account
+  sectionAccount: string;
+  authLogin: string;
+  authRegister: string;
+  authLogout: string;
+  logoutConfirm: string;
+  authEmail: string;
+  authPassword: string;
+  authPasswordRepeat: string;
+  authName: string;
+  authInvalidCreds: string;
+  authEmailTaken: string;
+  authWeakPassword: string;
+  authPasswordsMismatch: string;
+  authNoAccount: string;
+  authHaveAccount: string;
+  welcomeSubtitle: string;
+  startOffline: string;
+  onlineNeedsAccount: string;
+  onlineNeedsAccountMsg: string;
+  sessionExpired: string;
+
+  // Sync — cloud
+  syncNowTitle: string;
+  syncNowMsg: string;
+  later: string;
+  cloudSync: string;
+  syncNow: string;
+  lastSyncAt: string;
+  syncPending: string;
+  syncError: string;
+  syncConflictsCount: string;
+  syncGuestHint: string;
+  syncOfflineHint: string;
+  localDesktopSync: string;
 }
 
 const uk: Translations = {
@@ -1222,7 +1268,16 @@ const uk: Translations = {
   unavailableOffline: 'Недоступно в офлайн-режимі',
   enableOnline: 'Увімкнути онлайн',
   offlineBadge: 'Офлайн',
+  onlineBadge: 'Онлайн',
   sendUnavailableOffline: 'Надсилання недоступне в офлайн-режимі',
+  sharedSubtitle: 'Спільні списки та групи',
+  quickAddTask: '+ Завдання',
+  quickAddExpense: '+ Витрата',
+  quickAddWater: '+ Вода',
+  quickTimer: 'Таймер',
+  todayTasks: 'Завдання на сьогодні',
+  todayMeetings: 'Зустрічі сьогодні',
+  todayHabits: 'Звички',
   onbWelcomeTitle: 'Вітаємо у Flowi',
   onbWelcomeDesc: 'Завдання, фінанси, здоров\'я, час — в одному приватному застосунку. Дані лишаються на вашому пристрої.',
   onbStart: 'Почати',
@@ -1348,6 +1403,40 @@ const uk: Translations = {
   containerItems: 'Речі',
   itemTags: 'Теги (через кому)',
   itemNote: 'Нотатка (необов\'язково)',
+
+  sectionAccount: 'Акаунт',
+  authLogin: 'Увійти',
+  authRegister: 'Зареєструватись',
+  authLogout: 'Вийти',
+  logoutConfirm: 'Вийти з акаунта? Дані залишаться на пристрої.',
+  authEmail: 'Email',
+  authPassword: 'Пароль',
+  authPasswordRepeat: 'Повторіть пароль',
+  authName: "Ім'я (необов'язково)",
+  authInvalidCreds: 'Невірний email або пароль',
+  authEmailTaken: 'Цей email вже зайнятий',
+  authWeakPassword: 'Пароль занадто слабкий (мін 8 символів)',
+  authPasswordsMismatch: 'Паролі не збігаються',
+  authNoAccount: 'Немає акаунта? Зареєструватись',
+  authHaveAccount: 'Вже є акаунт? Увійти',
+  welcomeSubtitle: 'Завдання, фінанси, здоров\'я — приватно і офлайн-first',
+  startOffline: 'Розпочати офлайн',
+  onlineNeedsAccount: 'Для онлайн-функцій потрібен акаунт',
+  onlineNeedsAccountMsg: 'Увійдіть або зареєструйтесь, щоб увімкнути онлайн-режим.',
+  sessionExpired: 'Сесію завершено. Увійдіть знову.',
+
+  syncNowTitle: 'Синхронізувати дані?',
+  syncNowMsg: 'Завантажити зміни на сервер і отримати актуальні дані.',
+  later: 'Пізніше',
+  cloudSync: 'Хмарна синхронізація',
+  syncNow: 'Синхронізувати зараз',
+  lastSyncAt: 'Синхронізовано',
+  syncPending: 'очікує',
+  syncError: 'Помилка синхронізації',
+  syncConflictsCount: 'конфліктів',
+  syncGuestHint: 'Увійдіть або зареєструйтесь для синхронізації',
+  syncOfflineHint: 'Увімкніть онлайн-режим для синхронізації',
+  localDesktopSync: 'Локальна синхронізація з десктопом',
 };
 
 const en: Translations = {
@@ -1875,7 +1964,16 @@ const en: Translations = {
   unavailableOffline: 'Unavailable in offline mode',
   enableOnline: 'Go online',
   offlineBadge: 'Offline',
+  onlineBadge: 'Online',
   sendUnavailableOffline: 'Sending is unavailable offline',
+  sharedSubtitle: 'Shared lists & groups',
+  quickAddTask: '+ Task',
+  quickAddExpense: '+ Expense',
+  quickAddWater: '+ Water',
+  quickTimer: 'Timer',
+  todayTasks: "Today's tasks",
+  todayMeetings: "Today's meetings",
+  todayHabits: 'Habits',
   onbWelcomeTitle: 'Welcome to Flowi',
   onbWelcomeDesc: 'Tasks, finance, health, time — in one private app. Your data stays on your device.',
   onbStart: 'Get started',
@@ -2001,6 +2099,40 @@ const en: Translations = {
   containerItems: 'Items',
   itemTags: 'Tags (comma separated)',
   itemNote: 'Note (optional)',
+
+  sectionAccount: 'Account',
+  authLogin: 'Sign In',
+  authRegister: 'Register',
+  authLogout: 'Sign Out',
+  logoutConfirm: 'Sign out? Your data will remain on the device.',
+  authEmail: 'Email',
+  authPassword: 'Password',
+  authPasswordRepeat: 'Repeat password',
+  authName: 'Name (optional)',
+  authInvalidCreds: 'Invalid email or password',
+  authEmailTaken: 'This email is already taken',
+  authWeakPassword: 'Password too weak (min 8 characters)',
+  authPasswordsMismatch: 'Passwords do not match',
+  authNoAccount: 'No account? Register',
+  authHaveAccount: 'Already have an account? Sign in',
+  welcomeSubtitle: 'Tasks, finance, health — private and offline-first',
+  startOffline: 'Start offline',
+  onlineNeedsAccount: 'Online features require an account',
+  onlineNeedsAccountMsg: 'Sign in or register to enable online mode.',
+  sessionExpired: 'Session expired. Please sign in again.',
+
+  syncNowTitle: 'Sync data?',
+  syncNowMsg: 'Upload local changes to the server and fetch the latest data.',
+  later: 'Later',
+  cloudSync: 'Cloud Sync',
+  syncNow: 'Sync now',
+  lastSyncAt: 'Synced',
+  syncPending: 'pending',
+  syncError: 'Sync error',
+  syncConflictsCount: 'conflicts',
+  syncGuestHint: 'Sign in or register to sync',
+  syncOfflineHint: 'Enable online mode to sync',
+  localDesktopSync: 'Local desktop sync',
 };
 
 export const allTranslations: Record<Lang, Translations> = { uk, en };

@@ -19,7 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSynced } from '@/store/synced-storage';
 
 interface SavingsJar {
   id: string;
@@ -76,7 +77,7 @@ export default function BanksScreen() {
   }, []);
 
   useEffect(() => {
-    if (initialized) saveData('savings_jars', jars);
+    if (initialized) void saveSynced('savings_jars', jars);
   }, [jars, initialized]);
 
   const totalSaved = jars.reduce((s, j) => s + j.saved, 0);

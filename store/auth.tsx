@@ -185,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const data = await apiFetch<{ user: { id: number | string; email: string; name: string }; access: string; refresh: string }>(
       '/auth/login/',
-      { method: 'POST', body: { email, password }, auth: false },
+      { method: 'POST', body: { email, password }, auth: false, allowOffline: true },
     );
     const u: AuthUser = {
       id: String(data.user.id),
@@ -218,7 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const data = await apiFetch<{ user: { id: number | string; email: string; name: string }; access: string; refresh: string }>(
       '/auth/register/',
-      { method: 'POST', body, auth: false },
+      { method: 'POST', body, auth: false, allowOffline: true },
     );
     const u: AuthUser = {
       id: String(data.user.id),

@@ -63,6 +63,7 @@ export default function ForgotPasswordScreen() {
         method: 'POST',
         body: { email: trimEmail },
         auth: false,
+        allowOffline: true,
       });
       haptic.success();
       setStep(2);
@@ -107,6 +108,7 @@ export default function ForgotPasswordScreen() {
         method: 'POST',
         body: { email: email.trim().toLowerCase(), code: trimCode, new_password: newPassword },
         auth: false,
+        allowOffline: true,
       });
       haptic.success();
       Alert.alert(

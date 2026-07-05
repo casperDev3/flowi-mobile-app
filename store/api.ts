@@ -142,12 +142,14 @@ async function tryRefresh(): Promise<boolean> {
 // ─── Публічний apiFetch ──────────────────────────────────────────────────────
 export async function apiFetch<T>(
   path: string,
-  options: { method?: string; body?: unknown; auth?: boolean } = {},
+  options: { method?: string; body?: unknown; auth?: boolean; allowOffline?: boolean } = {},
 ): Promise<T> {
-  const { method = 'GET', body, auth = true } = options;
+  const { method = 'GET', body, auth = true, allowOffline = false } = options;
 
-  // Офлайн-гейт — жодного мережевого виклику
-  if (!isOnlineMode()) throw new OfflineError();
+  // Офлайн-гейт — жодного мережевого виклику.
+  // Виняток (allowOffline): автентифікація — інакше з офлайну неможливо
+  // увійти в акаунт, щоб увімкнути онлайн (глухий кут).
+  if (!isOnlineMode() && !allowOffline) throw new OfflineError();
 
   const headers = await buildHeaders(auth);
   const init: RequestInit = {

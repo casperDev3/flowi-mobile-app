@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -19,9 +20,11 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ApiError, OfflineError } from '@/store/api';
+import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { saveData } from '@/store/storage';
+import { syncNow } from '@/store/sync-engine';
 import { haptic } from '@/utils/haptics';
 
 // ─── Простий валідатор формату email ─────────────────────────────────────────
@@ -33,6 +36,7 @@ export default function RegisterScreen() {
   const router = useRouter();
   const { tr } = useI18n();
   const { register } = useAuth();
+  const { online, setOnline } = useAppMode();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -98,6 +102,13 @@ export default function RegisterScreen() {
       await register(trimEmail, password, name.trim() || undefined);
       await saveData('welcome_done', true);
       router.replace('/(tabs)');
+      // З офлайну зареєструвались заради онлайн-функцій — пропонуємо увімкнути
+      if (!online) {
+        Alert.alert(tr.enableOnline, tr.enableOnlineAfterLoginMsg, [
+          { text: tr.yes, onPress: () => { setOnline(true); void syncNow(); } },
+          { text: tr.later, style: 'cancel' },
+        ]);
+      }
     } catch (e: unknown) {
       haptic.error();
       if (e instanceof OfflineError) {

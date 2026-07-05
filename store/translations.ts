@@ -16,6 +16,7 @@ export interface Translations {
   syncPullAll: string;
   syncPullAllMsg: string;
   syncNeedsOnlineAuth: string;
+  enableOnlineAfterLoginMsg: string;
   todayGreetMorning: string;
   todayGreetDay: string;
   todayGreetEvening: string;
@@ -824,6 +825,7 @@ const uk: Translations = {
   syncPullAll: 'Завантажити все з сервера',
   syncPullAllMsg: 'Дані з сервера буде застосовано локально. Незасинхронізовані локальні зміни мають пріоритет. Продовжити?',
   syncNeedsOnlineAuth: 'Потрібен онлайн-режим і вхід в акаунт',
+  enableOnlineAfterLoginMsg: 'Увімкнути онлайн-режим і синхронізувати дані з сервером?',
   todayGreetMorning: 'Доброго ранку',
   todayGreetDay: 'Доброго дня',
   todayGreetEvening: 'Доброго вечора',
@@ -1575,6 +1577,7 @@ const en: Translations = {
   syncPullAll: 'Download everything from server',
   syncPullAllMsg: 'Server data will be applied locally. Unsynced local changes take priority. Continue?',
   syncNeedsOnlineAuth: 'Online mode and a signed-in account are required',
+  enableOnlineAfterLoginMsg: 'Enable online mode and sync data with the server?',
   todayGreetMorning: 'Good morning',
   todayGreetDay: 'Good afternoon',
   todayGreetEvening: 'Good evening',

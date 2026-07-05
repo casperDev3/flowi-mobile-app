@@ -427,6 +427,55 @@ export async function triggerFullSync(): Promise<void> {
   scheduleSync(500); // коротший debounce
 }
 
+/** Повне відвантаження: усі локальні дані → outbox → push+pull. */
+export async function pushAllToServer(): Promise<void> {
+  await generateFullOutbox();
+  updatePendingCount((await loadOutbox()).length);
+  await syncNow();
+}
+
+/**
+ * Повне завантаження з сервера (pull-only, since=0).
+ * Локальні незасинкані зміни (outbox) мають пріоритет — dirty-wins.
+ */
+export async function pullAllFromServer(): Promise<void> {
+  if (!isOnlineMode() || !_isAuthed) return;
+  if (_syncing) return;
+  _syncing = true;
+  updateSyncState('syncing');
+
+  try {
+    const outbox = await loadOutbox();
+    let cursor: number | null = 0;
+    let serverTime = 0;
+
+    while (cursor !== null) {
+      const res: SyncResponse = await apiFetch<SyncResponse>('/sync/user/', {
+        method: 'POST',
+        body: { since: cursor, items: [] },
+      });
+      await applyPullResponse(res.items, outbox);
+      serverTime = res.server_time;
+      cursor = res.next_cursor;
+    }
+
+    await setLastServerSync(serverTime);
+    updateLastSyncAt(serverTime);
+    clearRetryTimer();
+    _retryAttempt = 0;
+    updateSyncState('idle');
+  } catch (e) {
+    if (e instanceof OfflineError) {
+      updateSyncState('idle');
+    } else {
+      if (__DEV__) console.warn('[sync-engine] pullAllFromServer error:', e);
+      updateSyncState('error');
+    }
+  } finally {
+    _syncing = false;
+  }
+}
+
 // ─── SyncProvider ─────────────────────────────────────────────────────────────
 
 export function SyncProvider({ children, isAuthed }: { children: React.ReactNode; isAuthed: boolean }) {

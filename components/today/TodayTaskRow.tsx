@@ -17,6 +17,8 @@ interface Props {
   c: { border: string; text: string; sub: string };
   tr: Translations;
   onToggle: (id: string) => void;
+  /** Тап по рядку (не по чекбоксу) — відкрити деталі задачі. */
+  onOpen?: (id: string) => void;
 }
 
 // ─── Per-task row component (manages local checked state for animation) ────────
@@ -26,9 +28,10 @@ interface RowProps {
   isDark: boolean;
   c: { border: string; text: string; sub: string };
   onToggle: (id: string) => void;
+  onOpen?: (id: string) => void;
 }
 
-function TodayTaskItem({ task, isDark, c, onToggle }: RowProps) {
+function TodayTaskItem({ task, isDark, c, onToggle, onOpen }: RowProps) {
   const { reduced } = useMotion();
 
   // Local checked state drives the animation; the task disappears from
@@ -38,7 +41,7 @@ function TodayTaskItem({ task, isDark, c, onToggle }: RowProps) {
   const titleOpacity = useSharedValue(1);
   const titleStyle   = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
 
-  const handlePress = () => {
+  const handleToggle = () => {
     setLocalChecked(true);
     titleOpacity.value = withTiming(0.45, {
       duration: reduced ? 0 : Motion.duration.normal,
@@ -48,11 +51,10 @@ function TodayTaskItem({ task, isDark, c, onToggle }: RowProps) {
 
   return (
     <PressableScale
-      onPress={handlePress}
+      onPress={() => (onOpen ? onOpen(task.id) : handleToggle())}
       style={{ marginBottom: 6 }}
-      accessibilityRole="checkbox"
-      accessibilityLabel={task.title}
-      accessibilityState={{ checked: localChecked }}>
+      accessibilityRole="button"
+      accessibilityLabel={task.title}>
       <BlurView
         intensity={isDark ? 18 : 36}
         tint={isDark ? 'dark' : 'light'}
@@ -64,6 +66,11 @@ function TodayTaskItem({ task, isDark, c, onToggle }: RowProps) {
           color="#10B981"
           borderColor={c.sub + '60'}
           radius={10}  /* circle */
+          onPress={handleToggle}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityRole="checkbox"
+          accessibilityLabel={task.title}
+          accessibilityState={{ checked: localChecked }}
         />
         <Animated.Text
           style={[s.title, { color: c.text }, titleStyle]}
@@ -82,7 +89,7 @@ function TodayTaskItem({ task, isDark, c, onToggle }: RowProps) {
 
 // ─── Public component ─────────────────────────────────────────────────────────
 
-export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle }: Props) {
+export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle, onOpen }: Props) {
   const today = new Date();
   const motion = useMotion();
 
@@ -110,6 +117,7 @@ export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle }: Props) {
             isDark={isDark}
             c={c}
             onToggle={onToggle}
+            onOpen={onOpen}
           />
         </Animated.View>
       ))}

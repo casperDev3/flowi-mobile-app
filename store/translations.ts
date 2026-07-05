@@ -10,6 +10,12 @@ export interface Translations {
   todayOverdue: string;
   todayActive: string;
   todayTracked: string;
+  todayFocus: string;
+  syncPushAll: string;
+  syncPushAllMsg: string;
+  syncPullAll: string;
+  syncPullAllMsg: string;
+  syncNeedsOnlineAuth: string;
   todayGreetMorning: string;
   todayGreetDay: string;
   todayGreetEvening: string;
@@ -812,6 +818,12 @@ const uk: Translations = {
   todayOverdue: 'прострочено',
   todayActive: 'активних',
   todayTracked: 'відстежено',
+  todayFocus: 'У фокусі',
+  syncPushAll: 'Відвантажити все на сервер',
+  syncPushAllMsg: 'Усі локальні дані буде надіслано на сервер. Продовжити?',
+  syncPullAll: 'Завантажити все з сервера',
+  syncPullAllMsg: 'Дані з сервера буде застосовано локально. Незасинхронізовані локальні зміни мають пріоритет. Продовжити?',
+  syncNeedsOnlineAuth: 'Потрібен онлайн-режим і вхід в акаунт',
   todayGreetMorning: 'Доброго ранку',
   todayGreetDay: 'Доброго дня',
   todayGreetEvening: 'Доброго вечора',
@@ -1557,6 +1569,12 @@ const en: Translations = {
   todayOverdue: 'overdue',
   todayActive: 'active',
   todayTracked: 'tracked',
+  todayFocus: 'In focus',
+  syncPushAll: 'Upload everything to server',
+  syncPushAllMsg: 'All local data will be sent to the server. Continue?',
+  syncPullAll: 'Download everything from server',
+  syncPullAllMsg: 'Server data will be applied locally. Unsynced local changes take priority. Continue?',
+  syncNeedsOnlineAuth: 'Online mode and a signed-in account are required',
   todayGreetMorning: 'Good morning',
   todayGreetDay: 'Good afternoon',
   todayGreetEvening: 'Good evening',

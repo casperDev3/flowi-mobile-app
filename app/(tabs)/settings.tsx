@@ -24,7 +24,7 @@ import { useScreenView } from '@/hooks/use-screen-view';
 import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
-import { useSync } from '@/store/sync-engine';
+import { pullAllFromServer, pushAllToServer, useSync } from '@/store/sync-engine';
 import { getAllScheduledNotifications } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
@@ -67,6 +67,15 @@ export default function SettingsScreen() {
         { text: tr.authLogout, style: 'destructive', onPress: () => void logout() },
       ],
     );
+  };
+
+  // Гейт для ручних синк-дій: потрібні онлайн-режим і акаунт.
+  const guardSync = (fn: () => void | Promise<void>) => {
+    if (!online || status !== 'authed') {
+      Alert.alert(tr.syncNeedsOnlineAuth);
+      return;
+    }
+    void fn();
   };
 
   const handleOnlineToggle = (v: boolean) => {
@@ -402,6 +411,49 @@ export default function SettingsScreen() {
               label={tr.sync}
               value={syncValue}
               onPress={() => router.push('/sync')}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
+              icon="arrow.triangle.2.circlepath"
+              iconColor="#10B981"
+              label={tr.syncNow}
+              value={syncState === 'syncing' ? '…' : undefined}
+              onPress={() => guardSync(() => syncNow())}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
+              icon="arrow.up.circle"
+              iconColor="#0EA5E9"
+              label={tr.syncPushAll}
+              value={undefined}
+              onPress={() => guardSync(() => {
+                Alert.alert(tr.syncPushAll, tr.syncPushAllMsg, [
+                  { text: tr.cancel, style: 'cancel' },
+                  { text: tr.yes, onPress: () => void pushAllToServer() },
+                ]);
+              })}
+              text={c.text}
+              sub={c.sub}
+              border={c.border}
+              last={false}
+            />
+            <SettingRow
+              icon="arrow.down.circle"
+              iconColor="#F59E0B"
+              label={tr.syncPullAll}
+              value={undefined}
+              onPress={() => guardSync(() => {
+                Alert.alert(tr.syncPullAll, tr.syncPullAllMsg, [
+                  { text: tr.cancel, style: 'cancel' },
+                  { text: tr.yes, onPress: () => void pullAllFromServer() },
+                ]);
+              })}
               text={c.text}
               sub={c.sub}
               border={c.border}

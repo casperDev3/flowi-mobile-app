@@ -449,13 +449,23 @@ export default function TasksScreen() {
   }, []));
 
   // Open create-task modal when navigated with ?create=1 (e.g. from Today quick actions)
-  const { create: createParam } = useLocalSearchParams<{ create?: string }>();
+  const { create: createParam, open: openParam } = useLocalSearchParams<{ create?: string; open?: string }>();
   useEffect(() => {
     if (createParam === '1') {
       setShowAdd(true);
       router.setParams({ create: '' });
     }
   }, [createParam, router]);
+
+  // Open task details when navigated with ?open=<taskId> (e.g. from Today rows)
+  useEffect(() => {
+    if (!openParam || !initialized) return;
+    const t = tasks.find(x => x.id === openParam);
+    if (t) setSelected(t);
+    router.setParams({ open: '' });
+    // tasks навмисно поза deps: реагуємо лише на прихід параметра після ініціалізації
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParam, initialized, router]);
 
   // Save to storage
   useEffect(() => {

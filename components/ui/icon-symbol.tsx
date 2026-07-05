@@ -188,6 +188,7 @@ const MAPPING: Record<string, MaterialIconName> = {
   'rectangle.portrait.and.arrow.right': 'exit-to-app',
   'repeat': 'repeat',
   'stop.fill': 'stop',
+  'play.fill': 'play-arrow',
   'textformat.abc': 'text-fields',
   // Person & Auth (missing)
   'person.2.badge.plus': 'group-add',

@@ -29,7 +29,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -185,6 +185,8 @@ export function SheetModal({
       statusBarTranslucent
       onRequestClose={triggerClose}
     >
+      {/* RN Modal — окреме нативне вікно: жестам потрібен власний root. */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -235,6 +237,7 @@ export function SheetModal({
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

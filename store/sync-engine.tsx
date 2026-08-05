@@ -6,7 +6,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { apiFetch, ApiError, OfflineError } from './api';
 import { isOnlineMode } from './app-mode';
 import { loadData, saveData } from './storage';
-import { appendConflicts } from './sync-conflicts';
+import { appendConflicts, loadConflicts } from './sync-conflicts';
 import { assertCompatibleSyncContract } from './sync-contract';
 import {
   SYNC_ARRAY_KEYS,
@@ -28,6 +28,8 @@ interface SyncMutation {
   operation: 'upsert' | 'delete';
   data: Record<string, unknown>;
   base_revision: number | null;
+  /** Час правки на клієнті — основа авто-LWW (фаза 9). */
+  client_updated_at: string | null;
   force?: boolean;
 }
 
@@ -172,17 +174,54 @@ function scheduleSync(debounceMs = 5000): void {
   }, debounceMs);
 }
 
+/** Те, що осідає в LAST_SYNC_ERROR_KEY після невдалого обміну. */
+export interface SyncErrorInfo {
+  at: number;
+  error: unknown;
+}
+
+/** Читабельний опис помилки для UI. */
+export function formatSyncError(info: SyncErrorInfo | null): string | null {
+  if (!info) return null;
+  const { error } = info;
+  if (error && typeof error === 'object') {
+    const shaped = error as { status?: number; code?: string; message?: string };
+    const parts = [
+      shaped.status != null ? `HTTP ${shaped.status}` : null,
+      shaped.code && shaped.code !== 'unknown' ? shaped.code : null,
+      shaped.message,
+    ].filter(Boolean);
+    if (parts.length) return parts.join(' · ');
+  }
+  return String((error as { message?: string })?.message ?? error);
+}
+
+/** Найстаріший `queued_at` в outbox — вік застряглої черги. */
+export function oldestQueuedAt(items: OutboxItem[]): number | null {
+  let oldest: number | null = null;
+  for (const item of items) {
+    if (typeof item.queued_at !== 'number') continue;
+    if (oldest == null || item.queued_at < oldest) oldest = item.queued_at;
+  }
+  return oldest;
+}
+
 type SyncState = 'idle' | 'syncing' | 'error';
 interface SyncCtx {
   state: SyncState;
   lastSyncAt: number | null;
   pendingCount: number;
   conflictsCount: number;
+  /** Причина останнього провалу; null — останній обмін пройшов чисто. */
+  lastError: SyncErrorInfo | null;
+  /** Коли поставлено в чергу найстаріший непроведений запис. */
+  oldestPendingAt: number | null;
   syncNow: () => Promise<void>;
 }
 
 const Ctx = createContext<SyncCtx>({
   state: 'idle', lastSyncAt: null, pendingCount: 0, conflictsCount: 0,
+  lastError: null, oldestPendingAt: null,
   syncNow: async () => {},
 });
 
@@ -190,15 +229,55 @@ let _setState: ((state: SyncState) => void) | null = null;
 let _setLastSyncAt: ((timestamp: number) => void) | null = null;
 let _setPendingCount: ((count: number) => void) | null = null;
 let _setConflictsCount: ((count: number) => void) | null = null;
+let _setLastError: ((info: SyncErrorInfo | null) => void) | null = null;
+let _setOldestPendingAt: ((timestamp: number | null) => void) | null = null;
 
 const updateSyncState = (state: SyncState) => _setState?.(state);
 const updateLastSyncAt = (timestamp: number) => _setLastSyncAt?.(timestamp);
-const updatePendingCount = (count: number) => _setPendingCount?.(count);
 const updateConflictsCount = (count: number) => _setConflictsCount?.(count);
+const updateLastError = (info: SyncErrorInfo | null) => _setLastError?.(info);
+
+/** Тримає лічильник і вік черги узгодженими — обидва рахуються з того самого outbox. */
+function updatePendingFrom(items: OutboxItem[]): void {
+  _setPendingCount?.(items.length);
+  _setOldestPendingAt?.(oldestQueuedAt(items));
+}
+
+/** collection → (local_id → запис). Будується раз на синк. */
+type CollectionCache = Map<string, Map<string, Record<string, unknown>>>;
+
+/**
+ * Читає кожну потрібну колекцію рівно один раз.
+ *
+ * Без цього buildMutation робив loadData(collection) на КОЖЕН запис outbox, а
+ * loadData — це AsyncStorage.getItem + повний JSON.parse. Для N записів однієї
+ * колекції виходило N парсів масиву на N елементів, тобто O(n²) — і саме на
+ * першому синку, коли записів найбільше.
+ */
+async function buildCollectionCache(items: OutboxItem[]): Promise<CollectionCache> {
+  const cache: CollectionCache = new Map();
+  const needed = new Set(
+    items
+      .filter(item => !item.deleted && !(SYNC_SINGLETON_KEYS as readonly string[]).includes(item.collection))
+      .map(item => item.collection),
+  );
+
+  for (const collection of needed) {
+    const rows = await loadData<Record<string, unknown>[]>(collection, []);
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const row of rows) {
+      const id = normalizeSyncLocalId(row.id);
+      if (id) byId.set(id, row);
+    }
+    cache.set(collection, byId);
+  }
+  return cache;
+}
 
 async function buildMutation(
   outboxItem: OutboxItem,
   revisions: SyncRevisionMap,
+  cache: CollectionCache,
 ): Promise<SyncMutation | null> {
   const { collection, local_id, deleted, force } = outboxItem;
   const normalizedLocalId = normalizeSyncLocalId(local_id);
@@ -212,11 +291,12 @@ async function buildMutation(
     const value = await loadData<unknown>(collection, null);
     data = { value };
   } else {
-    const items = await loadData<Record<string, unknown>[]>(collection, []);
-    const item = items.find(candidate => String(candidate.id) === normalizedLocalId);
+    const item = cache.get(collection)?.get(normalizedLocalId);
     if (!item) return null;
     data = item;
   }
+
+  const clientUpdatedAt = typeof data.updatedAt === 'string' ? data.updatedAt : null;
 
   return {
     mutation_id: outboxItem.mutation_id ?? createMutationId(),
@@ -225,6 +305,9 @@ async function buildMutation(
     operation: deleted ? 'delete' : 'upsert',
     data,
     base_revision: revisions[syncRecordKey(collection, normalizedLocalId)] ?? null,
+    // Для видалень і singleton штампа немає — сервер тоді покладається на
+    // власний час прибуття.
+    client_updated_at: clientUpdatedAt,
     ...(force ? { force: true } : {}),
   };
 }
@@ -293,6 +376,8 @@ async function exchangeV2(
   initialCursor: number,
   mutations: SyncMutation[],
   initialRevisions: SyncRevisionMap,
+  /** Якщо передано — накопичує `collection:local_id` живих серверних записів. */
+  seenKeys?: Set<string>,
 ): Promise<ExchangeResult> {
   let pageCursor = initialCursor;
   let finalCursor = initialCursor;
@@ -314,6 +399,13 @@ async function exchangeV2(
       ...response.conflicts.map(item => item.mutation_id),
     ]);
     await removeMutationsFromOutbox(finishedIds);
+
+    if (seenKeys) {
+      for (const change of response.changes) {
+        if (change.deleted) seenKeys.delete(syncRecordKey(change.collection, change.local_id));
+        else seenKeys.add(syncRecordKey(change.collection, change.local_id));
+      }
+    }
 
     const conflictRows = response.conflicts.flatMap(item => item.server ? [item.server] : []);
     const currentOutbox = await loadOutbox();
@@ -362,7 +454,8 @@ async function doSync(): Promise<void> {
     if (cursor === 0) await generateFullOutbox();
 
     const outbox = await loadOutbox();
-    updatePendingCount(outbox.length);
+    updatePendingFrom(outbox);
+    const cache = await buildCollectionCache(outbox);
     const allConflicts: SyncConflictServer[] = [];
     const chunkCount = Math.max(1, Math.ceil(outbox.length / 500));
 
@@ -371,7 +464,7 @@ async function doSync(): Promise<void> {
       const mutations: SyncMutation[] = [];
       const staleMutationIds = new Set<string>();
       for (const item of sourceChunk) {
-        const mutation = await buildMutation(item, revisions);
+        const mutation = await buildMutation(item, revisions, cache);
         if (mutation) mutations.push(mutation);
         else if (item.mutation_id) staleMutationIds.add(item.mutation_id);
       }
@@ -383,7 +476,7 @@ async function doSync(): Promise<void> {
       allConflicts.push(...result.conflicts);
       await setRevisionMap(revisions);
       await setServerCursor(cursor);
-      updatePendingCount((await loadOutbox()).length);
+      updatePendingFrom(await loadOutbox());
     }
 
     if (allConflicts.length) {
@@ -401,7 +494,7 @@ async function doSync(): Promise<void> {
     await saveData(LAST_SYNC_AT_KEY, completedAt);
     await saveData(LAST_SYNC_ERROR_KEY, null);
     updateLastSyncAt(completedAt);
-    const { loadConflicts } = await import('./sync-conflicts');
+    updateLastError(null);
     updateConflictsCount((await loadConflicts()).length);
     clearRetryTimer();
     _retryAttempt = 0;
@@ -413,7 +506,9 @@ async function doSync(): Promise<void> {
     } else {
       const description = describeSyncError(error);
       if (__DEV__) console.warn('[sync-engine] syncNow error:', description);
-      await saveData(LAST_SYNC_ERROR_KEY, { at: Date.now(), error: description });
+      const info: SyncErrorInfo = { at: Date.now(), error: description };
+      await saveData(LAST_SYNC_ERROR_KEY, info);
+      updateLastError(info);
       updateSyncState('error');
       if (isRetryableSyncError(error)) scheduleRetry();
       else clearRetryTimer();
@@ -421,6 +516,20 @@ async function doSync(): Promise<void> {
   } finally {
     _syncing = false;
   }
+}
+
+/**
+ * Скасовує дебаунс і стартує синк негайно — для згортання застосунку.
+ *
+ * На відміну від syncNow() не чіпає лічильник retry: згортання не є ознакою
+ * того, що попередня помилка минула.
+ */
+export async function flushPendingSync(): Promise<void> {
+  if (_debounceTimer) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
+  }
+  await doSync();
 }
 
 export async function syncNow(): Promise<void> {
@@ -433,24 +542,70 @@ export async function syncNow(): Promise<void> {
   await doSync();
 }
 
+/** Повний синк із нуля: викликається після логіну/реєстрації (store/auth.tsx). */
 export async function triggerFullSync(): Promise<void> {
   await setServerCursor(0);
   await setRevisionMap({});
   scheduleSync(500);
 }
 
+/**
+ * «Відправити все на сервер» — локальний стан стає істиною.
+ *
+ * Кожна мутація йде з `force: true`, тож сервер не відхиляє її за OCC. Без
+ * цього кнопка означала «спробувати відправити все, якщо сервер дозволить», і
+ * мовчки лишала частину записів позаду.
+ */
 export async function pushAllToServer(): Promise<void> {
   await generateFullOutbox();
-  updatePendingCount((await loadOutbox()).length);
+  const outbox = await loadOutbox();
+  await saveOutbox(outbox.map(item => ({ ...item, force: true })));
+  updatePendingFrom(await loadOutbox());
   await syncNow();
 }
 
+/**
+ * Прибирає локальні записи синхронізованих колекцій, яких сервер не надіслав.
+ *
+ * Потрібно, щоб «витягнути все» справді означало «зробити цей пристрій таким,
+ * як сервер», а не «долити серверне поверх локального». Singleton-ключі не
+ * чіпаємо: їх відсутність на сервері означає «ще не задано», а не «видалено»,
+ * і обнуління зламало б дефолти в UI.
+ */
+async function pruneRecordsMissingOnServer(seenKeys: Set<string>): Promise<void> {
+  for (const collection of SYNC_ARRAY_KEYS) {
+    const local = await loadData<{ id: string }[]>(collection, []);
+    if (!local.length) continue;
+    const kept = local.filter(item => {
+      const id = normalizeSyncLocalId(item.id);
+      return id != null && seenKeys.has(syncRecordKey(collection, id));
+    });
+    if (kept.length !== local.length) await saveData(collection, kept);
+  }
+}
+
+/**
+ * «Витягнути все з сервера» — серверний стан стає істиною.
+ *
+ * Спершу скидаємо outbox, мапу ревізій і курсор. Без скидання outbox
+ * `applyPullResponse` пропускав саме ті записи, що локально розійшлися
+ * (dirty-wins), тобто кнопка не витягувала рівно те, заради чого її тиснуть.
+ *
+ * Операція деструктивна: незапушені локальні зміни втрачаються свідомо.
+ */
 export async function pullAllFromServer(): Promise<void> {
   if (!isOnlineMode() || !_isAuthed || _syncing) return;
   _syncing = true;
   updateSyncState('syncing');
   try {
-    const result = await exchangeV2(0, [], await getRevisionMap());
+    await saveOutbox([]);
+    updatePendingFrom([]);
+    await setRevisionMap({});
+    await setServerCursor(0);
+
+    const seenKeys = new Set<string>();
+    const result = await exchangeV2(0, [], {}, seenKeys);
+    await pruneRecordsMissingOnServer(seenKeys);
     await setRevisionMap(result.revisions);
     await setServerCursor(result.cursor);
     const completedAt = Date.now();
@@ -475,17 +630,23 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [conflictsCount, setConflictsCount] = useState(0);
+  const [lastError, setLastError] = useState<SyncErrorInfo | null>(null);
+  const [oldestPendingAt, setOldestPendingAt] = useState<number | null>(null);
 
   useEffect(() => {
     _setState = setState;
     _setLastSyncAt = setLastSyncAt;
     _setPendingCount = setPendingCount;
     _setConflictsCount = setConflictsCount;
+    _setLastError = setLastError;
+    _setOldestPendingAt = setOldestPendingAt;
     return () => {
       _setState = null;
       _setLastSyncAt = null;
       _setPendingCount = null;
       _setConflictsCount = null;
+      _setLastError = null;
+      _setOldestPendingAt = null;
     };
   }, []);
 
@@ -504,9 +665,17 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
     async function init() {
       const timestamp = await loadData<number>(LAST_SYNC_AT_KEY, 0);
       if (timestamp > 0) setLastSyncAt(timestamp);
-      setPendingCount((await loadOutbox()).length);
-      const { loadConflicts } = await import('./sync-conflicts');
+      const outbox = await loadOutbox();
+      setPendingCount(outbox.length);
+      setOldestPendingAt(oldestQueuedAt(outbox));
       setConflictsCount((await loadConflicts()).length);
+      // Помилка переживає перезапуск: якщо з моменту останнього провалу нічого
+      // не вдалося, стан має лишатись 'error', а не показувати чисте 'idle'.
+      const storedError = await loadData<SyncErrorInfo | null>(LAST_SYNC_ERROR_KEY, null);
+      if (storedError) {
+        setLastError(storedError);
+        setState(current => (current === 'idle' ? 'error' : current));
+      }
     }
     void init();
   }, []);
@@ -514,8 +683,16 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
-      if (appStateRef.current !== 'active' && next === 'active') void doSync();
+      const previous = appStateRef.current;
       appStateRef.current = next;
+      if (previous !== 'active' && next === 'active') {
+        void doSync();
+        return;
+      }
+      // Згортання: scheduleSync — це setTimeout на 5 с, а iOS призупиняє JS-
+      // таймери у фоні. Без флешу найтиповіший сценарій «швидко записав і
+      // закрив» лишає мутацію в outbox, і решта клієнтів тягне застарілі дані.
+      if (previous === 'active' && next !== 'active') void flushPendingSync();
     });
     return () => subscription.remove();
   }, []);
@@ -526,7 +703,10 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
 
   const syncNowCallback = useCallback(async () => syncNow(), []);
   return (
-    <Ctx.Provider value={{ state, lastSyncAt, pendingCount, conflictsCount, syncNow: syncNowCallback }}>
+    <Ctx.Provider value={{
+      state, lastSyncAt, pendingCount, conflictsCount,
+      lastError, oldestPendingAt, syncNow: syncNowCallback,
+    }}>
       {children}
     </Ctx.Provider>
   );

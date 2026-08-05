@@ -4,12 +4,9 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -21,12 +18,9 @@ import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
-import { collectAllData, mergeAndSave } from '@/store/sync';
 import { loadConflicts, SyncConflict } from '@/store/sync-conflicts';
-import { useSync } from '@/store/sync-engine';
+import { formatSyncError, useSync } from '@/store/sync-engine';
 import { markDirty, SYNC_SINGLETON_KEYS } from '@/store/synced-storage';
-
-const DEFAULT_PORT = 7842;
 
 const DATA_KEY_LABELS: Record<string, string> = {
   tasks: 'Завдання', transactions: 'Транзакції', time_entries: 'Час',
@@ -39,30 +33,18 @@ const FIELD_LABELS: Record<string, string> = {
   updatedAt: 'Оновлено', amount: 'Сума', type: 'Тип', color: 'Колір',
 };
 
-type P2PSyncStatus = 'idle' | 'fetching' | 'merging' | 'posting' | 'done' | 'error';
-
-const P2P_STATUS_LABELS: Record<P2PSyncStatus, string> = {
-  idle:     'Очікує підключення',
-  fetching: 'Отримання даних…',
-  merging:  'Об\'єднання даних…',
-  posting:  'Відправка назад…',
-  done:     'Синхронізовано',
-  error:    'Помилка',
-};
-
 export default function SyncScreen() {
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
   const { online } = useAppMode();
   const { status: authStatus } = useAuth();
-  const { state: syncState, lastSyncAt, pendingCount, conflictsCount, syncNow } = useSync();
+  const {
+    state: syncState, lastSyncAt, pendingCount, conflictsCount,
+    lastError, oldestPendingAt, syncNow,
+  } = useSync();
 
-  const [manualIp, setManualIp] = useState('');
-  const [p2pStatus, setP2pStatus] = useState<P2PSyncStatus>('idle');
-  const [p2pErrorMsg, setP2pErrorMsg] = useState('');
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
-  const [newConflictCount, setNewConflictCount] = useState(0);
 
   const c = {
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
@@ -85,8 +67,6 @@ export default function SyncScreen() {
     const conflict = conflicts.find(c => c.id === id);
     if (!conflict) return;
 
-    const { loadConflicts: lc } = await import('@/store/sync-conflicts');
-
     if (choice === 'local') {
       // Залишити моє: force-push на сервер
       const [collection, local_id] = id.split(':');
@@ -94,9 +74,8 @@ export default function SyncScreen() {
         await markDirty(collection, local_id, false, true /* force */);
       }
       // Видаляємо конфлікт зі списку (він піде через outbox)
-      const remaining = (await lc()).filter(c => c.id !== id);
-      const { saveData: sd } = await import('@/store/storage');
-      await sd('sync_pending_conflicts', remaining);
+      const remaining = (await loadConflicts()).filter(c => c.id !== id);
+      await saveData('sync_pending_conflicts', remaining);
     } else {
       // Прийняти серверне: upsert/delete локально, без outbox
       const remote = conflict.remote;
@@ -114,51 +93,12 @@ export default function SyncScreen() {
           await saveData(conflict.dataKey, withoutRemote);
         }
       }
-      const remaining = (await lc()).filter(c => c.id !== id);
+      const remaining = (await loadConflicts()).filter(c => c.id !== id);
       await saveData('sync_pending_conflicts', remaining);
     }
 
     await refreshConflicts();
   };
-
-  // ─── P2P sync logic ────────────────────────────────────────────────────────
-  const syncWithHost = useCallback(async (ip: string, port: number = DEFAULT_PORT) => {
-    const url = `http://${ip.trim()}:${port}`;
-    setP2pErrorMsg('');
-    try {
-      setP2pStatus('fetching');
-      const res = await fetch(`${url}/`, { headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error(`Сервер відповів: ${res.status}`);
-      const remoteData: Record<string, any[]> = await res.json();
-
-      setP2pStatus('merging');
-      const conflictCount = await mergeAndSave(remoteData);
-
-      setP2pStatus('posting');
-      const merged = await collectAllData();
-      const postRes = await fetch(`${url}/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(merged),
-      });
-      if (!postRes.ok) throw new Error(`Помилка відправки: ${postRes.status}`);
-
-      setNewConflictCount(prev => prev + conflictCount);
-      await refreshConflicts();
-      setP2pStatus('done');
-    } catch (e: any) {
-      setP2pErrorMsg(String(e?.message ?? e));
-      setP2pStatus('error');
-    }
-  }, [refreshConflicts]);
-
-  const handleManualConnect = () => {
-    const ip = manualIp.trim();
-    if (!ip) return;
-    syncWithHost(ip);
-  };
-
-  const isP2PLoading = p2pStatus === 'fetching' || p2pStatus === 'merging' || p2pStatus === 'posting';
 
   const isOnlineAuthed = online && authStatus === 'authed';
   const isCloudSyncing = syncState === 'syncing';
@@ -168,6 +108,14 @@ export default function SyncScreen() {
     hasCloudError ? c.red :
     isCloudSyncing ? c.accent :
     conflictsCount > 0 ? c.orange : c.green;
+
+  const errorText = formatSyncError(lastError);
+  // Година — поріг, за яким черга вже не «щойно поставлена», а справді застрягла:
+  // за цей час встигають відпрацювати і дебаунс (5 с), і поллінг (5 хв), і всі
+  // три кроки backoff (30 с / 2 хв / 5 хв).
+  const isStalled = pendingCount > 0
+    && oldestPendingAt != null
+    && Date.now() - oldestPendingAt > 60 * 60 * 1000;
 
   const cloudStatusText = isCloudSyncing
     ? 'Синхронізація…'
@@ -193,11 +141,9 @@ export default function SyncScreen() {
           <View style={{ width: 28 }} />
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <ScrollView
-            contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
+          showsVerticalScrollIndicator={false}>
 
             {/* ── CLOUD SYNC CARD ── */}
             <Text style={[st.sectionLabel, { color: c.sub, marginBottom: 8 }]}>
@@ -218,11 +164,35 @@ export default function SyncScreen() {
                 )}
               </View>
 
-              {/* Pending count */}
+              {/* Черга: скільки і, головне, як довго висить */}
               {pendingCount > 0 && !isCloudSyncing && (
                 <Text style={[st.pendingText, { color: c.sub }]}>
                   {pendingCount} {tr.syncPending}
+                  {oldestPendingAt ? ` · найстаріший ${fmtSyncTime(oldestPendingAt)}` : ''}
                 </Text>
+              )}
+
+              {/* Причина провалу. Без неї «помилка» — це глухий кут: рушій знає
+                  {status, code, message}, а користувач не бачив нічого. */}
+              {errorText && (
+                <View style={[st.hintRow, { backgroundColor: c.red + '12', borderColor: c.red + '28' }]}>
+                  <IconSymbol name="exclamationmark.circle" size={14} color={c.red} />
+                  <Text style={[st.hintText, { color: c.red }]} numberOfLines={4}>
+                    {errorText}
+                  </Text>
+                </View>
+              )}
+
+              {/* Застрягла черга — окремий сигнал: синк може рапортувати «ок»,
+                  поки записи не доїжджають днями. */}
+              {isStalled && (
+                <View style={[st.hintRow, { backgroundColor: c.orange + '12', borderColor: c.orange + '28' }]}>
+                  <IconSymbol name="clock" size={14} color={c.orange} />
+                  <Text style={[st.hintText, { color: c.orange }]}>
+                    Черга не рухається з {fmtSyncTime(oldestPendingAt!)}. Записи лишаються
+                    на цьому пристрої й не бачать змін з сервера.
+                  </Text>
+                </View>
               )}
 
               {/* Guest / Offline hint */}
@@ -284,97 +254,7 @@ export default function SyncScreen() {
               </View>
             )}
 
-            {/* ── LOCAL DESKTOP SYNC ── */}
-            <Text style={[st.sectionLabel, { color: c.sub, marginBottom: 8, marginTop: 24 }]}>
-              {tr.localDesktopSync.toUpperCase()}
-            </Text>
-
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-              style={[st.card, { borderColor: c.border }]}>
-
-              {/* P2P Status row */}
-              <View style={[st.statusRow, {
-                backgroundColor: (p2pStatus === 'done' ? c.green : p2pStatus === 'error' ? c.red : isP2PLoading ? c.accent : c.sub) + '15',
-                borderColor: (p2pStatus === 'done' ? c.green : p2pStatus === 'error' ? c.red : isP2PLoading ? c.accent : c.sub) + '30',
-              }]}>
-                <View style={[st.statusDot, { backgroundColor: p2pStatus === 'done' ? c.green : p2pStatus === 'error' ? c.red : isP2PLoading ? c.accent : c.sub }]} />
-                <Text style={[st.statusText, { color: p2pStatus === 'done' ? c.green : p2pStatus === 'error' ? c.red : isP2PLoading ? c.accent : c.sub }]}>
-                  {P2P_STATUS_LABELS[p2pStatus]}
-                </Text>
-                {isP2PLoading && <ActivityIndicator size="small" color={c.accent} style={{ marginLeft: 6 }} />}
-              </View>
-
-              {/* WiFi note */}
-              <View style={[st.wifiNote, { backgroundColor: c.accent + '10', borderColor: c.accent + '20' }]}>
-                <IconSymbol name="wifi" size={14} color={c.accent} />
-                <Text style={[st.wifiNoteText, { color: c.accent }]}>
-                  Пристрої мають бути в одній WiFi мережі
-                </Text>
-              </View>
-
-              {/* Error */}
-              {p2pStatus === 'error' && p2pErrorMsg ? (
-                <View style={[st.errorBox, { backgroundColor: c.red + '12', borderColor: c.red + '28' }]}>
-                  <IconSymbol name="exclamationmark.circle" size={14} color={c.red} />
-                  <Text style={[st.errorText, { color: c.red }]}>{p2pErrorMsg}</Text>
-                </View>
-              ) : null}
-
-              {/* New conflicts from P2P */}
-              {newConflictCount > 0 && (
-                <View style={[st.banner, { backgroundColor: c.orange + '12', borderColor: c.orange + '28', marginBottom: 12 }]}>
-                  <IconSymbol name="exclamationmark.triangle" size={18} color={c.orange} />
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={[st.bannerTitle, { color: c.orange }]}>Знайдено {newConflictCount} конфліктів</Text>
-                    <Text style={[st.bannerSub, { color: c.sub }]}>Перегляньте та вирішіть нижче</Text>
-                  </View>
-                </View>
-              )}
-
-              {/* Manual IP input */}
-              <View style={[st.ipRow, { borderColor: c.border }]}>
-                <TextInput
-                  style={[st.ipInput, { color: c.text }]}
-                  placeholder="192.168.1.X"
-                  placeholderTextColor={c.sub}
-                  value={manualIp}
-                  onChangeText={setManualIp}
-                  keyboardType="decimal-pad"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  onPress={handleManualConnect}
-                  disabled={!manualIp.trim() || isP2PLoading}
-                  style={[st.ipBtn, {
-                    backgroundColor: manualIp.trim() && !isP2PLoading ? c.accent : c.border,
-                  }]}>
-                  <IconSymbol name="arrow.right" size={16} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              {/* How-to */}
-              {p2pStatus === 'idle' && (
-                <View style={{ marginTop: 16 }}>
-                  <Text style={[st.howTitle, { color: c.text }]}>Як синхронізувати?</Text>
-                  {[
-                    'Відкрийте Flowi на комп\'ютері',
-                    'Перейдіть до «Синхронізація» у боковому меню',
-                    'Натисніть «Запустити сервер»',
-                    'Введіть IP-адресу комп\'ютера у поле вище та натисніть →',
-                  ].map((text, i) => (
-                    <View key={i} style={st.stepRow}>
-                      <View style={[st.stepNum, { backgroundColor: c.accent + '18' }]}>
-                        <Text style={[st.stepNumText, { color: c.accent }]}>{i + 1}</Text>
-                      </View>
-                      <Text style={[st.stepText, { color: c.sub }]}>{text}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </BlurView>
-
-          </ScrollView>
-        </KeyboardAvoidingView>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -494,23 +374,11 @@ const st = StyleSheet.create({
   hintText:      { fontSize: 12, fontWeight: '500', flex: 1 },
   syncBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 14, marginTop: 4 },
   syncBtnText:   { fontSize: 14, fontWeight: '700' },
-  wifiNote:      { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, marginBottom: 16 },
-  wifiNoteText:  { fontSize: 12, fontWeight: '600', flex: 1 },
-  errorBox:      { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, marginBottom: 12 },
-  errorText:     { flex: 1, fontSize: 12, lineHeight: 18 },
-  ipRow:         { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
-  ipInput:       { flex: 1, paddingHorizontal: 16, paddingVertical: 13, fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  ipBtn:         { width: 48, height: 50, alignItems: 'center', justifyContent: 'center' },
   banner:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 16 },
   bannerIcon:    { width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   bannerTitle:   { fontSize: 14, fontWeight: '700' },
   bannerSub:     { fontSize: 12, marginTop: 2 },
   sectionLabel:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginLeft: 2 },
-  howTitle:      { fontSize: 15, fontWeight: '700', marginBottom: 12 },
-  stepRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  stepNum:       { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
-  stepNumText:   { fontSize: 11, fontWeight: '800' },
-  stepText:      { flex: 1, fontSize: 13, lineHeight: 20 },
   conflictCard:  { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
   conflictHead:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1 },
   conflictDot:   { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },

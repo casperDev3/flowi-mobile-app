@@ -8,7 +8,6 @@ export interface SyncConflict {
 }
 
 const CONFLICTS_KEY = 'sync_pending_conflicts';
-const LAST_SYNC_KEY = 'last_sync_timestamp';
 
 export async function loadConflicts(): Promise<SyncConflict[]> {
   return loadData<SyncConflict[]>(CONFLICTS_KEY, []);
@@ -42,12 +41,4 @@ export async function resolveConflict(conflictId: string, choice: 'local' | 'rem
 
 export async function clearAllConflicts(): Promise<void> {
   await saveData(CONFLICTS_KEY, []);
-}
-
-export async function getLastSyncTime(): Promise<number> {
-  return loadData<number>(LAST_SYNC_KEY, 0);
-}
-
-export async function setLastSyncTime(timestamp: number): Promise<void> {
-  return saveData(LAST_SYNC_KEY, timestamp);
 }

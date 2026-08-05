@@ -8,6 +8,8 @@ export const HABITS_KEY = 'health_habits';
 export interface MedLog { date: string; takenAt: string; }
 export interface Medication {
   id: string;
+  /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
+  updatedAt?: string;
   name: string;
   dose?: string;            // "500 мг", "2 капсули"
   times: string[];          // ["08:00","20:00"]
@@ -22,6 +24,8 @@ export interface Medication {
 export type CheckupKind = 'analysis' | 'visit' | 'procedure';
 export interface Checkup {
   id: string;
+  /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
+  updatedAt?: string;
   kind: CheckupKind;
   title: string;
   date: string;             // ISO
@@ -34,6 +38,8 @@ export interface Checkup {
 
 export interface Vaccine {
   id: string;
+  /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
+  updatedAt?: string;
   name: string;
   date: string;
   doseNo?: number;
@@ -45,6 +51,8 @@ export interface Vaccine {
 
 export interface Habit {
   id: string;
+  /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
+  updatedAt?: string;
   title: string;
   icon: string;
   color: string;

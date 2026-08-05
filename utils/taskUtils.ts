@@ -33,6 +33,8 @@ export interface TaskHistoryEvent {
 
 export interface Task {
   id: string;
+  /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
+  updatedAt?: string;
   title: string;
   description: string;
   priority: Priority;

@@ -10,6 +10,8 @@ export interface TxHistoryEvent {
 
 export interface Transaction {
   id: string;
+  /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
+  updatedAt?: string;
   type: TxType;
   category: string;
   amount: number;

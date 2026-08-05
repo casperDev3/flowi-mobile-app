@@ -199,7 +199,12 @@ export function SheetModal({
 
         {/* Dismiss-область (за листом) */}
         {backdropDismiss && (
-          <Pressable style={StyleSheet.absoluteFill} onPress={triggerClose} />
+          <Pressable
+            accessible={false}
+            importantForAccessibility="no"
+            style={StyleSheet.absoluteFill}
+            onPress={triggerClose}
+          />
         )}
 
         {/* Контейнер листа (flex-end) */}
@@ -210,7 +215,12 @@ export function SheetModal({
              * Дочірні ScrollView/TextInput/кнопки перехоплюють свої дотики
              * у звичному порядку (глибший view — вищий пріоритет у RN).
              */}
-            <Pressable style={styles.wrapper} onPress={(e) => e.stopPropagation()}>
+            <Pressable
+              style={styles.wrapper}
+              onPress={(e) => e.stopPropagation()}
+              accessibilityViewIsModal
+              importantForAccessibility="yes"
+            >
 
               {/* Grabber-зона: GestureDetector + handle + xmark */}
               <GestureDetector gesture={panGesture}>

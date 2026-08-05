@@ -1,6 +1,6 @@
 # Flowi — статус готовності проєкту
 
-**Оновлено:** 2026-06-29
+**Оновлено:** 2026-08-05
 **Стек:** Expo ~54 · React Native 0.81 · expo-router ~6 · TypeScript · AsyncStorage · expo-notifications
 
 > Єдиний файл верхнього рівня в `docs/`. Решта матеріалів — у підкаталогах (див. «Індекс документації»).
@@ -24,7 +24,7 @@
 | Час | `(tabs)/time.tsx`, `time-records`, `time-stats` | 🟢 80% | — |
 | Спільне (колаборація) | `(tabs)/shared.tsx` | 🟡 70% | Живий таб — зріла версія (api-config, Clipboard, i18n, групи/секції). Дубль `app/shared.tsx` видалено. Лишається: device-QA, realtime/бекенд, конфлікти |
 | Нотатки/Проєкти/Контейнери/Архів | відповідні екрани | 🟢 80% | — |
-| Налаштування/Дані/Синхронізація | `settings`, `data`, `sync` | 🟡 70% | Sync лише масивів за `id`; об'єкти (профіль) не синхр. |
+| Налаштування/Дані/Синхронізація | `settings`, `data`, `sync` | 🟢 90% | Переробка 2026-08-05: realtime між клієнтами, авто-LWW, карантин відхилених. Див. `plans/SYNC_EXECUTION_STATUS.md` |
 | Нотифікації | `store/notifications.ts` | 🟡 75% | Ліки: ризик ліміту 64 нотифікацій на iOS |
 
 ---
@@ -69,6 +69,9 @@
 ```
 docs/
   status.md                                  ← цей файл (оцінка готовності)
+  plans/
+    SYNC_ARCHITECTURE_PLAN.md                — архітектура синхронізації (рішення + причини)
+    SYNC_EXECUTION_STATUS.md                 — журнал виконання, 12 фаз (виконано)
   reviews/
     UI_UX_REVIEW.md                          — загальний UI/UX-огляд
     QA_SECURITY_REVIEW.md                    — QA та безпека

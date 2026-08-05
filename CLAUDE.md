@@ -78,7 +78,10 @@ store/
   theme-context.tsx        — ThemeContext
   notifications.ts         — push-нотифікації утиліти
   healthkit.ts             — Apple HealthKit інтеграція
-  sync.ts                  — синхронізація між пристроями
+  sync-engine.tsx          — рушій синхронізації v2 (outbox, курсор, конфлікти, ws/user/)
+  synced-storage.ts        — saveSynced/saveSyncedValue: запис + постановка в outbox
+  sync-contract.ts         — список синхронізованих ключів + версія контракту
+  migrations.ts            — одноразові міграції форми локального сховища
   auto-backup.tsx          — авто-резервні копії
   sync-conflicts.ts        — вирішення конфліктів синхронізації
 
@@ -121,16 +124,20 @@ constants/
 | `'containers'` | `Container[]` | Контейнери зі списком речей |
 | `'projects'` | `Project[]` | Проєкти |
 | `'health_entries_v2'` | `HealthEntry[]` | Записи здоров'я (calories=їжа, calories_out=спалені, +макроси) |
-| `'health_profile'` | `HealthProfile` | Профіль для персональних цілей (стать/вік/зріст/активність/ціль) — локально, не синхронізується |
+| `'health_profile'` | `HealthProfile` | Профіль для персональних цілей (стать/вік/зріст/активність/ціль) — **локально**, не синхронізується (див. `docs/plans/SYNC_EXECUTION_STATUS.md`, невиконаний розділ 4) |
 | `'health_reminders'` | `{water,sleep}` | Перемикачі щоденних нагадувань — локально |
 | `'health_meds'` | `Medication[]` | Профілактика: ліки/добавки (час прийому, лог, нотифікації) |
 | `'health_checkups'` | `Checkup[]` | Профілактика: медогляди/аналізи |
 | `'health_vaccines'` | `Vaccine[]` | Профілактика: щеплення |
 | `'health_habits'` | `Habit[]` | Профілактика: звички + серії (streaks) |
-| `'categories'` | `Category[]` | Кастомні категорії фінансів |
+| `'categories'` | `CategoryRow[]` | Кастомні категорії фінансів (`{id, type, name, icon}`, id = `${type}:${name}`) |
 | `'ideas'` | `Idea[]` | Ідеї |
 | `'bugs'` | `Bug[]` | Баги |
-| `'banks'` | `PiggyBank[]` | Скарбнички |
+| `'savings_jars'` | `SavingsJar[]` | Скарбнички |
+| `'task_statuses'` | `TaskStatus[]` | Кастомні статуси завдань |
+| `'meetings'` | `Meeting[]` | Наради |
+| `'exercises'` | `Exercise[]` | Вправи |
+| `'workout_programs'` | `WorkoutProgram[]` | Програми тренувань |
 
 ## Правила коду
 

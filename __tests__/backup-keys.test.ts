@@ -3,6 +3,7 @@ import { BACKUP_KEYS } from '../store/backup-keys';
 // Keys from ALL_KEYS in app/data.tsx (must all be backed up)
 const ALL_KEYS_FROM_DATA = [
   'tasks',
+  'task_statuses',
   'transactions',
   'time_entries',
   'notes',
@@ -53,7 +54,7 @@ describe('BACKUP_KEYS', () => {
   });
 
   it('total count matches expected number of keys', () => {
-    // 18 from ALL_KEYS + 7 extra = 25
-    expect(BACKUP_KEYS.length).toBe(25);
+    // 19 from ALL_KEYS + 7 extra = 26
+    expect(BACKUP_KEYS.length).toBe(26);
   });
 });

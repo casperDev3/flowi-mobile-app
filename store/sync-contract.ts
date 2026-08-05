@@ -3,6 +3,7 @@ export const SYNC_CONTRACT_VERSION = 1;
 
 export const SYNC_ARRAY_KEYS = [
   'tasks',
+  'task_statuses',
   'transactions',
   'time_entries',
   'notes',

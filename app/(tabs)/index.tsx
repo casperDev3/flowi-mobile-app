@@ -45,6 +45,8 @@ import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import { filterTasksByMonth } from '@/utils/taskUtils';
+import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, taskColumnId, taskStatusColumn } from '@/utils/taskStatuses';
+import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
 
@@ -84,8 +86,10 @@ interface Task {
   description: string;
   priority: Priority;
   status: Status;
+  kanbanColumnId?: string;
   subtasks: SubTask[];
   createdAt: string;
+  startDate?: string;
   estimatedMinutes?: number;
   deadline?: string;
   projectId?: string;
@@ -321,6 +325,8 @@ export default function TasksScreen() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [storedTaskStatuses, setStoredTaskStatuses] = useState<TaskStatusColumn[]>([]);
+  const taskStatuses = useMemo(() => mergeTaskStatusColumns(storedTaskStatuses), [storedTaskStatuses]);
   const [initialized, setInitialized] = useState(false);
   const [activeMonth, setActiveMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [refreshing, setRefreshing] = useState(false);
@@ -340,6 +346,7 @@ export default function TasksScreen() {
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newPriority, setNewPriority] = useState<Priority>('medium');
+  const [newStatusId, setNewStatusId] = useState(ACTIVE_COLUMN_ID);
   const [newEstHours, setNewEstHours] = useState('');
   const [newEstMins, setNewEstMins] = useState('');
   const [newDeadline, setNewDeadline] = useState<string | null>(null);
@@ -389,6 +396,7 @@ export default function TasksScreen() {
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editPriority, setEditPriority] = useState<Priority>('medium');
+  const [editStatusId, setEditStatusId] = useState(ACTIVE_COLUMN_ID);
   const [editEstHours, setEditEstHours] = useState('');
   const [editEstMins, setEditEstMins] = useState('');
   const [editDeadline, setEditDeadline] = useState<string | null>(null);
@@ -427,14 +435,16 @@ export default function TasksScreen() {
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadAll = useCallback(async () => {
-    const [t, p, m] = await Promise.all([
+    const [t, p, m, statuses] = await Promise.all([
       loadData<Task[]>('tasks', []),
       loadData<Project[]>('projects', []),
       loadData<Meeting[]>('meetings', []),
+      loadData<TaskStatusColumn[]>('task_statuses', []),
     ]);
     setTasks(t);
     setProjects(p);
     setMeetings(m);
+    setStoredTaskStatuses(statuses);
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -634,12 +644,14 @@ export default function TasksScreen() {
       daysOfWeek: newRepeatFreq === 'weekly' && newRepeatDays.length > 0 ? newRepeatDays : undefined,
       until: newRepeatEndType === 'until' && newRepeatUntil ? newRepeatUntil : undefined,
     } : undefined;
+    const selectedStatus = taskStatuses.find(column => column.id === newStatusId) ?? taskStatuses[0];
     setTasks(p => [{
       id: Date.now().toString(),
       title: newTitle.trim(),
       description: newDesc.trim(),
       priority: newPriority,
-      status: 'active',
+      status: selectedStatus.isDone ? 'done' : 'active',
+      kanbanColumnId: selectedStatus.id,
       subtasks: [],
       createdAt: new Date().toISOString(),
       estimatedMinutes,
@@ -649,14 +661,14 @@ export default function TasksScreen() {
       history: [makeHistoryEvent('created')],
       recurrence,
     }, ...p]);
-    setNewTitle(''); setNewDesc(''); setNewPriority('medium');
+    setNewTitle(''); setNewDesc(''); setNewPriority('medium'); setNewStatusId(ACTIVE_COLUMN_ID);
     setNewEstHours(''); setNewEstMins(''); setNewDeadline(null);
     setNewProjectId(null); setShowDeadlineCal(false); setShowNewProjectDropdown(false); setShowAdd(false);
     setNewRepeat(false); setNewRepeatFreq('weekly'); setNewRepeatInterval(1);
     setNewRepeatDays([]); setNewRepeatEndType('never'); setNewRepeatUntil('');
     haptic.success();
-  }, [newTitle, newDesc, newPriority, newEstHours, newEstMins, newDeadline, newProjectId,
-      newRepeat, newRepeatFreq, newRepeatInterval, newRepeatDays, newRepeatEndType, newRepeatUntil]);
+  }, [newTitle, newDesc, newPriority, newStatusId, newEstHours, newEstMins, newDeadline, newProjectId,
+      newRepeat, newRepeatFreq, newRepeatInterval, newRepeatDays, newRepeatEndType, newRepeatUntil, taskStatuses]);
 
   const deleteTask = useCallback((id: string, title?: string) => {
     const taskToDelete = tasksRef.current.find(t => t.id === id);
@@ -770,6 +782,7 @@ export default function TasksScreen() {
     const patch = (t: Task): Task => {
       if (t.id !== id) return t;
       const status: Status = t.status === 'done' ? 'active' : 'done';
+      const kanbanColumnId = status === 'done' ? DONE_COLUMN_ID : ACTIVE_COLUMN_ID;
       const histType: HistoryEventType = status === 'done' ? 'done' : 'active';
       // Also stop active timer if completing task
       const timeEntries = status === 'done'
@@ -780,7 +793,7 @@ export default function TasksScreen() {
           })
         : (t.timeEntries ?? []);
       return {
-        ...t, status,
+        ...t, status, kanbanColumnId,
         subtasks: t.subtasks.map(s => ({ ...s, done: status === 'done' })),
         timeEntries,
         history: [...(t.history ?? []), makeHistoryEvent(histType)],
@@ -797,6 +810,7 @@ export default function TasksScreen() {
             ...task,
             id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
             status: 'active',
+            kanbanColumnId: ACTIVE_COLUMN_ID,
             deadline: nextDeadline,
             subtasks: task.subtasks.map(s => ({ ...s, done: false })),
             timeEntries: [],
@@ -842,6 +856,7 @@ export default function TasksScreen() {
         ...t,
         subtasks,
         status: subtasks.length > 0 && subtasks.every(s => s.done) ? 'done' : 'active',
+        kanbanColumnId: subtasks.length > 0 && subtasks.every(s => s.done) ? DONE_COLUMN_ID : ACTIVE_COLUMN_ID,
         history: [...(t.history ?? []), makeHistoryEvent(histType, targetSub?.title)],
       };
     };
@@ -915,6 +930,8 @@ export default function TasksScreen() {
       title: editTitle.trim(),
       description: editDesc.trim(),
       priority: editPriority,
+      status: (taskStatuses.find(column => column.id === editStatusId) ?? taskStatuses[0]).isDone ? 'done' : 'active',
+      kanbanColumnId: editStatusId,
       estimatedMinutes,
       deadline: editDeadline ?? undefined,
       recurrence,
@@ -925,8 +942,8 @@ export default function TasksScreen() {
     setIsEditingTask(false);
     setShowEditDeadlineCal(false);
     setShowEditProjectDropdown(false);
-  }, [editTitle, editDesc, editPriority, editEstHours, editEstMins, editDeadline, selected,
-      editRepeat, editRepeatFreq, editRepeatInterval, editRepeatDays, editRepeatEndType, editRepeatUntil]);
+  }, [editTitle, editDesc, editPriority, editStatusId, editEstHours, editEstMins, editDeadline, selected,
+      editRepeat, editRepeatFreq, editRepeatInterval, editRepeatDays, editRepeatEndType, editRepeatUntil, taskStatuses]);
 
   const openReminderPicker = useCallback((taskId: string, subtaskId?: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -1550,6 +1567,7 @@ export default function TasksScreen() {
                         layout={animLayout}>
                         <CompactCard
                           task={task}
+                          statusColumn={taskStatusColumn(task, taskStatuses)}
                           onPress={() => setSelected(task)}
                           onToggle={() => toggleTask(task.id)}
                           c={c}
@@ -1631,6 +1649,7 @@ export default function TasksScreen() {
                         layout={animLayout}>
                         <CompactCard
                           task={task}
+                          statusColumn={taskStatusColumn(task, taskStatuses)}
                           onPress={() => setSelected(task)}
                           onToggle={() => toggleTask(task.id)}
                           c={c}
@@ -1701,6 +1720,12 @@ export default function TasksScreen() {
 
                           {/* Row 2: meta badges */}
                           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 32, marginBottom: 9 }}>
+                            {(() => { const column = taskStatusColumn(task, taskStatuses); return (
+                              <View style={[s.badge, { backgroundColor: column.color + '18', borderColor: column.color + '40' }]}>
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: column.color }} />
+                                <Text style={{ color: column.color, fontSize: 10, fontWeight: '700', marginLeft: 4 }}>{column.name}</Text>
+                              </View>
+                            ); })()}
                             {/* Priority */}
                             <View style={[s.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
                               <View style={[s.dot, { backgroundColor: prioColor, width: 6, height: 6 }]} />
@@ -2600,6 +2625,18 @@ export default function TasksScreen() {
                     ))}
                   </View>
 
+                  <Text style={[s.label, { color: c.sub }]}>{lang === 'uk' ? 'Статус' : 'Status'}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                    <View style={{ flexDirection: 'row', gap: 7 }}>
+                      {taskStatuses.map(column => (
+                        <TouchableOpacity key={column.id} onPress={() => setNewStatusId(column.id)} style={[s.sortChip, { backgroundColor: newStatusId === column.id ? column.color : c.dim, borderColor: newStatusId === column.id ? column.color : c.border }]}>
+                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: newStatusId === column.id ? '#fff' : column.color, marginRight: 5 }} />
+                          <Text style={{ color: newStatusId === column.id ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{column.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+
                   {/* Project */}
                   {projects.length > 0 && (
                     <>
@@ -2855,6 +2892,7 @@ export default function TasksScreen() {
                               setEditTitle(selectedTask.title);
                               setEditDesc(selectedTask.description);
                               setEditPriority(selectedTask.priority);
+                              setEditStatusId(taskColumnId(selectedTask, taskStatuses));
                               const h = selectedTask.estimatedMinutes ? Math.floor(selectedTask.estimatedMinutes / 60) : 0;
                               const m = selectedTask.estimatedMinutes ? selectedTask.estimatedMinutes % 60 : 0;
                               setEditEstHours(h > 0 ? String(h) : '');
@@ -3037,6 +3075,18 @@ export default function TasksScreen() {
                             </TouchableOpacity>
                           ))}
                         </View>
+
+                        <Text style={[s.label, { color: c.sub }]}>{lang === 'uk' ? 'Статус' : 'Status'}</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                          <View style={{ flexDirection: 'row', gap: 7 }}>
+                            {taskStatuses.map(column => (
+                              <TouchableOpacity key={column.id} onPress={() => setEditStatusId(column.id)} style={[s.sortChip, { backgroundColor: editStatusId === column.id ? column.color : c.dim, borderColor: editStatusId === column.id ? column.color : c.border }]}>
+                                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: editStatusId === column.id ? '#fff' : column.color, marginRight: 5 }} />
+                                <Text style={{ color: editStatusId === column.id ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{column.name}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </ScrollView>
 
                         {projects.length > 0 && (
                           <>
@@ -3678,8 +3728,9 @@ export default function TasksScreen() {
 // ─── Compact Card ────────────────────────────────────────────────────────────
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
-function CompactCard({ task, onPress, onToggle, c, isDark, projects, todayLabel, yesterdayLabel, tomorrowLabel, locale }: {
+function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, todayLabel, yesterdayLabel, tomorrowLabel, locale }: {
   task: Task;
+  statusColumn: TaskStatusColumn;
   onPress: () => void;
   onToggle: () => void;
   c: any;
@@ -3722,6 +3773,10 @@ function CompactCard({ task, onPress, onToggle, c, isDark, projects, todayLabel,
           numberOfLines={1}>
           {task.title}
         </AnimatedText>
+        <View style={{ maxWidth: 90, flexDirection: 'row', alignItems: 'center', borderRadius: 7, paddingHorizontal: 6, paddingVertical: 3, marginRight: 6, backgroundColor: statusColumn.color + '16' }}>
+          <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 4 }} />
+          <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 9, fontWeight: '700', flexShrink: 1 }}>{statusColumn.name}</Text>
+        </View>
         {task.deadline && (
           <Text style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 10, fontWeight: '600', marginRight: 8 }}>
             {deadlineLabel(task.deadline!, todayLabel, yesterdayLabel, tomorrowLabel, locale)}

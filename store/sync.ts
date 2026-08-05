@@ -8,6 +8,7 @@ import {
 
 const SYNC_KEYS = [
   'tasks',
+  'task_statuses',
   'transactions',
   'time_entries',
   'notes',
@@ -81,4 +82,3 @@ export async function mergeAndSave(remote: Record<string, any[]>): Promise<numbe
   await setLastSyncTime(Date.now());
   return allConflicts.length;
 }
-

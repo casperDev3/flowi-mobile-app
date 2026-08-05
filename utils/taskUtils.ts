@@ -37,8 +37,10 @@ export interface Task {
   description: string;
   priority: Priority;
   status: Status;
+  kanbanColumnId?: string;
   subtasks: SubTask[];
   createdAt: string;
+  startDate?: string;
   estimatedMinutes?: number;
   deadline?: string;
   projectId?: string;

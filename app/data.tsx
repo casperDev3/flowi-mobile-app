@@ -26,6 +26,7 @@ import { SYNC_ARRAY_KEYS, saveSynced } from '@/store/synced-storage';
 
 const ALL_KEYS = [
   { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
+  { key: 'task_statuses',     label: 'Статуси задач', icon: 'rectangle.3.group', color: '#8B5CF6' },
   { key: 'transactions',      label: 'Транзакції',  icon: 'banknote',           color: '#0EA5E9' },
   { key: 'time_entries',      label: 'Записи часу', icon: 'timer',              color: '#6366F1' },
   { key: 'notes',             label: 'Нотатки',     icon: 'note.text',          color: '#F59E0B' },
@@ -47,7 +48,7 @@ const ALL_KEYS = [
 
 // export key maps storage key → JSON key (snake_case → camelCase where needed)
 const EXPORT_KEY_MAP: Record<string, string> = {
-  tasks: 'tasks', transactions: 'transactions', time_entries: 'timeEntries',
+  tasks: 'tasks', task_statuses: 'taskStatuses', transactions: 'transactions', time_entries: 'timeEntries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
   meetings: 'meetings', health_entries_v2: 'healthEntries',
   workouts: 'workouts', exercises: 'exercises', workout_programs: 'workoutPrograms',
@@ -56,7 +57,7 @@ const EXPORT_KEY_MAP: Record<string, string> = {
   health_vaccines: 'healthVaccines', health_habits: 'healthHabits',
 };
 const IMPORT_KEY_MAP: Record<string, string> = {
-  tasks: 'tasks', transactions: 'transactions', timeEntries: 'time_entries',
+  tasks: 'tasks', taskStatuses: 'task_statuses', transactions: 'transactions', timeEntries: 'time_entries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
   meetings: 'meetings', healthEntries: 'health_entries_v2',
   workouts: 'workouts', exercises: 'exercises', workoutPrograms: 'workout_programs',

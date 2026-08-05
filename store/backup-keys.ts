@@ -5,6 +5,7 @@
 export const BACKUP_KEYS = [
   // Core domain data (mirrors ALL_KEYS in app/data.tsx)
   'tasks',
+  'task_statuses',
   'transactions',
   'time_entries',
   'notes',

@@ -21,15 +21,22 @@ export const SYNC_ARRAY_KEYS = [
   'health_checkups',
   'health_vaccines',
   'health_habits',
+  // Нормалізовані з singleton-блобів. Їхні id ПОХІДНІ від природного ключа
+  // (код валюти / назва категорії), а не випадкові: інакше два пристрої,
+  // додавши офлайн одну й ту саму валюту, згенерували б різні id і після
+  // синку отримали б дублікат замість злиття.
+  'budget_limits',
+  'finance_currencies',
+  'finance_balance_adjustments',
 ] as const;
 
 export type SyncArrayKey = (typeof SYNC_ARRAY_KEYS)[number];
 
 export const SYNC_SINGLETON_KEYS = [
+  // TODO(фаза 7, крок 2): categories — вкладений Record<TxType, CategoryDef[]>,
+  // нормалізація зачіпає explore.tsx і finance-stats.tsx.
   'categories',
-  'budget_limits',
-  'finance_balance_adjustments',
-  'finance_currencies',
+  // Справжній скаляр — лишається singleton назавжди.
   'finance_primary_currency',
 ] as const;
 

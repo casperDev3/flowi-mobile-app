@@ -248,17 +248,15 @@ describe('doSync — застосування серверних змін', () =
 // ─── Singleton ───────────────────────────────────────────────────────────────
 
 describe('doSync — singleton-ключі', () => {
-  test('singleton замінюється цілком, без мерджу', async () => {
-    // Характеризація дефекту. Фаза 7 плану нормалізує ці ключі в масиви,
-    // після чого тест має бути переписаний на per-record поведінку.
-    seed('finance_currencies', [{ code: 'UAH' }, { code: 'локальна' }]);
+  test('справжній скаляр замінюється цілком — для нього це коректно', async () => {
+    seed('finance_primary_currency', 'UAH');
     mockApiFetch.mockResolvedValue(
       v2({
         changes: [
           serverItem({
-            collection: 'finance_currencies',
-            local_id: 'finance_currencies',
-            data: { value: [{ code: 'USD' }] },
+            collection: 'finance_primary_currency',
+            local_id: 'finance_primary_currency',
+            data: { value: 'USD' },
           }),
         ],
       }),
@@ -266,7 +264,7 @@ describe('doSync — singleton-ключі', () => {
 
     await loadEngine().syncNow();
 
-    expect(read('finance_currencies', [])).toEqual([{ code: 'USD' }]);
+    expect(read('finance_primary_currency', null)).toBe('USD');
   });
 
   test('singleton надсилається як {value}', async () => {
@@ -285,6 +283,53 @@ describe('doSync — singleton-ключі', () => {
     await loadEngine().syncNow();
 
     expect(mockApiFetch.mock.calls[0][1].body.mutations[0].data).toEqual({ value: 'UAH' });
+  });
+});
+
+// ─── Нормалізовані фінансові колекції (фаза 7 плану) ────────────────────────
+
+describe('нормалізовані фінансові ключі зливаються по-запису', () => {
+  test('валюта з сервера доливається до локальної, а не витирає її', async () => {
+    // Саме те, заради чого робилась фаза 7. Доти ці ключі їхали блобом: два
+    // пристрої, кожен додав офлайн по валюті — вигравав один блоб повністю.
+    seed('finance_currencies', [{ id: 'UAH', code: 'UAH' }]);
+    mockApiFetch.mockResolvedValue(
+      v2({
+        changes: [
+          serverItem({
+            collection: 'finance_currencies',
+            local_id: 'USD',
+            data: { id: 'USD', code: 'USD' },
+          }),
+        ],
+      }),
+    );
+
+    await loadEngine().syncNow();
+
+    expect(read<{ code: string }[]>('finance_currencies', []).map(c => c.code).sort())
+      .toEqual(['UAH', 'USD']);
+  });
+
+  test('ліміт бюджету надсилається окремою мутацією зі своїм local_id', async () => {
+    seed('budget_limits', [
+      { id: 'Їжа', category: 'Їжа', limit: 5000 },
+      { id: 'Транспорт', category: 'Транспорт', limit: 1200 },
+    ]);
+    seed('sync_outbox', [
+      { mutation_id: 'm1', collection: 'budget_limits', local_id: 'Їжа', deleted: false, queued_at: 1 },
+    ]);
+    mockApiFetch.mockResolvedValue(v2());
+
+    await loadEngine().syncNow();
+
+    const sent = mockApiFetch.mock.calls[0][1].body.mutations;
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      collection: 'budget_limits',
+      local_id: 'Їжа',
+      data: { category: 'Їжа', limit: 5000 },
+    });
   });
 });
 

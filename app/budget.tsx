@@ -22,7 +22,7 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
-import { saveSyncedValue } from '@/store/synced-storage';
+import { saveSynced } from '@/store/synced-storage';
 import { BUILTIN_CURRENCIES } from '@/utils/financeUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -35,9 +35,12 @@ interface Transaction {
 }
 
 interface BudgetLimit {
+  /** Дорівнює `category` — синхронізація ідентифікує запис саме за ним. */
+  id?: string;
   category: string;
   icon: IconSymbolName;
   limit: number; // monthly limit in UAH
+  updatedAt?: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -154,7 +157,9 @@ export default function BudgetScreen() {
 
   const saveBudgets = useCallback((next: BudgetLimit[]) => {
     setBudgets(next);
-    void saveSyncedValue('budget_limits', next);
+    // id похідний від назви категорії: два пристрої, що офлайн додали ліміт на
+    // ту саму категорію, мусять зійтись в один запис, а не в два.
+    void saveSynced('budget_limits', next.map(b => ({ ...b, id: b.category })));
   }, []);
 
   // ─── Computed ─────────────────────────────────────────────────────────────

@@ -153,7 +153,12 @@ function SyncGate({ children }: { children: React.ReactNode }) {
   // UI при цьому не блокуємо — притримуємо лише синхронізацію.
   useEffect(() => {
     runStorageMigrations()
-      .catch(e => { if (__DEV__) console.warn('[migrations] failed:', e); })
+      .catch(e => {
+        // Ковтати це мовчки не можна: далі синк читатиме колекції в застарілій
+        // формі. Форму він тепер переживе (див. sync-engine), але дані такого
+        // ключа на сервер не поїдуть, і причина має бути видимою.
+        console.warn('[migrations] НЕ ВІДПРАЦЮВАЛИ — дані лишились у старій формі:', e);
+      })
       .finally(() => setMigrated(true));
   }, []);
 

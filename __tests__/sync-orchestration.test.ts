@@ -475,6 +475,62 @@ describe('doSync — відхилення всього батчу', () => {
   });
 });
 
+// ─── Застаріла форма даних у сховищі ────────────────────────────────────────
+
+describe('колекція, що лежить у сховищі не масивом', () => {
+  // Реальний збій на пристрої: `TypeError: iterator method is not callable`,
+  // синк падав щоразу й назавжди. Причина — фаза 7 перенесла в SYNC_ARRAY_KEYS
+  // ключі, які на пристрої досі об'єкти (`categories` був
+  // Record<TxType, CategoryDef[]>), а generateFullOutbox робив по них for...of.
+  // Міграція мала це виправити, але її збій ковтався мовчки.
+
+  test('перший синк не падає, якщо categories ще об\'єкт', async () => {
+    seed('server_change_cursor_v2', 0);
+    seed('categories', { expense: [{ name: 'Кава', icon: 'cup' }] });
+    seed('tasks', [{ id: 't1' }]);
+    mockApiFetch.mockResolvedValue(v2({ cursor: 3 }));
+
+    await loadEngine().syncNow();
+
+    expect(lastError()).toBeNull();
+    // Валідна колекція все одно потрапляє в чергу — застаріла лише пропущена.
+    const sent = mockApiFetch.mock.calls[0][1].body.mutations as { local_id: string }[];
+    expect(sent.map(m => m.local_id)).toEqual(['t1']);
+  });
+
+  test('застаріла форма не блокує решту колекцій', async () => {
+    seed('server_change_cursor_v2', 0);
+    seed('finance_balance_adjustments', { UAH: 500 });
+    seed('notes', [{ id: 'n1' }]);
+    seed('tasks', [{ id: 't1' }, { id: 't2' }]);
+    mockApiFetch.mockResolvedValue(v2({ cursor: 3 }));
+
+    await loadEngine().syncNow();
+
+    expect(lastError()).toBeNull();
+    const sent = mockApiFetch.mock.calls[0][1].body.mutations as { local_id: string }[];
+    expect(sent.map(m => m.local_id).sort()).toEqual(['n1', 't1', 't2']);
+  });
+
+  test('серверні зміни застосовуються, навіть якщо локально лежить об\'єкт', async () => {
+    seed('categories', { expense: [{ name: 'Старе', icon: 'x' }] });
+    mockApiFetch.mockResolvedValue(v2({
+      changes: [serverItem({
+        collection: 'categories',
+        local_id: 'expense:Кава',
+        data: { id: 'expense:Кава', type: 'expense', name: 'Кава', icon: 'cup' },
+      })],
+    }));
+
+    await loadEngine().syncNow();
+
+    expect(lastError()).toBeNull();
+    expect(read('categories', [])).toEqual([
+      { id: 'expense:Кава', type: 'expense', name: 'Кава', icon: 'cup' },
+    ]);
+  });
+});
+
 // ─── Обнулення сервера (фаза 11 плану) ──────────────────────────────────────
 
 describe('відкат серверного курсора', () => {

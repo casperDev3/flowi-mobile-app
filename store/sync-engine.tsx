@@ -199,7 +199,14 @@ export function isRetryableSyncError(error: unknown): boolean {
 }
 
 export function describeSyncError(error: unknown): unknown {
-  if (!(error instanceof ApiError)) return error;
+  if (!(error instanceof ApiError)) {
+    // Не-ApiError — це баг у самому рушії, а не відмова мережі. Без стеку
+    // такий звіт марний: `[TypeError: ...]` не каже, де саме воно впало.
+    if (error instanceof Error) {
+      return { name: error.name, message: error.message, stack: error.stack };
+    }
+    return error;
+  }
   const invalid = error.details?.invalid;
   return {
     status: error.status,
@@ -340,15 +347,28 @@ type CollectionCache = Map<string, Map<string, Record<string, unknown>>>;
  */
 async function buildCollectionCache(items: OutboxItem[]): Promise<CollectionCache> {
   const cache: CollectionCache = new Map();
-  const needed = new Set(
-    items
-      .filter(item => !item.deleted && !(SYNC_SINGLETON_KEYS as readonly string[]).includes(item.collection))
-      .map(item => item.collection),
-  );
+
+  // Дедуп через звичайний масив, а не Set: цикл нижче — async з await у тілі,
+  // і `for...of` по Set/Map у такому контексті транспілюється інакше, ніж по
+  // масиву. Масив тут дає ту саму семантику без залежності від того, як саме
+  // рушій розгорнув ітератор.
+  const needed: string[] = [];
+  const seen: Record<string, boolean> = {};
+  for (const item of items) {
+    const { collection } = item;
+    if (item.deleted) continue;
+    if ((SYNC_SINGLETON_KEYS as readonly string[]).includes(collection)) continue;
+    if (seen[collection]) continue;
+    seen[collection] = true;
+    needed.push(collection);
+  }
 
   for (const collection of needed) {
-    const rows = await loadData<Record<string, unknown>[]>(collection, []);
+    const stored = await loadData<unknown>(collection, []);
     const byId = new Map<string, Record<string, unknown>>();
+    // Та сама причина, що й у generateFullOutbox: форма в сховищі може бути
+    // застарілою, а ітерація по не-масиву валить синк цілком.
+    const rows = Array.isArray(stored) ? (stored as Record<string, unknown>[]) : [];
     for (const row of rows) {
       const id = normalizeSyncLocalId(row.id);
       if (id) byId.set(id, row);
@@ -401,7 +421,19 @@ async function generateFullOutbox(): Promise<void> {
   const generated: OutboxItem[] = [];
 
   for (const key of SYNC_ARRAY_KEYS) {
-    const items = await loadData<{ id: string }[]>(key, []);
+    const stored = await loadData<unknown>(key, []);
+    // Ключ може тримати НЕ масив: `categories` і `finance_balance_adjustments`
+    // до нормалізації були об'єктами, і на пристрої, де міграція не
+    // відпрацювала, вони такими й лишились. `for...of` по звичайному об'єкту
+    // кидає TypeError і валить увесь синк — назавжди, бо генерація повного
+    // outbox виконується на кожному синку з нульовим курсором.
+    if (!Array.isArray(stored)) {
+      if (__DEV__) {
+        console.warn(`[sync-engine] '${key}' у сховищі не масив (${typeof stored}) — пропущено`);
+      }
+      continue;
+    }
+    const items = stored as { id: string }[];
     for (const item of items) {
       const localId = normalizeSyncLocalId(item.id);
       if (localId) {
@@ -426,14 +458,22 @@ async function applyPullResponse(
 ): Promise<void> {
   if (!serverItems.length) return;
   const dirtySet = new Set(currentOutbox.map(item => syncRecordKey(item.collection, item.local_id)));
-  const byCollection = new Map<string, SyncResponseItem[]>();
+
+  // Групування у звичайний об'єкт із окремим списком порядку — з тієї ж
+  // причини, що й у buildCollectionCache: цикл нижче async, і ітерація по
+  // Map у ньому залежить від способу транспіляції.
+  const byCollection: Record<string, SyncResponseItem[]> = {};
+  const order: string[] = [];
   for (const item of serverItems) {
-    const list = byCollection.get(item.collection) ?? [];
-    list.push(item);
-    byCollection.set(item.collection, list);
+    if (!byCollection[item.collection]) {
+      byCollection[item.collection] = [];
+      order.push(item.collection);
+    }
+    byCollection[item.collection].push(item);
   }
 
-  for (const [collection, items] of byCollection) {
+  for (const collection of order) {
+    const items = byCollection[collection];
     const isSingleton = (SYNC_SINGLETON_KEYS as readonly string[]).includes(collection);
     if (isSingleton) {
       if (dirtySet.has(syncRecordKey(collection, collection))) continue;
@@ -445,7 +485,8 @@ async function applyPullResponse(
       continue;
     }
     if (!(SYNC_ARRAY_KEYS as readonly string[]).includes(collection)) continue;
-    const local = await loadData<{ id: string }[]>(collection, []);
+    const storedLocal = await loadData<unknown>(collection, []);
+    const local = Array.isArray(storedLocal) ? (storedLocal as { id: string }[]) : [];
     await saveData(collection, applyPullItems(local, items, dirtySet, collection));
   }
 }
@@ -728,7 +769,9 @@ export async function pushAllToServer(): Promise<void> {
  */
 async function pruneRecordsMissingOnServer(seenKeys: Set<string>): Promise<void> {
   for (const collection of SYNC_ARRAY_KEYS) {
-    const local = await loadData<{ id: string }[]>(collection, []);
+    const storedLocal = await loadData<unknown>(collection, []);
+    if (!Array.isArray(storedLocal)) continue;
+    const local = storedLocal as { id: string }[];
     if (!local.length) continue;
     const kept = local.filter(item => {
       const id = normalizeSyncLocalId(item.id);

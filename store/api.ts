@@ -70,6 +70,7 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly code: string,
     message: string,
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -108,14 +109,21 @@ async function buildHeaders(auth: boolean): Promise<Record<string, string>> {
 async function parseErrorBody(res: Response): Promise<ApiError> {
   let code = 'unknown';
   let message = `HTTP ${res.status}`;
+  let details: Record<string, unknown> | undefined;
   try {
-    const body = (await res.json()) as Record<string, unknown>;
-    code = String(body.code ?? body.detail ?? code);
-    message = String(body.message ?? body.detail ?? message);
+    const body = (await res.json()) as unknown;
+    if (body && typeof body === 'object' && !Array.isArray(body)) {
+      details = body as Record<string, unknown>;
+      // Django validation errors in this project use `error`, while DRF and
+      // auth endpoints typically use `detail`/`code`. Preserve all three so a
+      // rejected sync request remains actionable on the device.
+      code = String(details.code ?? details.error ?? details.detail ?? code);
+      message = String(details.message ?? details.error ?? details.detail ?? message);
+    }
   } catch {
     // не вдалося розпарсити тіло помилки — лишаємо дефолти
   }
-  return new ApiError(res.status, code, message);
+  return new ApiError(res.status, code, message, details);
 }
 
 /** Спроба оновити access-токен через /auth/refresh/. Повертає true якщо успішно. */

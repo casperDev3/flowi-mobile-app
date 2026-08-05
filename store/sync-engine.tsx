@@ -3,7 +3,7 @@
 import { AppState, AppStateStatus } from 'react-native';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import { apiFetch, OfflineError } from './api';
+import { apiFetch, ApiError, OfflineError } from './api';
 import { isOnlineMode } from './app-mode';
 import { loadData, saveData } from './storage';
 import { appendConflicts } from './sync-conflicts';
@@ -75,9 +75,16 @@ export type SyncRevisionMap = Record<string, number>;
 const SERVER_CURSOR_KEY = 'server_change_cursor_v2';
 const SERVER_REVISIONS_KEY = 'server_record_revisions_v2';
 const LAST_SYNC_AT_KEY = 'last_server_sync_completed_at';
+const LAST_SYNC_ERROR_KEY = 'last_server_sync_error_v2';
 
 export const syncRecordKey = (collection: string, localId: string): string =>
   `${collection}:${localId}`;
+
+export function normalizeSyncLocalId(value: unknown): string | null {
+  if (value == null) return null;
+  const normalized = String(value);
+  return normalized.length >= 1 && normalized.length <= 64 ? normalized : null;
+}
 
 export function applyRevisionUpdates(
   current: SyncRevisionMap,
@@ -139,6 +146,22 @@ function scheduleRetry(): void {
   if (__DEV__) console.log(`[sync-engine] retry in ${delay / 1000}s (attempt ${_retryAttempt})`);
 }
 
+export function isRetryableSyncError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return true;
+  return error.status === 0 || error.status === 408 || error.status === 429 || error.status >= 500;
+}
+
+export function describeSyncError(error: unknown): unknown {
+  if (!(error instanceof ApiError)) return error;
+  const invalid = error.details?.invalid;
+  return {
+    status: error.status,
+    code: error.code,
+    message: error.message,
+    ...(invalid !== undefined ? { invalid } : {}),
+  };
+}
+
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleSync(debounceMs = 5000): void {
@@ -178,6 +201,8 @@ async function buildMutation(
   revisions: SyncRevisionMap,
 ): Promise<SyncMutation | null> {
   const { collection, local_id, deleted, force } = outboxItem;
+  const normalizedLocalId = normalizeSyncLocalId(local_id);
+  if (!normalizedLocalId) return null;
   const isSingleton = (SYNC_SINGLETON_KEYS as readonly string[]).includes(collection);
   let data: Record<string, unknown>;
 
@@ -188,7 +213,7 @@ async function buildMutation(
     data = { value };
   } else {
     const items = await loadData<Record<string, unknown>[]>(collection, []);
-    const item = items.find(candidate => candidate.id === local_id);
+    const item = items.find(candidate => String(candidate.id) === normalizedLocalId);
     if (!item) return null;
     data = item;
   }
@@ -196,10 +221,10 @@ async function buildMutation(
   return {
     mutation_id: outboxItem.mutation_id ?? createMutationId(),
     collection,
-    local_id,
+    local_id: normalizedLocalId,
     operation: deleted ? 'delete' : 'upsert',
     data,
-    base_revision: revisions[syncRecordKey(collection, local_id)] ?? null,
+    base_revision: revisions[syncRecordKey(collection, normalizedLocalId)] ?? null,
     ...(force ? { force: true } : {}),
   };
 }
@@ -211,7 +236,10 @@ async function generateFullOutbox(): Promise<void> {
   for (const key of SYNC_ARRAY_KEYS) {
     const items = await loadData<{ id: string }[]>(key, []);
     for (const item of items) {
-      generated.push({ collection: key, local_id: item.id, deleted: false, queued_at: now });
+      const localId = normalizeSyncLocalId(item.id);
+      if (localId) {
+        generated.push({ collection: key, local_id: localId, deleted: false, queued_at: now });
+      }
     }
   }
   for (const key of SYNC_SINGLETON_KEYS) {
@@ -371,6 +399,7 @@ async function doSync(): Promise<void> {
 
     const completedAt = Date.now();
     await saveData(LAST_SYNC_AT_KEY, completedAt);
+    await saveData(LAST_SYNC_ERROR_KEY, null);
     updateLastSyncAt(completedAt);
     const { loadConflicts } = await import('./sync-conflicts');
     updateConflictsCount((await loadConflicts()).length);
@@ -382,9 +411,12 @@ async function doSync(): Promise<void> {
       clearRetryTimer();
       updateSyncState('idle');
     } else {
-      if (__DEV__) console.warn('[sync-engine] syncNow error:', error);
+      const description = describeSyncError(error);
+      if (__DEV__) console.warn('[sync-engine] syncNow error:', description);
+      await saveData(LAST_SYNC_ERROR_KEY, { at: Date.now(), error: description });
       updateSyncState('error');
-      scheduleRetry();
+      if (isRetryableSyncError(error)) scheduleRetry();
+      else clearRetryTimer();
     }
   } finally {
     _syncing = false;
@@ -430,7 +462,7 @@ export async function pullAllFromServer(): Promise<void> {
   } catch (error) {
     if (error instanceof OfflineError) updateSyncState('idle');
     else {
-      if (__DEV__) console.warn('[sync-engine] pullAllFromServer error:', error);
+      if (__DEV__) console.warn('[sync-engine] pullAllFromServer error:', describeSyncError(error));
       updateSyncState('error');
     }
   } finally {
@@ -457,7 +489,12 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
     };
   }, []);
 
-  useEffect(() => setIsAuthed(isAuthed), [isAuthed]);
+  useEffect(() => {
+    setIsAuthed(isAuthed);
+    // A cold app launch starts in the active AppState, so the foreground
+    // listener below does not fire. Sync immediately once auth is restored.
+    if (isAuthed) void doSync();
+  }, [isAuthed]);
   useEffect(() => () => clearRetryTimer(), []);
   useEffect(() => {
     setSyncScheduler(scheduleSync);

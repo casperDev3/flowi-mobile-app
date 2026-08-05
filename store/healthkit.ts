@@ -47,6 +47,19 @@ export interface HKHeartRateSample {
 
 let _sdk: typeof import('@kingstinct/react-native-healthkit') | null = null;
 
+const HK_QUANTITY = {
+  steps: 'HKQuantityTypeIdentifierStepCount',
+  heartRate: 'HKQuantityTypeIdentifierHeartRate',
+  restingHeartRate: 'HKQuantityTypeIdentifierRestingHeartRate',
+  activeEnergy: 'HKQuantityTypeIdentifierActiveEnergyBurned',
+  bodyMass: 'HKQuantityTypeIdentifierBodyMass',
+  distance: 'HKQuantityTypeIdentifierDistanceWalkingRunning',
+  flights: 'HKQuantityTypeIdentifierFlightsClimbed',
+  oxygenSaturation: 'HKQuantityTypeIdentifierOxygenSaturation',
+} as const;
+
+const HK_SLEEP = 'HKCategoryTypeIdentifierSleepAnalysis' as const;
+
 function getSDK() {
   if (_sdk !== null) return _sdk;
   if (Platform.OS !== 'ios') return null;
@@ -64,23 +77,16 @@ export async function initHealthKit(): Promise<boolean> {
   const sdk = getSDK();
   if (!sdk) return false;
   try {
-    const { default: HealthKit, HKQuantityTypeIdentifier, HKCategoryTypeIdentifier } = sdk as any;
-    const available = await HealthKit.isHealthDataAvailable();
+    const HealthKit = (sdk as any).default ?? sdk;
+    if (
+      typeof HealthKit.isHealthDataAvailable !== 'function'
+      || typeof HealthKit.requestAuthorization !== 'function'
+    ) return false;
+    const available = await Promise.resolve(HealthKit.isHealthDataAvailable());
     if (!available) return false;
-    await HealthKit.requestAuthorization(
-      [],
-      [
-        HKQuantityTypeIdentifier.stepCount,
-        HKQuantityTypeIdentifier.heartRate,
-        HKQuantityTypeIdentifier.restingHeartRate,
-        HKQuantityTypeIdentifier.activeEnergyBurned,
-        HKQuantityTypeIdentifier.bodyMass,
-        HKQuantityTypeIdentifier.distanceWalkingRunning,
-        HKQuantityTypeIdentifier.flightsClimbed,
-        HKQuantityTypeIdentifier.oxygenSaturation,
-        HKCategoryTypeIdentifier.sleepAnalysis,
-      ],
-    );
+    await HealthKit.requestAuthorization({
+      toRead: [...Object.values(HK_QUANTITY), HK_SLEEP],
+    });
     return true;
   } catch (e) {
     console.warn('[HealthKit] initHealthKit error:', e);
@@ -102,47 +108,82 @@ function endOfDay(d = new Date()) {
   return e;
 }
 
-async function querySum(sdk: any, identifier: string, from: Date, to: Date): Promise<number> {
+function quantityValue(value: unknown): number {
+  if (typeof value === 'number') return value;
+  if (value && typeof value === 'object' && 'quantity' in value) {
+    const quantity = (value as { quantity?: unknown }).quantity;
+    return typeof quantity === 'number' ? quantity : 0;
+  }
+  return 0;
+}
+
+function dateFilter(from: Date, to: Date) {
+  return { filter: { date: { startDate: from, endDate: to } } };
+}
+
+async function querySum(
+  sdk: any,
+  identifier: string,
+  from: Date,
+  to: Date,
+  unit = 'count',
+): Promise<number> {
   try {
-    const { default: HealthKit, HKStatisticsOptions, HKUnit } = sdk;
+    const HealthKit = sdk.default ?? sdk;
     const result = await HealthKit.queryStatisticsForQuantity(
       identifier,
-      { from, to },
-      [HKStatisticsOptions.cumulativeSum],
+      ['cumulativeSum'],
+      { ...dateFilter(from, to), unit },
     );
-    return Math.round(result?.sumQuantity?.doubleValue(HKUnit.count()) ?? 0);
+    return Math.round(quantityValue(result?.sumQuantity));
   } catch {
     return 0;
   }
 }
 
 async function queryEnergySum(sdk: any, identifier: string, from: Date, to: Date): Promise<number> {
-  try {
-    const { default: HealthKit, HKStatisticsOptions, HKUnit } = sdk;
-    const result = await HealthKit.queryStatisticsForQuantity(
-      identifier,
-      { from, to },
-      [HKStatisticsOptions.cumulativeSum],
-    );
-    return Math.round(result?.sumQuantity?.doubleValue(HKUnit.kilocalorie()) ?? 0);
-  } catch {
-    return 0;
-  }
+  return querySum(sdk, identifier, from, to, 'kcal');
 }
 
-async function querySamples(sdk: any, identifier: string, from: Date, to: Date, limit = 500): Promise<any[]> {
+async function queryQuantitySamples(
+  sdk: any,
+  identifier: string,
+  from: Date,
+  to: Date,
+  limit = 500,
+  unit?: string,
+): Promise<any[]> {
   try {
-    const { default: HealthKit } = sdk;
-    return await HealthKit.querySamples(identifier, { from, to, limit }) ?? [];
+    const HealthKit = sdk.default ?? sdk;
+    return await HealthKit.queryQuantitySamples(identifier, {
+      ...dateFilter(from, to), limit, ascending: false, ...(unit ? { unit } : {}),
+    }) ?? [];
   } catch {
     return [];
   }
 }
 
-async function queryMostRecent(sdk: any, identifier: string): Promise<any | null> {
+async function queryCategorySamples(
+  sdk: any,
+  identifier: string,
+  from: Date,
+  to: Date,
+  limit = 500,
+): Promise<any[]> {
   try {
-    const { default: HealthKit } = sdk;
-    return await HealthKit.getMostRecentQuantitySample(identifier) ?? null;
+    const HealthKit = sdk.default ?? sdk;
+    return await HealthKit.queryCategorySamples(identifier, {
+      ...dateFilter(from, to), limit, ascending: false,
+    }) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function queryMostRecent(sdk: any, identifier: string, unit?: string): Promise<any | null> {
+  try {
+    const HealthKit = sdk.default ?? sdk;
+    return await HealthKit.getMostRecentQuantitySample(identifier, unit) ?? null;
   } catch {
     return null;
   }
@@ -150,25 +191,11 @@ async function queryMostRecent(sdk: any, identifier: string): Promise<any | null
 
 async function queryDistance(sdk: any, from: Date, to: Date): Promise<number | null> {
   try {
-    const { default: HealthKit, HKStatisticsOptions, HKUnit, HKQuantityTypeIdentifier } = sdk;
-    const result = await HealthKit.queryStatisticsForQuantity(
-      HKQuantityTypeIdentifier.distanceWalkingRunning,
-      { from, to },
-      [HKStatisticsOptions.cumulativeSum],
-    );
-    const meters = result?.sumQuantity?.doubleValue(HKUnit.meter()) ?? 0;
+    const meters = await querySum(sdk, HK_QUANTITY.distance, from, to, 'm');
     return meters > 0 ? Math.round(meters / 100) / 10 : null;
   } catch {
     return null;
   }
-}
-
-function hrFromSamples(sdk: any, samples: any[]): number | null {
-  if (!samples.length) return null;
-  const { HKUnit } = sdk;
-  const values = samples.map(s => s.quantity?.doubleValue(HKUnit.hertz()) ?? s.quantity?.doubleValue('count/min') ?? 0).filter(v => v > 0);
-  if (!values.length) return null;
-  return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
 }
 
 // ─── Today ────────────────────────────────────────────────────────────────────
@@ -182,27 +209,23 @@ export async function fetchTodayData(): Promise<HKDayData> {
   const sdk = getSDK();
   if (!sdk) return empty;
 
-  const { HKQuantityTypeIdentifier, HKCategoryTypeIdentifier, HKUnit } = sdk as any;
   const from = startOfDay();
   const to = new Date();
 
   const [steps, cal, hrSamples, restHRSample, weightSample, dist, sleepSamples] =
     await Promise.all([
-      querySum(sdk, HKQuantityTypeIdentifier.stepCount, from, to),
-      queryEnergySum(sdk, HKQuantityTypeIdentifier.activeEnergyBurned, from, to),
-      querySamples(sdk, HKQuantityTypeIdentifier.heartRate, from, to),
-      queryMostRecent(sdk, HKQuantityTypeIdentifier.restingHeartRate),
-      queryMostRecent(sdk, HKQuantityTypeIdentifier.bodyMass),
+      querySum(sdk, HK_QUANTITY.steps, from, to),
+      queryEnergySum(sdk, HK_QUANTITY.activeEnergy, from, to),
+      queryQuantitySamples(sdk, HK_QUANTITY.heartRate, from, to, 500, 'count/min'),
+      queryMostRecent(sdk, HK_QUANTITY.restingHeartRate, 'count/min'),
+      queryMostRecent(sdk, HK_QUANTITY.bodyMass, 'kg'),
       queryDistance(sdk, from, to),
-      querySamples(sdk, HKCategoryTypeIdentifier.sleepAnalysis, startOfDay(new Date(Date.now() - 86400000)), to),
+      queryCategorySamples(sdk, HK_SLEEP, startOfDay(new Date(Date.now() - 86400000)), to),
     ]);
 
-  // HR values — react-native-healthkit returns BPM directly in doubleValue(count/min)
-  const hrValues = hrSamples.map((s: any) => {
-    try { return Math.round(s.quantity.doubleValue(HKUnit.hertz()) * 60); } catch {}
-    try { return Math.round(s.quantity.doubleValue('count/min')); } catch {}
-    return 0;
-  }).filter((v: number) => v > 30 && v < 300);
+  const hrValues = hrSamples
+    .map((sample: any) => Math.round(quantityValue(sample?.quantity)))
+    .filter((value: number) => value > 30 && value < 300);
 
   const hrAvg = hrValues.length ? Math.round(hrValues.reduce((a: number, b: number) => a + b, 0) / hrValues.length) : null;
   const hrMin = hrValues.length ? Math.min(...hrValues) : null;
@@ -210,20 +233,19 @@ export async function fetchTodayData(): Promise<HKDayData> {
 
   let restHR: number | null = null;
   if (restHRSample) {
-    try { restHR = Math.round(restHRSample.quantity.doubleValue('count/min')); } catch {}
+    restHR = Math.round(quantityValue(restHRSample.quantity));
   }
 
   let weight: number | null = null;
   if (weightSample) {
-    try { weight = Math.round(weightSample.quantity.doubleValue(HKUnit.gramUnit(1)) / 100) / 10; } catch {}
-    try { weight = Math.round(weightSample.quantity.doubleValue('kg') * 10) / 10; } catch {}
+    weight = Math.round(quantityValue(weightSample.quantity) * 10) / 10;
   }
 
   // Sleep — sum ASLEEP categories
   const sleepMins = sleepSamples
     .filter((s: any) => {
       const v = s.value ?? s.categoryValue;
-      return v === 0 || v === 1 || v === 5 || v === 6 || v === 7; // in bed or asleep variants
+      return v === 1 || v === 3 || v === 4 || v === 5;
     })
     .reduce((sum: number, s: any) => {
       const ms = new Date(s.endDate).getTime() - new Date(s.startDate).getTime();
@@ -248,8 +270,6 @@ export async function fetchTodayData(): Promise<HKDayData> {
 export async function fetchWeekData(): Promise<HKWeekDay[]> {
   const sdk = getSDK();
   if (!sdk) return [];
-  const { HKQuantityTypeIdentifier, HKUnit } = sdk as any;
-
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d;
   });
@@ -258,17 +278,15 @@ export async function fetchWeekData(): Promise<HKWeekDay[]> {
     const from = startOfDay(day);
     const to = endOfDay(day);
     const [steps, cal, hrSamples, dist] = await Promise.all([
-      querySum(sdk, HKQuantityTypeIdentifier.stepCount, from, to),
-      queryEnergySum(sdk, HKQuantityTypeIdentifier.activeEnergyBurned, from, to),
-      querySamples(sdk, HKQuantityTypeIdentifier.heartRate, from, to, 50),
+      querySum(sdk, HK_QUANTITY.steps, from, to),
+      queryEnergySum(sdk, HK_QUANTITY.activeEnergy, from, to),
+      queryQuantitySamples(sdk, HK_QUANTITY.heartRate, from, to, 50, 'count/min'),
       queryDistance(sdk, from, to),
     ]);
 
-    const hrValues = hrSamples.map((s: any) => {
-      try { return Math.round(s.quantity.doubleValue(HKUnit.hertz()) * 60); } catch {}
-      try { return Math.round(s.quantity.doubleValue('count/min')); } catch {}
-      return 0;
-    }).filter((v: number) => v > 30 && v < 300);
+    const hrValues = hrSamples
+      .map((sample: any) => Math.round(quantityValue(sample?.quantity)))
+      .filter((value: number) => value > 30 && value < 300);
 
     return {
       date: day.toISOString().slice(0, 10),
@@ -287,13 +305,12 @@ export async function fetchWeekData(): Promise<HKWeekDay[]> {
 export async function fetchHeartRateSamples(hoursBack = 24): Promise<HKHeartRateSample[]> {
   const sdk = getSDK();
   if (!sdk) return [];
-  const { HKQuantityTypeIdentifier, HKUnit } = sdk as any;
   const from = new Date(Date.now() - hoursBack * 3600000);
-  const samples = await querySamples(sdk, HKQuantityTypeIdentifier.heartRate, from, new Date(), 200);
+  const samples = await queryQuantitySamples(
+    sdk, HK_QUANTITY.heartRate, from, new Date(), 200, 'count/min',
+  );
   return samples.map((s: any) => {
-    let value = 0;
-    try { value = Math.round(s.quantity.doubleValue(HKUnit.hertz()) * 60); } catch {}
-    if (!value) try { value = Math.round(s.quantity.doubleValue('count/min')); } catch {}
+    const value = Math.round(quantityValue(s.quantity));
     return { value, startDate: s.startDate };
   }).filter(s => s.value > 30 && s.value < 300);
 }
@@ -304,17 +321,21 @@ export async function fetchWorkouts(limit = 20): Promise<HKWorkout[]> {
   const sdk = getSDK();
   if (!sdk) return [];
   try {
-    const { default: HealthKit } = sdk as any;
+    const HealthKit = (sdk as any).default ?? sdk;
     const from = new Date(Date.now() - 30 * 86400000);
-    const results = await HealthKit.queryWorkoutSamples({ from, to: new Date(), limit }) ?? [];
+    const results = await HealthKit.queryWorkoutSamples({
+      filter: { date: { startDate: from, endDate: new Date() } },
+      limit,
+      ascending: false,
+    }) ?? [];
     return results.map((w: any) => ({
       activityId: w.workoutActivityType ?? 0,
-      activityName: w.workoutActivityType ?? 'Тренування',
-      calories: Math.round(w.totalEnergyBurned?.doubleValue('kcal') ?? 0),
-      distance: Math.round((w.totalDistance?.doubleValue('m') ?? 0)),
-      duration: Math.round(w.duration ?? 0),
-      startDate: w.startDate,
-      endDate: w.endDate,
+      activityName: String(w.workoutActivityType ?? 'Тренування'),
+      calories: Math.round(quantityValue(w.totalEnergyBurned)),
+      distance: Math.round(quantityValue(w.totalDistance)),
+      duration: Math.round(quantityValue(w.duration)),
+      startDate: w.startDate instanceof Date ? w.startDate.toISOString() : String(w.startDate),
+      endDate: w.endDate instanceof Date ? w.endDate.toISOString() : String(w.endDate),
       sourceName: w.sourceRevision?.source?.name ?? '',
     }));
   } catch {

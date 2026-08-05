@@ -16,6 +16,12 @@ import {
   OutboxItem,
 } from '@/store/synced-storage';
 import { assertCompatibleSyncContract } from '@/store/sync-contract';
+import { ApiError } from '@/store/api';
+import {
+  describeSyncError,
+  isRetryableSyncError,
+  normalizeSyncLocalId,
+} from '@/store/sync-engine';
 
 // ─── Мок AsyncStorage (аналогічно іншим тестам) ──────────────────────────────
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -40,6 +46,45 @@ describe('sync contract compatibility', () => {
 
   test('зупиняє застосування несумісного контракту', () => {
     expect(() => assertCompatibleSyncContract(2)).toThrow('Unsupported sync contract 2');
+  });
+});
+
+describe('sync error handling', () => {
+  test('не повторює детерміновані 400-відповіді', () => {
+    expect(isRetryableSyncError(new ApiError(400, 'invalid collection', 'invalid collection'))).toBe(false);
+  });
+
+  test('повторює мережеві, rate-limit та серверні помилки', () => {
+    expect(isRetryableSyncError(new ApiError(0, 'network', 'Network request failed'))).toBe(true);
+    expect(isRetryableSyncError(new ApiError(429, 'throttled', 'Too many requests'))).toBe(true);
+    expect(isRetryableSyncError(new ApiError(503, 'unavailable', 'Unavailable'))).toBe(true);
+  });
+
+  test('логує безпечні деталі відхиленої колекції', () => {
+    const error = new ApiError(400, 'invalid collection', 'invalid collection', {
+      error: 'invalid collection',
+      invalid: 'legacy_collection',
+    });
+    expect(describeSyncError(error)).toEqual({
+      status: 400,
+      code: 'invalid collection',
+      message: 'invalid collection',
+      invalid: 'legacy_collection',
+    });
+  });
+});
+
+describe('sync local id normalization', () => {
+  test('відсікає legacy-записи без id та надто довгі id', () => {
+    expect(normalizeSyncLocalId(undefined)).toBeNull();
+    expect(normalizeSyncLocalId(null)).toBeNull();
+    expect(normalizeSyncLocalId('')).toBeNull();
+    expect(normalizeSyncLocalId('x'.repeat(65))).toBeNull();
+  });
+
+  test('нормалізує старі числові id та зберігає валідні рядки', () => {
+    expect(normalizeSyncLocalId(123)).toBe('123');
+    expect(normalizeSyncLocalId('task-1')).toBe('task-1');
   });
 });
 

@@ -419,9 +419,10 @@ export default function BudgetScreen() {
         onRequestClose={() => setShowEditModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowEditModal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet, maxHeight: '90%' }]}>
+                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
                 {/* Handle */}
                 <View style={{ alignItems: 'center', marginBottom: 16 }}>
@@ -490,6 +491,7 @@ export default function BudgetScreen() {
                     <Text style={{ color: c.red, fontSize: 15, fontWeight: '600' }}>Видалити категорію</Text>
                   </TouchableOpacity>
                 )}
+                </ScrollView>
               </BlurView>
             </Pressable>
           </Pressable>
@@ -501,7 +503,7 @@ export default function BudgetScreen() {
         onRequestClose={() => setShowAddModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowAddModal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet, maxHeight: '90%' }]}>
 
@@ -555,7 +557,7 @@ export default function BudgetScreen() {
                     </View>
                   ))}
 
-                  <TouchableOpacity onPress={addCategory}
+                  <TouchableOpacity onPress={addCategory} disabled={!newCatName.trim()} accessibilityState={{ disabled: !newCatName.trim() }}
                     style={[st.btn, { backgroundColor: newCatName.trim() ? ACCENT : c.dim, marginTop: 8 }]}>
                     <Text style={{ color: newCatName.trim() ? '#fff' : c.sub, fontSize: 15, fontWeight: '700' }}>
                       Додати категорію

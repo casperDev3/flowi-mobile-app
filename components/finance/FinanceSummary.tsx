@@ -138,20 +138,20 @@ export function FinanceSummary({
         statusBarTranslucent
         onRequestClose={() => setShowAll(false)}>
         <Pressable style={s.overlay} onPress={() => setShowAll(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
               style={[s.sheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(12,12,20,0.98)' : 'rgba(248,246,255,0.98)' }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <TouchableOpacity onPress={() => setShowAll(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Закрити" onPress={() => setShowAll(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <IconSymbol name="xmark" size={17} color={c.sub} />
                   </TouchableOpacity>
                 </View>
               </View>
               <Text style={[s.sheetTitle, { color: c.sub }]}>{allCurrenciesLabel}</Text>
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480, flexShrink: 1 }}>
                 {/* Primary first — already primary, but still tappable to no-op */}
                 <OtherRow
                   cur={primary}
@@ -347,7 +347,7 @@ const s = StyleSheet.create({
   },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   sheetTitle:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 8 },

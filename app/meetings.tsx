@@ -1101,10 +1101,11 @@ export default function MeetingsScreen() {
       <Modal visible={!!selectedMtg} transparent animationType="slide" statusBarTranslucent
         onRequestClose={() => setSelectedMtg(null)}>
         <Pressable style={s.overlay} onPress={() => setSelectedMtg(null)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
             {selectedMtg && (
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
                 style={[s.sheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,10,20,0.98)' : 'rgba(245,244,255,0.98)' }]}>
+                <ScrollView showsVerticalScrollIndicator={false}>
 
                 {/* Handle */}
                 <View style={{ alignItems: 'center', marginBottom: 16 }}>
@@ -1208,6 +1209,7 @@ export default function MeetingsScreen() {
                     <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>Редагувати</Text>
                   </TouchableOpacity>
                 </View>
+                </ScrollView>
               </BlurView>
             )}
           </Pressable>
@@ -1231,7 +1233,7 @@ export default function MeetingsScreen() {
       <Modal visible={showGcalSheet} transparent animationType="slide" statusBarTranslucent
         onRequestClose={() => setShowGcalSheet(false)}>
         <Pressable style={s.overlay} onPress={() => setShowGcalSheet(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
               style={[s.sheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,12,22,0.98)' : 'rgba(240,240,255,0.98)', maxHeight: '90%' }]}>
               <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -1390,6 +1392,7 @@ export default function MeetingsScreen() {
         <Pressable style={[s.overlay, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }]}
           onPress={() => { if (!isRecording) setRecordingMtgId(null); }}>
           <Pressable onPress={e => e.stopPropagation()}
+            accessibilityViewIsModal importantForAccessibility="yes"
             style={{ backgroundColor: isDark ? '#12121E' : '#FFFFFF', borderRadius: 24, padding: 28,
               alignItems: 'center', width: 280, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20 }}>
 
@@ -1442,7 +1445,7 @@ const s = StyleSheet.create({
   fab:      { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:    { borderRadius: 22, borderWidth: 1, padding: 16, overflow: 'hidden' },
+  sheet:    { borderRadius: 22, borderWidth: 1, padding: 16, maxHeight: '90%', overflow: 'hidden' },
   label:    { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, color: '#888', marginBottom: 6, marginTop: 12 },
   input:    { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
   inp:      { borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontWeight: '600', borderWidth: 1.5 },

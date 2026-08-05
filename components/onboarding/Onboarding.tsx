@@ -104,8 +104,8 @@ export function Onboarding() {
   ];
 
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent>
-      <View style={{ flex: 1 }}>
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => undefined}>
+      <View style={{ flex: 1 }} accessibilityViewIsModal importantForAccessibility="yes">
         <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
         <SafeAreaView style={{ flex: 1 }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>

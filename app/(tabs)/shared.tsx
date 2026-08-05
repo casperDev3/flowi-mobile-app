@@ -2134,7 +2134,7 @@ const st = StyleSheet.create({
   // Modals
   overlay:         { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheetWrapper:    { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:           { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:           { borderRadius: 24, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
   handleRow:       { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:          { width: 36, height: 4, borderRadius: 2 },
   sheetTitle:      { fontSize: 20, fontWeight: '800', marginBottom: 8 },

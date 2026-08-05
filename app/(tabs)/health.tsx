@@ -268,7 +268,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, isD
   return (
     <Modal visible={open} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <Pressable style={s.overlay} onPress={onClose}>
-        <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+        <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
           <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
             <View style={s.handleRow}>
               <View style={{ flex: 1 }} />
@@ -349,7 +349,7 @@ const s = StyleSheet.create({
   fabGrad:      { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
   overlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2 },
   sheetTitle:   { fontSize: 20, fontWeight: '800' },

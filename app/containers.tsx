@@ -373,9 +373,10 @@ export default function ContainersScreen() {
       <Modal visible={showForm} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowForm(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowForm(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
                 style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
                   <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, marginRight: 'auto', marginLeft: 'auto' }} />
                 </View>
@@ -383,7 +384,7 @@ export default function ContainersScreen() {
                   <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', flex: 1 }}>
                     {editingId ? tr.editContainer : tr.newContainer}
                   </Text>
-                  <TouchableOpacity onPress={() => setShowForm(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.cancel} onPress={() => setShowForm(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <IconSymbol name="xmark" size={17} color={c.sub} />
                   </TouchableOpacity>
                 </View>
@@ -421,6 +422,7 @@ export default function ContainersScreen() {
                     <Text style={{ color: !cName.trim() ? c.sub : '#fff', fontWeight: '700' }}>{tr.save}</Text>
                   </TouchableOpacity>
                 </View>
+                </ScrollView>
               </BlurView>
             </Pressable>
           </Pressable>
@@ -431,15 +433,16 @@ export default function ContainersScreen() {
       <Modal visible={!!editItem} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditItem(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setEditItem(null)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
                 style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
                   <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, marginRight: 'auto', marginLeft: 'auto' }} />
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
                   <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', flex: 1 }}>Редагувати річ</Text>
-                  <TouchableOpacity onPress={() => setEditItem(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.cancel} onPress={() => setEditItem(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <IconSymbol name="xmark" size={17} color={c.sub} />
                   </TouchableOpacity>
                 </View>
@@ -484,6 +487,7 @@ export default function ContainersScreen() {
                     <Text style={{ color: !editItemName.trim() ? c.sub : '#fff', fontWeight: '700' }}>{tr.save}</Text>
                   </TouchableOpacity>
                 </View>
+                </ScrollView>
               </BlurView>
             </Pressable>
           </Pressable>
@@ -664,7 +668,7 @@ export default function ContainersScreen() {
 const s = StyleSheet.create({
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetOuter: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:      { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:      { borderRadius: 24, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
   label:      { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
   input:      { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500', marginBottom: 2 },
   btn:        { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },

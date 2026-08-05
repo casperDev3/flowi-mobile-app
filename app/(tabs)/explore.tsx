@@ -35,6 +35,9 @@ import {
   BalanceAdjustmentRow,
   balanceAdjustmentsToMap,
   balanceAdjustmentsToRows,
+  CategoryRow,
+  categoryMapToRows,
+  categoryRowsToMap,
 } from '@/store/migrations';
 import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
 import {
@@ -231,17 +234,18 @@ export default function FinanceScreen() {
   // Undo-тост (таб — над таб-баром)
   const { show: showUndo, element: undoElement } = useUndoToast(true);
 
-  // Load categories
+  // Load categories. У сховищі — пласкі рядки {id, type, name, icon}, екран
+  // працює зі звичною мапою за типом; конвертуємо на межі.
   useEffect(() => {
-    loadData<Record<TxType, CategoryDef[]>>('categories', DEFAULT_CATEGORIES).then(data => {
-      setCats(data);
+    loadData<CategoryRow[]>('categories', []).then(data => {
+      setCats(categoryRowsToMap(Array.isArray(data) ? data : [], DEFAULT_CATEGORIES));
       setCatsInitialized(true);
     });
   }, []);
 
   // Save categories
   useEffect(() => {
-    if (catsInitialized) void saveSyncedValue('categories', cats);
+    if (catsInitialized) void saveSynced('categories', categoryMapToRows(cats));
   }, [cats, catsInitialized]);
 
   // Load custom currencies

@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
 import { loadData } from '@/store/storage';
 
 type TxType = 'income' | 'expense';
@@ -255,7 +256,9 @@ export default function FinanceStatsScreen() {
 
   useEffect(() => {
     loadData<Transaction[]>('transactions', []).then(setTxs);
-    loadData<Record<TxType, CategoryDef[]>>('categories', DEFAULT_CATEGORIES).then(setCats);
+    loadData<CategoryRow[]>('categories', []).then(rows => {
+      setCats(categoryRowsToMap(Array.isArray(rows) ? rows : [], DEFAULT_CATEGORIES));
+    });
   }, []);
 
   const getCatIcon = (name: string, type: TxType): IconSymbolName =>

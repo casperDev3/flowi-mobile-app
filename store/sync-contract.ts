@@ -28,15 +28,13 @@ export const SYNC_ARRAY_KEYS = [
   'budget_limits',
   'finance_currencies',
   'finance_balance_adjustments',
+  'categories',
 ] as const;
 
 export type SyncArrayKey = (typeof SYNC_ARRAY_KEYS)[number];
 
 export const SYNC_SINGLETON_KEYS = [
-  // TODO(фаза 7, крок 2): categories — вкладений Record<TxType, CategoryDef[]>,
-  // нормалізація зачіпає explore.tsx і finance-stats.tsx.
-  'categories',
-  // Справжній скаляр — лишається singleton назавжди.
+  // Єдиний справжній скаляр — для нього повна заміна коректна за визначенням.
   'finance_primary_currency',
 ] as const;
 

@@ -470,6 +470,135 @@ describe('doSync — відхилення всього батчу', () => {
   });
 });
 
+// ─── Авто-LWW (фаза 9 плану) ────────────────────────────────────────────────
+
+describe('resolveConflictSide', () => {
+  const A = '2026-01-01T00:00:00.000Z';
+  const B = '2026-06-01T00:00:00.000Z';
+
+  test('пізніший штамп перемагає', () => {
+    const { resolveConflictSide } = loadEngine();
+    expect(resolveConflictSide(B, A)).toBe('local');
+    expect(resolveConflictSide(A, B)).toBe('server');
+  });
+
+  test('нічия віддається серверу — це детерміновано для обох клієнтів', () => {
+    const { resolveConflictSide } = loadEngine();
+    expect(resolveConflictSide(A, A)).toBe('server');
+  });
+
+  test('delete проти edit — до користувача', () => {
+    const { resolveConflictSide } = loadEngine();
+    expect(resolveConflictSide(B, A, { localDeleted: true })).toBe('manual');
+    expect(resolveConflictSide(B, A, { serverMissing: true })).toBe('manual');
+  });
+
+  test('коли штампа немає лише з одного боку — перемагає той, у кого він є', () => {
+    const { resolveConflictSide } = loadEngine();
+    expect(resolveConflictSide(A, undefined)).toBe('local');
+    expect(resolveConflictSide(undefined, A)).toBe('server');
+  });
+
+  test('жодного штампа — порівнювати нічим, до користувача', () => {
+    const { resolveConflictSide } = loadEngine();
+    expect(resolveConflictSide(undefined, undefined)).toBe('manual');
+    expect(resolveConflictSide('сміття', 'теж сміття')).toBe('manual');
+  });
+});
+
+describe('doSync — авторозв\'язання конфліктів', () => {
+  function conflictResponse(over: {
+    localUpdatedAt?: string;
+    serverUpdatedAt?: string | null;
+    clientDeleted?: boolean;
+    serverNull?: boolean;
+  }) {
+    return v2({
+      conflicts: [{
+        status: 'conflict',
+        mutation_id: 'm1',
+        collection: 'tasks',
+        local_id: 't1',
+        server: over.serverNull ? null : serverItem({
+          data: { id: 't1', title: 'серверне' },
+          client_updated_at: over.serverUpdatedAt ?? null,
+          revision: 9,
+        }),
+        client: {
+          data: { id: 't1', title: 'локальне', updatedAt: over.localUpdatedAt },
+          deleted: over.clientDeleted ?? false,
+          base_revision: null,
+        },
+      }],
+    });
+  }
+
+  function seedConflictScenario() {
+    seed('tasks', [{ id: 't1', title: 'локальне' }]);
+    seed('sync_outbox', [
+      { mutation_id: 'm1', collection: 'tasks', local_id: 't1', deleted: false, queued_at: 1 },
+    ]);
+  }
+
+  test('локальна правка новіша — перештовхується з force, користувача не турбуємо', async () => {
+    seedConflictScenario();
+    mockApiFetch.mockResolvedValue(conflictResponse({
+      localUpdatedAt: '2026-06-01T00:00:00.000Z',
+      serverUpdatedAt: '2026-01-01T00:00:00.000Z',
+    }));
+
+    await loadEngine().syncNow();
+
+    expect(read('sync_pending_conflicts', [])).toEqual([]);
+    const queued = outbox();
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({ collection: 'tasks', local_id: 't1', force: true });
+  });
+
+  test('серверна версія новіша — застосовується локально', async () => {
+    seedConflictScenario();
+    mockApiFetch.mockResolvedValue(conflictResponse({
+      localUpdatedAt: '2026-01-01T00:00:00.000Z',
+      serverUpdatedAt: '2026-06-01T00:00:00.000Z',
+    }));
+
+    await loadEngine().syncNow();
+
+    // Ключове: exchangeV2 тримає конфліктні рядки «брудними», тож серверні
+    // дані НЕ застосовуються самі — доводиться класти їх явно.
+    expect(read('tasks', [])).toEqual([{ id: 't1', title: 'серверне' }]);
+    expect(read('sync_pending_conflicts', [])).toEqual([]);
+    expect(outbox()).toHaveLength(0);
+  });
+
+  test('delete проти edit лишається користувачу', async () => {
+    seedConflictScenario();
+    mockApiFetch.mockResolvedValue(conflictResponse({
+      localUpdatedAt: '2026-06-01T00:00:00.000Z',
+      serverUpdatedAt: '2026-01-01T00:00:00.000Z',
+      clientDeleted: true,
+    }));
+
+    await loadEngine().syncNow();
+
+    const pending = read<{ id: string }[]>('sync_pending_conflicts', []);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].id).toBe('tasks:t1');
+  });
+
+  test('запис зник на сервері — теж до користувача', async () => {
+    seedConflictScenario();
+    mockApiFetch.mockResolvedValue(conflictResponse({
+      localUpdatedAt: '2026-06-01T00:00:00.000Z',
+      serverNull: true,
+    }));
+
+    await loadEngine().syncNow();
+
+    expect(read<unknown[]>('sync_pending_conflicts', [])).toHaveLength(1);
+  });
+});
+
 // ─── Карантин відхилених (фаза 8 плану) ─────────────────────────────────────
 
 describe('rejected[] — карантин замість заручництва', () => {

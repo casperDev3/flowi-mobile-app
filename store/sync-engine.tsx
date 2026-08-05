@@ -16,6 +16,7 @@ import {
   createMutationId,
   deduplicateOutbox,
   loadOutbox,
+  markDirty,
   removeMutationsFromOutbox,
   saveOutbox,
   setSyncScheduler,
@@ -215,6 +216,41 @@ function scheduleSync(debounceMs = 5000): void {
     _debounceTimer = null;
     void doSync();
   }, debounceMs);
+}
+
+export type ConflictResolution = 'local' | 'server' | 'manual';
+
+/**
+ * Хто перемагає в конфлікті — рішення приймає КЛІЄНТ, не сервер.
+ *
+ * Це особисті дані одного користувача на кількох пристроях: розбіжність там
+ * майже завжди означає офлайн, а не спір намірів. Тягнути користувача в
+ * модалку з двома JSON-об'єктами на кожен такий випадок не масштабується.
+ *
+ * Правила:
+ *  - пізніший `updatedAt` перемагає;
+ *  - нічия → сервер, бо це детерміновано: обидва клієнти порівнюють ті самі
+ *    два значення й доходять того самого висновку, тож стан збігається.
+ *    Штамп має мілісекундну роздільність, і нічия між пристроями реальна;
+ *  - delete проти edit → 'manual'. Це справжня неоднозначність наміру
+ *    («видалив на телефоні, дописав на планшеті»), і тут питання до
+ *    користувача виправдане;
+ *  - немає жодного штампа → 'manual', бо порівнювати нічим.
+ */
+export function resolveConflictSide(
+  localUpdatedAt: unknown,
+  serverUpdatedAt: unknown,
+  options: { localDeleted?: boolean; serverMissing?: boolean } = {},
+): ConflictResolution {
+  if (options.localDeleted || options.serverMissing) return 'manual';
+
+  const local = typeof localUpdatedAt === 'string' ? Date.parse(localUpdatedAt) : NaN;
+  const server = typeof serverUpdatedAt === 'string' ? Date.parse(serverUpdatedAt) : NaN;
+  if (Number.isNaN(local) && Number.isNaN(server)) return 'manual';
+  if (Number.isNaN(local)) return 'server';
+  if (Number.isNaN(server)) return 'local';
+
+  return local > server ? 'local' : 'server';
 }
 
 /** Те, що осідає в LAST_SYNC_ERROR_KEY після невдалого обміну. */
@@ -540,14 +576,49 @@ async function doSync(): Promise<void> {
     }
 
     if (allConflicts.length) {
-      await appendConflicts(allConflicts.map(conflict => ({
-        id: syncRecordKey(conflict.collection, conflict.local_id),
-        dataKey: conflict.collection,
-        local: { id: conflict.local_id, ...(conflict.client.data ?? {}) },
-        remote: conflict.server
-          ? { id: conflict.local_id, ...(conflict.server.data ?? {}) }
-          : { id: conflict.local_id, _deleted: true },
-      })));
+      const needsUser: SyncConflictServer[] = [];
+      // exchangeV2 навмисно тримає конфліктні рядки «брудними», щоб локальна
+      // версія лишалась видимою до вирішення. Тобто серверні дані НЕ
+      // застосовані — якщо перемагає сервер, їх треба покласти явно.
+      const serverWins: SyncResponseItem[] = [];
+
+      for (const conflict of allConflicts) {
+        const side = resolveConflictSide(
+          conflict.client.data?.updatedAt,
+          conflict.server?.client_updated_at,
+          { localDeleted: conflict.client.deleted, serverMissing: !conflict.server },
+        );
+
+        if (side === 'manual') {
+          needsUser.push(conflict);
+        } else if (side === 'local') {
+          // Локальна правка новіша — перештовхуємо її з force, інакше сервер
+          // відхилить за OCC вдруге, і так по колу.
+          await markDirty(conflict.collection, conflict.local_id, conflict.client.deleted, true);
+        } else if (conflict.server) {
+          serverWins.push(conflict.server);
+        }
+      }
+
+      if (serverWins.length) await applyPullResponse(serverWins, []);
+
+      if (__DEV__ && allConflicts.length !== needsUser.length) {
+        console.log(
+          `[sync-engine] авторозв'язано конфліктів: ${allConflicts.length - needsUser.length}, `
+          + `лишилось користувачу: ${needsUser.length}`,
+        );
+      }
+
+      if (needsUser.length) {
+        await appendConflicts(needsUser.map(conflict => ({
+          id: syncRecordKey(conflict.collection, conflict.local_id),
+          dataKey: conflict.collection,
+          local: { id: conflict.local_id, ...(conflict.client.data ?? {}) },
+          remote: conflict.server
+            ? { id: conflict.local_id, ...(conflict.server.data ?? {}) }
+            : { id: conflict.local_id, _deleted: true },
+        })));
+      }
     }
 
     const completedAt = Date.now();

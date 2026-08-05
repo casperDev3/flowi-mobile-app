@@ -19,7 +19,13 @@ import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
 import { loadConflicts, SyncConflict } from '@/store/sync-conflicts';
-import { formatSyncError, useSync } from '@/store/sync-engine';
+import {
+  formatSyncError,
+  loadRejected,
+  releaseFromQuarantine,
+  SyncRejection,
+  useSync,
+} from '@/store/sync-engine';
 import { markDirty, SYNC_SINGLETON_KEYS } from '@/store/synced-storage';
 
 const DATA_KEY_LABELS: Record<string, string> = {
@@ -41,10 +47,11 @@ export default function SyncScreen() {
   const { status: authStatus } = useAuth();
   const {
     state: syncState, lastSyncAt, pendingCount, conflictsCount,
-    lastError, oldestPendingAt, syncNow,
+    lastError, oldestPendingAt, rejectedCount, syncNow,
   } = useSync();
 
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
+  const [rejected, setRejected] = useState<SyncRejection[]>([]);
 
   const c = {
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
@@ -58,9 +65,18 @@ export default function SyncScreen() {
 
   const refreshConflicts = useCallback(async () => {
     setConflicts(await loadConflicts());
+    setRejected(await loadRejected());
   }, []);
 
-  useEffect(() => { refreshConflicts(); }, [refreshConflicts]);
+  useEffect(() => { refreshConflicts(); }, [refreshConflicts, rejectedCount]);
+
+  // «Спробувати ще» — просто випустити з карантину: наступна правка запису
+  // покладе його в outbox знову. «Відкинути» робить те саме, але користувач
+  // свідомо погоджується, що цей запис на сервер не поїде.
+  const handleRelease = useCallback(async (item: SyncRejection) => {
+    await releaseFromQuarantine(item.collection, item.local_id);
+    await refreshConflicts();
+  }, [refreshConflicts]);
 
   // ─── Вирішення конфліктів ──────────────────────────────────────────────────
   const handleResolve = async (id: string, choice: 'local' | 'remote') => {
@@ -229,6 +245,45 @@ export default function SyncScreen() {
                 </Text>
               </TouchableOpacity>
             </BlurView>
+
+            {/* ── КАРАНТИН ── */}
+            {rejected.length > 0 && (
+              <View style={{ marginTop: 4 }}>
+                <Text style={[st.sectionLabel, { color: c.sub }]}>
+                  СЕРВЕР НЕ ПРИЙНЯВ ({rejected.length})
+                </Text>
+                <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
+                  style={[st.card, { borderColor: c.red + '28', marginTop: 8 }]}>
+                  <Text style={[st.hintText, { color: c.sub, marginBottom: 10 }]}>
+                    Ці записи лишаються на пристрої. Решта синхронізації працює —
+                    вони більше не блокують чергу.
+                  </Text>
+                  {rejected.map(item => (
+                    <View
+                      key={`${item.collection}:${item.local_id}`}
+                      style={[st.hintRow, { backgroundColor: c.red + '10', borderColor: c.red + '24' }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[st.hintText, { color: c.text }]} numberOfLines={1}>
+                          {DATA_KEY_LABELS[item.collection] ?? item.collection}
+                          {' · '}
+                          {item.local_id}
+                        </Text>
+                        <Text style={[st.hintText, { color: c.sub }]} numberOfLines={2}>
+                          {item.detail ?? item.reason}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => void handleRelease(item)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Прибрати з карантину">
+                        <IconSymbol name="xmark" size={14} color={c.sub} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </BlurView>
+              </View>
+            )}
 
             {/* ── CONFLICTS ── */}
             {conflicts.length > 0 && (

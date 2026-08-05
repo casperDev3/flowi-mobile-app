@@ -470,6 +470,114 @@ describe('doSync — відхилення всього батчу', () => {
   });
 });
 
+// ─── Карантин відхилених (фаза 8 плану) ─────────────────────────────────────
+
+describe('rejected[] — карантин замість заручництва', () => {
+  function rejection(over: Partial<Record<string, unknown>> = {}) {
+    return {
+      status: 'rejected',
+      mutation_id: 'm-bad',
+      collection: 'tasks',
+      local_id: 'поганий',
+      reason: 'invalid_collection',
+      detail: 'unknown collection',
+      ...over,
+    };
+  }
+
+  test('відхилений запис іде в карантин і зникає з outbox', async () => {
+    seed('tasks', [{ id: 'поганий', title: 'не прийме' }]);
+    seed('sync_outbox', [
+      { mutation_id: 'm-bad', collection: 'tasks', local_id: 'поганий', deleted: false, queued_at: 1 },
+    ]);
+    mockApiFetch.mockResolvedValue(v2({ rejected: [rejection()] }));
+
+    await loadEngine().syncNow();
+
+    expect(outbox()).toHaveLength(0);
+    const quarantined = read<{ local_id: string; reason: string }[]>('sync_rejected_v2', []);
+    expect(quarantined).toHaveLength(1);
+    expect(quarantined[0]).toMatchObject({ local_id: 'поганий', reason: 'invalid_collection' });
+  });
+
+  test('решта батчу застосовується попри відхилення', async () => {
+    seed('tasks', [{ id: 'добрий' }, { id: 'поганий' }]);
+    seed('sync_outbox', [
+      { mutation_id: 'm-good', collection: 'tasks', local_id: 'добрий', deleted: false, queued_at: 1 },
+      { mutation_id: 'm-bad', collection: 'tasks', local_id: 'поганий', deleted: false, queued_at: 1 },
+    ]);
+    mockApiFetch.mockResolvedValue(v2({
+      acknowledged: [{ status: 'applied', mutation_id: 'm-good', collection: 'tasks', local_id: 'добрий', revision: 1, change_seq: 1 }],
+      rejected: [rejection()],
+    }));
+
+    await loadEngine().syncNow();
+
+    expect(outbox()).toHaveLength(0);
+    expect(lastError()).toBeNull();
+  });
+
+  test('карантин знімає сліпоту: серверні зміни для запису знову доходять', async () => {
+    seed('tasks', [{ id: 'поганий', title: 'локальне' }]);
+    seed('sync_outbox', [
+      { mutation_id: 'm-bad', collection: 'tasks', local_id: 'поганий', deleted: false, queued_at: 1 },
+    ]);
+    mockApiFetch.mockResolvedValue(v2({ rejected: [rejection()] }));
+    await loadEngine().syncNow();
+
+    mockApiFetch.mockResolvedValue(v2({
+      changes: [serverItem({ local_id: 'поганий', data: { id: 'поганий', title: 'серверне' } })],
+    }));
+    await loadEngine().syncNow();
+
+    // Доти запис висів би в outbox вічно, а dirty-wins глушив би серверні зміни.
+    expect(read('tasks', [])).toEqual([{ id: 'поганий', title: 'серверне' }]);
+  });
+
+  test('повторне відхилення не плодить дублікатів у карантині', async () => {
+    seed('sync_rejected_v2', [{ ...rejection(), quarantined_at: 111 }]);
+    seed('sync_outbox', [
+      { mutation_id: 'm-bad-2', collection: 'tasks', local_id: 'поганий', deleted: false, queued_at: 1 },
+    ]);
+    seed('tasks', [{ id: 'поганий' }]);
+    mockApiFetch.mockResolvedValue(
+      v2({ rejected: [rejection({ mutation_id: 'm-bad-2', reason: 'invalid_local_id' })] }),
+    );
+
+    await loadEngine().syncNow();
+
+    const quarantined = read<{ reason: string; quarantined_at: number }[]>('sync_rejected_v2', []);
+    expect(quarantined).toHaveLength(1);
+    expect(quarantined[0].reason).toBe('invalid_local_id');
+    // Вік карантину рахується з ПЕРШОГО відхилення, а не оновлюється щоразу.
+    expect(quarantined[0].quarantined_at).toBe(111);
+  });
+
+  test('відповідь старішого сервера без rejected не ламає обмін', async () => {
+    seed('tasks', [{ id: 't1' }]);
+    seed('sync_outbox', [
+      { mutation_id: 'm1', collection: 'tasks', local_id: 't1', deleted: false, queued_at: 1 },
+    ]);
+    mockApiFetch.mockResolvedValue(v2());
+
+    await loadEngine().syncNow();
+
+    expect(read('sync_rejected_v2', [])).toEqual([]);
+    expect(lastError()).toBeNull();
+  });
+
+  test('releaseFromQuarantine прибирає саме потрібний запис', async () => {
+    seed('sync_rejected_v2', [
+      rejection({ local_id: 'a' }),
+      rejection({ local_id: 'b' }),
+    ]);
+
+    await loadEngine().releaseFromQuarantine('tasks', 'a');
+
+    expect(read<{ local_id: string }[]>('sync_rejected_v2', []).map(r => r.local_id)).toEqual(['b']);
+  });
+});
+
 // ─── pullAllFromServer (дефект; фаза 4 плану) ───────────────────────────────
 
 describe('pullAllFromServer — сервер стає істиною', () => {

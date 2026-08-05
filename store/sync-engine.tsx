@@ -62,6 +62,18 @@ interface SyncConflictServer {
   client: { data: any; deleted: boolean; base_revision: number | null };
 }
 
+/** Запис, який сервер стабільно відмовляється приймати. */
+export interface SyncRejection {
+  status: 'rejected';
+  mutation_id: string;
+  collection: string;
+  local_id: string;
+  reason: string;
+  detail?: string;
+  /** Проставляє клієнт при карантині — вік запису в UI. */
+  quarantined_at?: number;
+}
+
 interface SyncResponse {
   contract_version?: number;
   protocol_version: 2;
@@ -69,6 +81,8 @@ interface SyncResponse {
   changes: SyncResponseItem[];
   acknowledged: SyncAcknowledgement[];
   conflicts: SyncConflictServer[];
+  /** Додано у фазі 8. Старіші сервери поля не повертають. */
+  rejected?: SyncRejection[];
   next_cursor: number | null;
 }
 
@@ -78,6 +92,35 @@ const SERVER_CURSOR_KEY = 'server_change_cursor_v2';
 const SERVER_REVISIONS_KEY = 'server_record_revisions_v2';
 const LAST_SYNC_AT_KEY = 'last_server_sync_completed_at';
 const LAST_SYNC_ERROR_KEY = 'last_server_sync_error_v2';
+const REJECTED_KEY = 'sync_rejected_v2';
+
+export async function loadRejected(): Promise<SyncRejection[]> {
+  return loadData<SyncRejection[]>(REJECTED_KEY, []);
+}
+
+/** Дедуп за collection:local_id — повторне відхилення оновлює причину. */
+export async function quarantineRejections(items: SyncRejection[]): Promise<SyncRejection[]> {
+  if (!items.length) return loadRejected();
+  const existing = await loadRejected();
+  const byRecord = new Map(existing.map(item => [syncRecordKey(item.collection, item.local_id), item]));
+  for (const item of items) {
+    const key = syncRecordKey(item.collection, item.local_id);
+    byRecord.set(key, { ...item, quarantined_at: byRecord.get(key)?.quarantined_at ?? Date.now() });
+  }
+  const next = Array.from(byRecord.values());
+  await saveData(REJECTED_KEY, next);
+  return next;
+}
+
+/** Прибирає запис із карантину — «спробувати ще» або «відкинути» в UI. */
+export async function releaseFromQuarantine(collection: string, localId: string): Promise<void> {
+  const key = syncRecordKey(collection, localId);
+  const next = (await loadRejected()).filter(
+    item => syncRecordKey(item.collection, item.local_id) !== key,
+  );
+  await saveData(REJECTED_KEY, next);
+  updateRejectedCount(next.length);
+}
 
 export const syncRecordKey = (collection: string, localId: string): string =>
   `${collection}:${localId}`;
@@ -216,12 +259,14 @@ interface SyncCtx {
   lastError: SyncErrorInfo | null;
   /** Коли поставлено в чергу найстаріший непроведений запис. */
   oldestPendingAt: number | null;
+  /** Скільки записів сервер відмовився приймати (фаза 8). */
+  rejectedCount: number;
   syncNow: () => Promise<void>;
 }
 
 const Ctx = createContext<SyncCtx>({
   state: 'idle', lastSyncAt: null, pendingCount: 0, conflictsCount: 0,
-  lastError: null, oldestPendingAt: null,
+  lastError: null, oldestPendingAt: null, rejectedCount: 0,
   syncNow: async () => {},
 });
 
@@ -231,11 +276,13 @@ let _setPendingCount: ((count: number) => void) | null = null;
 let _setConflictsCount: ((count: number) => void) | null = null;
 let _setLastError: ((info: SyncErrorInfo | null) => void) | null = null;
 let _setOldestPendingAt: ((timestamp: number | null) => void) | null = null;
+let _setRejectedCount: ((count: number) => void) | null = null;
 
 const updateSyncState = (state: SyncState) => _setState?.(state);
 const updateLastSyncAt = (timestamp: number) => _setLastSyncAt?.(timestamp);
 const updateConflictsCount = (count: number) => _setConflictsCount?.(count);
 const updateLastError = (info: SyncErrorInfo | null) => _setLastError?.(info);
+const updateRejectedCount = (count: number) => _setRejectedCount?.(count);
 
 /** Тримає лічильник і вік черги узгодженими — обидва рахуються з того самого outbox. */
 function updatePendingFrom(items: OutboxItem[]): void {
@@ -394,9 +441,22 @@ async function exchangeV2(
       throw new Error(`Unsupported sync protocol ${String(response.protocol_version)}`);
     }
 
+    const rejections = response.rejected ?? [];
+    // Відхилений запис прибирається з outbox і йде в карантин. Інакше він
+    // висів би вічно: сервер стабільно його не приймає, а поки він в outbox,
+    // клієнт ще й ігнорує серверні зміни для цього запису.
+    if (rejections.length) {
+      const quarantined = await quarantineRejections(rejections);
+      updateRejectedCount(quarantined.length);
+      if (__DEV__) {
+        console.warn('[sync-engine] відхилено сервером:', rejections.map(r => `${r.collection}:${r.local_id} (${r.reason})`));
+      }
+    }
+
     const finishedIds = new Set([
       ...response.acknowledged.map(item => item.mutation_id),
       ...response.conflicts.map(item => item.mutation_id),
+      ...rejections.map(item => item.mutation_id),
     ]);
     await removeMutationsFromOutbox(finishedIds);
 
@@ -632,6 +692,7 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
   const [conflictsCount, setConflictsCount] = useState(0);
   const [lastError, setLastError] = useState<SyncErrorInfo | null>(null);
   const [oldestPendingAt, setOldestPendingAt] = useState<number | null>(null);
+  const [rejectedCount, setRejectedCount] = useState(0);
 
   useEffect(() => {
     _setState = setState;
@@ -640,6 +701,7 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
     _setConflictsCount = setConflictsCount;
     _setLastError = setLastError;
     _setOldestPendingAt = setOldestPendingAt;
+    _setRejectedCount = setRejectedCount;
     return () => {
       _setState = null;
       _setLastSyncAt = null;
@@ -647,6 +709,7 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
       _setConflictsCount = null;
       _setLastError = null;
       _setOldestPendingAt = null;
+      _setRejectedCount = null;
     };
   }, []);
 
@@ -669,6 +732,7 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
       setPendingCount(outbox.length);
       setOldestPendingAt(oldestQueuedAt(outbox));
       setConflictsCount((await loadConflicts()).length);
+      setRejectedCount((await loadRejected()).length);
       // Помилка переживає перезапуск: якщо з моменту останнього провалу нічого
       // не вдалося, стан має лишатись 'error', а не показувати чисте 'idle'.
       const storedError = await loadData<SyncErrorInfo | null>(LAST_SYNC_ERROR_KEY, null);
@@ -705,7 +769,7 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
   return (
     <Ctx.Provider value={{
       state, lastSyncAt, pendingCount, conflictsCount,
-      lastError, oldestPendingAt, syncNow: syncNowCallback,
+      lastError, oldestPendingAt, rejectedCount, syncNow: syncNowCallback,
     }}>
       {children}
     </Ctx.Provider>

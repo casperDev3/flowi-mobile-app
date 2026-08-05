@@ -9,6 +9,7 @@
  */
 
 import { diffItems, deduplicateOutbox, applyPullItems, OutboxItem } from '@/store/synced-storage';
+import { assertCompatibleSyncContract } from '@/store/sync-contract';
 
 // ─── Мок AsyncStorage (аналогічно іншим тестам) ──────────────────────────────
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -24,6 +25,17 @@ jest.mock('@/store/storage', () => ({
   loadData: jest.fn(async (_key: string, fallback: unknown) => fallback),
   saveData: jest.fn(async () => {}),
 }));
+
+describe('sync contract compatibility', () => {
+  test('приймає поточну та legacy-відповідь без версії', () => {
+    expect(() => assertCompatibleSyncContract(1)).not.toThrow();
+    expect(() => assertCompatibleSyncContract(undefined)).not.toThrow();
+  });
+
+  test('зупиняє застосування несумісного контракту', () => {
+    expect(() => assertCompatibleSyncContract(2)).toThrow('Unsupported sync contract 2');
+  });
+});
 
 // ─── diffItems ────────────────────────────────────────────────────────────────
 

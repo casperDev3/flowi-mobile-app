@@ -2,6 +2,12 @@ import { isSameMonth, startOfMonth } from './dateUtils';
 
 export type TxType = 'income' | 'expense';
 
+export interface TxHistoryEvent {
+  id: string;
+  at: string;
+  note: string;
+}
+
 export interface Transaction {
   id: string;
   type: TxType;
@@ -10,6 +16,15 @@ export interface Transaction {
   note: string;
   date: string;
   currency?: string;
+  history?: TxHistoryEvent[];
+}
+
+/** Append chronologically; detail screens may reverse a copy for newest-first UI. */
+export function appendTransactionHistory(
+  transaction: Transaction,
+  event: TxHistoryEvent,
+): Transaction {
+  return { ...transaction, history: [...(transaction.history ?? []), event] };
 }
 
 export interface Currency {

@@ -1,4 +1,4 @@
-import { Transaction, calcTotals, filterByMonth, groupTransactions, txCurrency } from '@/utils/financeUtils';
+import { Transaction, appendTransactionHistory, calcTotals, filterByMonth, groupTransactions, txCurrency } from '@/utils/financeUtils';
 import { PRIORITY_ORDER, Task, applyTaskFilters, deadlineDiff, getProgress, isOverdue, sortTasks } from '@/utils/taskUtils';
 
 const tx = (over: Partial<Transaction> = {}): Transaction => ({
@@ -55,6 +55,17 @@ describe('financeUtils — валюта та групування', () => {
     const day15 = groups.find(g => g.items.length === 2)!;
     expect(day15.dayExpenseByCur.UAH).toBe(100);
     expect(day15.dayIncomeByCur.UAH).toBe(500);
+  });
+
+  test('історія транзакції зберігається хронологічно', () => {
+    const first = { id: 'h1', at: '2026-06-15T10:00:00.000Z', note: 'first' };
+    const second = { id: 'h2', at: '2026-06-15T11:00:00.000Z', note: 'second' };
+    const original = tx({ history: [first] });
+    const updated = appendTransactionHistory(original, second);
+
+    expect(updated.history).toEqual([first, second]);
+    expect(updated).not.toBe(original);
+    expect(original.history).toEqual([first]);
   });
 });
 

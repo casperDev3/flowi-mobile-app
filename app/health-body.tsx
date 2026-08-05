@@ -14,16 +14,17 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
+import type { Translations } from '@/store/translations';
 import { ACCENT, ACCENT_MOOD, ACCENT_PROT, ACCENT_PULSE, ACCENT_WEIGHT, getHealthColors } from '@/utils/healthTheme';
 import {
   DEFAULT_PROFILE, EntryType, MEASUREMENT_TYPES, MeasurementType,
   estimateBodyFatNavy, latestValue, leanMass, waistToHeightRatio, waistToHipRatio, whrHealthy, whtrCategory,
 } from '@/utils/healthUtils';
 
-const labelKey: Record<MeasurementType, string> = {
+const labelKey = {
   waist: 'mWaist', hips: 'mHips', chest: 'mChest', thigh: 'mThigh',
   biceps: 'mBiceps', neck: 'mNeck', calf: 'mCalf', bodyfat: 'mBodyfat',
-};
+} as const satisfies Record<MeasurementType, keyof Translations>;
 
 export default function BodyScreen() {
   const isDark = useColorScheme() === 'dark';

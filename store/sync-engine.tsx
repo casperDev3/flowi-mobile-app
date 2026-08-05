@@ -23,6 +23,7 @@ import { apiFetch, OfflineError } from './api';
 import { isOnlineMode } from './app-mode';
 import { loadData, saveData } from './storage';
 import { appendConflicts } from './sync-conflicts';
+import { assertCompatibleSyncContract } from './sync-contract';
 import {
   OUTBOX_KEY,
   SYNC_ARRAY_KEYS,
@@ -65,6 +66,7 @@ interface SyncConflictServer {
 }
 
 interface SyncResponse {
+  contract_version?: number;
   server_time: number;
   items: SyncResponseItem[];
   conflicts: SyncConflictServer[];
@@ -291,6 +293,7 @@ async function doSync(): Promise<void> {
         method: 'POST',
         body: { since, items: chunk },
       });
+      assertCompatibleSyncContract(res.contract_version);
 
       pullCursor = res.server_time;
 
@@ -315,6 +318,7 @@ async function doSync(): Promise<void> {
           method: 'POST',
           body: { since: cursor, items: [] },
         });
+        assertCompatibleSyncContract(pullRes.contract_version);
         await applyPullResponse(pullRes.items, outbox);
         cursor = pullRes.next_cursor;
         pullCursor = pullRes.server_time;
@@ -454,6 +458,7 @@ export async function pullAllFromServer(): Promise<void> {
         method: 'POST',
         body: { since: cursor, items: [] },
       });
+      assertCompatibleSyncContract(res.contract_version);
       await applyPullResponse(res.items, outbox);
       serverTime = res.server_time;
       cursor = res.next_cursor;

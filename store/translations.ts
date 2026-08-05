@@ -728,6 +728,9 @@ export interface Translations {
   taskDeleted: string;
   noteDeleted: string;
   transactionDeleted: string;
+  amount: string;
+  transactionEdited: string;
+  editTransaction: string;
 
   // Auth & Account
   sectionAccount: string;
@@ -1492,6 +1495,9 @@ const uk: Translations = {
   taskDeleted: 'Завдання видалено',
   noteDeleted: 'Нотатку видалено',
   transactionDeleted: 'Транзакцію видалено',
+  amount: 'Сума',
+  transactionEdited: 'Транзакцію відредаговано',
+  editTransaction: 'Редагувати транзакцію',
 
   sectionAccount: 'Акаунт',
   authLogin: 'Увійти',
@@ -2247,6 +2253,9 @@ const en: Translations = {
   taskDeleted: 'Task deleted',
   noteDeleted: 'Note deleted',
   transactionDeleted: 'Transaction deleted',
+  amount: 'Amount',
+  transactionEdited: 'Transaction edited',
+  editTransaction: 'Edit transaction',
 
   sectionAccount: 'Account',
   authLogin: 'Sign In',

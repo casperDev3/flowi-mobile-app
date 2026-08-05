@@ -21,7 +21,8 @@ import { MonthPicker } from '@/components/shared/MonthPicker';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSyncedValue } from '@/store/synced-storage';
 import { BUILTIN_CURRENCIES } from '@/utils/financeUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -153,7 +154,7 @@ export default function BudgetScreen() {
 
   const saveBudgets = useCallback((next: BudgetLimit[]) => {
     setBudgets(next);
-    saveData('budget_limits', next);
+    void saveSyncedValue('budget_limits', next);
   }, []);
 
   // ─── Computed ─────────────────────────────────────────────────────────────

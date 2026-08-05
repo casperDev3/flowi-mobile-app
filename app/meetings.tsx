@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -55,10 +56,37 @@ type Span = 'day' | 'week' | 'month' | 'quarter';
 // ─── Google Calendar config ───────────────────────────────────────────────────
 const GCAL_REDIRECT    = 'ftrackingapp://auth';
 const GCAL_SCOPES      = 'https://www.googleapis.com/auth/calendar.readonly';
+// Token/refresh/expiry live in expo-secure-store (Keychain/Keystore), not
+// AsyncStorage — same as the app's own auth tokens (store/api.ts) — since a
+// Google refresh token is a long-lived credential, not a UI preference.
 const GCAL_TOKEN_KEY   = 'gcal_access_token';
 const GCAL_REFRESH_KEY = 'gcal_refresh_token';
 const GCAL_EXPIRY_KEY  = 'gcal_token_expiry';
 const GCAL_CLIENT_KEY  = 'gcal_client_id';
+const GCAL_CREDENTIAL_KEYS = [GCAL_TOKEN_KEY, GCAL_REFRESH_KEY, GCAL_EXPIRY_KEY] as const;
+
+/**
+ * Move credentials written by older app versions out of AsyncStorage.
+ * Legacy values are deleted only after every required SecureStore write
+ * succeeds, so an interrupted migration cannot silently disconnect the user.
+ */
+async function loadAndMigrateGcalAccessToken(): Promise<string | null> {
+  const [secureValues, legacyEntries] = await Promise.all([
+    Promise.all(GCAL_CREDENTIAL_KEYS.map(key => SecureStore.getItemAsync(key))),
+    AsyncStorage.multiGet([...GCAL_CREDENTIAL_KEYS]),
+  ]);
+  const legacyValues = new Map(legacyEntries);
+
+  await Promise.all(GCAL_CREDENTIAL_KEYS.map((key, index) => {
+    const legacyValue = legacyValues.get(key);
+    return !secureValues[index] && legacyValue
+      ? SecureStore.setItemAsync(key, legacyValue)
+      : Promise.resolve();
+  }));
+  await AsyncStorage.multiRemove([...GCAL_CREDENTIAL_KEYS]);
+
+  return secureValues[0] ?? legacyValues.get(GCAL_TOKEN_KEY) ?? null;
+}
 
 // ─── PKCE helpers ─────────────────────────────────────────────────────────────
 
@@ -444,7 +472,9 @@ export default function MeetingsScreen() {
       setGcalClientId(cid);
       gcalClientIdRef.current = cid;
     });
-    AsyncStorage.getItem(GCAL_TOKEN_KEY).then(t => setGcalToken(t));
+    loadAndMigrateGcalAccessToken()
+      .then(t => setGcalToken(t))
+      .catch(e => { if (__DEV__) console.warn('[gcal] credential migration error:', e); });
     AsyncStorage.getItem('gcal_last_sync').then(t => setGcalLastSync(t));
   }, []));
 
@@ -574,10 +604,14 @@ export default function MeetingsScreen() {
       const tokenData = await tokenRes.json();
       if (!tokenRes.ok) throw new Error(tokenData.error_description ?? 'Token exchange failed');
 
-      await AsyncStorage.setItem(GCAL_TOKEN_KEY,   tokenData.access_token);
-      await AsyncStorage.setItem(GCAL_REFRESH_KEY, tokenData.refresh_token ?? '');
-      await AsyncStorage.setItem(GCAL_EXPIRY_KEY,
+      await SecureStore.setItemAsync(GCAL_TOKEN_KEY, tokenData.access_token);
+      if (tokenData.refresh_token) {
+        await SecureStore.setItemAsync(GCAL_REFRESH_KEY, tokenData.refresh_token);
+      }
+      await SecureStore.setItemAsync(GCAL_EXPIRY_KEY,
         String(Date.now() + (tokenData.expires_in ?? 3600) * 1000));
+      // Remove any plaintext credentials left by an older app version.
+      await AsyncStorage.multiRemove([...GCAL_CREDENTIAL_KEYS]);
 
       setGcalToken(tokenData.access_token);
       setShowGcalSheet(false);
@@ -589,12 +623,12 @@ export default function MeetingsScreen() {
   }, []);
 
   const getValidGcalToken = useCallback(async (): Promise<string | null> => {
-    const expiry = await AsyncStorage.getItem(GCAL_EXPIRY_KEY);
+    const expiry = await SecureStore.getItemAsync(GCAL_EXPIRY_KEY);
     if (expiry && Date.now() < Number(expiry) - 60000) {
-      return await AsyncStorage.getItem(GCAL_TOKEN_KEY);
+      return await SecureStore.getItemAsync(GCAL_TOKEN_KEY);
     }
     // Try refresh
-    const refreshToken = await AsyncStorage.getItem(GCAL_REFRESH_KEY);
+    const refreshToken = await SecureStore.getItemAsync(GCAL_REFRESH_KEY);
     const clientId = gcalClientIdRef.current;
     if (!refreshToken || !clientId) return null;
     try {
@@ -609,8 +643,8 @@ export default function MeetingsScreen() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error('Refresh failed');
-      await AsyncStorage.setItem(GCAL_TOKEN_KEY, data.access_token);
-      await AsyncStorage.setItem(GCAL_EXPIRY_KEY, String(Date.now() + (data.expires_in ?? 3600) * 1000));
+      await SecureStore.setItemAsync(GCAL_TOKEN_KEY, data.access_token);
+      await SecureStore.setItemAsync(GCAL_EXPIRY_KEY, String(Date.now() + (data.expires_in ?? 3600) * 1000));
       setGcalToken(data.access_token);
       return data.access_token;
     } catch {
@@ -695,7 +729,12 @@ export default function MeetingsScreen() {
     Alert.alert('Відключити Google Calendar?', 'Вже імпортовані зустрічі залишаться.', [
       { text: 'Скасувати', style: 'cancel' },
       { text: 'Відключити', style: 'destructive', onPress: async () => {
-        await AsyncStorage.multiRemove([GCAL_TOKEN_KEY, GCAL_REFRESH_KEY, GCAL_EXPIRY_KEY, 'gcal_last_sync']);
+        await Promise.all([
+          SecureStore.deleteItemAsync(GCAL_TOKEN_KEY),
+          SecureStore.deleteItemAsync(GCAL_REFRESH_KEY),
+          SecureStore.deleteItemAsync(GCAL_EXPIRY_KEY),
+          AsyncStorage.multiRemove([...GCAL_CREDENTIAL_KEYS, 'gcal_last_sync']),
+        ]);
         setGcalToken(null); setGcalLastSync(null); setShowGcalSheet(false);
       }},
     ]);

@@ -35,8 +35,8 @@ import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
 import {
   filterByMonth, groupTransactions,
   calcTotalsByCurrency, formatCurrency,
-  BUILTIN_CURRENCIES, txCurrency,
-  type Currency, type CurrencyTotals,
+  appendTransactionHistory, BUILTIN_CURRENCIES, txCurrency,
+  type Currency, type CurrencyTotals, type TxHistoryEvent,
 } from '@/utils/financeUtils';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useMotion } from '@/hooks/use-motion';
@@ -47,7 +47,7 @@ type TxType = 'income' | 'expense';
 
 interface Transaction {
   id: string; type: TxType; category: string; amount: number; note: string; date: string;
-  currency?: string;
+  currency?: string; history?: TxHistoryEvent[];
 }
 
 interface CategoryDef { name: string; icon: IconSymbolName; }
@@ -129,6 +129,7 @@ export default function FinanceScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [selected, setSelected] = useState<Transaction | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [txType, setTxType] = useState<TxType>('expense');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
@@ -329,17 +330,67 @@ export default function FinanceScreen() {
     locale,
   ), [filtered, locale]);
 
-  const addTx = () => {
+  const buildEditNote = (before: Transaction, after: { type: TxType; amount: number; category: string; note: string; currency: string }): string => {
+    const parts: string[] = [];
+    if (before.amount !== after.amount) parts.push(`${tr.amount}: ${before.amount} → ${after.amount}`);
+    if (before.category !== after.category) parts.push(`${tr.category}: ${before.category} → ${after.category}`);
+    if (txCurrency(before) !== after.currency) parts.push(`${tr.currency}: ${txCurrency(before)} → ${after.currency}`);
+    if ((before.note || '') !== after.note) parts.push(tr.note);
+    if (before.type !== after.type) parts.push(`${before.type === 'income' ? tr.income : tr.expense} → ${after.type === 'income' ? tr.income : tr.expense}`);
+    return parts.length ? parts.join(' · ') : tr.transactionEdited;
+  };
+
+  const startEdit = (tx: Transaction) => {
+    setEditingId(tx.id);
+    setTxType(tx.type);
+    setAmount(String(tx.amount));
+    setCategory(tx.category);
+    setNote(tx.note);
+    setTxCur(txCurrency(tx));
+    setSelected(null);
+    setShowAdd(true);
+  };
+
+  const saveTx = () => {
     const num = parseFloat(amount.replace(',', '.'));
     if (!num || num <= 0 || !category) return;
-    setTxs(p => [{
-      id: Date.now().toString(), type: txType, category, amount: num,
-      note: note.trim(), date: new Date().toISOString(), currency: txCur,
-    }, ...p]);
+
+    if (editingId) {
+      setTxs(prev => prev.map(t => {
+        if (t.id !== editingId) return t;
+        const noteText = buildEditNote(t, { type: txType, amount: num, category, note: note.trim(), currency: txCur });
+        const historyEvent: TxHistoryEvent = {
+          id: Date.now().toString() + Math.random().toString(36).slice(2),
+          at: new Date().toISOString(),
+          note: noteText,
+        };
+        return appendTransactionHistory({
+          ...t,
+          type: txType, category, amount: num, note: note.trim(), currency: txCur,
+        }, historyEvent);
+      }));
+      setEditingId(null);
+    } else {
+      setTxs(p => [{
+        id: Date.now().toString(), type: txType, category, amount: num,
+        note: note.trim(), date: new Date().toISOString(), currency: txCur,
+      }, ...p]);
+    }
     setAmount(''); setCategory(''); setNote(''); setShowAdd(false);
     setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill');
     setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol('');
     haptic.success();
+  };
+
+  // Cancel / backdrop-dismiss the Add-or-Edit sheet — must reset the form,
+  // not just editingId, or the next "+" (new transaction) opens prefilled
+  // with whatever transaction was being edited.
+  const closeAddSheet = () => {
+    setShowAdd(false);
+    setEditingId(null);
+    setAmount(''); setCategory(''); setNote('');
+    setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill');
+    setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol('');
   };
 
   const deleteTx = (id: string) => {
@@ -716,9 +767,13 @@ export default function FinanceScreen() {
       </Modal>
 
       {/* ─── Add Modal ─── */}
-      <SheetModal visible={showAdd} onClose={() => setShowAdd(false)}>
+      <SheetModal visible={showAdd} onClose={closeAddSheet}>
         <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+                  {editingId ? (
+                    <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 14 }}>{tr.editTransaction}</Text>
+                  ) : null}
 
                   {/* Type toggle */}
                   <View style={[s.typeRow, { backgroundColor: c.dim, marginBottom: 20 }]}>
@@ -906,15 +961,15 @@ export default function FinanceScreen() {
                   />
 
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
-                    <TouchableOpacity onPress={() => setShowAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                    <TouchableOpacity onPress={closeAddSheet} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                       <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      onPress={addTx}
+                      onPress={saveTx}
                       disabled={!amount.trim() || !category}
                       style={[s.btn, { flex: 2, backgroundColor: (!amount.trim() || !category) ? c.dim : c.accent }]}>
-                      <IconSymbol name={txType === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={15} color={(!amount.trim() || !category) ? c.sub : '#fff'} />
-                      <Text style={{ color: (!amount.trim() || !category) ? c.sub : '#fff', fontWeight: '700', marginLeft: 6 }}>{tr.add}</Text>
+                      <IconSymbol name={editingId ? 'checkmark' : (txType === 'income' ? 'arrow.up.trend' : 'arrow.down.trend')} size={15} color={(!amount.trim() || !category) ? c.sub : '#fff'} />
+                      <Text style={{ color: (!amount.trim() || !category) ? c.sub : '#fff', fontWeight: '700', marginLeft: 6 }}>{editingId ? tr.save : tr.add}</Text>
                     </TouchableOpacity>
                   </View>
           </ScrollView>
@@ -1040,12 +1095,38 @@ export default function FinanceScreen() {
                         <InfoRow icon="calendar" label={tr.creationDate} value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
                       </View>
 
+                      {selected.history && selected.history.length > 0 && (
+                        <View style={{ marginTop: 14 }}>
+                          <Text style={[s.label, { color: c.sub, marginBottom: 8 }]}>{tr.history}</Text>
+                          {[...selected.history].reverse().map((h) => (
+                            <View key={h.id} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 10 }}>
+                              <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#F59E0B20', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                                <IconSymbol name="pencil.circle.fill" size={14} color="#F59E0B" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{tr.transactionEdited}</Text>
+                                <Text style={{ color: c.sub, fontSize: 12, marginTop: 1 }} numberOfLines={2}>{h.note}</Text>
+                                <Text style={{ color: c.sub, fontSize: 11, marginTop: 3 }}>
+                                  {new Date(h.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+                                  {' · '}
+                                  {new Date(h.at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
                       <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
                         <TouchableOpacity onPress={() => deleteTx(selected.id)} style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
                           <IconSymbol name="trash" size={15} color="#EF4444" />
                           <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
+                        <TouchableOpacity onPress={() => startEdit(selected)} style={[s.btn, { flex: 1, backgroundColor: c.accent + '15', borderColor: c.accent + '40', borderWidth: 1 }]}>
+                          <IconSymbol name="pencil" size={15} color={c.accent} />
+                          <Text style={{ color: c.accent, fontWeight: '600', marginLeft: 5 }}>{tr.edit}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 1, backgroundColor: c.accent }]}>
                           <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.close}</Text>
                         </TouchableOpacity>
                       </View>

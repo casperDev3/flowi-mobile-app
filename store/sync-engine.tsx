@@ -3,7 +3,8 @@
 import { AppState, AppStateStatus } from 'react-native';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import { apiFetch, ApiError, OfflineError } from './api';
+import { apiFetch, ApiError, getAccessToken, OfflineError } from './api';
+import { WS_BASE } from './api-config';
 import { isOnlineMode } from './app-mode';
 import { loadData, saveData } from './storage';
 import { appendConflicts, loadConflicts } from './sync-conflicts';
@@ -756,6 +757,77 @@ export async function pullAllFromServer(): Promise<void> {
   }
 }
 
+/**
+ * Підписка на особистий канал realtime.
+ *
+ * Сокет несе ЛИШЕ сигнал «курсор зрушив», без даних: у відповідь робимо
+ * звичайний обмін. Тому він не є джерелом істини — якщо впав або не
+ * підключився, лишається поллінг (5 хв) і синк на foreground, і нічого не
+ * губиться. Це навмисно: realtime тут прискорює, а не забезпечує коректність.
+ *
+ * Токен іде субпротоколом, а не в query — query потрапляє в access-логи nginx.
+ */
+function useUserSyncSocket(isAuthed: boolean): void {
+  useEffect(() => {
+    if (!isAuthed) return;
+
+    let socket: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+    let cancelled = false;
+
+    const open = async () => {
+      if (cancelled || !isOnlineMode()) return;
+      const token = await getAccessToken();
+      if (cancelled || !token) return;
+
+      try {
+        socket = new WebSocket(`${WS_BASE}/user/`, ['flowi-jwt', token]);
+      } catch (error) {
+        if (__DEV__) console.warn('[sync-engine] ws open failed:', error);
+        scheduleReconnect();
+        return;
+      }
+
+      socket.onopen = () => { attempt = 0; };
+      socket.onmessage = () => {
+        // Дебаунс, а не миттєвий синк: сервер може прислати кілька сигналів
+        // поспіль (наприклад, клієнт запушив батч), і кожен піднімав би
+        // окремий обмін.
+        scheduleSync(800);
+      };
+      socket.onerror = () => { /* onclose однаково спрацює */ };
+      socket.onclose = () => {
+        socket = null;
+        scheduleReconnect();
+      };
+    };
+
+    const scheduleReconnect = () => {
+      if (cancelled || reconnectTimer) return;
+      // Максимум 30 с: сокет опортуністичний, агресивно перепідключатись
+      // немає сенсу — поллінг усе одно підстрахує.
+      const delay = Math.min(30_000, 1_000 * 2 ** Math.min(attempt, 5));
+      attempt += 1;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        void open();
+      }, delay);
+    };
+
+    void open();
+
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (socket) {
+        socket.onclose = null;
+        socket.close();
+      }
+    };
+  }, [isAuthed]);
+}
+
 export function SyncProvider({ children, isAuthed }: { children: React.ReactNode; isAuthed: boolean }) {
   const [state, setState] = useState<SyncState>('idle');
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
@@ -814,6 +886,8 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
     }
     void init();
   }, []);
+
+  useUserSyncSocket(isAuthed);
 
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   useEffect(() => {

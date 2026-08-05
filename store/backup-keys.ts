@@ -1,36 +1,24 @@
 /**
- * Single source of truth for all storage keys that must be included in backups.
- * Both store/auto-backup.tsx and app/data.tsx reference this list.
+ * Ключі сховища, що потрапляють у резервні копії.
+ *
+ * ПОХІДНИЙ від синк-контракту, а не окремий рукописний список. Доти це були
+ * дві копії, які розійшлися саме там, де це найдорожче: `health_profile` і
+ * `health_reminders` вважалися вартими збереження, але не переносились на
+ * новий пристрій. Наслідок був тихим — на новому клієнті профілю немає, тож
+ * норми калорій, білка, води та зони ІМТ рахувалися з дефолтів, і користувач
+ * бачив не «порожньо», а неправильні цифри.
+ *
+ * Тепер «зберігається» і «синхронізується» — це одна множина за визначенням.
+ * Додавання ключа в `sync-contract.ts` автоматично додає його в бекапи.
+ *
+ * Використовують `store/auto-backup.tsx` і `app/data.tsx`.
  */
+
+import { SYNC_ARRAY_KEYS, SYNC_SINGLETON_KEYS } from './sync-contract';
+
 export const BACKUP_KEYS = [
-  // Core domain data (mirrors ALL_KEYS in app/data.tsx)
-  'tasks',
-  'task_statuses',
-  'transactions',
-  'time_entries',
-  'notes',
-  'projects',
-  'meetings',
-  'health_entries_v2',
-  'workouts',
-  'exercises',
-  'workout_programs',
-  'savings_jars',
-  'containers',
-  'bugs',
-  'ideas',
-  'health_meds',
-  'health_checkups',
-  'health_vaccines',
-  'health_habits',
-  // Additional keys not in the ALL_KEYS display list
-  'categories',
-  'budget_limits',
-  'finance_balance_adjustments',
-  'finance_currencies',
-  'finance_primary_currency',
-  'health_profile',
-  'health_reminders',
+  ...SYNC_ARRAY_KEYS,
+  ...SYNC_SINGLETON_KEYS,
 ] as const;
 
 export type BackupKey = (typeof BACKUP_KEYS)[number];

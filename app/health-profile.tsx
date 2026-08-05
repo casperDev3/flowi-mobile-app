@@ -18,7 +18,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
-import { loadData, saveData } from '@/store/storage';
+import { loadData } from '@/store/storage';
+import { saveSyncedValue } from '@/store/synced-storage';
 import {
   ActivityLevel,
   DEFAULT_PROFILE,
@@ -60,7 +61,7 @@ export default function HealthProfileScreen() {
   const tdee = useMemo(() => calcTDEE(profile, weightForCalc), [profile, weightForCalc]);
 
   const save = useCallback(async () => {
-    await saveData(PROFILE_KEY, profile);
+    await saveSyncedValue(PROFILE_KEY, profile);
     router.back();
   }, [profile, router]);
 

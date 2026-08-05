@@ -124,8 +124,8 @@ constants/
 | `'containers'` | `Container[]` | Контейнери зі списком речей |
 | `'projects'` | `Project[]` | Проєкти |
 | `'health_entries_v2'` | `HealthEntry[]` | Записи здоров'я (calories=їжа, calories_out=спалені, +макроси) |
-| `'health_profile'` | `HealthProfile` | Профіль для персональних цілей (стать/вік/зріст/активність/ціль) — **локально**, не синхронізується (див. `docs/plans/SYNC_EXECUTION_STATUS.md`, невиконаний розділ 4) |
-| `'health_reminders'` | `{water,sleep}` | Перемикачі щоденних нагадувань — локально |
+| `'health_profile'` | `HealthProfile` | Профіль для персональних цілей (стать/вік/зріст/активність/ціль) — **синхронізується** як singleton |
+| `'health_reminders'` | `{water,sleep}` | Перемикачі щоденних нагадувань — **синхронізуються** як singleton |
 | `'health_meds'` | `Medication[]` | Профілактика: ліки/добавки (час прийому, лог, нотифікації) |
 | `'health_checkups'` | `Checkup[]` | Профілактика: медогляди/аналізи |
 | `'health_vaccines'` | `Vaccine[]` | Профілактика: щеплення |

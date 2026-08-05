@@ -17,6 +17,7 @@ import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { requestNotificationPermissions } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
+import { saveSyncedValue } from '@/store/synced-storage';
 import { DEFAULT_PROFILE, FitnessGoal, HealthProfile, PROFILE_KEY, Sex } from '@/utils/healthUtils';
 
 const ONBOARDING_KEY = 'onboarding_done';
@@ -74,7 +75,7 @@ export function Onboarding() {
 
   const finish = async () => {
     try {
-      if (profileTouched) await saveData(PROFILE_KEY, profile);
+      if (profileTouched) await saveSyncedValue(PROFILE_KEY, profile);
       await saveData(ONBOARDING_KEY, true);
     } catch {}
     setShow(false);

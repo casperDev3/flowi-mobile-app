@@ -4,7 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { HK_AVAILABLE, HKDayData, fetchTodayData, initHealthKit } from '@/store/healthkit';
 import { cancelDailyReminder, scheduleDailyReminder, scheduleWeeklyReminder } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
 import { Events, track } from '@/utils/analytics';
 import { isSameDay } from '@/utils/dateUtils';
 import {
@@ -142,7 +142,7 @@ export function useHealthEntries() {
   }, []);
 
   const setReminder = useCallback(async (key: keyof Reminders, on: boolean, title: string, body: string) => {
-    setReminders(curr => { const next = { ...curr, [key]: on }; saveData(REMINDERS_KEY, next); return next; });
+    setReminders(curr => { const next = { ...curr, [key]: on }; void saveSyncedValue(REMINDERS_KEY, next); return next; });
     if (!on) { await cancelDailyReminder(key); return; }
     if (key === 'measurements') await scheduleWeeklyReminder(key, MEASUREMENTS_WEEKDAY, MEASUREMENTS_HOUR, 0, title, body);
     else await scheduleDailyReminder(key, DAILY_HOURS[key], 0, title, body);

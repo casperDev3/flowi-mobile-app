@@ -1,4 +1,5 @@
 import { BACKUP_KEYS } from '../store/backup-keys';
+import { SYNC_ARRAY_KEYS, SYNC_SINGLETON_KEYS } from '../store/sync-contract';
 
 // Keys from ALL_KEYS in app/data.tsx (must all be backed up)
 const ALL_KEYS_FROM_DATA = [
@@ -54,7 +55,22 @@ describe('BACKUP_KEYS', () => {
   });
 
   it('total count matches expected number of keys', () => {
-    // 19 from ALL_KEYS + 7 extra = 26
-    expect(BACKUP_KEYS.length).toBe(26);
+    // 23 масиви + 3 singleton
+    expect(BACKUP_KEYS.length).toBe(SYNC_ARRAY_KEYS.length + SYNC_SINGLETON_KEYS.length);
+  });
+
+  // Корінь проблеми, яку виправляє розділ 4 плану синхронізації: це були два
+  // окремі рукописні списки, і вони розійшлися саме там, де найдорожче —
+  // health_profile вважався вартим збереження, але не переносився на новий
+  // пристрій. Тепер «зберігається» і «синхронізується» — одна множина.
+  it('є рівно множиною синхронізованих ключів — розійтись більше не може', () => {
+    expect([...BACKUP_KEYS].sort()).toEqual(
+      [...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS].sort(),
+    );
+  });
+
+  it('профіль здоров\'я і нагадування синхронізуються, а не лише бекапляться', () => {
+    expect(SYNC_SINGLETON_KEYS).toContain('health_profile');
+    expect(SYNC_SINGLETON_KEYS).toContain('health_reminders');
   });
 });

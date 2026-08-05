@@ -34,8 +34,16 @@ export const SYNC_ARRAY_KEYS = [
 export type SyncArrayKey = (typeof SYNC_ARRAY_KEYS)[number];
 
 export const SYNC_SINGLETON_KEYS = [
-  // Єдиний справжній скаляр — для нього повна заміна коректна за визначенням.
+  // Справжній скаляр — повна заміна коректна за визначенням.
   'finance_primary_currency',
+  // Профіль здоров'я і перемикачі нагадувань. Це справжні об'єкти, а не
+  // колекції: окремих записів, які можна було б зливати, у них немає.
+  //
+  // Без синхронізації новий клієнт не мав профілю, і healthUtils рахував TDEE,
+  // норму білка, води та зони ІМТ із дефолтів — користувач бачив не
+  // «порожньо», а НЕПРАВИЛЬНІ цифри.
+  'health_profile',
+  'health_reminders',
 ] as const;
 
 export type SyncSingletonKey = (typeof SYNC_SINGLETON_KEYS)[number];

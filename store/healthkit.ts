@@ -108,11 +108,27 @@ function endOfDay(d = new Date()) {
   return e;
 }
 
+/**
+ * Дістає число з HealthKit-семпла і повертає його МОДУЛЬ.
+ *
+ * Apple інколи віддає кількісні величини зі знаком мінус — спостережено на
+ * активних калоріях. Усе, що проходить через цю функцію, є фізичною
+ * величиною, яка не може бути відʼємною: кроки, спалена енергія, дистанція,
+ * пульс, вага, тривалість. Тобто мінус тут — завжди помилка знаку, а не дані.
+ *
+ * Симптом був подвійним: екран «Apple Health» показував число як є, тобто з
+ * мінусом, а в журнал `calories_out` воно не потрапляло взагалі — там стоїть
+ * фільтр `> 0`. Те саме з дистанцією (`queryDistance` віддає null для <= 0) і
+ * з пульсом (фільтр діапазону 30–300).
+ *
+ * Модуль береться саме тут, бо це єдина точка вилучення числа з семпла —
+ * інакше довелося б дублювати захист у девʼяти місцях.
+ */
 function quantityValue(value: unknown): number {
-  if (typeof value === 'number') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.abs(value) : 0;
   if (value && typeof value === 'object' && 'quantity' in value) {
     const quantity = (value as { quantity?: unknown }).quantity;
-    return typeof quantity === 'number' ? quantity : 0;
+    return typeof quantity === 'number' && Number.isFinite(quantity) ? Math.abs(quantity) : 0;
   }
   return 0;
 }

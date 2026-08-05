@@ -32,6 +32,10 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
 }) {
   const c = getHealthColors(isDark);
   const [vals, setVals] = useState<Record<string, string>>({});
+  const canSave = FIELDS.some(field => {
+    const value = parseFloat((vals[field.type] ?? '').replace(',', '.'));
+    return Number.isFinite(value) && value > 0;
+  });
 
   useEffect(() => { if (visible) setVals({}); }, [visible]);
 
@@ -41,7 +45,8 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
       const v = parseFloat((vals[f.type] ?? '').replace(',', '.'));
       if (!isNaN(v) && v > 0) records.push({ type: f.type, value: Math.round(v * (f.mul ?? 1)) });
     });
-    if (records.length) onSubmit(records);
+    if (!records.length) return;
+    onSubmit(records);
     onClose();
   };
 
@@ -49,7 +54,12 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable style={s.overlay} onPress={onClose}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap}>
+          <Pressable
+            onPress={e => e.stopPropagation()}
+            style={s.sheetWrap}
+            accessibilityViewIsModal
+            importantForAccessibility="yes"
+          >
             <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
@@ -70,6 +80,7 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
                     </View>
                     <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', flex: 1, marginLeft: 10 }}>{tr[f.labelKey]}</Text>
                     <TextInput
+                      accessibilityLabel={`${tr[f.labelKey]}, ${f.unit}`}
                       value={vals[f.type] ?? ''}
                       onChangeText={t => setVals(p => ({ ...p, [f.type]: t }))}
                       keyboardType="decimal-pad"
@@ -82,10 +93,16 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
               </ScrollView>
 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                   <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={save} style={[s.btn, { flex: 2, backgroundColor: ACCENT }]}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !canSave }}
+                  disabled={!canSave}
+                  onPress={save}
+                  style={[s.btn, { flex: 2, backgroundColor: ACCENT, opacity: canSave ? 1 : 0.55 }]}
+                >
                   <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
                 </TouchableOpacity>
               </View>
@@ -100,7 +117,7 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
 const s = StyleSheet.create({
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '92%', overflow: 'hidden' },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   handle:    { width: 36, height: 4, borderRadius: 2 },
   title:     { fontSize: 20, fontWeight: '800', marginBottom: 10 },

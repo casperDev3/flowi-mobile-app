@@ -32,6 +32,10 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
 }) {
   const c = getHealthColors(isDark);
   const [vals, setVals] = useState<Record<string, string>>({});
+  const canSave = FIELDS.some(field => {
+    const value = parseFloat((vals[field.type] ?? '').replace(',', '.'));
+    return Number.isFinite(value) && value > 0;
+  });
 
   // Префіл останніми значеннями при відкритті
   useEffect(() => {
@@ -47,7 +51,8 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
       const v = parseFloat((vals[f.type] ?? '').replace(',', '.'));
       if (!isNaN(v) && v > 0) records.push({ type: f.type, value: v });
     });
-    if (records.length) onSubmit(records);
+    if (!records.length) return;
+    onSubmit(records);
     onClose();
   };
 
@@ -55,7 +60,12 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable style={s.overlay} onPress={onClose}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap}>
+          <Pressable
+            onPress={e => e.stopPropagation()}
+            style={s.sheetWrap}
+            accessibilityViewIsModal
+            importantForAccessibility="yes"
+          >
             <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
@@ -75,6 +85,7 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
                       <Text style={[s.label, { color: c.sub }]}>{tr[f.labelKey]}</Text>
                       <View style={[s.inputWrap, { borderColor: c.border, backgroundColor: c.dim }]}>
                         <TextInput
+                          accessibilityLabel={`${tr[f.labelKey]}, ${f.unit}`}
                           value={vals[f.type] ?? ''}
                           onChangeText={t => setVals(p => ({ ...p, [f.type]: t }))}
                           keyboardType="decimal-pad"
@@ -89,10 +100,16 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
               </ScrollView>
 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                   <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={save} style={[s.btn, { flex: 2, backgroundColor: ACCENT_WEIGHT }]}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !canSave }}
+                  disabled={!canSave}
+                  onPress={save}
+                  style={[s.btn, { flex: 2, backgroundColor: ACCENT_WEIGHT, opacity: canSave ? 1 : 0.55 }]}
+                >
                   <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
                 </TouchableOpacity>
               </View>
@@ -107,7 +124,7 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
 const s = StyleSheet.create({
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '92%', overflow: 'hidden' },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   handle:    { width: 36, height: 4, borderRadius: 2 },
   title:     { fontSize: 20, fontWeight: '800', marginBottom: 12 },

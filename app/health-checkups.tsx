@@ -34,6 +34,7 @@ export default function CheckupsScreen() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [result, setResult] = useState('');
   const [nextDate, setNextDate] = useState('');
+  const canCreate = title.trim().length > 0;
 
   useEffect(() => { loadData<Checkup[]>(CHECKUPS_KEY, []).then(d => { setItems(d); setInitialized(true); }); }, []);
   useEffect(() => { if (initialized) void saveSynced(CHECKUPS_KEY, items); }, [items, initialized]);
@@ -106,7 +107,7 @@ export default function CheckupsScreen() {
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addCheckup}</Text>
@@ -120,8 +121,8 @@ export default function CheckupsScreen() {
                     <TouchableOpacity onPress={() => setAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                       <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={create} style={[s.btn, { flex: 2, backgroundColor: ACCENT_PULSE }]}>
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+                    <TouchableOpacity disabled={!canCreate} accessibilityState={{ disabled: !canCreate }} onPress={create} style={[s.btn, { flex: 2, backgroundColor: canCreate ? ACCENT_PULSE : c.dim }]}>
+                      <Text style={{ color: canCreate ? '#fff' : c.sub, fontWeight: '700' }}>{tr.save}</Text>
                     </TouchableOpacity>
                   </View>
                 </ScrollView>

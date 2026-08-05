@@ -33,6 +33,7 @@ export default function VaccinesScreen() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [doseNo, setDoseNo] = useState('');
   const [nextDate, setNextDate] = useState('');
+  const canCreate = name.trim().length > 0;
 
   useEffect(() => { loadData<Vaccine[]>(VACCINES_KEY, []).then(d => { setItems(d); setInitialized(true); }); }, []);
   useEffect(() => { if (initialized) void saveSynced(VACCINES_KEY, items); }, [items, initialized]);
@@ -101,8 +102,9 @@ export default function VaccinesScreen() {
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addVaccine}</Text>
                 <Field label={tr.title} value={name} onChange={setName} placeholder="Грип / COVID-19…" autoFocus c={c} />
                 <Field label={tr.date} value={date} onChange={setDate} placeholder="2026-06-29" c={c} />
@@ -112,10 +114,11 @@ export default function VaccinesScreen() {
                   <TouchableOpacity onPress={() => setAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                     <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={create} style={[s.btn, { flex: 2, backgroundColor: ACCENT_CAL }]}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+                  <TouchableOpacity disabled={!canCreate} accessibilityState={{ disabled: !canCreate }} onPress={create} style={[s.btn, { flex: 2, backgroundColor: canCreate ? ACCENT_CAL : c.dim }]}>
+                    <Text style={{ color: canCreate ? '#fff' : c.sub, fontWeight: '700' }}>{tr.save}</Text>
                   </TouchableOpacity>
                 </View>
+                </ScrollView>
               </BlurView>
             </Pressable>
           </Pressable>
@@ -133,7 +136,7 @@ const s = StyleSheet.create({
   next:      { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 },
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
   sheetTitle:{ fontSize: 20, fontWeight: '800', marginBottom: 6 },
   btn:       { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 });

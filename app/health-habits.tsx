@@ -36,6 +36,7 @@ export default function HabitsScreen() {
   const [icon, setIcon] = useState(ICONS[0]);
   const [color, setColor] = useState(COLORS[0]);
   const [remAt, setRemAt] = useState('');
+  const canCreate = title.trim().length > 0;
 
   useEffect(() => { loadData<Habit[]>(HABITS_KEY, []).then(d => { setHabits(d); setInitialized(true); }); }, []);
   useEffect(() => { if (initialized) void saveSynced(HABITS_KEY, habits); }, [habits, initialized]);
@@ -109,8 +110,9 @@ export default function HabitsScreen() {
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addHabit}</Text>
                 <Field label={tr.title} value={title} onChange={setTitle} placeholder="Випити вітаміни" autoFocus c={c} />
                 <Text style={[s.label, { color: c.sub }]}>ІКОНКА</Text>
@@ -134,10 +136,11 @@ export default function HabitsScreen() {
                   <TouchableOpacity onPress={() => setAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                     <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={create} style={[s.btn, { flex: 2, backgroundColor: ACC }]}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+                  <TouchableOpacity disabled={!canCreate} accessibilityState={{ disabled: !canCreate }} onPress={create} style={[s.btn, { flex: 2, backgroundColor: canCreate ? ACC : c.dim }]}>
+                    <Text style={{ color: canCreate ? '#fff' : c.sub, fontWeight: '700' }}>{tr.save}</Text>
                   </TouchableOpacity>
                 </View>
+                </ScrollView>
               </BlurView>
             </Pressable>
           </Pressable>
@@ -156,7 +159,7 @@ const s = StyleSheet.create({
   pick:      { width: 44, height: 44, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
   sheetTitle:{ fontSize: 20, fontWeight: '800', marginBottom: 6 },
   label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
   btn:       { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

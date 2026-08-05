@@ -5,6 +5,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -28,6 +29,20 @@ const KEY_COLOR: Record<ModalKey, string> = {
   water: ACCENT, calories: ACCENT_CAL, weight: ACCENT_WEIGHT, steps: ACCENT_STEPS, pulse: ACCENT_PULSE, sleep: ACCENT_SLEEP,
 };
 
+export function isValidHealthEntryInput(
+  modalKey: ModalKey | null,
+  value: string,
+  secondaryValue = '',
+): boolean {
+  if (modalKey === 'sleep') {
+    const hours = parseInt(value || '0', 10);
+    const minutes = parseInt(secondaryValue || '0', 10);
+    return hours >= 0 && minutes >= 0 && minutes < 60 && hours * 60 + minutes > 0;
+  }
+  const parsed = parseFloat(value.replace(',', '.'));
+  return modalKey !== null && Number.isFinite(parsed) && parsed > 0;
+}
+
 export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
   modalKey: ModalKey | null;
   onClose: () => void;
@@ -48,8 +63,10 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
   }, [modalKey]);
 
   const num = (s: string) => { const v = parseFloat(s.replace(',', '.')); return isNaN(v) ? undefined : v; };
+  const canSave = isValidHealthEntryInput(modalKey, val, val2);
 
   const save = () => {
+    if (!canSave) return;
     if (modalKey === 'sleep') {
       const mins = parseInt(val || '0', 10) * 60 + parseInt(val2 || '0', 10);
       if (!mins) return;
@@ -66,18 +83,34 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
     <Modal visible={modalKey !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable style={s.overlay} onPress={onClose}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+          <Pressable
+            onPress={e => e.stopPropagation()}
+            style={s.sheetWrapper}
+            accessibilityViewIsModal
+            importantForAccessibility="yes"
+          >
             <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
               style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <TouchableOpacity
+                    onPress={onClose}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.cancel}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
                     <IconSymbol name="xmark" size={17} color={c.sub} />
                   </TouchableOpacity>
                 </View>
               </View>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={s.content}
+              >
 
               {modalKey === 'water' && <>
                 <ModalTitle title={tr.addWater} icon="drop.fill" color={ACCENT} textColor={c.text} />
@@ -163,14 +196,24 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
               </>}
 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 24 }}>
-                <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                   <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={save}
-                  style={[s.btn, { flex: 2, backgroundColor: modalKey ? KEY_COLOR[modalKey] : ACCENT }]}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !canSave }}
+                  disabled={!canSave}
+                  onPress={save}
+                  style={[s.btn, {
+                    flex: 2,
+                    opacity: canSave ? 1 : 0.55,
+                    backgroundColor: modalKey ? KEY_COLOR[modalKey] : ACCENT,
+                  }]}
+                >
                   <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
                 </TouchableOpacity>
               </View>
+              </ScrollView>
             </BlurView>
           </Pressable>
         </Pressable>
@@ -223,7 +266,8 @@ function ModalTitle({ title, icon, color, textColor }: { title: string; icon: an
 const s = StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '92%', overflow: 'hidden' },
+  content:      { paddingBottom: 2 },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2 },
   label:        { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },

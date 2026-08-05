@@ -2799,7 +2799,7 @@ export default function TasksScreen() {
                       </View>
                       {newRepeatEndType === 'until' && (
                         <View style={{ marginTop: 8 }}>
-                          <TouchableOpacity onPress={() => {}}
+                          <View
                             style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1,
                               paddingHorizontal: 11, paddingVertical: 9,
                               borderColor: newRepeatUntil ? c.accent + '55' : c.border,
@@ -2812,7 +2812,7 @@ export default function TasksScreen() {
                               onChangeText={setNewRepeatUntil}
                               style={{ color: newRepeatUntil ? c.accent : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1, padding: 0 }}
                             />
-                          </TouchableOpacity>
+                          </View>
                         </View>
                       )}
                     </View>
@@ -2822,8 +2822,17 @@ export default function TasksScreen() {
                     <TouchableOpacity onPress={() => setShowAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                       <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={addTask} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.add}</Text>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: !newTitle.trim() }}
+                      disabled={!newTitle.trim()}
+                      onPress={addTask}
+                      style={[s.btn, {
+                        flex: 2,
+                        backgroundColor: newTitle.trim() ? c.accent : c.dim,
+                      }]}
+                    >
+                      <Text style={{ color: newTitle.trim() ? '#fff' : c.sub, fontWeight: '700' }}>{tr.add}</Text>
                     </TouchableOpacity>
                   </View>
           </ScrollView>

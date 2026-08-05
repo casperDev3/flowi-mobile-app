@@ -452,6 +452,8 @@ async function applyPullResponse(
 
 interface ExchangeResult {
   cursor: number;
+  /** Курсор сервера як є, без Math.max — потрібен, щоб помітити відкат. */
+  serverCursor: number;
   revisions: SyncRevisionMap;
   conflicts: SyncConflictServer[];
 }
@@ -465,6 +467,7 @@ async function exchangeV2(
 ): Promise<ExchangeResult> {
   let pageCursor = initialCursor;
   let finalCursor = initialCursor;
+  let serverCursor = initialCursor;
   let revisions = initialRevisions;
   const conflicts: SyncConflictServer[] = [];
 
@@ -526,9 +529,10 @@ async function exchangeV2(
     );
     conflicts.push(...response.conflicts);
     finalCursor = Math.max(finalCursor, response.cursor);
+    serverCursor = response.cursor;
 
     if (response.next_cursor == null) {
-      return { cursor: finalCursor, revisions, conflicts };
+      return { cursor: finalCursor, serverCursor, revisions, conflicts };
     }
     if (response.next_cursor <= pageCursor) {
       throw new Error('Server returned a non-advancing sync cursor');
@@ -548,6 +552,7 @@ async function doSync(): Promise<void> {
   try {
     let cursor = await getServerCursor();
     let revisions = await getRevisionMap();
+
     if (cursor === 0) await generateFullOutbox();
 
     const outbox = await loadOutbox();
@@ -568,6 +573,23 @@ async function doSync(): Promise<void> {
       await removeMutationsFromOutbox(staleMutationIds);
 
       const result = await exchangeV2(cursor, mutations, revisions);
+
+      // Курсор сервера, що поїхав НАЗАД, може означати лише одне: серверний
+      // стан обнулили. Без цієї перевірки клієнт надсилав би свій старий
+      // курсор, отримував порожній список змін і вирішував, що все гаразд —
+      // а його дані на сервер уже не повернулись би: outbox порожній, а
+      // generateFullOutbox спрацьовує тільки при cursor === 0.
+      if (cursor > 0 && result.serverCursor < cursor) {
+        if (__DEV__) console.log('[sync-engine] курсор сервера відкотився — повний перезалив');
+        await setServerCursor(0);
+        await setRevisionMap({});
+        await generateFullOutbox();
+        updatePendingFrom(await loadOutbox());
+        updateSyncState('idle');
+        scheduleSync(500);
+        return;
+      }
+
       cursor = result.cursor;
       revisions = result.revisions;
       allConflicts.push(...result.conflicts);

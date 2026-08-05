@@ -94,8 +94,13 @@ function outbox(): OutboxRow[] {
 /** Відповідь протоколу v2 з розумними дефолтами. */
 function v2(over: Partial<Record<string, unknown>> = {}) {
   return {
+    // Обов'язкове з фази 11: поблажливість до відповіді без версії прибрана,
+    // тож відповідь без contract_version тепер свідомо відхиляється.
+    contract_version: 2,
     protocol_version: 2,
-    cursor: 1,
+    // Вище за засіяний у beforeEach (5): інакше кожен обмін виглядав би як
+    // відкат курсора, тобто обнулення сервера.
+    cursor: 9,
     changes: [],
     acknowledged: [],
     conflicts: [],
@@ -467,6 +472,41 @@ describe('doSync — відхилення всього батчу', () => {
     await loadEngine().syncNow();
 
     expect(read('tasks', [])).toEqual([{ id: 't1', title: 'локальне' }]);
+  });
+});
+
+// ─── Обнулення сервера (фаза 11 плану) ──────────────────────────────────────
+
+describe('відкат серверного курсора', () => {
+  test('клієнт помічає обнулення і перезаливає все', async () => {
+    // Без цього після обнулення сервера клієнт надіслав би свій старий курсор,
+    // отримав порожній список змін і вирішив, що все гаразд. Дані не
+    // повернулись би: outbox порожній, а generateFullOutbox спрацьовує лише
+    // при cursor === 0.
+    seed('server_change_cursor_v2', 42);
+    seed('server_record_revisions_v2', { 'tasks:t1': 7 });
+    seed('tasks', [{ id: 't1' }, { id: 't2' }]);
+    seed('sync_outbox', []);
+    mockApiFetch.mockResolvedValue(v2({ cursor: 0 }));
+
+    await loadEngine().syncNow();
+
+    expect(read('server_change_cursor_v2', -1)).toBe(0);
+    expect(read('server_record_revisions_v2', {})).toEqual({});
+    // Локальні дані поставлені в чергу на повторну відправку.
+    expect(outbox().map(item => item.local_id).sort()).toEqual(['t1', 't2']);
+  });
+
+  test('звичайне просування курсора перезаливу не спричиняє', async () => {
+    seed('server_change_cursor_v2', 5);
+    seed('tasks', [{ id: 't1' }]);
+    seed('sync_outbox', []);
+    mockApiFetch.mockResolvedValue(v2({ cursor: 9 }));
+
+    await loadEngine().syncNow();
+
+    expect(read('server_change_cursor_v2', 0)).toBe(9);
+    expect(outbox()).toHaveLength(0);
   });
 });
 

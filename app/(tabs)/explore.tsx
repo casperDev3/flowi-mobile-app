@@ -31,6 +31,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
+import {
+  BalanceAdjustmentRow,
+  balanceAdjustmentsToMap,
+  balanceAdjustmentsToRows,
+  CategoryRow,
+  categoryMapToRows,
+  categoryRowsToMap,
+} from '@/store/migrations';
 import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
 import {
   filterByMonth, groupTransactions,
@@ -226,17 +234,18 @@ export default function FinanceScreen() {
   // Undo-тост (таб — над таб-баром)
   const { show: showUndo, element: undoElement } = useUndoToast(true);
 
-  // Load categories
+  // Load categories. У сховищі — пласкі рядки {id, type, name, icon}, екран
+  // працює зі звичною мапою за типом; конвертуємо на межі.
   useEffect(() => {
-    loadData<Record<TxType, CategoryDef[]>>('categories', DEFAULT_CATEGORIES).then(data => {
-      setCats(data);
+    loadData<CategoryRow[]>('categories', []).then(data => {
+      setCats(categoryRowsToMap(Array.isArray(data) ? data : [], DEFAULT_CATEGORIES));
       setCatsInitialized(true);
     });
   }, []);
 
   // Save categories
   useEffect(() => {
-    if (catsInitialized) void saveSyncedValue('categories', cats);
+    if (catsInitialized) void saveSynced('categories', categoryMapToRows(cats));
   }, [cats, catsInitialized]);
 
   // Load custom currencies
@@ -247,20 +256,26 @@ export default function FinanceScreen() {
     });
   }, []);
 
-  // Save custom currencies
+  // Save custom currencies. id похідний від коду валюти — два пристрої, що
+  // офлайн додали ту саму валюту, мусять зійтись в один запис.
   useEffect(() => {
-    if (currenciesInitialized) void saveSyncedValue('finance_currencies', customCurrencies);
+    if (currenciesInitialized) {
+      void saveSynced('finance_currencies', customCurrencies.map(c => ({ ...c, id: c.code })));
+    }
   }, [customCurrencies, currenciesInitialized]);
 
-  // Load / save manual balance adjustments
+  // Load / save manual balance adjustments. У сховищі лежать рядками
+  // {id: код валюти, amount}, а екран працює з мапою — конвертуємо на межі.
   useEffect(() => {
-    loadData<Record<string, number>>('finance_balance_adjustments', {}).then(data => {
-      setBalanceAdj(data && typeof data === 'object' ? data : {});
+    loadData<BalanceAdjustmentRow[]>('finance_balance_adjustments', []).then(data => {
+      setBalanceAdj(balanceAdjustmentsToMap(Array.isArray(data) ? data : []));
       setBalanceAdjInitialized(true);
     });
   }, []);
   useEffect(() => {
-    if (balanceAdjInitialized) void saveSyncedValue('finance_balance_adjustments', balanceAdj);
+    if (balanceAdjInitialized) {
+      void saveSynced('finance_balance_adjustments', balanceAdjustmentsToRows(balanceAdj));
+    }
   }, [balanceAdj, balanceAdjInitialized]);
 
   // Load / save primary currency

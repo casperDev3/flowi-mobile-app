@@ -39,13 +39,21 @@ jest.mock('@/store/storage', () => ({
 }));
 
 describe('sync contract compatibility', () => {
-  test('приймає поточну та legacy-відповідь без версії', () => {
-    expect(() => assertCompatibleSyncContract(1)).not.toThrow();
-    expect(() => assertCompatibleSyncContract(undefined)).not.toThrow();
+  test('приймає лише поточну версію контракту', () => {
+    expect(() => assertCompatibleSyncContract(2)).not.toThrow();
   });
 
-  test('зупиняє застосування несумісного контракту', () => {
-    expect(() => assertCompatibleSyncContract(2)).toThrow('Unsupported sync contract 2');
+  test('відхиляє попередню версію', () => {
+    expect(() => assertCompatibleSyncContract(1)).toThrow('Unsupported sync contract 1');
+  });
+
+  test('відповідь без версії більше не проходить', () => {
+    // Поблажливість існувала для rolling-деплою (фаза 11 її прибрала): тепер
+    // сервера без версії не існує, а сама поблажливість маскувала б розсинхрон
+    // версій — клієнт мовчки застосовував би дані від сервера, який не вміє
+    // того, на що клієнт розраховує.
+    expect(() => assertCompatibleSyncContract(undefined)).toThrow();
+    expect(() => assertCompatibleSyncContract(null)).toThrow();
   });
 });
 

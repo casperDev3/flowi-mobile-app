@@ -26,6 +26,8 @@ export const MEASUREMENT_TYPES: MeasurementType[] = ['waist', 'hips', 'chest', '
 
 export interface HealthEntry {
   id: string;
+  /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
+  updatedAt?: string;
   type: EntryType;
   value: number;
   note?: string;

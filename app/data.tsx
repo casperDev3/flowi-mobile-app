@@ -71,11 +71,18 @@ const IMPORT_KEY_MAP: Record<string, string> = {
 // Службові ключі синхронізації — очищуються разом з даними, але НЕ: auth, app_mode, onboarding, lang, notificationsEnabled
 const SERVICE_CLEAR_KEYS = [
   'sync_outbox',
-  'sync_tombstones',
-  'last_server_sync_at',
   'sync_pending_conflicts',
-  'last_sync_timestamp',
+  // Стан протоколу v2. Без цих трьох очищення даних лишало ненульовий курсор і
+  // мапу ревізій на записи, яких уже немає — це давало тихий розсинхрон.
+  'server_change_cursor_v2',
+  'server_record_revisions_v2',
+  'last_server_sync_error_v2',
+  'last_server_sync_completed_at',
   'last_backup_at',
+  // Legacy: писались P2P-синком і тумбстоунами, прибрані у 2026-08. Лишені в
+  // списку, щоб очистити наявні інсталяції.
+  'sync_tombstones',
+  'last_sync_timestamp',
 ] as const;
 
 function formatBackupTime(date: Date | null): string {

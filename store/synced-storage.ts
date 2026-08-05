@@ -3,7 +3,7 @@
  *
  * saveSynced(key, items[]) — для масивів SYNC_ARRAY_KEYS:
  *   1. Завантажує поточний стан зі сховища.
- *   2. Дифить за id: нові/змінені → outbox {deleted:false}; зниклі → outbox {deleted:true} + тумбстоун.
+ *   2. Дифить за id: нові/змінені → outbox {deleted:false}; зниклі → outbox {deleted:true}.
  *   3. saveData(key, items).
  *   4. Запускає debounce-синк.
  *
@@ -22,7 +22,6 @@ export {
 
 // ─── Ключові константи ─────────────────────────────────────────────────────────
 export const OUTBOX_KEY = 'sync_outbox';
-export const TOMBSTONES_KEY = 'sync_tombstones';
 
 // ─── Типи ─────────────────────────────────────────────────────────────────────
 export interface OutboxItem {
@@ -47,9 +46,6 @@ export function createMutationId(): string {
 export function ensureMutationIds(items: OutboxItem[]): OutboxItem[] {
   return items.map(item => item.mutation_id ? item : { ...item, mutation_id: createMutationId() });
 }
-
-/** map: collection → {id → deletedAtISO} */
-export type Tombstones = Record<string, Record<string, string>>;
 
 // ─── Scheduler hook (встановлюється sync-engine, щоб уникнути циклічного імпорту) ─
 let _scheduleSync: (() => void) | null = null;
@@ -147,16 +143,6 @@ export async function markDirty(
   notifySyncScheduler();
 }
 
-// ─── Тумбстоуни ──────────────────────────────────────────────────────────────
-
-export async function loadTombstones(): Promise<Tombstones> {
-  return loadData<Tombstones>(TOMBSTONES_KEY, {});
-}
-
-async function saveTombstones(t: Tombstones): Promise<void> {
-  await saveData(TOMBSTONES_KEY, t);
-}
-
 // ─── diffItems (чиста функція, тестабельна) ───────────────────────────────────
 
 export interface DiffResult {
@@ -164,12 +150,25 @@ export interface DiffResult {
   deleted: string[]; // local_ids зниклих
 }
 
+/**
+ * Порівняльний відбиток запису — БЕЗ `updatedAt`.
+ *
+ * `updatedAt` проставляється в сховищі (див. stampUpdatedAt), а екрани тримають
+ * items у React-стані, завантаженому раніше. Якби `updatedAt` брав участь у
+ * порівнянні, кожне збереження бачило б розбіжність «у сховищі штамп є, у стані
+ * ще немає» і позначало б змінними геть усі записи колекції.
+ */
+function comparableJson(item: Record<string, unknown>): string {
+  const { updatedAt: _ignored, ...rest } = item;
+  return JSON.stringify(rest);
+}
+
 export function diffItems<T extends { id: string }>(
   prev: T[],
   next: T[],
 ): DiffResult {
-  const prevMap = new Map(prev.map(i => [i.id, JSON.stringify(i)]));
-  const nextMap = new Map(next.map(i => [i.id, JSON.stringify(i)]));
+  const prevMap = new Map(prev.map(i => [i.id, comparableJson(i)]));
+  const nextMap = new Map(next.map(i => [i.id, comparableJson(i)]));
 
   const changed: string[] = [];
   for (const [id, json] of nextMap) {
@@ -186,6 +185,40 @@ export function diffItems<T extends { id: string }>(
   }
 
   return { changed, deleted };
+}
+
+// ─── stampUpdatedAt (чиста функція, тестабельна) ─────────────────────────────
+
+/** Будь-який синхронізований запис несе час останньої правки на клієнті. */
+export interface Timestamped {
+  id: string;
+  updatedAt?: string;
+  createdAt?: string;
+}
+
+/**
+ * Проставляє `updatedAt` перед записом у сховище.
+ *
+ * - змінені/нові → поточний час;
+ * - незмінені → зберігають наявний штамп;
+ * - незмінені без штампа → бекфіл із `createdAt` (а якщо його немає — поточний
+ *   час). Це ліниве доповнення для даних, створених до введення поля.
+ *
+ * Централізовано саме тут, щоб не правити 57 місць виклику saveSynced: усе, що
+ * лягає в сховище, гарантовано має штамп, навіть якщо екран його не проставив.
+ */
+export function stampUpdatedAt<T extends Timestamped>(
+  prev: T[],
+  next: T[],
+  changedIds: Set<string>,
+  now: string,
+): T[] {
+  const prevById = new Map(prev.map(item => [item.id, item]));
+  return next.map(item => {
+    if (changedIds.has(item.id)) return { ...item, updatedAt: now };
+    const existing = prevById.get(item.id)?.updatedAt ?? item.updatedAt;
+    return { ...item, updatedAt: existing ?? item.createdAt ?? now };
+  });
 }
 
 // ─── applyPullItems (чиста функція, тестабельна) ──────────────────────────────
@@ -226,8 +259,15 @@ export async function saveSynced<T extends { id: string }>(
   const existing = await loadData<T[]>(key, []);
   const { changed, deleted } = diffItems(existing, items);
 
-  // Зберігаємо нові дані
-  await saveData(key, items);
+  // Штампуємо updatedAt і зберігаємо. Робиться навіть коли змін немає — так
+  // ліниво доповнюються записи, створені до введення поля.
+  const stamped = stampUpdatedAt(
+    existing as unknown as Timestamped[],
+    items as unknown as Timestamped[],
+    new Set(changed),
+    new Date().toISOString(),
+  );
+  await saveData(key, stamped);
 
   // Якщо нема змін — не чіпаємо outbox
   if (!changed.length && !deleted.length) return;
@@ -242,20 +282,11 @@ export async function saveSynced<T extends { id: string }>(
     });
   }
 
-  // Тумбстоуни для видалених
-  if (deleted.length) {
-    const tombstones = await loadTombstones();
-    const colTomb = tombstones[key] ?? {};
-    const deletedAt = new Date().toISOString();
-    for (const id of deleted) {
-      colTomb[id] = deletedAt;
-      outboxItems.push({
-        mutation_id: createMutationId(), collection: key, local_id: id,
-        deleted: true, queued_at: now,
-      });
-    }
-    tombstones[key] = colTomb;
-    await saveTombstones(tombstones);
+  for (const id of deleted) {
+    outboxItems.push({
+      mutation_id: createMutationId(), collection: key, local_id: id,
+      deleted: true, queued_at: now,
+    });
   }
 
   await appendToOutbox(outboxItems);

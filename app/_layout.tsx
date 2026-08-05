@@ -13,6 +13,7 @@ import { initReporting } from '@/utils/reporting';
 import { AppModeProvider, useAppMode } from '@/store/app-mode';
 import { AuthProvider, useAuth } from '@/store/auth';
 import { AutoBackupProvider } from '@/store/auto-backup';
+import { runStorageMigrations } from '@/store/migrations';
 import { SyncProvider } from '@/store/sync-engine';
 import { I18nProvider } from '@/store/i18n';
 import { loadData } from '@/store/storage';
@@ -145,8 +146,19 @@ function RootLayoutContent() {
 
 function SyncGate({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();
+  const [migrated, setMigrated] = useState(false);
+
+  // Міграції мусять завершитись ДО першого обміну: рушій читає колекції за
+  // їхньою поточною формою, і синк застарілої форми запише на сервер сміття.
+  // UI при цьому не блокуємо — притримуємо лише синхронізацію.
+  useEffect(() => {
+    runStorageMigrations()
+      .catch(e => { if (__DEV__) console.warn('[migrations] failed:', e); })
+      .finally(() => setMigrated(true));
+  }, []);
+
   return (
-    <SyncProvider isAuthed={status === 'authed'}>
+    <SyncProvider isAuthed={migrated && status === 'authed'}>
       {children}
     </SyncProvider>
   );

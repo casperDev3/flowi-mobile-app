@@ -24,7 +24,7 @@ import { loadData, saveData } from '@/store/storage';
 import { collectAllData, mergeAndSave } from '@/store/sync';
 import { loadConflicts, SyncConflict } from '@/store/sync-conflicts';
 import { useSync } from '@/store/sync-engine';
-import { markDirty } from '@/store/synced-storage';
+import { markDirty, SYNC_SINGLETON_KEYS } from '@/store/synced-storage';
 
 const DEFAULT_PORT = 7842;
 
@@ -101,11 +101,18 @@ export default function SyncScreen() {
       // Прийняти серверне: upsert/delete локально, без outbox
       const remote = conflict.remote;
       if (remote) {
-        const items = await loadData<any[]>(conflict.dataKey, []);
-        const idx = items.findIndex((i: any) => i.id === remote.id);
-        if (idx >= 0) items[idx] = remote;
-        else if (remote.id) items.push(remote);
-        await saveData(conflict.dataKey, items);
+        const isSingleton = (SYNC_SINGLETON_KEYS as readonly string[]).includes(conflict.dataKey);
+        if (isSingleton) {
+          await saveData(
+            conflict.dataKey,
+            remote._deleted ? null : (remote.value ?? remote),
+          );
+        } else {
+          const items = await loadData<any[]>(conflict.dataKey, []);
+          const withoutRemote = items.filter((item: any) => item.id !== remote.id);
+          if (!remote._deleted && remote.id) withoutRemote.push(remote);
+          await saveData(conflict.dataKey, withoutRemote);
+        }
       }
       const remaining = (await lc()).filter(c => c.id !== id);
       await saveData('sync_pending_conflicts', remaining);

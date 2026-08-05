@@ -8,7 +8,13 @@
  *  - Tombstone: наявність після видалення
  */
 
-import { diffItems, deduplicateOutbox, applyPullItems, OutboxItem } from '@/store/synced-storage';
+import {
+  diffItems,
+  deduplicateOutbox,
+  applyPullItems,
+  ensureMutationIds,
+  OutboxItem,
+} from '@/store/synced-storage';
 import { assertCompatibleSyncContract } from '@/store/sync-contract';
 
 // ─── Мок AsyncStorage (аналогічно іншим тестам) ──────────────────────────────
@@ -133,6 +139,18 @@ describe('deduplicateOutbox', () => {
   });
 });
 
+describe('protocol v2 outbox ids', () => {
+  test('додає id старим outbox-записам і зберігає наявний id', () => {
+    const upgraded = ensureMutationIds([
+      { collection: 'tasks', local_id: 'old', deleted: false, queued_at: 1 },
+      { mutation_id: 'stable-id', collection: 'tasks', local_id: 'new', deleted: false, queued_at: 2 },
+    ]);
+    expect(upgraded[0].mutation_id).toBeTruthy();
+    expect(upgraded[0].mutation_id!.length).toBeLessThanOrEqual(64);
+    expect(upgraded[1].mutation_id).toBe('stable-id');
+  });
+});
+
 // ─── applyPullItems ───────────────────────────────────────────────────────────
 
 describe('applyPullItems', () => {
@@ -144,6 +162,13 @@ describe('applyPullItems', () => {
     const result = applyPullItems(local, serverItems, new Set(), 'tasks');
     expect(result).toHaveLength(2);
     expect(result.find(i => i.id === 'b')).toBeTruthy();
+  });
+
+  test('відновлює id, коли web payload його не містить', () => {
+    const result = applyPullItems([], [
+      { local_id: 'from-web', data: { title: 'Web task' }, deleted: false },
+    ], new Set(), 'tasks');
+    expect(result[0]).toEqual({ id: 'from-web', title: 'Web task' });
   });
 
   test('upsert існуючого елемента', () => {

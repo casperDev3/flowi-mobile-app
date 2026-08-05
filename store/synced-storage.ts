@@ -26,11 +26,26 @@ export const TOMBSTONES_KEY = 'sync_tombstones';
 
 // ─── Типи ─────────────────────────────────────────────────────────────────────
 export interface OutboxItem {
+  /** Added lazily for outbox rows created by pre-v2 app versions. */
+  mutation_id?: string;
   collection: string;
   local_id: string;
   deleted: boolean;
   force?: boolean;
   queued_at: number;
+}
+
+let mutationSequence = 0;
+
+export function createMutationId(): string {
+  mutationSequence = (mutationSequence + 1) % 1_000_000;
+  return `mob-${Date.now().toString(36)}-${mutationSequence.toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
+}
+
+export function ensureMutationIds(items: OutboxItem[]): OutboxItem[] {
+  return items.map(item => item.mutation_id ? item : { ...item, mutation_id: createMutationId() });
 }
 
 /** map: collection → {id → deletedAtISO} */
@@ -76,19 +91,33 @@ export function deduplicateOutbox(items: OutboxItem[]): OutboxItem[] {
 }
 
 export async function loadOutbox(): Promise<OutboxItem[]> {
-  return loadData<OutboxItem[]>(OUTBOX_KEY, []);
+  const stored = await loadData<OutboxItem[]>(OUTBOX_KEY, []);
+  const upgraded = ensureMutationIds(stored);
+  if (upgraded.some((item, index) => item !== stored[index])) {
+    await saveData(OUTBOX_KEY, upgraded);
+  }
+  return upgraded;
 }
 
 export async function saveOutbox(items: OutboxItem[]): Promise<void> {
-  await saveData(OUTBOX_KEY, items);
+  await saveData(OUTBOX_KEY, ensureMutationIds(items));
 }
 
 /** Додає нові записи до outbox, дедупліціруючи з наявними. */
 export async function appendToOutbox(newItems: OutboxItem[]): Promise<void> {
   if (!newItems.length) return;
   const existing = await loadOutbox();
-  const combined = deduplicateOutbox([...existing, ...newItems]);
+  const combined = deduplicateOutbox([...existing, ...ensureMutationIds(newItems)]);
   await saveOutbox(combined);
+}
+
+/** Remove only confirmed mutations, preserving a newer edit of the same row. */
+export async function removeMutationsFromOutbox(mutationIds: Set<string>): Promise<void> {
+  if (!mutationIds.size) return;
+  const current = await loadOutbox();
+  await saveOutbox(
+    current.filter(item => !item.mutation_id || !mutationIds.has(item.mutation_id)),
+  );
 }
 
 /** Видаляє записи з outbox за набором ключів collection:local_id. */
@@ -107,6 +136,7 @@ export async function markDirty(
   force = false,
 ): Promise<void> {
   const item: OutboxItem = {
+    mutation_id: createMutationId(),
     collection,
     local_id,
     deleted,
@@ -179,7 +209,7 @@ export function applyPullItems<T extends { id: string }>(
     if (si.deleted) {
       map.delete(si.local_id);
     } else {
-      map.set(si.local_id, si.data as T);
+      map.set(si.local_id, { id: si.local_id, ...(si.data ?? {}) } as T);
     }
   }
 
@@ -206,7 +236,10 @@ export async function saveSynced<T extends { id: string }>(
   const outboxItems: OutboxItem[] = [];
 
   for (const id of changed) {
-    outboxItems.push({ collection: key, local_id: id, deleted: false, queued_at: now });
+    outboxItems.push({
+      mutation_id: createMutationId(), collection: key, local_id: id,
+      deleted: false, queued_at: now,
+    });
   }
 
   // Тумбстоуни для видалених
@@ -216,7 +249,10 @@ export async function saveSynced<T extends { id: string }>(
     const deletedAt = new Date().toISOString();
     for (const id of deleted) {
       colTomb[id] = deletedAt;
-      outboxItems.push({ collection: key, local_id: id, deleted: true, queued_at: now });
+      outboxItems.push({
+        mutation_id: createMutationId(), collection: key, local_id: id,
+        deleted: true, queued_at: now,
+      });
     }
     tombstones[key] = colTomb;
     await saveTombstones(tombstones);
@@ -231,6 +267,7 @@ export async function saveSynced<T extends { id: string }>(
 export async function saveSyncedValue(key: string, value: unknown): Promise<void> {
   await saveData(key, value);
   const item: OutboxItem = {
+    mutation_id: createMutationId(),
     collection: key,
     local_id: key,
     deleted: false,

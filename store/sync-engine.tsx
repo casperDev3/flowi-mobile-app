@@ -1,20 +1,4 @@
-/**
- * store/sync-engine.ts — серверна синхронізація Flowi.
- *
- * Схема:
- *  - Outbox 'sync_outbox': записи, що очікують push на сервер.
- *  - 'last_server_sync_at' (ms): позначка останнього успішного серверного синку.
- *    НЕ плутати з 'last_sync_timestamp' (P2P).
- *  - syncNow():
- *      1. Гейт: isOnlineMode() && _isAuthed
- *      2. Push: читає outbox, збирає свіжі дані, надсилає чанками по 500.
- *      3. Pull: застосовує items з відповіді (dirty-wins).
- *      4. Конфлікти → appendConflicts().
- *      5. next_cursor → наступна сторінка pull.
- *  - Перший синк (last_server_sync_at === 0): генерує повний outbox з усіх колекцій.
- *  - Тригери: AppState→active; setInterval 5 хв; debounce 5 с після markDirty.
- *  - SyncProvider — підключається в app/_layout.tsx всередині AuthProvider.
- */
+/** Revision-based server synchronization for Flowi mobile. */
 
 import { AppState, AppStateStatus } from 'react-native';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
@@ -25,27 +9,25 @@ import { loadData, saveData } from './storage';
 import { appendConflicts } from './sync-conflicts';
 import { assertCompatibleSyncContract } from './sync-contract';
 import {
-  OUTBOX_KEY,
   SYNC_ARRAY_KEYS,
   SYNC_SINGLETON_KEYS,
-  Tombstones,
   OutboxItem,
   applyPullItems,
+  createMutationId,
   deduplicateOutbox,
   loadOutbox,
-  loadTombstones,
-  removeFromOutbox,
+  removeMutationsFromOutbox,
+  saveOutbox,
   setSyncScheduler,
 } from './synced-storage';
 
-// ─── Типи ─────────────────────────────────────────────────────────────────────
-
-interface SyncPushItem {
+interface SyncMutation {
+  mutation_id: string;
   collection: string;
   local_id: string;
-  data: unknown;
-  deleted: boolean;
-  client_updated_at: string;
+  operation: 'upsert' | 'delete';
+  data: Record<string, unknown>;
+  base_revision: number | null;
   force?: boolean;
 }
 
@@ -54,56 +36,88 @@ interface SyncResponseItem {
   local_id: string;
   data: any;
   deleted: boolean;
-  client_updated_at: string;
-  updated_at: string;
+  client_updated_at: string | null;
+  updated_at: number;
+  revision: number;
+  change_seq: number;
+}
+
+interface SyncAcknowledgement {
+  status: 'applied';
+  mutation_id: string;
+  collection: string;
+  local_id: string;
+  revision: number;
+  change_seq: number;
 }
 
 interface SyncConflictServer {
+  status: 'conflict';
+  mutation_id: string;
   collection: string;
   local_id: string;
-  server: { data: any; deleted: boolean; [key: string]: any };
-  client: { data: any; [key: string]: any };
+  server: SyncResponseItem | null;
+  client: { data: any; deleted: boolean; base_revision: number | null };
 }
 
 interface SyncResponse {
   contract_version?: number;
-  server_time: number;
-  items: SyncResponseItem[];
+  protocol_version: 2;
+  cursor: number;
+  changes: SyncResponseItem[];
+  acknowledged: SyncAcknowledgement[];
   conflicts: SyncConflictServer[];
   next_cursor: number | null;
-  applied: number;
 }
 
-// ─── Модульний стан auth ──────────────────────────────────────────────────────
+export type SyncRevisionMap = Record<string, number>;
+
+const SERVER_CURSOR_KEY = 'server_change_cursor_v2';
+const SERVER_REVISIONS_KEY = 'server_record_revisions_v2';
+const LAST_SYNC_AT_KEY = 'last_server_sync_completed_at';
+
+export const syncRecordKey = (collection: string, localId: string): string =>
+  `${collection}:${localId}`;
+
+export function applyRevisionUpdates(
+  current: SyncRevisionMap,
+  changes: Pick<SyncResponseItem, 'collection' | 'local_id' | 'revision'>[],
+  acknowledgements: Pick<SyncAcknowledgement, 'collection' | 'local_id' | 'revision'>[] = [],
+): SyncRevisionMap {
+  const next = { ...current };
+  for (const item of [...changes, ...acknowledgements]) {
+    next[syncRecordKey(item.collection, item.local_id)] = item.revision;
+  }
+  return next;
+}
+
+async function getServerCursor(): Promise<number> {
+  return loadData<number>(SERVER_CURSOR_KEY, 0);
+}
+
+async function setServerCursor(cursor: number): Promise<void> {
+  await saveData(SERVER_CURSOR_KEY, cursor);
+}
+
+async function getRevisionMap(): Promise<SyncRevisionMap> {
+  return loadData<SyncRevisionMap>(SERVER_REVISIONS_KEY, {});
+}
+
+async function setRevisionMap(revisions: SyncRevisionMap): Promise<void> {
+  await saveData(SERVER_REVISIONS_KEY, revisions);
+}
 
 let _isAuthed = false;
 
-export function setIsAuthed(v: boolean): void {
-  _isAuthed = v;
-  if (!v) {
-    // Вийшли з акаунта — скасовуємо автоматичні повторні спроби
+export function setIsAuthed(value: boolean): void {
+  _isAuthed = value;
+  if (!value) {
     clearRetryTimer();
     _retryAttempt = 0;
   }
 }
 
-// ─── Ключ останнього серверного синку ─────────────────────────────────────────
-
-const LAST_SERVER_SYNC_KEY = 'last_server_sync_at';
-
-async function getLastServerSync(): Promise<number> {
-  return loadData<number>(LAST_SERVER_SYNC_KEY, 0);
-}
-
-async function setLastServerSync(t: number): Promise<void> {
-  await saveData(LAST_SERVER_SYNC_KEY, t);
-}
-
-// ─── Auto-retry backoff при помилці синхронізації ────────────────────────────
-
-/** Затримки повторних спроб: 30с → 2хв → 5хв (cap) */
 const RETRY_DELAYS = [30_000, 2 * 60_000, 5 * 60_000] as const;
-
 let _retryAttempt = 0;
 let _retryTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -122,10 +136,8 @@ function scheduleRetry(): void {
     _retryTimer = null;
     void doSync();
   }, delay);
-  if (__DEV__) console.log(`[sync-engine] retry scheduled in ${delay / 1000}s (attempt ${_retryAttempt})`);
+  if (__DEV__) console.log(`[sync-engine] retry in ${delay / 1000}s (attempt ${_retryAttempt})`);
 }
-
-// ─── Debounce sync ────────────────────────────────────────────────────────────
 
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -137,10 +149,7 @@ function scheduleSync(debounceMs = 5000): void {
   }, debounceMs);
 }
 
-// ─── React context ────────────────────────────────────────────────────────────
-
 type SyncState = 'idle' | 'syncing' | 'error';
-
 interface SyncCtx {
   state: SyncState;
   lastSyncAt: number | null;
@@ -150,217 +159,230 @@ interface SyncCtx {
 }
 
 const Ctx = createContext<SyncCtx>({
-  state: 'idle',
-  lastSyncAt: null,
-  pendingCount: 0,
-  conflictsCount: 0,
+  state: 'idle', lastSyncAt: null, pendingCount: 0, conflictsCount: 0,
   syncNow: async () => {},
 });
 
-// Оновлення React-стану ззовні (для doSync)
-let _setState: ((s: SyncState) => void) | null = null;
-let _setLastSyncAt: ((t: number) => void) | null = null;
-let _setPendingCount: ((n: number) => void) | null = null;
-let _setConflictsCount: ((n: number) => void) | null = null;
+let _setState: ((state: SyncState) => void) | null = null;
+let _setLastSyncAt: ((timestamp: number) => void) | null = null;
+let _setPendingCount: ((count: number) => void) | null = null;
+let _setConflictsCount: ((count: number) => void) | null = null;
 
-function updateSyncState(s: SyncState): void {
-  _setState?.(s);
-}
+const updateSyncState = (state: SyncState) => _setState?.(state);
+const updateLastSyncAt = (timestamp: number) => _setLastSyncAt?.(timestamp);
+const updatePendingCount = (count: number) => _setPendingCount?.(count);
+const updateConflictsCount = (count: number) => _setConflictsCount?.(count);
 
-function updateLastSyncAt(t: number): void {
-  _setLastSyncAt?.(t);
-}
-
-function updatePendingCount(n: number): void {
-  _setPendingCount?.(n);
-}
-
-function updateConflictsCount(n: number): void {
-  _setConflictsCount?.(n);
-}
-
-// ─── Збір свіжих даних для push ──────────────────────────────────────────────
-
-async function buildPushItem(
+async function buildMutation(
   outboxItem: OutboxItem,
-  tombstones: Tombstones,
-): Promise<SyncPushItem | null> {
+  revisions: SyncRevisionMap,
+): Promise<SyncMutation | null> {
   const { collection, local_id, deleted, force } = outboxItem;
-
   const isSingleton = (SYNC_SINGLETON_KEYS as readonly string[]).includes(collection);
-
-  let data: unknown;
-  let client_updated_at: string;
+  let data: Record<string, unknown>;
 
   if (deleted) {
-    // Дані для видаленого — лише {id}
-    data = { id: local_id };
-    const tombAt = tombstones[collection]?.[local_id];
-    client_updated_at = tombAt ?? new Date().toISOString();
+    data = {};
   } else if (isSingleton) {
-    // Singleton — читаємо поточне значення
-    const val = await loadData<unknown>(collection, null);
-    data = { value: val };
-    client_updated_at = new Date().toISOString();
+    const value = await loadData<unknown>(collection, null);
+    data = { value };
   } else {
-    // Масив — знаходимо елемент за id
-    const arr = await loadData<{ id: string; updatedAt?: string; createdAt?: string }[]>(
-      collection,
-      [],
-    );
-    const item = arr.find(i => i.id === local_id);
-    if (!item) return null; // вже видалено без тумбстоуна — пропускаємо
+    const items = await loadData<Record<string, unknown>[]>(collection, []);
+    const item = items.find(candidate => candidate.id === local_id);
+    if (!item) return null;
     data = item;
-    client_updated_at =
-      item.updatedAt ?? item.createdAt ?? new Date().toISOString();
   }
 
   return {
+    mutation_id: outboxItem.mutation_id ?? createMutationId(),
     collection,
     local_id,
+    operation: deleted ? 'delete' : 'upsert',
     data,
-    deleted,
-    client_updated_at,
+    base_revision: revisions[syncRecordKey(collection, local_id)] ?? null,
     ...(force ? { force: true } : {}),
   };
 }
 
-// ─── Генерація повного outbox (перший синк) ───────────────────────────────────
-
 async function generateFullOutbox(): Promise<void> {
   const now = Date.now();
-  const items: OutboxItem[] = [];
+  const generated: OutboxItem[] = [];
 
   for (const key of SYNC_ARRAY_KEYS) {
-    const arr = await loadData<{ id: string }[]>(key, []);
-    for (const item of arr) {
-      items.push({ collection: key, local_id: item.id, deleted: false, queued_at: now });
+    const items = await loadData<{ id: string }[]>(key, []);
+    for (const item of items) {
+      generated.push({ collection: key, local_id: item.id, deleted: false, queued_at: now });
+    }
+  }
+  for (const key of SYNC_SINGLETON_KEYS) {
+    const value = await loadData<unknown | undefined>(key, undefined);
+    if (value !== undefined) {
+      generated.push({ collection: key, local_id: key, deleted: false, queued_at: now });
     }
   }
 
-  for (const key of SYNC_SINGLETON_KEYS) {
-    items.push({ collection: key, local_id: key, deleted: false, queued_at: now });
+  const existing = await loadOutbox();
+  await saveOutbox(deduplicateOutbox([...existing, ...generated]));
+}
+
+async function applyPullResponse(
+  serverItems: SyncResponseItem[],
+  currentOutbox: OutboxItem[],
+): Promise<void> {
+  if (!serverItems.length) return;
+  const dirtySet = new Set(currentOutbox.map(item => syncRecordKey(item.collection, item.local_id)));
+  const byCollection = new Map<string, SyncResponseItem[]>();
+  for (const item of serverItems) {
+    const list = byCollection.get(item.collection) ?? [];
+    list.push(item);
+    byCollection.set(item.collection, list);
   }
 
-  if (items.length > 0) {
-    // Перезаписуємо весь outbox (повний синк)
-    await saveData(OUTBOX_KEY, deduplicateOutbox(items));
+  for (const [collection, items] of byCollection) {
+    const isSingleton = (SYNC_SINGLETON_KEYS as readonly string[]).includes(collection);
+    if (isSingleton) {
+      if (dirtySet.has(syncRecordKey(collection, collection))) continue;
+      const serverItem = items[items.length - 1];
+      await saveData(
+        collection,
+        serverItem.deleted ? null : (serverItem.data?.value ?? serverItem.data),
+      );
+      continue;
+    }
+    if (!(SYNC_ARRAY_KEYS as readonly string[]).includes(collection)) continue;
+    const local = await loadData<{ id: string }[]>(collection, []);
+    await saveData(collection, applyPullItems(local, items, dirtySet, collection));
   }
 }
 
-// ─── Основна логіка syncNow ──────────────────────────────────────────────────
+interface ExchangeResult {
+  cursor: number;
+  revisions: SyncRevisionMap;
+  conflicts: SyncConflictServer[];
+}
+
+async function exchangeV2(
+  initialCursor: number,
+  mutations: SyncMutation[],
+  initialRevisions: SyncRevisionMap,
+): Promise<ExchangeResult> {
+  let pageCursor = initialCursor;
+  let finalCursor = initialCursor;
+  let revisions = initialRevisions;
+  const conflicts: SyncConflictServer[] = [];
+
+  for (let page = 0; page < 200; page++) {
+    const response = await apiFetch<SyncResponse>('/sync/user/v2/', {
+      method: 'POST',
+      body: { cursor: pageCursor, mutations: page === 0 ? mutations : [] },
+    });
+    assertCompatibleSyncContract(response.contract_version);
+    if (response.protocol_version !== 2) {
+      throw new Error(`Unsupported sync protocol ${String(response.protocol_version)}`);
+    }
+
+    const finishedIds = new Set([
+      ...response.acknowledged.map(item => item.mutation_id),
+      ...response.conflicts.map(item => item.mutation_id),
+    ]);
+    await removeMutationsFromOutbox(finishedIds);
+
+    const conflictRows = response.conflicts.flatMap(item => item.server ? [item.server] : []);
+    const currentOutbox = await loadOutbox();
+    // Keep the local candidate visible until the user resolves the conflict.
+    // The synthetic dirty rows only affect local application; the real outbox
+    // mutation has already been removed by mutation_id above.
+    const conflictDirtyRows: OutboxItem[] = response.conflicts.map(item => ({
+      collection: item.collection,
+      local_id: item.local_id,
+      deleted: item.client.deleted,
+      queued_at: Date.now(),
+    }));
+    await applyPullResponse(
+      [...response.changes, ...conflictRows],
+      [...currentOutbox, ...conflictDirtyRows],
+    );
+    revisions = applyRevisionUpdates(
+      revisions,
+      [...response.changes, ...conflictRows],
+      response.acknowledged,
+    );
+    conflicts.push(...response.conflicts);
+    finalCursor = Math.max(finalCursor, response.cursor);
+
+    if (response.next_cursor == null) {
+      return { cursor: finalCursor, revisions, conflicts };
+    }
+    if (response.next_cursor <= pageCursor) {
+      throw new Error('Server returned a non-advancing sync cursor');
+    }
+    pageCursor = response.next_cursor;
+  }
+  throw new Error('Sync page limit exceeded');
+}
 
 let _syncing = false;
 
 async function doSync(): Promise<void> {
-  if (!isOnlineMode() || !_isAuthed) return;
-  if (_syncing) return;
+  if (!isOnlineMode() || !_isAuthed || _syncing) return;
   _syncing = true;
   updateSyncState('syncing');
 
   try {
-    const lastSyncAt = await getLastServerSync();
+    let cursor = await getServerCursor();
+    let revisions = await getRevisionMap();
+    if (cursor === 0) await generateFullOutbox();
 
-    // Перший синк — генеруємо повний outbox
-    if (lastSyncAt === 0) {
-      await generateFullOutbox();
-    }
-
-    const tombstones = await loadTombstones();
-
-    // ── Push ──────────────────────────────────────────────────────────────────
     const outbox = await loadOutbox();
     updatePendingCount(outbox.length);
+    const allConflicts: SyncConflictServer[] = [];
+    const chunkCount = Math.max(1, Math.ceil(outbox.length / 500));
 
-    const CHUNK_SIZE = 500;
-    const applied: Set<string> = new Set();
-    const conflictsFromServer: SyncConflictServer[] = [];
-    let pullCursor = lastSyncAt;
-
-    // Збираємо push-items
-    const pushItems: SyncPushItem[] = [];
-    for (const item of outbox) {
-      const pi = await buildPushItem(item, tombstones);
-      if (pi) pushItems.push(pi);
-    }
-
-    // Чанкуємо по 500
-    for (let i = 0; i < Math.max(1, Math.ceil(pushItems.length / CHUNK_SIZE)); i++) {
-      const chunk = pushItems.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-      const since = i === 0 ? lastSyncAt : pullCursor;
-
-      const res = await apiFetch<SyncResponse>('/sync/user/', {
-        method: 'POST',
-        body: { since, items: chunk },
-      });
-      assertCompatibleSyncContract(res.contract_version);
-
-      pullCursor = res.server_time;
-
-      // Обробляємо успішно застосовані
-      for (const item of chunk) {
-        applied.add(`${item.collection}:${item.local_id}`);
+    for (let index = 0; index < chunkCount; index++) {
+      const sourceChunk = outbox.slice(index * 500, (index + 1) * 500);
+      const mutations: SyncMutation[] = [];
+      const staleMutationIds = new Set<string>();
+      for (const item of sourceChunk) {
+        const mutation = await buildMutation(item, revisions);
+        if (mutation) mutations.push(mutation);
+        else if (item.mutation_id) staleMutationIds.add(item.mutation_id);
       }
+      await removeMutationsFromOutbox(staleMutationIds);
 
-      // Конфлікти — прибираємо з outbox, зберігаємо для обробки
-      for (const conflict of res.conflicts) {
-        applied.add(`${conflict.collection}:${conflict.local_id}`);
-        conflictsFromServer.push(conflict);
-      }
-
-      // Pull — обробляємо відразу
-      await applyPullResponse(res.items, outbox);
-
-      // Пагінація pull
-      let cursor = res.next_cursor;
-      while (cursor !== null) {
-        const pullRes = await apiFetch<SyncResponse>('/sync/user/', {
-          method: 'POST',
-          body: { since: cursor, items: [] },
-        });
-        assertCompatibleSyncContract(pullRes.contract_version);
-        await applyPullResponse(pullRes.items, outbox);
-        cursor = pullRes.next_cursor;
-        pullCursor = pullRes.server_time;
-      }
-    }
-
-    // Прибираємо успішно надіслані з outbox
-    if (applied.size > 0) {
-      await removeFromOutbox(applied);
+      const result = await exchangeV2(cursor, mutations, revisions);
+      cursor = result.cursor;
+      revisions = result.revisions;
+      allConflicts.push(...result.conflicts);
+      await setRevisionMap(revisions);
+      await setServerCursor(cursor);
       updatePendingCount((await loadOutbox()).length);
     }
 
-    // Конфлікти → appendConflicts (формат sync-conflicts.ts)
-    if (conflictsFromServer.length > 0) {
-      const formatted = conflictsFromServer.map(c => ({
-        id: `${c.collection}:${c.local_id}`,
-        dataKey: c.collection,
-        local: c.client.data,
-        remote: c.server.data,
-      }));
-      await appendConflicts(formatted);
+    if (allConflicts.length) {
+      await appendConflicts(allConflicts.map(conflict => ({
+        id: syncRecordKey(conflict.collection, conflict.local_id),
+        dataKey: conflict.collection,
+        local: { id: conflict.local_id, ...(conflict.client.data ?? {}) },
+        remote: conflict.server
+          ? { id: conflict.local_id, ...(conflict.server.data ?? {}) }
+          : { id: conflict.local_id, _deleted: true },
+      })));
     }
 
-    // Оновлюємо позначку часу
-    await setLastServerSync(pullCursor);
-    updateLastSyncAt(pullCursor);
-
-    // Оновлюємо лічильник конфліктів
+    const completedAt = Date.now();
+    await saveData(LAST_SYNC_AT_KEY, completedAt);
+    updateLastSyncAt(completedAt);
     const { loadConflicts } = await import('./sync-conflicts');
-    const allConflicts = await loadConflicts();
-    updateConflictsCount(allConflicts.length);
-
+    updateConflictsCount((await loadConflicts()).length);
     clearRetryTimer();
     _retryAttempt = 0;
     updateSyncState('idle');
-  } catch (e) {
-    if (e instanceof OfflineError) {
-      // Тихо переходимо в idle — пристрій офлайн, retry не плануємо
+  } catch (error) {
+    if (error instanceof OfflineError) {
       clearRetryTimer();
       updateSyncState('idle');
     } else {
-      if (__DEV__) console.warn('[sync-engine] syncNow error:', e);
+      if (__DEV__) console.warn('[sync-engine] syncNow error:', error);
       updateSyncState('error');
       scheduleRetry();
     }
@@ -369,111 +391,46 @@ async function doSync(): Promise<void> {
   }
 }
 
-// ─── Застосування pull-відповіді ──────────────────────────────────────────────
-
-async function applyPullResponse(
-  serverItems: SyncResponseItem[],
-  currentOutbox: OutboxItem[],
-): Promise<void> {
-  if (!serverItems.length) return;
-
-  // Набір dirty ключів (локально змінено — dirty-wins)
-  const dirtySet = new Set(currentOutbox.map(i => `${i.collection}:${i.local_id}`));
-
-  // Групуємо items за колекцією
-  const byCollection = new Map<string, SyncResponseItem[]>();
-  for (const si of serverItems) {
-    const list = byCollection.get(si.collection) ?? [];
-    list.push(si);
-    byCollection.set(si.collection, list);
-  }
-
-  for (const [collection, items] of byCollection) {
-    const isSingleton = (SYNC_SINGLETON_KEYS as readonly string[]).includes(collection);
-
-    if (isSingleton) {
-      // Singleton — skip if dirty
-      const fullKey = `${collection}:${collection}`;
-      if (dirtySet.has(fullKey)) continue;
-      const serverItem = items[items.length - 1]; // остання версія
-      if (!serverItem.deleted && serverItem.data?.value !== undefined) {
-        await saveData(collection, serverItem.data.value);
-      }
-      continue;
-    }
-
-    // Масив — upsert/delete за id
-    if (!(SYNC_ARRAY_KEYS as readonly string[]).includes(collection)) continue;
-
-    const local = await loadData<{ id: string }[]>(collection, []);
-    const updated = applyPullItems(local, items, dirtySet, collection);
-    // Зберігаємо через saveData (НЕ saveSynced — уникаємо петлі!)
-    await saveData(collection, updated);
-  }
-}
-
-// ─── Публічна функція syncNow ─────────────────────────────────────────────────
-
 export async function syncNow(): Promise<void> {
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
   }
-  // Ручний тригер — скидаємо backoff
   clearRetryTimer();
   _retryAttempt = 0;
   await doSync();
 }
 
-/** Викликається з auth.tsx після login/register для повного синку. */
 export async function triggerFullSync(): Promise<void> {
-  await setLastServerSync(0); // скидаємо позначку → повний outbox
-  scheduleSync(500); // коротший debounce
+  await setServerCursor(0);
+  await setRevisionMap({});
+  scheduleSync(500);
 }
 
-/** Повне відвантаження: усі локальні дані → outbox → push+pull. */
 export async function pushAllToServer(): Promise<void> {
   await generateFullOutbox();
   updatePendingCount((await loadOutbox()).length);
   await syncNow();
 }
 
-/**
- * Повне завантаження з сервера (pull-only, since=0).
- * Локальні незасинкані зміни (outbox) мають пріоритет — dirty-wins.
- */
 export async function pullAllFromServer(): Promise<void> {
-  if (!isOnlineMode() || !_isAuthed) return;
-  if (_syncing) return;
+  if (!isOnlineMode() || !_isAuthed || _syncing) return;
   _syncing = true;
   updateSyncState('syncing');
-
   try {
-    const outbox = await loadOutbox();
-    let cursor: number | null = 0;
-    let serverTime = 0;
-
-    while (cursor !== null) {
-      const res: SyncResponse = await apiFetch<SyncResponse>('/sync/user/', {
-        method: 'POST',
-        body: { since: cursor, items: [] },
-      });
-      assertCompatibleSyncContract(res.contract_version);
-      await applyPullResponse(res.items, outbox);
-      serverTime = res.server_time;
-      cursor = res.next_cursor;
-    }
-
-    await setLastServerSync(serverTime);
-    updateLastSyncAt(serverTime);
+    const result = await exchangeV2(0, [], await getRevisionMap());
+    await setRevisionMap(result.revisions);
+    await setServerCursor(result.cursor);
+    const completedAt = Date.now();
+    await saveData(LAST_SYNC_AT_KEY, completedAt);
+    updateLastSyncAt(completedAt);
     clearRetryTimer();
     _retryAttempt = 0;
     updateSyncState('idle');
-  } catch (e) {
-    if (e instanceof OfflineError) {
-      updateSyncState('idle');
-    } else {
-      if (__DEV__) console.warn('[sync-engine] pullAllFromServer error:', e);
+  } catch (error) {
+    if (error instanceof OfflineError) updateSyncState('idle');
+    else {
+      if (__DEV__) console.warn('[sync-engine] pullAllFromServer error:', error);
       updateSyncState('error');
     }
   } finally {
@@ -481,15 +438,12 @@ export async function pullAllFromServer(): Promise<void> {
   }
 }
 
-// ─── SyncProvider ─────────────────────────────────────────────────────────────
-
 export function SyncProvider({ children, isAuthed }: { children: React.ReactNode; isAuthed: boolean }) {
   const [state, setState] = useState<SyncState>('idle');
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [conflictsCount, setConflictsCount] = useState(0);
 
-  // Прив'язуємо модульні сеттери до React-стану
   useEffect(() => {
     _setState = setState;
     _setLastSyncAt = setLastSyncAt;
@@ -503,60 +457,37 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
     };
   }, []);
 
-  // Синхронізуємо auth-стан у модульну змінну + очищуємо retry при деавторизації
-  useEffect(() => {
-    setIsAuthed(isAuthed);
-  }, [isAuthed]);
-
-  // Очищуємо retry-таймер при unmount
-  useEffect(() => {
-    return () => {
-      clearRetryTimer();
-    };
-  }, []);
-
-  // Реєструємо scheduleSync у synced-storage
+  useEffect(() => setIsAuthed(isAuthed), [isAuthed]);
+  useEffect(() => () => clearRetryTimer(), []);
   useEffect(() => {
     setSyncScheduler(scheduleSync);
     return () => setSyncScheduler(() => {});
   }, []);
-
-  // Ініціалізація: завантажуємо початкові значення
   useEffect(() => {
     async function init() {
-      const t = await getLastServerSync();
-      if (t > 0) setLastSyncAt(t);
-      const outbox = await loadOutbox();
-      setPendingCount(outbox.length);
+      const timestamp = await loadData<number>(LAST_SYNC_AT_KEY, 0);
+      if (timestamp > 0) setLastSyncAt(timestamp);
+      setPendingCount((await loadOutbox()).length);
       const { loadConflicts } = await import('./sync-conflicts');
-      const conflicts = await loadConflicts();
-      setConflictsCount(conflicts.length);
+      setConflictsCount((await loadConflicts()).length);
     }
     void init();
   }, []);
 
-  // AppState → active
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
-      if (appStateRef.current !== 'active' && next === 'active') {
-        void doSync();
-      }
+    const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (appStateRef.current !== 'active' && next === 'active') void doSync();
       appStateRef.current = next;
     });
-    return () => sub.remove();
+    return () => subscription.remove();
   }, []);
-
-  // Інтервал 5 хв
   useEffect(() => {
     const id = setInterval(() => void doSync(), 5 * 60 * 1000);
     return () => clearInterval(id);
   }, []);
 
-  const syncNowCallback = useCallback(async () => {
-    await syncNow();
-  }, []);
-
+  const syncNowCallback = useCallback(async () => syncNow(), []);
   return (
     <Ctx.Provider value={{ state, lastSyncAt, pendingCount, conflictsCount, syncNow: syncNowCallback }}>
       {children}

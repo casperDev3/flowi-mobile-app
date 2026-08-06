@@ -1427,9 +1427,33 @@ export default function TasksScreen() {
 
           {/* Stats — today (deadline = today) */}
           <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
-            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', letterSpacing: 0.4, marginBottom: 2 }}>
-              Сьогодні · {today.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+              <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', letterSpacing: 0.4, flex: 1 }}>
+                {tr.today} · {today.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
+              </Text>
+              {/* Одна кнопка з двома станами: відкрити фільтри або скинути їх.
+                  Друга кнопка «скинути» поруч була б зайвою — скидати нічого,
+                  доки фільтрів немає. */}
+              <TouchableOpacity
+                onPress={() => (hasActiveFilters ? clearAllFilters() : setShowFilterSheet(true))}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={hasActiveFilters ? tr.resetAllFilters : tr.filters}
+                // 34 + 5×2 = 44pt — мінімальна ціль дотику.
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                style={{
+                  width: 34, height: 34, borderRadius: 10, borderWidth: 1,
+                  alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: hasActiveFilters ? '#EF444418' : c.dim,
+                  borderColor: hasActiveFilters ? '#EF444440' : c.border,
+                }}>
+                <IconSymbol
+                  name={hasActiveFilters ? 'arrow.counterclockwise' : 'line.3.horizontal.decrease'}
+                  size={15}
+                  color={hasActiveFilters ? '#EF4444' : c.sub}
+                />
+              </TouchableOpacity>
+            </View>
             <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
               <StatCell value={activeCount}          label={tr.active} color="#F59E0B" sub={c.sub} />
               <View style={{ width: 1, backgroundColor: c.border }} />

@@ -28,6 +28,23 @@ const MAPPING: Record<string, MaterialIconName> = {
   'square.and.arrow.up': 'share',
   'square.and.arrow.down': 'download',
   'arrow.clockwise': 'refresh',
+  'arrow.counterclockwise': 'restart-alt',
+  // Додано після того, як __tests__/icon-mapping.test.ts виявив, що ці іконки
+  // використовуються в коді, але не мали мапінгу — тобто на Android рендерились
+  // порожнім місцем. Typecheck цього не ловить: він резолвить IconSymbol у
+  // .ios.tsx, де name типізовано вільно.
+  'pencil.circle.fill': 'edit',
+  'rectangle.stack.fill': 'layers',
+  'rectangle.stack': 'view-agenda',
+  'exclamationmark': 'priority-high',
+  'mic': 'mic',
+  'circle.dotted': 'radio-button-unchecked',
+  'clock.arrow.circlepath': 'history',
+  'pause.fill': 'pause',
+  'person.crop.circle': 'account-circle',
+  'doc.on.doc': 'content-copy',
+  'record.circle': 'radio-button-checked',
+  'shippingbox.fill': 'inventory-2',
   'arrow.uturn.backward': 'undo',
   // Arrows / trends
   'arrow.up': 'arrow-upward',

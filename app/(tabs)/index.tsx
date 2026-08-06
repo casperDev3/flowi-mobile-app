@@ -1636,12 +1636,8 @@ export default function TasksScreen() {
                           c={c}
                           isDark={isDark}
                           projects={projects}
-                          todayLabel={tr.today}
-                          yesterdayLabel={tr.yesterday}
-                          tomorrowLabel={tr.tomorrow}
                           overdueLabel={tr.overdueSection}
                           priorityLabel={PRIORITY[task.priority].label}
-                          locale={locale}
                         />
                       </Animated.View>
                     );
@@ -1720,12 +1716,8 @@ export default function TasksScreen() {
                           c={c}
                           isDark={isDark}
                           projects={projects}
-                          todayLabel={tr.today}
-                          yesterdayLabel={tr.yesterday}
-                          tomorrowLabel={tr.tomorrow}
                           overdueLabel={tr.overdueSection}
                           priorityLabel={PRIORITY[task.priority].label}
-                          locale={locale}
                         />
                       </Animated.View>
                     );
@@ -3846,7 +3838,7 @@ export default function TasksScreen() {
 // ─── Compact Card ────────────────────────────────────────────────────────────
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
-function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, todayLabel, yesterdayLabel, tomorrowLabel, overdueLabel, priorityLabel, locale }: {
+function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, overdueLabel, priorityLabel }: {
   task: Task;
   statusColumn: TaskStatusColumn;
   onPress: () => void;
@@ -3854,14 +3846,10 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
   c: any;
   isDark: boolean;
   projects: Project[];
-  todayLabel: string;
-  yesterdayLabel: string;
-  tomorrowLabel: string;
-  /** Для VoiceOver: колір «прострочено» інакше ніяк не озвучується. */
+  /** Для VoiceOver: стан «прострочено» інакше ніяк не озвучується. */
   overdueLabel: string;
   /** Те саме для пріоритету — він переданий лише кольоровою крапкою. */
   priorityLabel: string;
-  locale: string;
 }) {
   const overdue = isOverdue(task);
   const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
@@ -3877,12 +3865,13 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
 
   // Опис рядка для VoiceOver: інакше озвучувалась лише назва, а статус,
   // дедлайн, пріоритет і проєкт передавались виключно кольором.
+  // Дата тут не озвучується, бо її не видно: опис має відповідати тому, що
+  // на екрані. Прострочення лишається — це стан, а не дата, і саме воно
+  // потребує уваги.
   const a11ySummary = [
     task.title,
     statusColumn.name,
-    task.deadline
-      ? `${overdue ? overdueLabel : ''} ${deadlineLabel(task.deadline, todayLabel, yesterdayLabel, tomorrowLabel, locale)}`.trim()
-      : null,
+    overdue ? overdueLabel : null,
     priorityLabel,
     proj?.name,
   ].filter(Boolean).join(', ');
@@ -3909,9 +3898,10 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
           style={{ marginTop: 1 }}
         />
 
-        {/* Два рядки: назва зверху на всю ширину, метадані під нею.
-            В один рядок назва змагалася за місце зі статусом, дедлайном і
-            крапками — і обрізалась першою, хоча вона тут найважливіша. */}
+        {/* Два рядки: назва зверху на всю ширину, статус і проєкт під нею.
+            В один рядок назва змагалася за місце з рештою і обрізалась першою,
+            хоча вона тут найважливіша. Дату свідомо не показуємо — компактний
+            вигляд для швидкого перегляду списку, дедлайн видно в повному. */}
         <View style={{ flex: 1, marginHorizontal: 10, gap: 4 }}>
           <AnimatedText
             style={[{ color: c.text, fontSize: 14, fontWeight: '600', textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
@@ -3934,14 +3924,6 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
               </View>
             )}
 
-            {task.deadline && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <IconSymbol name={overdue ? 'exclamationmark.circle' : 'calendar'} size={10} color={overdue ? '#EF4444' : c.sub} />
-                <Text style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 10, fontWeight: '600' }}>
-                  {deadlineLabel(task.deadline!, todayLabel, yesterdayLabel, tomorrowLabel, locale)}
-                </Text>
-              </View>
-            )}
           </View>
         </View>
 

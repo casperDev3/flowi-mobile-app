@@ -159,6 +159,26 @@ export function computeGoals(profile: HealthProfile | null, weightKg: number): H
   };
 }
 
+/**
+ * Чисті калорії за день: спожито мінус спалено, але НЕ нижче нуля.
+ *
+ * Обрізання по нулю — не косметика. Спалені калорії приходять з Apple Health
+ * автоматично, а їжу користувач вносить руками, тож типовий стан зранку —
+ * «0 спожито, 400 спалено». Без обрізання екран показував `-400 кк`, що
+ * читається як помилка застосунку.
+ *
+ * Саме max(0, …), а не abs(): модуль перетворив би дефіцит 400 на «спожито
+ * 400», тобто показав би протилежне до правди. Нуль каже те, що є насправді —
+ * до денної норми не з'їдено нічого.
+ *
+ * Похідні величини від цього лише виграють: залишок до норми перестає бути
+ * завищеним на розмір дефіциту.
+ */
+export function calcNetCalories(consumed: number, burned: number): number {
+  const net = (Number.isFinite(consumed) ? consumed : 0) - (Number.isFinite(burned) ? burned : 0);
+  return net > 0 ? Math.round(net) : 0;
+}
+
 // ─── Вибірки записів ─────────────────────────────────────────────────────────
 
 export function getMonthEntries(entries: HealthEntry[], month: Date): HealthEntry[] {

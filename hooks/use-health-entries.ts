@@ -12,6 +12,7 @@ import {
   FALLBACK_WEIGHT,
   HealthEntry,
   HealthProfile,
+  calcNetCalories,
   PROFILE_KEY,
   bmiCategory,
   calcBMI,
@@ -171,7 +172,7 @@ export function useHealthEntries() {
   const heightCm = profile?.heightCm ?? 175;
   const bmi = useMemo(() => (latestWeight ? calcBMI(latestWeight, heightCm) : null), [latestWeight, heightCm]);
 
-  const calNet = todayCalIn - todayCalOut;
+  const calNet = calcNetCalories(todayCalIn, todayCalOut);
   const calRemaining = goals.calories - calNet;
   const calPct = goals.calories > 0 ? calNet / goals.calories : 0;
   const calOver = calNet > goals.calories;

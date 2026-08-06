@@ -1,6 +1,6 @@
 import {
   HealthEntry, HealthProfile,
-  bmiCategory, calcBMI, calcBMR, calcCalorieTarget, calcProteinTarget, calcTDEE, calcWaterTarget,
+  bmiCategory, calcBMI, calcBMR, calcCalorieTarget, calcNetCalories, calcProteinTarget, calcTDEE, calcWaterTarget,
   computeGoals, estimateBodyFatNavy, getWeeklyInsights, lastForDay, leanMass, maxHR, stepsToKm, sumForDay,
   waistToHeightRatio, waistToHipRatio, whrHealthy, whtrCategory,
 } from '@/utils/healthUtils';
@@ -141,5 +141,40 @@ describe('healthUtils — заміри тіла', () => {
     expect(estimateBodyFatNavy('male', 180, null, 85, null)).toBeNull();
     expect(estimateBodyFatNavy('male', 180, 90, 85, null)).toBeNull(); // шия ≥ талія
     expect(estimateBodyFatNavy('female', 170, 34, 70, null)).toBeNull(); // ж без стегон
+  });
+});
+
+// ─── Чисті калорії ───────────────────────────────────────────────────────────
+
+describe('calcNetCalories', () => {
+  // Реальний баг: Apple Health віддає спалені калорії автоматично, а їжу
+  // користувач вносить руками. Типовий стан зранку — «0 спожито, 400
+  // спалено», і екран показував `-400 кк`, що читається як помилка.
+
+  test('спожито більше за спалене — звичайна різниця', () => {
+    expect(calcNetCalories(1800, 400)).toBe(1400);
+  });
+
+  test('спалено більше за спожите — нуль, а не мінус', () => {
+    expect(calcNetCalories(0, 437)).toBe(0);
+    expect(calcNetCalories(200, 650)).toBe(0);
+  });
+
+  test('НЕ модуль: дефіцит не перетворюється на з\'їдене', () => {
+    // abs(-437) = 437 читалось би як «спожито 437» — протилежне до правди.
+    expect(calcNetCalories(0, 437)).not.toBe(437);
+  });
+
+  test('рівність дає нуль', () => {
+    expect(calcNetCalories(500, 500)).toBe(0);
+  });
+
+  test('нечислові значення не дають NaN', () => {
+    expect(calcNetCalories(Number.NaN, 100)).toBe(0);
+    expect(calcNetCalories(500, Number.NaN)).toBe(500);
+  });
+
+  test('результат цілий', () => {
+    expect(Number.isInteger(calcNetCalories(1800.6, 400.2))).toBe(true);
   });
 });

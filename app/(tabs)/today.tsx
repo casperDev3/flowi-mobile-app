@@ -33,7 +33,7 @@ import { Transaction, calcTotals, filterByMonth, txCurrency } from '@/utils/fina
 import {
   ACCENT, ACCENT_CAL, ACCENT_SLEEP, ACCENT_STEPS, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
-import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, computeGoals, lastForDay, sumForDay } from '@/utils/healthUtils';
+import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, calcNetCalories, computeGoals, lastForDay, sumForDay } from '@/utils/healthUtils';
 import { Habit, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { PRIORITY_COLORS, Task, isOverdue } from '@/utils/taskUtils';
 import { haptic } from '@/utils/haptics';
@@ -149,7 +149,10 @@ export default function TodayScreen() {
     const lw = weights.length ? weights[0].value : null;
     return computeGoals(profile, lw ?? FALLBACK_WEIGHT);
   }, [health, profile]);
-  const calNet = sumForDay(health, 'calories', today) - sumForDay(health, 'calories_out', today);
+  const calNet = calcNetCalories(
+    sumForDay(health, 'calories', today),
+    sumForDay(health, 'calories_out', today),
+  );
   const steps  = sumForDay(health, 'steps', today);
   const water  = sumForDay(health, 'water', today);
   const sleep  = lastForDay(health, 'sleep', today);

@@ -773,6 +773,32 @@ export default function TasksScreen() {
   }, []);
   // ────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Переносить завдання в іншу колонку статусу.
+   *
+   * Доти статус можна було змінити лише чекбоксом (готово ↔ активне) або
+   * увійшовши в режим редагування. Тобто перевести завдання з «В роботі» в
+   * будь-який інший кастомний статус із деталей було неможливо.
+   */
+  const setTaskColumn = useCallback((id: string, columnId: string) => {
+    const column = taskStatuses.find(item => item.id === columnId);
+    if (!column) return;
+    haptic.light();
+    setTasks(prev => prev.map(t => {
+      if (t.id !== id) return t;
+      if (taskStatusColumn(t, taskStatuses).id === column.id) return t;
+      const status: Status = column.isDone ? 'done' : 'active';
+      return {
+        ...t,
+        status,
+        kanbanColumnId: column.id,
+        // Назва колонки в нотатці: інакше в історії видно лише «активне», без
+        // того, КУДИ саме перенесли завдання.
+        history: [...(t.history ?? []), makeHistoryEvent(column.isDone ? 'done' : 'active', column.name)],
+      };
+    }));
+  }, [taskStatuses]);
+
   const toggleTask = useCallback((id: string) => {
     haptic.light();
     // Знімок поточного стану задачі для undo
@@ -3362,6 +3388,46 @@ export default function TasksScreen() {
 
                     {selectedTask.description ? <Text style={[s.detailDesc, { color: c.sub }]}>{selectedTask.description}</Text> : null}
 
+                    {/* Статус: перенести завдання в іншу колонку прямо з деталей.
+                        Раніше це вимагало входу в режим редагування, тож
+                        перевести «В роботі» в інший статус було нікуди. */}
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={[s.label, { color: c.sub }]}>{tr.status}</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        {taskStatuses.map(column => {
+                          const active = taskStatusColumn(selectedTask, taskStatuses).id === column.id;
+                          return (
+                            <TouchableOpacity
+                              key={column.id}
+                              onPress={() => setTaskColumn(selectedTask.id, column.id)}
+                              activeOpacity={0.7}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: active }}
+                              accessibilityLabel={column.name}
+                              style={{
+                                minHeight: 36,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                borderRadius: 10,
+                                borderWidth: 1,
+                                paddingHorizontal: 11,
+                                paddingVertical: 8,
+                                backgroundColor: active ? column.color + '20' : c.dim,
+                                borderColor: active ? column.color : c.border,
+                              }}>
+                              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: column.color, marginRight: 6 }} />
+                              <Text style={{ color: active ? column.color : c.sub, fontSize: 12, fontWeight: active ? '700' : '600' }}>
+                                {column.name}
+                              </Text>
+                              {/* Галочка, а не лише колір: вибраний стан не має
+                                  триматись виключно на кольорі. */}
+                              {active && <IconSymbol name="checkmark" size={11} color={column.color} style={{ marginLeft: 5 }} />}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+
                     {/* Meta badges */}
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 }}>
                       <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
@@ -3816,32 +3882,49 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
           accessibilityRole="checkbox"
           accessibilityLabel={task.title}
           accessibilityState={{ checked: isDone }}
+          style={{ marginTop: 1 }}
         />
-        <AnimatedText
-          style={[{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginHorizontal: 10, textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
-          numberOfLines={1}>
-          {task.title}
-        </AnimatedText>
-        {/* Статус приховано, коли назва довга: краще прочитати завдання, ніж
-            стиснути і його, і бейдж до нечитабельного. */}
-        <View
-          style={{ maxWidth: 96, flexDirection: 'row', alignItems: 'center', borderRadius: 7, paddingHorizontal: 6, paddingVertical: 3, marginRight: 6, backgroundColor: statusColumn.color + '16' }}
-          importantForAccessibility="no-hide-descendants">
-          <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 4 }} />
-          <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 10, fontWeight: '700', flexShrink: 1 }}>{statusColumn.name}</Text>
+
+        {/* Два рядки: назва зверху на всю ширину, метадані під нею.
+            В один рядок назва змагалася за місце зі статусом, дедлайном і
+            крапками — і обрізалась першою, хоча вона тут найважливіша. */}
+        <View style={{ flex: 1, marginHorizontal: 10, gap: 4 }}>
+          <AnimatedText
+            style={[{ color: c.text, fontSize: 14, fontWeight: '600', textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
+            numberOfLines={2}>
+            {task.title}
+          </AnimatedText>
+
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}
+            importantForAccessibility="no-hide-descendants">
+            <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: statusColumn.color + '16' }}>
+              <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 4 }} />
+              <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 10, fontWeight: '700' }}>{statusColumn.name}</Text>
+            </View>
+
+            {proj && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: proj.color + '16' }}>
+                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: proj.color, marginRight: 4 }} />
+                <Text numberOfLines={1} style={{ color: proj.color, fontSize: 10, fontWeight: '600', maxWidth: 110 }}>{proj.name}</Text>
+              </View>
+            )}
+
+            {task.deadline && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <IconSymbol name={overdue ? 'exclamationmark.circle' : 'calendar'} size={10} color={overdue ? '#EF4444' : c.sub} />
+                <Text style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 10, fontWeight: '600' }}>
+                  {deadlineLabel(task.deadline!, todayLabel, yesterdayLabel, tomorrowLabel, locale)}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-        {task.deadline && (
-          <Text
-            importantForAccessibility="no-hide-descendants"
-            style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 11, fontWeight: '600', marginRight: 8 }}>
-            {deadlineLabel(task.deadline!, todayLabel, yesterdayLabel, tomorrowLabel, locale)}
-          </Text>
-        )}
-        {/* Крапки пріоритету і проєкту. Сховані від скрінрідера — сенс уже
-            переданий у a11ySummary словами, а не кольором. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} importantForAccessibility="no-hide-descendants">
+
+        {/* Лишається лише пріоритет: проєкт тепер підписаний словом нижче,
+            тож друга безіменна крапка стала зайвою. */}
+        <View style={{ alignItems: 'center', justifyContent: 'center' }} importantForAccessibility="no-hide-descendants">
           <View style={[s.dot, { backgroundColor: PRIORITY_COLORS[task.priority] }]} />
-          {proj && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: proj.color }} />}
         </View>
       </BlurView>
     </PressableScale>
@@ -3972,7 +4055,7 @@ const s = StyleSheet.create({
   taskCard:       { borderRadius: 16, borderWidth: 1, padding: 14, overflow: 'hidden' },
   // minHeight 44 — мінімальна ціль дотику (Apple HIG). Було ~38: рядок цілком
   // клікабельний, тож він мусить відповідати нормі, а не лише чекбокс у ньому.
-  compactCard:    { minHeight: 44, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  compactCard:    { minHeight: 44, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' },
   boardCard:      { borderRadius: 13, padding: 11, overflow: 'hidden' },
   taskTitle:      { fontSize: 14, fontWeight: '600' },
   checkbox:       { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },

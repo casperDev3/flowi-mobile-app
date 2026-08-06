@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,7 +28,6 @@ import { useScreenView } from '@/hooks/use-screen-view';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
-import { useTimerContext } from '@/store/timer-context';
 import { isSameDay } from '@/utils/dateUtils';
 import { Transaction, calcTotals, filterByMonth, txCurrency } from '@/utils/financeUtils';
 import {
@@ -35,7 +35,7 @@ import {
 } from '@/utils/healthTheme';
 import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, calcNetCalories, computeGoals, lastForDay, sumForDay } from '@/utils/healthUtils';
 import { Habit, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
-import { PRIORITY_COLORS, Task, isOverdue } from '@/utils/taskUtils';
+import { Task, isOverdue } from '@/utils/taskUtils';
 import { haptic } from '@/utils/haptics';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -60,6 +60,14 @@ const QUICK_WATER  = 250;
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+/**
+ * Скільки записів показувати на головному екрані до «показати всі».
+ *
+ * Три — щоб екран лишався оглядовим: він відповідає на питання «що зараз
+ * важливо», а не замінює екран завдань.
+ */
+const TODAY_PREVIEW_LIMIT = 3;
+
 export default function TodayScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -67,7 +75,6 @@ export default function TodayScreen() {
   const motion = useMotion();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const c = getHealthColors(isDark);
-  const { setPendingTask } = useTimerContext();
   useScreenView('today');
 
   const [tasks,    setTasks]    = useState<Task[]>([]);
@@ -77,12 +84,13 @@ export default function TodayScreen() {
   const [profile,  setProfile]  = useState<HealthProfile | null>(null);
   const [meetings, setMeetings] = useState<TodayMeeting[]>([]);
   const [habits,   setHabits]   = useState<Habit[]>([]);
+  const [notesCount, setNotesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const firstLoadDone = useRef(false);
 
   const load = useCallback(async () => {
-    const [t, x, tm, h, p, m, hb] = await Promise.all([
+    const [t, x, tm, h, p, m, hb, notes] = await Promise.all([
       loadData<Task[]>('tasks', []),
       loadData<Transaction[]>('transactions', []),
       loadData<TimeEntry[]>('time_entries', []),
@@ -90,9 +98,11 @@ export default function TodayScreen() {
       loadData<HealthProfile | null>('health_profile', null),
       loadData<TodayMeeting[]>('meetings', []),
       loadData<Habit[]>('health_habits', []),
+      loadData<{ updatedAt?: string; createdAt?: string }[]>('notes', []),
     ]);
     setTasks(t); setTxs(x); setTime(tm); setHealth(h); setProfile(p);
     setMeetings(m); setHabits(hb);
+    setNotesCount(Array.isArray(notes) ? notes.length : 0);
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -131,17 +141,22 @@ export default function TodayScreen() {
   const activeCount  = tasks.filter(t => t.status === 'active').length;
   const overdueCount = tasks.filter(isOverdue).length;
 
-  // «У фокусі»: найбільш термінова активна задача (прострочена → найближчий дедлайн → перша активна)
-  const focusTask = useMemo<Task | null>(() => {
-    const active = tasks.filter(t => t.status === 'active');
-    const byDl = (a: Task, b: Task) =>
-      +new Date(a.deadline!) - +new Date(b.deadline!);
-    const overdue = active.filter(isOverdue).sort(byDl);
-    if (overdue.length) return overdue[0];
-    const withDl = active.filter(t => t.deadline).sort(byDl);
-    return withDl[0] ?? active[0] ?? null;
+  /**
+   * Незавершені завдання на сьогодні — прострочені та з дедлайном сьогодні,
+   * за спаданням пріоритету.
+   *
+   * Обчислюється тут, а не всередині TodayTaskRow: екрану потрібна не лише
+   * перша трійка, а й загальна кількість — щоб знати, чи показувати «показати
+   * всі», і що написати на кнопці статистики.
+   */
+  const todayTasks = useMemo(() => {
+    const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    return tasks
+      .filter(t => t.status === 'active'
+        && ((t.deadline && isSameDay(new Date(t.deadline), today)) || isOverdue(t)))
+      .sort((a, b) => (order[a.priority] ?? 1) - (order[b.priority] ?? 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
-  const focusOverdue = focusTask ? isOverdue(focusTask) : false;
 
   // Health
   const goals = useMemo(() => {
@@ -219,12 +234,6 @@ export default function TodayScreen() {
     haptic.light();
   }, []);
 
-  const handleFocusTimer = useCallback(() => {
-    if (!focusTask) return;
-    setPendingTask(focusTask.title);
-    haptic.medium();
-    router.push('/(tabs)/time');
-  }, [focusTask, setPendingTask, router]);
 
   const openTaskDetails = useCallback((id: string) => {
     router.push({ pathname: '/', params: { open: id } });
@@ -241,13 +250,6 @@ export default function TodayScreen() {
   };
   const fmtMoney = (n: number) =>
     `${n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString(locale)} ₴`;
-  const fmtDeadline = (d: string) => {
-    const dl = new Date(d);
-    if (isSameDay(dl, today)) {
-      return dl.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-    }
-    return dl.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-  };
 
   const Section = ({ index, children }: { index: number; children: React.ReactNode }) => (
     <Animated.View entering={motion.entering(FadeInDown.duration(250).delay(index * 50))}>
@@ -288,8 +290,82 @@ export default function TodayScreen() {
 
           {loaded && <>
 
-          {/* 1. Здоровʼя — hero-стрічка кілець */}
+          {/* 1. Завдання на сьогодні */}
           <Section index={0}>
+            <View style={{ marginBottom: 12 }}>
+              <View style={s.sectionRow}>
+                <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayTasks}</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {overdueCount > 0 && (
+                    <View style={[s.badge, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}>
+                      <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
+                        {overdueCount} {tr.todayOverdue}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={[s.badge, { backgroundColor: ACCENT_TASK + '18', borderColor: ACCENT_TASK + '35' }]}>
+                    <Text style={{ color: ACCENT_TASK, fontSize: 11, fontWeight: '700' }}>
+                      {activeCount} {tr.todayActive}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <TodayTaskRow
+                tasks={todayTasks.slice(0, TODAY_PREVIEW_LIMIT)}
+                isDark={isDark}
+                c={c}
+                tr={tr}
+                onToggle={handleToggleTask}
+                onOpen={openTaskDetails}
+              />
+              {todayTasks.length > TODAY_PREVIEW_LIMIT && (
+                <ShowAllRow
+                  label={tr.showAllCount.replace('{count}', String(todayTasks.length))}
+                  color={ACCENT_TASK}
+                  c={c}
+                  onPress={() => router.push('/')}
+                />
+              )}
+              {todayTasks.length === 0 && (
+                <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
+              )}
+            </View>
+          </Section>
+
+          {/* 2. Зустрічі сьогодні */}
+          {todayMeetings.length > 0 && (
+            <Section index={1}>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayMeetings}</Text>
+                {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(m => (
+                  <PressableScale
+                    key={m.id}
+                    onPress={() => router.push('/meetings')}
+                    style={{ marginBottom: 6 }}>
+                    <BlurView
+                      intensity={isDark ? 18 : 36}
+                      tint={isDark ? 'dark' : 'light'}
+                      style={[s.meetingRow, { borderColor: c.border }]}>
+                      <View style={[s.meetingBar, { backgroundColor: m.color || ACCENT_TASK }]} />
+                      <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
+                      <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
+                    </BlurView>
+                  </PressableScale>
+                ))}
+                {todayMeetings.length > TODAY_PREVIEW_LIMIT && (
+                  <ShowAllRow
+                    label={tr.showAllCount.replace('{count}', String(todayMeetings.length))}
+                    color="#6366F1"
+                    c={c}
+                    onPress={() => router.push('/meetings')}
+                  />
+                )}
+              </View>
+            </Section>
+          )}
+
+          {/* 3. Здоровʼя — hero-стрічка кілець */}
+          <Section index={2}>
             <PressableScale
               onPress={() => router.push('/health')}
               accessibilityRole="button"
@@ -313,8 +389,8 @@ export default function TodayScreen() {
             </PressableScale>
           </Section>
 
-          {/* 2. Швидкі дії */}
-          <Section index={1}>
+          {/* 4. Швидкі дії */}
+          <Section index={3}>
             <QuickActions
               isDark={isDark}
               c={c}
@@ -326,110 +402,9 @@ export default function TodayScreen() {
             />
           </Section>
 
-          {/* 3. У фокусі — найтерміновіша задача + старт таймера */}
-          {focusTask && (
-            <Section index={2}>
-              <View style={{ marginBottom: 12 }}>
-                <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayFocus}</Text>
-                <BlurView
-                  intensity={isDark ? 22 : 42}
-                  tint={isDark ? 'dark' : 'light'}
-                  style={[s.focusCard, { borderColor: focusOverdue ? '#EF4444' + '55' : c.border }]}>
-                  <View style={[s.focusBar, { backgroundColor: PRIORITY_COLORS[focusTask.priority] || ACCENT_TASK }]} />
-                  <AnimatedCheck
-                    checked={false}
-                    size={24}
-                    color={PRIORITY_COLORS[focusTask.priority] || ACCENT_TASK}
-                    borderColor={c.sub}
-                    onPress={() => handleToggleTask(focusTask.id)}
-                    accessibilityLabel={focusTask.title}
-                  />
-                  <PressableScale
-                    onPress={() => openTaskDetails(focusTask.id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={focusTask.title}
-                    style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={[s.focusTitle, { color: c.text }]} numberOfLines={2}>{focusTask.title}</Text>
-                    {focusTask.deadline && (
-                      <Text style={{ color: focusOverdue ? '#EF4444' : c.sub, fontSize: 12, fontWeight: '600', marginTop: 2 }}>
-                        {focusOverdue ? `${tr.todayOverdue} · ` : ''}{fmtDeadline(focusTask.deadline)}
-                      </Text>
-                    )}
-                  </PressableScale>
-                  <PressableScale
-                    onPress={handleFocusTimer}
-                    scaleTo={0.9}
-                    accessibilityRole="button"
-                    accessibilityLabel={tr.quickTimer}
-                    style={[s.playBtn, { backgroundColor: ACCENT_TIME + '22' }]}>
-                    <IconSymbol name="play.fill" size={16} color={ACCENT_TIME} />
-                  </PressableScale>
-                </BlurView>
-              </View>
-            </Section>
-          )}
-
-          {/* 4. Завдання на сьогодні */}
-          <Section index={3}>
-            <View style={{ marginBottom: 12 }}>
-              <View style={s.sectionRow}>
-                <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayTasks}</Text>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {overdueCount > 0 && (
-                    <View style={[s.badge, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}>
-                      <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
-                        {overdueCount} {tr.todayOverdue}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={[s.badge, { backgroundColor: ACCENT_TASK + '18', borderColor: ACCENT_TASK + '35' }]}>
-                    <Text style={{ color: ACCENT_TASK, fontSize: 11, fontWeight: '700' }}>
-                      {activeCount} {tr.todayActive}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <TodayTaskRow
-                tasks={focusTask ? tasks.filter(t => t.id !== focusTask.id) : tasks}
-                isDark={isDark}
-                c={c}
-                tr={tr}
-                onToggle={handleToggleTask}
-                onOpen={openTaskDetails}
-              />
-              {activeCount === 0 && (
-                <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
-              )}
-            </View>
-          </Section>
-
-          {/* 5. Зустрічі сьогодні */}
-          {todayMeetings.length > 0 && (
-            <Section index={4}>
-              <View style={{ marginBottom: 12 }}>
-                <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayMeetings}</Text>
-                {todayMeetings.map(m => (
-                  <PressableScale
-                    key={m.id}
-                    onPress={() => router.push('/meetings')}
-                    style={{ marginBottom: 6 }}>
-                    <BlurView
-                      intensity={isDark ? 18 : 36}
-                      tint={isDark ? 'dark' : 'light'}
-                      style={[s.meetingRow, { borderColor: c.border }]}>
-                      <View style={[s.meetingBar, { backgroundColor: m.color || ACCENT_TASK }]} />
-                      <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
-                      <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
-                    </BlurView>
-                  </PressableScale>
-                ))}
-              </View>
-            </Section>
-          )}
-
-          {/* 6. Звички */}
+          {/* 5. Звички */}
           {habits.length > 0 && (
-            <Section index={5}>
+            <Section index={4}>
               <View style={{ marginBottom: 12 }}>
                 <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayHabits}</Text>
                 {habits.map(h => {
@@ -468,8 +443,8 @@ export default function TodayScreen() {
             </Section>
           )}
 
-          {/* 7. Фінанси + Час — сітка 2 колонки */}
-          <Section index={6}>
+          {/* 6. Фінанси + Час — сітка 2 колонки */}
+          <Section index={5}>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
               <StatTile
                 c={c} isDark={isDark}
@@ -500,8 +475,8 @@ export default function TodayScreen() {
             </View>
           </Section>
 
-          {/* 8. Спільне */}
-          <Section index={7}>
+          {/* 7. Спільне */}
+          <Section index={6}>
             <PressableScale
               onPress={() => router.push('/(tabs)/shared')}
               accessibilityRole="button"
@@ -523,6 +498,39 @@ export default function TodayScreen() {
                 </View>
               </BlurView>
             </PressableScale>
+          </Section>
+
+          {/* 8. Швидкі переходи з лічильниками за сьогодні */}
+          <Section index={7}>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              <NavStat
+                icon="calendar"
+                count={todayMeetings.length}
+                label={tr.meetings}
+                color="#6366F1"
+                c={c}
+                isDark={isDark}
+                onPress={() => router.push('/meetings')}
+              />
+              <NavStat
+                icon="checklist"
+                count={todayTasks.length}
+                label={tr.tabTasks}
+                color={ACCENT_TASK}
+                c={c}
+                isDark={isDark}
+                onPress={() => router.push('/')}
+              />
+              <NavStat
+                icon="note.text"
+                count={notesCount}
+                label={tr.notes}
+                color="#F59E0B"
+                c={c}
+                isDark={isDark}
+                onPress={() => router.push('/notes')}
+              />
+            </View>
           </Section>
 
           </>}
@@ -599,6 +607,16 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
+  navStat: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    overflow: 'hidden',
+    minHeight: 88,
+    justifyContent: 'center',
+  },
   sectionTitle: {
     fontSize: 11,
     fontWeight: '700',
@@ -674,3 +692,67 @@ const s = StyleSheet.create({
   habitTitle: { flex: 1, fontSize: 14, fontWeight: '500' },
   streakBadge: { fontSize: 13, fontWeight: '700' },
 });
+
+/** Рядок «показати всі» під скороченим списком. */
+function ShowAllRow({ label, color, c, onPress }: {
+  label: string;
+  color: string;
+  c: any;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={{
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        marginTop: 2,
+      }}>
+      <Text style={{ color, fontSize: 13, fontWeight: '700' }}>{label}</Text>
+      <IconSymbol name="chevron.right" size={12} color={color} />
+    </TouchableOpacity>
+  );
+}
+
+/**
+ * Плитка-перехід із лічильником за сьогодні.
+ *
+ * Цифра і підпис разом: «3» саме по собі не каже, чого саме три, а сама лише
+ * назва не дає причини натиснути.
+ */
+function NavStat({ icon, count, label, color, c, isDark, onPress }: {
+  icon: string;
+  count: number;
+  label: string;
+  color: string;
+  c: any;
+  isDark: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <PressableScale
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${count}`}
+      style={{ flex: 1 }}>
+      <BlurView
+        intensity={isDark ? 22 : 42}
+        tint={isDark ? 'dark' : 'light'}
+        style={[s.navStat, { borderColor: c.border }]}>
+        <IconSymbol name={icon as any} size={16} color={color} />
+        <Text style={{ color: c.text, fontSize: 19, fontWeight: '800', marginTop: 6, fontVariant: ['tabular-nums'] }}>
+          {count}
+        </Text>
+        <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 1 }}>
+          {label}
+        </Text>
+      </BlurView>
+    </PressableScale>
+  );
+}

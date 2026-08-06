@@ -60,7 +60,6 @@ type SortBy = 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
 type Filter = 'all' | 'active' | 'done';
 type ViewMode = 'list' | 'calendar';
 type CalSpan = 'week' | 'month' | 'quarter' | 'year';
-type CardDetail = 'compact' | 'detailed';
 
 interface SubTask { id: string; title: string; done: boolean; reminderAt?: string; }
 
@@ -160,19 +159,6 @@ function isOverdue(task: Task): boolean {
   const d = new Date(task.deadline);
   d.setHours(23, 59, 59, 999);
   return d < today;
-}
-
-function deadlineDiff(iso: string): number {
-  const d = new Date(iso); d.setHours(23, 59, 59, 999);
-  return Math.ceil((d.getTime() - today.getTime()) / 86400000);
-}
-
-function deadlineColor(task: Task, fallback: string): string {
-  if (!task.deadline || task.status === 'done') return fallback;
-  const diff = deadlineDiff(task.deadline);
-  if (diff < 0) return '#EF4444';
-  if (diff <= 1) return '#F59E0B';
-  return fallback;
 }
 
 function deadlineLabel(iso: string, todayLabel: string, yesterdayLabel: string, tomorrowLabel: string, locale: string): string {
@@ -333,7 +319,6 @@ export default function TasksScreen() {
   const [filter, setFilter] = useState<Filter>('active');
   const [sort, setSort] = useState<SortBy>('deadline');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [cardDetail, setCardDetail] = useState<CardDetail>('compact');
 
   // Search & extra filters
   const [search, setSearch] = useState('');
@@ -1291,12 +1276,24 @@ export default function TasksScreen() {
               </TouchableOpacity>
               {viewMode === 'list' && (
                 <TouchableOpacity
-                  onPress={() => setCardDetail(v => v === 'detailed' ? 'compact' : 'detailed')}
+                  onPress={() => (hasActiveFilters ? clearAllFilters() : setShowFilterSheet(true))}
+                  onLongPress={() => setShowFilterSheet(true)}
                   hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                   accessibilityRole="button"
-                  accessibilityLabel={tr.a11yViewMode}
-                  style={[s.headerBtn, { backgroundColor: cardDetail === 'detailed' ? c.accent + '20' : c.dim, borderColor: cardDetail === 'detailed' ? c.accent : c.border }]}>
-                  <IconSymbol name={cardDetail === 'detailed' ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={cardDetail === 'detailed' ? c.accent : c.sub} />
+                  accessibilityLabel={hasActiveFilters ? tr.resetAllFilters : tr.filters}
+                  accessibilityHint={hasActiveFilters ? tr.filters : undefined}
+                  style={[s.headerBtn, {
+                    backgroundColor: hasActiveFilters ? '#EF444418' : c.dim,
+                    borderColor: hasActiveFilters ? '#EF444440' : c.border,
+                  }]}>
+                  {/* Два стани в одній кнопці: відкрити фільтри або скинути їх.
+                      Коли фільтри активні, короткий тап скидає, довгий — усе
+                      одно відкриває налаштування, щоб доступ до них не зникав. */}
+                  <IconSymbol
+                    name={hasActiveFilters ? 'arrow.counterclockwise' : 'line.3.horizontal.decrease'}
+                    size={17}
+                    color={hasActiveFilters ? '#EF4444' : c.sub}
+                  />
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -1427,33 +1424,6 @@ export default function TasksScreen() {
 
           {/* Stats — today (deadline = today) */}
           <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-              <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', letterSpacing: 0.4, flex: 1 }}>
-                {tr.today} · {today.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
-              </Text>
-              {/* Одна кнопка з двома станами: відкрити фільтри або скинути їх.
-                  Друга кнопка «скинути» поруч була б зайвою — скидати нічого,
-                  доки фільтрів немає. */}
-              <TouchableOpacity
-                onPress={() => (hasActiveFilters ? clearAllFilters() : setShowFilterSheet(true))}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={hasActiveFilters ? tr.resetAllFilters : tr.filters}
-                // 34 + 5×2 = 44pt — мінімальна ціль дотику.
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                style={{
-                  width: 34, height: 34, borderRadius: 10, borderWidth: 1,
-                  alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: hasActiveFilters ? '#EF444418' : c.dim,
-                  borderColor: hasActiveFilters ? '#EF444440' : c.border,
-                }}>
-                <IconSymbol
-                  name={hasActiveFilters ? 'arrow.counterclockwise' : 'line.3.horizontal.decrease'}
-                  size={15}
-                  color={hasActiveFilters ? '#EF4444' : c.sub}
-                />
-              </TouchableOpacity>
-            </View>
             <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
               <StatCell value={activeCount}          label={tr.active} color="#F59E0B" sub={c.sub} />
               <View style={{ width: 1, backgroundColor: c.border }} />
@@ -1616,75 +1586,29 @@ export default function TasksScreen() {
                   <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>{overdueItems.length}</Text>
                 </View>
               </View>
-              <View style={{ gap: cardDetail === 'compact' ? 6 : 10 }}>
+              <View style={{ gap: 6 }}>
                 {overdueItems.map((task, i) => {
                   const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
                   const animExiting  = motion.entering(FadeOutUp.duration(150));
                   const animLayout   = motion.entering(LinearTransition.springify());
-                  if (cardDetail === 'compact') {
-                    return (
-                      <Animated.View
-                        key={task.id}
-                        entering={animEntering}
-                        exiting={animExiting}
-                        layout={animLayout}>
-                        <CompactCard
-                          task={task}
-                          statusColumn={taskStatusColumn(task, taskStatuses)}
-                          onPress={() => setSelected(task)}
-                          onToggle={() => toggleTask(task.id)}
-                          c={c}
-                          isDark={isDark}
-                          projects={projects}
-                          overdueLabel={tr.overdueSection}
-                          priorityLabel={PRIORITY[task.priority].label}
-                        />
-                      </Animated.View>
-                    );
-                  }
-                  const prioColor = PRIORITY[task.priority].color;
-                  const cardBorder = '#EF444450';
                   return (
                     <Animated.View
                       key={task.id}
                       entering={animEntering}
                       exiting={animExiting}
                       layout={animLayout}>
-                      <TouchableOpacity activeOpacity={0.75} onPress={() => setSelected(task)}>
-                      <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[s.taskCard, { borderColor: cardBorder }]}>
-                        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: prioColor, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
-                        <View style={{ marginLeft: 8 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 9 }}>
-                            <AnimatedCheck
-                              checked={task.status === 'done'}
-                              color="#EF4444"
-                              borderColor="#EF4444"
-                              size={22}
-                              radius={7}
-                              onPress={() => toggleTask(task.id)}
-                              hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
-                              accessibilityRole="checkbox"
-                              accessibilityLabel={task.title}
-                              accessibilityState={{ checked: task.status === 'done' }}
-                              style={{ marginTop: 1 }}
-                            />
-                            <Text style={[s.taskTitle, { color: c.text, flex: 1, marginLeft: 10, lineHeight: 20 }]}>
-                              {task.title}
-                            </Text>
-                          </View>
-                          {task.deadline && (
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 32, marginBottom: 4 }}>
-                              <View style={[s.badge, { backgroundColor: '#EF444418', borderColor: '#EF444440' }]}>
-                                <IconSymbol name="flag" size={11} color="#EF4444" />
-                                <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                                  {deadlineLabel(task.deadline, tr.today, tr.yesterday, tr.tomorrow, locale)}
-                                </Text>
-                              </View>
-                            </View>
-                          )}
-                        </View>
-                      </BlurView>
-                      </TouchableOpacity>
+                      <CompactCard
+                        task={task}
+                        statusColumn={taskStatusColumn(task, taskStatuses)}
+                        onPress={() => setSelected(task)}
+                        onToggle={() => toggleTask(task.id)}
+                        c={c}
+                        isDark={isDark}
+                        projects={projects}
+                        overdueLabel={tr.overdueSection}
+                        priorityLabel={PRIORITY[task.priority].label}
+                        subtasksLabel={tr.subtasks}
+                      />
                     </Animated.View>
                   );
                 })}
@@ -1696,162 +1620,29 @@ export default function TasksScreen() {
           {viewMode === 'list' && groups.map(group => (
             <View key={group.label}>
               <Text style={[s.groupLabel, { color: c.sub }]}>{group.label}</Text>
-              <View style={{ gap: cardDetail === 'compact' ? 6 : 10 }}>
+              <View style={{ gap: 6 }}>
                 {group.tasks.map((task, i) => {
                   const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
                   const animExiting  = motion.entering(FadeOutUp.duration(150));
                   const animLayout   = motion.entering(LinearTransition.springify());
-                  if (cardDetail === 'compact') {
-                    return (
-                      <Animated.View
-                        key={task.id}
-                        entering={animEntering}
-                        exiting={animExiting}
-                        layout={animLayout}>
-                        <CompactCard
-                          task={task}
-                          statusColumn={taskStatusColumn(task, taskStatuses)}
-                          onPress={() => setSelected(task)}
-                          onToggle={() => toggleTask(task.id)}
-                          c={c}
-                          isDark={isDark}
-                          projects={projects}
-                          overdueLabel={tr.overdueSection}
-                          priorityLabel={PRIORITY[task.priority].label}
-                        />
-                      </Animated.View>
-                    );
-                  }
-                  const prog = getProgress(task);
-                  const overdue = isOverdue(task);
-                  const dlColor = deadlineColor(task, c.sub);
-                  const dlBg = task.deadline && task.status !== 'done'
-                    ? (overdue ? '#EF444418' : deadlineDiff(task.deadline) <= 1 ? '#F59E0B18' : c.dim)
-                    : c.dim;
-                  const dlBorder = task.deadline && task.status !== 'done'
-                    ? (overdue ? '#EF444440' : deadlineDiff(task.deadline) <= 1 ? '#F59E0B40' : c.border)
-                    : c.border;
-                  const cardBorder = overdue ? '#EF444450'
-                    : (task.deadline && task.status !== 'done' && deadlineDiff(task.deadline) <= 1) ? '#F59E0B50'
-                    : c.border;
-                  const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
-                  const prioColor = PRIORITY[task.priority].color;
                   return (
                     <Animated.View
                       key={task.id}
                       entering={animEntering}
                       exiting={animExiting}
                       layout={animLayout}>
-                      <TouchableOpacity activeOpacity={0.75} onPress={() => setSelected(task)}>
-                      <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[s.taskCard, { borderColor: cardBorder }]}>
-                        {/* Priority accent stripe */}
-                        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: task.status === 'done' ? '#10B981' : prioColor, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
-
-                        <View style={{ marginLeft: 8 }}>
-                          {/* Row 1: checkbox + title */}
-                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 9 }}>
-                            <AnimatedCheck
-                              checked={task.status === 'done'}
-                              color="#10B981"
-                              borderColor={c.border}
-                              size={22}
-                              radius={7}
-                              onPress={() => toggleTask(task.id)}
-                              hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
-                              accessibilityRole="checkbox"
-                              accessibilityLabel={task.title}
-                              accessibilityState={{ checked: task.status === 'done' }}
-                              style={{ marginTop: 1 }}
-                            />
-                            <Text style={[s.taskTitle, { color: c.text, flex: 1, marginLeft: 10, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none', lineHeight: 20 }]}>
-                              {task.title}
-                            </Text>
-                            <TouchableOpacity
-                              onPress={e => { e.stopPropagation(); setRecordingTaskId(task.id); }}
-                              accessibilityRole="button"
-                              accessibilityLabel={tr.voiceNote}
-                              // 26 + 9×2 = 44pt. Було 8 — на пункт нижче норми Apple HIG.
-                              hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
-                              style={{ width: 26, height: 26, borderRadius: 7,
-                                backgroundColor: (task.recordings?.length ?? 0) > 0 ? c.accent + '18' : 'rgba(255,255,255,0.07)',
-                                alignItems: 'center', justifyContent: 'center', marginLeft: 6 }}>
-                              <IconSymbol name={(task.recordings?.length ?? 0) > 0 ? 'waveform' : 'mic'} size={11}
-                                color={(task.recordings?.length ?? 0) > 0 ? c.accent : c.sub} />
-                            </TouchableOpacity>
-                          </View>
-
-                          {/* Row 2: meta badges */}
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 32, marginBottom: 9 }}>
-                            {(() => { const column = taskStatusColumn(task, taskStatuses); return (
-                              <View style={[s.badge, { backgroundColor: column.color + '18', borderColor: column.color + '40' }]}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: column.color }} />
-                                <Text style={{ color: column.color, fontSize: 11, fontWeight: '700', marginLeft: 4 }}>{column.name}</Text>
-                              </View>
-                            ); })()}
-                            {/* Пріоритет уже позначено смугою зліва. Бейдж лишається
-                                тільки для високого: інакше він дублює смугу на КОЖНІЙ
-                                картці й розмиває те, що справді потребує уваги. */}
-                            {task.priority === 'high' && task.status !== 'done' && (
-                              <View style={[s.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
-                                <IconSymbol name="exclamationmark" size={10} color={prioColor} />
-                                <Text style={{ color: prioColor, fontSize: 11, fontWeight: '700', marginLeft: 3 }}>{PRIORITY[task.priority].label}</Text>
-                              </View>
-                            )}
-                            {/* Project */}
-                            {proj && (
-                              <View style={[s.badge, { backgroundColor: proj.color + '18', borderColor: proj.color + '45' }]}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color }} />
-                                <Text style={{ color: proj.color, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>{proj.name}</Text>
-                              </View>
-                            )}
-                            {/* Deadline */}
-                            {task.deadline && (
-                              <View style={[s.badge, { backgroundColor: dlBg, borderColor: dlBorder }]}>
-                                <IconSymbol name={overdue ? 'exclamationmark.circle' : 'calendar'} size={10} color={dlColor} />
-                                <Text style={{ color: dlColor, fontSize: 11, fontWeight: '600', marginLeft: 3 }}>
-                                  {deadlineLabel(task.deadline!, tr.today, tr.yesterday, tr.tomorrow, locale)}
-                                </Text>
-                              </View>
-                            )}
-                            {/* Estimated time */}
-                            {task.estimatedMinutes && (
-                              <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                                <IconSymbol name="timer" size={10} color={c.sub} />
-                                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginLeft: 3 }}>
-                                  {task.estimatedMinutes >= 60
-                                    ? `${Math.floor(task.estimatedMinutes / 60)}г ${task.estimatedMinutes % 60 > 0 ? `${task.estimatedMinutes % 60}хв` : ''}`
-                                    : `${task.estimatedMinutes}хв`}
-                                </Text>
-                              </View>
-                            )}
-                            {/* Recurrence badge */}
-                            {task.recurrence && (
-                              <View style={[s.badge, { backgroundColor: c.accent + '15', borderColor: c.accent + '35' }]}>
-                                <IconSymbol name="repeat" size={10} color={c.accent} />
-                              </View>
-                            )}
-                          </View>
-
-                          {/* Row 3: progress. Ховаємо, коли підзавдань немає і прогресу
-                              нема — порожня смуга з «0%» на кожному простому завданні
-                              була чистим шумом і з'їдала висоту картки. */}
-                          {(task.subtasks.length > 0 || prog > 0) && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 32 }}>
-                            <View style={[s.progressBg, { flex: 1 }]}>
-                              <View style={[s.progressFill, { width: `${prog}%`, backgroundColor: task.status === 'done' ? '#10B981' : c.accent }]} />
-                            </View>
-                            <Text style={[s.pct, { color: c.sub }]}>{prog}%</Text>
-                            {task.subtasks.length > 0 && (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                <IconSymbol name="list.bullet" size={11} color={c.sub} />
-                                <Text style={[s.pct, { color: c.sub }]}>{task.subtasks.filter(x => x.done).length}/{task.subtasks.length}</Text>
-                              </View>
-                            )}
-                          </View>
-                          )}
-                        </View>
-                      </BlurView>
-                      </TouchableOpacity>
+                      <CompactCard
+                        task={task}
+                        statusColumn={taskStatusColumn(task, taskStatuses)}
+                        onPress={() => setSelected(task)}
+                        onToggle={() => toggleTask(task.id)}
+                        c={c}
+                        isDark={isDark}
+                        projects={projects}
+                        overdueLabel={tr.overdueSection}
+                        priorityLabel={PRIORITY[task.priority].label}
+                        subtasksLabel={tr.subtasks}
+                      />
                     </Animated.View>
                   );
                 })}
@@ -2512,7 +2303,24 @@ export default function TasksScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
-                <Text style={[s.sheetTitle, { color: c.text }]}>{tr.filtersAndSort}</Text>
+
+                {/* Скидання поруч із заголовком, а не в кінці списку: раніше
+                    до нього треба було прокрутити всі секції — тобто саме тоді,
+                    коли фільтрів багато, дістатись до скидання найважче. */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 10 }}>
+                  <Text style={[s.sheetTitle, { color: c.text, marginBottom: 0, flex: 1 }]}>{tr.filtersAndSort}</Text>
+                  {hasActiveFilters && (
+                    <TouchableOpacity
+                      onPress={clearAllFilters}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.resetAllFilters}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 32, paddingHorizontal: 10, borderRadius: 9, borderWidth: 1, backgroundColor: '#EF444414', borderColor: '#EF444438' }}>
+                      <IconSymbol name="arrow.counterclockwise" size={12} color="#EF4444" />
+                      <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{tr.resetAll}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
 
                 {/* Calendar filter */}
                 <Text style={[s.label, { color: c.sub }]}>{tr.creationDate}</Text>
@@ -2572,49 +2380,60 @@ export default function TasksScreen() {
                 {projects.length > 0 && (
                   <>
                     <Text style={[s.label, { color: c.sub }]}>{tr.project}</Text>
-                    <View style={{ gap: 7 }}>
+                    {/* Чипи замість повноширинних рядків: при 5 проєктах це
+                        економить пів екрана і дає побачити всі варіанти одразу. */}
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
                       <TouchableOpacity
                         onPress={() => setFilterProject(null)}
-                        style={[s.filterActionBtn, { backgroundColor: !filterProject ? c.accent + '15' : c.dim, borderColor: !filterProject ? c.accent + '50' : c.border }]}>
-                        <IconSymbol name="tray" size={14} color={!filterProject ? c.accent : c.sub} />
-                        <Text style={{ color: !filterProject ? c.accent : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 10 }}>{tr.allProjects}</Text>
-                        {!filterProject && <IconSymbol name="checkmark" size={13} color={c.accent} />}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: !filterProject }}
+                        style={[s.sortChip, { minHeight: 36, backgroundColor: !filterProject ? c.accent + '18' : c.dim, borderColor: !filterProject ? c.accent : c.border }]}>
+                        <Text style={{ color: !filterProject ? c.accent : c.sub, fontSize: 12, fontWeight: '600' }}>{tr.allProjects}</Text>
                       </TouchableOpacity>
-                      {projects.map(proj => (
-                        <TouchableOpacity
-                          key={proj.id}
-                          onPress={() => setFilterProject(filterProject === proj.id ? null : proj.id)}
-                          style={[s.filterActionBtn, { backgroundColor: filterProject === proj.id ? proj.color + '15' : c.dim, borderColor: filterProject === proj.id ? proj.color + '50' : c.border }]}>
-                          <View style={[s.colorDot, { backgroundColor: proj.color }]} />
-                          <Text style={{ color: filterProject === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', marginLeft: 10, flex: 1 }}>{proj.name}</Text>
-                          {filterProject === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
-                        </TouchableOpacity>
-                      ))}
+                      {projects.map(proj => {
+                        const on = filterProject === proj.id;
+                        return (
+                          <TouchableOpacity
+                            key={proj.id}
+                            onPress={() => setFilterProject(on ? null : proj.id)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: on }}
+                            style={[s.sortChip, { minHeight: 36, maxWidth: 190, backgroundColor: on ? proj.color + '18' : c.dim, borderColor: on ? proj.color : c.border }]}>
+                            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color, marginRight: 6 }} />
+                            <Text numberOfLines={1} style={{ color: on ? proj.color : c.text, fontSize: 12, fontWeight: '600', flexShrink: 1 }}>{proj.name}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   </>
                 )}
 
                 {/* Sort */}
                 <Text style={[s.label, { color: c.sub }]}>{tr.sorting}</Text>
-                <View style={{ gap: 7 }}>
-                  {SORT_OPTIONS.map(opt => (
-                    <TouchableOpacity
-                      key={opt.key}
-                      onPress={() => setSort(opt.key)}
-                      style={[s.filterActionBtn, { backgroundColor: sort === opt.key ? c.accent + '15' : c.dim, borderColor: sort === opt.key ? c.accent + '50' : c.border }]}>
-                      <IconSymbol name={opt.icon as any} size={15} color={sort === opt.key ? c.accent : c.sub} />
-                      <Text style={{ color: sort === opt.key ? c.accent : c.text, fontSize: 13, fontWeight: '600', marginLeft: 10, flex: 1 }}>{opt.label}</Text>
-                      {sort === opt.key && <IconSymbol name="checkmark" size={13} color={c.accent} />}
-                    </TouchableOpacity>
-                  ))}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+                  {SORT_OPTIONS.map(opt => {
+                    const on = sort === opt.key;
+                    return (
+                      <TouchableOpacity
+                        key={opt.key}
+                        onPress={() => setSort(opt.key)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        style={[s.sortChip, { minHeight: 36, backgroundColor: on ? c.accent + '18' : c.dim, borderColor: on ? c.accent : c.border }]}>
+                        <IconSymbol name={opt.icon as any} size={13} color={on ? c.accent : c.sub} />
+                        <Text style={{ color: on ? c.accent : c.text, fontSize: 12, fontWeight: '600', marginLeft: 6 }}>{opt.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
-                {/* Clear all */}
+                {/* Готово — головна дія шита. Скидання перенесено нагору,
+                    поруч із заголовком. */}
                 <TouchableOpacity
-                  onPress={() => { clearAllFilters(); setShowFilterSheet(false); }}
-                  style={[s.btn, { marginTop: 20, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)' }]}>
-                  <IconSymbol name="xmark.circle" size={15} color="#EF4444" />
-                  <Text style={{ color: '#EF4444', fontWeight: '700', marginLeft: 7 }}>{tr.resetAllFilters}</Text>
+                  onPress={() => setShowFilterSheet(false)}
+                  accessibilityRole="button"
+                  style={[s.btn, { marginTop: 22, backgroundColor: c.accent }]}>
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.applyFilters}</Text>
                 </TouchableOpacity>
 
                 <View style={{ height: 8 }} />
@@ -3838,7 +3657,7 @@ export default function TasksScreen() {
 // ─── Compact Card ────────────────────────────────────────────────────────────
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
-function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, overdueLabel, priorityLabel }: {
+function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, overdueLabel, priorityLabel, subtasksLabel }: {
   task: Task;
   statusColumn: TaskStatusColumn;
   onPress: () => void;
@@ -3850,10 +3669,14 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
   overdueLabel: string;
   /** Те саме для пріоритету — він переданий лише кольоровою крапкою. */
   priorityLabel: string;
+  /** Підпис до лічильника: «2/5» саме по собі нічого не означає. */
+  subtasksLabel: string;
 }) {
   const overdue = isOverdue(task);
   const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
   const isDone = task.status === 'done';
+  const doneSubtasks = task.subtasks.filter(sub => sub.done).length;
+  const allSubtasksDone = task.subtasks.length > 0 && doneSubtasks === task.subtasks.length;
 
   /* Animate text opacity when done state changes */
   const titleOpacity = useSharedValue(isDone ? 0.45 : 1);
@@ -3871,6 +3694,7 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
   const a11ySummary = [
     task.title,
     statusColumn.name,
+    task.subtasks.length > 0 ? `${subtasksLabel}: ${doneSubtasks}/${task.subtasks.length}` : null,
     overdue ? overdueLabel : null,
     priorityLabel,
     proj?.name,
@@ -3924,6 +3748,23 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
               </View>
             )}
 
+            {/* Виконані підзавдання. Показуємо лише коли вони є: «0/0» на
+                завданні без підзавдань — це шум, а не інформація. */}
+            {task.subtasks.length > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                <IconSymbol
+                  name={allSubtasksDone ? 'checkmark.circle.fill' : 'list.bullet'}
+                  size={10}
+                  color={allSubtasksDone ? '#10B981' : c.sub}
+                />
+                <Text style={{
+                  color: allSubtasksDone ? '#10B981' : c.sub,
+                  fontSize: 10, fontWeight: '600', fontVariant: ['tabular-nums'],
+                }}>
+                  {doneSubtasks}/{task.subtasks.length}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 

@@ -1188,11 +1188,15 @@ export default function TasksScreen() {
     return map;
   }, [meetings]);
 
-  const upcomingMeetings = useMemo(() => {
-    const todayStr = today.toISOString().slice(0, 10);
-    const tomorrowStr = new Date(today.getTime() + 86400000).toISOString().slice(0, 10);
+  const todayMeetings2 = useMemo(() => {
+    // Лише сьогоднішні: завтрашні події тут відволікали від того, що треба
+    // зробити зараз. Повний список — на екрані зустрічей.
+    //
+    // localDateStr, а не toISOString().slice(0,10): друге дає дату в UTC, тож
+    // біля півночі «сьогодні» зсувалось на добу.
+    const todayStr = localDateStr(today);
     return meetings
-      .filter(m => m.date === todayStr || m.date === tomorrowStr)
+      .filter(m => m.date === todayStr)
       .sort((a, b) => {
         const da = `${a.date}T${a.time || '00:00'}`;
         const db = `${b.date}T${b.time || '00:00'}`;
@@ -1436,11 +1440,21 @@ export default function TasksScreen() {
             <View style={{ marginBottom: 20 }}>
               {/* Header */}
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                <IconSymbol name="calendar.circle.fill" size={16} color="#6366F1" />
-                <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginLeft: 6, flex: 1 }}>{tr.meetings}</Text>
-                {upcomingMeetings.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => router.push('/meetings')}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.meetings}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <IconSymbol name="calendar.circle.fill" size={16} color="#6366F1" />
+                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginLeft: 6 }}>{tr.meetings}</Text>
+                  {/* Шеврон — інакше немає жодної підказки, що заголовок клікабельний */}
+                  <IconSymbol name="chevron.right" size={12} color={c.sub} style={{ marginLeft: 2 }} />
+                </TouchableOpacity>
+                {todayMeetings2.length > 0 && (
                   <View style={{ backgroundColor: '#6366F120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
-                    <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{upcomingMeetings.length}</Text>
+                    <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{todayMeetings2.length}</Text>
                   </View>
                 )}
                 <TouchableOpacity
@@ -1450,7 +1464,7 @@ export default function TasksScreen() {
                 </TouchableOpacity>
               </View>
 
-              {upcomingMeetings.length === 0 ? (
+              {todayMeetings2.length === 0 ? (
                 <TouchableOpacity onPress={() => openAddMeeting()} activeOpacity={0.7}
                   style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 10, gap: 8 }}>
                   <IconSymbol name="calendar.badge.plus" size={16} color={c.sub} />
@@ -1458,14 +1472,13 @@ export default function TasksScreen() {
                 </TouchableOpacity>
               ) : (
                 <View style={{ gap: 4 }}>
-                  {upcomingMeetings.map(mtg => {
-                    const todayStr2 = today.toISOString().slice(0, 10);
-                    const tomorrowStr2 = new Date(today.getTime() + 86400000).toISOString().slice(0, 10);
-                    const isMtgToday = mtg.date === todayStr2;
+                  {todayMeetings2.map(mtg => {
+                    // Список відфільтрований по сьогодні, тож перевіряти дату
+                    // повторно вже нема потреби.
                     const mtgDateObj = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
-                    const isPast = isMtgToday && mtgDateObj < new Date();
+                    const isPast = mtgDateObj < new Date();
                     const isNow = mtgDateObj <= new Date() && new Date(mtgDateObj.getTime() + mtg.durationMinutes * 60000) > new Date();
-                    const dFmt = isMtgToday ? tr.today : mtg.date === tomorrowStr2 ? tr.tomorrow : mtgDateObj.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' });
+                    const dFmt = tr.today;
                     const dur = mtg.durationMinutes >= 60
                       ? `${Math.floor(mtg.durationMinutes / 60)}г${mtg.durationMinutes % 60 ? ` ${mtg.durationMinutes % 60}хв` : ''}`
                       : `${mtg.durationMinutes} хв`;

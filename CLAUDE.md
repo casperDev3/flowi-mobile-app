@@ -94,8 +94,6 @@ components/
   health/
     MiniBarChart.tsx       — 7-денний бар-чарт
     RingCell.tsx           — кільцевий прогрес-індикатор
-  tasks/
-    CompactCard.tsx        — компактна картка завдання
   ui/
     icon-symbol.ios.tsx    — IconSymbol (SF Symbols через expo-symbols)
     icon-symbol.tsx        — fallback для non-iOS

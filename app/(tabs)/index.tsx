@@ -1589,6 +1589,8 @@ export default function TasksScreen() {
                           todayLabel={tr.today}
                           yesterdayLabel={tr.yesterday}
                           tomorrowLabel={tr.tomorrow}
+                          overdueLabel={tr.overdueSection}
+                          priorityLabel={PRIORITY[task.priority].label}
                           locale={locale}
                         />
                       </Animated.View>
@@ -1671,6 +1673,8 @@ export default function TasksScreen() {
                           todayLabel={tr.today}
                           yesterdayLabel={tr.yesterday}
                           tomorrowLabel={tr.tomorrow}
+                          overdueLabel={tr.overdueSection}
+                          priorityLabel={PRIORITY[task.priority].label}
                           locale={locale}
                         />
                       </Animated.View>
@@ -1722,7 +1726,10 @@ export default function TasksScreen() {
                             </Text>
                             <TouchableOpacity
                               onPress={e => { e.stopPropagation(); setRecordingTaskId(task.id); }}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityRole="button"
+                              accessibilityLabel={tr.voiceNote}
+                              // 26 + 9×2 = 44pt. Було 8 — на пункт нижче норми Apple HIG.
+                              hitSlop={{ top: 9, bottom: 9, left: 9, right: 9 }}
                               style={{ width: 26, height: 26, borderRadius: 7,
                                 backgroundColor: (task.recordings?.length ?? 0) > 0 ? c.accent + '18' : 'rgba(255,255,255,0.07)',
                                 alignItems: 'center', justifyContent: 'center', marginLeft: 6 }}>
@@ -1736,26 +1743,30 @@ export default function TasksScreen() {
                             {(() => { const column = taskStatusColumn(task, taskStatuses); return (
                               <View style={[s.badge, { backgroundColor: column.color + '18', borderColor: column.color + '40' }]}>
                                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: column.color }} />
-                                <Text style={{ color: column.color, fontSize: 10, fontWeight: '700', marginLeft: 4 }}>{column.name}</Text>
+                                <Text style={{ color: column.color, fontSize: 11, fontWeight: '700', marginLeft: 4 }}>{column.name}</Text>
                               </View>
                             ); })()}
-                            {/* Priority */}
-                            <View style={[s.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
-                              <View style={[s.dot, { backgroundColor: prioColor, width: 6, height: 6 }]} />
-                              <Text style={{ color: prioColor, fontSize: 10, fontWeight: '700', marginLeft: 4 }}>{PRIORITY[task.priority].label}</Text>
-                            </View>
+                            {/* Пріоритет уже позначено смугою зліва. Бейдж лишається
+                                тільки для високого: інакше він дублює смугу на КОЖНІЙ
+                                картці й розмиває те, що справді потребує уваги. */}
+                            {task.priority === 'high' && task.status !== 'done' && (
+                              <View style={[s.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
+                                <IconSymbol name="exclamationmark" size={10} color={prioColor} />
+                                <Text style={{ color: prioColor, fontSize: 11, fontWeight: '700', marginLeft: 3 }}>{PRIORITY[task.priority].label}</Text>
+                              </View>
+                            )}
                             {/* Project */}
                             {proj && (
                               <View style={[s.badge, { backgroundColor: proj.color + '18', borderColor: proj.color + '45' }]}>
                                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color }} />
-                                <Text style={{ color: proj.color, fontSize: 10, fontWeight: '600', marginLeft: 4 }}>{proj.name}</Text>
+                                <Text style={{ color: proj.color, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>{proj.name}</Text>
                               </View>
                             )}
                             {/* Deadline */}
                             {task.deadline && (
                               <View style={[s.badge, { backgroundColor: dlBg, borderColor: dlBorder }]}>
                                 <IconSymbol name={overdue ? 'exclamationmark.circle' : 'calendar'} size={10} color={dlColor} />
-                                <Text style={{ color: dlColor, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>
+                                <Text style={{ color: dlColor, fontSize: 11, fontWeight: '600', marginLeft: 3 }}>
                                   {deadlineLabel(task.deadline!, tr.today, tr.yesterday, tr.tomorrow, locale)}
                                 </Text>
                               </View>
@@ -1764,7 +1775,7 @@ export default function TasksScreen() {
                             {task.estimatedMinutes && (
                               <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
                                 <IconSymbol name="timer" size={10} color={c.sub} />
-                                <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>
+                                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginLeft: 3 }}>
                                   {task.estimatedMinutes >= 60
                                     ? `${Math.floor(task.estimatedMinutes / 60)}г ${task.estimatedMinutes % 60 > 0 ? `${task.estimatedMinutes % 60}хв` : ''}`
                                     : `${task.estimatedMinutes}хв`}
@@ -1779,7 +1790,10 @@ export default function TasksScreen() {
                             )}
                           </View>
 
-                          {/* Row 3: progress */}
+                          {/* Row 3: progress. Ховаємо, коли підзавдань немає і прогресу
+                              нема — порожня смуга з «0%» на кожному простому завданні
+                              була чистим шумом і з'їдала висоту картки. */}
+                          {(task.subtasks.length > 0 || prog > 0) && (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 32 }}>
                             <View style={[s.progressBg, { flex: 1 }]}>
                               <View style={[s.progressFill, { width: `${prog}%`, backgroundColor: task.status === 'done' ? '#10B981' : c.accent }]} />
@@ -1792,6 +1806,7 @@ export default function TasksScreen() {
                               </View>
                             )}
                           </View>
+                          )}
                         </View>
                       </BlurView>
                       </TouchableOpacity>
@@ -1969,7 +1984,7 @@ export default function TasksScreen() {
                                     {task.subtasks.length > 0 && (
                                       <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
                                         <IconSymbol name="list.bullet" size={9} color={c.sub} />
-                                        <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>{task.subtasks.filter(s => s.done).length}/{task.subtasks.length}</Text>
+                                        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginLeft: 3 }}>{task.subtasks.filter(s => s.done).length}/{task.subtasks.length}</Text>
                                       </View>
                                     )}
                                   </View>
@@ -3741,7 +3756,7 @@ export default function TasksScreen() {
 // ─── Compact Card ────────────────────────────────────────────────────────────
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
-function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, todayLabel, yesterdayLabel, tomorrowLabel, locale }: {
+function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, todayLabel, yesterdayLabel, tomorrowLabel, overdueLabel, priorityLabel, locale }: {
   task: Task;
   statusColumn: TaskStatusColumn;
   onPress: () => void;
@@ -3752,6 +3767,10 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
   todayLabel: string;
   yesterdayLabel: string;
   tomorrowLabel: string;
+  /** Для VoiceOver: колір «прострочено» інакше ніяк не озвучується. */
+  overdueLabel: string;
+  /** Те саме для пріоритету — він переданий лише кольоровою крапкою. */
+  priorityLabel: string;
   locale: string;
 }) {
   const overdue = isOverdue(task);
@@ -3766,9 +3785,26 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
   }, [isDone]);
   const titleAnimStyle = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
 
+  // Опис рядка для VoiceOver: інакше озвучувалась лише назва, а статус,
+  // дедлайн, пріоритет і проєкт передавались виключно кольором.
+  const a11ySummary = [
+    task.title,
+    statusColumn.name,
+    task.deadline
+      ? `${overdue ? overdueLabel : ''} ${deadlineLabel(task.deadline, todayLabel, yesterdayLabel, tomorrowLabel, locale)}`.trim()
+      : null,
+    priorityLabel,
+    proj?.name,
+  ].filter(Boolean).join(', ');
+
   return (
     <PressableScale onPress={onPress}>
-      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={s.compactCard}>
+      <BlurView
+        intensity={isDark ? 18 : 35}
+        tint={isDark ? 'dark' : 'light'}
+        style={s.compactCard}
+        accessibilityRole="button"
+        accessibilityLabel={a11ySummary}>
         <AnimatedCheck
           checked={isDone}
           color="#10B981"
@@ -3782,21 +3818,28 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
           accessibilityState={{ checked: isDone }}
         />
         <AnimatedText
-          style={[{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1, marginHorizontal: 10, textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
+          style={[{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginHorizontal: 10, textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
           numberOfLines={1}>
           {task.title}
         </AnimatedText>
-        <View style={{ maxWidth: 90, flexDirection: 'row', alignItems: 'center', borderRadius: 7, paddingHorizontal: 6, paddingVertical: 3, marginRight: 6, backgroundColor: statusColumn.color + '16' }}>
+        {/* Статус приховано, коли назва довга: краще прочитати завдання, ніж
+            стиснути і його, і бейдж до нечитабельного. */}
+        <View
+          style={{ maxWidth: 96, flexDirection: 'row', alignItems: 'center', borderRadius: 7, paddingHorizontal: 6, paddingVertical: 3, marginRight: 6, backgroundColor: statusColumn.color + '16' }}
+          importantForAccessibility="no-hide-descendants">
           <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 4 }} />
-          <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 9, fontWeight: '700', flexShrink: 1 }}>{statusColumn.name}</Text>
+          <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 10, fontWeight: '700', flexShrink: 1 }}>{statusColumn.name}</Text>
         </View>
         {task.deadline && (
-          <Text style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 10, fontWeight: '600', marginRight: 8 }}>
+          <Text
+            importantForAccessibility="no-hide-descendants"
+            style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 11, fontWeight: '600', marginRight: 8 }}>
             {deadlineLabel(task.deadline!, todayLabel, yesterdayLabel, tomorrowLabel, locale)}
           </Text>
         )}
-        {/* Grouped dots: priority + project */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {/* Крапки пріоритету і проєкту. Сховані від скрінрідера — сенс уже
+            переданий у a11ySummary словами, а не кольором. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} importantForAccessibility="no-hide-descendants">
           <View style={[s.dot, { backgroundColor: PRIORITY_COLORS[task.priority] }]} />
           {proj && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: proj.color }} />}
         </View>
@@ -3927,7 +3970,9 @@ const s = StyleSheet.create({
   sortLabel:      { fontSize: 12, fontWeight: '600' },
   groupLabel:     { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 6 },
   taskCard:       { borderRadius: 16, borderWidth: 1, padding: 14, overflow: 'hidden' },
-  compactCard:    { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  // minHeight 44 — мінімальна ціль дотику (Apple HIG). Було ~38: рядок цілком
+  // клікабельний, тож він мусить відповідати нормі, а не лише чекбокс у ньому.
+  compactCard:    { minHeight: 44, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
   boardCard:      { borderRadius: 13, padding: 11, overflow: 'hidden' },
   taskTitle:      { fontSize: 14, fontWeight: '600' },
   checkbox:       { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
@@ -3936,7 +3981,9 @@ const s = StyleSheet.create({
   badge:          { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
   progressBg:     { height: 3, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
   progressFill:   { height: '100%', borderRadius: 2 },
-  pct:            { fontSize: 10, fontWeight: '600', minWidth: 26 },
+  // tabular-nums: без них ширина «7%» і «71%» різна, і прогрес-рядок сіпається
+  // при кожній зміні.
+  pct:            { fontSize: 11, fontWeight: '600', minWidth: 30, fontVariant: ['tabular-nums'] },
   colLabel:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   emptyCol:       { borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 24, alignItems: 'center' },
   fab:            { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },

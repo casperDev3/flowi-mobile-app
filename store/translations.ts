@@ -143,6 +143,7 @@ export interface Translations {
   nothingFound: string;
   noTasks: string;
   overdueSection: string;
+  voiceNote: string;
   addTask: string;
   addNote: string;
   tryAnotherQuery: string;
@@ -950,6 +951,7 @@ const uk: Translations = {
   nothingFound: 'Нічого не знайдено',
   noTasks: 'Немає завдань',
   overdueSection: 'Прострочені',
+  voiceNote: 'Голосова нотатка',
   addTask: 'Додати завдання',
   addNote: 'Створити нотатку',
   tryAnotherQuery: 'Спробуйте інший запит',
@@ -1708,6 +1710,7 @@ const en: Translations = {
   nothingFound: 'Nothing found',
   noTasks: 'No tasks',
   overdueSection: 'Overdue',
+  voiceNote: 'Voice note',
   addTask: 'Add task',
   addNote: 'Create note',
   tryAnotherQuery: 'Try another query',

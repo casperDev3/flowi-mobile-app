@@ -1,5 +1,5 @@
 import { Transaction, appendTransactionHistory, calcTotals, filterByMonth, groupTransactions, txCurrency } from '@/utils/financeUtils';
-import { PRIORITY_ORDER, Task, applyTaskFilters, deadlineDiff, getProgress, isOverdue, sortTasks } from '@/utils/taskUtils';
+import { PRIORITY_ORDER, Task, applyTaskFilters, deadlineDiff, getProgress, isOverdue, sortTasks, taskMatchesSearch } from '@/utils/taskUtils';
 
 const tx = (over: Partial<Transaction> = {}): Transaction => ({
   id: 't', type: 'expense', category: 'food', amount: 100, note: '', date: '2026-06-15', ...over,
@@ -122,5 +122,41 @@ describe('taskUtils', () => {
   test('deadlineDiff знак', () => {
     expect(deadlineDiff('2999-01-01')).toBeGreaterThan(0);
     expect(deadlineDiff('2000-01-01')).toBeLessThan(0);
+  });
+});
+
+// ─── Пошук по завданнях ──────────────────────────────────────────────────────
+
+describe('taskMatchesSearch', () => {
+  // Реальний баг: пошук падав із «Cannot read property toLowerCase of
+  // undefined». Мобільний тип оголошував description обовʼязковим, а веб-клієнт
+  // пише туди undefined для порожнього опису — тож будь-яке завдання, створене
+  // у вебі без опису, валило весь пошук.
+
+  const task = { title: 'Купити молоко', description: 'у Сільпо' };
+
+  test('знаходить за назвою', () => {
+    expect(taskMatchesSearch(task, 'молоко')).toBe(true);
+    expect(taskMatchesSearch(task, 'МОЛОКО')).toBe(true);
+  });
+
+  test('знаходить за описом', () => {
+    expect(taskMatchesSearch(task, 'сільпо')).toBe(true);
+  });
+
+  test('не падає на завданні без опису (створеному у вебі)', () => {
+    const fromWeb = { title: 'Без опису', description: undefined };
+    expect(() => taskMatchesSearch(fromWeb, 'будь-що')).not.toThrow();
+    expect(taskMatchesSearch(fromWeb, 'опису')).toBe(true);
+    expect(taskMatchesSearch(fromWeb, 'молоко')).toBe(false);
+  });
+
+  test('порожній запит пропускає все', () => {
+    expect(taskMatchesSearch(task, '')).toBe(true);
+    expect(taskMatchesSearch(task, '   ')).toBe(true);
+  });
+
+  test('не збігається — false', () => {
+    expect(taskMatchesSearch(task, 'хліб')).toBe(false);
   });
 });

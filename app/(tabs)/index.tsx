@@ -44,7 +44,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
-import { filterTasksByMonth } from '@/utils/taskUtils';
+import { filterTasksByMonth, taskMatchesSearch } from '@/utils/taskUtils';
 import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, taskColumnId, taskStatusColumn } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
@@ -82,7 +82,8 @@ interface TaskHistoryEvent {
 interface Task {
   id: string;
   title: string;
-  description: string;
+  /** Опційний: веб-клієнт пише undefined замість порожнього рядка. */
+  description?: string;
   priority: Priority;
   status: Status;
   kanbanColumnId?: string;
@@ -561,10 +562,7 @@ export default function TasksScreen() {
         const d = new Date(t.createdAt);
         if (d.toDateString() !== dateFilter) return false;
       }
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        if (!t.title.toLowerCase().includes(q) && !t.description.toLowerCase().includes(q)) return false;
-      }
+      if (!taskMatchesSearch(t, search)) return false;
       if (filterProject && t.projectId !== filterProject) return false;
       if (filterPriority && t.priority !== filterPriority) return false;
       return true;
@@ -2779,7 +2777,7 @@ export default function TasksScreen() {
                           <TouchableOpacity
                             onPress={() => {
                               setEditTitle(selectedTask.title);
-                              setEditDesc(selectedTask.description);
+                              setEditDesc(selectedTask.description ?? '');
                               setEditPriority(selectedTask.priority);
                               setEditStatusId(taskColumnId(selectedTask, taskStatuses));
                               const h = selectedTask.estimatedMinutes ? Math.floor(selectedTask.estimatedMinutes / 60) : 0;

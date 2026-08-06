@@ -36,7 +36,9 @@ export interface Task {
   /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
   updatedAt?: string;
   title: string;
-  description: string;
+  /** Опційний: веб-клієнт пише undefined замість порожнього рядка, тож
+   *  вважати поле обовʼязковим означало б падати на його даних. */
+  description?: string;
   priority: Priority;
   status: Status;
   kanbanColumnId?: string;
@@ -118,6 +120,23 @@ export function sortTasks(tasks: Task[], by: SortBy): Task[] {
   });
 }
 
+/**
+ * Чи підходить завдання під пошуковий запит (назва або опис).
+ *
+ * `description` свідомо читається через ?? '': веб-клієнт пише туди undefined
+ * замість порожнього рядка, і пряме звертання до .toLowerCase() валило пошук
+ * на кожному завданні, створеному у вебі без опису.
+ */
+export function taskMatchesSearch(
+  task: Pick<Task, 'title' | 'description'>,
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (task.title ?? '').toLowerCase().includes(q)
+    || (task.description ?? '').toLowerCase().includes(q);
+}
+
 export function applyTaskFilters(
   tasks: Task[],
   {
@@ -136,7 +155,7 @@ export function applyTaskFilters(
 ): Task[] {
   return tasks.filter(t => {
     if (filter !== 'all' && t.status !== filter) return false;
-    if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (!taskMatchesSearch(t, search)) return false;
     if (projectId && t.projectId !== projectId) return false;
     if (priority && t.priority !== priority) return false;
     if (dateFilter) {

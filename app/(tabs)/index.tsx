@@ -54,6 +54,8 @@ import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/u
 import { TaskDetailPane } from '@/components/tasks/TaskDetailPane';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { TaskHistoryTab, type HistoryEventType, type TaskHistoryEvent } from '@/components/tasks/TaskHistoryTab';
+import { TaskTimerTab } from '@/components/tasks/TaskTimerTab';
+import { getActiveTimerEntry, totalSecondsIncludingActive, totalTrackedSeconds } from '@/utils/taskTimer';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
@@ -181,20 +183,8 @@ const fmtDur = (s: number) => {
   return `${m || 0} хв`;
 };
 
-function getActiveTimerEntry(task: Task): TaskTimeEntry | undefined {
-  return (task.timeEntries ?? []).find(e => !e.endedAt);
-}
 
-function calcElapsedSeconds(task: Task): number {
-  return (task.timeEntries ?? []).reduce((acc, e) => {
-    if (e.endedAt) return acc + e.duration;
-    return acc + Math.floor((Date.now() - new Date(e.startedAt).getTime()) / 1000);
-  }, 0);
-}
 
-function getTotalTrackedSeconds(task: Task): number {
-  return (task.timeEntries ?? []).reduce((acc, e) => acc + (e.endedAt ? e.duration : 0), 0);
-}
 
 function makeHistoryEvent(type: HistoryEventType, note?: string): TaskHistoryEvent {
   return { id: Date.now().toString() + Math.random().toString(36).slice(2), at: new Date().toISOString(), type, note };
@@ -1214,76 +1204,17 @@ export default function TasksScreen() {
 
                     {/* ─── Timer Tab ─── */}
                     {!editor.editing && detailTab === 'timer' && (
-                      <View>
-                        {/* Elapsed display */}
-                        <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' }}>
-                            {isTimerRunning ? tr.currentSession : tr.trackedTime}
-                          </Text>
-                          <ElapsedClock
-                            running={isTimerRunning}
-                            seconds={() => isTimerRunning ? calcElapsedSeconds(selectedTask) : getTotalTrackedSeconds(selectedTask)}
-                            format={fmtClock}
-                            style={{ color: c.text, fontSize: 44, fontWeight: '800', letterSpacing: -1 }} />
-                          {isTimerRunning && (() => {
-                            const ae = getActiveTimerEntry(selectedTask);
-                            return ae ? (
-                              <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
-                                Почато о {new Date(ae.startedAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
-                              </Text>
-                            ) : null;
-                          })()}
-                          {!isTimerRunning && (selectedTask.timeEntries?.length ?? 0) > 0 && (
-                            <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
-                              {(selectedTask.timeEntries ?? []).filter(e => e.endedAt).length} {lang === 'uk' ? 'сесій' : 'sessions'}
-                            </Text>
-                          )}
-                        </View>
-
-                        {/* Start / Stop button */}
-                        {selectedTask.status === 'active' && (
-                          <TouchableOpacity
-                            onPress={isTimerRunning ? stopTimer : startTimer}
-                            style={[s.btn, { backgroundColor: isTimerRunning ? '#EF4444' : '#6366F1' }]}>
-                            <IconSymbol name={isTimerRunning ? 'stop.fill' : 'play.fill'} size={15} color="#fff" />
-                            <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 8 }}>
-                              {isTimerRunning ? tr.stopTimer : tr.startTimer}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-
-                        {/* Sessions list */}
-                        {(selectedTask.timeEntries?.length ?? 0) > 0 && (
-                          <View style={{ marginTop: 18 }}>
-                            <Text style={[s.label, { color: c.sub }]}>{tr.sessions}</Text>
-                            {[...(selectedTask.timeEntries ?? [])].reverse().map((entry) => (
-                              <View key={entry.id} style={[s.subRow, { borderColor: !entry.endedAt ? '#6366F140' : c.border, backgroundColor: !entry.endedAt ? '#6366F108' : c.dim, marginBottom: 7 }]}>
-                                <IconSymbol name="timer" size={14} color={!entry.endedAt ? '#6366F1' : c.sub} />
-                                <View style={{ flex: 1, marginLeft: 10 }}>
-                                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>
-                                    {!entry.endedAt
-                                      ? fmtClock(Math.max(0, Math.floor((Date.now() - new Date(entry.startedAt).getTime()) / 1000)))
-                                      : fmtDur(entry.duration)}
-                                  </Text>
-                                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
-                                    {new Date(entry.startedAt).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })}
-                                    {' · '}
-                                    {new Date(entry.startedAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
-                                    {entry.endedAt ? ` → ${new Date(entry.endedAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}` : ''}
-                                  </Text>
-                                </View>
-                                {!entry.endedAt && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#6366F1' }} />}
-                              </View>
-                            ))}
-                          </View>
-                        )}
-
-                        {(selectedTask.timeEntries?.length ?? 0) === 0 && selectedTask.status === 'active' && (
-                          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 12 }}>
-                            {lang === 'uk' ? 'Натисніть «Запустити» щоб почати відстежувати час' : 'Press \'Start\' to begin tracking time'}
-                          </Text>
-                        )}
-                      </View>
+                      <TaskTimerTab
+                        task={selectedTask}
+                        running={isTimerRunning}
+                        onStart={startTimer}
+                        onStop={stopTimer}
+                        colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
+                        tr={tr}
+                        locale={locale}
+                        fmtClock={fmtClock}
+                        fmtDur={fmtDur}
+                      />
                     )}
 
                     {/* ─── History Tab ─── */}
@@ -1912,7 +1843,7 @@ export default function TasksScreen() {
                         style={[s.btn, { marginTop: 14, backgroundColor: isTimerRunning ? '#6366F120' : '#6366F1EE', borderWidth: isTimerRunning ? 1 : 0, borderColor: '#6366F150' }]}>
                         <IconSymbol name={isTimerRunning ? 'timer' : 'play.fill'} size={15} color={isTimerRunning ? '#6366F1' : '#fff'} />
                         <Text style={{ color: isTimerRunning ? '#6366F1' : '#fff', fontWeight: '700', marginLeft: 7 }}>
-                          {isTimerRunning ? `${lang === 'uk' ? 'Таймер' : 'Timer'}: ${fmtClock(calcElapsedSeconds(selectedTask))}` : (lang === 'uk' ? 'Запустити таймер' : 'Start timer')}
+                          {isTimerRunning ? `${lang === 'uk' ? 'Таймер' : 'Timer'}: ${fmtClock(totalSecondsIncludingActive(selectedTask))}` : (lang === 'uk' ? 'Запустити таймер' : 'Start timer')}
                         </Text>
                         {isTimerRunning && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#6366F1', marginLeft: 6 }} />}
                       </TouchableOpacity>

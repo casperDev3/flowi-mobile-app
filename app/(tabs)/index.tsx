@@ -11,6 +11,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -903,6 +904,23 @@ export default function TasksScreen() {
   }, []);
 
   // Стабільні посилання: інакше React.memo на картках нічого не дає.
+  const sections = useMemo(
+    () => groups.map(group => ({ title: group.label, data: group.tasks })),
+    [groups],
+  );
+
+  /**
+   * У віртуалізованому списку елементи монтуються заново при поверненні
+   * до них прокруткою. Без цієї перевірки картки «вʼїжджали» б щоразу,
+   * як користувач гортає туди-сюди. Анімується лише перша поява.
+   */
+  const animatedTaskIds = useRef<Set<string>>(new Set());
+  const shouldAnimateTask = useCallback((id: string) => {
+    if (animatedTaskIds.current.has(id)) return false;
+    animatedTaskIds.current.add(id);
+    return true;
+  }, []);
+
   const handleSelectTask = useCallback((task: Task) => setSelected(task), []);
   const handleToggleTask = useCallback((task: Task) => toggleTask(task.id), [toggleTask]);
 
@@ -2020,6 +2038,661 @@ export default function TasksScreen() {
     </>
   ) : null;
 
+  // Шапка спільна для обох режимів; у списку вона стає ListHeaderComponent.
+  const listHeader = (
+    <>
+            {/* Skeleton — перший завантаження */}
+            {!initialized && (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            )}
+
+            {/* Search bar */}
+            <View style={[s.searchBar, { backgroundColor: c.dim, borderColor: c.border }]}>
+              <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
+              <TextInput
+                placeholder={tr.searchPlaceholder}
+                placeholderTextColor={c.sub}
+                value={search}
+                onChangeText={setSearch}
+                style={[s.searchInput, { color: c.text }]}
+                returnKeyType="search"
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Active filter chips */}
+            {hasActiveFilters && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 4 }}>
+                <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center' }}>
+                  {filter !== 'active' && (
+                    <TouchableOpacity
+                      onPress={() => setFilter('active')}
+                      style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
+                      <Text style={[s.activeChipText, { color: c.accent }]}>
+                        {filter === 'all' ? tr.allTasks : tr.allCompleted}
+                      </Text>
+                      <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  )}
+                  {sort !== 'deadline' && (
+                    <TouchableOpacity
+                      onPress={() => setSort('deadline')}
+                      style={[s.activeChip, { backgroundColor: c.accent + '15', borderColor: c.accent + '40' }]}>
+                      <IconSymbol name="arrow.up.arrow.down" size={10} color={c.accent} />
+                      <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
+                        {SORT_OPTIONS.find(o => o.key === sort)?.label}
+                      </Text>
+                      <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  )}
+                  {filterProject && (() => {
+                    const proj = projects.find(p => p.id === filterProject);
+                    return proj ? (
+                      <TouchableOpacity
+                        onPress={() => setFilterProject(null)}
+                        style={[s.activeChip, { backgroundColor: proj.color + '20', borderColor: proj.color + '50' }]}>
+                        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color }} />
+                        <Text style={[s.activeChipText, { color: proj.color, marginLeft: 4 }]}>{proj.name}</Text>
+                        <IconSymbol name="xmark" size={10} color={proj.color} style={{ marginLeft: 4 }} />
+                      </TouchableOpacity>
+                    ) : null;
+                  })()}
+                  {filterPriority && (
+                    <TouchableOpacity
+                      onPress={() => setFilterPriority(null)}
+                      style={[s.activeChip, { backgroundColor: PRIORITY[filterPriority].color + '20', borderColor: PRIORITY[filterPriority].color + '50' }]}>
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: PRIORITY[filterPriority].color }} />
+                      <Text style={[s.activeChipText, { color: PRIORITY[filterPriority].color, marginLeft: 4 }]}>
+                        {PRIORITY[filterPriority].label}
+                      </Text>
+                      <IconSymbol name="xmark" size={10} color={PRIORITY[filterPriority].color} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  )}
+                  {dateFilter && (
+                    <TouchableOpacity
+                      onPress={() => setDateFilter(null)}
+                      style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
+                      <IconSymbol name="calendar" size={10} color={c.accent} />
+                      <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
+                        {new Date(dateFilter).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })}
+                      </Text>
+                      <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={clearAllFilters}
+                    style={[s.activeChip, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
+                    <Text style={[s.activeChipText, { color: '#EF4444' }]}>{tr.resetAll}</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+
+            {/* Stats — today (deadline = today) */}
+            <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
+              <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
+                <StatCell value={activeCount}          label={tr.active} color="#F59E0B" sub={c.sub} />
+                <View style={{ width: 1, backgroundColor: c.border }} />
+                <StatCell value={doneCount}            label={tr.done}           color="#10B981" sub={c.sub} />
+                <View style={{ width: 1, backgroundColor: c.border }} />
+                <StatCell value={todayMeetings.length} label={tr.meetings} color="#0EA5E9" sub={c.sub} />
+                <View style={{ width: 1, backgroundColor: c.border }} />
+                <StatCell value={`${efficiency}%`}    label={tr.efficiency}                                                         color={c.accent} sub={c.sub} />
+              </View>
+              {totalSubtasks > 0 && (
+                <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card }]}>
+                  <IconSymbol name="list.bullet.circle.fill" size={14} color="#6366F1" />
+                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 7 }}>{tr.subtasksToday}</Text>
+                  <View style={{ flex: 1, marginHorizontal: 12 }}>
+                    <View style={[s.progressBg, { flex: 1 }]}>
+                      <View style={[s.progressFill, { width: `${Math.round((doneSubtasks / totalSubtasks) * 100)}%`, backgroundColor: '#6366F1' }]} />
+                    </View>
+                  </View>
+                  <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '700' }}>
+                    {doneSubtasks}/{totalSubtasks}
+                  </Text>
+                </View>
+              )}
+              {dueTodayTasks.length === 0 && (
+                <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card, justifyContent: 'center' }]}>
+                  <IconSymbol name="checkmark.seal" size={13} color={c.sub} />
+                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 6 }}>{tr.noTasksToday}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* ── Meetings section (list view only) ── */}
+            {viewMode === 'list' && (
+              <View style={{ marginBottom: 20 }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => router.push('/meetings')}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.meetings}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <IconSymbol name="calendar.circle.fill" size={16} color="#6366F1" />
+                    <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginLeft: 6 }}>{tr.meetings}</Text>
+                    {/* Шеврон — інакше немає жодної підказки, що заголовок клікабельний */}
+                    <IconSymbol name="chevron.right" size={12} color={c.sub} style={{ marginLeft: 2 }} />
+                  </TouchableOpacity>
+                  {todayMeetings2.length > 0 && (
+                    <View style={{ backgroundColor: '#6366F120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
+                      <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{todayMeetings2.length}</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => openAddMeeting()}
+                    style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#6366F118', borderWidth: 1, borderColor: '#6366F130', alignItems: 'center', justifyContent: 'center' }}>
+                    <IconSymbol name="plus" size={14} color="#6366F1" />
+                  </TouchableOpacity>
+                </View>
+
+                {todayMeetings2.length === 0 ? (
+                  <TouchableOpacity onPress={() => openAddMeeting()} activeOpacity={0.7}
+                    style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 10, gap: 8 }}>
+                    <IconSymbol name="calendar.badge.plus" size={16} color={c.sub} />
+                    <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500' }}>{tr.addMeeting}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={{ gap: 4 }}>
+                    {todayMeetings2.map(mtg => {
+                      // Список відфільтрований по сьогодні, тож перевіряти дату
+                      // повторно вже нема потреби.
+                      const mtgDateObj = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
+                      const isPast = mtgDateObj < new Date();
+                      const isNow = mtgDateObj <= new Date() && new Date(mtgDateObj.getTime() + mtg.durationMinutes * 60000) > new Date();
+                      const dFmt = tr.today;
+                      const dur = mtg.durationMinutes >= 60
+                        ? `${Math.floor(mtg.durationMinutes / 60)}г${mtg.durationMinutes % 60 ? ` ${mtg.durationMinutes % 60}хв` : ''}`
+                        : `${mtg.durationMinutes} хв`;
+                      return (
+                        <TouchableOpacity key={mtg.id} onPress={() => openEditMeeting(mtg)} activeOpacity={0.75}>
+                          <View style={{ borderRadius: 11, paddingVertical: 7, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, overflow: 'hidden', opacity: isPast && !isNow ? 0.4 : 1, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+                            {/* Accent bar */}
+                            <View style={{ width: 2.5, alignSelf: 'stretch', backgroundColor: mtg.color, borderRadius: 2, marginLeft: 0, minHeight: 36 }} />
+                            {/* Time + day */}
+                            <View style={{ alignItems: 'center', minWidth: 44 }}>
+                              <Text style={{ color: mtg.color, fontSize: 13, fontWeight: '800', letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
+                              <Text style={{ color: mtg.color, fontSize: 9, fontWeight: '600', opacity: 0.75, marginTop: 1 }}>{dFmt}</Text>
+                            </View>
+                            {/* Divider */}
+                            <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: mtg.color + '30', marginVertical: 4 }} />
+                            {/* Info */}
+                            <View style={{ flex: 1, gap: 2 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />}
+                                <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                  <IconSymbol name="clock" size={9} color={c.sub} />
+                                  <Text style={{ color: c.sub, fontSize: 10 }}>{dur}</Text>
+                                </View>
+                                {mtg.location ? (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                    <IconSymbol name="mappin" size={9} color={c.sub} />
+                                    <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.location}</Text>
+                                  </View>
+                                ) : null}
+                                {mtg.link ? (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                    <IconSymbol name="link" size={9} color={'#6366F1'} />
+                                    <Text style={{ color: '#6366F1', fontSize: 10, fontWeight: '600' }}>Join</Text>
+                                  </View>
+                                ) : null}
+                                {mtg.notes ? (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                    <IconSymbol name="note.text" size={9} color={c.sub} />
+                                    <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.notes}</Text>
+                                  </View>
+                                ) : null}
+                              </View>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Empty state */}
+            {filtered.length === 0 && (
+              <View style={{ alignItems: 'center', paddingVertical: 56 }}>
+                <IconSymbol name="checklist" size={40} color={c.sub} />
+                <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>
+                  {search.trim() ? tr.nothingFound : tr.noTasks}
+                </Text>
+                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>
+                  {search.trim() ? tr.tryAnotherQuery : tr.pressToAdd}
+                </Text>
+                {!search.trim() && (
+                  <TouchableOpacity
+                    onPress={() => setShowAdd(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.addTask}
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconSymbol name="plus" size={15} color="#fff" />
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addTask}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Overdue section (list view, active/all filter) */}
+            {viewMode === 'list' && overdueItems.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                  <Text style={[s.groupLabel, { color: '#EF4444', marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
+                  <View style={{ backgroundColor: '#EF444420', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+                    <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>{overdueItems.length}</Text>
+                  </View>
+                </View>
+                <View style={{ gap: 6 }}>
+                  {overdueItems.map((task, i) => {
+                    const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
+                    const animExiting  = motion.entering(FadeOutUp.duration(150));
+                    const animLayout   = motion.entering(LinearTransition.springify());
+                    return (
+                      <Animated.View
+                        key={task.id}
+                        entering={animEntering}
+                        exiting={animExiting}
+                        layout={animLayout}>
+                        <CompactCard
+                          task={task}
+                          statusColumn={taskStatusColumn(task, taskStatuses)}
+                          onPress={handleSelectTask}
+                          onToggle={handleToggleTask}
+                          c={c}
+                          isDark={isDark}
+                          projects={projects}
+                          overdueLabel={tr.overdueSection}
+                          priorityLabel={PRIORITY[task.priority].label}
+                          subtasksLabel={tr.subtasks}
+                        />
+                      </Animated.View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+    </>
+  );
+
+  const calendarView = (
+    <>
+            {/* CALENDAR VIEW */}
+            {viewMode === 'calendar' && (
+              <View>
+                {/* Span selector */}
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
+                  {(['week', 'month', 'quarter', 'year'] as CalSpan[]).map(span => (
+                    <TouchableOpacity
+                      key={span}
+                      onPress={() => { setCalSpan(span); if (span === 'week') setCalViewDate(calWeekDay); }}
+                      style={[s.sortChip, {
+                        flex: 1, justifyContent: 'center',
+                        backgroundColor: calSpan === span ? c.accent + '20' : c.dim,
+                        borderColor: calSpan === span ? c.accent : c.border,
+                      }]}>
+                      <Text style={{ color: calSpan === span ? c.accent : c.sub, fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
+                        {span === 'week' ? tr.week : span === 'month' ? tr.month : span === 'quarter' ? tr.quarter : tr.year}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Nav header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                  <TouchableOpacity onPress={calPrev} style={s.navBtn}>
+                    <IconSymbol name="chevron.left" size={18} color={c.sub} />
+                  </TouchableOpacity>
+                  <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontWeight: '700' }}>{calHeaderLabel}</Text>
+                  <TouchableOpacity onPress={calNext} style={s.navBtn}>
+                    <IconSymbol name="chevron.right" size={18} color={c.sub} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* WEEK */}
+                {calSpan === 'week' && (() => {
+                  const weekDayTasks = tasksByDate[calWeekDay.toDateString()] ?? [];
+                  const weekActiveTasks = weekDayTasks.filter(t => t.status === 'active');
+                  const weekDoneTasks = weekDayTasks.filter(t => t.status === 'done');
+                  return (
+                    <View>
+                      {/* 7-day strip */}
+                      <View style={{ flexDirection: 'row', gap: 3, marginBottom: 20 }}>
+                        {Array.from({ length: 7 }, (_, i) => {
+                          const d = new Date(weekMonday); d.setDate(d.getDate() + i);
+                          const dayTasks = tasksByDate[d.toDateString()] ?? [];
+                          const isToday = d.toDateString() === today.toDateString();
+                          const isSel = d.toDateString() === calWeekDay.toDateString();
+                          const cnt = dayTasks.length;
+                          const hasActive = dayTasks.some(t => t.status === 'active');
+                          return (
+                            <TouchableOpacity
+                              key={i}
+                              onPress={() => setCalWeekDay(d)}
+                              activeOpacity={0.75}
+                              style={{
+                                flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 16,
+                                backgroundColor: isSel ? c.accent : isToday ? c.accent + '18' : c.dim,
+                                borderWidth: 1,
+                                borderColor: isSel ? c.accent : isToday ? c.accent + '60' : c.border,
+                              }}>
+                              <Text style={{
+                                fontSize: 10, fontWeight: '600', marginBottom: 4,
+                                color: isSel ? 'rgba(255,255,255,0.75)' : isToday ? c.accent : c.sub,
+                              }}>
+                                {WEEKDAYS_SHORT[i]}
+                              </Text>
+                              <Text style={{
+                                fontSize: 15, fontWeight: '800', lineHeight: 18,
+                                color: isSel ? '#fff' : isToday ? c.accent : c.text,
+                              }}>
+                                {d.getDate()}
+                              </Text>
+                              <View style={{ marginTop: 6, height: 5, alignItems: 'center', justifyContent: 'center' }}>
+                                {cnt > 0 && (
+                                  <View style={{
+                                    width: cnt > 3 ? 14 : cnt * 5,
+                                    height: 5, borderRadius: 3,
+                                    backgroundColor: isSel
+                                      ? 'rgba(255,255,255,0.55)'
+                                      : hasActive ? c.accent : '#10B981',
+                                  }} />
+                                )}
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Selected day header */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', flex: 1, textTransform: 'capitalize' }}>
+                          {calWeekDay.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        </Text>
+                        {weekDayTasks.length > 0 && (
+                          <View style={{ flexDirection: 'row', gap: 6 }}>
+                            {weekActiveTasks.length > 0 && (
+                              <View style={{ backgroundColor: c.accent + '20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>{weekActiveTasks.length} {tr.active}</Text>
+                              </View>
+                            )}
+                            {weekDoneTasks.length > 0 && (
+                              <View style={{ backgroundColor: '#10B98120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>{weekDoneTasks.length} {tr.done}</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Task list for selected day */}
+                      {weekDayTasks.length === 0 ? (
+                        <View style={{ alignItems: 'center', paddingVertical: 32, borderRadius: 16, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' }}>
+                          <IconSymbol name="calendar.badge.checkmark" size={28} color={c.sub} />
+                          <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginTop: 8 }}>{tr.noTasksForDay}</Text>
+                        </View>
+                      ) : (
+                        <View style={{ gap: 8 }}>
+                          {weekDayTasks.map(task => {
+                            const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
+                            const prog = getProgress(task);
+                            const overdue = isOverdue(task);
+                            const prioColor = PRIORITY[task.priority].color;
+                            return (
+                              <TouchableOpacity
+                                key={task.id}
+                                onPress={() => setSelected(task)}
+                                activeOpacity={0.75}>
+                                <BlurView
+                                  intensity={isDark ? 18 : 35}
+                                  tint={isDark ? 'dark' : 'light'}
+                                  style={{
+                                    borderRadius: 16, borderWidth: 1,
+                                    borderColor: task.status === 'done' ? c.border : overdue ? '#EF444450' : c.border,
+                                    padding: 13, overflow: 'hidden',
+                                  }}>
+                                  {/* Priority stripe */}
+                                  <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: task.status === 'done' ? '#10B981' : prioColor, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
+                                  <View style={{ marginLeft: 8 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                                      <AnimatedCheck
+                                        checked={task.status === 'done'}
+                                        color="#10B981"
+                                        borderColor={c.border}
+                                        size={22}
+                                        radius={7}
+                                        onPress={() => toggleTask(task.id)}
+                                        hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+                                        style={{ marginTop: 1, flexShrink: 0 }}
+                                      />
+                                      <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600', lineHeight: 20, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }}>
+                                        {task.title}
+                                      </Text>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, marginLeft: 32 }}>
+                                      <View style={[s.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
+                                        <View style={[s.dot, { backgroundColor: prioColor, width: 6, height: 6 }]} />
+                                        <Text style={{ color: prioColor, fontSize: 10, fontWeight: '700', marginLeft: 3 }}>{PRIORITY[task.priority].label}</Text>
+                                      </View>
+                                      {proj && (
+                                        <View style={[s.badge, { backgroundColor: proj.color + '18', borderColor: proj.color + '45' }]}>
+                                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color }} />
+                                          <Text style={{ color: proj.color, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>{proj.name}</Text>
+                                        </View>
+                                      )}
+                                      {task.subtasks.length > 0 && (
+                                        <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
+                                          <IconSymbol name="list.bullet" size={9} color={c.sub} />
+                                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginLeft: 3 }}>{task.subtasks.filter(s => s.done).length}/{task.subtasks.length}</Text>
+                                        </View>
+                                      )}
+                                    </View>
+
+                                    {(prog > 0 || task.subtasks.length > 0) && (
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginLeft: 32 }}>
+                                        <View style={[s.progressBg, { flex: 1 }]}>
+                                          <View style={[s.progressFill, { width: `${prog}%`, backgroundColor: task.status === 'done' ? '#10B981' : c.accent }]} />
+                                        </View>
+                                        <Text style={[s.pct, { color: c.sub }]}>{prog}%</Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                </BlurView>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
+
+                {/* MONTH */}
+                {calSpan === 'month' && (() => {
+                  const yr = calViewDate.getFullYear();
+                  const mo = calViewDate.getMonth();
+                  const fd = (() => { const d = new Date(yr, mo, 1).getDay(); return d === 0 ? 6 : d - 1; })();
+                  const dim = new Date(yr, mo + 1, 0).getDate();
+                  const cells: (number | null)[] = [];
+                  for (let i = 0; i < fd; i++) cells.push(null);
+                  for (let i = 1; i <= dim; i++) cells.push(i);
+                  while (cells.length % 7 !== 0) cells.push(null);
+                  const weeks = chunk(cells, 7);
+                  return (
+                    <View>
+                      <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                        {WEEKDAYS_SHORT.map(d => (
+                          <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
+                        ))}
+                      </View>
+                      {weeks.map((week, wi) => (
+                        <View key={wi} style={{ flexDirection: 'row', marginBottom: 6 }}>
+                          {week.map((day, di) => {
+                            if (!day) return <View key={di} style={{ flex: 1 }} />;
+                            const d = new Date(yr, mo, day);
+                            const dayTasks = tasksByDate[d.toDateString()] ?? [];
+                            const dayMeets = meetingsByDate[d.toISOString().slice(0, 10)] ?? [];
+                            const isToday = d.toDateString() === today.toDateString();
+                            const cnt = dayTasks.length;
+                            const activeCnt = dayTasks.filter(t => t.status === 'active').length;
+                            const hasMeet = dayMeets.length > 0;
+                            const hasAny = cnt > 0 || hasMeet;
+                            return (
+                              <TouchableOpacity
+                                key={di}
+                                onPress={() => hasAny ? setCalPopupDate(d) : undefined}
+                                activeOpacity={hasAny ? 0.7 : 1}
+                                style={{ flex: 1, alignItems: 'center' }}>
+                                <View style={[
+                                  { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+                                  isToday && { backgroundColor: c.accent },
+                                  hasAny && !isToday && { backgroundColor: c.accent + '1A' },
+                                ]}>
+                                  <Text style={{ color: isToday ? '#fff' : hasAny ? c.accent : c.text, fontSize: 13, fontWeight: isToday || hasAny ? '700' : '400' }}>{day}</Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', gap: 2, marginTop: 2, minHeight: 10 }}>
+                                  {cnt > 0 && <View style={{ backgroundColor: activeCnt > 0 ? c.accent : '#10B981', borderRadius: 3, paddingHorizontal: 3, minWidth: 12, alignItems: 'center' }}>
+                                    <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{cnt}</Text>
+                                  </View>}
+                                  {hasMeet && <View style={{ backgroundColor: '#6366F1', borderRadius: 3, paddingHorizontal: 3, minWidth: 12, alignItems: 'center' }}>
+                                    <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{dayMeets.length}</Text>
+                                  </View>}
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })()}
+
+                {/* QUARTER */}
+                {calSpan === 'quarter' && (() => {
+                  const yr = calViewDate.getFullYear();
+                  const qStart = Math.floor(calViewDate.getMonth() / 3) * 3;
+                  return (
+                    <View style={{ gap: 24 }}>
+                      {[0, 1, 2].map(offset => {
+                        const mo = qStart + offset;
+                        const fd = (() => { const d = new Date(yr, mo, 1).getDay(); return d === 0 ? 6 : d - 1; })();
+                        const dim = new Date(yr, mo + 1, 0).getDate();
+                        const cells: (number | null)[] = [];
+                        for (let i = 0; i < fd; i++) cells.push(null);
+                        for (let i = 1; i <= dim; i++) cells.push(i);
+                        while (cells.length % 7 !== 0) cells.push(null);
+                        const weeks = chunk(cells, 7);
+                        return (
+                          <View key={mo}>
+                            <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginBottom: 6 }}>{MONTHS_UA[mo]}</Text>
+                            <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+                              {WEEKDAYS_SHORT.map(d => (
+                                <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{d}</Text>
+                              ))}
+                            </View>
+                            {weeks.map((week, wi) => (
+                              <View key={wi} style={{ flexDirection: 'row', marginBottom: 2 }}>
+                                {week.map((day, di) => {
+                                  if (!day) return <View key={di} style={{ flex: 1 }} />;
+                                  const d = new Date(yr, mo, day);
+                                  const dayTasks = tasksByDate[d.toDateString()] ?? [];
+                                  const isToday = d.toDateString() === today.toDateString();
+                                  const cnt = dayTasks.length;
+                                  return (
+                                    <TouchableOpacity
+                                      key={di}
+                                      onPress={() => cnt > 0 ? setCalPopupDate(d) : undefined}
+                                      activeOpacity={cnt > 0 ? 0.7 : 1}
+                                      style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
+                                      <View style={[
+                                        { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+                                        isToday && { backgroundColor: c.accent },
+                                        cnt > 0 && !isToday && { backgroundColor: c.accent + '1A' },
+                                      ]}>
+                                        <Text style={{ color: isToday ? '#fff' : cnt > 0 ? c.accent : c.text, fontSize: 10, fontWeight: cnt > 0 || isToday ? '700' : '400' }}>{day}</Text>
+                                      </View>
+                                      {cnt > 0 && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: c.accent, marginTop: 1 }} />}
+                                      {cnt === 0 && <View style={{ height: 5 }} />}
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            ))}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
+
+                {/* YEAR */}
+                {calSpan === 'year' && (() => {
+                  const yr = calViewDate.getFullYear();
+                  return (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {MONTHS_UA.map((mName, mo) => {
+                        const monthTasks = tasks.filter(t => {
+                          if (!t.deadline) return false;
+                          const d = new Date(t.deadline);
+                          return d.getFullYear() === yr && d.getMonth() === mo;
+                        });
+                        const cnt = monthTasks.length;
+                        const activeCnt = monthTasks.filter(t => t.status === 'active').length;
+                        const isCurrent = today.getFullYear() === yr && today.getMonth() === mo;
+                        return (
+                          <TouchableOpacity
+                            key={mo}
+                            onPress={() => { setCalSpan('month'); setCalViewDate(new Date(yr, mo, 1)); }}
+                            activeOpacity={0.75}
+                            style={{
+                              width: '30.5%',
+                              borderRadius: 14,
+                              borderWidth: 1,
+                              borderColor: isCurrent ? c.accent : c.border,
+                              backgroundColor: isCurrent ? c.accent + '14' : c.dim,
+                              paddingVertical: 14,
+                              paddingHorizontal: 10,
+                              alignItems: 'center',
+                              gap: 5,
+                            }}>
+                            <Text style={{ color: isCurrent ? c.accent : c.text, fontSize: 12, fontWeight: '700' }}>{mName.slice(0, 3)}</Text>
+                            {cnt > 0 ? (
+                              <View style={{ backgroundColor: activeCnt > 0 ? c.accent : '#10B981', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, minWidth: 20, alignItems: 'center' }}>
+                                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{cnt}</Text>
+                              </View>
+                            ) : (
+                              <Text style={{ color: c.sub, fontSize: 11, opacity: 0.5 }}>—</Text>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
+              </View>
+            )}
+    </>
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
@@ -2086,692 +2759,47 @@ export default function TasksScreen() {
           />
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />
-          }>
-
-          {/* Skeleton — перший завантаження */}
-          {!initialized && (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          )}
-
-          {/* Search bar */}
-          <View style={[s.searchBar, { backgroundColor: c.dim, borderColor: c.border }]}>
-            <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
-            <TextInput
-              placeholder={tr.searchPlaceholder}
-              placeholderTextColor={c.sub}
-              value={search}
-              onChangeText={setSearch}
-              style={[s.searchInput, { color: c.text }]}
-              returnKeyType="search"
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
-              </TouchableOpacity>
+        {viewMode === 'list' ? (
+          <SectionList
+            sections={sections}
+            keyExtractor={task => task.id}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
+            showsVerticalScrollIndicator={false}
+            // Заголовки груп не липкі — так було й до віртуалізації.
+            stickySectionHeadersEnabled={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+            ListHeaderComponent={listHeader}
+            renderSectionHeader={({ section }) => (
+              <Text style={[s.groupLabel, { color: c.sub }]}>{section.title}</Text>
             )}
-          </View>
-
-          {/* Active filter chips */}
-          {hasActiveFilters && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 4 }}>
-              <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center' }}>
-                {filter !== 'active' && (
-                  <TouchableOpacity
-                    onPress={() => setFilter('active')}
-                    style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
-                    <Text style={[s.activeChipText, { color: c.accent }]}>
-                      {filter === 'all' ? tr.allTasks : tr.allCompleted}
-                    </Text>
-                    <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                )}
-                {sort !== 'deadline' && (
-                  <TouchableOpacity
-                    onPress={() => setSort('deadline')}
-                    style={[s.activeChip, { backgroundColor: c.accent + '15', borderColor: c.accent + '40' }]}>
-                    <IconSymbol name="arrow.up.arrow.down" size={10} color={c.accent} />
-                    <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
-                      {SORT_OPTIONS.find(o => o.key === sort)?.label}
-                    </Text>
-                    <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                )}
-                {filterProject && (() => {
-                  const proj = projects.find(p => p.id === filterProject);
-                  return proj ? (
-                    <TouchableOpacity
-                      onPress={() => setFilterProject(null)}
-                      style={[s.activeChip, { backgroundColor: proj.color + '20', borderColor: proj.color + '50' }]}>
-                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color }} />
-                      <Text style={[s.activeChipText, { color: proj.color, marginLeft: 4 }]}>{proj.name}</Text>
-                      <IconSymbol name="xmark" size={10} color={proj.color} style={{ marginLeft: 4 }} />
-                    </TouchableOpacity>
-                  ) : null;
-                })()}
-                {filterPriority && (
-                  <TouchableOpacity
-                    onPress={() => setFilterPriority(null)}
-                    style={[s.activeChip, { backgroundColor: PRIORITY[filterPriority].color + '20', borderColor: PRIORITY[filterPriority].color + '50' }]}>
-                    <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: PRIORITY[filterPriority].color }} />
-                    <Text style={[s.activeChipText, { color: PRIORITY[filterPriority].color, marginLeft: 4 }]}>
-                      {PRIORITY[filterPriority].label}
-                    </Text>
-                    <IconSymbol name="xmark" size={10} color={PRIORITY[filterPriority].color} style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                )}
-                {dateFilter && (
-                  <TouchableOpacity
-                    onPress={() => setDateFilter(null)}
-                    style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
-                    <IconSymbol name="calendar" size={10} color={c.accent} />
-                    <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
-                      {new Date(dateFilter).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })}
-                    </Text>
-                    <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={clearAllFilters}
-                  style={[s.activeChip, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
-                  <Text style={[s.activeChipText, { color: '#EF4444' }]}>{tr.resetAll}</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          )}
-
-          {/* Stats — today (deadline = today) */}
-          <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
-            <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
-              <StatCell value={activeCount}          label={tr.active} color="#F59E0B" sub={c.sub} />
-              <View style={{ width: 1, backgroundColor: c.border }} />
-              <StatCell value={doneCount}            label={tr.done}           color="#10B981" sub={c.sub} />
-              <View style={{ width: 1, backgroundColor: c.border }} />
-              <StatCell value={todayMeetings.length} label={tr.meetings} color="#0EA5E9" sub={c.sub} />
-              <View style={{ width: 1, backgroundColor: c.border }} />
-              <StatCell value={`${efficiency}%`}    label={tr.efficiency}                                                         color={c.accent} sub={c.sub} />
-            </View>
-            {totalSubtasks > 0 && (
-              <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card }]}>
-                <IconSymbol name="list.bullet.circle.fill" size={14} color="#6366F1" />
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 7 }}>{tr.subtasksToday}</Text>
-                <View style={{ flex: 1, marginHorizontal: 12 }}>
-                  <View style={[s.progressBg, { flex: 1 }]}>
-                    <View style={[s.progressFill, { width: `${Math.round((doneSubtasks / totalSubtasks) * 100)}%`, backgroundColor: '#6366F1' }]} />
-                  </View>
-                </View>
-                <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '700' }}>
-                  {doneSubtasks}/{totalSubtasks}
-                </Text>
-              </View>
+            ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
+            renderItem={({ item, index }) => (
+              <TaskListItem
+                task={item}
+                index={index}
+                animate={shouldAnimateTask(item.id)}
+                motion={motion}
+                statusColumn={taskStatusColumn(item, taskStatuses)}
+                onPress={handleSelectTask}
+                onToggle={handleToggleTask}
+                c={c}
+                isDark={isDark}
+                projects={projects}
+                overdueLabel={tr.overdueSection}
+                priorityLabel={PRIORITY[item.priority].label}
+                subtasksLabel={tr.subtasks}
+              />
             )}
-            {dueTodayTasks.length === 0 && (
-              <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card, justifyContent: 'center' }]}>
-                <IconSymbol name="checkmark.seal" size={13} color={c.sub} />
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 6 }}>{tr.noTasksToday}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* ── Meetings section (list view only) ── */}
-          {viewMode === 'list' && (
-            <View style={{ marginBottom: 20 }}>
-              {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                <TouchableOpacity
-                  onPress={() => router.push('/meetings')}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel={tr.meetings}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <IconSymbol name="calendar.circle.fill" size={16} color="#6366F1" />
-                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginLeft: 6 }}>{tr.meetings}</Text>
-                  {/* Шеврон — інакше немає жодної підказки, що заголовок клікабельний */}
-                  <IconSymbol name="chevron.right" size={12} color={c.sub} style={{ marginLeft: 2 }} />
-                </TouchableOpacity>
-                {todayMeetings2.length > 0 && (
-                  <View style={{ backgroundColor: '#6366F120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
-                    <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{todayMeetings2.length}</Text>
-                  </View>
-                )}
-                <TouchableOpacity
-                  onPress={() => openAddMeeting()}
-                  style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#6366F118', borderWidth: 1, borderColor: '#6366F130', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="plus" size={14} color="#6366F1" />
-                </TouchableOpacity>
-              </View>
-
-              {todayMeetings2.length === 0 ? (
-                <TouchableOpacity onPress={() => openAddMeeting()} activeOpacity={0.7}
-                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 10, gap: 8 }}>
-                  <IconSymbol name="calendar.badge.plus" size={16} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500' }}>{tr.addMeeting}</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={{ gap: 4 }}>
-                  {todayMeetings2.map(mtg => {
-                    // Список відфільтрований по сьогодні, тож перевіряти дату
-                    // повторно вже нема потреби.
-                    const mtgDateObj = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
-                    const isPast = mtgDateObj < new Date();
-                    const isNow = mtgDateObj <= new Date() && new Date(mtgDateObj.getTime() + mtg.durationMinutes * 60000) > new Date();
-                    const dFmt = tr.today;
-                    const dur = mtg.durationMinutes >= 60
-                      ? `${Math.floor(mtg.durationMinutes / 60)}г${mtg.durationMinutes % 60 ? ` ${mtg.durationMinutes % 60}хв` : ''}`
-                      : `${mtg.durationMinutes} хв`;
-                    return (
-                      <TouchableOpacity key={mtg.id} onPress={() => openEditMeeting(mtg)} activeOpacity={0.75}>
-                        <View style={{ borderRadius: 11, paddingVertical: 7, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, overflow: 'hidden', opacity: isPast && !isNow ? 0.4 : 1, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
-                          {/* Accent bar */}
-                          <View style={{ width: 2.5, alignSelf: 'stretch', backgroundColor: mtg.color, borderRadius: 2, marginLeft: 0, minHeight: 36 }} />
-                          {/* Time + day */}
-                          <View style={{ alignItems: 'center', minWidth: 44 }}>
-                            <Text style={{ color: mtg.color, fontSize: 13, fontWeight: '800', letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
-                            <Text style={{ color: mtg.color, fontSize: 9, fontWeight: '600', opacity: 0.75, marginTop: 1 }}>{dFmt}</Text>
-                          </View>
-                          {/* Divider */}
-                          <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: mtg.color + '30', marginVertical: 4 }} />
-                          {/* Info */}
-                          <View style={{ flex: 1, gap: 2 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                              {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />}
-                              <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                <IconSymbol name="clock" size={9} color={c.sub} />
-                                <Text style={{ color: c.sub, fontSize: 10 }}>{dur}</Text>
-                              </View>
-                              {mtg.location ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                  <IconSymbol name="mappin" size={9} color={c.sub} />
-                                  <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.location}</Text>
-                                </View>
-                              ) : null}
-                              {mtg.link ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                  <IconSymbol name="link" size={9} color={'#6366F1'} />
-                                  <Text style={{ color: '#6366F1', fontSize: 10, fontWeight: '600' }}>Join</Text>
-                                </View>
-                              ) : null}
-                              {mtg.notes ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                  <IconSymbol name="note.text" size={9} color={c.sub} />
-                                  <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.notes}</Text>
-                                </View>
-                              ) : null}
-                            </View>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Empty state */}
-          {filtered.length === 0 && (
-            <View style={{ alignItems: 'center', paddingVertical: 56 }}>
-              <IconSymbol name="checklist" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>
-                {search.trim() ? tr.nothingFound : tr.noTasks}
-              </Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>
-                {search.trim() ? tr.tryAnotherQuery : tr.pressToAdd}
-              </Text>
-              {!search.trim() && (
-                <TouchableOpacity
-                  onPress={() => setShowAdd(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel={tr.addTask}
-                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <IconSymbol name="plus" size={15} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addTask}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {/* Overdue section (list view, active/all filter) */}
-          {viewMode === 'list' && overdueItems.length > 0 && (
-            <View style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-                <Text style={[s.groupLabel, { color: '#EF4444', marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
-                <View style={{ backgroundColor: '#EF444420', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
-                  <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>{overdueItems.length}</Text>
-                </View>
-              </View>
-              <View style={{ gap: 6 }}>
-                {overdueItems.map((task, i) => {
-                  const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
-                  const animExiting  = motion.entering(FadeOutUp.duration(150));
-                  const animLayout   = motion.entering(LinearTransition.springify());
-                  return (
-                    <Animated.View
-                      key={task.id}
-                      entering={animEntering}
-                      exiting={animExiting}
-                      layout={animLayout}>
-                      <CompactCard
-                        task={task}
-                        statusColumn={taskStatusColumn(task, taskStatuses)}
-                        onPress={handleSelectTask}
-                        onToggle={handleToggleTask}
-                        c={c}
-                        isDark={isDark}
-                        projects={projects}
-                        overdueLabel={tr.overdueSection}
-                        priorityLabel={PRIORITY[task.priority].label}
-                        subtasksLabel={tr.subtasks}
-                      />
-                    </Animated.View>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
-          {/* LIST VIEW */}
-          {viewMode === 'list' && groups.map(group => (
-            <View key={group.label}>
-              <Text style={[s.groupLabel, { color: c.sub }]}>{group.label}</Text>
-              <View style={{ gap: 6 }}>
-                {group.tasks.map((task, i) => {
-                  const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
-                  const animExiting  = motion.entering(FadeOutUp.duration(150));
-                  const animLayout   = motion.entering(LinearTransition.springify());
-                  return (
-                    <Animated.View
-                      key={task.id}
-                      entering={animEntering}
-                      exiting={animExiting}
-                      layout={animLayout}>
-                      <CompactCard
-                        task={task}
-                        statusColumn={taskStatusColumn(task, taskStatuses)}
-                        onPress={() => setSelected(task)}
-                        onToggle={() => toggleTask(task.id)}
-                        c={c}
-                        isDark={isDark}
-                        projects={projects}
-                        overdueLabel={tr.overdueSection}
-                        priorityLabel={PRIORITY[task.priority].label}
-                        subtasksLabel={tr.subtasks}
-                      />
-                    </Animated.View>
-                  );
-                })}
-              </View>
-            </View>
-          ))}
-
-          {/* CALENDAR VIEW */}
-          {viewMode === 'calendar' && (
-            <View>
-              {/* Span selector */}
-              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
-                {(['week', 'month', 'quarter', 'year'] as CalSpan[]).map(span => (
-                  <TouchableOpacity
-                    key={span}
-                    onPress={() => { setCalSpan(span); if (span === 'week') setCalViewDate(calWeekDay); }}
-                    style={[s.sortChip, {
-                      flex: 1, justifyContent: 'center',
-                      backgroundColor: calSpan === span ? c.accent + '20' : c.dim,
-                      borderColor: calSpan === span ? c.accent : c.border,
-                    }]}>
-                    <Text style={{ color: calSpan === span ? c.accent : c.sub, fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
-                      {span === 'week' ? tr.week : span === 'month' ? tr.month : span === 'quarter' ? tr.quarter : tr.year}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Nav header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                <TouchableOpacity onPress={calPrev} style={s.navBtn}>
-                  <IconSymbol name="chevron.left" size={18} color={c.sub} />
-                </TouchableOpacity>
-                <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontWeight: '700' }}>{calHeaderLabel}</Text>
-                <TouchableOpacity onPress={calNext} style={s.navBtn}>
-                  <IconSymbol name="chevron.right" size={18} color={c.sub} />
-                </TouchableOpacity>
-              </View>
-
-              {/* WEEK */}
-              {calSpan === 'week' && (() => {
-                const weekDayTasks = tasksByDate[calWeekDay.toDateString()] ?? [];
-                const weekActiveTasks = weekDayTasks.filter(t => t.status === 'active');
-                const weekDoneTasks = weekDayTasks.filter(t => t.status === 'done');
-                return (
-                  <View>
-                    {/* 7-day strip */}
-                    <View style={{ flexDirection: 'row', gap: 3, marginBottom: 20 }}>
-                      {Array.from({ length: 7 }, (_, i) => {
-                        const d = new Date(weekMonday); d.setDate(d.getDate() + i);
-                        const dayTasks = tasksByDate[d.toDateString()] ?? [];
-                        const isToday = d.toDateString() === today.toDateString();
-                        const isSel = d.toDateString() === calWeekDay.toDateString();
-                        const cnt = dayTasks.length;
-                        const hasActive = dayTasks.some(t => t.status === 'active');
-                        return (
-                          <TouchableOpacity
-                            key={i}
-                            onPress={() => setCalWeekDay(d)}
-                            activeOpacity={0.75}
-                            style={{
-                              flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 16,
-                              backgroundColor: isSel ? c.accent : isToday ? c.accent + '18' : c.dim,
-                              borderWidth: 1,
-                              borderColor: isSel ? c.accent : isToday ? c.accent + '60' : c.border,
-                            }}>
-                            <Text style={{
-                              fontSize: 10, fontWeight: '600', marginBottom: 4,
-                              color: isSel ? 'rgba(255,255,255,0.75)' : isToday ? c.accent : c.sub,
-                            }}>
-                              {WEEKDAYS_SHORT[i]}
-                            </Text>
-                            <Text style={{
-                              fontSize: 15, fontWeight: '800', lineHeight: 18,
-                              color: isSel ? '#fff' : isToday ? c.accent : c.text,
-                            }}>
-                              {d.getDate()}
-                            </Text>
-                            <View style={{ marginTop: 6, height: 5, alignItems: 'center', justifyContent: 'center' }}>
-                              {cnt > 0 && (
-                                <View style={{
-                                  width: cnt > 3 ? 14 : cnt * 5,
-                                  height: 5, borderRadius: 3,
-                                  backgroundColor: isSel
-                                    ? 'rgba(255,255,255,0.55)'
-                                    : hasActive ? c.accent : '#10B981',
-                                }} />
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    {/* Selected day header */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', flex: 1, textTransform: 'capitalize' }}>
-                        {calWeekDay.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
-                      </Text>
-                      {weekDayTasks.length > 0 && (
-                        <View style={{ flexDirection: 'row', gap: 6 }}>
-                          {weekActiveTasks.length > 0 && (
-                            <View style={{ backgroundColor: c.accent + '20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                              <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>{weekActiveTasks.length} {tr.active}</Text>
-                            </View>
-                          )}
-                          {weekDoneTasks.length > 0 && (
-                            <View style={{ backgroundColor: '#10B98120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                              <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>{weekDoneTasks.length} {tr.done}</Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Task list for selected day */}
-                    {weekDayTasks.length === 0 ? (
-                      <View style={{ alignItems: 'center', paddingVertical: 32, borderRadius: 16, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' }}>
-                        <IconSymbol name="calendar.badge.checkmark" size={28} color={c.sub} />
-                        <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginTop: 8 }}>{tr.noTasksForDay}</Text>
-                      </View>
-                    ) : (
-                      <View style={{ gap: 8 }}>
-                        {weekDayTasks.map(task => {
-                          const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
-                          const prog = getProgress(task);
-                          const overdue = isOverdue(task);
-                          const prioColor = PRIORITY[task.priority].color;
-                          return (
-                            <TouchableOpacity
-                              key={task.id}
-                              onPress={() => setSelected(task)}
-                              activeOpacity={0.75}>
-                              <BlurView
-                                intensity={isDark ? 18 : 35}
-                                tint={isDark ? 'dark' : 'light'}
-                                style={{
-                                  borderRadius: 16, borderWidth: 1,
-                                  borderColor: task.status === 'done' ? c.border : overdue ? '#EF444450' : c.border,
-                                  padding: 13, overflow: 'hidden',
-                                }}>
-                                {/* Priority stripe */}
-                                <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: task.status === 'done' ? '#10B981' : prioColor, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
-                                <View style={{ marginLeft: 8 }}>
-                                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                                    <AnimatedCheck
-                                      checked={task.status === 'done'}
-                                      color="#10B981"
-                                      borderColor={c.border}
-                                      size={22}
-                                      radius={7}
-                                      onPress={() => toggleTask(task.id)}
-                                      hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
-                                      style={{ marginTop: 1, flexShrink: 0 }}
-                                    />
-                                    <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600', lineHeight: 20, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }}>
-                                      {task.title}
-                                    </Text>
-                                  </View>
-
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, marginLeft: 32 }}>
-                                    <View style={[s.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
-                                      <View style={[s.dot, { backgroundColor: prioColor, width: 6, height: 6 }]} />
-                                      <Text style={{ color: prioColor, fontSize: 10, fontWeight: '700', marginLeft: 3 }}>{PRIORITY[task.priority].label}</Text>
-                                    </View>
-                                    {proj && (
-                                      <View style={[s.badge, { backgroundColor: proj.color + '18', borderColor: proj.color + '45' }]}>
-                                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color }} />
-                                        <Text style={{ color: proj.color, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>{proj.name}</Text>
-                                      </View>
-                                    )}
-                                    {task.subtasks.length > 0 && (
-                                      <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                                        <IconSymbol name="list.bullet" size={9} color={c.sub} />
-                                        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginLeft: 3 }}>{task.subtasks.filter(s => s.done).length}/{task.subtasks.length}</Text>
-                                      </View>
-                                    )}
-                                  </View>
-
-                                  {(prog > 0 || task.subtasks.length > 0) && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginLeft: 32 }}>
-                                      <View style={[s.progressBg, { flex: 1 }]}>
-                                        <View style={[s.progressFill, { width: `${prog}%`, backgroundColor: task.status === 'done' ? '#10B981' : c.accent }]} />
-                                      </View>
-                                      <Text style={[s.pct, { color: c.sub }]}>{prog}%</Text>
-                                    </View>
-                                  )}
-                                </View>
-                              </BlurView>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
-                );
-              })()}
-
-              {/* MONTH */}
-              {calSpan === 'month' && (() => {
-                const yr = calViewDate.getFullYear();
-                const mo = calViewDate.getMonth();
-                const fd = (() => { const d = new Date(yr, mo, 1).getDay(); return d === 0 ? 6 : d - 1; })();
-                const dim = new Date(yr, mo + 1, 0).getDate();
-                const cells: (number | null)[] = [];
-                for (let i = 0; i < fd; i++) cells.push(null);
-                for (let i = 1; i <= dim; i++) cells.push(i);
-                while (cells.length % 7 !== 0) cells.push(null);
-                const weeks = chunk(cells, 7);
-                return (
-                  <View>
-                    <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-                      {WEEKDAYS_SHORT.map(d => (
-                        <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
-                      ))}
-                    </View>
-                    {weeks.map((week, wi) => (
-                      <View key={wi} style={{ flexDirection: 'row', marginBottom: 6 }}>
-                        {week.map((day, di) => {
-                          if (!day) return <View key={di} style={{ flex: 1 }} />;
-                          const d = new Date(yr, mo, day);
-                          const dayTasks = tasksByDate[d.toDateString()] ?? [];
-                          const dayMeets = meetingsByDate[d.toISOString().slice(0, 10)] ?? [];
-                          const isToday = d.toDateString() === today.toDateString();
-                          const cnt = dayTasks.length;
-                          const activeCnt = dayTasks.filter(t => t.status === 'active').length;
-                          const hasMeet = dayMeets.length > 0;
-                          const hasAny = cnt > 0 || hasMeet;
-                          return (
-                            <TouchableOpacity
-                              key={di}
-                              onPress={() => hasAny ? setCalPopupDate(d) : undefined}
-                              activeOpacity={hasAny ? 0.7 : 1}
-                              style={{ flex: 1, alignItems: 'center' }}>
-                              <View style={[
-                                { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-                                isToday && { backgroundColor: c.accent },
-                                hasAny && !isToday && { backgroundColor: c.accent + '1A' },
-                              ]}>
-                                <Text style={{ color: isToday ? '#fff' : hasAny ? c.accent : c.text, fontSize: 13, fontWeight: isToday || hasAny ? '700' : '400' }}>{day}</Text>
-                              </View>
-                              <View style={{ flexDirection: 'row', gap: 2, marginTop: 2, minHeight: 10 }}>
-                                {cnt > 0 && <View style={{ backgroundColor: activeCnt > 0 ? c.accent : '#10B981', borderRadius: 3, paddingHorizontal: 3, minWidth: 12, alignItems: 'center' }}>
-                                  <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{cnt}</Text>
-                                </View>}
-                                {hasMeet && <View style={{ backgroundColor: '#6366F1', borderRadius: 3, paddingHorizontal: 3, minWidth: 12, alignItems: 'center' }}>
-                                  <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{dayMeets.length}</Text>
-                                </View>}
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    ))}
-                  </View>
-                );
-              })()}
-
-              {/* QUARTER */}
-              {calSpan === 'quarter' && (() => {
-                const yr = calViewDate.getFullYear();
-                const qStart = Math.floor(calViewDate.getMonth() / 3) * 3;
-                return (
-                  <View style={{ gap: 24 }}>
-                    {[0, 1, 2].map(offset => {
-                      const mo = qStart + offset;
-                      const fd = (() => { const d = new Date(yr, mo, 1).getDay(); return d === 0 ? 6 : d - 1; })();
-                      const dim = new Date(yr, mo + 1, 0).getDate();
-                      const cells: (number | null)[] = [];
-                      for (let i = 0; i < fd; i++) cells.push(null);
-                      for (let i = 1; i <= dim; i++) cells.push(i);
-                      while (cells.length % 7 !== 0) cells.push(null);
-                      const weeks = chunk(cells, 7);
-                      return (
-                        <View key={mo}>
-                          <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginBottom: 6 }}>{MONTHS_UA[mo]}</Text>
-                          <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-                            {WEEKDAYS_SHORT.map(d => (
-                              <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{d}</Text>
-                            ))}
-                          </View>
-                          {weeks.map((week, wi) => (
-                            <View key={wi} style={{ flexDirection: 'row', marginBottom: 2 }}>
-                              {week.map((day, di) => {
-                                if (!day) return <View key={di} style={{ flex: 1 }} />;
-                                const d = new Date(yr, mo, day);
-                                const dayTasks = tasksByDate[d.toDateString()] ?? [];
-                                const isToday = d.toDateString() === today.toDateString();
-                                const cnt = dayTasks.length;
-                                return (
-                                  <TouchableOpacity
-                                    key={di}
-                                    onPress={() => cnt > 0 ? setCalPopupDate(d) : undefined}
-                                    activeOpacity={cnt > 0 ? 0.7 : 1}
-                                    style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
-                                    <View style={[
-                                      { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-                                      isToday && { backgroundColor: c.accent },
-                                      cnt > 0 && !isToday && { backgroundColor: c.accent + '1A' },
-                                    ]}>
-                                      <Text style={{ color: isToday ? '#fff' : cnt > 0 ? c.accent : c.text, fontSize: 10, fontWeight: cnt > 0 || isToday ? '700' : '400' }}>{day}</Text>
-                                    </View>
-                                    {cnt > 0 && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: c.accent, marginTop: 1 }} />}
-                                    {cnt === 0 && <View style={{ height: 5 }} />}
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-                          ))}
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })()}
-
-              {/* YEAR */}
-              {calSpan === 'year' && (() => {
-                const yr = calViewDate.getFullYear();
-                return (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {MONTHS_UA.map((mName, mo) => {
-                      const monthTasks = tasks.filter(t => {
-                        if (!t.deadline) return false;
-                        const d = new Date(t.deadline);
-                        return d.getFullYear() === yr && d.getMonth() === mo;
-                      });
-                      const cnt = monthTasks.length;
-                      const activeCnt = monthTasks.filter(t => t.status === 'active').length;
-                      const isCurrent = today.getFullYear() === yr && today.getMonth() === mo;
-                      return (
-                        <TouchableOpacity
-                          key={mo}
-                          onPress={() => { setCalSpan('month'); setCalViewDate(new Date(yr, mo, 1)); }}
-                          activeOpacity={0.75}
-                          style={{
-                            width: '30.5%',
-                            borderRadius: 14,
-                            borderWidth: 1,
-                            borderColor: isCurrent ? c.accent : c.border,
-                            backgroundColor: isCurrent ? c.accent + '14' : c.dim,
-                            paddingVertical: 14,
-                            paddingHorizontal: 10,
-                            alignItems: 'center',
-                            gap: 5,
-                          }}>
-                          <Text style={{ color: isCurrent ? c.accent : c.text, fontSize: 12, fontWeight: '700' }}>{mName.slice(0, 3)}</Text>
-                          {cnt > 0 ? (
-                            <View style={{ backgroundColor: activeCnt > 0 ? c.accent : '#10B981', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, minWidth: 20, alignItems: 'center' }}>
-                              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{cnt}</Text>
-                            </View>
-                          ) : (
-                            <Text style={{ color: c.sub, fontSize: 11, opacity: 0.5 }}>—</Text>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                );
-              })()}
-            </View>
-          )}
-        </ScrollView>
+          />
+        ) : (
+          <ScrollView
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
+            {listHeader}
+            {calendarView}
+          </ScrollView>
+        )}
       </SafeAreaView>
 
       {/* FAB */}
@@ -3629,6 +3657,51 @@ export default function TasksScreen() {
 
 // ─── Compact Card ────────────────────────────────────────────────────────────
 const AnimatedText = Animated.createAnimatedComponent(Text);
+
+/**
+ * Рядок списку: анімаційна обгортка навколо картки.
+ *
+ * Окремий компонент, щоб renderItem не створював елементи анімації
+ * заново — і щоб memo нижче мала що порівнювати.
+ */
+const TaskListItem = React.memo(function TaskListItem({
+  task, index, animate, motion, statusColumn, onPress, onToggle,
+  c, isDark, projects, overdueLabel, priorityLabel, subtasksLabel,
+}: {
+  task: Task;
+  index: number;
+  animate: boolean;
+  motion: ReturnType<typeof useMotion>;
+  statusColumn: TaskStatusColumn;
+  onPress: (task: Task) => void;
+  onToggle: (task: Task) => void;
+  c: any;
+  isDark: boolean;
+  projects: Project[];
+  overdueLabel: string;
+  priorityLabel: string;
+  subtasksLabel: string;
+}) {
+  return (
+    <Animated.View
+      entering={animate ? motion.entering(FadeInDown.duration(200).delay(Math.min(index, 10) * 40)) : undefined}
+      exiting={motion.entering(FadeOutUp.duration(150))}
+      layout={motion.entering(LinearTransition.springify())}>
+      <CompactCard
+        task={task}
+        statusColumn={statusColumn}
+        onPress={onPress}
+        onToggle={onToggle}
+        c={c}
+        isDark={isDark}
+        projects={projects}
+        overdueLabel={overdueLabel}
+        priorityLabel={priorityLabel}
+        subtasksLabel={subtasksLabel}
+      />
+    </Animated.View>
+  );
+});
 
 /**
  * Мемоізована: у списку її примірників стільки ж, скільки завдань, а екран

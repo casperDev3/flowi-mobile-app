@@ -5,7 +5,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   AppState,
-  Dimensions,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -49,6 +48,7 @@ import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, taskColumnId,
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
+import { useResponsive } from '@/hooks/use-responsive';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
 let AVAudio: any = null;
@@ -269,6 +269,7 @@ function historyEventColor(type: HistoryEventType): string {
 }
 
 export default function TasksScreen() {
+  const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   useScreenView('tasks');
   const router = useRouter();
@@ -2082,7 +2083,7 @@ export default function TasksScreen() {
               </View>
               {/* Task + Meeting list */}
               <ScrollView
-                style={{ maxHeight: Dimensions.get('window').height * 0.5 }}
+                style={{ maxHeight: height * 0.5 }}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 8 }}
                 showsVerticalScrollIndicator={false}>
 
@@ -2298,7 +2299,7 @@ export default function TasksScreen() {
       <Modal visible={showFilterSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
         <Pressable style={s.overlay} onPress={() => setShowFilterSheet(false)}>
           <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -2454,7 +2455,7 @@ export default function TasksScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -2491,7 +2492,7 @@ export default function TasksScreen() {
 
       {/* ─── Add Task Modal ─── */}
       <SheetModal visible={showAdd} onClose={() => setShowAdd(false)}>
-        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <Text style={[s.sheetTitle, { color: c.text }]}>{tr.newTask}</Text>
 
@@ -2777,7 +2778,7 @@ export default function TasksScreen() {
           <Pressable style={s.overlay} onPress={() => setSelected(null)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
               {selectedTask && (
-                <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                   <ScrollView ref={detailScrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     <View style={s.handleRow}>
                       <View style={{ flex: 1 }}>
@@ -3925,8 +3926,8 @@ const s = StyleSheet.create({
   fab:            { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:   { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:          { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.88 },
-  detailSheet:    { borderRadius: 24, borderWidth: 1, padding: 20, maxHeight: Dimensions.get('window').height * 0.88, overflow: 'hidden' },
+  sheet:          { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  detailSheet:    { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   inlineCalendar: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 8 },
   reminderPickerBox: { borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 8 },
   handleRow:      { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },

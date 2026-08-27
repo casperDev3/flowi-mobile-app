@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -33,6 +32,7 @@ import {
   HEALTH_ACCENTS, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
 import { HealthEntry, getMonthEntries, getWeeklyInsights } from '@/utils/healthUtils';
+import { useResponsive } from '@/hooks/use-responsive';
 
 export default function HealthHubScreen() {
   const isDark = useColorScheme() === 'dark';
@@ -263,6 +263,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, isD
   activeMonth: Date; setActiveMonth: (d: Date) => void;
   isDark: boolean; c: any; tr: any; locale: string;
 }) {
+  const { height } = useResponsive();
   const now = new Date();
   const monthEntries = useMemo(() => getMonthEntries(entries, activeMonth), [entries, activeMonth]);
   return (
@@ -284,7 +285,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, isD
               <MonthPicker month={activeMonth} onChange={setActiveMonth} months={tr.months}
                 accentColor={ACCENT} textColor={c.text} subColor={c.sub} dimColor={c.dim} borderColor={c.border} />
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: Dimensions.get('window').height * 0.58 }}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: height * 0.58 }}>
               {monthEntries.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                   <IconSymbol name="heart.fill" size={38} color={c.sub} />

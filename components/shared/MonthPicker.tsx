@@ -5,7 +5,6 @@ import {
   Text,
   View,
   Pressable,
-  Dimensions,
   Platform,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -25,7 +24,6 @@ interface MonthPickerProps {
   borderColor: string;
 }
 
-const W = Dimensions.get('window').width;
 
 export function MonthPicker({
   month,

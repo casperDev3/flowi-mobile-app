@@ -5,7 +5,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
-  Dimensions,
   Linking,
   Platform,
   ScrollView,
@@ -30,8 +29,8 @@ import {
   fetchWorkouts,
   initHealthKit,
 } from '@/store/healthkit';
+import { useResponsive } from '@/hooks/use-responsive';
 
-const { width: W } = Dimensions.get('window');
 
 const WORKOUT_NAMES: Record<number, string> = {
   1: 'Американський футбол', 2: 'Стрільба з лука', 3: 'Бадмінтон', 4: 'Бейсбол',
@@ -84,8 +83,9 @@ function MiniBarChart({ values, color, maxVal, height = 48 }: { values: (number 
 }
 
 function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: string }) {
+  const { width } = useResponsive();
   if (!samples.length) return null;
-  const W_CHART = W - 64;
+  const W_CHART = width - 64;
   const H = 56;
   const values = samples.map(s => s.value);
   const min = Math.min(...values), max = Math.max(...values, min + 1);
@@ -382,9 +382,10 @@ function MetricCard({ label, value, unit, icon, color, isDark, border, text, sub
   label: string; value: string; unit: string; icon: any; color: string;
   isDark: boolean; border: string; text: string; sub: string;
 }) {
+  const { width } = useResponsive();
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ width: (W - 42) / 2, borderRadius: 16, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14 }}>
+      style={{ width: (width - 42) / 2, borderRadius: 16, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
         <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name={icon} size={14} color={color} />

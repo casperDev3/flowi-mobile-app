@@ -166,3 +166,33 @@ export function getScreenColors(
       };
   }
 }
+
+// ─── Клас розміру вікна ───────────────────────────────────────────────────────
+
+/**
+ * Класифікація за ШИРИНОЮ вікна, а не за типом пристрою.
+ *
+ * Пристрій — погана основа: iPad у Split View має ширину телефону, а iPhone
+ * Pro Max у ландшафті ширший за iPad mini в портреті. Питання, на яке
+ * відповідає компонування, — «скільки місця є зараз», а не «що це за залізо».
+ *
+ * Джерело чисел — Material window size classes; вони збігаються з реальними
+ * точками, де iPad перестає бути схожим на телефон.
+ */
+export type SizeClass = 'compact' | 'medium' | 'expanded';
+
+export const Breakpoints = {
+  /** Від цієї ширини — `medium`: сайдбар з'являється, деталь ще ні. */
+  medium: 600,
+  /** Від цієї ширини — `expanded`: сайдбар + список + деталь. */
+  expanded: 840,
+} as const;
+
+/**
+ * Ширина вікна → клас розміру. Межі ВКЛЮЧНІ знизу: рівно 600 вже `medium`.
+ */
+export function sizeClassFor(width: number): SizeClass {
+  if (width >= Breakpoints.expanded) return 'expanded';
+  if (width >= Breakpoints.medium) return 'medium';
+  return 'compact';
+}

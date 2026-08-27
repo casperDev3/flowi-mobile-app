@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Dimensions,
   Platform,
   ScrollView,
   StyleSheet,
@@ -210,7 +209,6 @@ function buildChartBars(entries: FlatEntry[], period: Period): BarData[] {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-const SCREEN_W = Dimensions.get('window').width;
 
 export default function TimeRecordsScreen() {
   const isDark = useColorScheme() === 'dark';

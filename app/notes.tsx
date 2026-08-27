@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +26,7 @@ import { useMotion } from '@/hooks/use-motion';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useResponsive } from '@/hooks/use-responsive';
 
 interface Note {
   id: string;
@@ -52,6 +52,7 @@ function relativeDate(iso: string): string {
 }
 
 export default function NotesScreen() {
+  const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -279,7 +280,7 @@ export default function NotesScreen() {
               <BlurView
                 intensity={isDark ? 50 : 70}
                 tint={isDark ? 'dark' : 'light'}
-                style={[ns.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                style={[ns.sheet, { maxHeight: height * 0.82, borderColor: c.border, backgroundColor: c.sheet }]}>
 
                 <View style={ns.handleRow}>
                   <View style={{ flex: 1 }}>
@@ -313,7 +314,7 @@ export default function NotesScreen() {
                 />
                 <View style={[ns.divider, { backgroundColor: c.border }]} />
                 <ScrollView
-                  style={{ maxHeight: Dimensions.get('window').height * 0.38 }}
+                  style={{ maxHeight: height * 0.38 }}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}>
                   <TextInput
@@ -351,7 +352,7 @@ const ns = StyleSheet.create({
   fab:         { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.82 },
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   divider:     { height: 1, marginVertical: 12 },

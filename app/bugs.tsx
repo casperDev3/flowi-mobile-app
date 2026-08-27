@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -25,6 +24,7 @@ import { isOnlineMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useResponsive } from '@/hooks/use-responsive';
 
 // Вставте URL після деплою Google Apps Script
 const REPORTER_URL = 'https://script.google.com/macros/s/AKfycbzCOLtFr1M1bu2yU8AjKfLeqIQ7MKlbCthcfiC0bn6Br2f-tEtmjGJtJHoO7w98FPoN/exec';
@@ -48,6 +48,7 @@ const SEVERITY: Record<Severity, { label: string; color: string; icon: string }>
 };
 
 export default function BugsScreen() {
+  const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -378,7 +379,7 @@ export default function BugsScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowAdd(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={st.handleRow}>
                     <View style={{ flex: 1 }} />
@@ -458,7 +459,7 @@ export default function BugsScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowEdit(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={st.handleRow}>
                     <View style={{ flex: 1 }} />
@@ -554,7 +555,7 @@ const st = StyleSheet.create({
   actionBtn:    { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:        { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.88 },
+  sheet:        { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   sheetTitle:   { fontSize: 20, fontWeight: '800', marginBottom: 16 },

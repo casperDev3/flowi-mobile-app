@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -19,6 +18,7 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
 import { loadData } from '@/store/storage';
+import { useResponsive } from '@/hooks/use-responsive';
 
 type TxType = 'income' | 'expense';
 interface Transaction {
@@ -53,7 +53,6 @@ const CAT_COLORS = [
 const MONTHS_UA      = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 const MONTHS_UA_FULL = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const WEEKDAYS_UA    = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
-const W = Dimensions.get('window').width;
 const fmt = (n: number) => n.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
 const fmtShort = (n: number) => {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}к`;
@@ -187,6 +186,7 @@ function SparkLine({ data, color, height = 64, width }: {
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function FinanceStatsScreen() {
+  const { width } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [cats, setCats] = useState<Record<TxType, CategoryDef[]>>(DEFAULT_CATEGORIES);
@@ -390,7 +390,7 @@ export default function FinanceStatsScreen() {
     : [];
 
   const trendColor = balance >= 0 ? c.green : c.red;
-  const SPARK_W = W - 76;
+  const SPARK_W = width - 76;
 
   return (
     <View style={{ flex: 1 }}>

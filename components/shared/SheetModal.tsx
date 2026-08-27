@@ -20,7 +20,6 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -41,10 +40,10 @@ import Animated, {
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Motion } from '@/constants/motion';
+import { useResponsive } from '@/hooks/use-responsive';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SCREEN_H = Dimensions.get('window').height;
 const SWIPE_THRESHOLD = 120;   // px
 const VEL_THRESHOLD   = 800;   // px/s
 const EXIT_MS         = 150;   // ms
@@ -70,6 +69,18 @@ export function SheetModal({
   backdropDismiss = true,
 }: SheetModalProps) {
   const reduced = useReducedMotion() ?? false;
+  const { height } = useResponsive();
+
+  /**
+   * Дистанція, на яку лист їде за нижній край екрана.
+   *
+   * Живе в ref, а не просто в змінній рендеру, через ефект входу нижче:
+   * додати висоту в його deps означало б переграти spring-анімацію
+   * при кожному повороті екрана з уже відкритим листом. Ref дає свіже
+   * значення на момент виклику, не чіпаючи момент запуску анімацій.
+   */
+  const offscreenRef = useRef(height);
+  offscreenRef.current = height;
 
   /**
    * `mounted` — утримує Modal у DOM під час exit-анімації.
@@ -83,7 +94,7 @@ export function SheetModal({
   onCloseRef.current = onClose;
 
   const backdropOpacity = useSharedValue(0);
-  const translateY      = useSharedValue(SCREEN_H);
+  const translateY      = useSharedValue(height);
 
   // ── Анімація закриття (стабільна — deps змінюються рідко) ─────────────────
   const triggerClose = useCallback(() => {
@@ -97,13 +108,13 @@ export function SheetModal({
 
     if (reduced) {
       backdropOpacity.value = 0;
-      translateY.value = SCREEN_H;
+      translateY.value = offscreenRef.current;
       done();
       return;
     }
 
     backdropOpacity.value = withTiming(0, { duration: EXIT_MS });
-    translateY.value = withTiming(SCREEN_H, { duration: EXIT_MS }, (finished) => {
+    translateY.value = withTiming(offscreenRef.current, { duration: EXIT_MS }, (finished) => {
       if (finished) runOnJS(done)();
     });
   }, [reduced, backdropOpacity, translateY]);
@@ -128,7 +139,7 @@ export function SheetModal({
     if (!mounted) {
       // Скидаємо для наступного відкриття
       backdropOpacity.value = 0;
-      translateY.value = SCREEN_H;
+      translateY.value = offscreenRef.current;
       return;
     }
     // Не анімуємо, якщо вже закриваємось

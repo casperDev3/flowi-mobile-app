@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -25,6 +24,7 @@ import { loadData, saveData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { haptic } from '@/utils/haptics';
 import type { Transaction } from '@/utils/financeUtils';
+import { useResponsive } from '@/hooks/use-responsive';
 
 interface SavingsJar {
   id: string;
@@ -53,6 +53,7 @@ const fmt = (n: number) =>
   n.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
 
 export default function BanksScreen() {
+  const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
   const [jars, setJars] = useState<SavingsJar[]>([]);
@@ -332,7 +333,7 @@ export default function BanksScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowForm(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={s.handleRow}>
                     <View style={{ flex: 1 }} />
@@ -459,7 +460,7 @@ export default function BanksScreen() {
           <Pressable style={s.overlay} onPress={() => setShowDeposit(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
               {depositJar && (
-                <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
                   <View style={s.handleRow}>
                     <View style={{ flex: 1 }} />
                     <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -576,7 +577,7 @@ const s = StyleSheet.create({
   fab:          { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:        { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.92 },
+  sheet:        { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   sheetTitle:   { fontSize: 20, fontWeight: '800', marginBottom: 16 },

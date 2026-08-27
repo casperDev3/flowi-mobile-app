@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -37,6 +36,7 @@ import { requestNotificationPermissions } from '@/store/notifications';
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 import { WS_BASE } from '@/store/api-config';
+import { useResponsive } from '@/hooks/use-responsive';
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -84,8 +84,6 @@ interface GroupData {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SCREEN_W = Dimensions.get('window').width;
-const SIDEBAR_W = Math.round(SCREEN_W * 0.92);
 
 const SECTION_ICON: Record<SectionType, string> = {
   shopping: 'cart.fill',
@@ -121,6 +119,8 @@ interface PendingChange {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SharedScreen() {
+  const { width } = useResponsive();
+  const SIDEBAR_W = Math.round(width * 0.92);
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const { tr, lang } = useI18n();
@@ -247,6 +247,13 @@ export default function SharedScreen() {
 
   const sidebarAnim  = useRef(new Animated.Value(SIDEBAR_W)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
+
+  // Поворот екрана міняє ширину панелі, а закритий сайдбар тримає зсув,
+  // порахований для старої. Без цього після повороту з вужчого боку
+  // визирала б смужка панелі.
+  useEffect(() => {
+    if (!sidebarSection) sidebarAnim.setValue(SIDEBAR_W);
+  }, [SIDEBAR_W, sidebarSection, sidebarAnim]);
 
   // ─── Loading ──────────────────────────────────────────────────────────────
 
@@ -1299,7 +1306,7 @@ export default function SharedScreen() {
         {!!sidebarSection && (
         <Animated.View style={[
           st.sidebarPanel,
-          { backgroundColor: c.sidebar, borderLeftColor: c.border },
+          { width: SIDEBAR_W, backgroundColor: c.sidebar, borderLeftColor: c.border },
           { transform: [{ translateX: sidebarAnim }] },
         ]}>
           <View style={{ flex: 1 }}>
@@ -2106,7 +2113,7 @@ const st = StyleSheet.create({
   emptyDesc:       { fontSize: 14 },
   fab:             { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   // Sidebar
-  sidebarPanel:     { position: 'absolute', top: 0, bottom: 0, right: 0, width: SIDEBAR_W, borderLeftWidth: StyleSheet.hairlineWidth, shadowColor: '#000', shadowOffset: { width: -8, height: 0 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 12 },
+  sidebarPanel:     { position: 'absolute', top: 0, bottom: 0, right: 0, borderLeftWidth: StyleSheet.hairlineWidth, shadowColor: '#000', shadowOffset: { width: -8, height: 0 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 12 },
   sidebarHeader:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   sidebarTitle:     { flex: 1, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
   wsDot:            { width: 6, height: 6, borderRadius: 3, marginHorizontal: 4 },

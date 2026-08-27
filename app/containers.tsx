@@ -4,7 +4,6 @@ import { Stack, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -24,6 +23,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useResponsive } from '@/hooks/use-responsive';
 
 interface ContainerItem {
   id: string;
@@ -47,10 +47,12 @@ const PALETTE = [
   '#F97316', '#EF4444', '#EC4899', '#8B5CF6',
   '#6366F1', '#0EA5E9', '#10B981', '#F59E0B',
 ];
-const { width: SCREEN_W } = Dimensions.get('window');
-const CARD_W = (SCREEN_W - 48) / 2;
 
 export default function ContainersScreen() {
+  const { width } = useResponsive();
+  // Дві колонки з відступами 16/12/16. Рахується при рендері, а не при
+  // імпорті: у Split View ширина змінюється без перезапуску екрана.
+  const CARD_W = (width - 48) / 2;
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
   const router = useRouter();

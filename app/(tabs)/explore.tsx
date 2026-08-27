@@ -4,7 +4,6 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -50,6 +49,7 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { useMotion } from '@/hooks/use-motion';
 import { isSameDay } from '@/utils/dateUtils';
 import { haptic } from '@/utils/haptics';
+import { useResponsive } from '@/hooks/use-responsive';
 
 type TxType = 'income' | 'expense';
 
@@ -118,6 +118,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
 }
 
 export default function FinanceScreen() {
+  const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   useScreenView('finance');
   const insets = useSafeAreaInsets();
@@ -712,7 +713,7 @@ export default function FinanceScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
 
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -783,7 +784,7 @@ export default function FinanceScreen() {
 
       {/* ─── Add Modal ─── */}
       <SheetModal visible={showAdd} onClose={closeAddSheet}>
-        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                   {editingId ? (
@@ -995,7 +996,7 @@ export default function FinanceScreen() {
       <Modal visible={showPrimaryPicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowPrimaryPicker(false)}>
         <Pressable style={s.overlay} onPress={() => setShowPrimaryPicker(false)}>
           <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -1071,7 +1072,7 @@ export default function FinanceScreen() {
                 const color = isIncome ? c.green : c.red;
                 const iconName: IconSymbolName = getCatIcon(selected.category, selected.type);
                 return (
-                  <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                  <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                       <View style={s.handleRow}>
                         <View style={{ flex: 1 }} />
@@ -1159,7 +1160,7 @@ export default function FinanceScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => { setShowCats(false); setShowAddCat(false); }}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                   {/* Handle + close */}
@@ -1305,6 +1306,7 @@ function BalanceSplitModal({
   locale: string;
   styles: any;
 }) {
+  const { height } = useResponsive();
   // Per-currency string drafts for the inputs. Seeded from currently shown
   // carryover (computed + existing adjustment).
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -1368,7 +1370,7 @@ function BalanceSplitModal({
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable style={s.overlay} onPress={onClose}>
           <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -1536,7 +1538,7 @@ const s = StyleSheet.create({
   fab:         { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.88 },
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   amountBlock: { borderRadius: 16, borderWidth: 1, padding: 18, marginBottom: 4 },
   detailHero:  { borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center' },
   typePill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },

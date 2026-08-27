@@ -820,6 +820,10 @@ export interface Translations {
   navTimeTracker: string;
   navBudget: string;
   navAgent: string;
+
+  // Порожня колонка деталі (master-detail)
+  detailEmptyTitle: string;
+  detailEmptyHint: string;
 }
 
 const uk: Translations = {
@@ -829,6 +833,8 @@ const uk: Translations = {
   navTimeTracker: 'Трекер часу',
   navBudget: 'Планування бюджету',
   navAgent: 'OpenClaw Agent',
+  detailEmptyTitle: 'Оберіть завдання',
+  detailEmptyHint: 'Деталі, підзавдання й таймер зʼявляться тут.',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1595,6 +1601,8 @@ const en: Translations = {
   navTimeTracker: 'Time Tracker',
   navBudget: 'Budget Planning',
   navAgent: 'OpenClaw Agent',
+  detailEmptyTitle: 'Select a task',
+  detailEmptyHint: 'Details, subtasks and timer will appear here.',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

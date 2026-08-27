@@ -851,6 +851,11 @@ export interface Translations {
   hoursShort: string;
   minutesShort: string;
   viewAllSubtasks: string;
+
+  /** Одиниці тривалості. Див. utils/durationFormat. */
+  unitHour: string;
+  unitHourLong: string;
+  unitMinute: string;
 }
 
 const uk: Translations = {
@@ -882,6 +887,9 @@ const uk: Translations = {
   hoursShort: 'ГГ',
   minutesShort: 'ХХ',
   viewAllSubtasks: 'Переглянути всі',
+  unitHour: 'г',
+  unitHourLong: 'год',
+  unitMinute: 'хв',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1670,6 +1678,9 @@ const en: Translations = {
   hoursShort: 'HH',
   minutesShort: 'MM',
   viewAllSubtasks: 'View all',
+  unitHour: 'h',
+  unitHourLong: 'hr',
+  unitMinute: 'min',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
+import { formatDuration, formatDurationShort } from '@/utils/durationFormat';
+import { useI18n } from '@/store/i18n';
 
 type Shift = 'morning' | 'day' | 'evening' | 'night';
 
@@ -29,14 +31,16 @@ const SHIFTS: Record<Shift, ShiftCfg> = {
 
 interface TimeEntry { id: string; task: string; shift: Shift; duration: number; date: string; }
 
-const fmtDur = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h > 0 && m > 0) return `${h}г ${m}хв`;
-  if (h > 0) return `${h} год`;
-  return `${m} хв`;
-};
 
 export default function TimeStatsScreen() {
+  const { tr } = useI18n();
+  // Одиниці приходять зі словника: до цього кожен екран мав власну копію
+  // форматування з вшитими «год» і «хв».
+  const durationUnits = useMemo(
+    () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
+    [tr.unitHour, tr.unitHourLong, tr.unitMinute],
+  );
+  const fmtDurLocal = useCallback((s: number) => formatDuration(s, durationUnits), [durationUnits]);
   const isDark = useColorScheme() === 'dark';
   const [entries, setEntries] = useState<TimeEntry[]>([]);
 
@@ -84,11 +88,11 @@ export default function TimeStatsScreen() {
 
           {/* Summary */}
           <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
-            <StatCell value={total > 0 ? fmtDur(total) : '—'} label="Всього"  color={c.indigo} sub={c.sub} />
+            <StatCell value={total > 0 ? fmtDurLocal(total) : '—'} label="Всього"  color={c.indigo} sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border }} />
             <StatCell value={String(entries.length)}         label="Сесій"   color="#10B981" sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border }} />
-            <StatCell value={avg > 0 ? fmtDur(avg) : '—'}     label="Середнє" color="#F59E0B" sub={c.sub} />
+            <StatCell value={avg > 0 ? fmtDurLocal(avg) : '—'}     label="Середнє" color="#F59E0B" sub={c.sub} />
           </View>
 
           {/* Shift breakdown */}
@@ -104,7 +108,7 @@ export default function TimeStatsScreen() {
                     <IconSymbol name={cfg.icon} size={13} color={dur > 0 ? cfg.color : c.sub} />
                     <Text style={{ color: dur > 0 ? c.text : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 7, flex: 1 }}>{cfg.label}</Text>
                     <Text style={{ color: c.sub, fontSize: 10, marginRight: 10 }}>{cfg.hours}</Text>
-                    <Text style={{ color: dur > 0 ? cfg.color : c.sub, fontSize: 12, fontWeight: '700' }}>{dur > 0 ? fmtDur(dur) : '—'}</Text>
+                    <Text style={{ color: dur > 0 ? cfg.color : c.sub, fontSize: 12, fontWeight: '700' }}>{dur > 0 ? fmtDurLocal(dur) : '—'}</Text>
                   </View>
                   <View style={s.progressBg}>
                     <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: cfg.color }]} />

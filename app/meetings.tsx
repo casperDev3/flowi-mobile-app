@@ -227,64 +227,6 @@ function useColors(isDark: boolean) {
 
 // ─── CalendarGrid ─────────────────────────────────────────────────────────────
 
-function CalendarGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMonth, onSelectDay, c }: {
-  year: number; month: number; markedDays: Set<string>; selectedDate: string | null;
-  onPrevMonth: () => void; onNextMonth: () => void;
-  onSelectDay: (d: Date) => void; c: ReturnType<typeof useColors>;
-}) {
-  const fd = (() => { const dow = new Date(year, month, 1).getDay(); return dow === 0 ? 6 : dow - 1; })();
-  const dim = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < fd; i++) cells.push(null);
-  for (let i = 1; i <= dim; i++) cells.push(i);
-  while (cells.length % 7 !== 0) cells.push(null);
-  const weeks = chunk(cells, 7);
-  const todayStr = toDateStr(today);
-
-  return (
-    <View style={[{ borderRadius: 14, borderWidth: 1, padding: 12 }, { borderColor: c.border }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-        <TouchableOpacity onPress={onPrevMonth} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-          <IconSymbol name="chevron.left" size={18} color={c.sub} />
-        </TouchableOpacity>
-        <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontWeight: '700' }}>
-          {MONTHS_UA[month]} {year}
-        </Text>
-        <TouchableOpacity onPress={onNextMonth} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-          <IconSymbol name="chevron.right" size={18} color={c.sub} />
-        </TouchableOpacity>
-      </View>
-      <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-        {WEEKDAYS_SHORT.map(d => (
-          <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
-        ))}
-      </View>
-      {weeks.map((week, wi) => (
-        <View key={wi} style={{ flexDirection: 'row', marginBottom: 2 }}>
-          {week.map((day, di) => {
-            if (!day) return <View key={di} style={{ flex: 1 }} />;
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const isToday = dateStr === todayStr;
-            const isSel = selectedDate === dateStr;
-            const hasMark = markedDays.has(dateStr);
-            return (
-              <TouchableOpacity key={di} onPress={() => onSelectDay(new Date(dateStr + 'T00:00'))}
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 3 }}>
-                <View style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: isSel ? ACCENT : 'transparent',
-                  borderWidth: !isSel && isToday ? 1.5 : 0, borderColor: ACCENT }}>
-                  <Text style={{ color: isSel ? '#fff' : isToday ? ACCENT : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
-                </View>
-                {hasMark && !isSel && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: ACCENT, marginTop: 1 }} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ))}
-    </View>
-  );
-}
-
 // ─── MeetingCard ──────────────────────────────────────────────────────────────
 
 function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = false, isRecurring = false }: {
@@ -511,7 +453,6 @@ export default function MeetingsScreen() {
   }, [expandedMeetings]);
 
   const spanRange = useMemo(() => {
-    const todayStr = toDateStr(today);
     if (span === 'day') return { start: selectedDay, end: selectedDay };
     if (span === 'week') {
       return { start: toDateStr(weekStart), end: toDateStr(addDays(weekStart, 6)) };

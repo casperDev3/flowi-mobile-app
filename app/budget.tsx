@@ -92,7 +92,6 @@ function chunk<T>(arr: T[], n: number): T[][] {
 
 export default function BudgetScreen() {
   const isDark = useColorScheme() === 'dark';
-  const insets = useSafeAreaInsets();
   const { tr } = useI18n();
 
   const c = {

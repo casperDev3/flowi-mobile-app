@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   AppState,
   Linking,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -119,7 +118,6 @@ function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: 
 export default function AppleHealthScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);

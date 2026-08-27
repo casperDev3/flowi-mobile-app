@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
+import { formatDuration, formatDurationShort } from '@/utils/durationFormat';
+import { useI18n } from '@/store/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,19 +67,7 @@ const PERIOD_LABELS: Record<Period, string> = {
 const MONTHS_SHORT = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 
-const fmtDur = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h > 0 && m > 0) return `${h}г ${m}хв`;
-  if (h > 0) return `${h} год`;
-  return `${m || 0} хв`;
-};
 
-const fmtDurShort = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h > 0) return `${h}г`;
-  if (m > 0) return `${m}хв`;
-  return '0';
-};
 
 function dayKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -211,6 +201,15 @@ function buildChartBars(entries: FlatEntry[], period: Period): BarData[] {
 
 
 export default function TimeRecordsScreen() {
+  const { tr } = useI18n();
+  // Одиниці приходять зі словника: до цього кожен екран мав власну копію
+  // форматування з вшитими «год» і «хв».
+  const durationUnits = useMemo(
+    () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
+    [tr.unitHour, tr.unitHourLong, tr.unitMinute],
+  );
+  const fmtDurLocal = useCallback((s: number) => formatDuration(s, durationUnits), [durationUnits]);
+  const fmtDurShortLocal = useCallback((s: number) => formatDurationShort(s, durationUnits), [durationUnits]);
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
@@ -352,7 +351,7 @@ export default function TimeRecordsScreen() {
 
           {/* Stats */}
           <BlurView intensity={isDark ? 18 : 30} tint={isDark ? 'dark' : 'light'} style={[s.statsRow, { borderColor: c.border }]}>
-            <StatCell value={fmtDur(totalSeconds)} label="Загальний час" color={c.accent} sub={c.sub} />
+            <StatCell value={fmtDurLocal(totalSeconds)} label="Загальний час" color={c.accent} sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border, alignSelf: 'stretch', marginVertical: 12 }} />
             <StatCell value={String(sessionCount)} label="Сесій" color={c.text} sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border, alignSelf: 'stretch', marginVertical: 12 }} />
@@ -370,14 +369,14 @@ export default function TimeRecordsScreen() {
                     : period === 'month' ? 'По тижнях'
                     : 'По місяцях'}
                 </Text>
-                <Text style={{ color: c.sub, fontSize: 10 }}>макс {fmtDur(maxBarSec)}</Text>
+                <Text style={{ color: c.sub, fontSize: 10 }}>макс {fmtDurLocal(maxBarSec)}</Text>
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
                 {/* Y-axis */}
                 <View style={{ width: 30, alignItems: 'flex-end', paddingRight: 5, height: CHART_H + 24, justifyContent: 'space-between', paddingBottom: 24 }}>
-                  <Text style={{ color: c.sub, fontSize: 9 }}>{fmtDurShort(maxBarSec)}</Text>
-                  <Text style={{ color: c.sub, fontSize: 9 }}>{fmtDurShort(maxBarSec / 2)}</Text>
+                  <Text style={{ color: c.sub, fontSize: 9 }}>{fmtDurShortLocal(maxBarSec)}</Text>
+                  <Text style={{ color: c.sub, fontSize: 9 }}>{fmtDurShortLocal(maxBarSec / 2)}</Text>
                   <Text style={{ color: c.sub, fontSize: 9 }}>0</Text>
                 </View>
 
@@ -407,7 +406,7 @@ export default function TimeRecordsScreen() {
                             {/* Value label on top */}
                             {!noData && ratio > 0.1 && (
                               <Text style={{ color: bar.isToday ? c.accent : c.sub, fontSize: period === 'today' ? 7 : 9, fontWeight: '600', marginBottom: 3, textAlign: 'center' }}>
-                                {fmtDurShort(bar.seconds)}
+                                {fmtDurShortLocal(bar.seconds)}
                               </Text>
                             )}
                             <View style={{ width: barWidth, height: barH, borderRadius: barWidth <= 12 ? 3 : 6, backgroundColor: barColor }} />
@@ -454,7 +453,7 @@ export default function TimeRecordsScreen() {
                         style={[s.chip, { backgroundColor: active ? proj.color : c.dim, borderColor: active ? proj.color : c.border, gap: 6 }]}>
                         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: active ? '#fff' : proj.color }} />
                         <Text style={{ color: active ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{proj.name}</Text>
-                        <Text style={{ color: active ? 'rgba(255,255,255,0.7)' : c.sub, fontSize: 11 }}>{fmtDur(projTotal)}</Text>
+                        <Text style={{ color: active ? 'rgba(255,255,255,0.7)' : c.sub, fontSize: 11 }}>{fmtDurLocal(projTotal)}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -486,7 +485,7 @@ export default function TimeRecordsScreen() {
                         style={[s.chip, { backgroundColor: active ? c.accent : c.dim, borderColor: active ? c.accent : c.border, gap: 5 }]}>
                         {proj && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active ? '#fff' : proj.color }} />}
                         <Text style={{ color: active ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{t.title}</Text>
-                        <Text style={{ color: active ? 'rgba(255,255,255,0.7)' : c.sub, fontSize: 11 }}>{fmtDur(taskTotal)}</Text>
+                        <Text style={{ color: active ? 'rgba(255,255,255,0.7)' : c.sub, fontSize: 11 }}>{fmtDurLocal(taskTotal)}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -541,7 +540,7 @@ export default function TimeRecordsScreen() {
                     </Text>
                     <View style={[s.badge, { backgroundColor: c.accent + '18', borderColor: c.accent + '40' }]}>
                       <IconSymbol name="clock" size={10} color={c.accent} />
-                      <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700', marginLeft: 4 }}>{fmtDur(dayTotal)}</Text>
+                      <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700', marginLeft: 4 }}>{fmtDurLocal(dayTotal)}</Text>
                     </View>
                   </View>
 
@@ -573,7 +572,7 @@ export default function TimeRecordsScreen() {
                           </View>
                         </View>
                         <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                          <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>{fmtDur(entry.duration)}</Text>
+                          <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>{fmtDurLocal(entry.duration)}</Text>
                         </View>
                       </BlurView>
                     );

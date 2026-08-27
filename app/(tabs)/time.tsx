@@ -29,6 +29,7 @@ import { useI18n } from '@/store/i18n';
 import { haptic } from '@/utils/haptics';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { formatClock, formatDuration, formatDurationShort } from '@/utils/durationFormat';
 
 type Shift = 'morning' | 'day' | 'evening' | 'night';
 
@@ -51,16 +52,6 @@ function groupLabel(date: Date, todayStr: string, yesterdayStr: string, locale: 
   return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 }
 
-const fmtClock = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-};
-const fmtDur = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h > 0 && m > 0) return `${h}г ${m}хв`;
-  if (h > 0) return `${h} год`;
-  return `${m} хв`;
-};
 
 export default function TimeScreen() {
   const tabBarInset = useTabBarInset();
@@ -71,6 +62,13 @@ export default function TimeScreen() {
   const insets = useSafeAreaInsets();
   const { pendingTask, setPendingTask } = useTimerContext();
   const { tr, lang } = useI18n();
+  // Одиниці приходять зі словника: до цього кожен екран мав власну копію
+  // форматування з вшитими «год» і «хв».
+  const durationUnits = useMemo(
+    () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
+    [tr.unitHour, tr.unitHourLong, tr.unitMinute],
+  );
+  const fmtDurLocal = useCallback((s: number) => formatDuration(s, durationUnits), [durationUnits]);
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const SHIFTS: Record<Shift, ShiftCfg> = {
     morning: { label: tr.morning, icon: 'sun.horizon.fill', color: '#F59E0B', hours: '06–12' },
@@ -276,7 +274,7 @@ export default function TimeScreen() {
               </View>
             )}
 
-            <Text style={[s.clock, { color: running ? '#EF4444' : c.text, marginTop: taskName.trim() ? 16 : 0 }]}>{fmtClock(elapsed)}</Text>
+            <Text style={[s.clock, { color: running ? '#EF4444' : c.text, marginTop: taskName.trim() ? 16 : 0 }]}>{formatClock(elapsed)}</Text>
 
             {!running ? (
               <TextInput
@@ -323,11 +321,11 @@ export default function TimeScreen() {
 
           {/* Stats */}
           <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card, marginTop: 14 }]}>
-            <StatCell value={total > 0 ? fmtDur(total) : '—'} label={tr.totalLabel}    color={c.indigo} sub={c.sub} />
+            <StatCell value={total > 0 ? fmtDurLocal(total) : '—'} label={tr.totalLabel}    color={c.indigo} sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border }} />
             <StatCell value={String(entries.length)}           label={tr.sessionsCount} color="#10B981" sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border }} />
-            <StatCell value={avg > 0 ? fmtDur(avg) : '—'}     label={tr.avgLabel}      color="#F59E0B" sub={c.sub} />
+            <StatCell value={avg > 0 ? fmtDurLocal(avg) : '—'}     label={tr.avgLabel}      color="#F59E0B" sub={c.sub} />
           </View>
 
           {/* History */}
@@ -349,7 +347,7 @@ export default function TimeScreen() {
                 <Text style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{group.label}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <IconSymbol name="timer" size={11} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{fmtDur(group.dayTotal)}</Text>
+                  <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{fmtDurLocal(group.dayTotal)}</Text>
                 </View>
               </View>
               <View style={{ gap: 8 }}>
@@ -365,7 +363,7 @@ export default function TimeScreen() {
                           <Text style={[s.entryTask, { color: c.text }]}>{entry.task}</Text>
                           <Text style={[s.entryMeta, { color: c.sub }]}>{cfg.label} · {cfg.hours}</Text>
                         </View>
-                        <Text style={[s.entryDur, { color: cfg.color }]}>{fmtDur(entry.duration)}</Text>
+                        <Text style={[s.entryDur, { color: cfg.color }]}>{fmtDurLocal(entry.duration)}</Text>
                       </BlurView>
                     </TouchableOpacity>
                   );
@@ -616,7 +614,7 @@ export default function TimeScreen() {
                         <View style={[s.detailIcon, { backgroundColor: cfg.color + '25' }]}>
                           <IconSymbol name={cfg.icon} size={30} color={cfg.color} />
                         </View>
-                        <Text style={[s.detailDur, { color: cfg.color, marginTop: 12 }]}>{fmtDur(selected.duration)}</Text>
+                        <Text style={[s.detailDur, { color: cfg.color, marginTop: 12 }]}>{fmtDurLocal(selected.duration)}</Text>
                         <Text style={[s.detailTask, { color: c.text, marginTop: 4, textAlign: 'center' }]}>{selected.task}</Text>
                         <View style={[s.shiftBadge, { borderColor: cfg.color + '50', backgroundColor: cfg.color + '20', marginTop: 10 }]}>
                           <IconSymbol name={cfg.icon} size={12} color={cfg.color} />
@@ -627,7 +625,7 @@ export default function TimeScreen() {
                       </View>
 
                       <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim, marginTop: 14 }]}>
-                        <InfoRow icon="timer"    label={tr.duration}  value={fmtDur(selected.duration)} text={c.text} sub={c.sub} border={c.border} last={false} />
+                        <InfoRow icon="timer"    label={tr.duration}  value={fmtDurLocal(selected.duration)} text={c.text} sub={c.sub} border={c.border} last={false} />
                         <InfoRow icon="calendar" label={tr.date}      value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} text={c.text} sub={c.sub} border={c.border} last />
                       </View>
 

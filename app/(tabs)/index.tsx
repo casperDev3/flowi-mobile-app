@@ -4,7 +4,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -64,6 +63,7 @@ import { getActiveTimerEntry, totalSecondsIncludingActive, totalTrackedSeconds }
 import { monthGrid } from '@/utils/dateUtils';
 import { initialReminderDraft, resolveReminderMoment } from '@/utils/reminderTime';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { formatClock, formatDuration, formatDurationShort } from '@/utils/durationFormat';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
 let AVAudio: any = null;
@@ -131,20 +131,7 @@ function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function uaPlural(n: number, one: string, few: string, many: string): string {
-  const mod100 = Math.abs(n) % 100;
-  const mod10  = Math.abs(n) % 10;
-  if (mod100 >= 11 && mod100 <= 19) return many;
-  if (mod10 === 1) return one;
-  if (mod10 >= 2 && mod10 <= 4) return few;
-  return many;
-}
 
-function chunk<T>(arr: T[], n: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
-  return out;
-}
 
 function groupLabel(date: Date, todayLabel: string, yesterdayLabel: string, tomorrowLabel: string, locale: string) {
   if (date.toDateString() === today.toDateString()) return todayLabel;
@@ -168,27 +155,8 @@ function isOverdue(task: Task): boolean {
   return d < today;
 }
 
-function deadlineLabel(iso: string, todayLabel: string, yesterdayLabel: string, tomorrowLabel: string, locale: string): string {
-  const d = new Date(iso);
-  if (d.toDateString() === today.toDateString()) return todayLabel;
-  if (d.toDateString() === yesterday.toDateString()) return yesterdayLabel;
-  const diff = Math.ceil((d.getTime() - today.getTime()) / 86400000);
-  if (diff === 1) return tomorrowLabel;
-  if (diff > 1 && diff <= 7) return `+${diff} ${locale === 'uk-UA' ? 'дн' : 'd'}`;
-  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-}
 
 // ─── Timer helpers ────────────────────────────────────────────────────────────
-const fmtClock = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-};
-const fmtDur = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h > 0 && m > 0) return `${h}г ${m}хв`;
-  if (h > 0) return `${h} год`;
-  return `${m || 0} хв`;
-};
 
 
 
@@ -248,6 +216,13 @@ export default function TasksScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tr, lang } = useI18n();
+  // Одиниці приходять зі словника: до цього кожен екран мав власну копію
+  // форматування з вшитими «год» і «хв».
+  const durationUnits = useMemo(
+    () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
+    [tr.unitHour, tr.unitHourLong, tr.unitMinute],
+  );
+  const fmtDurLocal = useCallback((s: number) => formatDuration(s, durationUnits), [durationUnits]);
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
   const motion = useMotion();
@@ -1160,8 +1135,8 @@ export default function TasksScreen() {
                         colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
                         tr={tr}
                         locale={locale}
-                        fmtClock={fmtClock}
-                        fmtDur={fmtDur}
+                        fmtClock={formatClock}
+                        fmtDur={fmtDurLocal}
                       />
                     )}
 
@@ -1401,7 +1376,7 @@ export default function TasksScreen() {
                         style={[s.btn, { marginTop: 14, backgroundColor: isTimerRunning ? '#6366F120' : '#6366F1EE', borderWidth: isTimerRunning ? 1 : 0, borderColor: '#6366F150' }]}>
                         <IconSymbol name={isTimerRunning ? 'timer' : 'play.fill'} size={15} color={isTimerRunning ? '#6366F1' : '#fff'} />
                         <Text style={{ color: isTimerRunning ? '#6366F1' : '#fff', fontWeight: '700', marginLeft: 7 }}>
-                          {isTimerRunning ? `${lang === 'uk' ? 'Таймер' : 'Timer'}: ${fmtClock(totalSecondsIncludingActive(selectedTask))}` : (lang === 'uk' ? 'Запустити таймер' : 'Start timer')}
+                          {isTimerRunning ? `${lang === 'uk' ? 'Таймер' : 'Timer'}: ${formatClock(totalSecondsIncludingActive(selectedTask))}` : (lang === 'uk' ? 'Запустити таймер' : 'Start timer')}
                         </Text>
                         {isTimerRunning && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#6366F1', marginLeft: 6 }} />}
                       </TouchableOpacity>

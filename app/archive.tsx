@@ -4,7 +4,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,

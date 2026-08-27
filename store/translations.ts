@@ -826,6 +826,10 @@ export interface Translations {
   detailEmptyHint: string;
   noTasksMatchFilters: string;
   noTasksMatchFiltersHint: string;
+  /** Готові підписи кварталів. Не шаблон: українська нумерує їх
+   *  римськими, англійська арабськими, і підстановка «{n}» дала б
+   *  в одній із мов беззмістовне «QIII». */
+  quarters: string[];
 }
 
 const uk: Translations = {
@@ -839,6 +843,7 @@ const uk: Translations = {
   detailEmptyHint: 'Деталі, підзавдання й таймер зʼявляться тут.',
   noTasksMatchFilters: 'Під фільтри нічого не підходить',
   noTasksMatchFiltersHint: 'Завдання є, але їх приховано вибраними фільтрами.',
+  quarters: ['I квартал', 'II квартал', 'III квартал', 'IV квартал'],
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1609,6 +1614,7 @@ const en: Translations = {
   detailEmptyHint: 'Details, subtasks and timer will appear here.',
   noTasksMatchFilters: 'Nothing matches the filters',
   noTasksMatchFiltersHint: 'You have tasks, but the selected filters hide them.',
+  quarters: ['Q1', 'Q2', 'Q3', 'Q4'],
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

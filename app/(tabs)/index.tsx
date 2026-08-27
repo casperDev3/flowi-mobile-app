@@ -49,6 +49,7 @@ import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useCalendarNav, type CalSpan } from '@/hooks/use-calendar-nav';
 import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/use-task-editor';
 import { TaskDetailPane } from '@/components/tasks/TaskDetailPane';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
@@ -63,7 +64,6 @@ type Status = 'active' | 'done';
 type SortBy = 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
 type Filter = 'all' | 'active' | 'done';
 type ViewMode = 'list' | 'calendar';
-type CalSpan = 'week' | 'month' | 'quarter' | 'year';
 
 interface SubTask { id: string; title: string; done: boolean; reminderAt?: string; }
 
@@ -379,10 +379,7 @@ export default function TasksScreen() {
   const [dateFilter, setDateFilter] = useState<string | null>(null);
 
   // Calendar view state
-  const [calSpan, setCalSpan] = useState<CalSpan>('month');
-  const [calViewDate, setCalViewDate] = useState<Date>(new Date());
   const [calPopupDate, setCalPopupDate] = useState<Date | null>(null);
-  const [calWeekDay, setCalWeekDay] = useState<Date>(new Date());
 
   // Meetings state
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -1127,29 +1124,12 @@ export default function TasksScreen() {
   while (editDlCells.length % 7 !== 0) editDlCells.push(null);
   const editDlWeeks = chunk(editDlCells, 7);
 
-  // ─── Calendar View helpers ──────────────────────────────────────────────────
-  const weekMonday = useMemo(() => {
-    const d = new Date(calViewDate);
-    d.setHours(0, 0, 0, 0);
-    const day = d.getDay();
-    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-    return d;
-  }, [calViewDate]);
-
-  const calHeaderLabel = useMemo(() => {
-    if (calSpan === 'week') {
-      const d = new Date(weekMonday);
-      const end = new Date(d); end.setDate(d.getDate() + 6);
-      const fmt = (dt: Date) => dt.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' });
-      return `${fmt(d)} – ${fmt(end)}`;
-    }
-    if (calSpan === 'month') return `${MONTHS_UA[calViewDate.getMonth()]} ${calViewDate.getFullYear()}`;
-    if (calSpan === 'quarter') {
-      const q = Math.floor(calViewDate.getMonth() / 3) + 1;
-      return `${ ['I','II','III','IV'][q-1] } квартал ${calViewDate.getFullYear()}`;
-    }
-    return String(calViewDate.getFullYear());
-  }, [calSpan, calViewDate, weekMonday]);
+  // ─── Календар ─────────────────────────────────────────────────────────────
+  const calendarLabels = useMemo(
+    () => ({ locale, months: MONTHS_UA, quarters: tr.quarters }),
+    [locale, MONTHS_UA, tr.quarters],
+  );
+  const cal = useCalendarNav(calendarLabels);
 
   const tasksByDate = useMemo(() => {
     const map: Record<string, Task[]> = {};
@@ -1161,30 +1141,6 @@ export default function TasksScreen() {
     });
     return map;
   }, [tasks]);
-
-  const calPrev = useCallback(() => {
-    setCalViewDate(d => {
-      const nd = new Date(d);
-      if (calSpan === 'week') nd.setDate(nd.getDate() - 7);
-      else if (calSpan === 'month') nd.setMonth(nd.getMonth() - 1);
-      else if (calSpan === 'quarter') nd.setMonth(nd.getMonth() - 3);
-      else nd.setFullYear(nd.getFullYear() - 1);
-      return nd;
-    });
-    if (calSpan === 'week') setCalWeekDay(d => { const nd = new Date(d); nd.setDate(nd.getDate() - 7); return nd; });
-  }, [calSpan]);
-
-  const calNext = useCallback(() => {
-    setCalViewDate(d => {
-      const nd = new Date(d);
-      if (calSpan === 'week') nd.setDate(nd.getDate() + 7);
-      else if (calSpan === 'month') nd.setMonth(nd.getMonth() + 1);
-      else if (calSpan === 'quarter') nd.setMonth(nd.getMonth() + 3);
-      else nd.setFullYear(nd.getFullYear() + 1);
-      return nd;
-    });
-    if (calSpan === 'week') setCalWeekDay(d => { const nd = new Date(d); nd.setDate(nd.getDate() + 7); return nd; });
-  }, [calSpan]);
 
   // ─── Meetings computed ──────────────────────────────────────────────────────
   const meetingsByDate = useMemo(() => {
@@ -2360,13 +2316,13 @@ export default function TasksScreen() {
                   {(['week', 'month', 'quarter', 'year'] as CalSpan[]).map(span => (
                     <TouchableOpacity
                       key={span}
-                      onPress={() => { setCalSpan(span); if (span === 'week') setCalViewDate(calWeekDay); }}
+                      onPress={() => { cal.setSpan(span); if (span === 'week') cal.setViewDate(cal.weekDay); }}
                       style={[s.sortChip, {
                         flex: 1, justifyContent: 'center',
-                        backgroundColor: calSpan === span ? c.accent + '20' : c.dim,
-                        borderColor: calSpan === span ? c.accent : c.border,
+                        backgroundColor: cal.span === span ? c.accent + '20' : c.dim,
+                        borderColor: cal.span === span ? c.accent : c.border,
                       }]}>
-                      <Text style={{ color: calSpan === span ? c.accent : c.sub, fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
+                      <Text style={{ color: cal.span === span ? c.accent : c.sub, fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
                         {span === 'week' ? tr.week : span === 'month' ? tr.month : span === 'quarter' ? tr.quarter : tr.year}
                       </Text>
                     </TouchableOpacity>
@@ -2375,18 +2331,18 @@ export default function TasksScreen() {
 
                 {/* Nav header */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                  <TouchableOpacity onPress={calPrev} style={s.navBtn}>
+                  <TouchableOpacity onPress={cal.prev} style={s.navBtn}>
                     <IconSymbol name="chevron.left" size={18} color={c.sub} />
                   </TouchableOpacity>
-                  <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontWeight: '700' }}>{calHeaderLabel}</Text>
-                  <TouchableOpacity onPress={calNext} style={s.navBtn}>
+                  <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontWeight: '700' }}>{cal.headerLabel}</Text>
+                  <TouchableOpacity onPress={cal.next} style={s.navBtn}>
                     <IconSymbol name="chevron.right" size={18} color={c.sub} />
                   </TouchableOpacity>
                 </View>
 
                 {/* WEEK */}
-                {calSpan === 'week' && (() => {
-                  const weekDayTasks = tasksByDate[calWeekDay.toDateString()] ?? [];
+                {cal.span === 'week' && (() => {
+                  const weekDayTasks = tasksByDate[cal.weekDay.toDateString()] ?? [];
                   const weekActiveTasks = weekDayTasks.filter(t => t.status === 'active');
                   const weekDoneTasks = weekDayTasks.filter(t => t.status === 'done');
                   return (
@@ -2394,16 +2350,16 @@ export default function TasksScreen() {
                       {/* 7-day strip */}
                       <View style={{ flexDirection: 'row', gap: 3, marginBottom: 20 }}>
                         {Array.from({ length: 7 }, (_, i) => {
-                          const d = new Date(weekMonday); d.setDate(d.getDate() + i);
+                          const d = new Date(cal.weekMonday); d.setDate(d.getDate() + i);
                           const dayTasks = tasksByDate[d.toDateString()] ?? [];
                           const isToday = d.toDateString() === today.toDateString();
-                          const isSel = d.toDateString() === calWeekDay.toDateString();
+                          const isSel = d.toDateString() === cal.weekDay.toDateString();
                           const cnt = dayTasks.length;
                           const hasActive = dayTasks.some(t => t.status === 'active');
                           return (
                             <TouchableOpacity
                               key={i}
-                              onPress={() => setCalWeekDay(d)}
+                              onPress={() => cal.setWeekDay(d)}
                               activeOpacity={0.75}
                               style={{
                                 flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 16,
@@ -2442,7 +2398,7 @@ export default function TasksScreen() {
                       {/* Selected day header */}
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                         <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', flex: 1, textTransform: 'capitalize' }}>
-                          {calWeekDay.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+                          {cal.weekDay.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
                         </Text>
                         {weekDayTasks.length > 0 && (
                           <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -2544,9 +2500,9 @@ export default function TasksScreen() {
                 })()}
 
                 {/* MONTH */}
-                {calSpan === 'month' && (() => {
-                  const yr = calViewDate.getFullYear();
-                  const mo = calViewDate.getMonth();
+                {cal.span === 'month' && (() => {
+                  const yr = cal.viewDate.getFullYear();
+                  const mo = cal.viewDate.getMonth();
                   const fd = (() => { const d = new Date(yr, mo, 1).getDay(); return d === 0 ? 6 : d - 1; })();
                   const dim = new Date(yr, mo + 1, 0).getDate();
                   const cells: (number | null)[] = [];
@@ -2604,9 +2560,9 @@ export default function TasksScreen() {
                 })()}
 
                 {/* QUARTER */}
-                {calSpan === 'quarter' && (() => {
-                  const yr = calViewDate.getFullYear();
-                  const qStart = Math.floor(calViewDate.getMonth() / 3) * 3;
+                {cal.span === 'quarter' && (() => {
+                  const yr = cal.viewDate.getFullYear();
+                  const qStart = Math.floor(cal.viewDate.getMonth() / 3) * 3;
                   return (
                     <View style={{ gap: 24 }}>
                       {[0, 1, 2].map(offset => {
@@ -2662,8 +2618,8 @@ export default function TasksScreen() {
                 })()}
 
                 {/* YEAR */}
-                {calSpan === 'year' && (() => {
-                  const yr = calViewDate.getFullYear();
+                {cal.span === 'year' && (() => {
+                  const yr = cal.viewDate.getFullYear();
                   return (
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                       {MONTHS_UA.map((mName, mo) => {
@@ -2678,7 +2634,7 @@ export default function TasksScreen() {
                         return (
                           <TouchableOpacity
                             key={mo}
-                            onPress={() => { setCalSpan('month'); setCalViewDate(new Date(yr, mo, 1)); }}
+                            onPress={() => { cal.setSpan('month'); cal.setViewDate(new Date(yr, mo, 1)); }}
                             activeOpacity={0.75}
                             style={{
                               width: '30.5%',

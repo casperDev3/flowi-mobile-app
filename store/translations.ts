@@ -824,6 +824,8 @@ export interface Translations {
   // Порожня колонка деталі (master-detail)
   detailEmptyTitle: string;
   detailEmptyHint: string;
+  noTasksMatchFilters: string;
+  noTasksMatchFiltersHint: string;
 }
 
 const uk: Translations = {
@@ -835,6 +837,8 @@ const uk: Translations = {
   navAgent: 'OpenClaw Agent',
   detailEmptyTitle: 'Оберіть завдання',
   detailEmptyHint: 'Деталі, підзавдання й таймер зʼявляться тут.',
+  noTasksMatchFilters: 'Під фільтри нічого не підходить',
+  noTasksMatchFiltersHint: 'Завдання є, але їх приховано вибраними фільтрами.',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1603,6 +1607,8 @@ const en: Translations = {
   navAgent: 'OpenClaw Agent',
   detailEmptyTitle: 'Select a task',
   detailEmptyHint: 'Details, subtasks and timer will appear here.',
+  noTasksMatchFilters: 'Nothing matches the filters',
+  noTasksMatchFiltersHint: 'You have tasks, but the selected filters hide them.',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

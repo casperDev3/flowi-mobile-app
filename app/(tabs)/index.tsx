@@ -594,6 +594,10 @@ export default function TasksScreen() {
     return order.map(k => map[k]);
   }, [groupsSource, sort]);
 
+  // Пошук навмисно не враховано: у нього власна гілка порожнього стану,
+  // і змішувати їх означало б радити «скинути фільтри» людині, яка
+  // просто нічого не знайшла за запитом.
+  const hasFiltersBesidesSearch = filter !== 'active' || sort !== 'deadline' || !!dateFilter || !!filterProject || !!filterPriority;
   const hasActiveFilters = filter !== 'active' || sort !== 'deadline' || !!dateFilter || !!filterProject || !!filterPriority || !!search.trim();
 
   const addTask = useCallback(() => {
@@ -2273,12 +2277,25 @@ export default function TasksScreen() {
               <View style={{ alignItems: 'center', paddingVertical: 56 }}>
                 <IconSymbol name="checklist" size={40} color={c.sub} />
                 <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>
-                  {search.trim() ? tr.nothingFound : tr.noTasks}
+                  {search.trim() ? tr.nothingFound : hasFiltersBesidesSearch ? tr.noTasksMatchFilters : tr.noTasks}
                 </Text>
-                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>
-                  {search.trim() ? tr.tryAnotherQuery : tr.pressToAdd}
+                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7, textAlign: 'center' }}>
+                  {search.trim() ? tr.tryAnotherQuery : hasFiltersBesidesSearch ? tr.noTasksMatchFiltersHint : tr.pressToAdd}
                 </Text>
-                {!search.trim() && (
+                {/* Дія має вести до виходу з глухого кута. Коли список порожній
+                    через фільтри, кнопка «додати» безпорадна: нове завдання так
+                    само не пройде фільтр, і людина вирішить, що воно не
+                    створилося. Тому там пропонується скинути фільтри. */}
+                {!search.trim() && (hasFiltersBesidesSearch ? (
+                  <TouchableOpacity
+                    onPress={clearAllFilters}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.resetAllFilters}
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconSymbol name="arrow.clockwise" size={15} color={c.accent} />
+                    <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.resetAllFilters}</Text>
+                  </TouchableOpacity>
+                ) : (
                   <TouchableOpacity
                     onPress={() => setShowAdd(true)}
                     accessibilityRole="button"
@@ -2287,7 +2304,7 @@ export default function TasksScreen() {
                     <IconSymbol name="plus" size={15} color="#fff" />
                     <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addTask}</Text>
                   </TouchableOpacity>
-                )}
+                ))}
               </View>
             )}
 

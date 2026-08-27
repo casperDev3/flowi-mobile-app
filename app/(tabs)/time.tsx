@@ -28,6 +28,7 @@ import { useTimerContext } from '@/store/timer-context';
 import { useI18n } from '@/store/i18n';
 import { haptic } from '@/utils/haptics';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 type Shift = 'morning' | 'day' | 'evening' | 'night';
 
@@ -62,6 +63,7 @@ const fmtDur = (s: number) => {
 };
 
 export default function TimeScreen() {
+  const tabBarInset = useTabBarInset();
   const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   useScreenView('time');
@@ -246,7 +248,7 @@ export default function TimeScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }}
           showsVerticalScrollIndicator={false}>
 
           {/* Date filter chip */}

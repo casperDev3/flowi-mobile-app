@@ -813,9 +813,22 @@ export interface Translations {
   // Shared screen — invite deeplink
   shareInviteBtn: string;
   shareInviteText: string;
+  // Sidebar (широкий екран)
+  navGroupMain: string;
+  navGroupTools: string;
+  navGroupMore: string;
+  navTimeTracker: string;
+  navBudget: string;
+  navAgent: string;
 }
 
 const uk: Translations = {
+  navGroupMain: 'Головне',
+  navGroupTools: 'Інструменти',
+  navGroupMore: 'Ще',
+  navTimeTracker: 'Трекер часу',
+  navBudget: 'Планування бюджету',
+  navAgent: 'OpenClaw Agent',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1576,6 +1589,12 @@ const uk: Translations = {
 };
 
 const en: Translations = {
+  navGroupMain: 'Main',
+  navGroupTools: 'Tools',
+  navGroupMore: 'More',
+  navTimeTracker: 'Time Tracker',
+  navBudget: 'Budget Planning',
+  navAgent: 'OpenClaw Agent',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

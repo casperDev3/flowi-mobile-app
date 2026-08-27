@@ -50,6 +50,7 @@ import { useMotion } from '@/hooks/use-motion';
 import { isSameDay } from '@/utils/dateUtils';
 import { haptic } from '@/utils/haptics';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 type TxType = 'income' | 'expense';
 
@@ -118,6 +119,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
 }
 
 export default function FinanceScreen() {
+  const tabBarInset = useTabBarInset();
   const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   useScreenView('finance');
@@ -494,7 +496,7 @@ export default function FinanceScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />

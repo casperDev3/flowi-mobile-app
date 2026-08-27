@@ -49,6 +49,7 @@ import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
 let AVAudio: any = null;
@@ -269,6 +270,7 @@ function historyEventColor(type: HistoryEventType): string {
 }
 
 export default function TasksScreen() {
+  const tabBarInset = useTabBarInset();
   const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   useScreenView('tasks');
@@ -1328,7 +1330,7 @@ export default function TasksScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />

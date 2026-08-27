@@ -29,8 +29,10 @@ import { getAllScheduledNotifications } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
 import { Lang } from '@/store/translations';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 export default function SettingsScreen() {
+  const tabBarInset = useTabBarInset();
   const cs = useColorScheme();
   useScreenView('settings');
   const isDark = cs === 'dark';
@@ -145,7 +147,7 @@ export default function SettingsScreen() {
 
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 104 : 84 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 16 }}
           showsVerticalScrollIndicator={false}>
 
           <View style={{ marginTop: 10, marginBottom: 28 }}>

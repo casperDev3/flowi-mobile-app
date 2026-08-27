@@ -33,8 +33,10 @@ import {
 } from '@/utils/healthTheme';
 import { HealthEntry, getMonthEntries, getWeeklyInsights } from '@/utils/healthUtils';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 export default function HealthHubScreen() {
+  const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -107,7 +109,7 @@ export default function HealthHubScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 120 : 100 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset + 32 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 

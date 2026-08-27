@@ -1,6 +1,6 @@
 import 'react-native-get-random-values'; // полефіл crypto.getRandomValues (до будь-якого використання crypto)
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
@@ -8,8 +8,10 @@ import 'react-native-reanimated';
 
 import { Onboarding } from '@/components/onboarding/Onboarding';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { NavSidebar } from '@/components/shared/NavSidebar';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useOrientationLock } from '@/hooks/use-orientation-lock';
+import { useResponsive } from '@/hooks/use-responsive';
 import { initReporting } from '@/utils/reporting';
 import { AppModeProvider, useAppMode } from '@/store/app-mode';
 import { AuthProvider, useAuth } from '@/store/auth';
@@ -90,13 +92,29 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Екрани входу — самодостатні: користувач ще не всередині додатку, і
+ * навігація по розділах йому нікуди не веде.
+ */
+const SIDEBAR_HIDDEN_ON = ['/welcome', '/login', '/register', '/forgot-password'];
+
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { isWide } = useResponsive();
+  const pathname = usePathname();
+
+  // Сайдбар живе ТУТ, а не в (tabs)/_layout: інакше Stack-екрани
+  // (Проєкти, Нотатки, Контейнери…) відкривалися б поверх нього, і
+  // постійна навігація зникала б рівно там, де вона найпотрібніша.
+  const showSidebar = isWide && !SIDEBAR_HIDDEN_ON.includes(pathname);
 
   return (
     <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <AuthGate>
+        <View style={{ flex: 1, flexDirection: 'row' }}>
+        {showSidebar && <NavSidebar pathname={pathname} isDark={isDark} />}
+        <View style={{ flex: 1 }}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
@@ -138,6 +156,8 @@ function RootLayoutContent() {
           <Stack.Screen name="notifications" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
+        </View>
+        </View>
         <Onboarding />
         <StatusBar style={isDark ? 'light' : 'dark'} />
       </AuthGate>

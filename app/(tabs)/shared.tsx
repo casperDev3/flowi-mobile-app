@@ -37,6 +37,7 @@ import { requestNotificationPermissions } from '@/store/notifications';
 
 import { WS_BASE } from '@/store/api-config';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ interface PendingChange {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SharedScreen() {
+  const tabBarInset = useTabBarInset();
   const { width } = useResponsive();
   const SIDEBAR_W = Math.round(width * 0.92);
   const isDark = useColorScheme() === 'dark';
@@ -1039,7 +1041,7 @@ export default function SharedScreen() {
             )}
 
             <ScrollView
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
               showsVerticalScrollIndicator={false}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroups} tintColor={c.accent} />}>
 
@@ -1215,7 +1217,7 @@ export default function SharedScreen() {
 
             {/* Sections list */}
             <ScrollView
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
               showsVerticalScrollIndicator={false}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroup} tintColor={c.accent} />}>
 

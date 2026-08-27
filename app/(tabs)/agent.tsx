@@ -18,6 +18,7 @@ import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ function fmtTime(ts: number) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function AgentScreen() {
+  const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
 
   // Config
@@ -269,7 +271,7 @@ export default function AgentScreen() {
           {showSettings && (
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+              contentContainerStyle={{ padding: 20, paddingBottom: tabBarInset + 24 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled">
 

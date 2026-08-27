@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -37,6 +36,7 @@ import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, calcNetCalories, computeGo
 import { Habit, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { Task, isOverdue } from '@/utils/taskUtils';
 import { haptic } from '@/utils/haptics';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -69,6 +69,7 @@ const QUICK_WATER  = 250;
 const TODAY_PREVIEW_LIMIT = 3;
 
 export default function TodayScreen() {
+  const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -275,7 +276,7 @@ export default function TodayScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset + 24 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 

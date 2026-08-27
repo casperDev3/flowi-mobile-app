@@ -25,6 +25,7 @@ import { saveSynced } from '@/store/synced-storage';
 import { haptic } from '@/utils/haptics';
 import type { Transaction } from '@/utils/financeUtils';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 interface SavingsJar {
   id: string;
@@ -53,6 +54,7 @@ const fmt = (n: number) =>
   n.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
 
 export default function BanksScreen() {
+  const tabBarInset = useTabBarInset();
   const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
@@ -219,7 +221,7 @@ export default function BanksScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }}
           showsVerticalScrollIndicator={false}>
 
           {/* Summary card */}

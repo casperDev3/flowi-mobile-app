@@ -26,7 +26,10 @@ export interface EditFormProject {
 }
 
 export interface TaskEditFormProps {
-  task: { id: string; projectId?: string };
+  /** Заголовок форми: «Нове завдання» або «Редагувати». */
+  title: string;
+  /** Підпис кнопки підтвердження. */
+  submitLabel: string;
   editor: ReturnType<typeof useTaskEditor>;
   taskStatuses: TaskStatusColumn[];
   /** Лише живі проєкти: в архівний призначати нове немає сенсу. */
@@ -42,21 +45,21 @@ export interface TaskEditFormProps {
   deadlinePresets: { label: string; days: number }[];
   today: Date;
   onSave: () => void;
-  onChangeProject: (taskId: string, projectId: string | null) => void;
+  onCancel: () => void;
   colors: any;
   tr: Translations;
   locale: string;
 }
 
 export function TaskEditForm({
-  task, editor, taskStatuses, pickableProjects, projects, deadlineWeeks,
+  title, submitLabel, editor, taskStatuses, pickableProjects, projects, deadlineWeeks,
   priorityMeta: PRIORITY, months: MONTHS_UA, weekdays: WEEKDAYS_SHORT,
   deadlinePresets: DEADLINE_PRESETS,
-  today, onSave, onChangeProject, colors: c, tr, locale,
+  today, onSave, onCancel, colors: c, tr, locale,
 }: TaskEditFormProps) {
   return (
     <>
-        <Text style={[st.sheetTitle, { color: c.text }]}>{tr.editTask}</Text>
+        <Text style={[st.sheetTitle, { color: c.text }]}>{title}</Text>
 
         <TextInput
           placeholder={tr.taskNamePlaceholder}
@@ -101,7 +104,7 @@ export function TaskEditForm({
               onPress={() => editor.setShowProjectDropdown(v => !v)}
               style={[st.dropdownBtn, { backgroundColor: c.dim, borderColor: editor.showProjectDropdown ? c.accent : c.border }]}>
               {(() => {
-                const sel = projects.find(p => p.id === task.projectId);
+                const sel = projects.find(p => p.id === editor.draft.projectId);
                 return sel ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
                     <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
@@ -116,19 +119,19 @@ export function TaskEditForm({
             {editor.showProjectDropdown && (
               <View style={[st.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
                 <TouchableOpacity
-                  onPress={() => { onChangeProject(task.id, null); editor.setShowProjectDropdown(false); }}
-                  style={[st.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !task.projectId ? c.accent + '12' : 'transparent' }]}>
-                  <Text style={{ color: !task.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
-                  {!task.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
+                  onPress={() => { editor.patch({ projectId: null }); editor.setShowProjectDropdown(false); }}
+                  style={[st.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !editor.draft.projectId ? c.accent + '12' : 'transparent' }]}>
+                  <Text style={{ color: !editor.draft.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
+                  {!editor.draft.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
                 </TouchableOpacity>
                 {pickableProjects.map((proj, i) => (
                   <TouchableOpacity
                     key={proj.id}
-                    onPress={() => { onChangeProject(task.id, proj.id); editor.setShowProjectDropdown(false); }}
-                    style={[st.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: task.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
+                    onPress={() => { editor.patch({ projectId: proj.id }); editor.setShowProjectDropdown(false); }}
+                    style={[st.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: editor.draft.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
                     <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: proj.color, marginRight: 8 }} />
-                    <Text style={{ color: task.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
-                    {task.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
+                    <Text style={{ color: editor.draft.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
+                    {editor.draft.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -308,11 +311,11 @@ export function TaskEditForm({
         )}
 
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 20, marginBottom: 8 }}>
-          <TouchableOpacity onPress={() => { editor.finish(); }} style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>
+          <TouchableOpacity onPress={onCancel} style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>
             <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={onSave} style={[st.btn, { flex: 2, backgroundColor: c.accent }]}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>{submitLabel}</Text>
           </TouchableOpacity>
         </View>
     </>

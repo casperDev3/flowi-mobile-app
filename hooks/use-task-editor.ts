@@ -28,6 +28,7 @@ export interface EditableTask {
   priority: Priority;
   estimatedMinutes?: number;
   deadline?: string;
+  projectId?: string;
   recurrence?: RecurrenceRule;
 }
 
@@ -36,6 +37,14 @@ export interface TaskDraft {
   desc: string;
   priority: Priority;
   statusId: string;
+  /**
+   * Проєкт — частина чернетки, а не окреме поле завдання.
+   *
+   * Форма застосовує зміни при збереженні, і проєкт не має бути винятком:
+   * інакше «Скасувати» повертало б назву й пріоритет, але лишало новий
+   * проєкт — половина скасування, яку користувач не просив.
+   */
+  projectId: string | null;
   /** Години й хвилини — окремі рядки, бо це два поля вводу. */
   estHours: string;
   estMins: string;
@@ -50,7 +59,7 @@ export interface TaskDraft {
 
 function emptyDraft(statusId: string): TaskDraft {
   return {
-    title: '', desc: '', priority: 'medium', statusId,
+    title: '', desc: '', priority: 'medium', statusId, projectId: null,
     estHours: '', estMins: '', deadline: null,
     repeat: false, repeatFreq: 'weekly', repeatInterval: 1,
     repeatDays: [], repeatEndType: 'never', repeatUntil: '',
@@ -68,6 +77,7 @@ export function taskToDraft(task: EditableTask, statusId: string): TaskDraft {
     desc: task.description ?? '',
     priority: task.priority,
     statusId,
+    projectId: task.projectId ?? null,
     // Порожній рядок, а не '0': нуль у полі вводу читається як введене
     // значення, хоча користувач нічого не вводив.
     estHours: h > 0 ? String(h) : '',
@@ -117,6 +127,16 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
     setDraft(prev => ({ ...prev, ...part }));
   }, []);
 
+  /** Почати з чистої форми — для створення нового завдання. */
+  const reset = useCallback((statusId: string) => {
+    setDraft(emptyDraft(statusId));
+    setCalYear(today.getFullYear());
+    setCalMonth(today.getMonth());
+    setShowDeadlineCal(false);
+    setShowProjectDropdown(false);
+    setEditing(false);
+  }, [today]);
+
   const begin = useCallback((task: EditableTask, statusId: string) => {
     setDraft(taskToDraft(task, statusId));
     setCalYear(today.getFullYear());
@@ -137,9 +157,9 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
   // посилання, і будь-який useCallback/useMemo, що залежить від редактора,
   // перераховувався б завжди — тобто був би мемоізацією лише на вигляд.
   return useMemo(() => ({
-    editing, draft, patch, begin, finish,
+    editing, draft, patch, begin, reset, finish,
     showDeadlineCal, setShowDeadlineCal,
     showProjectDropdown, setShowProjectDropdown,
     calYear, setCalYear, calMonth, setCalMonth,
-  }), [editing, draft, patch, begin, finish, showDeadlineCal, showProjectDropdown, calYear, calMonth]);
+  }), [editing, draft, patch, begin, reset, finish, showDeadlineCal, showProjectDropdown, calYear, calMonth]);
 }

@@ -298,27 +298,9 @@ export default function TasksScreen() {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const [showAdd, setShowAdd] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const [newPriority, setNewPriority] = useState<Priority>('medium');
-  const [newStatusId, setNewStatusId] = useState(ACTIVE_COLUMN_ID);
-  const [newEstHours, setNewEstHours] = useState('');
-  const [newEstMins, setNewEstMins] = useState('');
-  const [newDeadline, setNewDeadline] = useState<string | null>(null);
-  const [newProjectId, setNewProjectId] = useState<string | null>(null);
-  const [showNewProjectDropdown, setShowNewProjectDropdown] = useState(false);
   const [showDetailProjectDropdown, setShowDetailProjectDropdown] = useState(false);
-  const [showDeadlineCal, setShowDeadlineCal] = useState(false);
-  const [deadlineCalYear, setDeadlineCalYear] = useState(today.getFullYear());
-  const [deadlineCalMonth, setDeadlineCalMonth] = useState(today.getMonth());
 
   // Recurrence for add task
-  const [newRepeat, setNewRepeat] = useState(false);
-  const [newRepeatFreq, setNewRepeatFreq] = useState<RecurrenceRule['freq']>('weekly');
-  const [newRepeatInterval, setNewRepeatInterval] = useState(1);
-  const [newRepeatDays, setNewRepeatDays] = useState<number[]>([]);
-  const [newRepeatEndType, setNewRepeatEndType] = useState<'never' | 'until'>('never');
-  const [newRepeatUntil, setNewRepeatUntil] = useState('');
 
   const [selected, setSelected] = useState<Task | null>(null);
   const [newSubtask, setNewSubtask] = useState('');
@@ -345,6 +327,9 @@ export default function TasksScreen() {
 
   // Форма редагування завдання — цілісний стан, див. use-task-editor.
   const editor = useTaskEditor(ACTIVE_COLUMN_ID, today);
+  // Створення нового завдання користується тією самою формою й тим самим
+  // станом, що й редагування — це той самий набір полів.
+  const composer = useTaskEditor(ACTIVE_COLUMN_ID, today);
 
   // Reminder picker state (shown inline in detail modal)
   const [showReminderPicker, setShowReminderPicker] = useState(false);
@@ -549,41 +534,29 @@ export default function TasksScreen() {
   const hasActiveFilters = filter !== 'active' || sort !== 'deadline' || !!dateFilter || !!filterProject || !!filterPriority || !!search.trim();
 
   const addTask = useCallback(() => {
-    if (!newTitle.trim()) return;
-    const estH = parseInt(newEstHours || '0', 10);
-    const estM = parseInt(newEstMins || '0', 10);
-    const estimatedMinutes = estH * 60 + estM || undefined;
-    const recurrence: RecurrenceRule | undefined = newRepeat ? {
-      freq: newRepeatFreq,
-      interval: newRepeatInterval,
-      daysOfWeek: newRepeatFreq === 'weekly' && newRepeatDays.length > 0 ? newRepeatDays : undefined,
-      until: newRepeatEndType === 'until' && newRepeatUntil ? newRepeatUntil : undefined,
-    } : undefined;
-    const selectedStatus = taskStatuses.find(column => column.id === newStatusId) ?? taskStatuses[0];
+    const draft = composer.draft;
+    if (!draft.title.trim()) return;
+    const selectedStatus = taskStatuses.find(column => column.id === draft.statusId) ?? taskStatuses[0];
     setTasks(p => [{
       id: Date.now().toString(),
-      title: newTitle.trim(),
-      description: newDesc.trim(),
-      priority: newPriority,
+      title: draft.title.trim(),
+      description: draft.desc.trim(),
+      priority: draft.priority,
       status: selectedStatus.isDone ? 'done' : 'active',
       kanbanColumnId: selectedStatus.id,
       subtasks: [],
       createdAt: new Date().toISOString(),
-      estimatedMinutes,
-      deadline: newDeadline ?? undefined,
-      projectId: newProjectId ?? undefined,
+      estimatedMinutes: draftEstimatedMinutes(draft),
+      deadline: draft.deadline ?? undefined,
+      projectId: draft.projectId ?? undefined,
       timeEntries: [],
       history: [makeHistoryEvent('created')],
-      recurrence,
+      recurrence: draftRecurrence(draft),
     }, ...p]);
-    setNewTitle(''); setNewDesc(''); setNewPriority('medium'); setNewStatusId(ACTIVE_COLUMN_ID);
-    setNewEstHours(''); setNewEstMins(''); setNewDeadline(null);
-    setNewProjectId(null); setShowDeadlineCal(false); setShowNewProjectDropdown(false); setShowAdd(false);
-    setNewRepeat(false); setNewRepeatFreq('weekly'); setNewRepeatInterval(1);
-    setNewRepeatDays([]); setNewRepeatEndType('never'); setNewRepeatUntil('');
+    composer.reset(ACTIVE_COLUMN_ID);
+    setShowAdd(false);
     haptic.success();
-  }, [newTitle, newDesc, newPriority, newStatusId, newEstHours, newEstMins, newDeadline, newProjectId,
-      newRepeat, newRepeatFreq, newRepeatInterval, newRepeatDays, newRepeatEndType, newRepeatUntil, taskStatuses]);
+  }, [composer, taskStatuses]);
 
   const deleteTask = useCallback((id: string, title?: string) => {
     const taskToDelete = tasksRef.current.find(t => t.id === id);
@@ -889,6 +862,9 @@ export default function TasksScreen() {
       kanbanColumnId: editor.draft.statusId,
       estimatedMinutes,
       deadline: editor.draft.deadline ?? undefined,
+      // Проєкт застосовується разом з рештою форми, а не миттєво при
+      // виборі: інакше «Скасувати» повертало б усе, крім нього.
+      projectId: editor.draft.projectId ?? undefined,
       recurrence,
       history: [...(t.history ?? []), makeHistoryEvent('edited')],
     };
@@ -1037,7 +1013,7 @@ export default function TasksScreen() {
   // Три календарі — фільтр, дедлайн нового завдання, дедлайн у редагуванні —
   // будували сітку місяця трьома однаковими копіями. Тепер monthGrid.
   const calWeeks    = useMemo(() => monthGrid(calYear, calMonth), [calYear, calMonth]);
-  const dlWeeks     = useMemo(() => monthGrid(deadlineCalYear, deadlineCalMonth), [deadlineCalYear, deadlineCalMonth]);
+  const dlWeeks     = useMemo(() => monthGrid(composer.calYear, composer.calMonth), [composer.calYear, composer.calMonth]);
   const editDlWeeks = useMemo(() => monthGrid(editor.calYear, editor.calMonth), [editor.calYear, editor.calMonth]);
 
   // ─── Календар ─────────────────────────────────────────────────────────────
@@ -1201,7 +1177,8 @@ export default function TasksScreen() {
 
                     {editor.editing ? (
                       <TaskEditForm
-                        task={selectedTask}
+                        title={tr.editTask}
+                        submitLabel={tr.save}
                         editor={editor}
                         taskStatuses={taskStatuses}
                         pickableProjects={pickableProjects}
@@ -1213,7 +1190,7 @@ export default function TasksScreen() {
                         deadlinePresets={DEADLINE_PRESETS}
                         today={today}
                         onSave={saveTaskEdit}
-                        onChangeProject={updateTaskProject}
+                        onCancel={editor.finish}
                         colors={c}
                         tr={tr}
                         locale={locale}
@@ -2725,280 +2702,25 @@ export default function TasksScreen() {
       <SheetModal visible={showAdd} onClose={() => setShowAdd(false)}>
         <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                  <Text style={[s.sheetTitle, { color: c.text }]}>{tr.newTask}</Text>
-
-                  <TextInput
-                    placeholder={tr.taskNamePlaceholder}
-                    placeholderTextColor={c.sub}
-                    value={newTitle}
-                    onChangeText={setNewTitle}
-                    style={[s.input, { backgroundColor: c.dim, color: c.text }]}
-                  />
-                  <TextInput
-                    placeholder={tr.taskDescPlaceholder}
-                    placeholderTextColor={c.sub}
-                    value={newDesc}
-                    onChangeText={setNewDesc}
-                    style={[s.input, { backgroundColor: c.dim, color: c.text, marginTop: 8 }]}
-                  />
-
-                  {/* Priority */}
-                  <Text style={[s.label, { color: c.sub }]}>{tr.priority}</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {(['high', 'medium', 'low'] as Priority[]).map(p => (
-                      <TouchableOpacity key={p} onPress={() => setNewPriority(p)} style={[s.priorityBtn, { borderColor: PRIORITY[p].color, backgroundColor: newPriority === p ? PRIORITY[p].color : 'transparent' }]}>
-                        <Text style={{ color: newPriority === p ? '#fff' : PRIORITY[p].color, fontSize: 12, fontWeight: '600' }}>{PRIORITY[p].label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <Text style={[s.label, { color: c.sub }]}>{lang === 'uk' ? 'Статус' : 'Status'}</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                    <View style={{ flexDirection: 'row', gap: 7 }}>
-                      {taskStatuses.map(column => (
-                        <TouchableOpacity key={column.id} onPress={() => setNewStatusId(column.id)} style={[s.sortChip, { backgroundColor: newStatusId === column.id ? column.color : c.dim, borderColor: newStatusId === column.id ? column.color : c.border }]}>
-                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: newStatusId === column.id ? '#fff' : column.color, marginRight: 5 }} />
-                          <Text style={{ color: newStatusId === column.id ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{column.name}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-
-                  {/* Project */}
-                  {pickableProjects.length > 0 && (
-                    <>
-                      <Text style={[s.label, { color: c.sub }]}>{tr.project}</Text>
-                      {/* Dropdown trigger */}
-                      <TouchableOpacity
-                        onPress={() => setShowNewProjectDropdown(v => !v)}
-                        style={[s.dropdownBtn, { backgroundColor: c.dim, borderColor: showNewProjectDropdown ? c.accent : c.border }]}>
-                        {(() => {
-                          const sel = projects.find(p => p.id === newProjectId);
-                          return sel ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
-                              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
-                              <Text style={{ color: sel.color, fontSize: 13, fontWeight: '600', flex: 1 }}>{sel.name}</Text>
-                            </View>
-                          ) : (
-                            <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', flex: 1 }}>{tr.noProject}</Text>
-                          );
-                        })()}
-                        <IconSymbol name={showNewProjectDropdown ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
-                      </TouchableOpacity>
-                      {showNewProjectDropdown && (
-                        <View style={[s.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
-                          <TouchableOpacity
-                            onPress={() => { setNewProjectId(null); setShowNewProjectDropdown(false); }}
-                            style={[s.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !newProjectId ? c.accent + '12' : 'transparent' }]}>
-                            <Text style={{ color: !newProjectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
-                            {!newProjectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
-                          </TouchableOpacity>
-                          {pickableProjects.map((p, i) => (
-                            <TouchableOpacity
-                              key={p.id}
-                              onPress={() => { setNewProjectId(p.id); setShowNewProjectDropdown(false); }}
-                              style={[s.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: newProjectId === p.id ? p.color + '12' : 'transparent' }]}>
-                              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: p.color, marginRight: 8 }} />
-                              <Text style={{ color: newProjectId === p.id ? p.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{p.name}</Text>
-                              {newProjectId === p.id && <IconSymbol name="checkmark" size={13} color={p.color} />}
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
-                    </>
-                  )}
-
-                  {/* Estimated time */}
-                  <Text style={[s.label, { color: c.sub }]}>{tr.timeEstimate}</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TextInput
-                      placeholder={tr.hoursPlaceholder}
-                      placeholderTextColor={c.sub}
-                      value={newEstHours}
-                      onChangeText={setNewEstHours}
-                      keyboardType="number-pad"
-                      style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                    />
-                    <TextInput
-                      placeholder={tr.minutesPlaceholder}
-                      placeholderTextColor={c.sub}
-                      value={newEstMins}
-                      onChangeText={setNewEstMins}
-                      keyboardType="number-pad"
-                      style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                    />
-                  </View>
-
-                  {/* Deadline */}
-                  <Text style={[s.label, { color: c.sub }]}>{tr.deadline}</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginBottom: 8 }}>
-                    <View style={{ flexDirection: 'row', gap: 7 }}>
-                      {DEADLINE_PRESETS.map(preset => {
-                        const d = new Date(); d.setDate(d.getDate() + preset.days);
-                        const iso = d.toISOString();
-                        const isSelected = newDeadline && new Date(newDeadline).toDateString() === d.toDateString();
-                        return (
-                          <TouchableOpacity
-                            key={preset.label}
-                            onPress={() => setNewDeadline(isSelected ? null : iso)}
-                            style={[s.sortChip, { backgroundColor: isSelected ? c.accent : c.dim, borderColor: isSelected ? c.accent : c.border }]}>
-                            <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>{preset.label}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                      <TouchableOpacity
-                        onPress={() => { Keyboard.dismiss(); setShowDeadlineCal(v => !v); }}
-                        style={[s.sortChip, { backgroundColor: showDeadlineCal ? c.accent + '20' : c.dim, borderColor: showDeadlineCal ? c.accent : c.border }]}>
-                        <IconSymbol name="calendar" size={13} color={showDeadlineCal ? c.accent : c.sub} />
-                        <Text style={{ color: showDeadlineCal ? c.accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>{tr.select}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </ScrollView>
-
-                  {newDeadline && (
-                    <View style={[s.badge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50', alignSelf: 'flex-start', marginBottom: 8 }]}>
-                      <IconSymbol name="calendar" size={11} color={c.accent} />
-                      <Text style={{ color: c.accent, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                        {new Date(newDeadline).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
-                      </Text>
-                      <TouchableOpacity onPress={() => setNewDeadline(null)} style={{ marginLeft: 6 }}>
-                        <IconSymbol name="xmark" size={11} color={c.accent} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {showDeadlineCal && (
-                    <View style={[s.inlineCalendar, { borderColor: c.border, backgroundColor: c.dim }]}>
-                      <CalendarGrid
-                        year={deadlineCalYear} month={deadlineCalMonth}
-                        markedDays={new Set()}
-                        selectedDate={newDeadline ? new Date(newDeadline).toDateString() : null}
-                        todayDate={today}
-                        weeks={dlWeeks}
-                        months={MONTHS_UA}
-                        weekdays={WEEKDAYS_SHORT}
-                        onPrevMonth={() => { if (deadlineCalMonth === 0) { setDeadlineCalMonth(11); setDeadlineCalYear(y => y - 1); } else setDeadlineCalMonth(m => m - 1); }}
-                        onNextMonth={() => { if (deadlineCalMonth === 11) { setDeadlineCalMonth(0); setDeadlineCalYear(y => y + 1); } else setDeadlineCalMonth(m => m + 1); }}
-                        onSelectDay={(d) => { setNewDeadline(d.toISOString()); setShowDeadlineCal(false); }}
-                        c={c}
-                      />
-                    </View>
-                  )}
-
-                  {/* Recurrence */}
-                  <TouchableOpacity
-                    onPress={() => setNewRepeat(v => !v)}
-                    style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1,
-                      paddingHorizontal: 11, paddingVertical: 9, marginTop: 8,
-                      borderColor: newRepeat ? c.accent + '55' : c.border,
-                      backgroundColor: newRepeat ? c.accent + '10' : c.dim }}>
-                    <IconSymbol name="repeat" size={13} color={newRepeat ? c.accent : c.sub} />
-                    <Text style={{ color: newRepeat ? c.accent : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 6, flex: 1 }}>
-                      {tr.repeat ?? 'Повторювати'}
-                    </Text>
-                    <View style={{ width: 36, height: 22, borderRadius: 11, backgroundColor: newRepeat ? c.accent : c.border, justifyContent: 'center', paddingHorizontal: 2 }}>
-                      <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff', alignSelf: newRepeat ? 'flex-end' : 'flex-start' }} />
-                    </View>
-                  </TouchableOpacity>
-
-                  {newRepeat && (
-                    <View style={{ borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 7,
-                      borderColor: c.accent + '40', backgroundColor: c.accent + '08' }}>
-                      <View style={{ flexDirection: 'row', gap: 5, marginBottom: 10 }}>
-                        {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => {
-                          const labels = { daily: 'Щодня', weekly: 'Щотижня', monthly: 'Щомісяця', yearly: 'Щороку' };
-                          const on = newRepeatFreq === f;
-                          return (
-                            <TouchableOpacity key={f} onPress={() => { setNewRepeatFreq(f); if (f !== 'weekly') setNewRepeatDays([]); }}
-                              style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
-                                backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                              <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{labels[f]}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>Кожні</Text>
-                        <TouchableOpacity onPress={() => setNewRepeatInterval(i => Math.max(1, i - 1))}
-                          style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>−</Text>
-                        </TouchableOpacity>
-                        <Text style={{ color: c.accent, fontSize: 16, fontWeight: '800', minWidth: 24, textAlign: 'center' }}>{newRepeatInterval}</Text>
-                        <TouchableOpacity onPress={() => setNewRepeatInterval(i => Math.min(99, i + 1))}
-                          style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>+</Text>
-                        </TouchableOpacity>
-                        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
-                          {newRepeatFreq === 'daily' ? (newRepeatInterval === 1 ? 'день' : 'дн.') :
-                           newRepeatFreq === 'weekly' ? (newRepeatInterval === 1 ? 'тиждень' : 'тиж.') :
-                           newRepeatFreq === 'monthly' ? (newRepeatInterval === 1 ? 'місяць' : 'міс.') : 'рік'}
-                        </Text>
-                      </View>
-                      {newRepeatFreq === 'weekly' && (
-                        <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
-                          {['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map((d, i) => {
-                            const on = newRepeatDays.includes(i);
-                            return (
-                              <TouchableOpacity key={i} onPress={() => setNewRepeatDays(prev => on ? prev.filter(x => x !== i) : [...prev, i])}
-                                style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8,
-                                  backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                                <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{d}</Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      )}
-                      <View style={{ flexDirection: 'row', gap: 7 }}>
-                        {(['never', 'until'] as const).map(type => {
-                          const labels = { never: 'Ніколи', until: 'До дати' };
-                          const on = newRepeatEndType === type;
-                          return (
-                            <TouchableOpacity key={type} onPress={() => setNewRepeatEndType(type)}
-                              style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
-                                backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                              <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>{labels[type]}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      {newRepeatEndType === 'until' && (
-                        <View style={{ marginTop: 8 }}>
-                          <View
-                            style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1,
-                              paddingHorizontal: 11, paddingVertical: 9,
-                              borderColor: newRepeatUntil ? c.accent + '55' : c.border,
-                              backgroundColor: newRepeatUntil ? c.accent + '10' : c.dim }}>
-                            <IconSymbol name="calendar" size={13} color={newRepeatUntil ? c.accent : c.sub} />
-                            <TextInput
-                              placeholder="YYYY-MM-DD"
-                              placeholderTextColor={c.sub}
-                              value={newRepeatUntil}
-                              onChangeText={setNewRepeatUntil}
-                              style={{ color: newRepeatUntil ? c.accent : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1, padding: 0 }}
-                            />
-                          </View>
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
-                    <TouchableOpacity onPress={() => setShowAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                      <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityState={{ disabled: !newTitle.trim() }}
-                      disabled={!newTitle.trim()}
-                      onPress={addTask}
-                      style={[s.btn, {
-                        flex: 2,
-                        backgroundColor: newTitle.trim() ? c.accent : c.dim,
-                      }]}
-                    >
-                      <Text style={{ color: newTitle.trim() ? '#fff' : c.sub, fontWeight: '700' }}>{tr.add}</Text>
-                    </TouchableOpacity>
-                  </View>
+            <TaskEditForm
+              title={tr.newTask}
+              submitLabel={tr.add}
+              editor={composer}
+              taskStatuses={taskStatuses}
+              pickableProjects={pickableProjects}
+              projects={projects}
+              deadlineWeeks={dlWeeks}
+              priorityMeta={PRIORITY}
+              months={MONTHS_UA}
+              weekdays={WEEKDAYS_SHORT}
+              deadlinePresets={DEADLINE_PRESETS}
+              today={today}
+              onSave={addTask}
+              onCancel={() => { composer.reset(ACTIVE_COLUMN_ID); setShowAdd(false); }}
+              colors={c}
+              tr={tr}
+              locale={locale}
+            />
           </ScrollView>
         </BlurView>
       </SheetModal>

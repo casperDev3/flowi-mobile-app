@@ -30,6 +30,9 @@ interface Project {
   id: string;
   name: string;
   color: string;
+  /** Див. app/projects.tsx. Тут НЕ фільтрується: записи часу за архівним
+      проєктом лишаються в історії й мусять показувати його назву. */
+  archivedAt?: string;
 }
 
 interface Task {

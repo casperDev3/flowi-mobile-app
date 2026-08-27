@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -23,15 +23,26 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { setProjectArchived } from '@/utils/projectUtils';
 
 export interface Project {
   id: string;
   name: string;
   color: string;
   createdAt: string;
+  /**
+   * Момент архівації. Стан ЯВНИЙ, а не похідний із задач: інакше проєкт із
+   * незавершеними задачами неможливо заморозити, а порожній проєкт (0 із 0)
+   * довелося б рахувати виконаним на 100%.
+   *
+   * Поле живе у вільному JSON запису синку, тож ані сервер, ані контракт
+   * синхронізації міняти не треба. Веб уже його виставляє.
+   */
+  archivedAt?: string;
 }
 
 interface Task { id: string; projectId?: string; status: string; }
+
 
 const PROJECT_COLORS = ['#7C3AED', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1'];
 
@@ -48,6 +59,7 @@ export default function ProjectsScreen() {
   const [editing, setEditing] = useState<Project | null>(null);
   const [name, setName] = useState('');
   const [color, setColor] = useState(PROJECT_COLORS[0]);
+  const [showArchived, setShowArchived] = useState(false);
 
   const loadAll = useCallback(async () => {
     const [p, t] = await Promise.all([
@@ -57,6 +69,12 @@ export default function ProjectsScreen() {
     setProjects(p);
     setTasks(t);
   }, []);
+
+  // Архівні ховаються зі списку, але лишаються в даних: стан явний
+  // (archivedAt), тож проєкт із незавершеними задачами теж можна заморозити.
+  const liveProjects = useMemo(() => projects.filter(p => !p.archivedAt), [projects]);
+  const archivedProjects = useMemo(() => projects.filter(p => !!p.archivedAt), [projects]);
+  const visibleProjects = showArchived ? archivedProjects : liveProjects;
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -95,6 +113,23 @@ export default function ProjectsScreen() {
       setProjects(prev => [...prev, { id: Date.now().toString(), name: name.trim(), color, createdAt: new Date().toISOString() }]);
     }
     closeModal();
+  };
+
+  const toggleArchive = (project: Project) => {
+    const archiving = !project.archivedAt;
+    const apply = () => setProjects(prev =>
+      prev.map(p => (p.id === project.id ? setProjectArchived(p, archiving) : p)));
+
+    const activeLeft = tasks.filter(t => t.projectId === project.id && t.status !== 'done').length;
+    if (archiving && activeLeft > 0) {
+      Alert.alert(
+        'Архівувати проект?',
+        `У «${project.name}» ще ${activeLeft} незавершених — вони залишаться активними в задачах, просто проект зникне зі списку.`,
+        [{ text: 'Скасувати', style: 'cancel' }, { text: 'Архівувати', onPress: apply }],
+      );
+      return;
+    }
+    apply();
   };
 
   const deleteProject = (id: string) => {
@@ -143,8 +178,36 @@ export default function ProjectsScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Живі / Архів. З'являється лише коли архів не порожній —
+              інакше це кнопка, яка нікуди не веде. */}
+          {archivedProjects.length > 0 && (
+            <View style={{ flexDirection: 'row', gap: 7, marginBottom: 18 }}>
+              {([
+                { key: false, label: 'Живі', count: liveProjects.length },
+                { key: true, label: 'Архів', count: archivedProjects.length },
+              ] as const).map(opt => (
+                <TouchableOpacity
+                  key={String(opt.key)}
+                  onPress={() => setShowArchived(opt.key)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: showArchived === opt.key }}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 6,
+                    paddingHorizontal: 13, paddingVertical: 8, borderRadius: 10, borderWidth: 1,
+                    backgroundColor: showArchived === opt.key ? c.accent + '18' : c.dim,
+                    borderColor: showArchived === opt.key ? c.accent : c.border,
+                  }}>
+                  <Text style={{ color: showArchived === opt.key ? c.accent : c.sub, fontWeight: '700', fontSize: 13 }}>
+                    {opt.label}
+                  </Text>
+                  <Text style={{ color: c.sub, fontSize: 12 }}>{opt.count}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           {/* Empty */}
-          {projects.length === 0 && (
+          {visibleProjects.length === 0 && (
             <View style={{ alignItems: 'center', paddingVertical: 64 }}>
               <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
                 <IconSymbol name="folder" size={32} color={c.accent} />
@@ -166,7 +229,7 @@ export default function ProjectsScreen() {
 
           {/* Project cards */}
           <View style={{ gap: 10 }}>
-            {projects.map(project => {
+            {visibleProjects.map(project => {
               const total = taskCount(project.id);
               const active = activeCount(project.id);
               const done = doneCount(project.id);
@@ -260,6 +323,17 @@ export default function ProjectsScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                {editing && (
+                  <TouchableOpacity
+                    onPress={() => { const target = editing; closeModal(); toggleArchive(target); }}
+                    accessibilityRole="button"
+                    style={[st.btn, { marginTop: 18, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
+                    <Text style={{ color: c.sub, fontWeight: '600' }}>
+                      {editing.archivedAt ? 'Повернути з архіву' : 'Архівувати'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 22, marginBottom: 4 }}>
                   <TouchableOpacity onPress={closeModal} style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>

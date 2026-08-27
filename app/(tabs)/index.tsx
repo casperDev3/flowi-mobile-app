@@ -312,6 +312,14 @@ export default function TasksScreen() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+
+  // Пікери показують лише ЖИВІ проєкти, а `projects` лишається повним.
+  // Це навмисно: підпис обраного значення шукається в повному списку, тож
+  // задача в архівному проєкті й далі показує його назву, а не порожнє поле.
+  const pickableProjects = useMemo(
+    () => projects.filter(p => !p.archivedAt),
+    [projects],
+  );
   const [storedTaskStatuses, setStoredTaskStatuses] = useState<TaskStatusColumn[]>([]);
   const taskStatuses = useMemo(() => mergeTaskStatusColumns(storedTaskStatuses), [storedTaskStatuses]);
   const [initialized, setInitialized] = useState(false);
@@ -2375,7 +2383,7 @@ export default function TasksScreen() {
                 </View>
 
                 {/* Project filter */}
-                {projects.length > 0 && (
+                {pickableProjects.length > 0 && (
                   <>
                     <Text style={[s.label, { color: c.sub }]}>{tr.project}</Text>
                     {/* Чипи замість повноширинних рядків: при 5 проєктах це
@@ -2388,7 +2396,7 @@ export default function TasksScreen() {
                         style={[s.sortChip, { minHeight: 36, backgroundColor: !filterProject ? c.accent + '18' : c.dim, borderColor: !filterProject ? c.accent : c.border }]}>
                         <Text style={{ color: !filterProject ? c.accent : c.sub, fontSize: 12, fontWeight: '600' }}>{tr.allProjects}</Text>
                       </TouchableOpacity>
-                      {projects.map(proj => {
+                      {pickableProjects.map(proj => {
                         const on = filterProject === proj.id;
                         return (
                           <TouchableOpacity
@@ -2525,7 +2533,7 @@ export default function TasksScreen() {
                   </ScrollView>
 
                   {/* Project */}
-                  {projects.length > 0 && (
+                  {pickableProjects.length > 0 && (
                     <>
                       <Text style={[s.label, { color: c.sub }]}>{tr.project}</Text>
                       {/* Dropdown trigger */}
@@ -2553,11 +2561,11 @@ export default function TasksScreen() {
                             <Text style={{ color: !newProjectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
                             {!newProjectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
                           </TouchableOpacity>
-                          {projects.map((p, i) => (
+                          {pickableProjects.map((p, i) => (
                             <TouchableOpacity
                               key={p.id}
                               onPress={() => { setNewProjectId(p.id); setShowNewProjectDropdown(false); }}
-                              style={[s.dropdownItem, { borderBottomWidth: i < projects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: newProjectId === p.id ? p.color + '12' : 'transparent' }]}>
+                              style={[s.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: newProjectId === p.id ? p.color + '12' : 'transparent' }]}>
                               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: p.color, marginRight: 8 }} />
                               <Text style={{ color: newProjectId === p.id ? p.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{p.name}</Text>
                               {newProjectId === p.id && <IconSymbol name="checkmark" size={13} color={p.color} />}
@@ -2975,7 +2983,7 @@ export default function TasksScreen() {
                           </View>
                         </ScrollView>
 
-                        {projects.length > 0 && (
+                        {pickableProjects.length > 0 && (
                           <>
                             <Text style={[s.label, { color: c.sub }]}>{tr.project}</Text>
                             <TouchableOpacity
@@ -3002,11 +3010,11 @@ export default function TasksScreen() {
                                   <Text style={{ color: !selectedTask.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
                                   {!selectedTask.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
                                 </TouchableOpacity>
-                                {projects.map((proj, i) => (
+                                {pickableProjects.map((proj, i) => (
                                   <TouchableOpacity
                                     key={proj.id}
                                     onPress={() => { updateTaskProject(selectedTask.id, proj.id); setShowEditProjectDropdown(false); }}
-                                    style={[s.dropdownItem, { borderBottomWidth: i < projects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: selectedTask.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
+                                    style={[s.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: selectedTask.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
                                     <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: proj.color, marginRight: 8 }} />
                                     <Text style={{ color: selectedTask.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
                                     {selectedTask.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
@@ -3385,7 +3393,7 @@ export default function TasksScreen() {
                     </View>
 
                     {/* Project changer */}
-                    {projects.length > 0 && (
+                    {pickableProjects.length > 0 && (
                       <View style={{ marginTop: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                           <IconSymbol name="folder" size={12} color={c.sub} />
@@ -3416,11 +3424,11 @@ export default function TasksScreen() {
                               <Text style={{ color: !selectedTask.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
                               {!selectedTask.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
                             </TouchableOpacity>
-                            {projects.map((proj, i) => (
+                            {pickableProjects.map((proj, i) => (
                               <TouchableOpacity
                                 key={proj.id}
                                 onPress={() => { updateTaskProject(selectedTask.id, proj.id); setShowDetailProjectDropdown(false); }}
-                                style={[s.dropdownItem, { borderBottomWidth: i < projects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: selectedTask.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
+                                style={[s.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: selectedTask.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
                                 <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: proj.color, marginRight: 8 }} />
                                 <Text style={{ color: selectedTask.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
                                 {selectedTask.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}

@@ -37,6 +37,9 @@ import { Habit, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { Task, isOverdue } from '@/utils/taskUtils';
 import { haptic } from '@/utils/haptics';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { formatDuration } from '@/utils/durationFormat';
+import { BUILTIN_CURRENCIES, formatCurrency, type Currency } from '@/utils/financeUtils';
+import { useResponsive } from '@/hooks/use-responsive';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -68,8 +71,35 @@ const QUICK_WATER  = 250;
  */
 const TODAY_PREVIEW_LIMIT = 3;
 
+/**
+ * Обгортка секції дашборду.
+ *
+ * Оголошена на рівні модуля, а не всередині екрана: локальна стрілка дає
+ * новий тип компонента при кожному рендері, і React перемонтовує всі
+ * вісім секцій — разом з їхніми анімаціями появи.
+ *
+ * На широкому екрані секції лягають у дві колонки. Дашборд із восьми
+ * карток в одну колонку на планшеті — це смуга контенту посеред
+ * порожнечі, а прокрутка вдвічі довша за потрібну.
+ */
+function Section({ index, wide, motion, children }: {
+  index: number;
+  wide: boolean;
+  motion: ReturnType<typeof useMotion>;
+  children: React.ReactNode;
+}) {
+  return (
+    <Animated.View
+      style={wide ? { width: '48.5%' } : undefined}
+      entering={motion.entering(FadeInDown.duration(250).delay(index * 50))}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export default function TodayScreen() {
   const tabBarInset = useTabBarInset();
+  const { isWide } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -80,6 +110,10 @@ export default function TodayScreen() {
 
   const [tasks,    setTasks]    = useState<Task[]>([]);
   const [txs,      setTxs]      = useState<Transaction[]>([]);
+  // Валюта зведення. До цього екран рахував лише UAH і підписував «₴»:
+  // у користувача з іншою валютою фінанси мовчки зникали зі зведення.
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [primaryCode, setPrimaryCode] = useState('UAH');
   const [time,     setTime]     = useState<TimeEntry[]>([]);
   const [health,   setHealth]   = useState<HealthEntry[]>([]);
   const [profile,  setProfile]  = useState<HealthProfile | null>(null);
@@ -91,7 +125,7 @@ export default function TodayScreen() {
   const firstLoadDone = useRef(false);
 
   const load = useCallback(async () => {
-    const [t, x, tm, h, p, m, hb, notes] = await Promise.all([
+    const [t, x, tm, h, p, m, hb, notes, curs, primary] = await Promise.all([
       loadData<Task[]>('tasks', []),
       loadData<Transaction[]>('transactions', []),
       loadData<TimeEntry[]>('time_entries', []),
@@ -100,10 +134,14 @@ export default function TodayScreen() {
       loadData<TodayMeeting[]>('meetings', []),
       loadData<Habit[]>('health_habits', []),
       loadData<{ updatedAt?: string; createdAt?: string }[]>('notes', []),
+      loadData<Currency[]>('finance_currencies', []),
+      loadData<string>('finance_primary_currency', 'UAH'),
     ]);
     setTasks(t); setTxs(x); setTime(tm); setHealth(h); setProfile(p);
     setMeetings(m); setHabits(hb);
     setNotesCount(Array.isArray(notes) ? notes.length : 0);
+    setCurrencies(Array.isArray(curs) ? curs : []);
+    setPrimaryCode(typeof primary === 'string' && primary ? primary : 'UAH');
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -174,11 +212,17 @@ export default function TodayScreen() {
   const sleep  = lastForDay(health, 'sleep', today);
 
   // Finance (UAH)
+  const primaryCurrency = useMemo<Currency>(
+    () => [...BUILTIN_CURRENCIES, ...currencies].find(cur => cur.code === primaryCode)
+       ?? BUILTIN_CURRENCIES[0],
+    [currencies, primaryCode],
+  );
+
   const fin = useMemo(() => {
-    const month = filterByMonth(txs.filter(t => txCurrency(t) === 'UAH'), today);
+    const month = filterByMonth(txs.filter(t => txCurrency(t) === primaryCode), today);
     return calcTotals(month);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txs]);
+  }, [txs, primaryCode]);
 
   // Time today
   const trackedSec = time
@@ -242,21 +286,16 @@ export default function TodayScreen() {
 
   // ─── Formatters ────────────────────────────────────────────────────────────
 
-  const hUnit = lang === 'uk' ? 'г' : 'h';
-  const mUnit = lang === 'uk' ? 'хв' : 'm';
-  const fmtTime = (sec: number) => {
-    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-    if (h > 0) return `${h}${hUnit} ${m}${mUnit}`;
-    return `${m}${mUnit}`;
-  };
-  const fmtMoney = (n: number) =>
-    `${n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString(locale)} ₴`;
-
-  const Section = ({ index, children }: { index: number; children: React.ReactNode }) => (
-    <Animated.View entering={motion.entering(FadeInDown.duration(250).delay(index * 50))}>
-      {children}
-    </Animated.View>
+  const durationUnits = useMemo(
+    () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
+    [tr.unitHour, tr.unitHourLong, tr.unitMinute],
   );
+  const fmtTime = useCallback((sec: number) => formatDuration(sec, durationUnits), [durationUnits]);
+  const fmtMoney = useCallback(
+    (n: number) => formatCurrency(n, primaryCurrency, locale),
+    [primaryCurrency, locale],
+  );
+
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -289,10 +328,11 @@ export default function TodayScreen() {
             </>
           )}
 
-          {loaded && <>
+          {loaded && (
+          <View style={isWide ? s.grid : undefined}>
 
           {/* 1. Завдання на сьогодні */}
-          <Section index={0}>
+          <Section index={0} wide={isWide} motion={motion}>
             <View style={{ marginBottom: 12 }}>
               <View style={s.sectionRow}>
                 <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayTasks}</Text>
@@ -335,7 +375,7 @@ export default function TodayScreen() {
 
           {/* 2. Зустрічі сьогодні */}
           {todayMeetings.length > 0 && (
-            <Section index={1}>
+            <Section index={1} wide={isWide} motion={motion}>
               <View style={{ marginBottom: 12 }}>
                 <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayMeetings}</Text>
                 {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(m => (
@@ -366,7 +406,7 @@ export default function TodayScreen() {
           )}
 
           {/* 3. Здоровʼя — hero-стрічка кілець */}
-          <Section index={2}>
+          <Section index={2} wide={isWide} motion={motion}>
             <PressableScale
               onPress={() => router.push('/health')}
               accessibilityRole="button"
@@ -391,7 +431,7 @@ export default function TodayScreen() {
           </Section>
 
           {/* 4. Швидкі дії */}
-          <Section index={3}>
+          <Section index={3} wide={isWide} motion={motion}>
             <QuickActions
               isDark={isDark}
               c={c}
@@ -405,7 +445,7 @@ export default function TodayScreen() {
 
           {/* 5. Звички */}
           {habits.length > 0 && (
-            <Section index={4}>
+            <Section index={4} wide={isWide} motion={motion}>
               <View style={{ marginBottom: 12 }}>
                 <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayHabits}</Text>
                 {habits.map(h => {
@@ -445,7 +485,7 @@ export default function TodayScreen() {
           )}
 
           {/* 6. Фінанси + Час — сітка 2 колонки */}
-          <Section index={5}>
+          <Section index={5} wide={isWide} motion={motion}>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
               <StatTile
                 c={c} isDark={isDark}
@@ -477,7 +517,7 @@ export default function TodayScreen() {
           </Section>
 
           {/* 7. Спільне */}
-          <Section index={6}>
+          <Section index={6} wide={isWide} motion={motion}>
             <PressableScale
               onPress={() => router.push('/(tabs)/shared')}
               accessibilityRole="button"
@@ -502,7 +542,7 @@ export default function TodayScreen() {
           </Section>
 
           {/* 8. Швидкі переходи з лічильниками за сьогодні */}
-          <Section index={7}>
+          <Section index={7} wide={isWide} motion={motion}>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               <NavStat
                 icon="calendar"
@@ -534,7 +574,8 @@ export default function TodayScreen() {
             </View>
           </Section>
 
-          </>}
+          </View>
+          )}
 
         </ScrollView>
       </SafeAreaView>
@@ -580,6 +621,9 @@ function StatTile({ c, isDark, icon, color, title, onPress, children }: {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
+  // Дві колонки з рівним проміжком. alignItems: 'flex-start' — щоб картка
+  // не розтягувалася до висоти сусідки й не лишала порожнечі всередині.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', columnGap: 12 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

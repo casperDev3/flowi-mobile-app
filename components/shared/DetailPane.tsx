@@ -1,7 +1,7 @@
 /**
- * components/tasks/TaskDetailPane.tsx
+ * components/shared/DetailPane.tsx
  *
- * Оболонка для деталі завдання. Той самий вміст показується двома
+ * Оболонка для панелі деталі. Той самий вміст показується двома
  * різними способами залежно від того, скільки є місця:
  *
  *   вузько  — модальний лист поверх списку (як було й лишається на телефоні)
@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 /** Підібрано під найдовший рядок деталі («Дедлайн: 12 листопада 2026»). */
 export const DETAIL_COLUMN_WIDTH = 380;
 
-export interface TaskDetailPaneProps {
+export interface DetailPaneProps {
   /** Чи є вибране завдання. */
   open: boolean;
   /** Показувати колонкою замість модалки. */
@@ -39,9 +39,9 @@ export interface TaskDetailPaneProps {
   children: React.ReactNode;
 }
 
-export function TaskDetailPane({
+export function DetailPane({
   open, wide, onClose, isDark, sheetColor, borderColor, maxHeight, scrollRef, empty, children,
-}: TaskDetailPaneProps) {
+}: DetailPaneProps) {
   // Колонка не має власного SafeAreaView (він лишився в списку зліва),
   // тож верхній виріз доводиться враховувати самій.
   const insets = useSafeAreaInsets();

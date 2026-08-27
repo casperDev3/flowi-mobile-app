@@ -50,7 +50,7 @@ import type { Project } from '../projects';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useCalendarNav, type CalSpan } from '@/hooks/use-calendar-nav';
 import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/use-task-editor';
-import { TaskDetailPane } from '@/components/tasks/TaskDetailPane';
+import { DetailPane } from '@/components/shared/DetailPane';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { TaskHistoryTab, type HistoryEventType, type TaskHistoryEvent } from '@/components/tasks/TaskHistoryTab';
 import { TaskTimerTab } from '@/components/tasks/TaskTimerTab';
@@ -1078,7 +1078,7 @@ export default function TasksScreen() {
   const selectedTask = selected ? tasks.find(t => t.id === selected.id) ?? selected : null;
 
   // Вміст деталі. Однаковий для модалки й для колонки — різниться
-  // лише обрамлення, див. TaskDetailPane.
+  // лише обрамлення, див. DetailPane.
   const detailBody = selectedTask ? (
     <>
                     <View style={s.handleRow}>
@@ -1846,7 +1846,7 @@ export default function TasksScreen() {
       </PressableScale>
       </View>
 
-        <TaskDetailPane
+        <DetailPane
           open={!!selectedTask}
           wide={showDetailColumn}
           onClose={() => setSelected(null)}
@@ -1863,7 +1863,7 @@ export default function TasksScreen() {
             </>
           }>
           {detailBody}
-        </TaskDetailPane>
+        </DetailPane>
       </View>
 
 

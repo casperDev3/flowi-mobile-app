@@ -1,13 +1,14 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
+  FlatList,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -51,6 +52,7 @@ import { isSameDay } from '@/utils/dateUtils';
 import { haptic } from '@/utils/haptics';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { DetailPane } from '@/components/shared/DetailPane';
 
 type TxType = 'income' | 'expense';
 
@@ -120,7 +122,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
 
 export default function FinanceScreen() {
   const tabBarInset = useTabBarInset();
-  const { height } = useResponsive();
+  const { height, isExpanded } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   useScreenView('finance');
   const insets = useSafeAreaInsets();
@@ -341,6 +343,14 @@ export default function FinanceScreen() {
     return true;
   }), [monthTxs, filter, dateFilter]);
 
+  /** У віртуалізованому списку елементи монтуються заново при прокрутці. */
+  const animatedGroups = useRef<Set<string>>(new Set());
+  const shouldAnimateGroup = useCallback((key: string) => {
+    if (animatedGroups.current.has(key)) return false;
+    animatedGroups.current.add(key);
+    return true;
+  }, []);
+
   const groups = useMemo(() => groupTransactions(
     filtered,
     now.toDateString(),
@@ -455,9 +465,186 @@ export default function FinanceScreen() {
     sheet:  isDark ? 'rgba(12,12,20,0.98)' : 'rgba(248,246,255,0.98)',
   };
 
+  const txDetailScrollRef = useRef<ScrollView>(null);
+
+  const groupColors = useMemo(
+    () => ({ sub: c.sub, text: c.text, green: c.green, red: c.red, border: c.border, dim: c.dim }),
+    [c.sub, c.text, c.green, c.red, c.border, c.dim],
+  );
+
+
+  // Шапка списку: фільтри, баланси, порожній стан. Виносимо в змінну,
+  // щоб FlatList не перебудовував її на кожному кадрі прокрутки.
+  const listHeader = (
+    <>
+            {/* Skeleton — перший завантаження */}
+            {!initialized && (
+              <>
+                <SkeletonCard style={{ marginTop: 4 }} />
+                <SkeletonCard />
+                <SkeletonCard />
+              </>
+            )}
+
+            {/* Date filter chip */}
+            {dateFilter && (
+              <TouchableOpacity
+                onPress={() => setDateFilter(null)}
+                style={[s.dateChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
+                <IconSymbol name="calendar" size={13} color={c.accent} />
+                <Text style={{ color: c.accent, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>
+                  {dateFilter.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
+                </Text>
+                <IconSymbol name="xmark" size={13} color={c.accent} style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
+            )}
+
+            {/* Balance Cards — one per active currency */}
+            <FinanceSummary
+              currencies={allCurrencies}
+              totalsByCurrency={totalsByCurrency}
+              primaryCode={primaryCurrency}
+              onPickPrimary={() => setShowPrimaryPicker(true)}
+              fmt={fmtCur}
+              isDark={isDark}
+              c={{ border: c.border, sub: c.sub, green: c.green, red: c.red }}
+              incomeLabel={tr.incomes}
+              expenseLabel={tr.expenses}
+              balanceLabel={tr.balance}
+              savingsLabel={tr.savings}
+              carryoverLabel={tr.carryover}
+              otherCurrenciesLabel={tr.otherCurrencies}
+              primaryBadgeLabel={tr.primaryBadge}
+              showAllLabel={(n) => tr.showAllCount.replace('{count}', String(n))}
+              allCurrenciesLabel={tr.allCurrencies}
+              onSelectPrimary={setPrimaryCurrency}
+            />
+
+            {/* Filters */}
+            <View style={[s.filterRow, { backgroundColor: c.card, borderColor: c.border, marginTop: 16, marginBottom: 22 }]}>
+              {(['all', 'income', 'expense'] as const).map(f => (
+                <TouchableOpacity
+                  key={f}
+                  onPress={() => setFilter(f)}
+                  style={[s.filterBtn, filter === f && { backgroundColor: f === 'income' ? c.green : f === 'expense' ? c.red : c.accent }]}>
+                  <Text style={[s.filterLabel, { color: filter === f ? '#fff' : c.sub }]}>
+                    {f === 'all' ? tr.all : f === 'income' ? tr.incomes : tr.expenses}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Empty state with CTA */}
+            {groups.length === 0 && (
+              <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.accent + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                  <IconSymbol name="banknote" size={32} color={c.accent} />
+                </View>
+                <Text style={{ color: c.text, fontSize: 16, marginTop: 6, fontWeight: '700' }}>{tr.noTransactions}</Text>
+                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.85 }}>{tr.pressToAdd}</Text>
+                <TouchableOpacity
+                  onPress={() => setShowAdd(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.add}
+                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <IconSymbol name="plus" size={15} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.add}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+    </>
+  );
+
+  // Той самий вміст показується модалкою на телефоні й колонкою на
+  // планшеті — див. DetailPane.
+  const txDetailBody = selected ? (() => {
+    const isIncome = selected.type === 'income';
+    const color = isIncome ? c.green : c.red;
+    const iconName: IconSymbolName = getCatIcon(selected.category, selected.type);
+    return (
+    <>
+                        <View style={s.handleRow}>
+                          <View style={{ flex: 1 }} />
+                          <View style={[s.handle, { backgroundColor: c.border }]} />
+                          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                            <TouchableOpacity onPress={() => setSelected(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                              <IconSymbol name="xmark" size={17} color={c.sub} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        {/* Hero */}
+                        <View style={[s.detailHero, { backgroundColor: color + '12', borderColor: color + '25' }]}>
+                          <View style={[s.detailIcon, { backgroundColor: color + '25' }]}>
+                            <IconSymbol name={iconName} size={30} color={color} />
+                          </View>
+                          <Text style={[s.detailAmount, { color, marginTop: 12 }]}>
+                            {isIncome ? '+' : '−'}{fmtCur(selected.amount, curOf(txCurrency(selected)))}
+                          </Text>
+                          <Text style={[s.detailCat, { color: c.text, marginTop: 4 }]}>{selected.category}</Text>
+                          <View style={{ flexDirection: 'row', gap: 6, marginTop: 10 }}>
+                            <View style={[s.typePill, { backgroundColor: color + '20', borderColor: color + '40' }]}>
+                              <IconSymbol name={isIncome ? 'arrow.up.trend' : 'arrow.down.trend'} size={11} color={color} />
+                              <Text style={{ color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{isIncome ? tr.income : tr.expense}</Text>
+                            </View>
+                            <View style={[s.typePill, { backgroundColor: c.dim, borderColor: c.border }]}>
+                              <Text style={{ color: c.sub, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>
+                                {curOf(txCurrency(selected)).code}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim, marginTop: 14 }]}>
+                          {selected.note ? <InfoRow icon="doc.text" label={tr.note} value={selected.note} color={c.sub} text={c.text} sub={c.sub} border={c.border} last={false} /> : null}
+                          <InfoRow icon="calendar" label={tr.creationDate} value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
+                        </View>
+
+                        {selected.history && selected.history.length > 0 && (
+                          <View style={{ marginTop: 14 }}>
+                            <Text style={[s.label, { color: c.sub, marginBottom: 8 }]}>{tr.history}</Text>
+                            {[...selected.history].reverse().map((h) => (
+                              <View key={h.id} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 10 }}>
+                                <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#F59E0B20', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                                  <IconSymbol name="pencil.circle.fill" size={14} color="#F59E0B" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{tr.transactionEdited}</Text>
+                                  <Text style={{ color: c.sub, fontSize: 12, marginTop: 1 }} numberOfLines={2}>{h.note}</Text>
+                                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 3 }}>
+                                    {new Date(h.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+                                    {' · '}
+                                    {new Date(h.at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+                                  </Text>
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+
+                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
+                          <TouchableOpacity onPress={() => deleteTx(selected.id)} style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
+                            <IconSymbol name="trash" size={15} color="#EF4444" />
+                            <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => startEdit(selected)} style={[s.btn, { flex: 1, backgroundColor: c.accent + '15', borderColor: c.accent + '40', borderWidth: 1 }]}>
+                            <IconSymbol name="pencil" size={15} color={c.accent} />
+                            <Text style={{ color: c.accent, fontWeight: '600', marginLeft: 5 }}>{tr.edit}</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 1, backgroundColor: c.accent }]}>
+                            <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.close}</Text>
+                          </TouchableOpacity>
+                        </View>
+    </>
+    );
+  })() : null;
+
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+      <View style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
         {/* Fixed Header */}
@@ -495,100 +682,22 @@ export default function FinanceScreen() {
           />
         </View>
 
-        <ScrollView
+        <FlatList
+          data={groups}
+          keyExtractor={group => group.dateStr}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />
-          }>
-
-          {/* Skeleton — перший завантаження */}
-          {!initialized && (
-            <>
-              <SkeletonCard style={{ marginTop: 4 }} />
-              <SkeletonCard />
-              <SkeletonCard />
-            </>
-          )}
-
-          {/* Date filter chip */}
-          {dateFilter && (
-            <TouchableOpacity
-              onPress={() => setDateFilter(null)}
-              style={[s.dateChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
-              <IconSymbol name="calendar" size={13} color={c.accent} />
-              <Text style={{ color: c.accent, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>
-                {dateFilter.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
-              </Text>
-              <IconSymbol name="xmark" size={13} color={c.accent} style={{ marginLeft: 4 }} />
-            </TouchableOpacity>
-          )}
-
-          {/* Balance Cards — one per active currency */}
-          <FinanceSummary
-            currencies={allCurrencies}
-            totalsByCurrency={totalsByCurrency}
-            primaryCode={primaryCurrency}
-            onPickPrimary={() => setShowPrimaryPicker(true)}
-            fmt={fmtCur}
-            isDark={isDark}
-            c={{ border: c.border, sub: c.sub, green: c.green, red: c.red }}
-            incomeLabel={tr.incomes}
-            expenseLabel={tr.expenses}
-            balanceLabel={tr.balance}
-            savingsLabel={tr.savings}
-            carryoverLabel={tr.carryover}
-            otherCurrenciesLabel={tr.otherCurrencies}
-            primaryBadgeLabel={tr.primaryBadge}
-            showAllLabel={(n) => tr.showAllCount.replace('{count}', String(n))}
-            allCurrenciesLabel={tr.allCurrencies}
-            onSelectPrimary={setPrimaryCurrency}
-          />
-
-          {/* Filters */}
-          <View style={[s.filterRow, { backgroundColor: c.card, borderColor: c.border, marginTop: 16, marginBottom: 22 }]}>
-            {(['all', 'income', 'expense'] as const).map(f => (
-              <TouchableOpacity
-                key={f}
-                onPress={() => setFilter(f)}
-                style={[s.filterBtn, filter === f && { backgroundColor: f === 'income' ? c.green : f === 'expense' ? c.red : c.accent }]}>
-                <Text style={[s.filterLabel, { color: filter === f ? '#fff' : c.sub }]}>
-                  {f === 'all' ? tr.all : f === 'income' ? tr.incomes : tr.expenses}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Empty state with CTA */}
-          {groups.length === 0 && (
-            <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-              <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.accent + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                <IconSymbol name="banknote" size={32} color={c.accent} />
-              </View>
-              <Text style={{ color: c.text, fontSize: 16, marginTop: 6, fontWeight: '700' }}>{tr.noTransactions}</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.85 }}>{tr.pressToAdd}</Text>
-              <TouchableOpacity
-                onPress={() => setShowAdd(true)}
-                accessibilityRole="button"
-                accessibilityLabel={tr.add}
-                style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <IconSymbol name="plus" size={15} color="#fff" />
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.add}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Grouped transactions */}
-          {groups.map((group, i) => (
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+          ListHeaderComponent={listHeader}
+          renderItem={({ item, index }) => (
             <Animated.View
-              key={group.dateStr}
-              entering={motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40))}
+              entering={shouldAnimateGroup(item.dateStr) ? motion.entering(FadeInDown.duration(200).delay(Math.min(index, 10) * 40)) : undefined}
               layout={motion.entering(LinearTransition.springify())}>
               <TransactionGroup
-                group={group}
+                group={item}
                 compact={compact}
                 isDark={isDark}
-                c={{ sub: c.sub, text: c.text, green: c.green, red: c.red, border: c.border, dim: c.dim }}
+                c={groupColors}
                 fmt={fmtCur}
                 currencyByCode={currencyByCode}
                 primaryCode={primaryCurrency}
@@ -600,14 +709,36 @@ export default function FinanceScreen() {
                 expenseLabel={tr.expense}
               />
             </Animated.View>
-          ))}
-        </ScrollView>
+          )}
+        />
       </SafeAreaView>
 
       {/* FAB */}
-      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { backgroundColor: c.accent }]}>
+      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </PressableScale>
+      </View>
+
+      <DetailPane
+        open={!!selected}
+        wide={isExpanded}
+        onClose={() => setSelected(null)}
+        isDark={isDark}
+        sheetColor={c.sheet}
+        borderColor={c.border}
+        maxHeight={height * 0.88}
+        scrollRef={txDetailScrollRef}
+        empty={
+          <>
+            <IconSymbol name="banknote" size={40} color={c.sub} />
+            <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginTop: 12 }}>{tr.txEmptyTitle}</Text>
+            <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 6 }}>{tr.txEmptyHint}</Text>
+          </>
+        }>
+        {txDetailBody}
+      </DetailPane>
+      </View>
+
 
       {/* Undo-тост */}
       {undoElement}
@@ -1064,99 +1195,6 @@ export default function FinanceScreen() {
         styles={s}
       />
 
-      {/* ─── Detail Modal ─── */}
-      <Modal visible={!!selected} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setSelected(null)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              {selected && (() => {
-                const isIncome = selected.type === 'income';
-                const color = isIncome ? c.green : c.red;
-                const iconName: IconSymbolName = getCatIcon(selected.category, selected.type);
-                return (
-                  <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
-                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                      <View style={s.handleRow}>
-                        <View style={{ flex: 1 }} />
-                        <View style={[s.handle, { backgroundColor: c.border }]} />
-                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                          <TouchableOpacity onPress={() => setSelected(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                            <IconSymbol name="xmark" size={17} color={c.sub} />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-
-                      {/* Hero */}
-                      <View style={[s.detailHero, { backgroundColor: color + '12', borderColor: color + '25' }]}>
-                        <View style={[s.detailIcon, { backgroundColor: color + '25' }]}>
-                          <IconSymbol name={iconName} size={30} color={color} />
-                        </View>
-                        <Text style={[s.detailAmount, { color, marginTop: 12 }]}>
-                          {isIncome ? '+' : '−'}{fmtCur(selected.amount, curOf(txCurrency(selected)))}
-                        </Text>
-                        <Text style={[s.detailCat, { color: c.text, marginTop: 4 }]}>{selected.category}</Text>
-                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 10 }}>
-                          <View style={[s.typePill, { backgroundColor: color + '20', borderColor: color + '40' }]}>
-                            <IconSymbol name={isIncome ? 'arrow.up.trend' : 'arrow.down.trend'} size={11} color={color} />
-                            <Text style={{ color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{isIncome ? tr.income : tr.expense}</Text>
-                          </View>
-                          <View style={[s.typePill, { backgroundColor: c.dim, borderColor: c.border }]}>
-                            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>
-                              {curOf(txCurrency(selected)).code}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim, marginTop: 14 }]}>
-                        {selected.note ? <InfoRow icon="doc.text" label={tr.note} value={selected.note} color={c.sub} text={c.text} sub={c.sub} border={c.border} last={false} /> : null}
-                        <InfoRow icon="calendar" label={tr.creationDate} value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
-                      </View>
-
-                      {selected.history && selected.history.length > 0 && (
-                        <View style={{ marginTop: 14 }}>
-                          <Text style={[s.label, { color: c.sub, marginBottom: 8 }]}>{tr.history}</Text>
-                          {[...selected.history].reverse().map((h) => (
-                            <View key={h.id} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 10 }}>
-                              <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#F59E0B20', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-                                <IconSymbol name="pencil.circle.fill" size={14} color="#F59E0B" />
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{tr.transactionEdited}</Text>
-                                <Text style={{ color: c.sub, fontSize: 12, marginTop: 1 }} numberOfLines={2}>{h.note}</Text>
-                                <Text style={{ color: c.sub, fontSize: 11, marginTop: 3 }}>
-                                  {new Date(h.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-                                  {' · '}
-                                  {new Date(h.at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-                                </Text>
-                              </View>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
-                        <TouchableOpacity onPress={() => deleteTx(selected.id)} style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
-                          <IconSymbol name="trash" size={15} color="#EF4444" />
-                          <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => startEdit(selected)} style={[s.btn, { flex: 1, backgroundColor: c.accent + '15', borderColor: c.accent + '40', borderWidth: 1 }]}>
-                          <IconSymbol name="pencil" size={15} color={c.accent} />
-                          <Text style={{ color: c.accent, fontWeight: '600', marginLeft: 5 }}>{tr.edit}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 1, backgroundColor: c.accent }]}>
-                          <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.close}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </ScrollView>
-                  </BlurView>
-                );
-              })()}
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
-
       {/* ─── Categories Modal ─── */}
       <Modal visible={showCats} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { setShowCats(false); setShowAddCat(false); }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -1537,7 +1575,7 @@ const s = StyleSheet.create({
   filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   filterLabel: { fontSize: 12, fontWeight: '600' },
   groupLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  fab:         { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  fab:         { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },

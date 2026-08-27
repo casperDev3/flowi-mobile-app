@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import { Onboarding } from '@/components/onboarding/Onboarding';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useOrientationLock } from '@/hooks/use-orientation-lock';
 import { initReporting } from '@/utils/reporting';
 import { AppModeProvider, useAppMode } from '@/store/app-mode';
 import { AuthProvider, useAuth } from '@/store/auth';
@@ -170,6 +171,8 @@ function SyncGate({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  useOrientationLock();
+
   return (
     <ErrorBoundary>
       <I18nProvider>

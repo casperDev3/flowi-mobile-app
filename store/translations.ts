@@ -858,6 +858,9 @@ export interface Translations {
   unitMinute: string;
   txEmptyTitle: string;
   txEmptyHint: string;
+  unitKcal: string;
+  unitKg: string;
+  unitGram: string;
 }
 
 const uk: Translations = {
@@ -894,6 +897,9 @@ const uk: Translations = {
   unitMinute: 'хв',
   txEmptyTitle: 'Оберіть транзакцію',
   txEmptyHint: 'Деталі та історія змін зʼявляться тут.',
+  unitKcal: 'кк',
+  unitKg: 'кг',
+  unitGram: 'г',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1687,6 +1693,9 @@ const en: Translations = {
   unitMinute: 'min',
   txEmptyTitle: 'Select a transaction',
   txEmptyHint: 'Details and change history will appear here.',
+  unitKcal: 'kcal',
+  unitKg: 'kg',
+  unitGram: 'g',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

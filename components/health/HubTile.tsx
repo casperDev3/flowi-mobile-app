@@ -3,11 +3,12 @@ import React from 'react';
 import { Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/shared/PressableScale';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 
 export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark, border, text, sub }: {
   title: string;
-  icon: string;
+  /** Типізовано: рядок пропускав назви, яких немає в маппінгу. */
+  icon: IconSymbolName;
   color: string;
   stat?: string;
   hint?: string;

@@ -830,6 +830,18 @@ export interface Translations {
    *  римськими, англійська арабськими, і підстановка «{n}» дала б
    *  в одній із мов беззмістовне «QIII». */
   quarters: string[];
+
+  // Історія завдання
+  historyEmpty: string;
+  historyCreated: string;
+  historyEdited: string;
+  historyDone: string;
+  historyRestored: string;
+  historyTimerStart: string;
+  historyTimerStop: string;
+  historySubtaskAdd: string;
+  historySubtaskDone: string;
+  historySubtaskUndone: string;
 }
 
 const uk: Translations = {
@@ -844,6 +856,16 @@ const uk: Translations = {
   noTasksMatchFilters: 'Під фільтри нічого не підходить',
   noTasksMatchFiltersHint: 'Завдання є, але їх приховано вибраними фільтрами.',
   quarters: ['I квартал', 'II квартал', 'III квартал', 'IV квартал'],
+  historyEmpty: 'Немає записів в історії',
+  historyCreated: 'Завдання створено',
+  historyEdited: 'Завдання відредаговано',
+  historyDone: 'Завдання виконано',
+  historyRestored: 'Завдання відновлено',
+  historyTimerStart: 'Таймер запущено',
+  historyTimerStop: 'Таймер зупинено',
+  historySubtaskAdd: 'Підзавдання додано',
+  historySubtaskDone: 'Підзавдання виконано',
+  historySubtaskUndone: 'Підзавдання відновлено',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1615,6 +1637,16 @@ const en: Translations = {
   noTasksMatchFilters: 'Nothing matches the filters',
   noTasksMatchFiltersHint: 'You have tasks, but the selected filters hide them.',
   quarters: ['Q1', 'Q2', 'Q3', 'Q4'],
+  historyEmpty: 'No history records',
+  historyCreated: 'Task created',
+  historyEdited: 'Task edited',
+  historyDone: 'Task completed',
+  historyRestored: 'Task restored',
+  historyTimerStart: 'Timer started',
+  historyTimerStop: 'Timer stopped',
+  historySubtaskAdd: 'Subtask added',
+  historySubtaskDone: 'Subtask completed',
+  historySubtaskUndone: 'Subtask restored',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

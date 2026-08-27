@@ -232,6 +232,19 @@ const MAPPING: Record<string, MaterialIconName> = {
   'wrench.fill': 'build',
   // Extra unstyled variants (missing)
   'bolt': 'bolt',
+
+  // Іконки, що вживалися в коді, але не мали відповідника тут: MAPPING[name]
+  // віддавав undefined, і на Android вони просто не малювалися. Типізацію
+  // це не ловило, бо всі такі місця приводили назву через `as any`.
+  'arrow.counterclockwise.circle.fill': 'restore',
+  'play.circle.fill': 'play-circle-filled',
+  'stop.circle.fill': 'stop-circle',
+  'plus.square.fill': 'add-box',
+  'checkmark.square.fill': 'check-box',
+  'square.dashed': 'check-box-outline-blank',
+  'rectangle.3.group': 'view-column',
+  'stethoscope': 'medical-services',
+  'syringe.fill': 'vaccines',
 };
 
 export type IconSymbolName = keyof typeof MAPPING;

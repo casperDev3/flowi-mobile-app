@@ -53,6 +53,7 @@ import { useCalendarNav, type CalSpan } from '@/hooks/use-calendar-nav';
 import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/use-task-editor';
 import { TaskDetailPane } from '@/components/tasks/TaskDetailPane';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
+import { TaskHistoryTab, type HistoryEventType, type TaskHistoryEvent } from '@/components/tasks/TaskHistoryTab';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
@@ -74,14 +75,6 @@ interface TaskTimeEntry {
   duration: number; // seconds
 }
 
-type HistoryEventType = 'created' | 'edited' | 'done' | 'active' | 'timer_start' | 'timer_stop' | 'subtask_add' | 'subtask_done' | 'subtask_undone';
-
-interface TaskHistoryEvent {
-  id: string;
-  at: string;
-  type: HistoryEventType;
-  note?: string;
-}
 
 interface Task {
   id: string;
@@ -244,33 +237,7 @@ function nextRecurrenceDate(fromDateStr: string, rule: RecurrenceRule): string |
 }
 
 
-function historyEventIcon(type: HistoryEventType): string {
-  switch (type) {
-    case 'created':        return 'plus.circle.fill';
-    case 'edited':         return 'pencil.circle.fill';
-    case 'done':           return 'checkmark.circle.fill';
-    case 'active':         return 'arrow.counterclockwise.circle.fill';
-    case 'timer_start':    return 'play.circle.fill';
-    case 'timer_stop':     return 'stop.circle.fill';
-    case 'subtask_add':    return 'plus.square.fill';
-    case 'subtask_done':   return 'checkmark.square.fill';
-    case 'subtask_undone': return 'square.dashed';
-  }
-}
 
-function historyEventColor(type: HistoryEventType): string {
-  switch (type) {
-    case 'created':        return '#10B981';
-    case 'edited':         return '#F59E0B';
-    case 'done':           return '#10B981';
-    case 'active':         return '#6366F1';
-    case 'timer_start':    return '#6366F1';
-    case 'timer_stop':     return '#EF4444';
-    case 'subtask_add':    return '#0EA5E9';
-    case 'subtask_done':   return '#10B981';
-    case 'subtask_undone': return '#F59E0B';
-  }
-}
 
 export default function TasksScreen() {
   const tabBarInset = useTabBarInset();
@@ -308,18 +275,6 @@ export default function TasksScreen() {
   ];
   const MONTHS_UA = tr.months;
   const WEEKDAYS_SHORT = tr.weekdays;
-  const HISTORY_LABELS: Record<HistoryEventType, string> = {
-    created:        lang === 'uk' ? 'Завдання створено'     : 'Task created',
-    edited:         lang === 'uk' ? 'Завдання відредаговано': 'Task edited',
-    done:           lang === 'uk' ? 'Завдання виконано'     : 'Task completed',
-    active:         lang === 'uk' ? 'Завдання відновлено'   : 'Task restored',
-    timer_start:    lang === 'uk' ? 'Таймер запущено'       : 'Timer started',
-    timer_stop:     lang === 'uk' ? 'Таймер зупинено'       : 'Timer stopped',
-    subtask_add:    lang === 'uk' ? 'Підзавдання додано'    : 'Subtask added',
-    subtask_done:   lang === 'uk' ? 'Підзавдання виконано'  : 'Subtask completed',
-    subtask_undone: lang === 'uk' ? 'Підзавдання відновлено': 'Subtask restored',
-  };
-
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
 
@@ -1333,30 +1288,13 @@ export default function TasksScreen() {
 
                     {/* ─── History Tab ─── */}
                     {!editor.editing && detailTab === 'history' && (
-                      <View>
-                        {!(selectedTask.history?.length) ? (
-                          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>
-                            {lang === 'uk' ? 'Немає записів в історії' : 'No history records'}
-                          </Text>
-                        ) : (
-                          [...(selectedTask.history ?? [])].reverse().map((event) => (
-                            <View key={event.id} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14, gap: 10 }}>
-                              <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: historyEventColor(event.type) + '20', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-                                <IconSymbol name={historyEventIcon(event.type) as any} size={14} color={historyEventColor(event.type)} />
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{HISTORY_LABELS[event.type]}</Text>
-                                {event.note ? <Text style={{ color: c.sub, fontSize: 12, marginTop: 1 }} numberOfLines={2}>{event.note}</Text> : null}
-                                <Text style={{ color: c.sub, fontSize: 11, marginTop: 3 }}>
-                                  {new Date(event.at).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })}
-                                  {' · '}
-                                  {new Date(event.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
-                                </Text>
-                              </View>
-                            </View>
-                          ))
-                        )}
-                      </View>
+                      <TaskHistoryTab
+                        events={selectedTask.history ?? []}
+                        textColor={c.text}
+                        subColor={c.sub}
+                        tr={tr}
+                        locale={locale}
+                      />
                     )}
 
                     {editor.editing ? (

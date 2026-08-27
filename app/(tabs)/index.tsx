@@ -57,8 +57,10 @@ import { TaskHistoryTab, type HistoryEventType, type TaskHistoryEvent } from '@/
 import { TaskTimerTab } from '@/components/tasks/TaskTimerTab';
 import { TaskEditForm } from '@/components/tasks/TaskEditForm';
 import { CalendarGrid } from '@/components/tasks/CalendarGrid';
+import { TaskReminderRow } from '@/components/tasks/TaskReminderRow';
 import { getActiveTimerEntry, totalSecondsIncludingActive, totalTrackedSeconds } from '@/utils/taskTimer';
 import { monthGrid } from '@/utils/dateUtils';
+import { initialReminderDraft, resolveReminderMoment } from '@/utils/reminderTime';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
@@ -901,18 +903,10 @@ export default function TasksScreen() {
     const existing = subtaskId
       ? task.subtasks.find(s => s.id === subtaskId)?.reminderAt
       : task.reminderAt;
-    if (existing) {
-      const d = new Date(existing);
-      setReminderHours(String(d.getHours()).padStart(2, '0'));
-      setReminderMins(String(d.getMinutes()).padStart(2, '0'));
-      setReminderDate(existing);
-    } else {
-      const now = new Date();
-      now.setMinutes(now.getMinutes() + 30, 0, 0);
-      setReminderHours(String(now.getHours()).padStart(2, '0'));
-      setReminderMins(String(now.getMinutes()).padStart(2, '0'));
-      setReminderDate(now.toISOString());
-    }
+    const draft = initialReminderDraft(existing);
+    setReminderHours(draft.hours);
+    setReminderMins(draft.mins);
+    setReminderDate(draft.date);
     setReminderPickerTarget({ taskId, subtaskId });
     setShowReminderPicker(true);
   }, [tasks]);
@@ -920,13 +914,7 @@ export default function TasksScreen() {
   const saveReminder = useCallback(async () => {
     if (!reminderPickerTarget) return;
     const { taskId, subtaskId } = reminderPickerTarget;
-    const h = Math.max(0, Math.min(23, parseInt(reminderHours || '0', 10)));
-    const m = Math.max(0, Math.min(59, parseInt(reminderMins || '0', 10)));
-    const base = reminderDate ? new Date(reminderDate) : new Date();
-    base.setHours(h, m, 0, 0);
-    if (base <= new Date()) {
-      base.setDate(base.getDate() + 1);
-    }
+    const base = resolveReminderMoment({ date: reminderDate, hours: reminderHours, mins: reminderMins });
     const isoDate = base.toISOString();
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
@@ -1333,88 +1321,29 @@ export default function TasksScreen() {
                     </View>
 
                     {/* Reminder row */}
-                    <View style={{ marginTop: 7 }}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          if (showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId) {
-                            setShowReminderPicker(false);
-                          } else {
-                            openReminderPicker(selectedTask.id);
-                          }
-                        }}
-                        style={[s.badge, { backgroundColor: selectedTask.reminderAt ? '#F59E0B20' : c.dim, borderColor: selectedTask.reminderAt ? '#F59E0B50' : c.border, alignSelf: 'flex-start' }]}>
-                        <IconSymbol name="bell" size={11} color={selectedTask.reminderAt ? '#F59E0B' : c.sub} />
-                        <Text style={{ color: selectedTask.reminderAt ? '#F59E0B' : c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                          {selectedTask.reminderAt
-                            ? `Нагадування: ${new Date(selectedTask.reminderAt).toLocaleString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
-                            : tr.reminderDate}
-                        </Text>
-                        {selectedTask.reminderAt && (
-                          <TouchableOpacity
-                            onPress={(e) => { e.stopPropagation(); removeReminder(selectedTask.id); }}
-                            style={{ marginLeft: 6 }}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <IconSymbol name="xmark" size={10} color="#F59E0B" />
-                          </TouchableOpacity>
-                        )}
-                      </TouchableOpacity>
-
-                      {showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId && (
-                        <View style={[s.reminderPickerBox, { borderColor: c.border, backgroundColor: c.dim }]}>
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 8 }}>{tr.reminderDate}</Text>
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-                            <View style={{ flexDirection: 'row', gap: 7 }}>
-                              {[{ label: tr.dateToday, days: 0 }, { label: tr.dateTomorrow, days: 1 }, { label: tr.datePlus2, days: 2 }, { label: tr.datePlus7, days: 7 }].map(preset => {
-                                const d = new Date(); d.setDate(d.getDate() + preset.days);
-                                const iso = d.toISOString();
-                                const isSelected = reminderDate && new Date(reminderDate).toDateString() === d.toDateString();
-                                return (
-                                  <TouchableOpacity
-                                    key={preset.label}
-                                    onPress={() => {
-                                      const nd = new Date(d);
-                                      nd.setHours(parseInt(reminderHours || '0', 10), parseInt(reminderMins || '0', 10), 0, 0);
-                                      setReminderDate(nd.toISOString());
-                                    }}
-                                    style={[s.sortChip, { backgroundColor: isSelected ? '#F59E0B' : c.dim, borderColor: isSelected ? '#F59E0B' : c.border }]}>
-                                    <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>{preset.label}</Text>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-                          </ScrollView>
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 8 }}>{tr.timeLabel}</Text>
-                          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-                            <TextInput
-                              value={reminderHours}
-                              onChangeText={v => setReminderHours(v.replace(/\D/g, '').slice(0, 2))}
-                              keyboardType="number-pad"
-                              placeholder={lang === 'uk' ? 'ГГ' : 'HH'}
-                              placeholderTextColor={c.sub}
-                              style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                            />
-                            <Text style={{ color: c.sub, fontSize: 18, fontWeight: '700' }}>:</Text>
-                            <TextInput
-                              value={reminderMins}
-                              onChangeText={v => setReminderMins(v.replace(/\D/g, '').slice(0, 2))}
-                              keyboardType="number-pad"
-                              placeholder={lang === 'uk' ? 'ХХ' : 'MM'}
-                              placeholderTextColor={c.sub}
-                              style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                            />
-                          </View>
-                          <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <TouchableOpacity onPress={() => setShowReminderPicker(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                              <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={saveReminder} style={[s.btn, { flex: 2, backgroundColor: '#F59E0B' }]}>
-                              <IconSymbol name="bell" size={14} color="#fff" />
-                              <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 6 }}>{tr.setReminder}</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      )}
-                    </View>
+                    <TaskReminderRow
+                      reminderAt={selectedTask.reminderAt}
+                      open={showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId}
+                      draft={{ date: reminderDate, hours: reminderHours, mins: reminderMins }}
+                      onToggleOpen={() => {
+                        if (showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId) {
+                          setShowReminderPicker(false);
+                        } else {
+                          openReminderPicker(selectedTask.id);
+                        }
+                      }}
+                      onChangeDraft={part => {
+                        if (part.date !== undefined) setReminderDate(part.date);
+                        if (part.hours !== undefined) setReminderHours(part.hours);
+                        if (part.mins !== undefined) setReminderMins(part.mins);
+                      }}
+                      onSave={saveReminder}
+                      onRemove={() => removeReminder(selectedTask.id)}
+                      onCancel={() => setShowReminderPicker(false)}
+                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
+                      tr={tr}
+                      locale={locale}
+                    />
 
                     {/* Project changer */}
                     {pickableProjects.length > 0 && (

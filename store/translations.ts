@@ -847,6 +847,9 @@ export interface Translations {
   startedAtLabel: string;
   timerHint: string;
   statusLabel: string;
+  reminderAtLabel: string;
+  hoursShort: string;
+  minutesShort: string;
 }
 
 const uk: Translations = {
@@ -874,6 +877,9 @@ const uk: Translations = {
   startedAtLabel: 'Почато о',
   timerHint: 'Натисніть «Запустити», щоб почати відстежувати час',
   statusLabel: 'Статус',
+  reminderAtLabel: 'Нагадування',
+  hoursShort: 'ГГ',
+  minutesShort: 'ХХ',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1658,6 +1664,9 @@ const en: Translations = {
   startedAtLabel: "Started at",
   timerHint: "Press 'Start' to begin tracking time",
   statusLabel: 'Status',
+  reminderAtLabel: 'Reminder',
+  hoursShort: 'HH',
+  minutesShort: 'MM',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

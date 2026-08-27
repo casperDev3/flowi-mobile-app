@@ -846,6 +846,7 @@ export interface Translations {
   // Таймер завдання
   startedAtLabel: string;
   timerHint: string;
+  statusLabel: string;
 }
 
 const uk: Translations = {
@@ -872,6 +873,7 @@ const uk: Translations = {
   historySubtaskUndone: 'Підзавдання відновлено',
   startedAtLabel: 'Почато о',
   timerHint: 'Натисніть «Запустити», щоб почати відстежувати час',
+  statusLabel: 'Статус',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1655,6 +1657,7 @@ const en: Translations = {
   historySubtaskUndone: 'Subtask restored',
   startedAtLabel: "Started at",
   timerHint: "Press 'Start' to begin tracking time",
+  statusLabel: 'Status',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

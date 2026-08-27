@@ -4,7 +4,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  AppState,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -51,6 +50,7 @@ import type { Project } from '../projects';
 import { useResponsive } from '@/hooks/use-responsive';
 import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/use-task-editor';
 import { TaskDetailPane } from '@/components/tasks/TaskDetailPane';
+import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
@@ -415,8 +415,6 @@ export default function TasksScreen() {
 
   // Detail tab + timer display
   const [detailTab, setDetailTab] = useState<'info' | 'timer' | 'history'>('info');
-  const [timerTick, setTimerTick] = useState(0);
-  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadAll = useCallback(async () => {
     const [t, p, m, statuses] = await Promise.all([
@@ -483,26 +481,9 @@ export default function TasksScreen() {
     setShowReminderPicker(false);
   }, [selected?.id]);
 
-  // AppState listener — refresh timer display when app returns from background
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') setTimerTick(t => t + 1);
-    });
-    return () => sub.remove();
-  }, []);
-
   // Timer interval — run while selected task has active timer entry
   const selectedTaskForTimer = selected ? tasks.find(t => t.id === selected.id) : null;
   const isTimerRunning = selectedTaskForTimer ? !!getActiveTimerEntry(selectedTaskForTimer) : false;
-
-  useEffect(() => {
-    if (isTimerRunning) {
-      timerIntervalRef.current = setInterval(() => setTimerTick(t => t + 1), 1000);
-    } else {
-      if (timerIntervalRef.current) { clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; }
-    }
-    return () => { if (timerIntervalRef.current) { clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; } };
-  }, [isTimerRunning]);
 
   const todayStr = today.toDateString();
   // Tasks due today (deadline = today) — both done and not done
@@ -921,6 +902,10 @@ export default function TasksScreen() {
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
   }, []);
 
+  // Стабільні посилання: інакше React.memo на картках нічого не дає.
+  const handleSelectTask = useCallback((task: Task) => setSelected(task), []);
+  const handleToggleTask = useCallback((task: Task) => toggleTask(task.id), [toggleTask]);
+
   const saveTaskEdit = useCallback(() => {
     if (!editor.draft.title.trim() || !selected) return;
     const estimatedMinutes = draftEstimatedMinutes(editor.draft);
@@ -1078,7 +1063,10 @@ export default function TasksScreen() {
     setSearch('');
   }, []);
 
-  const c = {
+  // Мемоізовано: палітра йде пропом у кожну картку списку, і новий об'єкт
+  // щорендеру ламав би React.memo на них — а рендери тут часті, бо тік
+  // таймера смикає екран щосекунди.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
@@ -1088,7 +1076,7 @@ export default function TasksScreen() {
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-  };
+  }), [isDark]);
 
   // Calendar helpers (filter calendar)
   const firstDay = (() => { const d = new Date(calYear, calMonth, 1).getDay(); return d === 0 ? 6 : d - 1; })();
@@ -1299,9 +1287,11 @@ export default function TasksScreen() {
                           <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' }}>
                             {isTimerRunning ? tr.currentSession : tr.trackedTime}
                           </Text>
-                          <Text style={{ color: c.text, fontSize: 44, fontWeight: '800', letterSpacing: -1 }}>
-                            {timerTick >= 0 && fmtClock(isTimerRunning ? calcElapsedSeconds(selectedTask) : getTotalTrackedSeconds(selectedTask))}
-                          </Text>
+                          <ElapsedClock
+                            running={isTimerRunning}
+                            seconds={() => isTimerRunning ? calcElapsedSeconds(selectedTask) : getTotalTrackedSeconds(selectedTask)}
+                            format={fmtClock}
+                            style={{ color: c.text, fontSize: 44, fontWeight: '800', letterSpacing: -1 }} />
                           {isTimerRunning && (() => {
                             const ae = getActiveTimerEntry(selectedTask);
                             return ae ? (
@@ -2376,8 +2366,8 @@ export default function TasksScreen() {
                       <CompactCard
                         task={task}
                         statusColumn={taskStatusColumn(task, taskStatuses)}
-                        onPress={() => setSelected(task)}
-                        onToggle={() => toggleTask(task.id)}
+                        onPress={handleSelectTask}
+                        onToggle={handleToggleTask}
                         c={c}
                         isDark={isDark}
                         projects={projects}
@@ -3640,11 +3630,18 @@ export default function TasksScreen() {
 // ─── Compact Card ────────────────────────────────────────────────────────────
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
-function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, overdueLabel, priorityLabel, subtasksLabel }: {
+/**
+ * Мемоізована: у списку її примірників стільки ж, скільки завдань, а екран
+ * перемальовується щосекунди, поки йде таймер. Щоб memo працювала,
+ * колбеки приймають завдання аргументом — інакше виклик довелося б
+ * загортати в стрілку, нову при кожному рендері.
+ */
+const CompactCard = React.memo(function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, overdueLabel, priorityLabel, subtasksLabel }: {
   task: Task;
   statusColumn: TaskStatusColumn;
-  onPress: () => void;
-  onToggle: () => void;
+  /** Завдання приходить аргументом, щоб екран міг тримати колбек стабільним. */
+  onPress: (task: Task) => void;
+  onToggle: (task: Task) => void;
   c: any;
   isDark: boolean;
   projects: Project[];
@@ -3684,7 +3681,7 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
   ].filter(Boolean).join(', ');
 
   return (
-    <PressableScale onPress={onPress}>
+    <PressableScale onPress={() => onPress(task)}>
       <BlurView
         intensity={isDark ? 18 : 35}
         tint={isDark ? 'dark' : 'light'}
@@ -3697,7 +3694,7 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
           borderColor={c.border}
           size={18}
           radius={5}
-          onPress={onToggle}
+          onPress={() => onToggle(task)}
           hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
           accessibilityRole="checkbox"
           accessibilityLabel={task.title}
@@ -3759,54 +3756,7 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
       </BlurView>
     </PressableScale>
   );
-}
-
-// ─── Board Card ─────────────────────────────────────────────────────────────
-function BoardCard({ task, onPress, onToggle, c, isDark, todayLabel, yesterdayLabel, tomorrowLabel, locale }: {
-  task: Task;
-  onPress: () => void;
-  onToggle: () => void;
-  c: any;
-  isDark: boolean;
-  todayLabel: string;
-  yesterdayLabel: string;
-  tomorrowLabel: string;
-  locale: string;
-}) {
-  const overdue = isOverdue(task);
-  const isDone = task.status === 'done';
-  return (
-    <PressableScale onPress={onPress} style={{ marginBottom: 8 }}>
-      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={s.boardCard}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 7 }}>
-          <AnimatedCheck
-            checked={isDone}
-            color="#10B981"
-            borderColor={c.border}
-            size={18}
-            radius={5}
-            onPress={onToggle}
-            hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
-            style={{ marginTop: 1 }}
-          />
-          <View style={{ flex: 1 }}>
-            <Text numberOfLines={3} style={{ color: c.text, fontSize: 12, fontWeight: '600', lineHeight: 17, opacity: isDone ? 0.45 : 1, textDecorationLine: isDone ? 'line-through' : 'none' }}>
-              {task.title}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 7, gap: 5 }}>
-              <View style={[s.dot, { backgroundColor: PRIORITY_COLORS[task.priority] }]} />
-              {task.deadline && (
-                <Text style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 10, fontWeight: '500' }}>
-                  {deadlineLabel(task.deadline!, todayLabel, yesterdayLabel, tomorrowLabel, locale)}
-                </Text>
-              )}
-            </View>
-          </View>
-        </View>
-      </BlurView>
-    </PressableScale>
-  );
-}
+});
 
 // ─── Calendar Grid ───────────────────────────────────────────────────────────
 function CalendarGrid({ year, month, markedDays, selectedDate, todayDate, weeks, onPrevMonth, onNextMonth, onSelectDay, c, months, weekdays }: {

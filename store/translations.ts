@@ -850,6 +850,7 @@ export interface Translations {
   reminderAtLabel: string;
   hoursShort: string;
   minutesShort: string;
+  viewAllSubtasks: string;
 }
 
 const uk: Translations = {
@@ -880,6 +881,7 @@ const uk: Translations = {
   reminderAtLabel: 'Нагадування',
   hoursShort: 'ГГ',
   minutesShort: 'ХХ',
+  viewAllSubtasks: 'Переглянути всі',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -1667,6 +1669,7 @@ const en: Translations = {
   reminderAtLabel: 'Reminder',
   hoursShort: 'HH',
   minutesShort: 'MM',
+  viewAllSubtasks: 'View all',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',

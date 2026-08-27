@@ -58,6 +58,7 @@ import { TaskTimerTab } from '@/components/tasks/TaskTimerTab';
 import { TaskEditForm } from '@/components/tasks/TaskEditForm';
 import { CalendarGrid } from '@/components/tasks/CalendarGrid';
 import { TaskReminderRow } from '@/components/tasks/TaskReminderRow';
+import { TaskSubtasks } from '@/components/tasks/TaskSubtasks';
 import { getActiveTimerEntry, totalSecondsIncludingActive, totalTrackedSeconds } from '@/utils/taskTimer';
 import { monthGrid } from '@/utils/dateUtils';
 import { initialReminderDraft, resolveReminderMoment } from '@/utils/reminderTime';
@@ -1392,117 +1393,28 @@ export default function TasksScreen() {
                       </View>
                     )}
 
-                    {/* Subtasks section */}
-                    <View style={{ marginTop: 14, borderRadius: 16, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderWidth: 1, borderColor: c.border, padding: 12 }}>
-
-                    {selectedTask.subtasks.length > 0 && (
-                      <View style={{ marginBottom: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                          <IconSymbol name="list.bullet" size={13} color={c.sub} />
-                          <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0, flex: 1 }]}>
-                            {tr.subtasks} · {selectedTask.subtasks.filter(x => x.done).length}/{selectedTask.subtasks.length}
-                          </Text>
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{getProgress(selectedTask)}%</Text>
-                        </View>
-                        <View style={s.progressBg}>
-                          <View style={[s.progressFill, { width: `${getProgress(selectedTask)}%`, backgroundColor: selectedTask.status === 'done' ? '#10B981' : c.accent }]} />
-                        </View>
-                      </View>
-                    )}
-
-                    {!selectedTask.subtasks.length && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                        <IconSymbol name="list.bullet" size={13} color={c.sub} />
-                        <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0 }]}>{tr.subtasks}</Text>
-                      </View>
-                    )}
-
-                    {(() => {
-                      // completed subtasks go to end
-                      const sortedSubs = [...selectedTask.subtasks].sort((a, b) => Number(a.done) - Number(b.done));
-                      const LIMIT = 4;
-                      const hasMore = sortedSubs.length > LIMIT;
-                      const displaySubs = hasMore ? sortedSubs.slice(0, LIMIT) : sortedSubs;
-                      return (
-                        <View style={{ gap: 7 }}>
-                          {displaySubs.map((sub) => {
-                            const originalIdx = selectedTask.subtasks.findIndex(s => s.id === sub.id);
-                            if (editingSubId === sub.id) {
-                              return (
-                                <View key={sub.id} style={[s.subRow, { backgroundColor: c.dim, borderColor: c.accent + '80' }]}>
-                                  <View style={[s.subCheck, { borderColor: c.accent, backgroundColor: 'transparent' }]} />
-                                  <TextInput
-                                    value={editingSubText}
-                                    onChangeText={setEditingSubText}
-                                    autoFocus
-                                    onSubmitEditing={() => saveSubEdit(selectedTask.id, sub.id, editingSubText)}
-                                    returnKeyType="done"
-                                    style={[s.subTitle, { color: c.text, flex: 1, marginHorizontal: 10 }]}
-                                  />
-                                  <TouchableOpacity onPress={() => saveSubEdit(selectedTask.id, sub.id, editingSubText)}>
-                                    <IconSymbol name="checkmark.circle.fill" size={20} color={c.accent} />
-                                  </TouchableOpacity>
-                                </View>
-                              );
-                            }
-                            return (
-                              <TouchableOpacity
-                                key={sub.id}
-                                activeOpacity={0.7}
-                                onPress={() => toggleSubtask(selectedTask.id, sub.id)}
-                                onLongPress={() => showSubtaskActions(selectedTask.id, sub, originalIdx, selectedTask.subtasks.length)}
-                                delayLongPress={350}
-                                style={[s.subRow, { backgroundColor: c.dim, borderColor: sub.done ? '#10B98130' : c.border }]}>
-                                <View style={[s.subCheck, { borderColor: sub.done ? '#10B981' : c.border, backgroundColor: sub.done ? '#10B981' : 'transparent' }]}>
-                                  {sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
-                                </View>
-                                <Text style={[s.subTitle, { color: sub.done ? c.sub : c.text, textDecorationLine: sub.done ? 'line-through' : 'none', flex: 1, marginHorizontal: 10 }]}>{sub.title}</Text>
-                                <TouchableOpacity onPress={() => showSubtaskActions(selectedTask.id, sub, originalIdx, selectedTask.subtasks.length)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                                  <IconSymbol name="ellipsis" size={14} color={c.sub} />
-                                </TouchableOpacity>
-                              </TouchableOpacity>
-                            );
-                          })}
-
-                          {hasMore && (
-                            <TouchableOpacity
-                              onPress={() => {
-                                setSelected(null);
-                                setEditingSubId(null);
-                                router.push({ pathname: '/subtasks', params: { taskId: selectedTask.id } });
-                              }}
-                              style={[s.viewAllBtn, { backgroundColor: c.accent + '12', borderColor: c.accent + '40' }]}>
-                              <IconSymbol name="list.bullet" size={14} color={c.accent} />
-                              <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 8 }}>
-                                {lang === 'uk' ? 'Переглянути всі' : 'View all'} · {selectedTask.subtasks.length}
-                              </Text>
-                              <IconSymbol name="chevron.right" size={12} color={c.accent} />
-                            </TouchableOpacity>
-                          )}
-
-                          <View style={[s.addSubRow, { borderColor: c.border, backgroundColor: c.dim }]}>
-                            <IconSymbol name="plus" size={15} color={c.sub} />
-                            <TextInput
-                              placeholder={tr.addSubtask}
-                              placeholderTextColor={c.sub}
-                              value={newSubtask}
-                              onChangeText={setNewSubtask}
-                              onSubmitEditing={() => addSubtask(selectedTask.id)}
-                              returnKeyType="done"
-                              onFocus={() => setTimeout(() => detailScrollRef.current?.scrollToEnd({ animated: true }), 300)}
-                              style={[s.subInput, { color: c.text, flex: 1, marginLeft: 8 }]}
-                            />
-                            {newSubtask.trim() ? (
-                              <TouchableOpacity onPress={() => addSubtask(selectedTask.id)}>
-                                <IconSymbol name="checkmark.circle.fill" size={20} color={c.accent} />
-                              </TouchableOpacity>
-                            ) : null}
-                          </View>
-                        </View>
-                      );
-                    })()}
-
-                    </View>{/* end subtasks block */}
+                    <TaskSubtasks
+                      task={selectedTask}
+                      progressPercent={getProgress(selectedTask)}
+                      editingId={editingSubId}
+                      editingText={editingSubText}
+                      onChangeEditingText={setEditingSubText}
+                      onSaveEdit={(subId, text) => saveSubEdit(selectedTask.id, subId, text)}
+                      onToggle={subId => toggleSubtask(selectedTask.id, subId)}
+                      onShowActions={(sub, idx) => showSubtaskActions(selectedTask.id, sub, idx, selectedTask.subtasks.length)}
+                      onOpenAll={() => {
+                        setSelected(null);
+                        setEditingSubId(null);
+                        router.push({ pathname: '/subtasks', params: { taskId: selectedTask.id } });
+                      }}
+                      newText={newSubtask}
+                      onChangeNewText={setNewSubtask}
+                      onAdd={() => addSubtask(selectedTask.id)}
+                      onFocusInput={() => setTimeout(() => detailScrollRef.current?.scrollToEnd({ animated: true }), 300)}
+                      colors={c}
+                      isDark={isDark}
+                      tr={tr}
+                    />
 
                     {/* Quick timer launch from info tab */}
                     {selectedTask.status === 'active' && (

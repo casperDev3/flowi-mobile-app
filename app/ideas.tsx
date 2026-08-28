@@ -2,9 +2,10 @@ import * as Clipboard from 'expo-clipboard';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -60,6 +61,147 @@ const STATUS_LABELS: Record<IdeaStatus, string> = {
   done: 'Реалізовано',
 };
 
+// Довідники не залежать від стану — тримаємо поза компонентом, щоб не
+// створювати нові об'єкти на кожному рендері.
+const PRIORITY_ORDER: Record<IdeaPriority, number> = { high: 0, medium: 1, low: 2 };
+
+// 'planned' — застарілий статус зі старих записів, лишається заради сумісності.
+const STATUS_COLORS: Record<string, string> = {
+  idea: '#8B5CF6',
+  planned: '#8B5CF6',
+  done: '#10B981',
+};
+
+const STATUS_ICONS: Record<string, string> = {
+  idea: 'lightbulb',
+  planned: 'lightbulb',
+  done: 'checkmark',
+};
+
+interface IdeaCardProps {
+  idea: Idea;
+  isDark: boolean;
+  borderColor: string;
+  textColor: string;
+  subColor: string;
+  editLabel: string;
+  copyLabel: string;
+  deleteLabel: string;
+  onShowActions: (idea: Idea) => void;
+  onCycleStatus: (id: string) => void;
+  onEdit: (idea: Idea) => void;
+  onCopy: (idea: Idea) => void;
+  onDelete: (id: string) => void;
+  onSendToDev: (idea: Idea) => void;
+}
+
+/**
+ * Рядок списку мемоізований: набір тексту в модалці «Нова ідея» інакше
+ * перемальовує всі картки разом із їхніми BlurView.
+ */
+const IdeaCard = React.memo(function IdeaCard({
+  idea, isDark, borderColor, textColor, subColor,
+  editLabel, copyLabel, deleteLabel,
+  onShowActions, onCycleStatus, onEdit, onCopy, onDelete, onSendToDev,
+}: IdeaCardProps) {
+  const prio = PRIORITY[idea.priority];
+  const statusColor = STATUS_COLORS[idea.status];
+  const statusIcon = STATUS_ICONS[idea.status];
+  const isDone = idea.status === 'done';
+  return (
+    <TouchableOpacity
+      activeOpacity={0.95}
+      onLongPress={() => onShowActions(idea)}
+      delayLongPress={350}>
+      <BlurView
+        intensity={isDark ? 18 : 35}
+        tint={isDark ? 'dark' : 'light'}
+        style={[st.ideaCard, { borderColor: isDone ? '#10B98130' : statusColor + '40', opacity: isDone ? 0.7 : 1 }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+          {/* Status checkbox */}
+          <TouchableOpacity
+            onPress={() => onCycleStatus(idea.id)}
+            style={[st.check, { borderColor: statusColor, backgroundColor: isDone ? statusColor : 'transparent' }]}>
+            <IconSymbol name={statusIcon as any} size={11} color={isDone ? '#fff' : statusColor} />
+          </TouchableOpacity>
+
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <View style={[st.badge, { backgroundColor: statusColor + '20', borderColor: statusColor + '40' }]}>
+                <Text style={{ color: statusColor, fontSize: 10, fontWeight: '700' }}>{STATUS_LABELS[idea.status as IdeaStatus] ?? STATUS_LABELS['idea']}</Text>
+              </View>
+              <View style={[st.badge, { backgroundColor: prio.color + '18', borderColor: prio.color + '35' }]}>
+                <IconSymbol name={prio.icon as any} size={9} color={prio.color} />
+                <Text style={{ color: prio.color, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>{prio.label}</Text>
+              </View>
+              {idea.sentToDev && (
+                <View style={[st.badge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
+                  <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>✉️ Надіслано</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[st.ideaTitle, { color: textColor, textDecorationLine: isDone ? 'line-through' : 'none' }]}>
+              {idea.title}
+            </Text>
+            {idea.description ? (
+              <Text style={[st.ideaDesc, { color: subColor }]} numberOfLines={2}>
+                {idea.description}
+              </Text>
+            ) : null}
+            <Text style={{ color: subColor, fontSize: 10, marginTop: 6 }}>
+              {new Date(idea.createdAt).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+
+          {/* Action buttons */}
+          <View style={{ flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+            <TouchableOpacity
+              onPress={e => { e.stopPropagation(); onEdit(idea); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={editLabel}
+              style={[st.actionBtn, { backgroundColor: '#6366F115', borderColor: '#6366F130' }]}>
+              <IconSymbol name="pencil" size={13} color="#6366F1" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={e => { e.stopPropagation(); onCopy(idea); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={copyLabel}
+              style={[st.actionBtn, { backgroundColor: '#0EA5E915', borderColor: '#0EA5E930' }]}>
+              <IconSymbol name="doc.on.clipboard" size={13} color="#0EA5E9" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={e => { e.stopPropagation(); onDelete(idea.id); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={deleteLabel}
+              style={[st.actionBtn, { backgroundColor: '#EF444415', borderColor: '#EF444430' }]}>
+              <IconSymbol name="trash" size={13} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Send to dev button */}
+        <TouchableOpacity
+          onPress={() => onSendToDev(idea)}
+          disabled={idea.sentToDev}
+          activeOpacity={0.7}
+          style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5,
+            alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 7,
+            backgroundColor: 'transparent',
+            borderWidth: 1, borderColor: idea.sentToDev ? '#10B98130' : borderColor }}>
+          <IconSymbol name="paperplane" size={11} color={idea.sentToDev ? '#10B981' : subColor} />
+          <Text style={{ color: idea.sentToDev ? '#10B981' : subColor, fontSize: 11, fontWeight: '600' }}>
+            {idea.sentToDev ? 'Надіслано розробнику' : 'Надіслати розробнику'}
+          </Text>
+        </TouchableOpacity>
+      </BlurView>
+    </TouchableOpacity>
+  );
+});
+
 export default function IdeasScreen() {
   const contentWidth = useContentWidth();
   const { height } = useResponsive();
@@ -84,7 +226,8 @@ export default function IdeasScreen() {
   const [editDesc, setEditDesc] = useState('');
   const [editPriority, setEditPriority] = useState<IdeaPriority>('medium');
 
-  const c = {
+  // Палітра стабільна між рендерами — інакше React.memo на картці не спрацює.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F5F0FF',
     bg2:    isDark ? '#14121E' : '#EDE8FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
@@ -93,7 +236,7 @@ export default function IdeasScreen() {
     accent: '#8B5CF6',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-  };
+  }), [isDark]);
 
   const loadIdeas = useCallback(async () => {
     const data = await loadData<Idea[]>('ideas', []);
@@ -113,11 +256,9 @@ export default function IdeasScreen() {
     if (initialized) void saveSynced('ideas', ideas);
   }, [ideas, initialized]);
 
-  const PRIORITY_ORDER: Record<IdeaPriority, number> = { high: 0, medium: 1, low: 2 };
+  const sentCount = useMemo(() => ideas.filter(i => !!i.sentToDev).length, [ideas]);
 
-  const sentCount = ideas.filter(i => !!i.sentToDev).length;
-
-  const filtered = ideas
+  const filtered = useMemo(() => ideas
     .filter(i => {
       if (filter === 'sent') return !!i.sentToDev;
       if (filter === 'all') return true;
@@ -127,10 +268,13 @@ export default function IdeasScreen() {
       if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       if (sort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
-    });
+    }), [ideas, filter, sort]);
 
-  const ideaCount = ideas.filter(i => i.status === 'idea' || i.status === ('planned' as any)).length;
-  const doneCount = ideas.filter(i => i.status === 'done').length;
+  const ideaCount = useMemo(
+    () => ideas.filter(i => i.status === 'idea' || i.status === ('planned' as any)).length,
+    [ideas],
+  );
+  const doneCount = useMemo(() => ideas.filter(i => i.status === 'done').length, [ideas]);
 
   const addIdea = useCallback(() => {
     if (!newTitle.trim()) return;
@@ -209,17 +353,25 @@ export default function IdeasScreen() {
     ]);
   }, [openEdit, copyToClipboard, cycleStatus, sendToDev, deleteIdea]);
 
-  const STATUS_COLORS: Record<string, string> = {
-    idea: '#8B5CF6',
-    planned: '#8B5CF6',
-    done: '#10B981',
-  };
-
-  const STATUS_ICONS: Record<string, string> = {
-    idea: 'lightbulb',
-    planned: 'lightbulb',
-    done: 'checkmark',
-  };
+  const renderItem = useCallback(({ item }: { item: Idea }) => (
+    <IdeaCard
+      idea={item}
+      isDark={isDark}
+      borderColor={c.border}
+      textColor={c.text}
+      subColor={c.sub}
+      editLabel={tr.edit}
+      copyLabel={tr.copyText}
+      deleteLabel={tr.delete}
+      onShowActions={showIdeaActions}
+      onCycleStatus={cycleStatus}
+      onEdit={openEdit}
+      onCopy={copyToClipboard}
+      onDelete={deleteIdea}
+      onSendToDev={sendToDev}
+    />
+  ), [isDark, c.border, c.text, c.sub, tr.edit, tr.copyText, tr.delete,
+      showIdeaActions, cycleStatus, openEdit, copyToClipboard, deleteIdea, sendToDev]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -291,119 +443,23 @@ export default function IdeasScreen() {
           ))}
         </View>
 
-        <ScrollView
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24, gap: 10 }]}
+        {/* Ідей може накопичитися сотні — список віртуалізований. */}
+        <FlatList
+          data={filtered}
+          keyExtractor={idea => idea.id}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
-
-          {filtered.length === 0 && (
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+          renderItem={renderItem}
+          ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
               <IconSymbol name="lightbulb.fill" size={40} color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 15, fontWeight: '600' }}>Поки немає ідей</Text>
               <Text style={{ color: c.sub, fontSize: 13, opacity: 0.7 }}>Натисніть + щоб додати ідею</Text>
             </View>
-          )}
-
-          {filtered.map(idea => {
-            const prio = PRIORITY[idea.priority];
-            const statusColor = STATUS_COLORS[idea.status];
-            const statusIcon = STATUS_ICONS[idea.status];
-            const isDone = idea.status === 'done';
-            return (
-              <TouchableOpacity
-                key={idea.id}
-                activeOpacity={0.95}
-                onLongPress={() => showIdeaActions(idea)}
-                delayLongPress={350}>
-                <BlurView
-                  intensity={isDark ? 18 : 35}
-                  tint={isDark ? 'dark' : 'light'}
-                  style={[st.ideaCard, { borderColor: isDone ? '#10B98130' : statusColor + '40', opacity: isDone ? 0.7 : 1 }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                    {/* Status checkbox */}
-                    <TouchableOpacity
-                      onPress={() => cycleStatus(idea.id)}
-                      style={[st.check, { borderColor: statusColor, backgroundColor: isDone ? statusColor : 'transparent' }]}>
-                      <IconSymbol name={statusIcon as any} size={11} color={isDone ? '#fff' : statusColor} />
-                    </TouchableOpacity>
-
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <View style={[st.badge, { backgroundColor: statusColor + '20', borderColor: statusColor + '40' }]}>
-                          <Text style={{ color: statusColor, fontSize: 10, fontWeight: '700' }}>{STATUS_LABELS[idea.status as IdeaStatus] ?? STATUS_LABELS['idea']}</Text>
-                        </View>
-                        <View style={[st.badge, { backgroundColor: prio.color + '18', borderColor: prio.color + '35' }]}>
-                          <IconSymbol name={prio.icon as any} size={9} color={prio.color} />
-                          <Text style={{ color: prio.color, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>{prio.label}</Text>
-                        </View>
-                        {idea.sentToDev && (
-                          <View style={[st.badge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
-                            <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>✉️ Надіслано</Text>
-                          </View>
-                        )}
-                      </View>
-
-                      <Text style={[st.ideaTitle, { color: c.text, textDecorationLine: isDone ? 'line-through' : 'none' }]}>
-                        {idea.title}
-                      </Text>
-                      {idea.description ? (
-                        <Text style={[st.ideaDesc, { color: c.sub }]} numberOfLines={2}>
-                          {idea.description}
-                        </Text>
-                      ) : null}
-                      <Text style={{ color: c.sub, fontSize: 10, marginTop: 6 }}>
-                        {new Date(idea.createdAt).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
-                      </Text>
-                    </View>
-
-                    {/* Action buttons */}
-                    <View style={{ flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-                      <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); openEdit(idea); }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={tr.edit}
-                        style={[st.actionBtn, { backgroundColor: '#6366F115', borderColor: '#6366F130' }]}>
-                        <IconSymbol name="pencil" size={13} color="#6366F1" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); copyToClipboard(idea); }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={tr.copyText}
-                        style={[st.actionBtn, { backgroundColor: '#0EA5E915', borderColor: '#0EA5E930' }]}>
-                        <IconSymbol name="doc.on.clipboard" size={13} color="#0EA5E9" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); deleteIdea(idea.id); }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={tr.delete}
-                        style={[st.actionBtn, { backgroundColor: '#EF444415', borderColor: '#EF444430' }]}>
-                        <IconSymbol name="trash" size={13} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Send to dev button */}
-                  <TouchableOpacity
-                    onPress={() => sendToDev(idea)}
-                    disabled={idea.sentToDev}
-                    activeOpacity={0.7}
-                    style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5,
-                      alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 7,
-                      backgroundColor: 'transparent',
-                      borderWidth: 1, borderColor: idea.sentToDev ? '#10B98130' : c.border }}>
-                    <IconSymbol name="paperplane" size={11} color={idea.sentToDev ? '#10B981' : c.sub} />
-                    <Text style={{ color: idea.sentToDev ? '#10B981' : c.sub, fontSize: 11, fontWeight: '600' }}>
-                      {idea.sentToDev ? 'Надіслано розробнику' : 'Надіслати розробнику'}
-                    </Text>
-                  </TouchableOpacity>
-                </BlurView>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+          }
+        />
       </SafeAreaView>
 
       {/* Add Idea Modal */}

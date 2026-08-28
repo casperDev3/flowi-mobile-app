@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError, apiFetch } from '@/store/api';
 import { useI18n } from '@/store/i18n';
 import { haptic } from '@/utils/haptics';
@@ -30,6 +31,8 @@ export default function ForgotPasswordScreen() {
   const isDark = cs === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
+  // Код із шести цифр і два поля пароля не потребують ширини планшета.
+  const contentWidth = useContentWidth();
 
   // Step 1: email; Step 2: code + new password
   const [step, setStep] = useState<1 | 2>(1);
@@ -44,9 +47,7 @@ export default function ForgotPasswordScreen() {
 
   const c = {
     ...getScreenColors('auth', isDark),
-    input:       isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-    errorBorder: '#EF4444',
-    red:         '#EF4444',
+    red: '#EF4444',
   };
 
   const handleSendCode = async () => {
@@ -160,7 +161,7 @@ export default function ForgotPasswordScreen() {
           style={{ flex: 1 }}
         >
           <ScrollView
-            contentContainerStyle={st.scroll}
+            contentContainerStyle={[st.scroll, contentWidth]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >

@@ -2,9 +2,10 @@ import * as Clipboard from 'expo-clipboard';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -48,6 +49,130 @@ const SEVERITY: Record<Severity, { label: string; color: string; icon: string }>
   minor:    { label: 'Незначний', color: '#6366F1', icon: 'info.circle.fill' },
 };
 
+// Порядок сортування не залежить від стану — тримаємо поза компонентом,
+// щоб не створювати об'єкт на кожному рендері.
+const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, major: 1, minor: 2 };
+
+interface BugCardProps {
+  bug: Bug;
+  isDark: boolean;
+  borderColor: string;
+  textColor: string;
+  subColor: string;
+  editLabel: string;
+  copyLabel: string;
+  deleteLabel: string;
+  onShowActions: (bug: Bug) => void;
+  onToggleFixed: (id: string) => void;
+  onEdit: (bug: Bug) => void;
+  onCopy: (bug: Bug) => void;
+  onDelete: (id: string) => void;
+  onSendToDev: (bug: Bug) => void;
+}
+
+/**
+ * Рядок списку мемоізований: набір тексту в модалці «Новий баг» інакше
+ * перемальовує всі картки разом із їхніми BlurView.
+ */
+const BugCard = React.memo(function BugCard({
+  bug, isDark, borderColor, textColor, subColor,
+  editLabel, copyLabel, deleteLabel,
+  onShowActions, onToggleFixed, onEdit, onCopy, onDelete, onSendToDev,
+}: BugCardProps) {
+  const sv = SEVERITY[bug.severity];
+  return (
+    <TouchableOpacity
+      activeOpacity={0.95}
+      onLongPress={() => onShowActions(bug)}
+      delayLongPress={350}>
+      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.bugCard, { borderColor: bug.fixed ? '#10B98130' : sv.color + '40', opacity: bug.fixed ? 0.7 : 1 }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+          {/* Fixed checkbox */}
+          <TouchableOpacity
+            onPress={() => onToggleFixed(bug.id)}
+            style={[st.check, { borderColor: bug.fixed ? '#10B981' : sv.color, backgroundColor: bug.fixed ? '#10B981' : 'transparent' }]}>
+            {bug.fixed && <IconSymbol name="checkmark" size={11} color="#fff" />}
+          </TouchableOpacity>
+
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <View style={[st.severityBadge, { backgroundColor: sv.color + '20', borderColor: sv.color + '40' }]}>
+                <IconSymbol name={sv.icon as any} size={10} color={sv.color} />
+                <Text style={{ color: sv.color, fontSize: 10, fontWeight: '700', marginLeft: 3 }}>{sv.label}</Text>
+              </View>
+              {bug.fixed && (
+                <View style={[st.severityBadge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
+                  <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>Виправлено</Text>
+                </View>
+              )}
+              {bug.sentToDev && (
+                <View style={[st.severityBadge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
+                  <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>✉️ Надіслано</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[st.bugTitle, { color: textColor, textDecorationLine: bug.fixed ? 'line-through' : 'none' }]}>
+              {bug.title}
+            </Text>
+            {bug.description ? (
+              <Text style={[st.bugDesc, { color: subColor }]} numberOfLines={2}>
+                {bug.description}
+              </Text>
+            ) : null}
+            <Text style={{ color: subColor, fontSize: 10, marginTop: 6 }}>
+              {new Date(bug.createdAt).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+
+          {/* Action buttons */}
+          <View style={{ flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+            <TouchableOpacity
+              onPress={e => { e.stopPropagation(); onEdit(bug); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={editLabel}
+              style={[st.actionBtn, { backgroundColor: '#6366F115', borderColor: '#6366F130' }]}>
+              <IconSymbol name="pencil" size={13} color="#6366F1" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={e => { e.stopPropagation(); onCopy(bug); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={copyLabel}
+              style={[st.actionBtn, { backgroundColor: '#0EA5E915', borderColor: '#0EA5E930' }]}>
+              <IconSymbol name="doc.on.clipboard" size={13} color="#0EA5E9" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={e => { e.stopPropagation(); onDelete(bug.id); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={deleteLabel}
+              style={[st.actionBtn, { backgroundColor: '#EF444415', borderColor: '#EF444430' }]}>
+              <IconSymbol name="trash" size={13} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Send to dev button */}
+        <TouchableOpacity
+          onPress={() => onSendToDev(bug)}
+          disabled={bug.sentToDev}
+          activeOpacity={0.7}
+          style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5,
+            alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 7,
+            backgroundColor: 'transparent',
+            borderWidth: 1, borderColor: bug.sentToDev ? '#10B98130' : borderColor }}>
+          <IconSymbol name="paperplane" size={11} color={bug.sentToDev ? '#10B981' : subColor} />
+          <Text style={{ color: bug.sentToDev ? '#10B981' : subColor, fontSize: 11, fontWeight: '600' }}>
+            {bug.sentToDev ? 'Надіслано розробнику' : 'Надіслати розробнику'}
+          </Text>
+        </TouchableOpacity>
+      </BlurView>
+    </TouchableOpacity>
+  );
+});
+
 export default function BugsScreen() {
   const contentWidth = useContentWidth();
   const { height } = useResponsive();
@@ -72,17 +197,17 @@ export default function BugsScreen() {
   const [editDesc, setEditDesc] = useState('');
   const [editSeverity, setEditSeverity] = useState<Severity>('major');
 
-  const c = {
+  // Палітра стабільна між рендерами — інакше React.memo на картці не спрацює.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#FFF5F5',
     bg2:    isDark ? '#14121E' : '#FFE8E8',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.80)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
     sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#EF4444',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(255,250,250,0.98)',
-  };
+  }), [isDark]);
 
   useEffect(() => {
     loadData<Bug[]>('bugs', []).then(data => {
@@ -95,11 +220,11 @@ export default function BugsScreen() {
     if (initialized) void saveSynced('bugs', bugs);
   }, [bugs, initialized]);
 
-  const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, major: 1, minor: 2 };
+  const sentCount = useMemo(() => bugs.filter(b => !!b.sentToDev).length, [bugs]);
+  const openCount = useMemo(() => bugs.filter(b => !b.fixed).length, [bugs]);
+  const fixedCount = useMemo(() => bugs.filter(b => b.fixed).length, [bugs]);
 
-  const sentCount = bugs.filter(b => !!b.sentToDev).length;
-
-  const filtered = bugs
+  const filtered = useMemo(() => bugs
     .filter(b => {
       if (filter === 'open') return !b.fixed;
       if (filter === 'fixed') return b.fixed;
@@ -110,10 +235,7 @@ export default function BugsScreen() {
       if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       if (sort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       return SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
-    });
-
-  const openCount  = bugs.filter(b => !b.fixed).length;
-  const fixedCount = bugs.filter(b => b.fixed).length;
+    }), [bugs, filter, sort]);
 
   const addBug = useCallback(() => {
     if (!newTitle.trim()) return;
@@ -187,6 +309,26 @@ export default function BugsScreen() {
       { text: 'Скасувати', style: 'cancel' as const },
     ]);
   }, [openEdit, copyToClipboard, toggleFixed, sendToDev, deleteBug]);
+
+  const renderItem = useCallback(({ item }: { item: Bug }) => (
+    <BugCard
+      bug={item}
+      isDark={isDark}
+      borderColor={c.border}
+      textColor={c.text}
+      subColor={c.sub}
+      editLabel={tr.edit}
+      copyLabel={tr.copyText}
+      deleteLabel={tr.delete}
+      onShowActions={showBugActions}
+      onToggleFixed={toggleFixed}
+      onEdit={openEdit}
+      onCopy={copyToClipboard}
+      onDelete={deleteBug}
+      onSendToDev={sendToDev}
+    />
+  ), [isDark, c.border, c.text, c.sub, tr.edit, tr.copyText, tr.delete,
+      showBugActions, toggleFixed, openEdit, copyToClipboard, deleteBug, sendToDev]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -262,11 +404,15 @@ export default function BugsScreen() {
           ))}
         </View>
 
-        <ScrollView
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24, gap: 10 }]}
-          showsVerticalScrollIndicator={false}>
-
-          {filtered.length === 0 && (
+        {/* Список багів росте без стелі — віртуалізуємо. */}
+        <FlatList
+          data={filtered}
+          keyExtractor={bug => bug.id}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }]}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          renderItem={renderItem}
+          ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
               <IconSymbol name="ladybug.fill" size={40} color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 15, fontWeight: '600' }}>
@@ -276,104 +422,8 @@ export default function BugsScreen() {
                 <Text style={{ color: c.sub, fontSize: 13, opacity: 0.7 }}>Натисніть + щоб додати баг</Text>
               )}
             </View>
-          )}
-
-          {filtered.map(bug => {
-            const sv = SEVERITY[bug.severity];
-            return (
-              <TouchableOpacity
-                key={bug.id}
-                activeOpacity={0.95}
-                onLongPress={() => showBugActions(bug)}
-                delayLongPress={350}>
-                <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.bugCard, { borderColor: bug.fixed ? '#10B98130' : sv.color + '40', opacity: bug.fixed ? 0.7 : 1 }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                    {/* Fixed checkbox */}
-                    <TouchableOpacity
-                      onPress={() => toggleFixed(bug.id)}
-                      style={[st.check, { borderColor: bug.fixed ? '#10B981' : sv.color, backgroundColor: bug.fixed ? '#10B981' : 'transparent' }]}>
-                      {bug.fixed && <IconSymbol name="checkmark" size={11} color="#fff" />}
-                    </TouchableOpacity>
-
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <View style={[st.severityBadge, { backgroundColor: sv.color + '20', borderColor: sv.color + '40' }]}>
-                          <IconSymbol name={sv.icon as any} size={10} color={sv.color} />
-                          <Text style={{ color: sv.color, fontSize: 10, fontWeight: '700', marginLeft: 3 }}>{sv.label}</Text>
-                        </View>
-                        {bug.fixed && (
-                          <View style={[st.severityBadge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
-                            <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>Виправлено</Text>
-                          </View>
-                        )}
-                        {bug.sentToDev && (
-                          <View style={[st.severityBadge, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
-                            <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>✉️ Надіслано</Text>
-                          </View>
-                        )}
-                      </View>
-
-                      <Text style={[st.bugTitle, { color: c.text, textDecorationLine: bug.fixed ? 'line-through' : 'none' }]}>
-                        {bug.title}
-                      </Text>
-                      {bug.description ? (
-                        <Text style={[st.bugDesc, { color: c.sub }]} numberOfLines={2}>
-                          {bug.description}
-                        </Text>
-                      ) : null}
-                      <Text style={{ color: c.sub, fontSize: 10, marginTop: 6 }}>
-                        {new Date(bug.createdAt).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
-                      </Text>
-                    </View>
-
-                    {/* Action buttons */}
-                    <View style={{ flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-                      <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); openEdit(bug); }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={tr.edit}
-                        style={[st.actionBtn, { backgroundColor: '#6366F115', borderColor: '#6366F130' }]}>
-                        <IconSymbol name="pencil" size={13} color="#6366F1" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); copyToClipboard(bug); }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={tr.copyText}
-                        style={[st.actionBtn, { backgroundColor: '#0EA5E915', borderColor: '#0EA5E930' }]}>
-                        <IconSymbol name="doc.on.clipboard" size={13} color="#0EA5E9" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); deleteBug(bug.id); }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={tr.delete}
-                        style={[st.actionBtn, { backgroundColor: '#EF444415', borderColor: '#EF444430' }]}>
-                        <IconSymbol name="trash" size={13} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Send to dev button */}
-                  <TouchableOpacity
-                    onPress={() => sendToDev(bug)}
-                    disabled={bug.sentToDev}
-                    activeOpacity={0.7}
-                    style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5,
-                      alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 7,
-                      backgroundColor: 'transparent',
-                      borderWidth: 1, borderColor: bug.sentToDev ? '#10B98130' : c.border }}>
-                    <IconSymbol name="paperplane" size={11} color={bug.sentToDev ? '#10B981' : c.sub} />
-                    <Text style={{ color: bug.sentToDev ? '#10B981' : c.sub, fontSize: 11, fontWeight: '600' }}>
-                      {bug.sentToDev ? 'Надіслано розробнику' : 'Надіслати розробнику'}
-                    </Text>
-                  </TouchableOpacity>
-                </BlurView>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+          }
+        />
       </SafeAreaView>
 
       {/* Add Bug Modal */}

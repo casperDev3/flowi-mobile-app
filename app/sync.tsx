@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -40,6 +40,11 @@ const FIELD_LABELS: Record<string, string> = {
   updatedAt: 'Оновлено', amount: 'Сума', type: 'Тип', color: 'Колір',
 };
 
+interface Palette {
+  bg1: string; bg2: string; border: string; text: string; sub: string;
+  accent: string; green: string; orange: string; red: string; dim: string;
+}
+
 export default function SyncScreen() {
   const contentWidth = useContentWidth();
   const router = useRouter();
@@ -55,7 +60,9 @@ export default function SyncScreen() {
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [rejected, setRejected] = useState<SyncRejection[]>([]);
 
-  const c = {
+  // Палітра — у useMemo: картка конфлікту нижче обгорнута в React.memo і
+  // новий об'єкт кольорів щоразу зводив би мемоізацію нанівець.
+  const c: Palette = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
     bg2:    isDark ? '#14121E' : '#EBEBF5',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
@@ -63,7 +70,7 @@ export default function SyncScreen() {
     sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#7C3AED', green: '#10B981', orange: '#F59E0B', red: '#EF4444',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  };
+  }), [isDark]);
 
   const refreshConflicts = useCallback(async () => {
     setConflicts(await loadConflicts());
@@ -81,7 +88,7 @@ export default function SyncScreen() {
   }, [refreshConflicts]);
 
   // ─── Вирішення конфліктів ──────────────────────────────────────────────────
-  const handleResolve = async (id: string, choice: 'local' | 'remote') => {
+  const handleResolve = useCallback(async (id: string, choice: 'local' | 'remote') => {
     const conflict = conflicts.find(c => c.id === id);
     if (!conflict) return;
 
@@ -116,7 +123,7 @@ export default function SyncScreen() {
     }
 
     await refreshConflicts();
-  };
+  }, [conflicts, refreshConflicts]);
 
   const isOnlineAuthed = online && authStatus === 'authed';
   const isCloudSyncing = syncState === 'syncing';
@@ -319,11 +326,14 @@ export default function SyncScreen() {
 
 // ─── ConflictCard ─────────────────────────────────────────────────────────────
 
-function ConflictCard({ conflict, onResolve, c, isDark }: {
+interface ConflictCardProps {
   conflict: SyncConflict;
   onResolve: (id: string, choice: 'local' | 'remote') => void;
-  c: any; isDark: boolean;
-}) {
+  c: Palette;
+  isDark: boolean;
+}
+
+const ConflictCard = React.memo(function ConflictCard({ conflict, onResolve, c, isDark }: ConflictCardProps) {
   const label = DATA_KEY_LABELS[conflict.dataKey] ?? conflict.dataKey;
   const name = conflict.local?.title ?? conflict.local?.name ?? `#${String(conflict.local?.id ?? '').slice(0, 6)}`;
   const diffs = getFieldDiffs(conflict.local, conflict.remote);
@@ -359,12 +369,12 @@ function ConflictCard({ conflict, onResolve, c, isDark }: {
       </View>
     </BlurView>
   );
-}
+});
 
 function VersionPanel({ label, accent, diffs, version, c }: {
   label: string; accent: string;
   diffs: { key: string; local: string; remote: string }[];
-  version: 'local' | 'remote'; c: any;
+  version: 'local' | 'remote'; c: Palette;
 }) {
   return (
     <View style={{ flex: 1 }}>

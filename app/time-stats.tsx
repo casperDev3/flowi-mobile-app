@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
-import { formatDuration, formatDurationShort } from '@/utils/durationFormat';
+import { formatDuration } from '@/utils/durationFormat';
 import { useI18n } from '@/store/i18n';
 import { useContentWidth } from '@/hooks/use-content-width';
 
@@ -23,11 +23,13 @@ type Shift = 'morning' | 'day' | 'evening' | 'night';
 
 interface ShiftCfg { label: string; icon: IconSymbolName; color: string; hours: string; }
 
-const SHIFTS: Record<Shift, ShiftCfg> = {
-  morning: { label: 'Ранок',  icon: 'sun.horizon.fill', color: '#F59E0B', hours: '06–12' },
-  day:     { label: 'День',   icon: 'sun.max.fill',     color: '#EF4444', hours: '12–18' },
-  evening: { label: 'Вечір',  icon: 'sunset.fill',      color: '#8B5CF6', hours: '18–24' },
-  night:   { label: 'Ніч',    icon: 'moon.fill',        color: '#0EA5E9', hours: '00–06' },
+/** Порядок і оформлення змін сталі; лише підпис залежить від мови. */
+const SHIFT_ORDER: Shift[] = ['morning', 'day', 'evening', 'night'];
+const SHIFT_STYLE: Record<Shift, Omit<ShiftCfg, 'label'>> = {
+  morning: { icon: 'sun.horizon.fill', color: '#F59E0B', hours: '06–12' },
+  day:     { icon: 'sun.max.fill',     color: '#EF4444', hours: '12–18' },
+  evening: { icon: 'sunset.fill',      color: '#8B5CF6', hours: '18–24' },
+  night:   { icon: 'moon.fill',        color: '#0EA5E9', hours: '00–06' },
 };
 
 interface TimeEntry { id: string; task: string; shift: Shift; duration: number; date: string; }
@@ -46,6 +48,13 @@ export default function TimeStatsScreen() {
   const isDark = useColorScheme() === 'dark';
   const [entries, setEntries] = useState<TimeEntry[]>([]);
 
+  const SHIFTS = useMemo<Record<Shift, ShiftCfg>>(() => ({
+    morning: { ...SHIFT_STYLE.morning, label: tr.morning },
+    day:     { ...SHIFT_STYLE.day,     label: tr.daytime },
+    evening: { ...SHIFT_STYLE.evening, label: tr.evening },
+    night:   { ...SHIFT_STYLE.night,   label: tr.night },
+  }), [tr.morning, tr.daytime, tr.evening, tr.night]);
+
   useEffect(() => {
     loadData<TimeEntry[]>('time_entries', []).then(setEntries);
   }, []);
@@ -59,7 +68,7 @@ export default function TimeStatsScreen() {
     return out;
   }, [entries]);
 
-  const c = {
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
@@ -68,7 +77,7 @@ export default function TimeStatsScreen() {
     sub:    isDark ? 'rgba(238,240,255,0.62)' : 'rgba(13,16,51,0.58)',
     indigo: '#6366F1',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  };
+  }), [isDark]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -90,17 +99,17 @@ export default function TimeStatsScreen() {
 
           {/* Summary */}
           <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
-            <StatCell value={total > 0 ? fmtDurLocal(total) : '—'} label="Всього"  color={c.indigo} sub={c.sub} />
+            <StatCell value={total > 0 ? fmtDurLocal(total) : '—'} label={tr.totalLabel}    color={c.indigo} sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border }} />
-            <StatCell value={String(entries.length)}         label="Сесій"   color="#10B981" sub={c.sub} />
+            <StatCell value={String(entries.length)}              label={tr.sessionsCount} color="#10B981" sub={c.sub} />
             <View style={{ width: 1, backgroundColor: c.border }} />
-            <StatCell value={avg > 0 ? fmtDurLocal(avg) : '—'}     label="Середнє" color="#F59E0B" sub={c.sub} />
+            <StatCell value={avg > 0 ? fmtDurLocal(avg) : '—'}    label={tr.avgLabel}      color="#F59E0B" sub={c.sub} />
           </View>
 
           {/* Shift breakdown */}
           <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginTop: 14 }]}>
             <Text style={[s.sectionTitle, { color: c.text, marginBottom: 16 }]}>По змінах</Text>
-            {(Object.keys(SHIFTS) as Shift[]).map(sh => {
+            {SHIFT_ORDER.map(sh => {
               const cfg = SHIFTS[sh];
               const dur = byShift[sh];
               const pct = total > 0 ? Math.round((dur / total) * 100) : 0;

@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MonthPicker } from '@/components/shared/MonthPicker';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
@@ -23,8 +23,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
-import { BUILTIN_CURRENCIES } from '@/utils/financeUtils';
+import { BUILTIN_CURRENCIES, formatCurrency, type Currency } from '@/utils/financeUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useResponsive } from '@/hooks/use-responsive';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,29 +75,19 @@ function isSameMonth(dateStr: string, month: Date): boolean {
   return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth();
 }
 
-function getCurrencySymbol(code: string): string {
-  return BUILTIN_CURRENCIES.find(c => c.code === code)?.symbol ?? code;
-}
-
-function formatCurrency(n: number, symbol?: string): string {
-  const formatted = n.toLocaleString('uk-UA', { maximumFractionDigits: 0 });
-  return symbol ? `${formatted} ${symbol}` : formatted;
-}
-
 function chunk<T>(arr: T[], n: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
   return out;
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
-
-export default function BudgetScreen() {
-  const contentWidth = useContentWidth();
-  const isDark = useColorScheme() === 'dark';
-  const { tr } = useI18n();
-
-  const c = {
+/**
+ * Палітра винесена з тіла екрана: `useMemo` віддає той самий об'єкт між
+ * рендерами, інакше кожен рядок категорії отримує нові кольори і `React.memo`
+ * на ньому нічого не заощаджує.
+ */
+function makeColors(isDark: boolean) {
+  return {
     bg1:    isDark ? '#080E18' : '#EFF5FF',
     bg2:    isDark ? '#0F1A2E' : '#E0ECFF',
     card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.80)',
@@ -110,13 +101,27 @@ export default function BudgetScreen() {
     amber:  '#F59E0B',
     red:    '#EF4444',
   };
+}
+
+type BudgetColors = ReturnType<typeof makeColors>;
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function BudgetScreen() {
+  const contentWidth = useContentWidth();
+  const { isWide } = useResponsive();
+  const isDark = useColorScheme() === 'dark';
+  const { tr, lang } = useI18n();
+
+  const c = useMemo(() => makeColors(isDark), [isDark]);
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
   // ─── State ────────────────────────────────────────────────────────────────
 
-  const [initialized, setInitialized] = useState(false);
   const [budgets, setBudgets]         = useState<BudgetLimit[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [primaryCurrency, setPrimaryCurrency] = useState<string>('UAH');
+  const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
   const [activeMonth, setActiveMonth] = useState(() => {
     const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1);
   });
@@ -136,12 +141,14 @@ export default function BudgetScreen() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [savedBudgets, txs, primCur] = await Promise.all([
+      const [savedBudgets, txs, primCur, curList] = await Promise.all([
         loadData<BudgetLimit[]>('budget_limits', []),
         loadData<Transaction[]>('transactions', []),
         loadData<string>('finance_primary_currency', 'UAH'),
+        loadData<Currency[]>('finance_currencies', []),
       ]);
       setPrimaryCurrency(primCur || 'UAH');
+      setCustomCurrencies(Array.isArray(curList) ? curList : []);
 
       // Merge saved budgets with defaults (add new default categories that don't exist yet)
       const merged = [...savedBudgets];
@@ -152,7 +159,6 @@ export default function BudgetScreen() {
       }
       setBudgets(merged);
       setTransactions(txs);
-      setInitialized(true);
     })();
   }, []));
 
@@ -165,8 +171,14 @@ export default function BudgetScreen() {
 
   // ─── Computed ─────────────────────────────────────────────────────────────
 
-  // Currency symbol for primary currency
-  const currencySymbol = useMemo(() => getCurrencySymbol(primaryCurrency), [primaryCurrency]);
+  // Бюджет рахується в основній валюті — тій самій, що показують «Фінанси».
+  const currency = useMemo<Currency>(
+    () => [...BUILTIN_CURRENCIES, ...customCurrencies].find(cur => cur.code === primaryCurrency)
+      ?? BUILTIN_CURRENCIES[0],
+    [customCurrencies, primaryCurrency],
+  );
+  const currencySymbol = currency.symbol;
+  const fmt = useCallback((n: number) => formatCurrency(n, currency, locale), [currency, locale]);
 
   // Actual spending per category for selected month — only primary currency transactions
   const actualByCategory = useMemo(() => {
@@ -219,11 +231,11 @@ export default function BudgetScreen() {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  function openEdit(item: BudgetLimit) {
+  const openEdit = useCallback((item: BudgetLimit) => {
     setEditItem(item);
     setEditLimit(item.limit > 0 ? String(item.limit) : '');
     setShowEditModal(true);
-  }
+  }, []);
 
   function saveEdit() {
     if (!editItem) return;
@@ -316,13 +328,13 @@ export default function BudgetScreen() {
                 <View>
                   <Text style={{ fontSize: 12, color: c.sub, fontWeight: '600' }}>ВИТРАЧЕНО</Text>
                   <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, marginTop: 2, letterSpacing: -0.5 }}>
-                    {formatCurrency(totals.totalSpent, currencySymbol)}
+                    {fmt(totals.totalSpent)}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={{ fontSize: 12, color: c.sub, fontWeight: '600' }}>БЮДЖЕТ</Text>
                   <Text style={{ fontSize: 22, fontWeight: '800', color: ACCENT, marginTop: 2, letterSpacing: -0.5 }}>
-                    {formatCurrency(totals.totalBudget, currencySymbol)}
+                    {fmt(totals.totalBudget)}
                   </Text>
                 </View>
               </View>
@@ -330,7 +342,7 @@ export default function BudgetScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
                 <Text style={{ fontSize: 12, color: c.sub }}>
                   Залишилось: <Text style={{ fontWeight: '700', color: totals.totalSpent > totals.totalBudget ? c.red : c.green }}>
-                    {formatCurrency(Math.max(0, totals.totalBudget - totals.totalSpent), currencySymbol)}
+                    {fmt(Math.max(0, totals.totalBudget - totals.totalSpent))}
                   </Text>
                 </Text>
                 <Text style={{ fontSize: 12, color: c.sub }}>
@@ -346,47 +358,18 @@ export default function BudgetScreen() {
           {displayBudgets.length > 0 && (
             <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
               style={[st.card, { borderColor: c.border }]}>
-              {displayBudgets.map((item, idx) => {
-                const spent = actualByCategory[item.category] ?? 0;
-                const pct = item.limit > 0 ? Math.min(spent / item.limit, 1) : 0;
-                const isOver = item.limit > 0 && spent > item.limit;
-                const barColor = isOver ? c.red : pct > 0.8 ? c.amber : ACCENT;
-                const isAutoAdded = !budgets.find(b => b.category === item.category);
-                return (
-                  <TouchableOpacity key={item.category} onPress={() => openEdit(item)} activeOpacity={0.75}>
-                    <View style={[st.categoryRow,
-                      idx < displayBudgets.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
-                      {/* Icon */}
-                      <View style={[st.catIconBox, { backgroundColor: isAutoAdded ? c.dim : ACCENT + '18' }]}>
-                        <IconSymbol name={item.icon} size={16} color={isAutoAdded ? c.sub : ACCENT} />
-                      </View>
-                      {/* Info */}
-                      <View style={{ flex: 1, gap: 4 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{item.category}</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: isOver ? c.red : c.text }}>
-                            {formatCurrency(spent, currencySymbol)}
-                            {item.limit > 0 && (
-                              <Text style={{ color: c.sub, fontWeight: '400' }}> / {formatCurrency(item.limit, currencySymbol)}</Text>
-                            )}
-                          </Text>
-                        </View>
-                        {item.limit > 0 ? (
-                          <View style={[st.progressTrack, { backgroundColor: c.dim }]}>
-                            <View style={[st.progressFill, { backgroundColor: barColor, width: `${pct * 100}%` as any }]} />
-                          </View>
-                        ) : (
-                          <Text style={{ fontSize: 11, color: c.sub, fontStyle: 'italic' }}>
-                            Натисніть щоб встановити прогноз
-                          </Text>
-                        )}
-                      </View>
-                      {/* Chevron */}
-                      <IconSymbol name="chevron.right" size={14} color={c.sub} style={{ marginLeft: 6 }} />
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+              {displayBudgets.map((item, idx) => (
+                <BudgetCategoryRow
+                  key={item.category}
+                  item={item}
+                  spent={actualByCategory[item.category] ?? 0}
+                  isAutoAdded={!budgets.some(b => b.category === item.category)}
+                  divider={idx < displayBudgets.length - 1}
+                  c={c}
+                  fmt={fmt}
+                  onPress={openEdit}
+                />
+              ))}
             </BlurView>
           )}
 
@@ -425,7 +408,7 @@ export default function BudgetScreen() {
         onRequestClose={() => setShowEditModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowEditModal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
+            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, contentWidth]} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet, maxHeight: '90%' }]}>
                 <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -451,7 +434,7 @@ export default function BudgetScreen() {
                   <View style={[st.spentRow, { backgroundColor: c.dim, borderColor: c.border }]}>
                     <Text style={{ fontSize: 13, color: c.sub }}>Фактично витрачено:</Text>
                     <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>
-                      {formatCurrency(actualByCategory[editItem.category] ?? 0, currencySymbol)}
+                      {fmt(actualByCategory[editItem.category] ?? 0)}
                     </Text>
                   </View>
                 )}
@@ -509,7 +492,7 @@ export default function BudgetScreen() {
         onRequestClose={() => setShowAddModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={st.overlay} onPress={() => setShowAddModal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
+            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, contentWidth]} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet, maxHeight: '90%' }]}>
 
@@ -549,7 +532,9 @@ export default function BudgetScreen() {
 
                   {/* Icon picker */}
                   <Text style={{ fontSize: 13, color: c.sub, marginTop: 14, marginBottom: 8, fontWeight: '500' }}>Іконка</Text>
-                  {chunk(ICON_OPTIONS, 7).map((row, ri) => (
+                  {/* На планшеті аркуш ширший, тож іконки не роздуваються до
+                      розміру кнопки — у ряд їх стає більше. */}
+                  {chunk(ICON_OPTIONS, isWide ? 10 : 7).map((row, ri) => (
                     <View key={ri} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
                       {row.map(icon => (
                         <TouchableOpacity key={icon} onPress={() => setNewCatIcon(icon)}
@@ -581,7 +566,7 @@ export default function BudgetScreen() {
 
 // ─── ProgressBar ──────────────────────────────────────────────────────────────
 
-function ProgressBar({ spent, limit, c }: { spent: number; limit: number; c: any }) {
+function ProgressBar({ spent, limit, c }: { spent: number; limit: number; c: BudgetColors }) {
   const pct = limit > 0 ? Math.min(spent / limit, 1) : 0;
   const isOver = limit > 0 && spent > limit;
   const color = isOver ? c.red : pct > 0.8 ? c.amber : ACCENT;
@@ -591,6 +576,66 @@ function ProgressBar({ spent, limit, c }: { spent: number; limit: number; c: any
     </View>
   );
 }
+
+// ─── Рядок категорії ─────────────────────────────────────────────────────────
+
+/**
+ * Один рядок бюджету.
+ *
+ * Мемоізація має сенс лише разом зі стабільними пропсами: палітра приходить
+ * з `useMemo`, `fmt` і `onPress` — з `useCallback`, а сама категорія
+ * передається аргументом натискання, а не замиканням.
+ */
+const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
+  item, spent, isAutoAdded, divider, c, fmt, onPress,
+}: {
+  item: BudgetLimit;
+  spent: number;
+  /** Категорія прийшла з транзакцій, а не з налаштованого бюджету. */
+  isAutoAdded: boolean;
+  divider: boolean;
+  c: BudgetColors;
+  fmt: (n: number) => string;
+  onPress: (item: BudgetLimit) => void;
+}) {
+  const pct = item.limit > 0 ? Math.min(spent / item.limit, 1) : 0;
+  const isOver = item.limit > 0 && spent > item.limit;
+  const barColor = isOver ? c.red : pct > 0.8 ? c.amber : ACCENT;
+  return (
+    <TouchableOpacity onPress={() => onPress(item)} activeOpacity={0.75}>
+      <View style={[st.categoryRow,
+        divider && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
+        {/* Icon */}
+        <View style={[st.catIconBox, { backgroundColor: isAutoAdded ? c.dim : ACCENT + '18' }]}>
+          <IconSymbol name={item.icon} size={16} color={isAutoAdded ? c.sub : ACCENT} />
+        </View>
+        {/* Info */}
+        <View style={{ flex: 1, gap: 4 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{item.category}</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: isOver ? c.red : c.text }}>
+              {fmt(spent)}
+              {item.limit > 0 && (
+                <Text style={{ color: c.sub, fontWeight: '400' }}> / {fmt(item.limit)}</Text>
+              )}
+            </Text>
+          </View>
+          {item.limit > 0 ? (
+            <View style={[st.progressTrack, { backgroundColor: c.dim }]}>
+              <View style={[st.progressFill, { backgroundColor: barColor, width: `${pct * 100}%` as any }]} />
+            </View>
+          ) : (
+            <Text style={{ fontSize: 11, color: c.sub, fontStyle: 'italic' }}>
+              Натисніть щоб встановити прогноз
+            </Text>
+          )}
+        </View>
+        {/* Chevron */}
+        <IconSymbol name="chevron.right" size={14} color={c.sub} style={{ marginLeft: 6 }} />
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -604,7 +649,6 @@ const st = StyleSheet.create({
   catIconBox:   { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   progressTrack:{ height: 5, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
-  warningCard:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
   emptyIcon:    { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   addBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16 },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

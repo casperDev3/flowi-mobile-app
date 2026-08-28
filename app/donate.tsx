@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   Alert,
   Linking,
@@ -27,7 +27,7 @@ export default function DonateScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
-  const c = {
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
     bg2:    isDark ? '#14121E' : '#EBEBF5',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
@@ -35,16 +35,16 @@ export default function DonateScreen() {
     sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
-  };
+  }), [isDark]);
 
-  const handlePayPal = async () => {
+  const handlePayPal = useCallback(async () => {
     await Clipboard.setStringAsync(PAYPAL_EMAIL);
     Alert.alert(
       'Email скопійовано',
       `${PAYPAL_EMAIL}\n\nВідкрийте PayPal і надішліть кошти на цей email.`,
       [{ text: 'Зрозуміло' }],
     );
-  };
+  }, []);
 
   return (
     <View style={{ flex: 1 }}>

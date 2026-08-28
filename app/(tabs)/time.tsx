@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -29,8 +30,9 @@ import { useI18n } from '@/store/i18n';
 import { haptic } from '@/utils/haptics';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
-import { formatClock, formatDuration, formatDurationShort } from '@/utils/durationFormat';
+import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { monthGrid } from '@/utils/dateUtils';
 
 type Shift = 'morning' | 'day' | 'evening' | 'night';
 
@@ -40,12 +42,6 @@ interface TimeEntry { id: string; task: string; shift: Shift; duration: number; 
 
 const today = new Date();
 const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
-
-function chunk<T>(arr: T[], n: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
-  return out;
-}
 
 function groupLabel(date: Date, todayStr: string, yesterdayStr: string, locale: string) {
   if (date.toDateString() === today.toDateString()) return todayStr;
@@ -72,14 +68,16 @@ export default function TimeScreen() {
   );
   const fmtDurLocal = useCallback((s: number) => formatDuration(s, durationUnits), [durationUnits]);
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const SHIFTS: Record<Shift, ShiftCfg> = {
+  // Мемоізовано, бо цей обʼєкт іде пропом у React.memo-рядок списку: новий
+  // обʼєкт щосекунди (таймер) перерендерював би всю історію.
+  const SHIFTS = useMemo<Record<Shift, ShiftCfg>>(() => ({
     morning: { label: tr.morning, icon: 'sun.horizon.fill', color: '#F59E0B', hours: '06–12' },
     day:     { label: tr.daytime, icon: 'sun.max.fill',     color: '#EF4444', hours: '12–18' },
     evening: { label: tr.evening, icon: 'sunset.fill',      color: '#8B5CF6', hours: '18–24' },
     night:   { label: tr.night,   icon: 'moon.fill',        color: '#0EA5E9', hours: '00–06' },
-  };
-  const MONTHS_UA = tr.months;
-  const WEEKDAYS_SHORT = tr.weekdays;
+  }), [tr.morning, tr.daytime, tr.evening, tr.night]);
+  const months = tr.months;
+  const weekdaysShort = tr.weekdays;
 
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -162,7 +160,7 @@ export default function TimeScreen() {
   const toggle = () => {
     if (running) {
       if (elapsed > 0) {
-        setEntries(p => [{ id: Date.now().toString(), task: taskName.trim() || (lang === 'uk' ? 'Без назви' : 'Untitled'), shift: activeShift, duration: elapsed, date: new Date().toISOString() }, ...p]);
+        setEntries(p => [{ id: Date.now().toString(), task: taskName.trim() || tr.untitled, shift: activeShift, duration: elapsed, date: new Date().toISOString() }, ...p]);
       }
       setElapsed(0); setRunning(false);
     } else {
@@ -188,27 +186,24 @@ export default function TimeScreen() {
     return entries.filter(e => new Date(e.date).toDateString() === dateFilter);
   }, [entries, dateFilter]);
 
-  const groups = useMemo(() => {
-    const map: Record<string, { label: string; items: TimeEntry[]; dayTotal: number }> = {};
+  const sections = useMemo(() => {
+    const map: Record<string, { label: string; dayTotal: number; data: TimeEntry[] }> = {};
     const order: string[] = [];
     filteredEntries.forEach(e => {
       const d = new Date(e.date);
       const key = d.toDateString();
-      if (!map[key]) { map[key] = { label: groupLabel(d, tr.today, tr.yesterday, locale), items: [], dayTotal: 0 }; order.push(key); }
-      map[key].items.push(e);
+      if (!map[key]) { map[key] = { label: groupLabel(d, tr.today, tr.yesterday, locale), dayTotal: 0, data: [] }; order.push(key); }
+      map[key].data.push(e);
       map[key].dayTotal += e.duration;
     });
     return order.map(k => map[k]);
-  }, [filteredEntries]);
+    // Підписи груп («Сьогодні», «Вчора») залежать від мови — без цих
+    // залежностей історія лишалася б підписаною попередньою мовою.
+  }, [filteredEntries, tr.today, tr.yesterday, locale]);
 
-  // Calendar helpers
-  const firstDay = (() => { const d = new Date(calYear, calMonth, 1).getDay(); return d === 0 ? 6 : d - 1; })();
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const calCells: (number | null)[] = [];
-  for (let i = 0; i < firstDay; i++) calCells.push(null);
-  for (let i = 1; i <= daysInMonth; i++) calCells.push(i);
-  while (calCells.length % 7 !== 0) calCells.push(null);
-  const calWeeks = chunk(calCells, 7);
+  // Сітка місяця — зі спільної утиліти; локальна копія рахувала зсув
+  // понеділка окремо й могла розійтися з календарем завдань.
+  const calWeeks = useMemo(() => monthGrid(calYear, calMonth), [calYear, calMonth]);
 
   const markedDays = useMemo(() => {
     const set = new Set<string>();
@@ -219,7 +214,8 @@ export default function TimeScreen() {
     return set;
   }, [entries]);
 
-  const c = {
+  // Мемоізовано разом із рядками списку: інакше memo не спрацює.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
@@ -230,7 +226,9 @@ export default function TimeScreen() {
     indigo: '#6366F1',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(10,12,24,0.98)' : 'rgba(250,251,255,0.98)',
-  };
+  }), [isDark, running]);
+
+  const handleSelect = useCallback((entry: TimeEntry) => setSelected(entry), []);
 
   return (
     <View style={{ flex: 1 }}>
@@ -239,7 +237,7 @@ export default function TimeScreen() {
 
         {/* Fixed Header */}
         <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Трекер часу</Text>
+          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.navTimeTracker}</Text>
           <TouchableOpacity
             onPress={() => setShowMenu(true)}
             style={[s.headerBtn, { backgroundColor: dateFilter ? c.indigo + '20' : c.dim, borderColor: dateFilter ? c.indigo : c.border }]}>
@@ -247,10 +245,47 @@ export default function TimeScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
+        <SectionList
+          sections={sections}
+          keyExtractor={item => item.id}
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
-          showsVerticalScrollIndicator={false}>
-
+          showsVerticalScrollIndicator={false}
+          // Заголовки днів не липкі — так було й до віртуалізації.
+          stickySectionHeadersEnabled={false}
+          renderSectionHeader={({ section }) => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 14 }}>
+              <Text style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{section.label}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <IconSymbol name="timer" size={11} color={c.sub} />
+                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{fmtDurLocal(section.dayTotal)}</Text>
+              </View>
+            </View>
+          )}
+          // Відступи повторюють колишню розмітку: 8 між картками,
+          // 6 після групи (разом із marginTop заголовка — ті самі 20).
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          renderSectionFooter={() => <View style={{ height: 6 }} />}
+          renderItem={({ item }) => (
+            <EntryRow
+              entry={item}
+              cfg={SHIFTS[item.shift]}
+              isDark={isDark}
+              border={c.border}
+              text={c.text}
+              sub={c.sub}
+              duration={fmtDurLocal(item.duration)}
+              onPress={handleSelect}
+            />
+          )}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+              <IconSymbol name="clock.fill" size={40} color={c.sub} />
+              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noRecordsYet}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>Натисніть + для ручного запису</Text>
+            </View>
+          }
+          ListHeaderComponent={
+            <>
           {/* Date filter chip */}
           {dateFilter && (
             <TouchableOpacity
@@ -332,52 +367,15 @@ export default function TimeScreen() {
 
           {/* History */}
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 4 }}>
-            <Text style={[s.sectionTitle, { color: c.text, flex: 1 }]}>Історія</Text>
+            <Text style={[s.sectionTitle, { color: c.text, flex: 1 }]}>{tr.history}</Text>
           </View>
-
-          {filteredEntries.length === 0 && (
-            <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-              <IconSymbol name="clock.fill" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noRecordsYet}</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>Натисніть + для ручного запису</Text>
-            </View>
-          )}
-
-          {groups.map(group => (
-            <View key={group.label} style={{ marginBottom: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 14 }}>
-                <Text style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{group.label}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <IconSymbol name="timer" size={11} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{fmtDurLocal(group.dayTotal)}</Text>
-                </View>
-              </View>
-              <View style={{ gap: 8 }}>
-                {group.items.map(entry => {
-                  const cfg = SHIFTS[entry.shift];
-                  return (
-                    <TouchableOpacity key={entry.id} activeOpacity={0.75} onPress={() => setSelected(entry)}>
-                      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.entryCard, { borderColor: c.border }]}>
-                        <View style={[s.shiftIcon, { backgroundColor: cfg.color + '20' }]}>
-                          <IconSymbol name={cfg.icon} size={17} color={cfg.color} />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: 13 }}>
-                          <Text style={[s.entryTask, { color: c.text }]}>{entry.task}</Text>
-                          <Text style={[s.entryMeta, { color: c.sub }]}>{cfg.label} · {cfg.hours}</Text>
-                        </View>
-                        <Text style={[s.entryDur, { color: cfg.color }]}>{fmtDurLocal(entry.duration)}</Text>
-                      </BlurView>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          ))}
-        </ScrollView>
+            </>
+          }
+        />
       </SafeAreaView>
 
       {/* FAB */}
-      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { backgroundColor: c.indigo }]}>
+      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.indigo }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </PressableScale>
 
@@ -398,7 +396,7 @@ export default function TimeScreen() {
                 <View style={[s.menuIconBox, { backgroundColor: dateFilter ? c.indigo + '25' : c.dim }]}>
                   <IconSymbol name="calendar" size={15} color={dateFilter ? c.indigo : c.sub} />
                 </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>Календар</Text>
+                <Text style={[s.menuLabel, { color: c.text }]}>{tr.calendar}</Text>
                 {dateFilter
                   ? <View style={[s.menuPill, { backgroundColor: c.indigo + '20', borderColor: c.indigo + '40' }]}>
                       <Text style={[s.menuPillText, { color: c.indigo }]}>
@@ -418,7 +416,7 @@ export default function TimeScreen() {
                 <View style={[s.menuIconBox, { backgroundColor: c.indigo + '25' }]}>
                   <IconSymbol name="chart.bar.fill" size={15} color={c.indigo} />
                 </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>Статистика</Text>
+                <Text style={[s.menuLabel, { color: c.text }]}>{tr.statistics}</Text>
                 <IconSymbol name="chevron.right" size={13} color={c.sub} />
               </TouchableOpacity>
 
@@ -449,7 +447,7 @@ export default function TimeScreen() {
                     <IconSymbol name="chevron.left" size={20} color={c.sub} />
                   </TouchableOpacity>
                   <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontWeight: '700' }}>
-                    {MONTHS_UA[calMonth]} {calYear}
+                    {months[calMonth]} {calYear}
                   </Text>
                   <TouchableOpacity onPress={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }} style={s.navBtn}>
                     <IconSymbol name="chevron.right" size={20} color={c.sub} />
@@ -457,7 +455,7 @@ export default function TimeScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                  {WEEKDAYS_SHORT.map(d => (
+                  {weekdaysShort.map(d => (
                     <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
                   ))}
                 </View>
@@ -654,6 +652,40 @@ export default function TimeScreen() {
   );
 }
 
+interface EntryRowProps {
+  entry: TimeEntry;
+  cfg: ShiftCfg;
+  isDark: boolean;
+  border: string;
+  text: string;
+  sub: string;
+  /** Готовий рядок, а не секунди: щоб не тягти сюди функцію форматування. */
+  duration: string;
+  onPress: (entry: TimeEntry) => void;
+}
+
+/**
+ * Рядок історії окремим memo-компонентом: поки біжить таймер, екран
+ * перемальовується щосекунди, і без цього разом із ним перемальовувався
+ * б увесь список записів.
+ */
+const EntryRow = React.memo(function EntryRow({ entry, cfg, isDark, border, text, sub, duration, onPress }: EntryRowProps) {
+  return (
+    <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(entry)}>
+      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.entryCard, { borderColor: border }]}>
+        <View style={[s.shiftIcon, { backgroundColor: cfg.color + '20' }]}>
+          <IconSymbol name={cfg.icon} size={17} color={cfg.color} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 13 }}>
+          <Text style={[s.entryTask, { color: text }]}>{entry.task}</Text>
+          <Text style={[s.entryMeta, { color: sub }]}>{cfg.label} · {cfg.hours}</Text>
+        </View>
+        <Text style={[s.entryDur, { color: cfg.color }]}>{duration}</Text>
+      </BlurView>
+    </TouchableOpacity>
+  );
+});
+
 function StatCell({ value, label, color, sub }: { value: string; label: string; color: string; sub: string }) {
   return (
     <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}>
@@ -694,7 +726,7 @@ const s = StyleSheet.create({
   entryTask:   { fontSize: 13, fontWeight: '600' },
   entryMeta:   { fontSize: 11, marginTop: 2 },
   entryDur:    { fontSize: 13, fontWeight: '800' },
-  fab:         { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  fab:         { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },

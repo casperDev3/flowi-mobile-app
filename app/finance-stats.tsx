@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -17,9 +17,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
+import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
+import { monthGrid } from '@/utils/dateUtils';
+import { BUILTIN_CURRENCIES, formatCurrency, type Currency } from '@/utils/financeUtils';
 import { useResponsive } from '@/hooks/use-responsive';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 
 type TxType = 'income' | 'expense';
 interface Transaction {
@@ -54,11 +57,31 @@ const CAT_COLORS = [
 const MONTHS_UA      = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 const MONTHS_UA_FULL = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const WEEKDAYS_UA    = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
-const fmt = (n: number) => n.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
 const fmtShort = (n: number) => {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}к`;
   return String(Math.round(n));
 };
+
+/**
+ * Палітра екрана. Винесена з тіла компонента, щоб `useMemo` віддавав той
+ * самий об'єкт між рендерами — інакше мемоізовані картки бачать «нові»
+ * кольори на кожен рендер і перемальовуються дарма.
+ */
+function makeColors(isDark: boolean) {
+  return {
+    bg1:    isDark ? '#080E18' : '#EFF5FF',
+    bg2:    isDark ? '#0F1A2E' : '#E0ECFF',
+    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
+    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(140,180,240,0.35)',
+    text:   isDark ? '#F0F5FF' : '#0A1020',
+    sub:    isDark ? 'rgba(240,245,255,0.62)' : 'rgba(10,16,32,0.58)',
+    green:  '#10B981',
+    red:    '#EF4444',
+    accent: '#0EA5E9',
+    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    hole:   isDark ? '#0C1420' : '#E8F0FC',
+  };
+}
 
 type Period = 'week' | 'month' | '3months' | 'year' | 'all';
 
@@ -72,7 +95,7 @@ function getPeriodStart(period: Period): Date | null {
 }
 
 // ─── Pie slice (no SVG) ──────────────────────────────────────────────────────
-function PieSlice({ from, sweep, color, size }: { from: number; sweep: number; color: string; size: number }) {
+const PieSlice = React.memo(function PieSlice({ from, sweep, color, size }: { from: number; sweep: number; color: string; size: number }) {
   if (sweep <= 0.5) return null;
   if (sweep > 180) {
     return (
@@ -95,9 +118,9 @@ function PieSlice({ from, sweep, color, size }: { from: number; sweep: number; c
       </View>
     </View>
   );
-}
+});
 
-function DonutChart({ data, size = 180, holeRatio = 0.56, holeBg }: {
+const DonutChart = React.memo(function DonutChart({ data, size = 180, holeRatio = 0.56, holeBg }: {
   data: { value: number; color: string }[];
   size?: number; holeRatio?: number; holeBg: string;
 }) {
@@ -123,10 +146,10 @@ function DonutChart({ data, size = 180, holeRatio = 0.56, holeBg }: {
       }} />
     </View>
   );
-}
+});
 
 // ─── Trend line chart (rotated Views) ────────────────────────────────────────
-function SparkLine({ data, color, height = 64, width }: {
+const SparkLine = React.memo(function SparkLine({ data, color, height = 64, width }: {
   data: number[]; color: string; height: number; width: number;
 }) {
   if (data.length < 2) return null;
@@ -183,15 +206,21 @@ function SparkLine({ data, color, height = 64, width }: {
       }} />
     </View>
   );
-}
+});
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function FinanceStatsScreen() {
   const contentWidth = useContentWidth();
-  const { width } = useResponsive();
+  const { width, isWide } = useResponsive();
   const isDark = useColorScheme() === 'dark';
+  const { tr, lang } = useI18n();
   const [txs, setTxs] = useState<Transaction[]>([]);
+  // Порожній стан показуємо лише після читання сховища: інакше він блимає
+  // на першому кадрі, поки транзакції ще не приїхали.
+  const [loaded, setLoaded] = useState(false);
   const [cats, setCats] = useState<Record<TxType, CategoryDef[]>>(DEFAULT_CATEGORIES);
+  const [primaryCurrency, setPrimaryCurrency] = useState('UAH');
+  const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
   const [period, setPeriod] = useState<Period>('month');
   const [catTab, setCatTab] = useState<TxType>('expense');
 
@@ -231,21 +260,7 @@ export default function FinanceStatsScreen() {
     }
   };
 
-  // Calendar grid helpers
-  const firstDayOfMonth = useMemo(() => {
-    const d = new Date(calYear, calMonth, 1).getDay();
-    return d === 0 ? 6 : d - 1;
-  }, [calYear, calMonth]);
-  const daysInMonth = useMemo(() => new Date(calYear, calMonth + 1, 0).getDate(), [calYear, calMonth]);
-  const calWeeks = useMemo(() => {
-    const cells: (number | null)[] = [];
-    for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
-    for (let i = 1; i <= daysInMonth; i++) cells.push(i);
-    while (cells.length % 7 !== 0) cells.push(null);
-    const weeks: (number | null)[][] = [];
-    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-    return weeks;
-  }, [firstDayOfMonth, daysInMonth]);
+  const calWeeks = useMemo(() => monthGrid(calYear, calMonth), [calYear, calMonth]);
 
   const markedDays = useMemo(() => {
     const set = new Set<string>();
@@ -257,30 +272,40 @@ export default function FinanceStatsScreen() {
   }, [txs]);
 
   useEffect(() => {
-    loadData<Transaction[]>('transactions', []).then(setTxs);
-    loadData<CategoryRow[]>('categories', []).then(rows => {
+    Promise.all([
+      loadData<Transaction[]>('transactions', []),
+      loadData<CategoryRow[]>('categories', []),
+      loadData<string>('finance_primary_currency', 'UAH'),
+      loadData<Currency[]>('finance_currencies', []),
+    ]).then(([loadedTxs, rows, primCur, curList]) => {
+      setTxs(loadedTxs);
       setCats(categoryRowsToMap(Array.isArray(rows) ? rows : [], DEFAULT_CATEGORIES));
+      setPrimaryCurrency(primCur || 'UAH');
+      setCustomCurrencies(Array.isArray(curList) ? curList : []);
+      setLoaded(true);
     });
   }, []);
 
-  const getCatIcon = (name: string, type: TxType): IconSymbolName =>
-    cats[type].find(c => c.name === name)?.icon ??
-    DEFAULT_CATEGORIES[type].find(c => c.name === name)?.icon ??
-    'ellipsis.circle.fill';
+  const getCatIcon = useCallback(
+    (name: string, type: TxType): IconSymbolName =>
+      cats[type].find(cat => cat.name === name)?.icon ??
+      DEFAULT_CATEGORIES[type].find(cat => cat.name === name)?.icon ??
+      'ellipsis.circle.fill',
+    [cats],
+  );
 
-  const c = {
-    bg1:    isDark ? '#080E18' : '#EFF5FF',
-    bg2:    isDark ? '#0F1A2E' : '#E0ECFF',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(140,180,240,0.35)',
-    text:   isDark ? '#F0F5FF' : '#0A1020',
-    sub:    isDark ? 'rgba(240,245,255,0.62)' : 'rgba(10,16,32,0.58)',
-    green:  '#10B981',
-    red:    '#EF4444',
-    accent: '#0EA5E9',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    hole:   isDark ? '#0C1420' : '#E8F0FC',
-  };
+  const c = useMemo(() => makeColors(isDark), [isDark]);
+
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+
+  // Статистика показує ті самі суми, що й «Фінанси», тож і валюта та сама —
+  // вшитий ₴ брехав би всім, хто веде облік у іншій валюті.
+  const currency = useMemo<Currency>(
+    () => [...BUILTIN_CURRENCIES, ...customCurrencies].find(cur => cur.code === primaryCurrency)
+      ?? BUILTIN_CURRENCIES[0],
+    [customCurrencies, primaryCurrency],
+  );
+  const fmt = useCallback((n: number) => formatCurrency(n, currency, locale), [currency, locale]);
 
   const periodStart = useMemo(() => getPeriodStart(period), [period]);
   const periodTxs   = useMemo(() => {
@@ -387,12 +412,34 @@ export default function FinanceStatsScreen() {
     : periodStart ? Math.max(1, Math.ceil((Date.now() - periodStart.getTime()) / 86400000)) : 30;
   const avgDailyExp  = expense / periodDays;
 
-  const balanceDonutData = income + expense > 0
-    ? [{ value: income, color: c.green }, { value: expense, color: c.red }]
-    : [];
+  const balanceDonutData = useMemo(
+    () => (income + expense > 0
+      ? [{ value: income, color: c.green }, { value: expense, color: c.red }]
+      : []),
+    [income, expense, c.green, c.red],
+  );
+
+  const categoryDonutData = useMemo(
+    () => categoryStats.map(item => ({ value: item.amt, color: item.color })),
+    [categoryStats],
+  );
 
   const trendColor = balance >= 0 ? c.green : c.red;
-  const SPARK_W = width - 76;
+  // Графік живе всередині колонки, обмеженої CONTENT_MAX_WIDTH: на планшеті
+  // ширина вікна значно більша, і без стелі лінія вилазила б за картку.
+  // 76 = поля прокрутки (20+20) + внутрішні поля картки (18+18).
+  const SPARK_W = Math.min(width, CONTENT_MAX_WIDTH) - 76;
+
+  const summaryCards = [
+    { label: 'Доходи',       value: fmt(income),      color: c.green },
+    { label: 'Витрати',      value: fmt(expense),     color: c.red },
+    { label: 'Баланс',       value: fmt(balance),     color: balance >= 0 ? c.green : c.red },
+    { label: 'Заощадження',  value: `${savingsPct}%`, color: c.accent },
+  ];
+  // На широкому екрані всі чотири підсумки вміщаються в один ряд.
+  const summaryRows = isWide
+    ? [summaryCards]
+    : [summaryCards.slice(0, 2), summaryCards.slice(2)];
 
   return (
     <View style={{ flex: 1 }}>
@@ -434,6 +481,26 @@ export default function FinanceStatsScreen() {
             </TouchableOpacity>
           )}
 
+          {loaded && txs.length === 0 ? (
+            /* Порожня статистика — глухий кут: графіки нулів не пояснюють,
+               що робити далі, тому веде одразу до створення транзакції. */
+            <View style={{ alignItems: 'center', paddingVertical: 64 }}>
+              <View style={[s.emptyIcon, { backgroundColor: c.accent + '15' }]}>
+                <IconSymbol name="chart.bar.fill" size={34} color={c.accent} />
+              </View>
+              <Text style={{ color: c.text, fontSize: 17, fontWeight: '700', marginTop: 16 }}>
+                {tr.noTransactions}
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/explore', params: { create: '1' } })}
+                style={[s.emptyBtn, { backgroundColor: c.accent }]}>
+                <IconSymbol name="plus" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', marginLeft: 8 }}>{tr.add}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+          <>
+
           {/* ── Period selector (hidden when custom range active) ── */}
           {!hasCustomRange && (
           <View style={[s.segRow, { backgroundColor: c.card, borderColor: c.border, marginBottom: 18 }]}>
@@ -455,14 +522,13 @@ export default function FinanceStatsScreen() {
           )}
 
           {/* ── Summary row ── */}
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-            <SummCard label="Доходи"  value={fmt(income)}  color={c.green} border={c.border} isDark={isDark} />
-            <SummCard label="Витрати" value={fmt(expense)} color={c.red}   border={c.border} isDark={isDark} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 18 }}>
-            <SummCard label="Баланс"      value={fmt(balance)}      color={balance >= 0 ? c.green : c.red} border={c.border} isDark={isDark} />
-            <SummCard label="Заощадження" value={`${savingsPct}%`}  color={c.accent} border={c.border} isDark={isDark} />
-          </View>
+          {summaryRows.map((row, ri) => (
+            <View key={ri} style={{ flexDirection: 'row', gap: 8, marginBottom: ri === summaryRows.length - 1 ? 18 : 8 }}>
+              {row.map(card => (
+                <SummCard key={card.label} label={card.label} value={card.value} color={card.color} border={c.border} isDark={isDark} />
+              ))}
+            </View>
+          ))}
 
           {/* ── Balance trend ── */}
           {trendData.length >= 2 && (
@@ -640,7 +706,7 @@ export default function FinanceStatsScreen() {
               {/* Donut + legend side by side */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 18 }}>
                 <DonutChart
-                  data={categoryStats.map(s => ({ value: s.amt, color: s.color }))}
+                  data={categoryDonutData}
                   size={130}
                   holeRatio={0.52}
                   holeBg={c.hole}
@@ -695,13 +761,16 @@ export default function FinanceStatsScreen() {
             </BlurView>
           )}
 
+          </>
+          )}
+
         </ScrollView>
       </SafeAreaView>
 
       {/* ─── Calendar Range Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <Pressable style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.28)', justifyContent: 'flex-end' }} onPress={() => setShowCal(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }}>
+          <Pressable onPress={e => e.stopPropagation()} style={[{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }, contentWidth]}>
             <BlurView intensity={isDark ? 55 : 72} tint={isDark ? 'dark' : 'light'} style={[s.calSheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,16,30,0.97)' : 'rgba(245,248,255,0.97)' }]}>
 
               {/* Handle + close */}
@@ -834,20 +903,20 @@ export default function FinanceStatsScreen() {
 }
 
 // ─── Helper components ───────────────────────────────────────────────────────
-function SectionTitle({ text, sub }: { text: string; sub: string }) {
+const SectionTitle = React.memo(function SectionTitle({ text, sub }: { text: string; sub: string }) {
   return <Text style={[s.sectionTitle, { color: sub }]}>{text}</Text>;
-}
+});
 
-function SummCard({ label, value, color, border, isDark }: { label: string; value: string; color: string; border: string; isDark: boolean }) {
+const SummCard = React.memo(function SummCard({ label, value, color, border, isDark }: { label: string; value: string; color: string; border: string; isDark: boolean }) {
   return (
     <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.summCard, { borderColor: border, flex: 1 }]}>
       <Text style={{ color, fontSize: 10, fontWeight: '600', marginBottom: 5, opacity: 0.55 }}>{label}</Text>
       <Text style={{ color, fontSize: 15, fontWeight: '800', letterSpacing: -0.3 }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
     </BlurView>
   );
-}
+});
 
-function QuickStat({ icon, label, value, color, border, isDark }: { icon: IconSymbolName; label: string; value: string; color: string; border: string; isDark: boolean }) {
+const QuickStat = React.memo(function QuickStat({ icon, label, value, color, border, isDark }: { icon: IconSymbolName; label: string; value: string; color: string; border: string; isDark: boolean }) {
   return (
     <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.summCard, { borderColor: border, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
       <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: color + '20', alignItems: 'center', justifyContent: 'center' }}>
@@ -859,16 +928,16 @@ function QuickStat({ icon, label, value, color, border, isDark }: { icon: IconSy
       </View>
     </BlurView>
   );
-}
+});
 
-function LegendDot({ color, label, sub }: { color: string; label: string; sub: string }) {
+const LegendDot = React.memo(function LegendDot({ color, label, sub }: { color: string; label: string; sub: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
       <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
       <Text style={{ color: sub, fontSize: 11, fontWeight: '600' }}>{label}</Text>
     </View>
   );
-}
+});
 
 const s = StyleSheet.create({
   header:       { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' },
@@ -889,4 +958,6 @@ const s = StyleSheet.create({
   navBtn:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   dayCell:      { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   calBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingVertical: 11 },
+  emptyIcon:    { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  emptyBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 14, marginTop: 20 },
 });

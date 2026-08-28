@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -28,6 +28,47 @@ interface Task {
   createdAt: string; estimatedMinutes?: number; deadline?: string; projectId?: string;
 }
 
+interface SubRowProps {
+  sub: SubTask;
+  textColor: string;
+  subColor: string;
+  borderColor: string;
+  dimColor: string;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+/**
+ * Рядок мемоізований: набір тексту в полі «Додати підзавдання» інакше
+ * перемальовує весь список на кожну натиснуту літеру.
+ */
+const SubRow = React.memo(function SubRow({
+  sub, textColor, subColor, borderColor, dimColor, onToggle, onDelete,
+}: SubRowProps) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => onToggle(sub.id)}
+      style={[st.subRow, { backgroundColor: dimColor, borderColor: sub.done ? '#10B98130' : borderColor }]}>
+      <View style={[st.subCheck, { borderColor: sub.done ? '#10B981' : borderColor, backgroundColor: sub.done ? '#10B981' : 'transparent' }]}>
+        {sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
+      </View>
+      <Text style={{
+        color: sub.done ? subColor : textColor,
+        textDecorationLine: sub.done ? 'line-through' : 'none',
+        flex: 1, marginHorizontal: 12, fontSize: 14, fontWeight: '500',
+      }}>
+        {sub.title}
+      </Text>
+      <TouchableOpacity
+        onPress={() => onDelete(sub.id)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <IconSymbol name="trash" size={14} color={subColor} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+});
+
 export default function SubtasksScreen() {
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
@@ -37,7 +78,8 @@ export default function SubtasksScreen() {
   const [task, setTask] = useState<Task | null>(null);
   const [newSubtask, setNewSubtask] = useState('');
 
-  const c = {
+  // Палітра стабільна між рендерами — інакше React.memo на рядку не спрацює.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
@@ -45,7 +87,7 @@ export default function SubtasksScreen() {
     sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  };
+  }), [isDark]);
 
   useEffect(() => {
     loadData<Task[]>('tasks', []).then(tasks => {
@@ -80,7 +122,10 @@ export default function SubtasksScreen() {
   }, [task, newSubtask, persistTask]);
 
   // completed subtasks go to end
-  const sortedSubs = task ? [...task.subtasks].sort((a, b) => Number(a.done) - Number(b.done)) : [];
+  const sortedSubs = useMemo(
+    () => (task ? [...task.subtasks].sort((a, b) => Number(a.done) - Number(b.done)) : []),
+    [task],
+  );
   const doneCount = task ? task.subtasks.filter(s => s.done).length : 0;
   const total = task ? task.subtasks.length : 0;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
@@ -120,28 +165,19 @@ export default function SubtasksScreen() {
             )}
 
             <View style={{ gap: 8 }}>
+              {/* Підзавдань у межах однієї задачі одиниці — віртуалізація тут
+                  лише додала б накладних витрат, тому звичайний map. */}
               {sortedSubs.map(sub => (
-                <TouchableOpacity
+                <SubRow
                   key={sub.id}
-                  activeOpacity={0.7}
-                  onPress={() => toggleSubtask(sub.id)}
-                  style={[st.subRow, { backgroundColor: c.dim, borderColor: sub.done ? '#10B98130' : c.border }]}>
-                  <View style={[st.subCheck, { borderColor: sub.done ? '#10B981' : c.border, backgroundColor: sub.done ? '#10B981' : 'transparent' }]}>
-                    {sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
-                  </View>
-                  <Text style={{
-                    color: sub.done ? c.sub : c.text,
-                    textDecorationLine: sub.done ? 'line-through' : 'none',
-                    flex: 1, marginHorizontal: 12, fontSize: 14, fontWeight: '500',
-                  }}>
-                    {sub.title}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => deleteSubtask(sub.id)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                    <IconSymbol name="trash" size={14} color={c.sub} />
-                  </TouchableOpacity>
-                </TouchableOpacity>
+                  sub={sub}
+                  textColor={c.text}
+                  subColor={c.sub}
+                  borderColor={c.border}
+                  dimColor={c.dim}
+                  onToggle={toggleSubtask}
+                  onDelete={deleteSubtask}
+                />
               ))}
 
               {/* Add subtask */}

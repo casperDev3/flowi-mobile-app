@@ -2,9 +2,10 @@ import * as Notifications from 'expo-notifications';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  FlatList,
   Modal,
   Platform,
   RefreshControl,
@@ -23,6 +24,7 @@ import { requestNotificationPermissions } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
+import { formatDuration } from '@/utils/durationFormat';
 import { useContentWidth } from '@/hooks/use-content-width';
 
 const ACCENT = '#0EA5E9';
@@ -77,12 +79,18 @@ const MUSCLE_GROUPS = ['Груди', 'Спина', 'Плечі', 'Біцепс',
 const PROGRAM_COLORS = ['#EF4444', '#F97316', '#EAB308', '#10B981', '#0EA5E9', '#6366F1', '#A78BFA', '#EC4899'];
 const DAY_LABELS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
-const fmtDuration = (min: number) => {
-  const h = Math.floor(min / 60), m = min % 60;
-  if (h > 0 && m > 0) return `${h}г ${m}хв`;
-  if (h > 0) return `${h} год`;
-  return `${m} хв`;
-};
+const TABS = [
+  { key: 'workouts' as const, label: 'Тренування' },
+  { key: 'exercises' as const, label: 'Вправи' },
+  { key: 'programs' as const, label: 'Програми' },
+];
+
+// Одиниці вшиті українською, як і решта рядків цього екрана (див. звіт);
+// сама ж форма тривалості береться зі спільної утиліти, щоб екран не
+// розходився з рештою застосунку через власну копію тих самих трьох гілок.
+const DURATION_UNITS = { hour: 'г', hourLong: 'год', minute: 'хв' };
+
+const fmtDuration = (min: number) => formatDuration(min * 60, DURATION_UNITS);
 
 // ─── Exercise Modal ────────────────────────────────────────────────────────────
 function ExerciseModal({
@@ -543,12 +551,178 @@ function sectionLabel(c: ReturnType<typeof makeColors>) {
   };
 }
 
+// ─── Рядки списків ────────────────────────────────────────────────────────────
+// Історія тренувань і бібліотека вправ ростуть без стелі, тож вони їдуть
+// через FlatList. Рядки винесені й мемоізовані: без цього віртуалізація
+// нічого не дає — кожен рендер екрана однаково перемальовував би всі видимі
+// картки, бо JSX всередині .map створюється заново.
+
+type Colors = ReturnType<typeof makeColors>;
+
+const WorkoutRow = React.memo(function WorkoutRow({ w, c, isDark, lastInGroup, onDelete }: {
+  w: Workout; c: Colors; isDark: boolean; lastInGroup: boolean; onDelete: (id: string) => void;
+}) {
+  const cfg = WORKOUT_TYPES.find(t => t.key === w.type) ?? WORKOUT_TYPES[6];
+  return (
+    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
+      style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: lastInGroup ? 24 : 8, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+        <IconSymbol name={cfg.icon as any} size={20} color={cfg.color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{w.title}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
+          {fmtDuration(w.durationMin)}{w.calories ? ` · ${w.calories} ккал` : ''}
+        </Text>
+      </View>
+      <TouchableOpacity onPress={() => onDelete(w.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <IconSymbol name="xmark" size={14} color={c.sub} />
+      </TouchableOpacity>
+    </BlurView>
+  );
+});
+
+const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onDelete }: {
+  ex: Exercise; c: Colors; isDark: boolean;
+  onEdit: (ex: Exercise) => void; onDelete: (id: string) => void;
+}) {
+  return (
+    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
+      style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: ACCENT2 + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+        <IconSymbol name="dumbbell.fill" size={18} color={ACCENT2} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{ex.name}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
+          {[
+            ex.muscleGroup,
+            ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null,
+            ex.weightKg ? `${ex.weightKg} кг` : null,
+            ex.restSec ? `відпочинок ${ex.restSec}с` : null,
+          ].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
+      <TouchableOpacity
+        onPress={() => onEdit(ex)}
+        style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <IconSymbol name="pencil" size={15} color={c.sub} />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => onDelete(ex.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <IconSymbol name="trash" size={15} color="#EF4444" />
+      </TouchableOpacity>
+    </BlurView>
+  );
+});
+
+const ProgramShortcut = React.memo(function ProgramShortcut({ prog, exercises, c, onStart }: {
+  prog: WorkoutProgram; exercises: Exercise[]; c: Colors; onStart: (p: WorkoutProgram) => void;
+}) {
+  const progExs = exercises.filter(e => prog.exerciseIds.includes(e.id));
+  return (
+    <TouchableOpacity
+      onPress={() => onStart(prog)}
+      activeOpacity={0.75}
+      style={{
+        flexDirection: 'row', alignItems: 'center',
+        padding: 14, borderRadius: 14, marginBottom: 10,
+        backgroundColor: prog.color + '12',
+        borderWidth: 1, borderColor: prog.color + '35',
+      }}>
+      <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: prog.color + '28', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+        <IconSymbol name="dumbbell.fill" size={20} color={prog.color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 3 }}>{prog.name}</Text>
+        <Text style={{ color: c.sub, fontSize: 12 }}>
+          {progExs.length > 0
+            ? progExs.slice(0, 3).map(e => e.name).join(', ') + (progExs.length > 3 ? ` +${progExs.length - 3}` : '')
+            : `${prog.exerciseIds.length} вправ`}
+        </Text>
+      </View>
+      <View style={{ backgroundColor: prog.color + '20', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 }}>
+        <Text style={{ color: prog.color, fontSize: 12, fontWeight: '700' }}>Старт</Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark, onEdit, onDelete, onStart }: {
+  prog: WorkoutProgram; exercises: Exercise[]; c: Colors; isDark: boolean;
+  onEdit: (p: WorkoutProgram) => void; onDelete: (p: WorkoutProgram) => void; onStart: (p: WorkoutProgram) => void;
+}) {
+  const progExs = exercises.filter(e => prog.exerciseIds.includes(e.id));
+  return (
+    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
+      style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 12 }}>
+      <View style={{ padding: 14 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: prog.color + '25', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+            <IconSymbol name="dumbbell.fill" size={18} color={prog.color} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{prog.name}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
+              {prog.exerciseIds.length} вправ
+              {prog.reminderEnabled && prog.reminderDays.length > 0
+                ? ` · ${prog.reminderDays.map(d => DAY_LABELS[d]).join(', ')} о ${prog.reminderTime}`
+                : ''}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => onEdit(prog)}
+            style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <IconSymbol name="pencil" size={15} color={c.sub} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onDelete(prog)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <IconSymbol name="trash" size={15} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
+
+        {progExs.length > 0 && (
+          <View style={{ marginTop: 12, gap: 6 }}>
+            {progExs.map((ex, idx) => (
+              <View key={ex.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', width: 18 }}>{idx + 1}.</Text>
+                <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{ex.name}</Text>
+                <Text style={{ color: c.sub, fontSize: 12 }}>
+                  {[
+                    ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null,
+                    ex.weightKg ? `${ex.weightKg}кг` : null,
+                  ].filter(Boolean).join(' · ')}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <TouchableOpacity
+          onPress={() => onStart(prog)}
+          style={{ marginTop: 14, padding: 10, borderRadius: 10, backgroundColor: prog.color + '20', alignItems: 'center' }}>
+          <Text style={{ color: prog.color, fontSize: 13, fontWeight: '700' }}>Розпочати тренування</Text>
+        </TouchableOpacity>
+      </View>
+    </BlurView>
+  );
+});
+
+// Рядок списку однієї з трьох вкладок — тип вибирає, що малювати.
+type Row =
+  | { kind: 'dateLabel'; key: string; date: string }
+  | { kind: 'workout'; key: string; w: Workout; lastInGroup: boolean }
+  | { kind: 'exercise'; key: string; ex: Exercise }
+  | { kind: 'program'; key: string; prog: WorkoutProgram };
+
+const rowKey = (r: Row) => r.key;
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function WorkoutsScreen() {
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const c = makeColors(isDark);
+  // Палітра мусить бути стабільним обʼєктом: інакше кожен рендер екрана
+  // віддавав би мемоізованим рядкам нове посилання, і React.memo не спрацює.
+  const c = useMemo(() => makeColors(isDark), [isDark]);
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -579,7 +753,7 @@ export default function WorkoutsScreen() {
     setRefreshing(false);
   }, [load]);
 
-  useEffect(() => { load().then(() => setInitialized(true)); }, []);
+  useEffect(() => { load().then(() => setInitialized(true)); }, [load]);
 
   useEffect(() => {
     if (!initialized) return;
@@ -625,32 +799,47 @@ export default function WorkoutsScreen() {
     return ids;
   }, []);
 
-  const now = new Date();
-  const todayWorkouts = workouts.filter(w => isSameDay(new Date(w.date), now));
-  const totalMinToday = todayWorkouts.reduce((s, w) => s + w.durationMin, 0);
-  const totalCalToday = todayWorkouts.reduce((s, w) => s + (w.calories ?? 0), 0);
+  const todayStats = useMemo(() => {
+    const now = new Date();
+    const items = workouts.filter(w => isSameDay(new Date(w.date), now));
+    return {
+      count: items.length,
+      minutes: items.reduce((s, w) => s + w.durationMin, 0),
+      calories: items.reduce((s, w) => s + (w.calories ?? 0), 0),
+    };
+  }, [workouts]);
 
-  // Group workouts by date (newest first)
-  const grouped: { date: string; items: Workout[] }[] = [];
-  const seen = new Set<string>();
-  [...workouts]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .forEach(w => {
-      const d = new Date(w.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      if (!seen.has(key)) { seen.add(key); grouped.push({ date: key, items: [] }); }
-      grouped.find(g => g.date === key)!.items.push(w);
-    });
+  // Групування історії по днях (новіші згори) за один прохід. Попередня
+  // версія на кожен запис шукала свою групу через grouped.find, тобто
+  // квадратично від довжини історії — на кількох сотнях тренувань це
+  // помітно на кожному рендері.
+  const grouped = useMemo(() => {
+    const byDate = new Map<string, Workout[]>();
+    [...workouts]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .forEach(w => {
+        const d = new Date(w.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const bucket = byDate.get(key);
+        if (bucket) bucket.push(w);
+        else byDate.set(key, [w]);
+      });
+    return [...byDate].map(([date, items]) => ({ date, items }));
+  }, [workouts]);
 
-  const saveExercise = (e: Exercise) => {
+  const saveExercise = useCallback((e: Exercise) => {
     setExercises(p => {
       const idx = p.findIndex(x => x.id === e.id);
       return idx >= 0 ? p.map(x => x.id === e.id ? e : x) : [...p, e];
     });
     setShowExModal(false); setEditingEx(null);
-  };
+  }, []);
 
-  const deleteExercise = (id: string) => {
+  const editExercise = useCallback((ex: Exercise) => {
+    setEditingEx(ex); setShowExModal(true);
+  }, []);
+
+  const deleteExercise = useCallback((id: string) => {
     Alert.alert('Видалити вправу?', 'Вправу буде видалено з усіх програм.', [
       { text: 'Скасувати', style: 'cancel' },
       {
@@ -660,9 +849,9 @@ export default function WorkoutsScreen() {
         },
       },
     ]);
-  };
+  }, []);
 
-  const saveProgram = async (p: WorkoutProgram) => {
+  const saveProgram = useCallback(async (p: WorkoutProgram) => {
     const ids = await scheduleNotifs(p);
     const saved = ids.length ? { ...p, notificationIds: ids } : p;
     setPrograms(prev => {
@@ -670,9 +859,13 @@ export default function WorkoutsScreen() {
       return idx >= 0 ? prev.map(x => x.id === p.id ? saved : x) : [...prev, saved];
     });
     setShowProgModal(false); setEditingProg(null);
-  };
+  }, [scheduleNotifs]);
 
-  const deleteProgram = (prog: WorkoutProgram) => {
+  const editProgram = useCallback((prog: WorkoutProgram) => {
+    setEditingProg(prog); setShowProgModal(true);
+  }, []);
+
+  const deleteProgram = useCallback((prog: WorkoutProgram) => {
     Alert.alert('Видалити програму?', undefined, [
       { text: 'Скасувати', style: 'cancel' },
       {
@@ -686,22 +879,181 @@ export default function WorkoutsScreen() {
         },
       },
     ]);
-  };
+  }, []);
 
-  const startFromProgram = (prog: WorkoutProgram) => {
+  const deleteWorkout = useCallback((id: string) => {
+    setWorkouts(p => p.filter(x => x.id !== id));
+  }, []);
+
+  const startFromProgram = useCallback((prog: WorkoutProgram) => {
     setWorkouts(p => [{
       id: Date.now().toString(),
       type: 'gym', title: prog.name, durationMin: 45,
       date: new Date().toISOString(), programId: prog.id,
     }, ...p]);
     setTab('workouts');
-  };
+  }, []);
 
-  const TABS = [
-    { key: 'workouts' as const, label: 'Тренування' },
-    { key: 'exercises' as const, label: 'Вправи' },
-    { key: 'programs' as const, label: 'Програми' },
-  ];
+  const openNewExercise = useCallback(() => { setEditingEx(null); setShowExModal(true); }, []);
+  const openNewProgram = useCallback(() => { setEditingProg(null); setShowProgModal(true); }, []);
+  const goToPrograms = useCallback(() => setTab('programs'), []);
+
+  // Пласкі рядки для FlatList: заголовок дня і картки одного дня йдуть
+  // поспіль, тож віртуалізація бачить однорідний список, а не вкладені мапи.
+  const rows = useMemo<Row[]>(() => {
+    if (tab === 'exercises') return exercises.map(ex => ({ kind: 'exercise', key: ex.id, ex }));
+    if (tab === 'programs') return programs.map(prog => ({ kind: 'program', key: prog.id, prog }));
+    const out: Row[] = [];
+    grouped.forEach(group => {
+      out.push({ kind: 'dateLabel', key: `date_${group.date}`, date: group.date });
+      group.items.forEach((w, idx) =>
+        out.push({ kind: 'workout', key: w.id, w, lastInGroup: idx === group.items.length - 1 }));
+    });
+    return out;
+  }, [tab, exercises, programs, grouped]);
+
+  const renderRow = useCallback(({ item }: { item: Row }) => {
+    switch (item.kind) {
+      case 'dateLabel':
+        return (
+          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
+            {new Date(item.date + 'T00:00').toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}
+          </Text>
+        );
+      case 'workout':
+        return <WorkoutRow w={item.w} c={c} isDark={isDark} lastInGroup={item.lastInGroup} onDelete={deleteWorkout} />;
+      case 'exercise':
+        return <ExerciseRow ex={item.ex} c={c} isDark={isDark} onEdit={editExercise} onDelete={deleteExercise} />;
+      case 'program':
+        return (
+          <ProgramCard prog={item.prog} exercises={exercises} c={c} isDark={isDark}
+            onEdit={editProgram} onDelete={deleteProgram} onStart={startFromProgram} />
+        );
+    }
+  }, [c, isDark, exercises, deleteWorkout, editExercise, deleteExercise, editProgram, deleteProgram, startFromProgram]);
+
+  const listHeader = useMemo(() => {
+    if (tab === 'exercises') {
+      return (
+        <TouchableOpacity
+          onPress={openNewExercise}
+          style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: 14, borderRadius: 14, marginBottom: 16,
+            backgroundColor: ACCENT2 + '15', borderWidth: 1, borderColor: ACCENT2 + '40',
+          }}>
+          <IconSymbol name="plus" size={16} color={ACCENT2} />
+          <Text style={{ color: ACCENT2, fontSize: 14, fontWeight: '700' }}>Нова вправа</Text>
+        </TouchableOpacity>
+      );
+    }
+    if (tab === 'programs') {
+      return (
+        <TouchableOpacity
+          onPress={openNewProgram}
+          style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: 14, borderRadius: 14, marginBottom: 16,
+            backgroundColor: ACCENT + '15', borderWidth: 1, borderColor: ACCENT + '40',
+          }}>
+          <IconSymbol name="plus" size={16} color={ACCENT} />
+          <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '700' }}>Нова програма</Text>
+        </TouchableOpacity>
+      );
+    }
+    return (
+      <>
+        {todayStats.count > 0 && (
+          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
+            style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16, marginBottom: 16 }}>
+            <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Сьогодні</Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+                <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{todayStats.count}</Text>
+                <Text style={{ color: c.sub, fontSize: 11 }}>тренувань</Text>
+              </View>
+              <View style={{ width: 1, backgroundColor: c.border }} />
+              <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+                <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{fmtDuration(todayStats.minutes)}</Text>
+                <Text style={{ color: c.sub, fontSize: 11 }}>загалом</Text>
+              </View>
+              {todayStats.calories > 0 && <>
+                <View style={{ width: 1, backgroundColor: c.border }} />
+                <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+                  <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{todayStats.calories}</Text>
+                  <Text style={{ color: c.sub, fontSize: 11 }}>ккал</Text>
+                </View>
+              </>}
+            </View>
+          </BlurView>
+        )}
+
+        {programs.length > 0 && <>
+          <Text style={[sectionLabel(c), { marginBottom: 10, marginTop: 4 }]}>Мої програми</Text>
+          {programs.map(prog => (
+            <ProgramShortcut key={prog.id} prog={prog} exercises={exercises} c={c} onStart={startFromProgram} />
+          ))}
+          <View style={{ height: 8 }} />
+        </>}
+
+        {grouped.length > 0 && (
+          <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Історія</Text>
+        )}
+      </>
+    );
+  }, [tab, c, isDark, todayStats, programs, exercises, grouped.length, startFromProgram, openNewExercise, openNewProgram]);
+
+  const listEmpty = useMemo(() => {
+    if (tab === 'exercises') {
+      return (
+        <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+          <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: ACCENT2 + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+            <IconSymbol name="dumbbell.fill" size={26} color={ACCENT2} />
+          </View>
+          <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає вправ</Text>
+          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>Створи свою бібліотеку вправ</Text>
+        </View>
+      );
+    }
+    if (tab === 'programs') {
+      return (
+        <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+          <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+            <IconSymbol name="list.bullet.clipboard" size={26} color={ACCENT} />
+          </View>
+          <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає програм</Text>
+          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>Створи програму з вправ та встанови нагадування</Text>
+        </View>
+      );
+    }
+    // Тренування додаються лише зі збереженої програми. Якщо жодної програми
+    // ще немає, порожній екран був глухим кутом: підказка «додай вище»
+    // вказувала на порожнє місце. Тому тут — прямий перехід до програм.
+    const hasPrograms = programs.length > 0;
+    return (
+      <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+        <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+          <IconSymbol name="figure.run" size={26} color={ACCENT} />
+        </View>
+        <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає тренувань</Text>
+        <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>
+          {hasPrograms ? 'Додай перше тренування вище' : 'Створи програму — і тренування зʼявляться тут'}
+        </Text>
+        {!hasPrograms && (
+          <TouchableOpacity
+            onPress={goToPrograms}
+            style={{
+              marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 8,
+              paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12,
+              backgroundColor: ACCENT + '15', borderWidth: 1, borderColor: ACCENT + '40',
+            }}>
+            <IconSymbol name="plus" size={15} color={ACCENT} />
+            <Text style={{ color: ACCENT, fontSize: 13, fontWeight: '700' }}>Нова програма</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }, [tab, c, programs.length, goToPrograms]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -709,283 +1061,59 @@ export default function WorkoutsScreen() {
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
-        {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <IconSymbol name="chevron.left" size={20} color={c.text} />
-          </TouchableOpacity>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: c.text, letterSpacing: -0.5, flex: 1 }}>
-            Тренування
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowStats(true)}
-            style={{
-              width: 36, height: 36, borderRadius: 12,
-              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-              alignItems: 'center', justifyContent: 'center',
-            }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <IconSymbol name="chart.bar.fill" size={17} color={c.text} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Tab bar */}
-        <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 6 }}>
-          {TABS.map(t => (
-            <TouchableOpacity
-              key={t.key}
-              onPress={() => setTab(t.key)}
-              style={{
-                flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
-                backgroundColor: tab === t.key ? ACCENT : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
-                borderWidth: 1, borderColor: tab === t.key ? ACCENT + '80' : c.border,
-              }}>
-              <Text style={{ color: tab === t.key ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }}>
-                {t.label}
-              </Text>
+        {/* Шапка й вкладки живуть у тій самій колонці, що й список: інакше на
+            планшеті вони розтягуються на всю ширину, а картки стоять по центру. */}
+        <View style={contentWidth}>
+          {/* Header */}
+          <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <IconSymbol name="chevron.left" size={20} color={c.text} />
             </TouchableOpacity>
-          ))}
+            <Text style={{ fontSize: 24, fontWeight: '800', color: c.text, letterSpacing: -0.5, flex: 1 }}>
+              Тренування
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowStats(true)}
+              style={{
+                width: 36, height: 36, borderRadius: 12,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                alignItems: 'center', justifyContent: 'center',
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <IconSymbol name="chart.bar.fill" size={17} color={c.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Tab bar */}
+          <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 6 }}>
+            {TABS.map(t => (
+              <TouchableOpacity
+                key={t.key}
+                onPress={() => setTab(t.key)}
+                style={{
+                  flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
+                  backgroundColor: tab === t.key ? ACCENT : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
+                  borderWidth: 1, borderColor: tab === t.key ? ACCENT + '80' : c.border,
+                }}>
+                <Text style={{ color: tab === t.key ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }}>
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
-        <ScrollView
+        <FlatList
+          data={rows}
+          keyExtractor={rowKey}
+          renderItem={renderRow}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={listEmpty}
           contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
-
-          {/* ── WORKOUTS TAB ── */}
-          {tab === 'workouts' && <>
-            {todayWorkouts.length > 0 && (
-              <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16, marginBottom: 16 }}>
-                <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Сьогодні</Text>
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                    <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{todayWorkouts.length}</Text>
-                    <Text style={{ color: c.sub, fontSize: 11 }}>тренувань</Text>
-                  </View>
-                  <View style={{ width: 1, backgroundColor: c.border }} />
-                  <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                    <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{fmtDuration(totalMinToday)}</Text>
-                    <Text style={{ color: c.sub, fontSize: 11 }}>загалом</Text>
-                  </View>
-                  {totalCalToday > 0 && <>
-                    <View style={{ width: 1, backgroundColor: c.border }} />
-                    <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                      <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{totalCalToday}</Text>
-                      <Text style={{ color: c.sub, fontSize: 11 }}>ккал</Text>
-                    </View>
-                  </>}
-                </View>
-              </BlurView>
-            )}
-
-            {programs.length > 0 ? <>
-              <Text style={[sectionLabel(c), { marginBottom: 10, marginTop: 4 }]}>Мої програми</Text>
-              {programs.map(prog => {
-                const progExs = exercises.filter(e => prog.exerciseIds.includes(e.id));
-                return (
-                  <TouchableOpacity
-                    key={prog.id}
-                    onPress={() => startFromProgram(prog)}
-                    activeOpacity={0.75}
-                    style={{
-                      flexDirection: 'row', alignItems: 'center',
-                      padding: 14, borderRadius: 14, marginBottom: 10,
-                      backgroundColor: prog.color + '12',
-                      borderWidth: 1, borderColor: prog.color + '35',
-                    }}>
-                    <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: prog.color + '28', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
-                      <IconSymbol name="dumbbell.fill" size={20} color={prog.color} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 3 }}>{prog.name}</Text>
-                      <Text style={{ color: c.sub, fontSize: 12 }}>
-                        {progExs.length > 0
-                          ? progExs.slice(0, 3).map(e => e.name).join(', ') + (progExs.length > 3 ? ` +${progExs.length - 3}` : '')
-                          : `${prog.exerciseIds.length} вправ`}
-                      </Text>
-                    </View>
-                    <View style={{ backgroundColor: prog.color + '20', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 }}>
-                      <Text style={{ color: prog.color, fontSize: 12, fontWeight: '700' }}>Старт</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-              <View style={{ height: 8 }} />
-            </> : null}
-
-            {grouped.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                  <IconSymbol name="figure.run" size={26} color={ACCENT} />
-                </View>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає тренувань</Text>
-                <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>Додай перше тренування вище</Text>
-              </View>
-            ) : <>
-              <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Історія</Text>
-              {grouped.map(group => (
-                <View key={group.date} style={{ marginBottom: 16 }}>
-                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
-                    {new Date(group.date + 'T00:00').toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}
-                  </Text>
-                  {group.items.map(w => {
-                    const cfg = WORKOUT_TYPES.find(t => t.key === w.type) ?? WORKOUT_TYPES[6];
-                    return (
-                      <BlurView key={w.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                        style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                          <IconSymbol name={cfg.icon as any} size={20} color={cfg.color} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{w.title}</Text>
-                          <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
-                            {fmtDuration(w.durationMin)}{w.calories ? ` · ${w.calories} ккал` : ''}
-                          </Text>
-                        </View>
-                        <TouchableOpacity
-                          onPress={() => setWorkouts(p => p.filter(x => x.id !== w.id))}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <IconSymbol name="xmark" size={14} color={c.sub} />
-                        </TouchableOpacity>
-                      </BlurView>
-                    );
-                  })}
-                </View>
-              ))}
-            </>}
-          </>}
-
-          {/* ── EXERCISES TAB ── */}
-          {tab === 'exercises' && <>
-            <TouchableOpacity
-              onPress={() => { setEditingEx(null); setShowExModal(true); }}
-              style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 8, padding: 14, borderRadius: 14, marginBottom: 16,
-                backgroundColor: ACCENT2 + '15', borderWidth: 1, borderColor: ACCENT2 + '40',
-              }}>
-              <IconSymbol name="plus" size={16} color={ACCENT2} />
-              <Text style={{ color: ACCENT2, fontSize: 14, fontWeight: '700' }}>Нова вправа</Text>
-            </TouchableOpacity>
-
-            {exercises.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: ACCENT2 + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                  <IconSymbol name="dumbbell.fill" size={26} color={ACCENT2} />
-                </View>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає вправ</Text>
-                <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>Створи свою бібліотеку вправ</Text>
-              </View>
-            ) : exercises.map(ex => (
-              <BlurView key={ex.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: ACCENT2 + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                  <IconSymbol name="dumbbell.fill" size={18} color={ACCENT2} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{ex.name}</Text>
-                  <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
-                    {[
-                      ex.muscleGroup,
-                      ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null,
-                      ex.weightKg ? `${ex.weightKg} кг` : null,
-                      ex.restSec ? `відпочинок ${ex.restSec}с` : null,
-                    ].filter(Boolean).join(' · ')}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => { setEditingEx(ex); setShowExModal(true); }}
-                  style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <IconSymbol name="pencil" size={15} color={c.sub} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => deleteExercise(ex.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <IconSymbol name="trash" size={15} color="#EF4444" />
-                </TouchableOpacity>
-              </BlurView>
-            ))}
-          </>}
-
-          {/* ── PROGRAMS TAB ── */}
-          {tab === 'programs' && <>
-            <TouchableOpacity
-              onPress={() => { setEditingProg(null); setShowProgModal(true); }}
-              style={{
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                gap: 8, padding: 14, borderRadius: 14, marginBottom: 16,
-                backgroundColor: ACCENT + '15', borderWidth: 1, borderColor: ACCENT + '40',
-              }}>
-              <IconSymbol name="plus" size={16} color={ACCENT} />
-              <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '700' }}>Нова програма</Text>
-            </TouchableOpacity>
-
-            {programs.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                  <IconSymbol name="list.bullet.clipboard" size={26} color={ACCENT} />
-                </View>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає програм</Text>
-                <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>Створи програму з вправ та встанови нагадування</Text>
-              </View>
-            ) : programs.map(prog => {
-              const progExs = exercises.filter(e => prog.exerciseIds.includes(e.id));
-              return (
-                <BlurView key={prog.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                  style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 12 }}>
-                  <View style={{ padding: 14 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: prog.color + '25', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                        <IconSymbol name="dumbbell.fill" size={18} color={prog.color} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{prog.name}</Text>
-                        <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
-                          {prog.exerciseIds.length} вправ
-                          {prog.reminderEnabled && prog.reminderDays.length > 0
-                            ? ` · ${prog.reminderDays.map(d => DAY_LABELS[d]).join(', ')} о ${prog.reminderTime}`
-                            : ''}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => { setEditingProg(prog); setShowProgModal(true); }}
-                        style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <IconSymbol name="pencil" size={15} color={c.sub} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => deleteProgram(prog)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <IconSymbol name="trash" size={15} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-
-                    {progExs.length > 0 && (
-                      <View style={{ marginTop: 12, gap: 6 }}>
-                        {progExs.map((ex, idx) => (
-                          <View key={ex.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', width: 18 }}>{idx + 1}.</Text>
-                            <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{ex.name}</Text>
-                            <Text style={{ color: c.sub, fontSize: 12 }}>
-                              {[
-                                ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null,
-                                ex.weightKg ? `${ex.weightKg}кг` : null,
-                              ].filter(Boolean).join(' · ')}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-
-                    <TouchableOpacity
-                      onPress={() => startFromProgram(prog)}
-                      style={{ marginTop: 14, padding: 10, borderRadius: 10, backgroundColor: prog.color + '20', alignItems: 'center' }}>
-                      <Text style={{ color: prog.color, fontSize: 13, fontWeight: '700' }}>Розпочати тренування</Text>
-                    </TouchableOpacity>
-                  </View>
-                </BlurView>
-              );
-            })}
-          </>}
-
-        </ScrollView>
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
+        />
       </SafeAreaView>
 
       <ExerciseModal

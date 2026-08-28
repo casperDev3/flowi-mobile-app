@@ -10,12 +10,14 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
+  SectionList,
   Share,
   StyleSheet,
   Text,
@@ -39,6 +41,7 @@ import { WS_BASE } from '@/store/api-config';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { formatDuration } from '@/utils/durationFormat';
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +50,21 @@ function randomUUID(): string {
     const r = Math.random() * 16 | 0;
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
+}
+
+// Підстановка {name} у рядок словника. Не залежить від стану екрана,
+// тому живе поза компонентом — інакше кожен ререндер створював би нову
+// функцію й псував мемоізацію тим, хто її отримує пропсом.
+function fmt(str: string, vars: Record<string, string | number>): string {
+  return Object.keys(vars).reduce((s, k) => s.replace(new RegExp(`\\{${k}\\}`, 'g'), String(vars[k])), str);
+}
+
+// Останній рядок сітки, не заповнений до кінця, розтягнув би єдину картку
+// на всю ширину. Добивка порожніми місцями лишає її в своїй колонці.
+function padToGrid<T>(items: T[], cols: number): (T | null)[] {
+  if (cols <= 1) return items;
+  const rest = items.length % cols;
+  return rest === 0 ? items : [...items, ...Array<null>(cols - rest).fill(null)];
 }
 
 // Обгортка зі збереженою сигнатурою (path, method, body).
@@ -123,12 +141,22 @@ interface PendingChange {
 export default function SharedScreen() {
   const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
-  const { width } = useResponsive();
-  const SIDEBAR_W = Math.round(width * 0.92);
+  const { width, isWide } = useResponsive();
+  // На планшеті панель деталі — бічна колонка, а не майже весь екран:
+  // 92% ширини сховали б список секцій, заради якого її й відкривають.
+  const SIDEBAR_W = isWide ? Math.min(Math.round(width * 0.5), 460) : Math.round(width * 0.92);
+  // Картки груп і списків — рядки з іконкою й назвою, а не плитки. Колонка
+  // вмісту обмежена 720pt, тож третя колонка зробила б їх нечитабельно
+  // вузькими; на планшеті виправдані рівно дві.
+  const gridCols = isWide ? 2 : 1;
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const { tr, lang } = useI18n();
   const { online } = useAppMode();
+  const durationUnits = useMemo(
+    () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
+    [tr.unitHour, tr.unitHourLong, tr.unitMinute],
+  );
   const sectionLabel = useCallback((t: SectionType) => {
     if (t === 'shopping') return lang === 'uk' ? 'Покупки' : 'Shopping';
     if (t === 'tasks')    return lang === 'uk' ? 'Завдання' : 'Tasks';
@@ -139,10 +167,9 @@ export default function SharedScreen() {
     if (t === 'tasks')    return lang === 'uk' ? 'Список завдань' : 'Task list';
     return lang === 'uk' ? 'Нотатник' : 'Notepad';
   }, [lang]);
-  const fmt = (str: string, vars: Record<string, string | number>) =>
-    Object.keys(vars).reduce((s, k) => s.replace(new RegExp(`\\{${k}\\}`, 'g'), String(vars[k])), str);
-
-  const c = {
+  // Палітра — мемоізована, бо йде пропсом у мемоізовані рядки списку:
+  // новий обʼєкт на кожен ререндер зводив би React.memo нанівець.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
@@ -156,8 +183,7 @@ export default function SharedScreen() {
     input:  isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
     dim:    isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
     sidebar: isDark ? '#0C0C14' : '#F4F2FF',
-    toolbar: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-  };
+  }), [isDark]);
 
   // ─── Deeplink — вхідний invite URL ────────────────────────────────────────
 
@@ -880,8 +906,9 @@ export default function SharedScreen() {
   function secretExpiresIn(at: string): string {
     const diff = new Date(at).getTime() + 86400000 - Date.now();
     if (diff <= 0) return 'Термін вичерпано';
-    const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000);
-    return h > 0 ? `Діє ще ${h}г ${m}хв` : `Діє ще ${m}хв`;
+    // Одиниці беремо зі словника спільною утилітою: локальна копія писала
+    // «г»/«хв» і в англійському інтерфейсі теж.
+    return `Діє ще ${formatDuration(Math.floor(diff / 1000), durationUnits)}`;
   }
 
   async function rotateSecret() {
@@ -924,6 +951,22 @@ export default function SharedScreen() {
     }
   }
 
+  // ─── Стабільні колбеки для рядків списків ─────────────────────────────────
+  // React.memo на картках має сенс лише тоді, коли пропси не змінюються на
+  // кожен ререндер екрана. Обробники залежать від майже всього стану, тому
+  // самі лишаються тими самими функціями, а найсвіжішу реалізацію читають
+  // через ref у момент натискання.
+
+  const actionsRef = useRef({ toggleItem, deleteItem, openEditItem, enterGroup, openSidebar });
+  actionsRef.current = { toggleItem, deleteItem, openEditItem, enterGroup, openSidebar };
+
+  const onItemToggle = useCallback((i: LocalItem) => { actionsRef.current.toggleItem(i); }, []);
+  const onItemDelete = useCallback((i: LocalItem) => { actionsRef.current.deleteItem(i); }, []);
+  const onItemEdit   = useCallback((i: LocalItem) => { actionsRef.current.openEditItem(i); }, []);
+  const onGroupPress = useCallback((g: GroupData) => { actionsRef.current.enterGroup(g); }, []);
+  const onSectionPress     = useCallback((s: SharedSection) => { actionsRef.current.openSidebar(s); }, []);
+  const onSectionLongPress = useCallback((s: SharedSection) => { setShowSectionMenu(s); }, []);
+
   // ─── Derived: filtered + sorted sidebar items ─────────────────────────────
 
   const { activeItems, doneItems } = useMemo(() => {
@@ -958,11 +1001,71 @@ export default function SharedScreen() {
     return groups.filter(g => g.name.toLowerCase().includes(q));
   }, [groups, groupSearch]);
 
-  function tabSections(tab: SectionType): SharedSection[] {
+  // Один прохід замість чотирьох: списки потрібні і лічильникам на вкладках,
+  // і самому переліку, а перерахунок на кожен ререндер бив по довгих групах.
+  const sectionsByTab = useMemo(() => {
     const q = sectionSearch.trim().toLowerCase();
-    return (activeGroup?.sections ?? [])
-      .filter(s => s.type === tab && (!q || s.name.toLowerCase().includes(q)));
-  }
+    const out: Record<SectionType, SharedSection[]> = { shopping: [], tasks: [], notes: [] };
+    for (const s of activeGroup?.sections ?? []) {
+      if (q && !s.name.toLowerCase().includes(q)) continue;
+      if (out[s.type]) out[s.type].push(s);
+    }
+    return out;
+  }, [activeGroup?.sections, sectionSearch]);
+
+  const currentSections = sectionsByTab[activeTab];
+
+  // Рядки для сітки: на телефоні — як були, на планшеті добиті до пари.
+  const groupRows  = useMemo(() => padToGrid(filteredGroups, gridCols), [filteredGroups, gridCols]);
+  const sectionRows = useMemo(() => padToGrid(currentSections, gridCols), [currentSections, gridCols]);
+
+  // ─── Секції віртуалізованого списку елементів ─────────────────────────────
+  // Активні й виконані — дві секції одного списку. Ознака `last` рахується
+  // тут, щоб рядок знав про свій нижній роздільник, не заглядаючи в сусідню
+  // секцію під час рендеру.
+
+  const sidebarListSections = useMemo(() => {
+    const out: { key: 'active' | 'done'; data: LocalItem[]; last: boolean }[] = [];
+    if (sbFilter !== 'done'   && activeItems.length) out.push({ key: 'active', data: activeItems, last: false });
+    if (sbFilter !== 'active' && doneItems.length)   out.push({ key: 'done',   data: doneItems,   last: false });
+    if (out.length) out[out.length - 1].last = true;
+    return out;
+  }, [sbFilter, activeItems, doneItems]);
+
+  // Підвал списку вже пропонує вихід («Показати виконані»), тож у порожньому
+  // стані дублювати його ще однією кнопкою не треба.
+  const sidebarHasEscape = doneItems.length > 0 && sbFilter !== 'done';
+
+  const sidebarType = sidebarSection?.type;
+
+  const renderGroupRow = useCallback(({ item }: { item: GroupData | null }) => (
+    item
+      ? <GroupCard group={item} c={c} isDark={isDark} lang={lang} grid={gridCols > 1} onPress={onGroupPress} />
+      : <View style={{ flex: 1 }} />
+  ), [c, isDark, lang, gridCols, onGroupPress]);
+
+  const renderSectionRow = useCallback(({ item }: { item: SharedSection | null }) => (
+    item
+      ? <SectionCard
+          section={item} counts={sectionCounts[item.id]} c={c} isDark={isDark}
+          grid={gridCols > 1} onPress={onSectionPress} onLongPress={onSectionLongPress} />
+      : <View style={{ flex: 1 }} />
+  ), [c, isDark, gridCols, sectionCounts, onSectionPress, onSectionLongPress]);
+
+  const renderItemRow = useCallback(({ item, index, section }: {
+    item: LocalItem; index: number;
+    section: { key: 'active' | 'done'; data: LocalItem[]; last: boolean };
+  }) => (
+    <ItemRow
+      item={item}
+      isLast={section.last && index === section.data.length - 1}
+      type={sidebarType ?? 'shopping'}
+      c={c}
+      onToggle={onItemToggle}
+      onDelete={onItemDelete}
+      onEdit={onItemEdit}
+    />
+  ), [c, sidebarType, onItemToggle, onItemDelete, onItemEdit]);
 
   // ─── Refresh ──────────────────────────────────────────────────────────────
 
@@ -1042,12 +1145,17 @@ export default function SharedScreen() {
               </View>
             )}
 
-            <ScrollView
+            <FlatList
+              key={`groups-${gridCols}`}
+              data={groupRows}
+              keyExtractor={(g, i) => g?.id ?? `pad-${i}`}
+              renderItem={renderGroupRow}
+              numColumns={gridCols}
+              columnWrapperStyle={gridCols > 1 ? st.gridRow : undefined}
               contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }]}
               showsVerticalScrollIndicator={false}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroups} tintColor={c.accent} />}>
-
-              {filteredGroups.length === 0 ? (
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroups} tintColor={c.accent} />}
+              ListEmptyComponent={
                 <View style={{ alignItems: 'center', paddingVertical: 64 }}>
                   <View style={[st.emptyIconBox, { backgroundColor: c.accent + '15' }]}>
                     <IconSymbol name="person.2.fill" size={36} color={c.accent} />
@@ -1055,7 +1163,17 @@ export default function SharedScreen() {
                   <Text style={[st.emptyTitle, { color: c.text }]}>
                     {groupSearch ? tr.nothingFound : tr.noGroups}
                   </Text>
-                  {!groupSearch && (
+                  {groupSearch ? (
+                    // Пошук нічого не знайшов: без кнопки скидання екран лишається
+                    // порожнім, і повернути список нічим, окрім ручного стирання.
+                    <TouchableOpacity onPress={() => { setGroupSearch(''); setGroupSearchOpen(false); }}
+                      accessibilityRole="button" accessibilityLabel={tr.clear}
+                      style={[st.btn, { backgroundColor: c.dim, borderWidth: 1, borderColor: c.border,
+                        paddingHorizontal: 20, marginTop: 8 }]}>
+                      <IconSymbol name="xmark" size={14} color={c.accent} />
+                      <Text style={[st.btnLabel, { color: c.accent }]}>{tr.clear}</Text>
+                    </TouchableOpacity>
+                  ) : (
                     <>
                       <Text style={[st.emptyDesc, { color: c.sub, textAlign: 'center' }]}>
                         {tr.noGroupsHint}
@@ -1077,42 +1195,8 @@ export default function SharedScreen() {
                     </>
                   )}
                 </View>
-              ) : filteredGroups.map(g => (
-                <TouchableOpacity key={g.id} onPress={() => enterGroup(g)} activeOpacity={0.75} style={{ marginBottom: 12 }}>
-                  <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-                    style={[st.groupCard, { borderColor: c.border }]}>
-                    <View style={[st.groupIconBox, { backgroundColor: c.accent + '15' }]}>
-                      <IconSymbol name="person.2.fill" size={20} color={c.accent} />
-                    </View>
-                    <View style={{ flex: 1, gap: 4 }}>
-                      <Text style={[st.groupName, { color: c.text }]}>{g.name}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <View style={[st.dot, { backgroundColor: c.green }]} />
-                        <Text style={{ fontSize: 13, color: c.sub }}>
-                          {g.member_count} {pluralMember(g.member_count, lang)}
-                          {g.sections.length > 0 ? ` · ${g.sections.length}` : ''}
-                        </Text>
-                      </View>
-                      {g.sections.length > 0 && (
-                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-                          {TAB_ORDER.map(type => {
-                            const cnt = g.sections.filter(s => s.type === type).length;
-                            if (!cnt) return null;
-                            return (
-                              <View key={type} style={[st.pill, { backgroundColor: c.accent + '12' }]}>
-                                <IconSymbol name={SECTION_ICON[type] as any} size={11} color={c.accent} />
-                                <Text style={{ fontSize: 11, color: c.accent, fontWeight: '600' }}>{cnt}</Text>
-                              </View>
-                            );
-                          })}
-                        </View>
-                      )}
-                    </View>
-                    <IconSymbol name="chevron.right" size={16} color={c.sub} />
-                  </BlurView>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              }
+            />
           </>
 
         ) : (
@@ -1201,7 +1285,7 @@ export default function SharedScreen() {
               style={{ flexGrow: 0, marginBottom: 8 }}>
               {TAB_ORDER.map(tab => {
                 const active = activeTab === tab;
-                const cnt = tabSections(tab).length;
+                const cnt = sectionsByTab[tab].length;
                 return (
                   <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)}
                     style={[st.tab, active ? { backgroundColor: c.accent } : { backgroundColor: c.dim, borderColor: c.border, borderWidth: 1 }]}>
@@ -1218,12 +1302,17 @@ export default function SharedScreen() {
             </ScrollView>
 
             {/* Sections list */}
-            <ScrollView
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
+            <FlatList
+              key={`sections-${gridCols}`}
+              data={sectionRows}
+              keyExtractor={(s, i) => s?.id ?? `pad-${i}`}
+              renderItem={renderSectionRow}
+              numColumns={gridCols}
+              columnWrapperStyle={gridCols > 1 ? st.gridRow : undefined}
+              contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }]}
               showsVerticalScrollIndicator={false}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroup} tintColor={c.accent} />}>
-
-              {tabSections(activeTab).length === 0 ? (
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroup} tintColor={c.accent} />}
+              ListEmptyComponent={
                 <View style={{ alignItems: 'center', paddingVertical: 56 }}>
                   <View style={[st.emptyIconBox, { backgroundColor: c.accent + '12', width: 64, height: 64, borderRadius: 20 }]}>
                     <IconSymbol name={SECTION_ICON[activeTab] as any} size={30} color={c.accent + '80'} />
@@ -1231,7 +1320,17 @@ export default function SharedScreen() {
                   <Text style={[st.emptyTitle, { color: c.text }]}>
                     {sectionSearch ? tr.nothingFound : tr.noLists}
                   </Text>
-                  {!sectionSearch && (
+                  {sectionSearch ? (
+                    // Той самий глухий кут, що й у списку груп: пошук сховав усе,
+                    // а вийти з нього нічим.
+                    <TouchableOpacity onPress={() => { setSectionSearch(''); setSectionSearchOpen(false); }}
+                      accessibilityRole="button" accessibilityLabel={tr.clear}
+                      style={[st.btn, { backgroundColor: c.dim, borderWidth: 1, borderColor: c.border,
+                        paddingHorizontal: 20, marginTop: 8 }]}>
+                      <IconSymbol name="xmark" size={14} color={c.accent} />
+                      <Text style={[st.btnLabel, { color: c.accent }]}>{tr.clear}</Text>
+                    </TouchableOpacity>
+                  ) : (
                     <>
                       <Text style={[st.emptyDesc, { color: c.sub }]}>{tr.pressPlusToAdd}</Text>
                       <TouchableOpacity
@@ -1245,46 +1344,8 @@ export default function SharedScreen() {
                     </>
                   )}
                 </View>
-              ) : tabSections(activeTab).map(section => {
-                const counts = sectionCounts[section.id];
-                const total = counts ? counts.active + counts.done : 0;
-                const progress = total > 0 ? Math.round((counts!.done / total) * 100) : 0;
-                return (
-                  <TouchableOpacity key={section.id} onPress={() => openSidebar(section)}
-                    onLongPress={() => setShowSectionMenu(section)}
-                    activeOpacity={0.75} style={{ marginBottom: 10 }}>
-                    <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-                      style={[st.sectionCard, { borderColor: c.border }]}>
-                      <View style={[st.sectionIconBox, { backgroundColor: c.accent + '18' }]}>
-                        <IconSymbol name={SECTION_ICON[activeTab] as any} size={18} color={c.accent} />
-                      </View>
-                      <View style={{ flex: 1, gap: 4 }}>
-                        <Text style={[st.sectionCardName, { color: c.text }]}>{section.name}</Text>
-                        {total > 0 && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <View style={[st.progressTrack, { backgroundColor: c.dim, flex: 1, maxWidth: 80 }]}>
-                              <View style={[st.progressFill, {
-                                backgroundColor: progress === 100 ? c.green : c.accent,
-                                width: `${progress}%` as any,
-                              }]} />
-                            </View>
-                            <Text style={{ fontSize: 11, color: c.sub, fontWeight: '500' }}>
-                              {counts!.done}/{total}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      {counts && counts.active > 0 && (
-                        <View style={[st.badge, { backgroundColor: c.accent + '20' }]}>
-                          <Text style={[st.badgeText, { color: c.accent }]}>{counts.active}</Text>
-                        </View>
-                      )}
-                      <IconSymbol name="chevron.right" size={16} color={c.sub} />
-                    </BlurView>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+              }
+            />
           </>
         )}
       </SafeAreaView>
@@ -1292,7 +1353,7 @@ export default function SharedScreen() {
       {/* ── FAB ── */}
       {viewMode === 'group' && !sidebarSection && (
         <TouchableOpacity onPress={() => setShowAddSectionModal(true)}
-          style={[st.fab, { backgroundColor: c.accent, bottom: Platform.OS === 'ios' ? 108 : 88 }]}>
+          style={[st.fab, { backgroundColor: c.accent, bottom: tabBarInset + 20 }]}>
           <IconSymbol name="plus" size={26} color="#fff" />
         </TouchableOpacity>
       )}
@@ -1442,87 +1503,87 @@ export default function SharedScreen() {
             )}
 
             {/* ── Items list ── */}
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8 }}
-              keyboardShouldPersistTaps="handled"
-              onScrollBeginDrag={() => { setSbMenuOpen(false); setShowUnitPicker(false); }}>
-
-              {/* Empty state */}
-              {activeItems.length === 0 && doneItems.length === 0 && !sidebarSyncing && (
-                <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-                  <View style={{ width: 60, height: 60, borderRadius: 18, backgroundColor: c.accent + '12',
-                    alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                    <IconSymbol name={SECTION_ICON[sidebarSection.type] as any} size={28} color={c.accent + '80'} />
-                  </View>
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{tr.emptyListTitle}</Text>
-                  <Text style={{ fontSize: 13, color: c.sub, marginTop: 4 }}>{tr.emptyListHint}</Text>
-                </View>
-              )}
-
-              {/* Active items */}
-              {(sbFilter === 'active' || sbFilter === 'all') && activeItems.map((item, idx) => (
-                <ItemRow
-                  key={item.local_id}
-                  item={item}
-                  isLast={idx === activeItems.length - 1 && (sbFilter === 'all' ? doneItems.length === 0 : true)}
-                  type={sidebarSection!.type}
-                  c={c}
-                  onToggle={() => toggleItem(item)}
-                  onDelete={() => deleteItem(item)}
-                  onEdit={() => openEditItem(item)}
-                />
-              ))}
-
-              {/* Done items */}
-              {sbFilter !== 'active' && doneItems.length > 0 && (
-                <>
-                  {sbFilter === 'all' && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
-                      paddingHorizontal: 16, paddingVertical: 8 }}>
-                      <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <IconSymbol name="checkmark.circle.fill" size={11} color={c.sub} />
-                        <Text style={{ fontSize: 11, color: c.sub, fontWeight: '600' }}>
-                          ВИКОНАНІ ({doneItems.length})
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+            <SectionList
+              style={{ flex: 1 }}
+              sections={sidebarListSections}
+              keyExtractor={i => i.local_id}
+              renderItem={renderItemRow}
+              // Заголовок «виконані» — роздільник посеред списку, а не липка
+              // шапка: приклеєний до верху, він перекривав би активні рядки.
+              stickySectionHeadersEnabled={false}
+              renderSectionHeader={({ section }) => (
+                section.key === 'done' && sbFilter === 'all' ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
+                    paddingHorizontal: 16, paddingVertical: 8 }}>
+                    <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <IconSymbol name="checkmark.circle.fill" size={11} color={c.sub} />
+                      <Text style={{ fontSize: 11, color: c.sub, fontWeight: '600' }}>
+                        {tr.filterDone.toUpperCase()} ({doneItems.length})
+                      </Text>
                     </View>
-                  )}
-                  {doneItems.map((item, idx) => (
-                    <ItemRow
-                      key={item.local_id}
-                      item={item}
-                      isLast={idx === doneItems.length - 1}
-                      type={sidebarSection!.type}
-                      c={c}
-                      onToggle={() => toggleItem(item)}
-                      onDelete={() => deleteItem(item)}
-                      onEdit={() => openEditItem(item)}
-                    />
-                  ))}
-                </>
+                    <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
+                  </View>
+                ) : null
               )}
-
-              {/* Show / hide done toggle */}
-              {sbFilter === 'active' && doneItems.length > 0 && (
-                <TouchableOpacity onPress={() => setSbFilter('all')}
-                  accessibilityRole="button"
-                  style={[st.showDoneBtn, { borderColor: c.border }]}>
-                  <IconSymbol name="checkmark.circle" size={14} color={c.sub} />
-                  <Text style={[st.showDoneTxt, { color: c.sub }]}>
-                    {fmt(tr.showCompleted, { n: doneItems.length })}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {sbFilter === 'all' && doneItems.length > 0 && (
-                <TouchableOpacity onPress={() => setSbFilter('active')}
-                  accessibilityRole="button"
-                  style={[st.showDoneBtn, { borderColor: c.border }]}>
-                  <IconSymbol name="eye.slash" size={14} color={c.sub} />
-                  <Text style={[st.showDoneTxt, { color: c.sub }]}>{tr.hideCompleted}</Text>
-                </TouchableOpacity>
-              )}
-            </ScrollView>
+              contentContainerStyle={{ paddingBottom: 8 }}
+              keyboardShouldPersistTaps="handled"
+              onScrollBeginDrag={() => { setSbMenuOpen(false); setShowUnitPicker(false); }}
+              ListEmptyComponent={
+                sidebarSyncing ? null
+                  : (sbSearch.trim() || ((activeItems.length > 0 || doneItems.length > 0) && !sidebarHasEscape)) ? (
+                    // Порожньо не тому, що елементів немає, а тому що їх сховав
+                    // пошук чи фільтр. Без кнопки повернення це глухий кут.
+                    <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+                      <View style={{ width: 60, height: 60, borderRadius: 18, backgroundColor: c.accent + '12',
+                        alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                        <IconSymbol name="magnifyingglass" size={26} color={c.accent + '80'} />
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{tr.nothingFound}</Text>
+                      <TouchableOpacity
+                        onPress={() => { setSbSearch(''); setSbSearchOpen(false); setSbFilter('all'); }}
+                        accessibilityRole="button"
+                        accessibilityLabel={sbSearch.trim() ? tr.clear : tr.resetFilter}
+                        style={[st.btn, { backgroundColor: c.accent + '18', borderWidth: 1,
+                          borderColor: c.accent + '40', paddingHorizontal: 18, marginTop: 16 }]}>
+                        <IconSymbol name="arrow.clockwise" size={14} color={c.accent} />
+                        <Text style={[st.btnLabel, { color: c.accent }]}>
+                          {sbSearch.trim() ? tr.clear : tr.resetFilter}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+                      <View style={{ width: 60, height: 60, borderRadius: 18, backgroundColor: c.accent + '12',
+                        alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                        <IconSymbol name={SECTION_ICON[sidebarSection.type] as any} size={28} color={c.accent + '80'} />
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{tr.emptyListTitle}</Text>
+                      <Text style={{ fontSize: 13, color: c.sub, marginTop: 4 }}>{tr.emptyListHint}</Text>
+                    </View>
+                  )
+              }
+              ListFooterComponent={
+                doneItems.length === 0 ? null
+                  : sbFilter === 'active' ? (
+                    <TouchableOpacity onPress={() => setSbFilter('all')}
+                      accessibilityRole="button"
+                      style={[st.showDoneBtn, { borderColor: c.border }]}>
+                      <IconSymbol name="checkmark.circle" size={14} color={c.sub} />
+                      <Text style={[st.showDoneTxt, { color: c.sub }]}>
+                        {fmt(tr.showCompleted, { n: doneItems.length })}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : sbFilter === 'all' ? (
+                    <TouchableOpacity onPress={() => setSbFilter('active')}
+                      accessibilityRole="button"
+                      style={[st.showDoneBtn, { borderColor: c.border }]}>
+                      <IconSymbol name="eye.slash" size={14} color={c.sub} />
+                      <Text style={[st.showDoneTxt, { color: c.sub }]}>{tr.hideCompleted}</Text>
+                    </TouchableOpacity>
+                  ) : null
+              }
+            />
 
             {/* ── Add form ── */}
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -2001,13 +2062,21 @@ export default function SharedScreen() {
 
 // ─── ItemRow component ────────────────────────────────────────────────────────
 
-function ItemRow({ item, isLast, type, c, onToggle, onDelete, onEdit }: {
-  item: LocalItem; isLast: boolean; type: SectionType;
-  c: any; onToggle: () => void; onDelete: () => void; onEdit: () => void;
+// Рядок списку мемоізований: у довгому списку покупок зміна одного елемента
+// інакше перемальовувала б усі. Обробники приймають елемент аргументом, щоб
+// екран міг тримати їх незмінними між ререндерами.
+const ItemRow = React.memo(function ItemRow({ item, isLast, type, c, onToggle, onDelete, onEdit }: {
+  item: LocalItem; isLast: boolean; type: SectionType; c: any;
+  onToggle: (i: LocalItem) => void;
+  onDelete: (i: LocalItem) => void;
+  onEdit:   (i: LocalItem) => void;
 }) {
   const checkColor = type === 'shopping' ? c.green : c.accent;
+  const handleToggle = useCallback(() => onToggle(item), [onToggle, item]);
+  const handleDelete = useCallback(() => onDelete(item), [onDelete, item]);
+  const handleEdit   = useCallback(() => onEdit(item),   [onEdit, item]);
   return (
-    <TouchableOpacity activeOpacity={0.7} onPress={onEdit} style={[
+    <TouchableOpacity activeOpacity={0.7} onPress={handleEdit} style={[
       st.itemRow,
       !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
       type === 'tasks' && item.priority && !item.checked && {
@@ -2016,7 +2085,7 @@ function ItemRow({ item, isLast, type, c, onToggle, onDelete, onEdit }: {
       },
     ]}>
       {/* Checkbox */}
-      <TouchableOpacity onPress={onToggle} style={st.checkbox}
+      <TouchableOpacity onPress={handleToggle} style={st.checkbox}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}>
         <View style={[st.checkCircle, {
           borderColor:     item.checked ? checkColor : c.border,
@@ -2060,13 +2129,107 @@ function ItemRow({ item, isLast, type, c, onToggle, onDelete, onEdit }: {
               color: PRIORITY_COLOR[item.priority] }}>{item.priority.charAt(0).toUpperCase()}</Text>
           </View>
         )}
-        <TouchableOpacity onPress={onDelete} hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={handleDelete} hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
           <IconSymbol name="xmark" size={13} color={c.sub + '80'} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
-}
+});
+
+// ─── Картки груп і списків ────────────────────────────────────────────────────
+
+// Обидві картки мемоізовані з тієї ж причини, що й ItemRow: у сітці на
+// планшеті їх видно вдвічі більше, а перемальовує їх кожне оновлення
+// лічильників, що приходить по WebSocket.
+
+const GroupCard = React.memo(function GroupCard({ group, c, isDark, lang, grid, onPress }: {
+  group: GroupData; c: any; isDark: boolean; lang: 'uk' | 'en'; grid: boolean;
+  onPress: (g: GroupData) => void;
+}) {
+  const handlePress = useCallback(() => onPress(group), [onPress, group]);
+  return (
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.75}
+      style={[{ marginBottom: 12 }, grid && { flex: 1 }]}>
+      <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
+        style={[st.groupCard, { borderColor: c.border }, grid && { flex: 1 }]}>
+        <View style={[st.groupIconBox, { backgroundColor: c.accent + '15' }]}>
+          <IconSymbol name="person.2.fill" size={20} color={c.accent} />
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={[st.groupName, { color: c.text }]}>{group.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={[st.dot, { backgroundColor: c.green }]} />
+            <Text style={{ fontSize: 13, color: c.sub }}>
+              {group.member_count} {pluralMember(group.member_count, lang)}
+              {group.sections.length > 0 ? ` · ${group.sections.length}` : ''}
+            </Text>
+          </View>
+          {group.sections.length > 0 && (
+            <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+              {TAB_ORDER.map(type => {
+                const cnt = group.sections.filter(s => s.type === type).length;
+                if (!cnt) return null;
+                return (
+                  <View key={type} style={[st.pill, { backgroundColor: c.accent + '12' }]}>
+                    <IconSymbol name={SECTION_ICON[type] as any} size={11} color={c.accent} />
+                    <Text style={{ fontSize: 11, color: c.accent, fontWeight: '600' }}>{cnt}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+        <IconSymbol name="chevron.right" size={16} color={c.sub} />
+      </BlurView>
+    </TouchableOpacity>
+  );
+});
+
+const SectionCard = React.memo(function SectionCard({ section, counts, c, isDark, grid, onPress, onLongPress }: {
+  section: SharedSection; counts?: { active: number; done: number };
+  c: any; isDark: boolean; grid: boolean;
+  onPress: (s: SharedSection) => void;
+  onLongPress: (s: SharedSection) => void;
+}) {
+  const handlePress     = useCallback(() => onPress(section), [onPress, section]);
+  const handleLongPress = useCallback(() => onLongPress(section), [onLongPress, section]);
+  const total = counts ? counts.active + counts.done : 0;
+  const progress = total > 0 ? Math.round((counts!.done / total) * 100) : 0;
+  return (
+    <TouchableOpacity onPress={handlePress} onLongPress={handleLongPress}
+      activeOpacity={0.75} style={[{ marginBottom: 10 }, grid && { flex: 1 }]}>
+      <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
+        style={[st.sectionCard, { borderColor: c.border }, grid && { flex: 1 }]}>
+        <View style={[st.sectionIconBox, { backgroundColor: c.accent + '18' }]}>
+          <IconSymbol name={SECTION_ICON[section.type] as any} size={18} color={c.accent} />
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={[st.sectionCardName, { color: c.text }]}>{section.name}</Text>
+          {total > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={[st.progressTrack, { backgroundColor: c.dim, flex: 1, maxWidth: 80 }]}>
+                <View style={[st.progressFill, {
+                  backgroundColor: progress === 100 ? c.green : c.accent,
+                  width: `${progress}%` as any,
+                }]} />
+              </View>
+              <Text style={{ fontSize: 11, color: c.sub, fontWeight: '500' }}>
+                {counts!.done}/{total}
+              </Text>
+            </View>
+          )}
+        </View>
+        {counts && counts.active > 0 && (
+          <View style={[st.badge, { backgroundColor: c.accent + '20' }]}>
+            <Text style={[st.badgeText, { color: c.accent }]}>{counts.active}</Text>
+          </View>
+        )}
+        <IconSymbol name="chevron.right" size={16} color={c.sub} />
+      </BlurView>
+    </TouchableOpacity>
+  );
+});
 
 // ─── HandleRow ────────────────────────────────────────────────────────────────
 
@@ -2111,6 +2274,7 @@ const st = StyleSheet.create({
   badgeText:       { color: '#fff', fontSize: 10, fontWeight: '800' },
   sectionCard:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   sectionCardName: { fontSize: 16, fontWeight: '600' },
+  gridRow:         { gap: 12 },
   sectionIconBox:  { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   emptyIconBox:    { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle:      { fontSize: 17, fontWeight: '700', marginTop: 10, marginBottom: 6 },

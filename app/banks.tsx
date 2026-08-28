@@ -1,8 +1,9 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -23,9 +24,13 @@ import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { haptic } from '@/utils/haptics';
-import type { Transaction } from '@/utils/financeUtils';
+import {
+  BUILTIN_CURRENCIES,
+  formatCurrency,
+  type Currency,
+  type Transaction,
+} from '@/utils/financeUtils';
 import { useResponsive } from '@/hooks/use-responsive';
-import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth } from '@/hooks/use-content-width';
 
 interface SavingsJar {
@@ -51,20 +56,50 @@ const JAR_COLORS = [
   '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#84CC16',
 ];
 
-const fmt = (n: number) =>
-  n.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
+/**
+ * Відступ FAB від низу. Живе константою, бо його мусять знати двоє: сама
+ * кнопка і нижній відступ списку — інакше остання картка ховається під FAB.
+ */
+const FAB_BOTTOM = Platform.OS === 'ios' ? 48 : 28;
+const FAB_SIZE = 52;
+
+/**
+ * Палітра винесена з тіла екрана, щоб `useMemo` віддавав той самий об'єкт
+ * між рендерами: інакше кожна картка бачить нові кольори й `React.memo`
+ * на ній не має сенсу.
+ */
+function makeColors(isDark: boolean) {
+  return {
+    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
+    bg2:    isDark ? '#14121E' : '#EAE6FF',
+    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
+    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(100,160,240,0.3)',
+    text:   isDark ? '#EFF5FF' : '#071524',
+    sub:    isDark ? 'rgba(239,245,255,0.62)' : 'rgba(7,21,36,0.58)',
+    accent: '#0EA5E9',
+    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    sheet:  isDark ? 'rgba(8,14,24,0.98)' : 'rgba(239,245,255,0.98)',
+    green:  '#10B981',
+    gold:   '#F59E0B',
+  };
+}
+
+type JarColors = ReturnType<typeof makeColors>;
 
 export default function BanksScreen() {
   const contentWidth = useContentWidth();
-  const tabBarInset = useTabBarInset();
-  const { height } = useResponsive();
+  const { height, isWide } = useResponsive();
   const isDark = useColorScheme() === 'dark';
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const [jars, setJars] = useState<SavingsJar[]>([]);
   const [initialized, setInitialized] = useState(false);
   // Opt-in: create a finance transaction on every deposit/withdrawal
   const [createTx, setCreateTx] = useState(false);
   const [primaryCurrency, setPrimaryCurrency] = useState('UAH');
+  const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
+
+  // Картка скарбнички вузька, тож на планшеті їх поміщається дві в ряд.
+  const columns = isWide ? 2 : 1;
 
   // Screens: 'list' | 'add' | 'edit' | 'deposit'
   const [showForm, setShowForm] = useState(false);
@@ -87,10 +122,12 @@ export default function BanksScreen() {
       loadData<SavingsJar[]>('savings_jars', []),
       loadData<boolean>('banks_create_tx', false),
       loadData<string>('finance_primary_currency', 'UAH'),
-    ]).then(([data, tx, cur]) => {
+      loadData<Currency[]>('finance_currencies', []),
+    ]).then(([data, tx, cur, curList]) => {
       setJars(data);
       setCreateTx(tx);
       setPrimaryCurrency(cur);
+      setCustomCurrencies(Array.isArray(curList) ? curList : []);
       setInitialized(true);
     });
   }, []);
@@ -99,8 +136,24 @@ export default function BanksScreen() {
     if (initialized) void saveSynced('savings_jars', jars);
   }, [jars, initialized]);
 
-  const totalSaved = jars.reduce((s, j) => s + j.saved, 0);
-  const totalGoal  = jars.reduce((s, j) => s + j.goal, 0);
+  const totals = useMemo(() => ({
+    saved: jars.reduce((s, j) => s + j.saved, 0),
+    goal:  jars.reduce((s, j) => s + j.goal, 0),
+  }), [jars]);
+  const { saved: totalSaved, goal: totalGoal } = totals;
+
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+
+  // Скарбнички живуть у тій самій валюті, що й решта фінансів: інакше та сама
+  // сума в «Фінансах» і тут виглядала б як два різні числа.
+  const currency = useMemo<Currency>(
+    () => [...BUILTIN_CURRENCIES, ...customCurrencies].find(cur => cur.code === primaryCurrency)
+      ?? BUILTIN_CURRENCIES[0],
+    [customCurrencies, primaryCurrency],
+  );
+  const fmt = useCallback((n: number) => formatCurrency(n, currency, locale), [currency, locale]);
+
+  const c = useMemo(() => makeColors(isDark), [isDark]);
 
   const openAdd = () => {
     setEditingJar(null);
@@ -110,7 +163,7 @@ export default function BanksScreen() {
     setShowForm(true);
   };
 
-  const openEdit = (jar: SavingsJar) => {
+  const openEdit = useCallback((jar: SavingsJar) => {
     setEditingJar(jar);
     setName(jar.name);
     setGoal(jar.goal.toString());
@@ -119,14 +172,14 @@ export default function BanksScreen() {
     setSelIcon(jar.icon);
     setSelColor(jar.color);
     setShowForm(true);
-  };
+  }, []);
 
-  const openDeposit = (jar: SavingsJar) => {
+  const openDeposit = useCallback((jar: SavingsJar) => {
     setDepositJar(jar);
     setDepositAmount('');
     setDepositSign('+');
     setShowDeposit(true);
-  };
+  }, []);
 
   const saveForm = () => {
     const goalNum  = parseFloat(goal.replace(',', '.'));
@@ -193,19 +246,20 @@ export default function BanksScreen() {
     setShowForm(false);
   };
 
-  const c = {
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(100,160,240,0.3)',
-    text:   isDark ? '#EFF5FF' : '#071524',
-    sub:    isDark ? 'rgba(239,245,255,0.62)' : 'rgba(7,21,36,0.58)',
-    accent: '#0EA5E9',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(8,14,24,0.98)' : 'rgba(239,245,255,0.98)',
-    green:  '#10B981',
-    gold:   '#F59E0B',
-  };
+  const renderJar = useCallback(
+    ({ item }: { item: SavingsJar }) => (
+      <JarCard
+        jar={item}
+        c={c}
+        isDark={isDark}
+        fmt={fmt}
+        grow={columns > 1}
+        onEdit={openEdit}
+        onDeposit={openDeposit}
+      />
+    ),
+    [c, isDark, fmt, columns, openEdit, openDeposit],
+  );
 
   return (
     <View style={{ flex: 1 }}>
@@ -222,109 +276,61 @@ export default function BanksScreen() {
           <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>Скарбнички</Text>
         </View>
 
-        <ScrollView
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
-          showsVerticalScrollIndicator={false}>
-
-          {/* Summary card */}
-          {jars.length > 0 && (
-            <BlurView intensity={isDark ? 25 : 45} tint={isDark ? 'dark' : 'light'} style={[s.summaryCard, { borderColor: c.border }]}>
-              <View style={{ flexDirection: 'row', marginBottom: 14 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.summaryLabel, { color: c.sub }]}>Накопичено</Text>
-                  <Text style={[s.summaryAmount, { color: c.green }]}>{fmt(totalSaved)}</Text>
-                </View>
-                <View style={{ width: 1, backgroundColor: c.border }} />
-                <View style={{ flex: 1, paddingLeft: 16 }}>
-                  <Text style={[s.summaryLabel, { color: c.sub }]}>Мета</Text>
-                  <Text style={[s.summaryAmount, { color: c.text }]}>{fmt(totalGoal)}</Text>
-                </View>
-              </View>
-              {totalGoal > 0 && (
-                <>
-                  <View style={[s.progressBg, { height: 6 }]}>
-                    <View style={[s.progressFill, {
-                      width: `${Math.min(100, Math.round((totalSaved / totalGoal) * 100))}%`,
-                      backgroundColor: c.green,
-                    }]} />
+        <FlatList
+          // numColumns не можна змінювати на льоту — при повороті чи Split View
+          // список має перестворитися, інакше комірки лишаються старої ширини.
+          key={`cols-${columns}`}
+          data={jars}
+          keyExtractor={jar => jar.id}
+          numColumns={columns}
+          columnWrapperStyle={columns > 1 ? { gap: 12 } : undefined}
+          ItemSeparatorComponent={JarSeparator}
+          renderItem={renderJar}
+          contentContainerStyle={[contentWidth, {
+            paddingHorizontal: 20,
+            paddingTop: 8,
+            // Останню картку не має перекривати плавуча кнопка.
+            paddingBottom: FAB_BOTTOM + FAB_SIZE + 12,
+          }]}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            jars.length > 0 ? (
+              <BlurView intensity={isDark ? 25 : 45} tint={isDark ? 'dark' : 'light'} style={[s.summaryCard, { borderColor: c.border, marginBottom: 16 }]}>
+                <View style={{ flexDirection: 'row', marginBottom: 14 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.summaryLabel, { color: c.sub }]}>Накопичено</Text>
+                    <Text style={[s.summaryAmount, { color: c.green }]}>{fmt(totalSaved)}</Text>
                   </View>
-                  <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 7 }}>
-                    {Math.min(100, Math.round((totalSaved / totalGoal) * 100))}% від загальної мети
-                  </Text>
-                </>
-              )}
-            </BlurView>
-          )}
-
-          {/* Empty state */}
-          {jars.length === 0 && (
+                  <View style={{ width: 1, backgroundColor: c.border }} />
+                  <View style={{ flex: 1, paddingLeft: 16 }}>
+                    <Text style={[s.summaryLabel, { color: c.sub }]}>Мета</Text>
+                    <Text style={[s.summaryAmount, { color: c.text }]}>{fmt(totalGoal)}</Text>
+                  </View>
+                </View>
+                {totalGoal > 0 && (
+                  <>
+                    <View style={[s.progressBg, { height: 6 }]}>
+                      <View style={[s.progressFill, {
+                        width: `${Math.min(100, Math.round((totalSaved / totalGoal) * 100))}%`,
+                        backgroundColor: c.green,
+                      }]} />
+                    </View>
+                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 7 }}>
+                      {Math.min(100, Math.round((totalSaved / totalGoal) * 100))}% від загальної мети
+                    </Text>
+                  </>
+                )}
+              </BlurView>
+            ) : null
+          }
+          ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 56 }}>
               <Text style={{ fontSize: 48 }}>🫙</Text>
               <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>Немає скарбничок</Text>
               <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>Натисніть + щоб створити ціль</Text>
             </View>
-          )}
-
-          {/* Jars list */}
-          <View style={{ gap: 12, marginTop: jars.length > 0 ? 16 : 0 }}>
-            {jars.map(jar => {
-              const pct = jar.goal > 0 ? Math.min(100, (jar.saved / jar.goal) * 100) : 0;
-              const done = pct >= 100;
-              return (
-                <BlurView key={jar.id} intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.jarCard, { borderColor: done ? jar.color + '60' : c.border }]}>
-                  {/* Top row */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <View style={[s.jarIcon, { backgroundColor: jar.color + (isDark ? '22' : '18') }]}>
-                      <IconSymbol name={jar.icon} size={20} color={jar.color} />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={[s.jarName, { color: c.text }]}>{jar.name}</Text>
-                        {done && (
-                          <View style={[s.doneBadge, { backgroundColor: jar.color + '20', borderColor: jar.color + '40' }]}>
-                            <Text style={{ color: jar.color, fontSize: 10, fontWeight: '700' }}>✓ Виконано</Text>
-                          </View>
-                        )}
-                      </View>
-                      {jar.note ? <Text style={[s.jarNote, { color: c.sub }]} numberOfLines={1}>{jar.note}</Text> : null}
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => openEdit(jar)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      style={[s.editBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-                      <IconSymbol name="pencil" size={13} color={c.sub} />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Amounts */}
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10 }}>
-                    <Text style={[s.savedAmt, { color: jar.color }]}>{fmt(jar.saved)}</Text>
-                    <Text style={[s.goalAmt, { color: c.sub }]}> / {fmt(jar.goal)}</Text>
-                    <View style={{ flex: 1 }} />
-                    <Text style={[s.pctLabel, { color: done ? jar.color : c.sub }]}>{Math.round(pct)}%</Text>
-                  </View>
-
-                  {/* Progress */}
-                  <View style={[s.progressBg, { marginBottom: 12 }]}>
-                    <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: jar.color }]} />
-                  </View>
-
-                  {/* Deposit button */}
-                  <TouchableOpacity
-                    onPress={() => openDeposit(jar)}
-                    style={[s.depositBtn, { backgroundColor: jar.color + '18', borderColor: jar.color + '35' }]}>
-                    <IconSymbol name="plus.circle.fill" size={15} color={jar.color} />
-                    <Text style={{ color: jar.color, fontSize: 13, fontWeight: '700', marginLeft: 6 }}>Поповнити</Text>
-                    <View style={{ flex: 1 }} />
-                    <Text style={{ color: c.sub, fontSize: 11 }}>
-                      Залишилось {fmt(Math.max(0, jar.goal - jar.saved))}
-                    </Text>
-                  </TouchableOpacity>
-                </BlurView>
-              );
-            })}
-          </View>
-        </ScrollView>
+          }
+        />
       </SafeAreaView>
 
       {/* FAB */}
@@ -336,7 +342,7 @@ export default function BanksScreen() {
       <Modal visible={showForm} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowForm(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowForm(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, contentWidth]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={s.handleRow}>
@@ -355,9 +361,9 @@ export default function BanksScreen() {
 
                   {/* Goal amount */}
                   <View style={[s.amountBlock, { backgroundColor: selColor + '12', borderColor: selColor + '30' }]}>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>ЦІЛЬ (₴)</Text>
+                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>ЦІЛЬ ({currency.symbol})</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ color: selColor, fontSize: 28, fontWeight: '300' }}>₴</Text>
+                      <Text style={{ color: selColor, fontSize: 28, fontWeight: '300' }}>{currency.symbol}</Text>
                       <TextInput
                         placeholder="0"
                         placeholderTextColor={c.sub}
@@ -380,7 +386,7 @@ export default function BanksScreen() {
                   />
 
                   {/* Already saved */}
-                  <Text style={[s.label, { color: c.sub }]}>Вже накопичено (₴)</Text>
+                  <Text style={[s.label, { color: c.sub }]}>Вже накопичено ({currency.symbol})</Text>
                   <TextInput
                     placeholder="0"
                     placeholderTextColor={c.sub}
@@ -462,7 +468,7 @@ export default function BanksScreen() {
       <Modal visible={showDeposit} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowDeposit(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowDeposit(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, contentWidth]}>
               {depositJar && (
                 <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
                   <View style={s.handleRow}>
@@ -508,9 +514,9 @@ export default function BanksScreen() {
                     backgroundColor: (depositSign === '+' ? c.green : '#EF4444') + '12',
                     borderColor: (depositSign === '+' ? c.green : '#EF4444') + '30',
                   }]}>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>СУМА (₴)</Text>
+                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>СУМА ({currency.symbol})</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ color: depositSign === '+' ? c.green : '#EF4444', fontSize: 28, fontWeight: '300' }}>₴</Text>
+                      <Text style={{ color: depositSign === '+' ? c.green : '#EF4444', fontSize: 28, fontWeight: '300' }}>{currency.symbol}</Text>
                       <TextInput
                         placeholder="0"
                         placeholderTextColor={c.sub}
@@ -560,6 +566,91 @@ export default function BanksScreen() {
   );
 }
 
+/** Проміжок між картками у списку — окремий компонент, щоб не створювати
+ *  новий інлайн-елемент на кожен рендер списку. */
+function JarSeparator() {
+  return <View style={{ height: 12 }} />;
+}
+
+/**
+ * Картка однієї скарбнички.
+ *
+ * `React.memo` тут не косметика: у списку з десятком карток кожен рендер
+ * екрана (а він трапляється на кожен символ у полі суми) інакше перемальовує
+ * усі BlurView разом із прогресами.
+ */
+const JarCard = React.memo(function JarCard({
+  jar, c, isDark, fmt, grow, onEdit, onDeposit,
+}: {
+  jar: SavingsJar;
+  c: JarColors;
+  isDark: boolean;
+  fmt: (n: number) => string;
+  /** У сітці на планшеті картка ділить рядок навпіл. */
+  grow: boolean;
+  onEdit: (jar: SavingsJar) => void;
+  onDeposit: (jar: SavingsJar) => void;
+}) {
+  const pct = jar.goal > 0 ? Math.min(100, (jar.saved / jar.goal) * 100) : 0;
+  const done = pct >= 100;
+  return (
+    <BlurView
+      intensity={isDark ? 18 : 35}
+      tint={isDark ? 'dark' : 'light'}
+      // maxWidth не дає одинокій картці в останньому ряду розтягнутися на дві колонки
+      style={[s.jarCard, grow && { flex: 1, maxWidth: '50%' }, { borderColor: done ? jar.color + '60' : c.border }]}>
+      {/* Top row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+        <View style={[s.jarIcon, { backgroundColor: jar.color + (isDark ? '22' : '18') }]}>
+          <IconSymbol name={jar.icon} size={20} color={jar.color} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[s.jarName, { color: c.text }]}>{jar.name}</Text>
+            {done && (
+              <View style={[s.doneBadge, { backgroundColor: jar.color + '20', borderColor: jar.color + '40' }]}>
+                <Text style={{ color: jar.color, fontSize: 10, fontWeight: '700' }}>✓ Виконано</Text>
+              </View>
+            )}
+          </View>
+          {jar.note ? <Text style={[s.jarNote, { color: c.sub }]} numberOfLines={1}>{jar.note}</Text> : null}
+        </View>
+        <TouchableOpacity
+          onPress={() => onEdit(jar)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={[s.editBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
+          <IconSymbol name="pencil" size={13} color={c.sub} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Amounts */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10 }}>
+        <Text style={[s.savedAmt, { color: jar.color }]}>{fmt(jar.saved)}</Text>
+        <Text style={[s.goalAmt, { color: c.sub }]}> / {fmt(jar.goal)}</Text>
+        <View style={{ flex: 1 }} />
+        <Text style={[s.pctLabel, { color: done ? jar.color : c.sub }]}>{Math.round(pct)}%</Text>
+      </View>
+
+      {/* Progress */}
+      <View style={[s.progressBg, { marginBottom: 12 }]}>
+        <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: jar.color }]} />
+      </View>
+
+      {/* Deposit button */}
+      <TouchableOpacity
+        onPress={() => onDeposit(jar)}
+        style={[s.depositBtn, { backgroundColor: jar.color + '18', borderColor: jar.color + '35' }]}>
+        <IconSymbol name="plus.circle.fill" size={15} color={jar.color} />
+        <Text style={{ color: jar.color, fontSize: 13, fontWeight: '700', marginLeft: 6 }}>Поповнити</Text>
+        <View style={{ flex: 1 }} />
+        <Text style={{ color: c.sub, fontSize: 11 }}>
+          Залишилось {fmt(Math.max(0, jar.goal - jar.saved))}
+        </Text>
+      </TouchableOpacity>
+    </BlurView>
+  );
+});
+
 const s = StyleSheet.create({
   pageTitle:    { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
   headerBtn:    { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
@@ -578,7 +669,7 @@ const s = StyleSheet.create({
   progressBg:   { height: 5, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
   depositBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 10 },
-  fab:          { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  fab:          { position: 'absolute', right: 20, bottom: FAB_BOTTOM, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:        { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },

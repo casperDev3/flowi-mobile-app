@@ -8,7 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Empty, Field } from '@/components/health/FormBits';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { cancelDailyReminder, scheduleDailyReminder } from '@/store/notifications';
@@ -19,7 +19,9 @@ import { HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
 import { HABITS_KEY, Habit, genId, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
 
-const ICONS = ['drop.fill', 'bolt.fill', 'figure.walk', 'moon.fill', 'pills.fill', 'heart.fill'];
+// Типізовано: раніше це був string[], і назва без відповідника в маппінгу
+// мовчки малювала порожнє місце на Android.
+const ICONS: IconSymbolName[] = ['drop.fill', 'bolt.fill', 'figure.walk', 'moon.fill', 'pills.fill', 'heart.fill'];
 const COLORS = [HEALTH_ACCENTS.water, HEALTH_ACCENTS.prot, HEALTH_ACCENTS.steps, HEALTH_ACCENTS.sleep, HEALTH_ACCENTS.cal, HEALTH_ACCENTS.pulse];
 const ACC = HEALTH_ACCENTS.prot;
 
@@ -88,7 +90,7 @@ export default function HabitsScreen() {
             return (
               <BlurView key={h.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
                 <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: h.color + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name={h.icon as any} size={17} color={h.color} />
+                  <IconSymbol name={h.icon} size={17} color={h.color} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{h.title}</Text>
@@ -122,7 +124,7 @@ export default function HabitsScreen() {
                   {ICONS.map(ic => (
                     <TouchableOpacity key={ic} onPress={() => setIcon(ic)}
                       style={[s.pick, { borderColor: icon === ic ? color : c.border, backgroundColor: icon === ic ? color + '20' : c.dim }]}>
-                      <IconSymbol name={ic as any} size={17} color={icon === ic ? color : c.sub} />
+                      <IconSymbol name={ic} size={17} color={icon === ic ? color : c.sub} />
                     </TouchableOpacity>
                   ))}
                 </View>

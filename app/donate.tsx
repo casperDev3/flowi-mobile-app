@@ -17,11 +17,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const PAYPAL_EMAIL = 'ihor.lialuik@gmail.com';
 const DONATELLO_URL = 'https://donatello.to/igorichua';
 
 export default function DonateScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
@@ -62,7 +64,7 @@ export default function DonateScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Hero */}

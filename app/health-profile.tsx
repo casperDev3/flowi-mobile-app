@@ -32,10 +32,12 @@ import {
   calcTDEE,
   computeGoals,
 } from '@/utils/healthUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const ACCENT = '#10B981';
 
 export default function HealthProfileScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -103,7 +105,7 @@ export default function HealthProfileScreen() {
         </View>
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 120 }]} showsVerticalScrollIndicator={false}>
 
             {/* Стать */}
             <Text style={[s.label, { color: c.sub }]}>{tr.sexLabel}</Text>

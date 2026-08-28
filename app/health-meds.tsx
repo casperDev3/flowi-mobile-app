@@ -18,10 +18,12 @@ import { useI18n } from '@/store/i18n';
 import { Events, track } from '@/utils/analytics';
 import { HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
 import { MEDS_KEY, Medication, genId, medAdherence, medTakenToday, parseTimes } from '@/utils/preventionUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const ACC = HEALTH_ACCENTS.prevention;
 
 export default function MedsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -82,7 +84,7 @@ export default function MedsScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
           {meds.length === 0 ? (
             <Empty c={c} text={tr.medsSub} />
           ) : meds.map(m => {

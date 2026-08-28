@@ -17,12 +17,14 @@ import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
 import { HABITS_KEY, Habit, genId, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const ICONS = ['drop.fill', 'bolt.fill', 'figure.walk', 'moon.fill', 'pills.fill', 'heart.fill'];
 const COLORS = [HEALTH_ACCENTS.water, HEALTH_ACCENTS.prot, HEALTH_ACCENTS.steps, HEALTH_ACCENTS.sleep, HEALTH_ACCENTS.cal, HEALTH_ACCENTS.pulse];
 const ACC = HEALTH_ACCENTS.prot;
 
 export default function HabitsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -80,7 +82,7 @@ export default function HabitsScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
           {habits.length === 0 ? <Empty c={c} text={tr.habitsSub} icon="checklist" /> : habits.map(h => {
             const done = habitDoneToday(h); const streak = habitStreak(h);
             return (

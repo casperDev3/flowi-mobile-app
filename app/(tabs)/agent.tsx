@@ -19,6 +19,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ function fmtTime(ts: number) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function AgentScreen() {
+  const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
 
@@ -271,7 +273,7 @@ export default function AgentScreen() {
           {showSettings && (
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 20, paddingBottom: tabBarInset + 24 }}
+              contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: tabBarInset + 24 }]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled">
 

@@ -24,6 +24,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { BUILTIN_CURRENCIES } from '@/utils/financeUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function BudgetScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
 
@@ -291,7 +293,7 @@ export default function BudgetScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Info: other-currency transactions excluded */}

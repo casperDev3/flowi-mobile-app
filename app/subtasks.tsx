@@ -17,6 +17,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
@@ -28,6 +29,7 @@ interface Task {
 }
 
 export default function SubtasksScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { taskId } = useLocalSearchParams<{ taskId: string }>();
@@ -103,7 +105,7 @@ export default function SubtasksScreen() {
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+            contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled">
 

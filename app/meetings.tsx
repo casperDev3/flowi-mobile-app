@@ -28,6 +28,7 @@ import { isOnlineMode } from '@/store/app-mode';
 import { cancelMeetingNotification, scheduleMeetingNotification } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
 let AVAudio: any = null;
@@ -353,6 +354,7 @@ function WeekStrip({ weekStart, meetingsByDate, selected, onSelect, c }: {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function MeetingsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const c = useColors(isDark);
@@ -952,7 +954,7 @@ export default function MeetingsScreen() {
         )}
 
         {/* ── Content ── */}
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }} showsVerticalScrollIndicator={false}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]} showsVerticalScrollIndicator={false}>
 
           {/* Day view: timeline */}
           {(span === 'day' || (span === 'week' && selectedDay)) && (() => {

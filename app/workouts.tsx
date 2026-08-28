@@ -23,6 +23,7 @@ import { requestNotificationPermissions } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const ACCENT = '#0EA5E9';
 const ACCENT2 = '#6366F1';
@@ -544,6 +545,7 @@ function sectionLabel(c: ReturnType<typeof makeColors>) {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function WorkoutsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const c = makeColors(isDark);
@@ -747,7 +749,7 @@ export default function WorkoutsScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 

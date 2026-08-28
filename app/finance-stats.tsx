@@ -19,6 +19,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
 import { loadData } from '@/store/storage';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 type TxType = 'income' | 'expense';
 interface Transaction {
@@ -186,6 +187,7 @@ function SparkLine({ data, color, height = 64, width }: {
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function FinanceStatsScreen() {
+  const contentWidth = useContentWidth();
   const { width } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const [txs, setTxs] = useState<Transaction[]>([]);
@@ -414,7 +416,7 @@ export default function FinanceStatsScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* ── Custom range chip ── */}

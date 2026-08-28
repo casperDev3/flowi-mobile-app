@@ -19,6 +19,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
@@ -50,6 +51,7 @@ type SortBy = 'newest' | 'oldest' | 'priority' | 'name';
 const PRIORITY_ORDER: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 
 export default function ArchiveScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -196,7 +198,7 @@ export default function ArchiveScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}>
 
           {done.length === 0 && (

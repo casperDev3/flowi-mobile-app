@@ -29,6 +29,7 @@ import {
   initHealthKit,
 } from '@/store/healthkit';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 
 const WORKOUT_NAMES: Record<number, string> = {
@@ -116,6 +117,7 @@ function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: 
 }
 
 export default function AppleHealthScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
@@ -233,7 +235,7 @@ export default function AppleHealthScreen() {
             );
           }} />
         ) : (
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 40 }]} showsVerticalScrollIndicator={false}>
 
             {/* WIP banner */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#F59E0B44', backgroundColor: '#F59E0B12', padding: 14, marginBottom: 18 }}>

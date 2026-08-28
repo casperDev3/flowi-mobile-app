@@ -30,6 +30,7 @@ import { haptic } from '@/utils/haptics';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { formatClock, formatDuration, formatDurationShort } from '@/utils/durationFormat';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 type Shift = 'morning' | 'day' | 'evening' | 'night';
 
@@ -54,6 +55,7 @@ function groupLabel(date: Date, todayStr: string, yesterdayStr: string, locale: 
 
 
 export default function TimeScreen() {
+  const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
   const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
@@ -246,7 +248,7 @@ export default function TimeScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Date filter chip */}

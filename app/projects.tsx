@@ -24,6 +24,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { setProjectArchived } from '@/utils/projectUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 export interface Project {
   id: string;
@@ -47,6 +48,7 @@ interface Task { id: string; projectId?: string; status: string; }
 const PROJECT_COLORS = ['#7C3AED', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1'];
 
 export default function ProjectsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -159,7 +161,7 @@ export default function ProjectsScreen() {
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
 

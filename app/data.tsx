@@ -23,6 +23,7 @@ import { useAutoBackup } from '@/store/auto-backup';
 import { BACKUP_KEYS } from '@/store/backup-keys';
 import { loadData, saveData } from '@/store/storage';
 import { SYNC_ARRAY_KEYS, saveSynced } from '@/store/synced-storage';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const ALL_KEYS = [
   { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
@@ -99,6 +100,7 @@ function formatBackupTime(date: Date | null): string {
 type Counts = Record<string, number>;
 
 export default function DataScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { triggerBackup, getLastBackupTime, getLastBackupUri, isAutoBackupEnabled, setAutoBackupEnabled } = useAutoBackup();
@@ -387,7 +389,7 @@ export default function DataScreen() {
           <View style={{ width: 36 }} />
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]} showsVerticalScrollIndicator={false}>
 
           {/* ─── Auto-backup ─── */}
           <Text style={[st.sectionLabel, { color: c.sub }]}>АВТО-РЕЗЕРВУВАННЯ</Text>

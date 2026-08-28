@@ -38,6 +38,7 @@ import { requestNotificationPermissions } from '@/store/notifications';
 import { WS_BASE } from '@/store/api-config';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ interface PendingChange {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SharedScreen() {
+  const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
   const { width } = useResponsive();
   const SIDEBAR_W = Math.round(width * 0.92);
@@ -1041,7 +1043,7 @@ export default function SharedScreen() {
             )}
 
             <ScrollView
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
+              contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }]}
               showsVerticalScrollIndicator={false}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroups} tintColor={c.accent} />}>
 

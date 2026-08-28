@@ -17,6 +17,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
 import { formatDuration, formatDurationShort } from '@/utils/durationFormat';
 import { useI18n } from '@/store/i18n';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -201,6 +202,7 @@ function buildChartBars(entries: FlatEntry[], period: Period): BarData[] {
 
 
 export default function TimeRecordsScreen() {
+  const contentWidth = useContentWidth();
   const { tr } = useI18n();
   // Одиниці приходять зі словника: до цього кожен екран мав власну копію
   // форматування з вшитими «год» і «хв».
@@ -332,7 +334,7 @@ export default function TimeRecordsScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 18, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Period pills */}

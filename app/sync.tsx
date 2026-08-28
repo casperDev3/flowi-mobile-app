@@ -27,6 +27,7 @@ import {
   useSync,
 } from '@/store/sync-engine';
 import { markDirty, SYNC_SINGLETON_KEYS } from '@/store/synced-storage';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const DATA_KEY_LABELS: Record<string, string> = {
   tasks: 'Завдання', transactions: 'Транзакції', time_entries: 'Час',
@@ -40,6 +41,7 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 export default function SyncScreen() {
+  const contentWidth = useContentWidth();
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
@@ -158,7 +160,7 @@ export default function SyncScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ padding: 20, paddingBottom: 48 }}
+          contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: 48 }]}
           showsVerticalScrollIndicator={false}>
 
             {/* ── CLOUD SYNC CARD ── */}

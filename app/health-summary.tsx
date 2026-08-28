@@ -17,6 +17,7 @@ import {
 } from '@/utils/healthTheme';
 import { Agg, Period, buildTrend } from '@/utils/healthPeriods';
 import { EntryType, HealthEntry } from '@/utils/healthUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 interface Metric { type: EntryType; label: string; color: string; agg: Agg; unit: string; goal?: number; }
 
@@ -29,6 +30,7 @@ function fmtMetric(m: Metric, v: number): string {
 }
 
 export default function HealthSummaryScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -64,7 +66,7 @@ export default function HealthSummaryScreen() {
           <PeriodSelector period={period} onChange={setPeriod} color={ACCENT} c={c} tr={tr} />
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
           {metrics.map(m => (
             <SummaryCard key={m.type} m={m} period={period} entries={h.entries} isDark={isDark} c={c} tr={tr} />

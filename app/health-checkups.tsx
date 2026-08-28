@@ -17,8 +17,10 @@ import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { ACCENT_PULSE, getHealthColors } from '@/utils/healthTheme';
 import { CHECKUPS_KEY, Checkup, CheckupKind, genId } from '@/utils/preventionUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 export default function CheckupsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -77,7 +79,7 @@ export default function CheckupsScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
           {items.length === 0 ? <Empty c={c} text={tr.checkupsSub} icon="cross.case.fill" /> : items.map(item => (
             <BlurView key={item.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>

@@ -30,8 +30,10 @@ import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
 import { Lang } from '@/store/translations';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 export default function SettingsScreen() {
+  const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
   const cs = useColorScheme();
   useScreenView('settings');
@@ -147,7 +149,7 @@ export default function SettingsScreen() {
 
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 16 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 16 }]}
           showsVerticalScrollIndicator={false}>
 
           <View style={{ marginTop: 10, marginBottom: 28 }}>

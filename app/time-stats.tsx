@@ -17,6 +17,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
 import { formatDuration, formatDurationShort } from '@/utils/durationFormat';
 import { useI18n } from '@/store/i18n';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 type Shift = 'morning' | 'day' | 'evening' | 'night';
 
@@ -33,6 +34,7 @@ interface TimeEntry { id: string; task: string; shift: Shift; duration: number; 
 
 
 export default function TimeStatsScreen() {
+  const contentWidth = useContentWidth();
   const { tr } = useI18n();
   // Одиниці приходять зі словника: до цього кожен екран мав власну копію
   // форматування з вшитими «год» і «хв».
@@ -83,7 +85,7 @@ export default function TimeStatsScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Summary */}

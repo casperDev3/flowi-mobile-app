@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const SOCIALS: {
   key: string;
@@ -65,6 +66,7 @@ const SOCIALS: {
 ];
 
 export default function DeveloperScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
@@ -97,7 +99,7 @@ export default function DeveloperScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Developer card */}

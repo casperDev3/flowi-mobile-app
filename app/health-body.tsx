@@ -20,6 +20,7 @@ import {
   DEFAULT_PROFILE, EntryType, MEASUREMENT_TYPES, MeasurementType,
   estimateBodyFatNavy, latestValue, leanMass, waistToHeightRatio, waistToHipRatio, whrHealthy, whtrCategory,
 } from '@/utils/healthUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const labelKey = {
   waist: 'mWaist', hips: 'mHips', chest: 'mChest', thigh: 'mThigh',
@@ -27,6 +28,7 @@ const labelKey = {
 } as const satisfies Record<MeasurementType, keyof Translations>;
 
 export default function BodyScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -77,7 +79,7 @@ export default function BodyScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT_WEIGHT} />}>
 
           {/* Зведення */}

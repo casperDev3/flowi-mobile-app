@@ -19,8 +19,10 @@ import { isSameDay } from '@/utils/dateUtils';
 import {
   ACCENT, ACCENT_CAL, ACCENT_PROT, ACCENT_PULSE, ACCENT_STEPS, ModalKey, getHealthColors,
 } from '@/utils/healthTheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 export default function NutritionScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -51,7 +53,7 @@ export default function NutritionScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 
           {/* Калорії */}

@@ -17,8 +17,10 @@ import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { ACCENT_CAL, getHealthColors } from '@/utils/healthTheme';
 import { VACCINES_KEY, Vaccine, genId } from '@/utils/preventionUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 export default function VaccinesScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -73,7 +75,7 @@ export default function VaccinesScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
           {items.length === 0 ? <Empty c={c} text={tr.vaccinesSub} icon="syringe" /> : items.map(item => (
             <BlurView key={item.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>

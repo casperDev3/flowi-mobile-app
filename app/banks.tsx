@@ -26,6 +26,7 @@ import { haptic } from '@/utils/haptics';
 import type { Transaction } from '@/utils/financeUtils';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 interface SavingsJar {
   id: string;
@@ -54,6 +55,7 @@ const fmt = (n: number) =>
   n.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
 
 export default function BanksScreen() {
+  const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
   const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
@@ -221,7 +223,7 @@ export default function BanksScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Summary card */}

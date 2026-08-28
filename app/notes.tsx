@@ -27,6 +27,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 interface Note {
   id: string;
@@ -52,6 +53,7 @@ function relativeDate(iso: string): string {
 }
 
 export default function NotesScreen() {
+  const contentWidth = useContentWidth();
   const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -209,7 +211,7 @@ export default function NotesScreen() {
         )}
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
 

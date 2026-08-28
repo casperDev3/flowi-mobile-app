@@ -24,6 +24,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 interface ContainerItem {
   id: string;
@@ -49,6 +50,7 @@ const PALETTE = [
 ];
 
 export default function ContainersScreen() {
+  const contentWidth = useContentWidth();
   const { width } = useResponsive();
   // Дві колонки з відступами 16/12/16. Рахується при рендері, а не при
   // імпорті: у Split View ширина змінюється без перезапуску екрана.
@@ -259,7 +261,7 @@ export default function ContainersScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 

@@ -25,6 +25,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 // Вставте URL після деплою Google Apps Script
 const REPORTER_URL = 'https://script.google.com/macros/s/AKfycbzCOLtFr1M1bu2yU8AjKfLeqIQ7MKlbCthcfiC0bn6Br2f-tEtmjGJtJHoO7w98FPoN/exec';
@@ -48,6 +49,7 @@ const SEVERITY: Record<Severity, { label: string; color: string; icon: string }>
 };
 
 export default function BugsScreen() {
+  const contentWidth = useContentWidth();
   const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -261,7 +263,7 @@ export default function BugsScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24, gap: 10 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24, gap: 10 }]}
           showsVerticalScrollIndicator={false}>
 
           {filtered.length === 0 && (

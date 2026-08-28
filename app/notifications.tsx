@@ -20,6 +20,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { getAllScheduledNotifications, requestNotificationPermissions } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,7 @@ const GROUP_ICONS: Record<NotifGroup, GroupMeta> = {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function NotificationsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -230,7 +232,7 @@ export default function NotificationsScreen() {
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Header */}

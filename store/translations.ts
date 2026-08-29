@@ -101,6 +101,7 @@ export interface Translations {
   notes: string;
   archive: string;
   timeRecords: string;
+  sortStatus: string;
   sortDeadline: string;
   sortPriority: string;
   sortNewest: string;
@@ -150,6 +151,9 @@ export interface Translations {
   tryAnotherQuery: string;
   pressToAdd: string;
   searchPlaceholder: string;
+  /** Пошук усередині списку вибору (статус, проєкт). */
+  pickerSearch: string;
+  pickerNothingFound: string;
   taskNamePlaceholder: string;
   taskDescPlaceholder: string;
   hoursPlaceholder: string;
@@ -230,6 +234,30 @@ export interface Translations {
   otherCurrencies: string;
   showAllCount: string;          // "Показати всі ({count})"
   allCurrencies: string;
+  // Finance — рахунки та перекази
+  account: string;
+  accounts: string;
+  accountCash: string;
+  accountCard: string;
+  accountSavings: string;
+  accountDefaultName: string;      // назва рахунку, створеного міграцією
+  newAccount: string;
+  openingBalance: string;
+  selectAccount: string;
+  noAccounts: string;
+  noAccountsHint: string;
+  accountArchived: string;
+  archiveAccount: string;
+  unarchiveAccount: string;
+  accountCurrencyLocked: string;
+  transfer: string;
+  transferFrom: string;
+  transferTo: string;
+  transferReceived: string;        // сума, що дійшла на рахунок призначення
+  transferRate: string;
+  transfersNotCounted: string;
+  markAsTransfer: string;
+  markTransferSameCurrency: string;
   // Shared
   sharedTitle: string;
   noGroups: string;
@@ -579,21 +607,6 @@ export interface Translations {
   todayTasks: string;
   todayMeetings: string;
   todayHabits: string;
-  // Onboarding
-  onbWelcomeTitle: string;
-  onbWelcomeDesc: string;
-  onbStart: string;
-  onbSkip: string;
-  onbProfileTitle: string;
-  onbProfileDesc: string;
-  onbNext: string;
-  onbNotifTitle: string;
-  onbNotifDesc: string;
-  onbAllow: string;
-  onbLater: string;
-  onbDoneTitle: string;
-  onbDoneDesc: string;
-  onbBegin: string;
   // Prevention sub-modules
   meds: string;
   medsSub: string;
@@ -813,9 +826,124 @@ export interface Translations {
   // Shared screen — invite deeplink
   shareInviteBtn: string;
   shareInviteText: string;
+  // Sidebar (широкий екран)
+  navGroupMain: string;
+  navGroupTools: string;
+  navGroupMore: string;
+  navTimeTracker: string;
+  navBudget: string;
+  navAgent: string;
+
+  // Порожня колонка деталі (master-detail)
+  detailEmptyTitle: string;
+  detailEmptyHint: string;
+  noTasksMatchFilters: string;
+  noTasksMatchFiltersHint: string;
+  /** Готові підписи кварталів. Не шаблон: українська нумерує їх
+   *  римськими, англійська арабськими, і підстановка «{n}» дала б
+   *  в одній із мов беззмістовне «QIII». */
+  quarters: string[];
+
+  // Історія завдання
+  historyEmpty: string;
+  historyCreated: string;
+  historyEdited: string;
+  historyDone: string;
+  historyRestored: string;
+  historyTimerStart: string;
+  historyTimerStop: string;
+  historySubtaskAdd: string;
+  historySubtaskDone: string;
+  historySubtaskUndone: string;
+
+  // Таймер завдання
+  startedAtLabel: string;
+  timerHint: string;
+  statusLabel: string;
+  reminderAtLabel: string;
+  hoursShort: string;
+  minutesShort: string;
+  viewAllSubtasks: string;
+
+  // Активні таймери (спільний реєстр active_timers)
+  activeTimers: string;
+  newTimer: string;
+  noActiveTimers: string;
+  noActiveTimersHint: string;
+  fullscreenTimers: string;
+  exitFullscreen: string;
+  startTimerAction: string;
+  stopTimerAction: string;
+  timerLabel: string;
+  parallelTimers: string;
+
+  /** Циферблати таймера. Див. utils/timerDials. */
+  dialPicker: string;
+  dialDigits: string;
+  dialRings: string;
+  dialChrono: string;
+  dialFlip: string;
+  dialDots: string;
+  dialArc: string;
+  dialHourglass: string;
+  dialOrbit: string;
+  dialSegment: string;
+  dialTape: string;
+
+  /** Прикріплення завдання до таймера на вкладці Час. */
+  attachTask: string;
+  detachTask: string;
+  pickTaskTitle: string;
+  freeTimerHint: string;
+
+  /** Одиниці тривалості. Див. utils/durationFormat. */
+  unitHour: string;
+  unitHourLong: string;
+  unitMinute: string;
+  txEmptyTitle: string;
+  txEmptyHint: string;
+  unitKcal: string;
+  unitKg: string;
+  unitGram: string;
 }
 
 const uk: Translations = {
+  navGroupMain: 'Головне',
+  navGroupTools: 'Інструменти',
+  navGroupMore: 'Ще',
+  navTimeTracker: 'Трекер часу',
+  navBudget: 'Планування бюджету',
+  navAgent: 'OpenClaw Agent',
+  detailEmptyTitle: 'Оберіть завдання',
+  detailEmptyHint: 'Деталі, підзавдання й таймер зʼявляться тут.',
+  noTasksMatchFilters: 'Під фільтри нічого не підходить',
+  noTasksMatchFiltersHint: 'Завдання є, але їх приховано вибраними фільтрами.',
+  quarters: ['I квартал', 'II квартал', 'III квартал', 'IV квартал'],
+  historyEmpty: 'Немає записів в історії',
+  historyCreated: 'Завдання створено',
+  historyEdited: 'Завдання відредаговано',
+  historyDone: 'Завдання виконано',
+  historyRestored: 'Завдання відновлено',
+  historyTimerStart: 'Таймер запущено',
+  historyTimerStop: 'Таймер зупинено',
+  historySubtaskAdd: 'Підзавдання додано',
+  historySubtaskDone: 'Підзавдання виконано',
+  historySubtaskUndone: 'Підзавдання відновлено',
+  startedAtLabel: 'Почато о',
+  timerHint: 'Натисніть «Запустити», щоб почати відстежувати час',
+  statusLabel: 'Статус',
+  reminderAtLabel: 'Нагадування',
+  hoursShort: 'ГГ',
+  minutesShort: 'ХХ',
+  viewAllSubtasks: 'Переглянути всі',
+  unitHour: 'г',
+  unitHourLong: 'год',
+  unitMinute: 'хв',
+  txEmptyTitle: 'Оберіть транзакцію',
+  txEmptyHint: 'Деталі та історія змін зʼявляться тут.',
+  unitKcal: 'кк',
+  unitKg: 'кг',
+  unitGram: 'г',
   tabTasks: 'Завдання',
   tabFinance: 'Фінанси',
   tabHealth: "Здоров'я",
@@ -910,6 +1038,7 @@ const uk: Translations = {
   notes: 'Нотатки',
   archive: 'Архів',
   timeRecords: 'Записи часу',
+  sortStatus: 'Статус',
   sortDeadline: 'Дедлайн',
   sortPriority: 'Пріоритет',
   sortNewest: 'Нові',
@@ -959,6 +1088,8 @@ const uk: Translations = {
   tryAnotherQuery: 'Спробуйте інший запит',
   pressToAdd: 'Натисніть + щоб додати',
   searchPlaceholder: 'Пошук завдань...',
+  pickerSearch: 'Пошук…',
+  pickerNothingFound: 'Нічого не знайдено',
   taskNamePlaceholder: 'Назва',
   taskDescPlaceholder: "Опис (необов'язково)",
   hoursPlaceholder: 'Год',
@@ -1035,6 +1166,29 @@ const uk: Translations = {
   otherCurrencies: 'Інші валюти',
   showAllCount: 'Показати всі ({count})',
   allCurrencies: 'Всі валюти',
+  account: 'Рахунок',
+  accounts: 'Рахунки',
+  accountCash: 'Готівка',
+  accountCard: 'Картка',
+  accountSavings: 'Заощадження',
+  accountDefaultName: 'Основний',
+  newAccount: 'Новий рахунок',
+  openingBalance: 'Початковий залишок',
+  selectAccount: 'Оберіть рахунок',
+  noAccounts: 'Немає рахунків',
+  noAccountsHint: 'Заведіть гаманець, картку чи заощадження — операції мусять звідкись іти',
+  accountArchived: 'В архіві',
+  archiveAccount: 'Архівувати',
+  unarchiveAccount: 'Повернути з архіву',
+  accountCurrencyLocked: 'Валюту рахунку не змінити після створення',
+  transfer: 'Переказ',
+  transferFrom: 'Звідки',
+  transferTo: 'Куди',
+  transferReceived: 'Отримано',
+  transferRate: 'Курс',
+  transfersNotCounted: 'Перекази не входять у доходи й витрати',
+  markAsTransfer: 'Позначити як переказ',
+  markTransferSameCurrency: 'Лише рахунки в тій самій валюті — курс минулого переказу невідомий',
   sharedTitle: 'Спільне',
   noGroups: 'Немає груп',
   noGroupsHint: 'Створіть групу або приєднайтесь за кодом',
@@ -1362,20 +1516,6 @@ const uk: Translations = {
   todayTasks: 'Завдання на сьогодні',
   todayMeetings: 'Зустрічі сьогодні',
   todayHabits: 'Звички',
-  onbWelcomeTitle: 'Вітаємо у Flowi',
-  onbWelcomeDesc: 'Завдання, фінанси, здоров\'я, час — в одному приватному застосунку. Дані лишаються на вашому пристрої.',
-  onbStart: 'Почати',
-  onbSkip: 'Пропустити',
-  onbProfileTitle: 'Трохи про вас',
-  onbProfileDesc: 'Для персональних цілей здоров\'я (калорії, білок, вода). Можна пропустити.',
-  onbNext: 'Далі',
-  onbNotifTitle: 'Нагадування',
-  onbNotifDesc: 'Дозвольте сповіщення, щоб отримувати нагадування про воду, сон, ліки та завдання.',
-  onbAllow: 'Дозволити',
-  onbLater: 'Пізніше',
-  onbDoneTitle: 'Готово!',
-  onbDoneDesc: 'Усе налаштовано. Почніть із першого запису — і Flowi візьме решту на себе.',
-  onbBegin: 'Розпочати',
   meds: 'Ліки та добавки',
   medsSub: 'Нагадування про прийом',
   checkups: 'Медогляди',
@@ -1573,9 +1713,71 @@ const uk: Translations = {
 
   shareInviteBtn: 'Поділитись запрошенням',
   shareInviteText: '{name} запрошує тебе у спільну групу!\nКод: {code}\n{link}',
+
+  activeTimers: 'Активні таймери',
+  newTimer: 'Новий таймер',
+  noActiveTimers: 'Немає активних таймерів',
+  noActiveTimersHint: 'Запустіть таймер із завдання або створіть вільний',
+  fullscreenTimers: 'На весь екран',
+  exitFullscreen: 'Вийти',
+  startTimerAction: 'Запустити таймер',
+  stopTimerAction: 'Зупинити таймер',
+  dialPicker: 'Циферблат',
+  dialDigits: 'Цифри',
+  dialRings: 'Кільця',
+  dialChrono: 'Хронограф',
+  dialFlip: 'Табло',
+  dialDots: 'Сітка секунд',
+  dialArc: 'Дуга',
+  dialHourglass: 'Пісочний годинник',
+  dialOrbit: 'Орбіта',
+  dialSegment: 'Семисегментний',
+  dialTape: 'Лінійка',
+  attachTask: 'Прикріпити завдання',
+  detachTask: 'Відкріпити',
+  pickTaskTitle: 'Яке завдання відлічуємо?',
+  freeTimerHint: 'Без завдання час запишеться лише в історію трекера',
+  timerLabel: 'Таймер',
+  parallelTimers: 'Паралельно',
 };
 
 const en: Translations = {
+  navGroupMain: 'Main',
+  navGroupTools: 'Tools',
+  navGroupMore: 'More',
+  navTimeTracker: 'Time Tracker',
+  navBudget: 'Budget Planning',
+  navAgent: 'OpenClaw Agent',
+  detailEmptyTitle: 'Select a task',
+  detailEmptyHint: 'Details, subtasks and timer will appear here.',
+  noTasksMatchFilters: 'Nothing matches the filters',
+  noTasksMatchFiltersHint: 'You have tasks, but the selected filters hide them.',
+  quarters: ['Q1', 'Q2', 'Q3', 'Q4'],
+  historyEmpty: 'No history records',
+  historyCreated: 'Task created',
+  historyEdited: 'Task edited',
+  historyDone: 'Task completed',
+  historyRestored: 'Task restored',
+  historyTimerStart: 'Timer started',
+  historyTimerStop: 'Timer stopped',
+  historySubtaskAdd: 'Subtask added',
+  historySubtaskDone: 'Subtask completed',
+  historySubtaskUndone: 'Subtask restored',
+  startedAtLabel: "Started at",
+  timerHint: "Press 'Start' to begin tracking time",
+  statusLabel: 'Status',
+  reminderAtLabel: 'Reminder',
+  hoursShort: 'HH',
+  minutesShort: 'MM',
+  viewAllSubtasks: 'View all',
+  unitHour: 'h',
+  unitHourLong: 'hr',
+  unitMinute: 'min',
+  txEmptyTitle: 'Select a transaction',
+  txEmptyHint: 'Details and change history will appear here.',
+  unitKcal: 'kcal',
+  unitKg: 'kg',
+  unitGram: 'g',
   tabTasks: 'Tasks',
   tabToday: 'Today',
   todayOverdue: 'overdue',
@@ -1670,6 +1872,7 @@ const en: Translations = {
   notes: 'Notes',
   archive: 'Archive',
   timeRecords: 'Time Records',
+  sortStatus: 'Status',
   sortDeadline: 'Deadline',
   sortPriority: 'Priority',
   sortNewest: 'Newest',
@@ -1719,6 +1922,8 @@ const en: Translations = {
   tryAnotherQuery: 'Try another query',
   pressToAdd: 'Press + to add',
   searchPlaceholder: 'Search tasks...',
+  pickerSearch: 'Search…',
+  pickerNothingFound: 'Nothing found',
   taskNamePlaceholder: 'Title',
   taskDescPlaceholder: 'Description (optional)',
   hoursPlaceholder: 'Hrs',
@@ -1795,6 +2000,29 @@ const en: Translations = {
   otherCurrencies: 'Other currencies',
   showAllCount: 'Show all ({count})',
   allCurrencies: 'All currencies',
+  account: 'Account',
+  accounts: 'Accounts',
+  accountCash: 'Cash',
+  accountCard: 'Card',
+  accountSavings: 'Savings',
+  accountDefaultName: 'Main',
+  newAccount: 'New account',
+  openingBalance: 'Opening balance',
+  selectAccount: 'Select an account',
+  noAccounts: 'No accounts',
+  noAccountsHint: 'Add a wallet, a card or savings — every operation needs a place to come from',
+  accountArchived: 'Archived',
+  archiveAccount: 'Archive',
+  unarchiveAccount: 'Restore from archive',
+  accountCurrencyLocked: 'An account currency cannot be changed after creation',
+  transfer: 'Transfer',
+  transferFrom: 'From',
+  transferTo: 'To',
+  transferReceived: 'Received',
+  transferRate: 'Rate',
+  transfersNotCounted: 'Transfers are not counted as income or expenses',
+  markAsTransfer: 'Mark as transfer',
+  markTransferSameCurrency: 'Same-currency accounts only — the rate of a past transfer is unknown',
   sharedTitle: 'Shared',
   noGroups: 'No groups',
   noGroupsHint: 'Create a group or join with a code',
@@ -2122,20 +2350,6 @@ const en: Translations = {
   todayTasks: "Today's tasks",
   todayMeetings: "Today's meetings",
   todayHabits: 'Habits',
-  onbWelcomeTitle: 'Welcome to Flowi',
-  onbWelcomeDesc: 'Tasks, finance, health, time — in one private app. Your data stays on your device.',
-  onbStart: 'Get started',
-  onbSkip: 'Skip',
-  onbProfileTitle: 'A bit about you',
-  onbProfileDesc: 'For personal health goals (calories, protein, water). You can skip this.',
-  onbNext: 'Next',
-  onbNotifTitle: 'Reminders',
-  onbNotifDesc: 'Allow notifications to get reminders for water, sleep, meds and tasks.',
-  onbAllow: 'Allow',
-  onbLater: 'Later',
-  onbDoneTitle: 'All set!',
-  onbDoneDesc: 'Everything is ready. Start with your first entry — Flowi handles the rest.',
-  onbBegin: 'Start',
   meds: 'Meds & supplements',
   medsSub: 'Intake reminders',
   checkups: 'Checkups',
@@ -2333,6 +2547,32 @@ const en: Translations = {
 
   shareInviteBtn: 'Share invitation',
   shareInviteText: '{name} invites you to a shared group!\nCode: {code}\n{link}',
+
+  activeTimers: 'Active timers',
+  newTimer: 'New timer',
+  noActiveTimers: 'No active timers',
+  noActiveTimersHint: 'Start a timer from a task or create a free one',
+  fullscreenTimers: 'Fullscreen',
+  exitFullscreen: 'Exit',
+  startTimerAction: 'Start timer',
+  stopTimerAction: 'Stop timer',
+  dialPicker: 'Dial',
+  dialDigits: 'Digits',
+  dialRings: 'Rings',
+  dialChrono: 'Chronograph',
+  dialFlip: 'Split-flap',
+  dialDots: 'Second grid',
+  dialArc: 'Arc',
+  dialHourglass: 'Hourglass',
+  dialOrbit: 'Orbit',
+  dialSegment: 'Seven-segment',
+  dialTape: 'Tape',
+  attachTask: 'Attach a task',
+  detachTask: 'Detach',
+  pickTaskTitle: 'Which task are you timing?',
+  freeTimerHint: 'Without a task the time only lands in the tracker history',
+  timerLabel: 'Timer',
+  parallelTimers: 'In parallel',
 };
 
 export const allTranslations: Record<Lang, Translations> = { uk, en };

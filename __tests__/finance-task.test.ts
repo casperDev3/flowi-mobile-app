@@ -2,7 +2,8 @@ import { Transaction, appendTransactionHistory, calcTotals, filterByMonth, group
 import { PRIORITY_ORDER, Task, applyTaskFilters, deadlineDiff, getProgress, isOverdue, sortTasks, taskMatchesSearch } from '@/utils/taskUtils';
 
 const tx = (over: Partial<Transaction> = {}): Transaction => ({
-  id: 't', type: 'expense', category: 'food', amount: 100, note: '', date: '2026-06-15', ...over,
+  id: 't', type: 'expense', category: 'food', amount: 100, note: '', date: '2026-06-15',
+  accountId: 'acct-uah', ...over,
 });
 
 const task = (over: Partial<Task> = {}): Task => ({

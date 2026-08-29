@@ -17,8 +17,10 @@ import { useI18n } from '@/store/i18n';
 import {
   ACCENT, ACCENT_MOOD, ACCENT_PULSE, ACCENT_STEPS, ACCENT_WEIGHT, ModalKey, getHealthColors,
 } from '@/utils/healthTheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 export default function VitalsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -56,7 +58,7 @@ export default function VitalsScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 
           {/* Вага */}

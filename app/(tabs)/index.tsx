@@ -4,15 +4,13 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  AppState,
-  Dimensions,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -41,14 +39,33 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
+import { useTimerContext } from '@/store/timer-context';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import { filterTasksByMonth, taskMatchesSearch } from '@/utils/taskUtils';
-import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, taskColumnId, taskStatusColumn } from '@/utils/taskStatuses';
+import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, orderColumnsForList, taskColumnId, taskStatusColumn } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
+import { useResponsive } from '@/hooks/use-responsive';
+import { useCalendarNav, type CalSpan } from '@/hooks/use-calendar-nav';
+import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/use-task-editor';
+import { DetailPane } from '@/components/shared/DetailPane';
+import { ElapsedClock } from '@/components/tasks/ElapsedClock';
+import { PickerField } from '@/components/shared/PickerField';
+import { TaskHistoryTab, type HistoryEventType, type TaskHistoryEvent } from '@/components/tasks/TaskHistoryTab';
+import { TaskTimerTab } from '@/components/tasks/TaskTimerTab';
+import { TaskEditForm } from '@/components/tasks/TaskEditForm';
+import { CalendarGrid } from '@/components/tasks/CalendarGrid';
+import { TaskReminderRow } from '@/components/tasks/TaskReminderRow';
+import { TaskSubtasks } from '@/components/tasks/TaskSubtasks';
+import { TaskCalendarView } from '@/components/tasks/TaskCalendarView';
+import { totalSecondsIncludingActive } from '@/utils/taskTimer';
+import { monthGrid } from '@/utils/dateUtils';
+import { initialReminderDraft, resolveReminderMoment } from '@/utils/reminderTime';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { formatClock, formatDuration, formatDurationShort } from '@/utils/durationFormat';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
 let AVAudio: any = null;
@@ -56,10 +73,9 @@ try { AVAudio = require('expo-av').Audio; } catch {}
 
 type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
-type SortBy = 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
+type SortBy = 'status' | 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
 type Filter = 'all' | 'active' | 'done';
 type ViewMode = 'list' | 'calendar';
-type CalSpan = 'week' | 'month' | 'quarter' | 'year';
 
 interface SubTask { id: string; title: string; done: boolean; reminderAt?: string; }
 
@@ -70,14 +86,6 @@ interface TaskTimeEntry {
   duration: number; // seconds
 }
 
-type HistoryEventType = 'created' | 'edited' | 'done' | 'active' | 'timer_start' | 'timer_stop' | 'subtask_add' | 'subtask_done' | 'subtask_undone';
-
-interface TaskHistoryEvent {
-  id: string;
-  at: string;
-  type: HistoryEventType;
-  note?: string;
-}
 
 interface Task {
   id: string;
@@ -125,20 +133,7 @@ function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function uaPlural(n: number, one: string, few: string, many: string): string {
-  const mod100 = Math.abs(n) % 100;
-  const mod10  = Math.abs(n) % 10;
-  if (mod100 >= 11 && mod100 <= 19) return many;
-  if (mod10 === 1) return one;
-  if (mod10 >= 2 && mod10 <= 4) return few;
-  return many;
-}
 
-function chunk<T>(arr: T[], n: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
-  return out;
-}
 
 function groupLabel(date: Date, todayLabel: string, yesterdayLabel: string, tomorrowLabel: string, locale: string) {
   if (date.toDateString() === today.toDateString()) return todayLabel;
@@ -162,42 +157,11 @@ function isOverdue(task: Task): boolean {
   return d < today;
 }
 
-function deadlineLabel(iso: string, todayLabel: string, yesterdayLabel: string, tomorrowLabel: string, locale: string): string {
-  const d = new Date(iso);
-  if (d.toDateString() === today.toDateString()) return todayLabel;
-  if (d.toDateString() === yesterday.toDateString()) return yesterdayLabel;
-  const diff = Math.ceil((d.getTime() - today.getTime()) / 86400000);
-  if (diff === 1) return tomorrowLabel;
-  if (diff > 1 && diff <= 7) return `+${diff} ${locale === 'uk-UA' ? 'дн' : 'd'}`;
-  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-}
 
 // ─── Timer helpers ────────────────────────────────────────────────────────────
-const fmtClock = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-};
-const fmtDur = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h > 0 && m > 0) return `${h}г ${m}хв`;
-  if (h > 0) return `${h} год`;
-  return `${m || 0} хв`;
-};
 
-function getActiveTimerEntry(task: Task): TaskTimeEntry | undefined {
-  return (task.timeEntries ?? []).find(e => !e.endedAt);
-}
 
-function calcElapsedSeconds(task: Task): number {
-  return (task.timeEntries ?? []).reduce((acc, e) => {
-    if (e.endedAt) return acc + e.duration;
-    return acc + Math.floor((Date.now() - new Date(e.startedAt).getTime()) / 1000);
-  }, 0);
-}
 
-function getTotalTrackedSeconds(task: Task): number {
-  return (task.timeEntries ?? []).reduce((acc, e) => acc + (e.endedAt ? e.duration : 0), 0);
-}
 
 function makeHistoryEvent(type: HistoryEventType, note?: string): TaskHistoryEvent {
   return { id: Date.now().toString() + Math.random().toString(36).slice(2), at: new Date().toISOString(), type, note };
@@ -240,40 +204,27 @@ function nextRecurrenceDate(fromDateStr: string, rule: RecurrenceRule): string |
 }
 
 
-function historyEventIcon(type: HistoryEventType): string {
-  switch (type) {
-    case 'created':        return 'plus.circle.fill';
-    case 'edited':         return 'pencil.circle.fill';
-    case 'done':           return 'checkmark.circle.fill';
-    case 'active':         return 'arrow.counterclockwise.circle.fill';
-    case 'timer_start':    return 'play.circle.fill';
-    case 'timer_stop':     return 'stop.circle.fill';
-    case 'subtask_add':    return 'plus.square.fill';
-    case 'subtask_done':   return 'checkmark.square.fill';
-    case 'subtask_undone': return 'square.dashed';
-  }
-}
 
-function historyEventColor(type: HistoryEventType): string {
-  switch (type) {
-    case 'created':        return '#10B981';
-    case 'edited':         return '#F59E0B';
-    case 'done':           return '#10B981';
-    case 'active':         return '#6366F1';
-    case 'timer_start':    return '#6366F1';
-    case 'timer_stop':     return '#EF4444';
-    case 'subtask_add':    return '#0EA5E9';
-    case 'subtask_done':   return '#10B981';
-    case 'subtask_undone': return '#F59E0B';
-  }
-}
 
 export default function TasksScreen() {
+  const tabBarInset = useTabBarInset();
+  const { height, isExpanded } = useResponsive();
+  // Деталь стає колонкою лише на expanded (≥840). На medium сайдбар уже
+  // займає 232pt, і колонка вийшла б вужчою за 260pt — гірше, ніж на
+  // весь екран. Там деталь лишається модалкою.
+  const showDetailColumn = isExpanded;
   const isDark = useColorScheme() === 'dark';
   useScreenView('tasks');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tr, lang } = useI18n();
+  // Одиниці приходять зі словника: до цього кожен екран мав власну копію
+  // форматування з вшитими «год» і «хв».
+  const durationUnits = useMemo(
+    () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
+    [tr.unitHour, tr.unitHourLong, tr.unitMinute],
+  );
+  const fmtDurLocal = useCallback((s: number) => formatDuration(s, durationUnits), [durationUnits]);
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
   const motion = useMotion();
@@ -284,6 +235,7 @@ export default function TasksScreen() {
     low:    { label: tr.priorityLow,    color: PRIORITY_COLORS.low    },
   };
   const SORT_OPTIONS: { key: SortBy; label: string; icon: string }[] = [
+    { key: 'status',    label: tr.sortStatus,    icon: 'rectangle.3.group' },
     { key: 'deadline',  label: tr.sortDeadline,  icon: 'flag' },
     { key: 'priority',  label: tr.sortPriority,  icon: 'exclamationmark.circle' },
     { key: 'newest',    label: tr.sortNewest,    icon: 'arrow.down.circle' },
@@ -298,19 +250,11 @@ export default function TasksScreen() {
   ];
   const MONTHS_UA = tr.months;
   const WEEKDAYS_SHORT = tr.weekdays;
-  const HISTORY_LABELS: Record<HistoryEventType, string> = {
-    created:        lang === 'uk' ? 'Завдання створено'     : 'Task created',
-    edited:         lang === 'uk' ? 'Завдання відредаговано': 'Task edited',
-    done:           lang === 'uk' ? 'Завдання виконано'     : 'Task completed',
-    active:         lang === 'uk' ? 'Завдання відновлено'   : 'Task restored',
-    timer_start:    lang === 'uk' ? 'Таймер запущено'       : 'Timer started',
-    timer_stop:     lang === 'uk' ? 'Таймер зупинено'       : 'Timer stopped',
-    subtask_add:    lang === 'uk' ? 'Підзавдання додано'    : 'Subtask added',
-    subtask_done:   lang === 'uk' ? 'Підзавдання виконано'  : 'Subtask completed',
-    subtask_undone: lang === 'uk' ? 'Підзавдання відновлено': 'Subtask restored',
-  };
-
   const [tasks, setTasks] = useState<Task[]>([]);
+  // Таймери завдань живуть у сторі, а не в цьому екрані: ту саму сесію можна
+  // зупинити з вкладки часу або з іншого пристрою, і локальний стан про це
+  // ніколи б не дізнався.
+  const { startTaskTimer, stopTimerForTask, getTimerForTask, tasksRevision } = useTimerContext();
   const [projects, setProjects] = useState<Project[]>([]);
 
   // Пікери показують лише ЖИВІ проєкти, а `projects` лишається повним.
@@ -326,7 +270,7 @@ export default function TasksScreen() {
   const [activeMonth, setActiveMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('active');
-  const [sort, setSort] = useState<SortBy>('deadline');
+  const [sort, setSort] = useState<SortBy>('status');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   // Search & extra filters
@@ -337,27 +281,8 @@ export default function TasksScreen() {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const [showAdd, setShowAdd] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newDesc, setNewDesc] = useState('');
-  const [newPriority, setNewPriority] = useState<Priority>('medium');
-  const [newStatusId, setNewStatusId] = useState(ACTIVE_COLUMN_ID);
-  const [newEstHours, setNewEstHours] = useState('');
-  const [newEstMins, setNewEstMins] = useState('');
-  const [newDeadline, setNewDeadline] = useState<string | null>(null);
-  const [newProjectId, setNewProjectId] = useState<string | null>(null);
-  const [showNewProjectDropdown, setShowNewProjectDropdown] = useState(false);
-  const [showDetailProjectDropdown, setShowDetailProjectDropdown] = useState(false);
-  const [showDeadlineCal, setShowDeadlineCal] = useState(false);
-  const [deadlineCalYear, setDeadlineCalYear] = useState(today.getFullYear());
-  const [deadlineCalMonth, setDeadlineCalMonth] = useState(today.getMonth());
 
   // Recurrence for add task
-  const [newRepeat, setNewRepeat] = useState(false);
-  const [newRepeatFreq, setNewRepeatFreq] = useState<RecurrenceRule['freq']>('weekly');
-  const [newRepeatInterval, setNewRepeatInterval] = useState(1);
-  const [newRepeatDays, setNewRepeatDays] = useState<number[]>([]);
-  const [newRepeatEndType, setNewRepeatEndType] = useState<'never' | 'until'>('never');
-  const [newRepeatUntil, setNewRepeatUntil] = useState('');
 
   const [selected, setSelected] = useState<Task | null>(null);
   const [newSubtask, setNewSubtask] = useState('');
@@ -369,10 +294,7 @@ export default function TasksScreen() {
   const [dateFilter, setDateFilter] = useState<string | null>(null);
 
   // Calendar view state
-  const [calSpan, setCalSpan] = useState<CalSpan>('month');
-  const [calViewDate, setCalViewDate] = useState<Date>(new Date());
   const [calPopupDate, setCalPopupDate] = useState<Date | null>(null);
-  const [calWeekDay, setCalWeekDay] = useState<Date>(new Date());
 
   // Meetings state
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -385,27 +307,11 @@ export default function TasksScreen() {
   const [editingSubId, setEditingSubId] = useState<string | null>(null);
   const [editingSubText, setEditingSubText] = useState('');
 
-  // Task editing state
-  const [isEditingTask, setIsEditingTask] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editPriority, setEditPriority] = useState<Priority>('medium');
-  const [editStatusId, setEditStatusId] = useState(ACTIVE_COLUMN_ID);
-  const [editEstHours, setEditEstHours] = useState('');
-  const [editEstMins, setEditEstMins] = useState('');
-  const [editDeadline, setEditDeadline] = useState<string | null>(null);
-  const [showEditDeadlineCal, setShowEditDeadlineCal] = useState(false);
-  const [editDeadlineCalYear, setEditDeadlineCalYear] = useState(today.getFullYear());
-  const [editDeadlineCalMonth, setEditDeadlineCalMonth] = useState(today.getMonth());
-  const [showEditProjectDropdown, setShowEditProjectDropdown] = useState(false);
-
-  // Recurrence for edit task
-  const [editRepeat, setEditRepeat] = useState(false);
-  const [editRepeatFreq, setEditRepeatFreq] = useState<RecurrenceRule['freq']>('weekly');
-  const [editRepeatInterval, setEditRepeatInterval] = useState(1);
-  const [editRepeatDays, setEditRepeatDays] = useState<number[]>([]);
-  const [editRepeatEndType, setEditRepeatEndType] = useState<'never' | 'until'>('never');
-  const [editRepeatUntil, setEditRepeatUntil] = useState('');
+  // Форма редагування завдання — цілісний стан, див. use-task-editor.
+  const editor = useTaskEditor(ACTIVE_COLUMN_ID, today);
+  // Створення нового завдання користується тією самою формою й тим самим
+  // станом, що й редагування — це той самий набір полів.
+  const composer = useTaskEditor(ACTIVE_COLUMN_ID, today);
 
   // Reminder picker state (shown inline in detail modal)
   const [showReminderPicker, setShowReminderPicker] = useState(false);
@@ -425,8 +331,6 @@ export default function TasksScreen() {
 
   // Detail tab + timer display
   const [detailTab, setDetailTab] = useState<'info' | 'timer' | 'history'>('info');
-  const [timerTick, setTimerTick] = useState(0);
-  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadAll = useCallback(async () => {
     const [t, p, m, statuses] = await Promise.all([
@@ -471,10 +375,35 @@ export default function TasksScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openParam, initialized, router]);
 
+  /**
+   * Завдання, чий таймер треба зупинити, щойно наш власний запис 'tasks'
+   * долетить до сховища. Стор зупиняє таймер через read-modify-write того
+   * самого ключа — якби він прочитав список ДО нашого запису, або статус
+   * «готово», або дописана сесія загубилися б залежно від того, хто написав
+   * останнім.
+   */
+  const pendingTimerStops = useRef<string[]>([]);
+
   // Save to storage
   useEffect(() => {
-    if (initialized) void saveSynced('tasks', tasks);
-  }, [tasks, initialized]);
+    if (!initialized) return;
+    void saveSynced('tasks', tasks).then(() => {
+      if (pendingTimerStops.current.length === 0) return;
+      const ids = pendingTimerStops.current;
+      pendingTimerStops.current = [];
+      for (const id of ids) void stopTimerForTask(id);
+    });
+  }, [tasks, initialized, stopTimerForTask]);
+
+  // Стор пише 'tasks' повз наш стан: старт таймера дописує історію і рухає
+  // колонку, зупинка — додає завершену сесію. Без перечитування наступний
+  // запис цього екрана затер би все це своїм застарілим списком.
+  useEffect(() => {
+    if (!initialized || tasksRevision === 0) return;
+    loadData<Task[]>('tasks', [])
+      .then(setTasks)
+      .catch(e => { if (__DEV__) console.warn('[tasks] перечитування після запису стору не вдалося:', e); });
+  }, [tasksRevision, initialized]);
 
   useEffect(() => {
     if (meetingsInit) void saveSynced('meetings', meetings);
@@ -493,26 +422,11 @@ export default function TasksScreen() {
     setShowReminderPicker(false);
   }, [selected?.id]);
 
-  // AppState listener — refresh timer display when app returns from background
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') setTimerTick(t => t + 1);
-    });
-    return () => sub.remove();
-  }, []);
-
-  // Timer interval — run while selected task has active timer entry
-  const selectedTaskForTimer = selected ? tasks.find(t => t.id === selected.id) : null;
-  const isTimerRunning = selectedTaskForTimer ? !!getActiveTimerEntry(selectedTaskForTimer) : false;
-
-  useEffect(() => {
-    if (isTimerRunning) {
-      timerIntervalRef.current = setInterval(() => setTimerTick(t => t + 1), 1000);
-    } else {
-      if (timerIntervalRef.current) { clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; }
-    }
-    return () => { if (timerIntervalRef.current) { clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; } };
-  }, [isTimerRunning]);
+  // Джерело правди про «йде» — реєстр активних таймерів у сторі. Читання
+  // синхронне, але реактивне: стор оновлює стан разом із ref, тож цей рендер
+  // уже бачить актуальний запис.
+  const activeTimer = selected ? getTimerForTask(selected.id) : undefined;
+  const isTimerRunning = !!activeTimer;
 
   const todayStr = today.toDateString();
   // Tasks due today (deadline = today) — both done and not done
@@ -554,6 +468,9 @@ export default function TasksScreen() {
           if (!b.deadline) return -1;
           return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
         }
+        // Усередині статусної групи порядок задає пріоритет: сам статус уже
+        // винесений у заголовок групи.
+        case 'status':
         case 'priority': return pOrd[a.priority] - pOrd[b.priority];
         case 'newest':   return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         case 'oldest':   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -597,7 +514,14 @@ export default function TasksScreen() {
     groupsSource.forEach(t => {
       let key: string;
       let label: string;
-      if (sort === 'deadline') {
+      if (sort === 'status') {
+        // Групи за колонкою дошки. Ті самі, що на екрані дня, і тим самим
+        // правилом порядку — orderColumnsForList нижче ставить «У процесі»
+        // попереду решти.
+        const column = taskStatusColumn(t, taskStatuses);
+        key = column.id;
+        label = column.name;
+      } else if (sort === 'deadline') {
         if (!t.deadline) {
           key = '__no_deadline__';
           label = tr.withoutDeadline;
@@ -614,52 +538,50 @@ export default function TasksScreen() {
       if (!map[key]) { map[key] = { label, tasks: [] }; order.push(key); }
       map[key].tasks.push(t);
     });
+    if (sort === 'status') {
+      // Порядок груп задає дошка, а не порядок появи завдань у списку.
+      const rank = new Map(orderColumnsForList(taskStatuses).map((column, i) => [column.id, i]));
+      order.sort((a, b) => (rank.get(a) ?? 99) - (rank.get(b) ?? 99));
+      return order.map(k => map[k]);
+    }
     const noDeadlineIdx = order.indexOf('__no_deadline__');
     if (noDeadlineIdx > 0) {
       order.splice(noDeadlineIdx, 1);
       order.push('__no_deadline__');
     }
     return order.map(k => map[k]);
-  }, [groupsSource, sort]);
+  }, [groupsSource, sort, taskStatuses]);
 
-  const hasActiveFilters = filter !== 'active' || sort !== 'deadline' || !!dateFilter || !!filterProject || !!filterPriority || !!search.trim();
+  // Пошук навмисно не враховано: у нього власна гілка порожнього стану,
+  // і змішувати їх означало б радити «скинути фільтри» людині, яка
+  // просто нічого не знайшла за запитом.
+  const hasFiltersBesidesSearch = filter !== 'active' || sort !== 'status' || !!dateFilter || !!filterProject || !!filterPriority;
+  const hasActiveFilters = filter !== 'active' || sort !== 'status' || !!dateFilter || !!filterProject || !!filterPriority || !!search.trim();
 
   const addTask = useCallback(() => {
-    if (!newTitle.trim()) return;
-    const estH = parseInt(newEstHours || '0', 10);
-    const estM = parseInt(newEstMins || '0', 10);
-    const estimatedMinutes = estH * 60 + estM || undefined;
-    const recurrence: RecurrenceRule | undefined = newRepeat ? {
-      freq: newRepeatFreq,
-      interval: newRepeatInterval,
-      daysOfWeek: newRepeatFreq === 'weekly' && newRepeatDays.length > 0 ? newRepeatDays : undefined,
-      until: newRepeatEndType === 'until' && newRepeatUntil ? newRepeatUntil : undefined,
-    } : undefined;
-    const selectedStatus = taskStatuses.find(column => column.id === newStatusId) ?? taskStatuses[0];
+    const draft = composer.draft;
+    if (!draft.title.trim()) return;
+    const selectedStatus = taskStatuses.find(column => column.id === draft.statusId) ?? taskStatuses[0];
     setTasks(p => [{
       id: Date.now().toString(),
-      title: newTitle.trim(),
-      description: newDesc.trim(),
-      priority: newPriority,
+      title: draft.title.trim(),
+      description: draft.desc.trim(),
+      priority: draft.priority,
       status: selectedStatus.isDone ? 'done' : 'active',
       kanbanColumnId: selectedStatus.id,
       subtasks: [],
       createdAt: new Date().toISOString(),
-      estimatedMinutes,
-      deadline: newDeadline ?? undefined,
-      projectId: newProjectId ?? undefined,
+      estimatedMinutes: draftEstimatedMinutes(draft),
+      deadline: draft.deadline ?? undefined,
+      projectId: draft.projectId ?? undefined,
       timeEntries: [],
       history: [makeHistoryEvent('created')],
-      recurrence,
+      recurrence: draftRecurrence(draft),
     }, ...p]);
-    setNewTitle(''); setNewDesc(''); setNewPriority('medium'); setNewStatusId(ACTIVE_COLUMN_ID);
-    setNewEstHours(''); setNewEstMins(''); setNewDeadline(null);
-    setNewProjectId(null); setShowDeadlineCal(false); setShowNewProjectDropdown(false); setShowAdd(false);
-    setNewRepeat(false); setNewRepeatFreq('weekly'); setNewRepeatInterval(1);
-    setNewRepeatDays([]); setNewRepeatEndType('never'); setNewRepeatUntil('');
+    composer.reset(ACTIVE_COLUMN_ID);
+    setShowAdd(false);
     haptic.success();
-  }, [newTitle, newDesc, newPriority, newStatusId, newEstHours, newEstMins, newDeadline, newProjectId,
-      newRepeat, newRepeatFreq, newRepeatInterval, newRepeatDays, newRepeatEndType, newRepeatUntil, taskStatuses]);
+  }, [composer, taskStatuses]);
 
   const deleteTask = useCallback((id: string, title?: string) => {
     const taskToDelete = tasksRef.current.find(t => t.id === id);
@@ -672,8 +594,15 @@ export default function TasksScreen() {
           text: tr.delete,
           style: 'destructive',
           onPress: () => {
+            // Видалення завдання мусить прибрати і його таймер: інакше в
+            // реєстрі лишається запис із taskId, що вказує в нікуди, — він
+            // далі цокає у fullscreen-сітці, а зупинити його нема звідки.
+            // Черга, а не прямий виклик — див. коментар до pendingTimerStops.
+            // Витрачений час при цьому не губиться: stopTimer дзеркалить сесію
+            // в 'time_entries', які переживають видалення завдання.
+            if (getTimerForTask(id)) pendingTimerStops.current.push(id);
             setTasks(p => p.filter(t => t.id !== id));
-            if (selected?.id === id) { setSelected(null); setShowDetailProjectDropdown(false); }
+            if (selected?.id === id) setSelected(null);
             // Undo: повернути задачу до списку
             if (taskToDelete) {
               showUndo(tr.taskDeleted, () => {
@@ -684,7 +613,7 @@ export default function TasksScreen() {
         },
       ],
     );
-  }, [selected, tr, showUndo]);
+  }, [selected, tr, showUndo, getTimerForTask]);
 
   // ─── Recording ──────────────────────────────────────────────────────────────
   const startRecording = useCallback(async (taskId: string) => {
@@ -775,6 +704,10 @@ export default function TasksScreen() {
     const column = taskStatuses.find(item => item.id === columnId);
     if (!column) return;
     haptic.light();
+    // Перенесення в колонку «готово» — така сама зупинка таймера, як і
+    // чекбокс: інакше відлік лишався б на завершеному завданні, а кнопку
+    // «Стоп» у деталі до нього вже не показують.
+    if (column.isDone && getTimerForTask(id)) pendingTimerStops.current.push(id);
     setTasks(prev => prev.map(t => {
       if (t.id !== id) return t;
       if (taskStatusColumn(t, taskStatuses).id === column.id) return t;
@@ -788,7 +721,7 @@ export default function TasksScreen() {
         history: [...(t.history ?? []), makeHistoryEvent(column.isDone ? 'done' : 'active', column.name)],
       };
     }));
-  }, [taskStatuses]);
+  }, [taskStatuses, getTimerForTask]);
 
   const toggleTask = useCallback((id: string) => {
     haptic.light();
@@ -801,21 +734,19 @@ export default function TasksScreen() {
       const status: Status = t.status === 'done' ? 'active' : 'done';
       const kanbanColumnId = status === 'done' ? DONE_COLUMN_ID : ACTIVE_COLUMN_ID;
       const histType: HistoryEventType = status === 'done' ? 'done' : 'active';
-      // Also stop active timer if completing task
-      const timeEntries = status === 'done'
-        ? (t.timeEntries ?? []).map(e => {
-            if (e.endedAt) return e;
-            const now = new Date();
-            return { ...e, endedAt: now.toISOString(), duration: Math.max(0, Math.floor((now.getTime() - new Date(e.startedAt).getTime()) / 1000)) };
-          })
-        : (t.timeEntries ?? []);
+      // timeEntries тут не чіпаємо: завершену сесію допише стор при зупинці —
+      // він єдиний знає, коли вона почалась.
       return {
         ...t, status, kanbanColumnId,
         subtasks: t.subtasks.map(s => ({ ...s, done: status === 'done' })),
-        timeEntries,
         history: [...(t.history ?? []), makeHistoryEvent(histType)],
       };
     };
+
+    // «Готово» зупиняє таймер завдання: тримати відлік на завершеному
+    // завданні означало б накопичувати час, якого ніхто не витрачає.
+    // Черга, а не прямий виклик — див. коментар до pendingTimerStops.
+    if (becomingDone && getTimerForTask(id)) pendingTimerStops.current.push(id);
     setTasks(p => {
       const updated = p.map(patch);
       const task = p.find(t => t.id === id);
@@ -843,12 +774,30 @@ export default function TasksScreen() {
     // Тост undo лише при позначенні виконаним
     if (becomingDone && prevTask) {
       const snapshot = prevTask;
+      /**
+       * Відкочуємо ЛИШЕ те, що змінив чекбокс, а не підміняємо завдання цілим
+       * знімком. Знімок зроблено ДО зупинки таймера, а стор дописує завершену
+       * сесію (і подію timer_stop) уже після нашого запису 'tasks' — підміна
+       * стерла б її назавжди, лишивши дзеркало в 'time_entries' без пари.
+       */
+      const restore = (t: Task): Task => t.id !== id ? t : {
+        ...t,
+        status: snapshot.status,
+        kanbanColumnId: snapshot.kanbanColumnId,
+        // Прапорці підзавдань повертаємо за id: решту полів підзавдання
+        // чекбокс завдання не чіпав.
+        subtasks: t.subtasks.map(sub => {
+          const before = snapshot.subtasks.find(x => x.id === sub.id);
+          return before ? { ...sub, done: before.done } : sub;
+        }),
+        history: [...(t.history ?? []), makeHistoryEvent('active')],
+      };
       showUndo(tr.taskMarkedDone, () => {
-        setTasks(prev => prev.map(t => t.id === id ? snapshot : t));
-        setSelected(prev => prev?.id === id ? snapshot : prev);
+        setTasks(prev => prev.map(restore));
+        setSelected(prev => prev?.id === id ? restore(prev) : prev);
       });
     }
-  }, [showUndo, tr.taskMarkedDone]);
+  }, [showUndo, tr.taskMarkedDone, getTimerForTask]);
 
   const addSubtask = useCallback((taskId: string) => {
     if (!newSubtask.trim()) return;
@@ -864,6 +813,13 @@ export default function TasksScreen() {
   }, [newSubtask]);
 
   const toggleSubtask = useCallback((taskId: string, subId: string) => {
+    // Останнє закрите підзавдання завершує завдання — і мусить зупинити його
+    // таймер так само, як чекбокс завдання.
+    const current = tasksRef.current.find(t => t.id === taskId);
+    const becomingDone = !!current && current.subtasks.length > 0
+      && current.subtasks.every(s => s.id === subId ? !s.done : s.done);
+    if (becomingDone && getTimerForTask(taskId)) pendingTimerStops.current.push(taskId);
+
     const patch = (t: Task): Task => {
       if (t.id !== taskId) return t;
       const targetSub = t.subtasks.find(s => s.id === subId);
@@ -879,7 +835,7 @@ export default function TasksScreen() {
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, []);
+  }, [getTimerForTask]);
 
   const deleteSubtask = useCallback((taskId: string, subId: string) => {
     const patch = (t: Task): Task => t.id === taskId ? { ...t, subtasks: t.subtasks.filter(s => s.id !== subId) } : t;
@@ -931,36 +887,67 @@ export default function TasksScreen() {
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
   }, []);
 
+  // Стабільні посилання: інакше React.memo на картках нічого не дає.
+  const sections = useMemo(
+    () => groups.map(group => ({ title: group.label, data: group.tasks })),
+    [groups],
+  );
+
+  /**
+   * У віртуалізованому списку елементи монтуються заново при поверненні
+   * до них прокруткою. Без цієї перевірки картки «вʼїжджали» б щоразу,
+   * як користувач гортає туди-сюди. Анімується лише перша поява.
+   */
+  const animatedTaskIds = useRef<Set<string>>(new Set());
+  const shouldAnimateTask = useCallback((id: string) => {
+    if (animatedTaskIds.current.has(id)) return false;
+    animatedTaskIds.current.add(id);
+    return true;
+  }, []);
+
+  // Списки для полів вибору в деталі. Мемоізовані: PickerField тримає їх у
+  // useMemo фільтрації, і новий масив на кожен рендер знецінював би це.
+  const statusOptions = useMemo(
+    () => taskStatuses.map(column => ({ id: column.id, label: column.name, color: column.color })),
+    [taskStatuses],
+  );
+  const projectOptions = useMemo(
+    () => pickableProjects.map(project => ({ id: project.id, label: project.name, color: project.color })),
+    [pickableProjects],
+  );
+
+  const handleSelectTask = useCallback((task: Task) => setSelected(task), []);
+  const handleToggleTask = useCallback((task: Task) => toggleTask(task.id), [toggleTask]);
+
   const saveTaskEdit = useCallback(() => {
-    if (!editTitle.trim() || !selected) return;
-    const estH = parseInt(editEstHours || '0', 10);
-    const estM = parseInt(editEstMins || '0', 10);
-    const estimatedMinutes = estH * 60 + estM || undefined;
-    const recurrence: RecurrenceRule | undefined = editRepeat ? {
-      freq: editRepeatFreq,
-      interval: editRepeatInterval,
-      daysOfWeek: editRepeatFreq === 'weekly' && editRepeatDays.length > 0 ? editRepeatDays : undefined,
-      until: editRepeatEndType === 'until' && editRepeatUntil ? editRepeatUntil : undefined,
-    } : undefined;
+    if (!editor.draft.title.trim() || !selected) return;
+    const estimatedMinutes = draftEstimatedMinutes(editor.draft);
+    const recurrence = draftRecurrence(editor.draft);
+    const column = taskStatuses.find(item => item.id === editor.draft.statusId) ?? taskStatuses[0];
+    // Вибір done-статусу в редакторі — теж завершення завдання, і таймер на
+    // ньому далі йти не має.
+    if (column.isDone && getTimerForTask(selected.id)) pendingTimerStops.current.push(selected.id);
+
     const patch = (t: Task): Task => t.id !== selected.id ? t : {
       ...t,
-      title: editTitle.trim(),
-      description: editDesc.trim(),
-      priority: editPriority,
-      status: (taskStatuses.find(column => column.id === editStatusId) ?? taskStatuses[0]).isDone ? 'done' : 'active',
-      kanbanColumnId: editStatusId,
+      title: editor.draft.title.trim(),
+      description: editor.draft.desc.trim(),
+      priority: editor.draft.priority,
+      status: column.isDone ? 'done' : 'active',
+      kanbanColumnId: editor.draft.statusId,
       estimatedMinutes,
-      deadline: editDeadline ?? undefined,
+      deadline: editor.draft.deadline ?? undefined,
+      // Проєкт застосовується разом з рештою форми, а не миттєво при
+      // виборі: інакше «Скасувати» повертало б усе, крім нього.
+      projectId: editor.draft.projectId ?? undefined,
       recurrence,
       history: [...(t.history ?? []), makeHistoryEvent('edited')],
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === selected.id ? patch(prev) : prev);
-    setIsEditingTask(false);
-    setShowEditDeadlineCal(false);
-    setShowEditProjectDropdown(false);
-  }, [editTitle, editDesc, editPriority, editStatusId, editEstHours, editEstMins, editDeadline, selected,
-      editRepeat, editRepeatFreq, editRepeatInterval, editRepeatDays, editRepeatEndType, editRepeatUntil, taskStatuses]);
+    editor.finish();
+    // Чернетка тепер один об'єкт, тож і залежність одна замість тринадцяти.
+  }, [editor, selected, taskStatuses, getTimerForTask]);
 
   const openReminderPicker = useCallback((taskId: string, subtaskId?: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -968,18 +955,10 @@ export default function TasksScreen() {
     const existing = subtaskId
       ? task.subtasks.find(s => s.id === subtaskId)?.reminderAt
       : task.reminderAt;
-    if (existing) {
-      const d = new Date(existing);
-      setReminderHours(String(d.getHours()).padStart(2, '0'));
-      setReminderMins(String(d.getMinutes()).padStart(2, '0'));
-      setReminderDate(existing);
-    } else {
-      const now = new Date();
-      now.setMinutes(now.getMinutes() + 30, 0, 0);
-      setReminderHours(String(now.getHours()).padStart(2, '0'));
-      setReminderMins(String(now.getMinutes()).padStart(2, '0'));
-      setReminderDate(now.toISOString());
-    }
+    const draft = initialReminderDraft(existing);
+    setReminderHours(draft.hours);
+    setReminderMins(draft.mins);
+    setReminderDate(draft.date);
     setReminderPickerTarget({ taskId, subtaskId });
     setShowReminderPicker(true);
   }, [tasks]);
@@ -987,13 +966,7 @@ export default function TasksScreen() {
   const saveReminder = useCallback(async () => {
     if (!reminderPickerTarget) return;
     const { taskId, subtaskId } = reminderPickerTarget;
-    const h = Math.max(0, Math.min(23, parseInt(reminderHours || '0', 10)));
-    const m = Math.max(0, Math.min(59, parseInt(reminderMins || '0', 10)));
-    const base = reminderDate ? new Date(reminderDate) : new Date();
-    base.setHours(h, m, 0, 0);
-    if (base <= new Date()) {
-      base.setDate(base.getDate() + 1);
-    }
+    const base = resolveReminderMoment({ date: reminderDate, hours: reminderHours, mins: reminderMins });
     const isoDate = base.toISOString();
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
@@ -1044,60 +1017,38 @@ export default function TasksScreen() {
 
   const startTimer = useCallback(() => {
     if (!selected) return;
-    const entry: TaskTimeEntry = { id: Date.now().toString(), startedAt: new Date().toISOString(), duration: 0 };
-    const evt = makeHistoryEvent('timer_start');
-    setTasks(p => p.map(t => t.id !== selected.id ? t : {
-      ...t,
-      timeEntries: [...(t.timeEntries ?? []), entry],
-      history: [...(t.history ?? []), evt],
-    }));
-  }, [selected]);
+    // Беремо свіжу копію: у `selected` лежить знімок на момент відкриття, а
+    // стору важливі саме поточні колонка і статус — від них залежить, чи
+    // переїде завдання в «У процесі».
+    const task = tasksRef.current.find(t => t.id === selected.id) ?? selected;
+    void startTaskTimer({
+      id: task.id,
+      title: task.title,
+      kanbanColumnId: task.kanbanColumnId,
+      status: task.status,
+    });
+  }, [selected, startTaskTimer]);
 
+  // Дзеркалення сесії в 'time_entries' і дозапис у timeEntries завдання робить
+  // стор — однаково для деталі завдання, вкладки часу і fullscreen-сітки.
   const stopTimer = useCallback(() => {
     if (!selected) return;
-    const now = new Date();
-    const evt = makeHistoryEvent('timer_stop');
-    // sessionDuration is captured inside the setTasks updater (runs synchronously)
-    // so we can read it immediately after setTasks returns.
-    let sessionDuration = 0;
-
-    setTasks(p => p.map(t => {
-      if (t.id !== selected.id) return t;
-      const timeEntries = (t.timeEntries ?? []).map(e => {
-        if (e.endedAt) return e;
-        const duration = Math.max(0, Math.floor((now.getTime() - new Date(e.startedAt).getTime()) / 1000));
-        sessionDuration = duration; // capture for time_entries write
-        return { ...e, endedAt: now.toISOString(), duration };
-      });
-      return { ...t, timeEntries, history: [...(t.history ?? []), evt] };
-    }));
-
-    // Mirror session to shared 'time_entries' so time-stats/time-records see it
-    if (sessionDuration > 0) {
-      const hour = now.getHours();
-      const shift: 'morning' | 'day' | 'evening' | 'night' =
-        hour >= 6 && hour < 12 ? 'morning'
-        : hour >= 12 && hour < 18 ? 'day'
-        : hour >= 18 ? 'evening'
-        : 'night';
-      type _TimeEntry = { id: string; task: string; shift: string; duration: number; date: string };
-      const tEntry: _TimeEntry = { id: `task_${Date.now()}`, task: selected.title, shift, duration: sessionDuration, date: now.toISOString() };
-      void loadData<_TimeEntry[]>('time_entries', []).then(existing =>
-        saveSynced('time_entries', [tEntry, ...existing]),
-      );
-    }
-  }, [selected]);
+    void stopTimerForTask(selected.id);
+  }, [selected, stopTimerForTask]);
 
   const clearAllFilters = useCallback(() => {
     setFilter('active');
-    setSort('deadline');
+    setSort('status');
     setFilterProject(null);
     setFilterPriority(null);
     setDateFilter(null);
     setSearch('');
   }, []);
 
-  const c = {
+  // Мемоізовано: палітра йде пропом у кожну картку списку, і новий об'єкт
+  // щорендеру ламав би React.memo на них — а рендери тут часті, бо тік
+  // таймера смикає екран щосекунди.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
@@ -1107,58 +1058,20 @@ export default function TasksScreen() {
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-  };
+  }), [isDark]);
 
-  // Calendar helpers (filter calendar)
-  const firstDay = (() => { const d = new Date(calYear, calMonth, 1).getDay(); return d === 0 ? 6 : d - 1; })();
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const calCells: (number | null)[] = [];
-  for (let i = 0; i < firstDay; i++) calCells.push(null);
-  for (let i = 1; i <= daysInMonth; i++) calCells.push(i);
-  while (calCells.length % 7 !== 0) calCells.push(null);
-  const calWeeks = chunk(calCells, 7);
+  // Три календарі — фільтр, дедлайн нового завдання, дедлайн у редагуванні —
+  // будували сітку місяця трьома однаковими копіями. Тепер monthGrid.
+  const calWeeks    = useMemo(() => monthGrid(calYear, calMonth), [calYear, calMonth]);
+  const dlWeeks     = useMemo(() => monthGrid(composer.calYear, composer.calMonth), [composer.calYear, composer.calMonth]);
+  const editDlWeeks = useMemo(() => monthGrid(editor.calYear, editor.calMonth), [editor.calYear, editor.calMonth]);
 
-  // Deadline calendar helpers
-  const dlFirstDay = (() => { const d = new Date(deadlineCalYear, deadlineCalMonth, 1).getDay(); return d === 0 ? 6 : d - 1; })();
-  const dlDaysInMonth = new Date(deadlineCalYear, deadlineCalMonth + 1, 0).getDate();
-  const dlCells: (number | null)[] = [];
-  for (let i = 0; i < dlFirstDay; i++) dlCells.push(null);
-  for (let i = 1; i <= dlDaysInMonth; i++) dlCells.push(i);
-  while (dlCells.length % 7 !== 0) dlCells.push(null);
-  const dlWeeks = chunk(dlCells, 7);
-
-  // Edit deadline calendar helpers
-  const editDlFirstDay = (() => { const d = new Date(editDeadlineCalYear, editDeadlineCalMonth, 1).getDay(); return d === 0 ? 6 : d - 1; })();
-  const editDlDaysInMonth = new Date(editDeadlineCalYear, editDeadlineCalMonth + 1, 0).getDate();
-  const editDlCells: (number | null)[] = [];
-  for (let i = 0; i < editDlFirstDay; i++) editDlCells.push(null);
-  for (let i = 1; i <= editDlDaysInMonth; i++) editDlCells.push(i);
-  while (editDlCells.length % 7 !== 0) editDlCells.push(null);
-  const editDlWeeks = chunk(editDlCells, 7);
-
-  // ─── Calendar View helpers ──────────────────────────────────────────────────
-  const weekMonday = useMemo(() => {
-    const d = new Date(calViewDate);
-    d.setHours(0, 0, 0, 0);
-    const day = d.getDay();
-    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-    return d;
-  }, [calViewDate]);
-
-  const calHeaderLabel = useMemo(() => {
-    if (calSpan === 'week') {
-      const d = new Date(weekMonday);
-      const end = new Date(d); end.setDate(d.getDate() + 6);
-      const fmt = (dt: Date) => dt.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' });
-      return `${fmt(d)} – ${fmt(end)}`;
-    }
-    if (calSpan === 'month') return `${MONTHS_UA[calViewDate.getMonth()]} ${calViewDate.getFullYear()}`;
-    if (calSpan === 'quarter') {
-      const q = Math.floor(calViewDate.getMonth() / 3) + 1;
-      return `${ ['I','II','III','IV'][q-1] } квартал ${calViewDate.getFullYear()}`;
-    }
-    return String(calViewDate.getFullYear());
-  }, [calSpan, calViewDate, weekMonday]);
+  // ─── Календар ─────────────────────────────────────────────────────────────
+  const calendarLabels = useMemo(
+    () => ({ locale, months: MONTHS_UA, quarters: tr.quarters }),
+    [locale, MONTHS_UA, tr.quarters],
+  );
+  const cal = useCalendarNav(calendarLabels);
 
   const tasksByDate = useMemo(() => {
     const map: Record<string, Task[]> = {};
@@ -1170,30 +1083,6 @@ export default function TasksScreen() {
     });
     return map;
   }, [tasks]);
-
-  const calPrev = useCallback(() => {
-    setCalViewDate(d => {
-      const nd = new Date(d);
-      if (calSpan === 'week') nd.setDate(nd.getDate() - 7);
-      else if (calSpan === 'month') nd.setMonth(nd.getMonth() - 1);
-      else if (calSpan === 'quarter') nd.setMonth(nd.getMonth() - 3);
-      else nd.setFullYear(nd.getFullYear() - 1);
-      return nd;
-    });
-    if (calSpan === 'week') setCalWeekDay(d => { const nd = new Date(d); nd.setDate(nd.getDate() - 7); return nd; });
-  }, [calSpan]);
-
-  const calNext = useCallback(() => {
-    setCalViewDate(d => {
-      const nd = new Date(d);
-      if (calSpan === 'week') nd.setDate(nd.getDate() + 7);
-      else if (calSpan === 'month') nd.setMonth(nd.getMonth() + 1);
-      else if (calSpan === 'quarter') nd.setMonth(nd.getMonth() + 3);
-      else nd.setFullYear(nd.getFullYear() + 1);
-      return nd;
-    });
-    if (calSpan === 'week') setCalWeekDay(d => { const nd = new Date(d); nd.setDate(nd.getDate() + 7); return nd; });
-  }, [calSpan]);
 
   // ─── Meetings computed ──────────────────────────────────────────────────────
   const meetingsByDate = useMemo(() => {
@@ -1262,9 +1151,624 @@ export default function TasksScreen() {
 
   const selectedTask = selected ? tasks.find(t => t.id === selected.id) ?? selected : null;
 
+  // Вміст деталі. Однаковий для модалки й для колонки — різниться
+  // лише обрамлення, див. DetailPane.
+  const detailBody = selectedTask ? (
+    <>
+                    <View style={s.handleRow}>
+                      <View style={{ flex: 1 }}>
+                        {!editor.editing && detailTab === 'info' && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              editor.begin(selectedTask, taskColumnId(selectedTask, taskStatuses));
+                            }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <IconSymbol name="pencil" size={17} color={c.sub} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <View style={[s.handle, { backgroundColor: c.border }]} />
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <TouchableOpacity onPress={() => { setSelected(null); editor.finish(); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                          <IconSymbol name="xmark" size={17} color={c.sub} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Tab Switcher */}
+                    {!editor.editing && (
+                      <View style={{ flexDirection: 'row', gap: 5, marginBottom: 16, backgroundColor: c.dim, borderRadius: 12, padding: 4 }}>
+                        {(['info', 'timer', 'history'] as const).map(tab => (
+                          <TouchableOpacity
+                            key={tab}
+                            onPress={() => setDetailTab(tab)}
+                            style={{ flex: 1, paddingVertical: 8, borderRadius: 9, backgroundColor: detailTab === tab ? c.accent : 'transparent', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 5 }}>
+                            <IconSymbol
+                              name={tab === 'info' ? 'list.bullet' : tab === 'timer' ? 'timer' : 'clock.arrow.circlepath'}
+                              size={12}
+                              color={detailTab === tab ? '#fff' : c.sub}
+                            />
+                            <Text style={{ color: detailTab === tab ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>
+                              {tab === 'info' ? tr.details : tab === 'timer' ? tr.tracker : tr.history}
+                            </Text>
+                            {tab === 'timer' && isTimerRunning && (
+                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: detailTab === 'timer' ? '#fff' : '#6366F1' }} />
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* ─── Timer Tab ─── */}
+                    {!editor.editing && detailTab === 'timer' && (
+                      <TaskTimerTab
+                        task={selectedTask}
+                        running={isTimerRunning}
+                        activeStartedAt={activeTimer?.startedAt}
+                        onStart={startTimer}
+                        onStop={stopTimer}
+                        colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
+                        tr={tr}
+                        locale={locale}
+                        fmtClock={formatClock}
+                        fmtDur={fmtDurLocal}
+                      />
+                    )}
+
+                    {/* ─── History Tab ─── */}
+                    {!editor.editing && detailTab === 'history' && (
+                      <TaskHistoryTab
+                        events={selectedTask.history ?? []}
+                        textColor={c.text}
+                        subColor={c.sub}
+                        tr={tr}
+                        locale={locale}
+                      />
+                    )}
+
+                    {editor.editing ? (
+                      <TaskEditForm
+                        title={tr.editTask}
+                        submitLabel={tr.save}
+                        editor={editor}
+                        taskStatuses={taskStatuses}
+                        pickableProjects={pickableProjects}
+                        projects={projects}
+                        deadlineWeeks={editDlWeeks}
+                        priorityMeta={PRIORITY}
+                        months={MONTHS_UA}
+                        weekdays={WEEKDAYS_SHORT}
+                        deadlinePresets={DEADLINE_PRESETS}
+                        today={today}
+                        onSave={saveTaskEdit}
+                        onCancel={editor.finish}
+                        colors={c}
+                        tr={tr}
+                        locale={locale}
+                      />
+                    ) : detailTab === 'info' ? (
+                    <>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
+                      <AnimatedCheck
+                        checked={selectedTask.status === 'done'}
+                        color="#10B981"
+                        borderColor={c.border}
+                        size={22}
+                        radius={7}
+                        onPress={() => toggleTask(selectedTask.id)}
+                        hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+                        style={{ marginTop: 2 }}
+                      />
+                      <Text style={[s.detailTitle, { color: c.text, flex: 1, marginHorizontal: 10 }]}>{selectedTask.title}</Text>
+                      <View style={[s.prioBadge, { backgroundColor: PRIORITY[selectedTask.priority].color + '22' }]}>
+                        <View style={[s.dot, { backgroundColor: PRIORITY[selectedTask.priority].color }]} />
+                        <Text style={{ color: PRIORITY[selectedTask.priority].color, fontSize: 11, fontWeight: '700', marginLeft: 4 }}>
+                          {PRIORITY[selectedTask.priority].label}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {selectedTask.description ? <Text style={[s.detailDesc, { color: c.sub }]}>{selectedTask.description}</Text> : null}
+
+                    {/* Статус і проєкт — однакове поле вибору: обидва
+                        відкривають аркуш зі списком, а при більш ніж пʼятьох
+                        варіантах ще й із пошуком. Раніше тут стояли два різні
+                        способи вибирати поруч — розсип чипів і інлайн-список,
+                        що розсовував вміст. */}
+                    <PickerField
+                      label={tr.status}
+                      icon="rectangle.3.group"
+                      options={statusOptions}
+                      value={taskStatusColumn(selectedTask, taskStatuses).id}
+                      onSelect={id => { if (id) setTaskColumn(selectedTask.id, id); }}
+                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
+                      isDark={isDark}
+                      tr={tr}
+                    />
+
+                    {/* Meta badges */}
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 }}>
+                      <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
+                        <IconSymbol name="calendar" size={11} color={c.sub} />
+                        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '500', marginLeft: 4 }}>
+                          {new Date(selectedTask.createdAt).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
+                        </Text>
+                      </View>
+                      {selectedTask.deadline && (
+                        <View style={[s.badge, { backgroundColor: isOverdue(selectedTask) ? '#EF444420' : c.dim, borderColor: isOverdue(selectedTask) ? '#EF444440' : c.border }]}>
+                          <IconSymbol name="flag" size={11} color={isOverdue(selectedTask) ? '#EF4444' : c.sub} />
+                          <Text style={{ color: isOverdue(selectedTask) ? '#EF4444' : c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
+                            Дедлайн: {new Date(selectedTask.deadline).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
+                          </Text>
+                        </View>
+                      )}
+                      {selectedTask.estimatedMinutes && (
+                        <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
+                          <IconSymbol name="timer" size={11} color={c.sub} />
+                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
+                            {selectedTask.estimatedMinutes >= 60
+                              ? `${Math.floor(selectedTask.estimatedMinutes / 60)}г ${selectedTask.estimatedMinutes % 60 > 0 ? `${selectedTask.estimatedMinutes % 60}хв` : ''}`
+                              : `${selectedTask.estimatedMinutes}хв`}
+                          </Text>
+                        </View>
+                      )}
+                      {selectedTask.recurrence && (
+                        <View style={[s.badge, { backgroundColor: c.accent + '15', borderColor: c.accent + '35' }]}>
+                          <IconSymbol name="repeat" size={11} color={c.accent} />
+                          <Text style={{ color: c.accent, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
+                            {selectedTask.recurrence.freq === 'daily' ? 'Щодня' :
+                             selectedTask.recurrence.freq === 'weekly' ? 'Щотижня' :
+                             selectedTask.recurrence.freq === 'monthly' ? 'Щомісяця' : 'Щороку'}
+                            {selectedTask.recurrence.interval > 1 ? ` ×${selectedTask.recurrence.interval}` : ''}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Reminder row */}
+                    <TaskReminderRow
+                      reminderAt={selectedTask.reminderAt}
+                      open={showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId}
+                      draft={{ date: reminderDate, hours: reminderHours, mins: reminderMins }}
+                      onToggleOpen={() => {
+                        if (showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId) {
+                          setShowReminderPicker(false);
+                        } else {
+                          openReminderPicker(selectedTask.id);
+                        }
+                      }}
+                      onChangeDraft={part => {
+                        if (part.date !== undefined) setReminderDate(part.date);
+                        if (part.hours !== undefined) setReminderHours(part.hours);
+                        if (part.mins !== undefined) setReminderMins(part.mins);
+                      }}
+                      onSave={saveReminder}
+                      onRemove={() => removeReminder(selectedTask.id)}
+                      onCancel={() => setShowReminderPicker(false)}
+                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
+                      tr={tr}
+                      locale={locale}
+                    />
+
+                    {pickableProjects.length > 0 && (
+                      <PickerField
+                        label={lang === 'uk' ? 'Проєкт' : 'Project'}
+                        icon="folder"
+                        options={projectOptions}
+                        value={selectedTask.projectId ?? null}
+                        onSelect={id => updateTaskProject(selectedTask.id, id)}
+                        emptyOption={{ label: tr.noProject }}
+                        colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
+                        isDark={isDark}
+                        tr={tr}
+                      />
+                    )}
+
+                    <TaskSubtasks
+                      task={selectedTask}
+                      progressPercent={getProgress(selectedTask)}
+                      editingId={editingSubId}
+                      editingText={editingSubText}
+                      onChangeEditingText={setEditingSubText}
+                      onSaveEdit={(subId, text) => saveSubEdit(selectedTask.id, subId, text)}
+                      onToggle={subId => toggleSubtask(selectedTask.id, subId)}
+                      onShowActions={(sub, idx) => showSubtaskActions(selectedTask.id, sub, idx, selectedTask.subtasks.length)}
+                      onOpenAll={() => {
+                        setSelected(null);
+                        setEditingSubId(null);
+                        router.push({ pathname: '/subtasks', params: { taskId: selectedTask.id } });
+                      }}
+                      newText={newSubtask}
+                      onChangeNewText={setNewSubtask}
+                      onAdd={() => addSubtask(selectedTask.id)}
+                      onFocusInput={() => setTimeout(() => detailScrollRef.current?.scrollToEnd({ animated: true }), 300)}
+                      colors={c}
+                      isDark={isDark}
+                      tr={tr}
+                    />
+
+                    {/* Quick timer launch from info tab */}
+                    {selectedTask.status === 'active' && (
+                      <TouchableOpacity
+                        onPress={() => { setDetailTab('timer'); if (!isTimerRunning) startTimer(); }}
+                        style={[s.btn, { marginTop: 14, backgroundColor: isTimerRunning ? '#6366F120' : '#6366F1EE', borderWidth: isTimerRunning ? 1 : 0, borderColor: '#6366F150' }]}>
+                        <IconSymbol name={isTimerRunning ? 'timer' : 'play.fill'} size={15} color={isTimerRunning ? '#6366F1' : '#fff'} />
+                        {/* Годинник — СУСІД підпису, а не вкладений у нього <Text>.
+                            На iOS вкладений текст не є окремою в'юхою: він згортається
+                            в атрибутований рядок батька, тож перемальовування дочірнього
+                            компонента саме по собі нічого на екрані не змінює — число
+                            оновлювалося б лише тоді, коли перемальовується батьківський
+                            <Text>. Саме так годинник і завмирав на планшеті, де панель
+                            деталі висить постійно й перемальовувати її нема з чого. */}
+                        <Text style={{ color: isTimerRunning ? '#6366F1' : '#fff', fontWeight: '700', marginLeft: 7 }}>
+                          {activeTimer ? `${tr.timerLabel}: ` : tr.startTimerAction}
+                        </Text>
+                        {activeTimer && (
+                          <ElapsedClock
+                            running
+                            seconds={now => totalSecondsIncludingActive(selectedTask, activeTimer.startedAt, now)}
+                            format={formatClock}
+                            style={{ color: '#6366F1', fontWeight: '700' }}
+                          />
+                        )}
+                        {isTimerRunning && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#6366F1', marginLeft: 6 }} />}
+                      </TouchableOpacity>
+                    )}
+
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                      <TouchableOpacity
+                        onPress={() => deleteTask(selectedTask.id, selectedTask.title)}
+                        style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
+                        <IconSymbol name="trash" size={15} color="#EF4444" />
+                        <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => toggleTask(selectedTask.id)}
+                        style={[s.btn, { flex: 2, backgroundColor: selectedTask.status === 'done' ? '#374151' : c.accent }]}>
+                        <Text style={{ color: '#fff', fontWeight: '700' }}>{selectedTask.status === 'done' ? tr.restore : tr.completed}</Text>
+                      </TouchableOpacity>
+                    </View>
+                    </>
+                    ) : null}
+    </>
+  ) : null;
+
+  // Шапка спільна для обох режимів; у списку вона стає ListHeaderComponent.
+  const listHeader = (
+    <>
+            {/* Skeleton — перший завантаження */}
+            {!initialized && (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            )}
+
+            {/* Search bar */}
+            <View style={[s.searchBar, { backgroundColor: c.dim, borderColor: c.border }]}>
+              <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
+              <TextInput
+                placeholder={tr.searchPlaceholder}
+                placeholderTextColor={c.sub}
+                value={search}
+                onChangeText={setSearch}
+                style={[s.searchInput, { color: c.text }]}
+                returnKeyType="search"
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Active filter chips */}
+            {hasActiveFilters && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 4 }}>
+                <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center' }}>
+                  {filter !== 'active' && (
+                    <TouchableOpacity
+                      onPress={() => setFilter('active')}
+                      style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
+                      <Text style={[s.activeChipText, { color: c.accent }]}>
+                        {filter === 'all' ? tr.allTasks : tr.allCompleted}
+                      </Text>
+                      <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  )}
+                  {sort !== 'status' && (
+                    <TouchableOpacity
+                      onPress={() => setSort('status')}
+                      style={[s.activeChip, { backgroundColor: c.accent + '15', borderColor: c.accent + '40' }]}>
+                      <IconSymbol name="arrow.up.arrow.down" size={10} color={c.accent} />
+                      <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
+                        {SORT_OPTIONS.find(o => o.key === sort)?.label}
+                      </Text>
+                      <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  )}
+                  {filterProject && (() => {
+                    const proj = projects.find(p => p.id === filterProject);
+                    return proj ? (
+                      <TouchableOpacity
+                        onPress={() => setFilterProject(null)}
+                        style={[s.activeChip, { backgroundColor: proj.color + '20', borderColor: proj.color + '50' }]}>
+                        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color }} />
+                        <Text style={[s.activeChipText, { color: proj.color, marginLeft: 4 }]}>{proj.name}</Text>
+                        <IconSymbol name="xmark" size={10} color={proj.color} style={{ marginLeft: 4 }} />
+                      </TouchableOpacity>
+                    ) : null;
+                  })()}
+                  {filterPriority && (
+                    <TouchableOpacity
+                      onPress={() => setFilterPriority(null)}
+                      style={[s.activeChip, { backgroundColor: PRIORITY[filterPriority].color + '20', borderColor: PRIORITY[filterPriority].color + '50' }]}>
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: PRIORITY[filterPriority].color }} />
+                      <Text style={[s.activeChipText, { color: PRIORITY[filterPriority].color, marginLeft: 4 }]}>
+                        {PRIORITY[filterPriority].label}
+                      </Text>
+                      <IconSymbol name="xmark" size={10} color={PRIORITY[filterPriority].color} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  )}
+                  {dateFilter && (
+                    <TouchableOpacity
+                      onPress={() => setDateFilter(null)}
+                      style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
+                      <IconSymbol name="calendar" size={10} color={c.accent} />
+                      <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
+                        {new Date(dateFilter).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })}
+                      </Text>
+                      <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={clearAllFilters}
+                    style={[s.activeChip, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
+                    <Text style={[s.activeChipText, { color: '#EF4444' }]}>{tr.resetAll}</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+
+            {/* Stats — today (deadline = today) */}
+            <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
+              <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
+                <StatCell value={activeCount}          label={tr.active} color="#F59E0B" sub={c.sub} />
+                <View style={{ width: 1, backgroundColor: c.border }} />
+                <StatCell value={doneCount}            label={tr.done}           color="#10B981" sub={c.sub} />
+                <View style={{ width: 1, backgroundColor: c.border }} />
+                <StatCell value={todayMeetings.length} label={tr.meetings} color="#0EA5E9" sub={c.sub} />
+                <View style={{ width: 1, backgroundColor: c.border }} />
+                <StatCell value={`${efficiency}%`}    label={tr.efficiency}                                                         color={c.accent} sub={c.sub} />
+              </View>
+              {totalSubtasks > 0 && (
+                <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card }]}>
+                  <IconSymbol name="list.bullet.circle.fill" size={14} color="#6366F1" />
+                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 7 }}>{tr.subtasksToday}</Text>
+                  <View style={{ flex: 1, marginHorizontal: 12 }}>
+                    <View style={[s.progressBg, { flex: 1 }]}>
+                      <View style={[s.progressFill, { width: `${Math.round((doneSubtasks / totalSubtasks) * 100)}%`, backgroundColor: '#6366F1' }]} />
+                    </View>
+                  </View>
+                  <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '700' }}>
+                    {doneSubtasks}/{totalSubtasks}
+                  </Text>
+                </View>
+              )}
+              {dueTodayTasks.length === 0 && (
+                <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card, justifyContent: 'center' }]}>
+                  <IconSymbol name="checkmark.seal" size={13} color={c.sub} />
+                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 6 }}>{tr.noTasksToday}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* ── Meetings section (list view only) ── */}
+            {viewMode === 'list' && (
+              <View style={{ marginBottom: 20 }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => router.push('/meetings')}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.meetings}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <IconSymbol name="calendar.circle.fill" size={16} color="#6366F1" />
+                    <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginLeft: 6 }}>{tr.meetings}</Text>
+                    {/* Шеврон — інакше немає жодної підказки, що заголовок клікабельний */}
+                    <IconSymbol name="chevron.right" size={12} color={c.sub} style={{ marginLeft: 2 }} />
+                  </TouchableOpacity>
+                  {todayMeetings2.length > 0 && (
+                    <View style={{ backgroundColor: '#6366F120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
+                      <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{todayMeetings2.length}</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => openAddMeeting()}
+                    style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#6366F118', borderWidth: 1, borderColor: '#6366F130', alignItems: 'center', justifyContent: 'center' }}>
+                    <IconSymbol name="plus" size={14} color="#6366F1" />
+                  </TouchableOpacity>
+                </View>
+
+                {todayMeetings2.length === 0 ? (
+                  <TouchableOpacity onPress={() => openAddMeeting()} activeOpacity={0.7}
+                    style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 10, gap: 8 }}>
+                    <IconSymbol name="calendar.badge.plus" size={16} color={c.sub} />
+                    <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500' }}>{tr.addMeeting}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={{ gap: 4 }}>
+                    {todayMeetings2.map(mtg => {
+                      // Список відфільтрований по сьогодні, тож перевіряти дату
+                      // повторно вже нема потреби.
+                      const mtgDateObj = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
+                      const isPast = mtgDateObj < new Date();
+                      const isNow = mtgDateObj <= new Date() && new Date(mtgDateObj.getTime() + mtg.durationMinutes * 60000) > new Date();
+                      const dFmt = tr.today;
+                      const dur = mtg.durationMinutes >= 60
+                        ? `${Math.floor(mtg.durationMinutes / 60)}г${mtg.durationMinutes % 60 ? ` ${mtg.durationMinutes % 60}хв` : ''}`
+                        : `${mtg.durationMinutes} хв`;
+                      return (
+                        <TouchableOpacity key={mtg.id} onPress={() => openEditMeeting(mtg)} activeOpacity={0.75}>
+                          <View style={{ borderRadius: 11, paddingVertical: 7, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, overflow: 'hidden', opacity: isPast && !isNow ? 0.4 : 1, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+                            {/* Accent bar */}
+                            <View style={{ width: 2.5, alignSelf: 'stretch', backgroundColor: mtg.color, borderRadius: 2, marginLeft: 0, minHeight: 36 }} />
+                            {/* Time + day */}
+                            <View style={{ alignItems: 'center', minWidth: 44 }}>
+                              <Text style={{ color: mtg.color, fontSize: 13, fontWeight: '800', letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
+                              <Text style={{ color: mtg.color, fontSize: 9, fontWeight: '600', opacity: 0.75, marginTop: 1 }}>{dFmt}</Text>
+                            </View>
+                            {/* Divider */}
+                            <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: mtg.color + '30', marginVertical: 4 }} />
+                            {/* Info */}
+                            <View style={{ flex: 1, gap: 2 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />}
+                                <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                  <IconSymbol name="clock" size={9} color={c.sub} />
+                                  <Text style={{ color: c.sub, fontSize: 10 }}>{dur}</Text>
+                                </View>
+                                {mtg.location ? (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                    <IconSymbol name="mappin" size={9} color={c.sub} />
+                                    <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.location}</Text>
+                                  </View>
+                                ) : null}
+                                {mtg.link ? (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                    <IconSymbol name="link" size={9} color={'#6366F1'} />
+                                    <Text style={{ color: '#6366F1', fontSize: 10, fontWeight: '600' }}>Join</Text>
+                                  </View>
+                                ) : null}
+                                {mtg.notes ? (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                    <IconSymbol name="note.text" size={9} color={c.sub} />
+                                    <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.notes}</Text>
+                                  </View>
+                                ) : null}
+                              </View>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Empty state */}
+            {filtered.length === 0 && (
+              <View style={{ alignItems: 'center', paddingVertical: 56 }}>
+                <IconSymbol name="checklist" size={40} color={c.sub} />
+                <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>
+                  {search.trim() ? tr.nothingFound : hasFiltersBesidesSearch ? tr.noTasksMatchFilters : tr.noTasks}
+                </Text>
+                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7, textAlign: 'center' }}>
+                  {search.trim() ? tr.tryAnotherQuery : hasFiltersBesidesSearch ? tr.noTasksMatchFiltersHint : tr.pressToAdd}
+                </Text>
+                {/* Дія має вести до виходу з глухого кута. Коли список порожній
+                    через фільтри, кнопка «додати» безпорадна: нове завдання так
+                    само не пройде фільтр, і людина вирішить, що воно не
+                    створилося. Тому там пропонується скинути фільтри. */}
+                {!search.trim() && (hasFiltersBesidesSearch ? (
+                  <TouchableOpacity
+                    onPress={clearAllFilters}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.resetAllFilters}
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconSymbol name="arrow.clockwise" size={15} color={c.accent} />
+                    <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.resetAllFilters}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => setShowAdd(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.addTask}
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconSymbol name="plus" size={15} color="#fff" />
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addTask}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Overdue section (list view, active/all filter) */}
+            {viewMode === 'list' && overdueItems.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                  <Text style={[s.groupLabel, { color: '#EF4444', marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
+                  <View style={{ backgroundColor: '#EF444420', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+                    <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>{overdueItems.length}</Text>
+                  </View>
+                </View>
+                <View style={{ gap: 6 }}>
+                  {overdueItems.map((task, i) => {
+                    const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
+                    const animExiting  = motion.entering(FadeOutUp.duration(150));
+                    const animLayout   = motion.entering(LinearTransition.springify());
+                    return (
+                      <Animated.View
+                        key={task.id}
+                        entering={animEntering}
+                        exiting={animExiting}
+                        layout={animLayout}>
+                        <CompactCard
+                          task={task}
+                          statusColumn={taskStatusColumn(task, taskStatuses)}
+                          onPress={handleSelectTask}
+                          onToggle={handleToggleTask}
+                          c={c}
+                          isDark={isDark}
+                          projects={projects}
+                          overdueLabel={tr.overdueSection}
+                          priorityLabel={PRIORITY[task.priority].label}
+                          subtasksLabel={tr.subtasks}
+                        />
+                      </Animated.View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+    </>
+  );
+
+  const calendarView = (
+    <TaskCalendarView
+      nav={cal}
+      tasksByDate={tasksByDate}
+      tasks={tasks}
+      meetingsByDate={meetingsByDate}
+      projects={projects}
+      today={today}
+      weekdays={WEEKDAYS_SHORT}
+      months={MONTHS_UA}
+      priorityMeta={PRIORITY}
+      getProgress={getProgress}
+      isOverdue={isOverdue}
+      onSelectTask={handleSelectTask}
+      onToggleTask={toggleTask}
+      onOpenDay={setCalPopupDate}
+      colors={c}
+      isDark={isDark}
+      tr={tr}
+      locale={locale}
+    />
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+      <View style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
         {/* Fixed Header */}
@@ -1326,698 +1830,75 @@ export default function TasksScreen() {
           />
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />
-          }>
-
-          {/* Skeleton — перший завантаження */}
-          {!initialized && (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          )}
-
-          {/* Search bar */}
-          <View style={[s.searchBar, { backgroundColor: c.dim, borderColor: c.border }]}>
-            <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
-            <TextInput
-              placeholder={tr.searchPlaceholder}
-              placeholderTextColor={c.sub}
-              value={search}
-              onChangeText={setSearch}
-              style={[s.searchInput, { color: c.text }]}
-              returnKeyType="search"
-            />
-            {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
-              </TouchableOpacity>
+        {viewMode === 'list' ? (
+          <SectionList
+            sections={sections}
+            keyExtractor={task => task.id}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
+            showsVerticalScrollIndicator={false}
+            // Заголовки груп не липкі — так було й до віртуалізації.
+            stickySectionHeadersEnabled={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+            ListHeaderComponent={listHeader}
+            renderSectionHeader={({ section }) => (
+              <Text style={[s.groupLabel, { color: c.sub }]}>{section.title}</Text>
             )}
-          </View>
-
-          {/* Active filter chips */}
-          {hasActiveFilters && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 4 }}>
-              <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center' }}>
-                {filter !== 'active' && (
-                  <TouchableOpacity
-                    onPress={() => setFilter('active')}
-                    style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
-                    <Text style={[s.activeChipText, { color: c.accent }]}>
-                      {filter === 'all' ? tr.allTasks : tr.allCompleted}
-                    </Text>
-                    <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                )}
-                {sort !== 'deadline' && (
-                  <TouchableOpacity
-                    onPress={() => setSort('deadline')}
-                    style={[s.activeChip, { backgroundColor: c.accent + '15', borderColor: c.accent + '40' }]}>
-                    <IconSymbol name="arrow.up.arrow.down" size={10} color={c.accent} />
-                    <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
-                      {SORT_OPTIONS.find(o => o.key === sort)?.label}
-                    </Text>
-                    <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                )}
-                {filterProject && (() => {
-                  const proj = projects.find(p => p.id === filterProject);
-                  return proj ? (
-                    <TouchableOpacity
-                      onPress={() => setFilterProject(null)}
-                      style={[s.activeChip, { backgroundColor: proj.color + '20', borderColor: proj.color + '50' }]}>
-                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color }} />
-                      <Text style={[s.activeChipText, { color: proj.color, marginLeft: 4 }]}>{proj.name}</Text>
-                      <IconSymbol name="xmark" size={10} color={proj.color} style={{ marginLeft: 4 }} />
-                    </TouchableOpacity>
-                  ) : null;
-                })()}
-                {filterPriority && (
-                  <TouchableOpacity
-                    onPress={() => setFilterPriority(null)}
-                    style={[s.activeChip, { backgroundColor: PRIORITY[filterPriority].color + '20', borderColor: PRIORITY[filterPriority].color + '50' }]}>
-                    <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: PRIORITY[filterPriority].color }} />
-                    <Text style={[s.activeChipText, { color: PRIORITY[filterPriority].color, marginLeft: 4 }]}>
-                      {PRIORITY[filterPriority].label}
-                    </Text>
-                    <IconSymbol name="xmark" size={10} color={PRIORITY[filterPriority].color} style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                )}
-                {dateFilter && (
-                  <TouchableOpacity
-                    onPress={() => setDateFilter(null)}
-                    style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
-                    <IconSymbol name="calendar" size={10} color={c.accent} />
-                    <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
-                      {new Date(dateFilter).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })}
-                    </Text>
-                    <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={clearAllFilters}
-                  style={[s.activeChip, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
-                  <Text style={[s.activeChipText, { color: '#EF4444' }]}>{tr.resetAll}</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          )}
-
-          {/* Stats — today (deadline = today) */}
-          <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
-            <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
-              <StatCell value={activeCount}          label={tr.active} color="#F59E0B" sub={c.sub} />
-              <View style={{ width: 1, backgroundColor: c.border }} />
-              <StatCell value={doneCount}            label={tr.done}           color="#10B981" sub={c.sub} />
-              <View style={{ width: 1, backgroundColor: c.border }} />
-              <StatCell value={todayMeetings.length} label={tr.meetings} color="#0EA5E9" sub={c.sub} />
-              <View style={{ width: 1, backgroundColor: c.border }} />
-              <StatCell value={`${efficiency}%`}    label={tr.efficiency}                                                         color={c.accent} sub={c.sub} />
-            </View>
-            {totalSubtasks > 0 && (
-              <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card }]}>
-                <IconSymbol name="list.bullet.circle.fill" size={14} color="#6366F1" />
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 7 }}>{tr.subtasksToday}</Text>
-                <View style={{ flex: 1, marginHorizontal: 12 }}>
-                  <View style={[s.progressBg, { flex: 1 }]}>
-                    <View style={[s.progressFill, { width: `${Math.round((doneSubtasks / totalSubtasks) * 100)}%`, backgroundColor: '#6366F1' }]} />
-                  </View>
-                </View>
-                <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '700' }}>
-                  {doneSubtasks}/{totalSubtasks}
-                </Text>
-              </View>
+            ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
+            renderItem={({ item, index }) => (
+              <TaskListItem
+                task={item}
+                index={index}
+                animate={shouldAnimateTask(item.id)}
+                motion={motion}
+                statusColumn={taskStatusColumn(item, taskStatuses)}
+                onPress={handleSelectTask}
+                onToggle={handleToggleTask}
+                c={c}
+                isDark={isDark}
+                projects={projects}
+                overdueLabel={tr.overdueSection}
+                priorityLabel={PRIORITY[item.priority].label}
+                subtasksLabel={tr.subtasks}
+              />
             )}
-            {dueTodayTasks.length === 0 && (
-              <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card, justifyContent: 'center' }]}>
-                <IconSymbol name="checkmark.seal" size={13} color={c.sub} />
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 6 }}>{tr.noTasksToday}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* ── Meetings section (list view only) ── */}
-          {viewMode === 'list' && (
-            <View style={{ marginBottom: 20 }}>
-              {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                <TouchableOpacity
-                  onPress={() => router.push('/meetings')}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel={tr.meetings}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <IconSymbol name="calendar.circle.fill" size={16} color="#6366F1" />
-                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginLeft: 6 }}>{tr.meetings}</Text>
-                  {/* Шеврон — інакше немає жодної підказки, що заголовок клікабельний */}
-                  <IconSymbol name="chevron.right" size={12} color={c.sub} style={{ marginLeft: 2 }} />
-                </TouchableOpacity>
-                {todayMeetings2.length > 0 && (
-                  <View style={{ backgroundColor: '#6366F120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
-                    <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{todayMeetings2.length}</Text>
-                  </View>
-                )}
-                <TouchableOpacity
-                  onPress={() => openAddMeeting()}
-                  style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#6366F118', borderWidth: 1, borderColor: '#6366F130', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="plus" size={14} color="#6366F1" />
-                </TouchableOpacity>
-              </View>
-
-              {todayMeetings2.length === 0 ? (
-                <TouchableOpacity onPress={() => openAddMeeting()} activeOpacity={0.7}
-                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 10, gap: 8 }}>
-                  <IconSymbol name="calendar.badge.plus" size={16} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500' }}>{tr.addMeeting}</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={{ gap: 4 }}>
-                  {todayMeetings2.map(mtg => {
-                    // Список відфільтрований по сьогодні, тож перевіряти дату
-                    // повторно вже нема потреби.
-                    const mtgDateObj = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
-                    const isPast = mtgDateObj < new Date();
-                    const isNow = mtgDateObj <= new Date() && new Date(mtgDateObj.getTime() + mtg.durationMinutes * 60000) > new Date();
-                    const dFmt = tr.today;
-                    const dur = mtg.durationMinutes >= 60
-                      ? `${Math.floor(mtg.durationMinutes / 60)}г${mtg.durationMinutes % 60 ? ` ${mtg.durationMinutes % 60}хв` : ''}`
-                      : `${mtg.durationMinutes} хв`;
-                    return (
-                      <TouchableOpacity key={mtg.id} onPress={() => openEditMeeting(mtg)} activeOpacity={0.75}>
-                        <View style={{ borderRadius: 11, paddingVertical: 7, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, overflow: 'hidden', opacity: isPast && !isNow ? 0.4 : 1, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
-                          {/* Accent bar */}
-                          <View style={{ width: 2.5, alignSelf: 'stretch', backgroundColor: mtg.color, borderRadius: 2, marginLeft: 0, minHeight: 36 }} />
-                          {/* Time + day */}
-                          <View style={{ alignItems: 'center', minWidth: 44 }}>
-                            <Text style={{ color: mtg.color, fontSize: 13, fontWeight: '800', letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
-                            <Text style={{ color: mtg.color, fontSize: 9, fontWeight: '600', opacity: 0.75, marginTop: 1 }}>{dFmt}</Text>
-                          </View>
-                          {/* Divider */}
-                          <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: mtg.color + '30', marginVertical: 4 }} />
-                          {/* Info */}
-                          <View style={{ flex: 1, gap: 2 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                              {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />}
-                              <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
-                            </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                <IconSymbol name="clock" size={9} color={c.sub} />
-                                <Text style={{ color: c.sub, fontSize: 10 }}>{dur}</Text>
-                              </View>
-                              {mtg.location ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                  <IconSymbol name="mappin" size={9} color={c.sub} />
-                                  <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.location}</Text>
-                                </View>
-                              ) : null}
-                              {mtg.link ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                  <IconSymbol name="link" size={9} color={'#6366F1'} />
-                                  <Text style={{ color: '#6366F1', fontSize: 10, fontWeight: '600' }}>Join</Text>
-                                </View>
-                              ) : null}
-                              {mtg.notes ? (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                  <IconSymbol name="note.text" size={9} color={c.sub} />
-                                  <Text style={{ color: c.sub, fontSize: 10 }} numberOfLines={1}>{mtg.notes}</Text>
-                                </View>
-                              ) : null}
-                            </View>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Empty state */}
-          {filtered.length === 0 && (
-            <View style={{ alignItems: 'center', paddingVertical: 56 }}>
-              <IconSymbol name="checklist" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>
-                {search.trim() ? tr.nothingFound : tr.noTasks}
-              </Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>
-                {search.trim() ? tr.tryAnotherQuery : tr.pressToAdd}
-              </Text>
-              {!search.trim() && (
-                <TouchableOpacity
-                  onPress={() => setShowAdd(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel={tr.addTask}
-                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <IconSymbol name="plus" size={15} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addTask}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {/* Overdue section (list view, active/all filter) */}
-          {viewMode === 'list' && overdueItems.length > 0 && (
-            <View style={{ marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-                <Text style={[s.groupLabel, { color: '#EF4444', marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
-                <View style={{ backgroundColor: '#EF444420', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
-                  <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>{overdueItems.length}</Text>
-                </View>
-              </View>
-              <View style={{ gap: 6 }}>
-                {overdueItems.map((task, i) => {
-                  const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
-                  const animExiting  = motion.entering(FadeOutUp.duration(150));
-                  const animLayout   = motion.entering(LinearTransition.springify());
-                  return (
-                    <Animated.View
-                      key={task.id}
-                      entering={animEntering}
-                      exiting={animExiting}
-                      layout={animLayout}>
-                      <CompactCard
-                        task={task}
-                        statusColumn={taskStatusColumn(task, taskStatuses)}
-                        onPress={() => setSelected(task)}
-                        onToggle={() => toggleTask(task.id)}
-                        c={c}
-                        isDark={isDark}
-                        projects={projects}
-                        overdueLabel={tr.overdueSection}
-                        priorityLabel={PRIORITY[task.priority].label}
-                        subtasksLabel={tr.subtasks}
-                      />
-                    </Animated.View>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
-          {/* LIST VIEW */}
-          {viewMode === 'list' && groups.map(group => (
-            <View key={group.label}>
-              <Text style={[s.groupLabel, { color: c.sub }]}>{group.label}</Text>
-              <View style={{ gap: 6 }}>
-                {group.tasks.map((task, i) => {
-                  const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
-                  const animExiting  = motion.entering(FadeOutUp.duration(150));
-                  const animLayout   = motion.entering(LinearTransition.springify());
-                  return (
-                    <Animated.View
-                      key={task.id}
-                      entering={animEntering}
-                      exiting={animExiting}
-                      layout={animLayout}>
-                      <CompactCard
-                        task={task}
-                        statusColumn={taskStatusColumn(task, taskStatuses)}
-                        onPress={() => setSelected(task)}
-                        onToggle={() => toggleTask(task.id)}
-                        c={c}
-                        isDark={isDark}
-                        projects={projects}
-                        overdueLabel={tr.overdueSection}
-                        priorityLabel={PRIORITY[task.priority].label}
-                        subtasksLabel={tr.subtasks}
-                      />
-                    </Animated.View>
-                  );
-                })}
-              </View>
-            </View>
-          ))}
-
-          {/* CALENDAR VIEW */}
-          {viewMode === 'calendar' && (
-            <View>
-              {/* Span selector */}
-              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
-                {(['week', 'month', 'quarter', 'year'] as CalSpan[]).map(span => (
-                  <TouchableOpacity
-                    key={span}
-                    onPress={() => { setCalSpan(span); if (span === 'week') setCalViewDate(calWeekDay); }}
-                    style={[s.sortChip, {
-                      flex: 1, justifyContent: 'center',
-                      backgroundColor: calSpan === span ? c.accent + '20' : c.dim,
-                      borderColor: calSpan === span ? c.accent : c.border,
-                    }]}>
-                    <Text style={{ color: calSpan === span ? c.accent : c.sub, fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
-                      {span === 'week' ? tr.week : span === 'month' ? tr.month : span === 'quarter' ? tr.quarter : tr.year}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Nav header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                <TouchableOpacity onPress={calPrev} style={s.navBtn}>
-                  <IconSymbol name="chevron.left" size={18} color={c.sub} />
-                </TouchableOpacity>
-                <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontWeight: '700' }}>{calHeaderLabel}</Text>
-                <TouchableOpacity onPress={calNext} style={s.navBtn}>
-                  <IconSymbol name="chevron.right" size={18} color={c.sub} />
-                </TouchableOpacity>
-              </View>
-
-              {/* WEEK */}
-              {calSpan === 'week' && (() => {
-                const weekDayTasks = tasksByDate[calWeekDay.toDateString()] ?? [];
-                const weekActiveTasks = weekDayTasks.filter(t => t.status === 'active');
-                const weekDoneTasks = weekDayTasks.filter(t => t.status === 'done');
-                return (
-                  <View>
-                    {/* 7-day strip */}
-                    <View style={{ flexDirection: 'row', gap: 3, marginBottom: 20 }}>
-                      {Array.from({ length: 7 }, (_, i) => {
-                        const d = new Date(weekMonday); d.setDate(d.getDate() + i);
-                        const dayTasks = tasksByDate[d.toDateString()] ?? [];
-                        const isToday = d.toDateString() === today.toDateString();
-                        const isSel = d.toDateString() === calWeekDay.toDateString();
-                        const cnt = dayTasks.length;
-                        const hasActive = dayTasks.some(t => t.status === 'active');
-                        return (
-                          <TouchableOpacity
-                            key={i}
-                            onPress={() => setCalWeekDay(d)}
-                            activeOpacity={0.75}
-                            style={{
-                              flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 16,
-                              backgroundColor: isSel ? c.accent : isToday ? c.accent + '18' : c.dim,
-                              borderWidth: 1,
-                              borderColor: isSel ? c.accent : isToday ? c.accent + '60' : c.border,
-                            }}>
-                            <Text style={{
-                              fontSize: 10, fontWeight: '600', marginBottom: 4,
-                              color: isSel ? 'rgba(255,255,255,0.75)' : isToday ? c.accent : c.sub,
-                            }}>
-                              {WEEKDAYS_SHORT[i]}
-                            </Text>
-                            <Text style={{
-                              fontSize: 15, fontWeight: '800', lineHeight: 18,
-                              color: isSel ? '#fff' : isToday ? c.accent : c.text,
-                            }}>
-                              {d.getDate()}
-                            </Text>
-                            <View style={{ marginTop: 6, height: 5, alignItems: 'center', justifyContent: 'center' }}>
-                              {cnt > 0 && (
-                                <View style={{
-                                  width: cnt > 3 ? 14 : cnt * 5,
-                                  height: 5, borderRadius: 3,
-                                  backgroundColor: isSel
-                                    ? 'rgba(255,255,255,0.55)'
-                                    : hasActive ? c.accent : '#10B981',
-                                }} />
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    {/* Selected day header */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', flex: 1, textTransform: 'capitalize' }}>
-                        {calWeekDay.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
-                      </Text>
-                      {weekDayTasks.length > 0 && (
-                        <View style={{ flexDirection: 'row', gap: 6 }}>
-                          {weekActiveTasks.length > 0 && (
-                            <View style={{ backgroundColor: c.accent + '20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                              <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>{weekActiveTasks.length} {tr.active}</Text>
-                            </View>
-                          )}
-                          {weekDoneTasks.length > 0 && (
-                            <View style={{ backgroundColor: '#10B98120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                              <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>{weekDoneTasks.length} {tr.done}</Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Task list for selected day */}
-                    {weekDayTasks.length === 0 ? (
-                      <View style={{ alignItems: 'center', paddingVertical: 32, borderRadius: 16, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' }}>
-                        <IconSymbol name="calendar.badge.checkmark" size={28} color={c.sub} />
-                        <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginTop: 8 }}>{tr.noTasksForDay}</Text>
-                      </View>
-                    ) : (
-                      <View style={{ gap: 8 }}>
-                        {weekDayTasks.map(task => {
-                          const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
-                          const prog = getProgress(task);
-                          const overdue = isOverdue(task);
-                          const prioColor = PRIORITY[task.priority].color;
-                          return (
-                            <TouchableOpacity
-                              key={task.id}
-                              onPress={() => setSelected(task)}
-                              activeOpacity={0.75}>
-                              <BlurView
-                                intensity={isDark ? 18 : 35}
-                                tint={isDark ? 'dark' : 'light'}
-                                style={{
-                                  borderRadius: 16, borderWidth: 1,
-                                  borderColor: task.status === 'done' ? c.border : overdue ? '#EF444450' : c.border,
-                                  padding: 13, overflow: 'hidden',
-                                }}>
-                                {/* Priority stripe */}
-                                <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: task.status === 'done' ? '#10B981' : prioColor, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
-                                <View style={{ marginLeft: 8 }}>
-                                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-                                    <AnimatedCheck
-                                      checked={task.status === 'done'}
-                                      color="#10B981"
-                                      borderColor={c.border}
-                                      size={22}
-                                      radius={7}
-                                      onPress={() => toggleTask(task.id)}
-                                      hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
-                                      style={{ marginTop: 1, flexShrink: 0 }}
-                                    />
-                                    <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600', lineHeight: 20, opacity: task.status === 'done' ? 0.45 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }}>
-                                      {task.title}
-                                    </Text>
-                                  </View>
-
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, marginLeft: 32 }}>
-                                    <View style={[s.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
-                                      <View style={[s.dot, { backgroundColor: prioColor, width: 6, height: 6 }]} />
-                                      <Text style={{ color: prioColor, fontSize: 10, fontWeight: '700', marginLeft: 3 }}>{PRIORITY[task.priority].label}</Text>
-                                    </View>
-                                    {proj && (
-                                      <View style={[s.badge, { backgroundColor: proj.color + '18', borderColor: proj.color + '45' }]}>
-                                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color }} />
-                                        <Text style={{ color: proj.color, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>{proj.name}</Text>
-                                      </View>
-                                    )}
-                                    {task.subtasks.length > 0 && (
-                                      <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                                        <IconSymbol name="list.bullet" size={9} color={c.sub} />
-                                        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginLeft: 3 }}>{task.subtasks.filter(s => s.done).length}/{task.subtasks.length}</Text>
-                                      </View>
-                                    )}
-                                  </View>
-
-                                  {(prog > 0 || task.subtasks.length > 0) && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginLeft: 32 }}>
-                                      <View style={[s.progressBg, { flex: 1 }]}>
-                                        <View style={[s.progressFill, { width: `${prog}%`, backgroundColor: task.status === 'done' ? '#10B981' : c.accent }]} />
-                                      </View>
-                                      <Text style={[s.pct, { color: c.sub }]}>{prog}%</Text>
-                                    </View>
-                                  )}
-                                </View>
-                              </BlurView>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
-                );
-              })()}
-
-              {/* MONTH */}
-              {calSpan === 'month' && (() => {
-                const yr = calViewDate.getFullYear();
-                const mo = calViewDate.getMonth();
-                const fd = (() => { const d = new Date(yr, mo, 1).getDay(); return d === 0 ? 6 : d - 1; })();
-                const dim = new Date(yr, mo + 1, 0).getDate();
-                const cells: (number | null)[] = [];
-                for (let i = 0; i < fd; i++) cells.push(null);
-                for (let i = 1; i <= dim; i++) cells.push(i);
-                while (cells.length % 7 !== 0) cells.push(null);
-                const weeks = chunk(cells, 7);
-                return (
-                  <View>
-                    <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-                      {WEEKDAYS_SHORT.map(d => (
-                        <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
-                      ))}
-                    </View>
-                    {weeks.map((week, wi) => (
-                      <View key={wi} style={{ flexDirection: 'row', marginBottom: 6 }}>
-                        {week.map((day, di) => {
-                          if (!day) return <View key={di} style={{ flex: 1 }} />;
-                          const d = new Date(yr, mo, day);
-                          const dayTasks = tasksByDate[d.toDateString()] ?? [];
-                          const dayMeets = meetingsByDate[d.toISOString().slice(0, 10)] ?? [];
-                          const isToday = d.toDateString() === today.toDateString();
-                          const cnt = dayTasks.length;
-                          const activeCnt = dayTasks.filter(t => t.status === 'active').length;
-                          const hasMeet = dayMeets.length > 0;
-                          const hasAny = cnt > 0 || hasMeet;
-                          return (
-                            <TouchableOpacity
-                              key={di}
-                              onPress={() => hasAny ? setCalPopupDate(d) : undefined}
-                              activeOpacity={hasAny ? 0.7 : 1}
-                              style={{ flex: 1, alignItems: 'center' }}>
-                              <View style={[
-                                { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-                                isToday && { backgroundColor: c.accent },
-                                hasAny && !isToday && { backgroundColor: c.accent + '1A' },
-                              ]}>
-                                <Text style={{ color: isToday ? '#fff' : hasAny ? c.accent : c.text, fontSize: 13, fontWeight: isToday || hasAny ? '700' : '400' }}>{day}</Text>
-                              </View>
-                              <View style={{ flexDirection: 'row', gap: 2, marginTop: 2, minHeight: 10 }}>
-                                {cnt > 0 && <View style={{ backgroundColor: activeCnt > 0 ? c.accent : '#10B981', borderRadius: 3, paddingHorizontal: 3, minWidth: 12, alignItems: 'center' }}>
-                                  <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{cnt}</Text>
-                                </View>}
-                                {hasMeet && <View style={{ backgroundColor: '#6366F1', borderRadius: 3, paddingHorizontal: 3, minWidth: 12, alignItems: 'center' }}>
-                                  <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{dayMeets.length}</Text>
-                                </View>}
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    ))}
-                  </View>
-                );
-              })()}
-
-              {/* QUARTER */}
-              {calSpan === 'quarter' && (() => {
-                const yr = calViewDate.getFullYear();
-                const qStart = Math.floor(calViewDate.getMonth() / 3) * 3;
-                return (
-                  <View style={{ gap: 24 }}>
-                    {[0, 1, 2].map(offset => {
-                      const mo = qStart + offset;
-                      const fd = (() => { const d = new Date(yr, mo, 1).getDay(); return d === 0 ? 6 : d - 1; })();
-                      const dim = new Date(yr, mo + 1, 0).getDate();
-                      const cells: (number | null)[] = [];
-                      for (let i = 0; i < fd; i++) cells.push(null);
-                      for (let i = 1; i <= dim; i++) cells.push(i);
-                      while (cells.length % 7 !== 0) cells.push(null);
-                      const weeks = chunk(cells, 7);
-                      return (
-                        <View key={mo}>
-                          <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginBottom: 6 }}>{MONTHS_UA[mo]}</Text>
-                          <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-                            {WEEKDAYS_SHORT.map(d => (
-                              <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{d}</Text>
-                            ))}
-                          </View>
-                          {weeks.map((week, wi) => (
-                            <View key={wi} style={{ flexDirection: 'row', marginBottom: 2 }}>
-                              {week.map((day, di) => {
-                                if (!day) return <View key={di} style={{ flex: 1 }} />;
-                                const d = new Date(yr, mo, day);
-                                const dayTasks = tasksByDate[d.toDateString()] ?? [];
-                                const isToday = d.toDateString() === today.toDateString();
-                                const cnt = dayTasks.length;
-                                return (
-                                  <TouchableOpacity
-                                    key={di}
-                                    onPress={() => cnt > 0 ? setCalPopupDate(d) : undefined}
-                                    activeOpacity={cnt > 0 ? 0.7 : 1}
-                                    style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
-                                    <View style={[
-                                      { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-                                      isToday && { backgroundColor: c.accent },
-                                      cnt > 0 && !isToday && { backgroundColor: c.accent + '1A' },
-                                    ]}>
-                                      <Text style={{ color: isToday ? '#fff' : cnt > 0 ? c.accent : c.text, fontSize: 10, fontWeight: cnt > 0 || isToday ? '700' : '400' }}>{day}</Text>
-                                    </View>
-                                    {cnt > 0 && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: c.accent, marginTop: 1 }} />}
-                                    {cnt === 0 && <View style={{ height: 5 }} />}
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-                          ))}
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })()}
-
-              {/* YEAR */}
-              {calSpan === 'year' && (() => {
-                const yr = calViewDate.getFullYear();
-                return (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                    {MONTHS_UA.map((mName, mo) => {
-                      const monthTasks = tasks.filter(t => {
-                        if (!t.deadline) return false;
-                        const d = new Date(t.deadline);
-                        return d.getFullYear() === yr && d.getMonth() === mo;
-                      });
-                      const cnt = monthTasks.length;
-                      const activeCnt = monthTasks.filter(t => t.status === 'active').length;
-                      const isCurrent = today.getFullYear() === yr && today.getMonth() === mo;
-                      return (
-                        <TouchableOpacity
-                          key={mo}
-                          onPress={() => { setCalSpan('month'); setCalViewDate(new Date(yr, mo, 1)); }}
-                          activeOpacity={0.75}
-                          style={{
-                            width: '30.5%',
-                            borderRadius: 14,
-                            borderWidth: 1,
-                            borderColor: isCurrent ? c.accent : c.border,
-                            backgroundColor: isCurrent ? c.accent + '14' : c.dim,
-                            paddingVertical: 14,
-                            paddingHorizontal: 10,
-                            alignItems: 'center',
-                            gap: 5,
-                          }}>
-                          <Text style={{ color: isCurrent ? c.accent : c.text, fontSize: 12, fontWeight: '700' }}>{mName.slice(0, 3)}</Text>
-                          {cnt > 0 ? (
-                            <View style={{ backgroundColor: activeCnt > 0 ? c.accent : '#10B981', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, minWidth: 20, alignItems: 'center' }}>
-                              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{cnt}</Text>
-                            </View>
-                          ) : (
-                            <Text style={{ color: c.sub, fontSize: 11, opacity: 0.5 }}>—</Text>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                );
-              })()}
-            </View>
-          )}
-        </ScrollView>
+          />
+        ) : (
+          <ScrollView
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
+            {listHeader}
+            {calendarView}
+          </ScrollView>
+        )}
       </SafeAreaView>
 
       {/* FAB */}
-      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { backgroundColor: c.accent }]}>
+      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </PressableScale>
+      </View>
+
+        <DetailPane
+          open={!!selectedTask}
+          wide={showDetailColumn}
+          onClose={() => setSelected(null)}
+          isDark={isDark}
+          sheetColor={c.sheet}
+          borderColor={c.border}
+          maxHeight={height * 0.88}
+          scrollRef={detailScrollRef}
+          empty={
+            <>
+              <IconSymbol name="checklist" size={40} color={c.sub} />
+              <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginTop: 12 }}>{tr.detailEmptyTitle}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 6 }}>{tr.detailEmptyHint}</Text>
+            </>
+          }>
+          {detailBody}
+        </DetailPane>
+      </View>
+
 
       <MeetingFormSheet
         visible={showMeetingForm}
@@ -2082,7 +1963,7 @@ export default function TasksScreen() {
               </View>
               {/* Task + Meeting list */}
               <ScrollView
-                style={{ maxHeight: Dimensions.get('window').height * 0.5 }}
+                style={{ maxHeight: height * 0.5 }}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 8 }}
                 showsVerticalScrollIndicator={false}>
 
@@ -2298,7 +2179,7 @@ export default function TasksScreen() {
       <Modal visible={showFilterSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
         <Pressable style={s.overlay} onPress={() => setShowFilterSheet(false)}>
           <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -2454,7 +2335,7 @@ export default function TasksScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -2491,1101 +2372,31 @@ export default function TasksScreen() {
 
       {/* ─── Add Task Modal ─── */}
       <SheetModal visible={showAdd} onClose={() => setShowAdd(false)}>
-        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                  <Text style={[s.sheetTitle, { color: c.text }]}>{tr.newTask}</Text>
-
-                  <TextInput
-                    placeholder={tr.taskNamePlaceholder}
-                    placeholderTextColor={c.sub}
-                    value={newTitle}
-                    onChangeText={setNewTitle}
-                    style={[s.input, { backgroundColor: c.dim, color: c.text }]}
-                  />
-                  <TextInput
-                    placeholder={tr.taskDescPlaceholder}
-                    placeholderTextColor={c.sub}
-                    value={newDesc}
-                    onChangeText={setNewDesc}
-                    style={[s.input, { backgroundColor: c.dim, color: c.text, marginTop: 8 }]}
-                  />
-
-                  {/* Priority */}
-                  <Text style={[s.label, { color: c.sub }]}>{tr.priority}</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {(['high', 'medium', 'low'] as Priority[]).map(p => (
-                      <TouchableOpacity key={p} onPress={() => setNewPriority(p)} style={[s.priorityBtn, { borderColor: PRIORITY[p].color, backgroundColor: newPriority === p ? PRIORITY[p].color : 'transparent' }]}>
-                        <Text style={{ color: newPriority === p ? '#fff' : PRIORITY[p].color, fontSize: 12, fontWeight: '600' }}>{PRIORITY[p].label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <Text style={[s.label, { color: c.sub }]}>{lang === 'uk' ? 'Статус' : 'Status'}</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                    <View style={{ flexDirection: 'row', gap: 7 }}>
-                      {taskStatuses.map(column => (
-                        <TouchableOpacity key={column.id} onPress={() => setNewStatusId(column.id)} style={[s.sortChip, { backgroundColor: newStatusId === column.id ? column.color : c.dim, borderColor: newStatusId === column.id ? column.color : c.border }]}>
-                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: newStatusId === column.id ? '#fff' : column.color, marginRight: 5 }} />
-                          <Text style={{ color: newStatusId === column.id ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{column.name}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-
-                  {/* Project */}
-                  {pickableProjects.length > 0 && (
-                    <>
-                      <Text style={[s.label, { color: c.sub }]}>{tr.project}</Text>
-                      {/* Dropdown trigger */}
-                      <TouchableOpacity
-                        onPress={() => setShowNewProjectDropdown(v => !v)}
-                        style={[s.dropdownBtn, { backgroundColor: c.dim, borderColor: showNewProjectDropdown ? c.accent : c.border }]}>
-                        {(() => {
-                          const sel = projects.find(p => p.id === newProjectId);
-                          return sel ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
-                              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
-                              <Text style={{ color: sel.color, fontSize: 13, fontWeight: '600', flex: 1 }}>{sel.name}</Text>
-                            </View>
-                          ) : (
-                            <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', flex: 1 }}>{tr.noProject}</Text>
-                          );
-                        })()}
-                        <IconSymbol name={showNewProjectDropdown ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
-                      </TouchableOpacity>
-                      {showNewProjectDropdown && (
-                        <View style={[s.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
-                          <TouchableOpacity
-                            onPress={() => { setNewProjectId(null); setShowNewProjectDropdown(false); }}
-                            style={[s.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !newProjectId ? c.accent + '12' : 'transparent' }]}>
-                            <Text style={{ color: !newProjectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
-                            {!newProjectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
-                          </TouchableOpacity>
-                          {pickableProjects.map((p, i) => (
-                            <TouchableOpacity
-                              key={p.id}
-                              onPress={() => { setNewProjectId(p.id); setShowNewProjectDropdown(false); }}
-                              style={[s.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: newProjectId === p.id ? p.color + '12' : 'transparent' }]}>
-                              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: p.color, marginRight: 8 }} />
-                              <Text style={{ color: newProjectId === p.id ? p.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{p.name}</Text>
-                              {newProjectId === p.id && <IconSymbol name="checkmark" size={13} color={p.color} />}
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
-                    </>
-                  )}
-
-                  {/* Estimated time */}
-                  <Text style={[s.label, { color: c.sub }]}>{tr.timeEstimate}</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TextInput
-                      placeholder={tr.hoursPlaceholder}
-                      placeholderTextColor={c.sub}
-                      value={newEstHours}
-                      onChangeText={setNewEstHours}
-                      keyboardType="number-pad"
-                      style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                    />
-                    <TextInput
-                      placeholder={tr.minutesPlaceholder}
-                      placeholderTextColor={c.sub}
-                      value={newEstMins}
-                      onChangeText={setNewEstMins}
-                      keyboardType="number-pad"
-                      style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                    />
-                  </View>
-
-                  {/* Deadline */}
-                  <Text style={[s.label, { color: c.sub }]}>{tr.deadline}</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginBottom: 8 }}>
-                    <View style={{ flexDirection: 'row', gap: 7 }}>
-                      {DEADLINE_PRESETS.map(preset => {
-                        const d = new Date(); d.setDate(d.getDate() + preset.days);
-                        const iso = d.toISOString();
-                        const isSelected = newDeadline && new Date(newDeadline).toDateString() === d.toDateString();
-                        return (
-                          <TouchableOpacity
-                            key={preset.label}
-                            onPress={() => setNewDeadline(isSelected ? null : iso)}
-                            style={[s.sortChip, { backgroundColor: isSelected ? c.accent : c.dim, borderColor: isSelected ? c.accent : c.border }]}>
-                            <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>{preset.label}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                      <TouchableOpacity
-                        onPress={() => { Keyboard.dismiss(); setShowDeadlineCal(v => !v); }}
-                        style={[s.sortChip, { backgroundColor: showDeadlineCal ? c.accent + '20' : c.dim, borderColor: showDeadlineCal ? c.accent : c.border }]}>
-                        <IconSymbol name="calendar" size={13} color={showDeadlineCal ? c.accent : c.sub} />
-                        <Text style={{ color: showDeadlineCal ? c.accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>{tr.select}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </ScrollView>
-
-                  {newDeadline && (
-                    <View style={[s.badge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50', alignSelf: 'flex-start', marginBottom: 8 }]}>
-                      <IconSymbol name="calendar" size={11} color={c.accent} />
-                      <Text style={{ color: c.accent, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                        {new Date(newDeadline).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
-                      </Text>
-                      <TouchableOpacity onPress={() => setNewDeadline(null)} style={{ marginLeft: 6 }}>
-                        <IconSymbol name="xmark" size={11} color={c.accent} />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {showDeadlineCal && (
-                    <View style={[s.inlineCalendar, { borderColor: c.border, backgroundColor: c.dim }]}>
-                      <CalendarGrid
-                        year={deadlineCalYear} month={deadlineCalMonth}
-                        markedDays={new Set()}
-                        selectedDate={newDeadline ? new Date(newDeadline).toDateString() : null}
-                        todayDate={today}
-                        weeks={dlWeeks}
-                        months={MONTHS_UA}
-                        weekdays={WEEKDAYS_SHORT}
-                        onPrevMonth={() => { if (deadlineCalMonth === 0) { setDeadlineCalMonth(11); setDeadlineCalYear(y => y - 1); } else setDeadlineCalMonth(m => m - 1); }}
-                        onNextMonth={() => { if (deadlineCalMonth === 11) { setDeadlineCalMonth(0); setDeadlineCalYear(y => y + 1); } else setDeadlineCalMonth(m => m + 1); }}
-                        onSelectDay={(d) => { setNewDeadline(d.toISOString()); setShowDeadlineCal(false); }}
-                        c={c}
-                      />
-                    </View>
-                  )}
-
-                  {/* Recurrence */}
-                  <TouchableOpacity
-                    onPress={() => setNewRepeat(v => !v)}
-                    style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1,
-                      paddingHorizontal: 11, paddingVertical: 9, marginTop: 8,
-                      borderColor: newRepeat ? c.accent + '55' : c.border,
-                      backgroundColor: newRepeat ? c.accent + '10' : c.dim }}>
-                    <IconSymbol name="repeat" size={13} color={newRepeat ? c.accent : c.sub} />
-                    <Text style={{ color: newRepeat ? c.accent : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 6, flex: 1 }}>
-                      {tr.repeat ?? 'Повторювати'}
-                    </Text>
-                    <View style={{ width: 36, height: 22, borderRadius: 11, backgroundColor: newRepeat ? c.accent : c.border, justifyContent: 'center', paddingHorizontal: 2 }}>
-                      <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff', alignSelf: newRepeat ? 'flex-end' : 'flex-start' }} />
-                    </View>
-                  </TouchableOpacity>
-
-                  {newRepeat && (
-                    <View style={{ borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 7,
-                      borderColor: c.accent + '40', backgroundColor: c.accent + '08' }}>
-                      <View style={{ flexDirection: 'row', gap: 5, marginBottom: 10 }}>
-                        {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => {
-                          const labels = { daily: 'Щодня', weekly: 'Щотижня', monthly: 'Щомісяця', yearly: 'Щороку' };
-                          const on = newRepeatFreq === f;
-                          return (
-                            <TouchableOpacity key={f} onPress={() => { setNewRepeatFreq(f); if (f !== 'weekly') setNewRepeatDays([]); }}
-                              style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
-                                backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                              <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{labels[f]}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>Кожні</Text>
-                        <TouchableOpacity onPress={() => setNewRepeatInterval(i => Math.max(1, i - 1))}
-                          style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>−</Text>
-                        </TouchableOpacity>
-                        <Text style={{ color: c.accent, fontSize: 16, fontWeight: '800', minWidth: 24, textAlign: 'center' }}>{newRepeatInterval}</Text>
-                        <TouchableOpacity onPress={() => setNewRepeatInterval(i => Math.min(99, i + 1))}
-                          style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>+</Text>
-                        </TouchableOpacity>
-                        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
-                          {newRepeatFreq === 'daily' ? (newRepeatInterval === 1 ? 'день' : 'дн.') :
-                           newRepeatFreq === 'weekly' ? (newRepeatInterval === 1 ? 'тиждень' : 'тиж.') :
-                           newRepeatFreq === 'monthly' ? (newRepeatInterval === 1 ? 'місяць' : 'міс.') : 'рік'}
-                        </Text>
-                      </View>
-                      {newRepeatFreq === 'weekly' && (
-                        <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
-                          {['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map((d, i) => {
-                            const on = newRepeatDays.includes(i);
-                            return (
-                              <TouchableOpacity key={i} onPress={() => setNewRepeatDays(prev => on ? prev.filter(x => x !== i) : [...prev, i])}
-                                style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8,
-                                  backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                                <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{d}</Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      )}
-                      <View style={{ flexDirection: 'row', gap: 7 }}>
-                        {(['never', 'until'] as const).map(type => {
-                          const labels = { never: 'Ніколи', until: 'До дати' };
-                          const on = newRepeatEndType === type;
-                          return (
-                            <TouchableOpacity key={type} onPress={() => setNewRepeatEndType(type)}
-                              style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
-                                backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                              <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>{labels[type]}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      {newRepeatEndType === 'until' && (
-                        <View style={{ marginTop: 8 }}>
-                          <View
-                            style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1,
-                              paddingHorizontal: 11, paddingVertical: 9,
-                              borderColor: newRepeatUntil ? c.accent + '55' : c.border,
-                              backgroundColor: newRepeatUntil ? c.accent + '10' : c.dim }}>
-                            <IconSymbol name="calendar" size={13} color={newRepeatUntil ? c.accent : c.sub} />
-                            <TextInput
-                              placeholder="YYYY-MM-DD"
-                              placeholderTextColor={c.sub}
-                              value={newRepeatUntil}
-                              onChangeText={setNewRepeatUntil}
-                              style={{ color: newRepeatUntil ? c.accent : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1, padding: 0 }}
-                            />
-                          </View>
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
-                    <TouchableOpacity onPress={() => setShowAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                      <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityState={{ disabled: !newTitle.trim() }}
-                      disabled={!newTitle.trim()}
-                      onPress={addTask}
-                      style={[s.btn, {
-                        flex: 2,
-                        backgroundColor: newTitle.trim() ? c.accent : c.dim,
-                      }]}
-                    >
-                      <Text style={{ color: newTitle.trim() ? '#fff' : c.sub, fontWeight: '700' }}>{tr.add}</Text>
-                    </TouchableOpacity>
-                  </View>
+            <TaskEditForm
+              title={tr.newTask}
+              submitLabel={tr.add}
+              editor={composer}
+              taskStatuses={taskStatuses}
+              pickableProjects={pickableProjects}
+              projects={projects}
+              deadlineWeeks={dlWeeks}
+              priorityMeta={PRIORITY}
+              months={MONTHS_UA}
+              weekdays={WEEKDAYS_SHORT}
+              deadlinePresets={DEADLINE_PRESETS}
+              today={today}
+              onSave={addTask}
+              onCancel={() => { composer.reset(ACTIVE_COLUMN_ID); setShowAdd(false); }}
+              colors={c}
+              tr={tr}
+              locale={locale}
+            />
           </ScrollView>
         </BlurView>
       </SheetModal>
 
-      {/* ─── Detail Modal ─── */}
-      <Modal visible={!!selectedTask} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setSelected(null)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
-              {selectedTask && (
-                <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-                  <ScrollView ref={detailScrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                    <View style={s.handleRow}>
-                      <View style={{ flex: 1 }}>
-                        {!isEditingTask && detailTab === 'info' && (
-                          <TouchableOpacity
-                            onPress={() => {
-                              setEditTitle(selectedTask.title);
-                              setEditDesc(selectedTask.description ?? '');
-                              setEditPriority(selectedTask.priority);
-                              setEditStatusId(taskColumnId(selectedTask, taskStatuses));
-                              const h = selectedTask.estimatedMinutes ? Math.floor(selectedTask.estimatedMinutes / 60) : 0;
-                              const m = selectedTask.estimatedMinutes ? selectedTask.estimatedMinutes % 60 : 0;
-                              setEditEstHours(h > 0 ? String(h) : '');
-                              setEditEstMins(m > 0 ? String(m) : '');
-                              setEditDeadline(selectedTask.deadline ?? null);
-                              setEditDeadlineCalYear(today.getFullYear());
-                              setEditDeadlineCalMonth(today.getMonth());
-                              setShowEditDeadlineCal(false);
-                              setShowEditProjectDropdown(false);
-                              const rec = selectedTask.recurrence;
-                              setEditRepeat(!!rec);
-                              setEditRepeatFreq(rec?.freq ?? 'weekly');
-                              setEditRepeatInterval(rec?.interval ?? 1);
-                              setEditRepeatDays(rec?.daysOfWeek ?? []);
-                              setEditRepeatEndType(rec?.until ? 'until' : 'never');
-                              setEditRepeatUntil(rec?.until ?? '');
-                              setIsEditingTask(true);
-                            }}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                            <IconSymbol name="pencil" size={17} color={c.sub} />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                      <View style={[s.handle, { backgroundColor: c.border }]} />
-                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <TouchableOpacity onPress={() => { setSelected(null); setIsEditingTask(false); setShowEditDeadlineCal(false); setShowEditProjectDropdown(false); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                          <IconSymbol name="xmark" size={17} color={c.sub} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Tab Switcher */}
-                    {!isEditingTask && (
-                      <View style={{ flexDirection: 'row', gap: 5, marginBottom: 16, backgroundColor: c.dim, borderRadius: 12, padding: 4 }}>
-                        {(['info', 'timer', 'history'] as const).map(tab => (
-                          <TouchableOpacity
-                            key={tab}
-                            onPress={() => setDetailTab(tab)}
-                            style={{ flex: 1, paddingVertical: 8, borderRadius: 9, backgroundColor: detailTab === tab ? c.accent : 'transparent', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 5 }}>
-                            <IconSymbol
-                              name={tab === 'info' ? 'list.bullet' : tab === 'timer' ? 'timer' : 'clock.arrow.circlepath'}
-                              size={12}
-                              color={detailTab === tab ? '#fff' : c.sub}
-                            />
-                            <Text style={{ color: detailTab === tab ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>
-                              {tab === 'info' ? tr.details : tab === 'timer' ? tr.tracker : tr.history}
-                            </Text>
-                            {tab === 'timer' && isTimerRunning && (
-                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: detailTab === 'timer' ? '#fff' : '#6366F1' }} />
-                            )}
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-
-                    {/* ─── Timer Tab ─── */}
-                    {!isEditingTask && detailTab === 'timer' && (
-                      <View>
-                        {/* Elapsed display */}
-                        <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' }}>
-                            {isTimerRunning ? tr.currentSession : tr.trackedTime}
-                          </Text>
-                          <Text style={{ color: c.text, fontSize: 44, fontWeight: '800', letterSpacing: -1 }}>
-                            {timerTick >= 0 && fmtClock(isTimerRunning ? calcElapsedSeconds(selectedTask) : getTotalTrackedSeconds(selectedTask))}
-                          </Text>
-                          {isTimerRunning && (() => {
-                            const ae = getActiveTimerEntry(selectedTask);
-                            return ae ? (
-                              <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
-                                Почато о {new Date(ae.startedAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
-                              </Text>
-                            ) : null;
-                          })()}
-                          {!isTimerRunning && (selectedTask.timeEntries?.length ?? 0) > 0 && (
-                            <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
-                              {(selectedTask.timeEntries ?? []).filter(e => e.endedAt).length} {lang === 'uk' ? 'сесій' : 'sessions'}
-                            </Text>
-                          )}
-                        </View>
-
-                        {/* Start / Stop button */}
-                        {selectedTask.status === 'active' && (
-                          <TouchableOpacity
-                            onPress={isTimerRunning ? stopTimer : startTimer}
-                            style={[s.btn, { backgroundColor: isTimerRunning ? '#EF4444' : '#6366F1' }]}>
-                            <IconSymbol name={isTimerRunning ? 'stop.fill' : 'play.fill'} size={15} color="#fff" />
-                            <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 8 }}>
-                              {isTimerRunning ? tr.stopTimer : tr.startTimer}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-
-                        {/* Sessions list */}
-                        {(selectedTask.timeEntries?.length ?? 0) > 0 && (
-                          <View style={{ marginTop: 18 }}>
-                            <Text style={[s.label, { color: c.sub }]}>{tr.sessions}</Text>
-                            {[...(selectedTask.timeEntries ?? [])].reverse().map((entry) => (
-                              <View key={entry.id} style={[s.subRow, { borderColor: !entry.endedAt ? '#6366F140' : c.border, backgroundColor: !entry.endedAt ? '#6366F108' : c.dim, marginBottom: 7 }]}>
-                                <IconSymbol name="timer" size={14} color={!entry.endedAt ? '#6366F1' : c.sub} />
-                                <View style={{ flex: 1, marginLeft: 10 }}>
-                                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>
-                                    {!entry.endedAt
-                                      ? fmtClock(Math.max(0, Math.floor((Date.now() - new Date(entry.startedAt).getTime()) / 1000)))
-                                      : fmtDur(entry.duration)}
-                                  </Text>
-                                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
-                                    {new Date(entry.startedAt).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })}
-                                    {' · '}
-                                    {new Date(entry.startedAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
-                                    {entry.endedAt ? ` → ${new Date(entry.endedAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}` : ''}
-                                  </Text>
-                                </View>
-                                {!entry.endedAt && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#6366F1' }} />}
-                              </View>
-                            ))}
-                          </View>
-                        )}
-
-                        {(selectedTask.timeEntries?.length ?? 0) === 0 && selectedTask.status === 'active' && (
-                          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 12 }}>
-                            {lang === 'uk' ? 'Натисніть «Запустити» щоб почати відстежувати час' : 'Press \'Start\' to begin tracking time'}
-                          </Text>
-                        )}
-                      </View>
-                    )}
-
-                    {/* ─── History Tab ─── */}
-                    {!isEditingTask && detailTab === 'history' && (
-                      <View>
-                        {!(selectedTask.history?.length) ? (
-                          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>
-                            {lang === 'uk' ? 'Немає записів в історії' : 'No history records'}
-                          </Text>
-                        ) : (
-                          [...(selectedTask.history ?? [])].reverse().map((event) => (
-                            <View key={event.id} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14, gap: 10 }}>
-                              <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: historyEventColor(event.type) + '20', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-                                <IconSymbol name={historyEventIcon(event.type) as any} size={14} color={historyEventColor(event.type)} />
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{HISTORY_LABELS[event.type]}</Text>
-                                {event.note ? <Text style={{ color: c.sub, fontSize: 12, marginTop: 1 }} numberOfLines={2}>{event.note}</Text> : null}
-                                <Text style={{ color: c.sub, fontSize: 11, marginTop: 3 }}>
-                                  {new Date(event.at).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })}
-                                  {' · '}
-                                  {new Date(event.at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
-                                </Text>
-                              </View>
-                            </View>
-                          ))
-                        )}
-                      </View>
-                    )}
-
-                    {isEditingTask ? (
-                      <>
-                        <Text style={[s.sheetTitle, { color: c.text }]}>{tr.editTask}</Text>
-
-                        <TextInput
-                          placeholder={tr.taskNamePlaceholder}
-                          placeholderTextColor={c.sub}
-                          value={editTitle}
-                          onChangeText={setEditTitle}
-                          style={[s.input, { backgroundColor: c.dim, color: c.text }]}
-                        />
-                        <TextInput
-                          placeholder={tr.taskDescPlaceholder}
-                          placeholderTextColor={c.sub}
-                          value={editDesc}
-                          onChangeText={setEditDesc}
-                          style={[s.input, { backgroundColor: c.dim, color: c.text, marginTop: 8 }]}
-                        />
-
-                        <Text style={[s.label, { color: c.sub }]}>{tr.priority}</Text>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                          {(['high', 'medium', 'low'] as Priority[]).map(p => (
-                            <TouchableOpacity key={p} onPress={() => setEditPriority(p)} style={[s.priorityBtn, { borderColor: PRIORITY[p].color, backgroundColor: editPriority === p ? PRIORITY[p].color : 'transparent' }]}>
-                              <Text style={{ color: editPriority === p ? '#fff' : PRIORITY[p].color, fontSize: 12, fontWeight: '600' }}>{PRIORITY[p].label}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-
-                        <Text style={[s.label, { color: c.sub }]}>{lang === 'uk' ? 'Статус' : 'Status'}</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                          <View style={{ flexDirection: 'row', gap: 7 }}>
-                            {taskStatuses.map(column => (
-                              <TouchableOpacity key={column.id} onPress={() => setEditStatusId(column.id)} style={[s.sortChip, { backgroundColor: editStatusId === column.id ? column.color : c.dim, borderColor: editStatusId === column.id ? column.color : c.border }]}>
-                                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: editStatusId === column.id ? '#fff' : column.color, marginRight: 5 }} />
-                                <Text style={{ color: editStatusId === column.id ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{column.name}</Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </ScrollView>
-
-                        {pickableProjects.length > 0 && (
-                          <>
-                            <Text style={[s.label, { color: c.sub }]}>{tr.project}</Text>
-                            <TouchableOpacity
-                              onPress={() => setShowEditProjectDropdown(v => !v)}
-                              style={[s.dropdownBtn, { backgroundColor: c.dim, borderColor: showEditProjectDropdown ? c.accent : c.border }]}>
-                              {(() => {
-                                const sel = projects.find(p => p.id === selectedTask.projectId);
-                                return sel ? (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
-                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
-                                    <Text style={{ color: sel.color, fontSize: 13, fontWeight: '600', flex: 1 }}>{sel.name}</Text>
-                                  </View>
-                                ) : (
-                                  <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', flex: 1 }}>{tr.noProject}</Text>
-                                );
-                              })()}
-                              <IconSymbol name={showEditProjectDropdown ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
-                            </TouchableOpacity>
-                            {showEditProjectDropdown && (
-                              <View style={[s.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
-                                <TouchableOpacity
-                                  onPress={() => { updateTaskProject(selectedTask.id, null); setShowEditProjectDropdown(false); }}
-                                  style={[s.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !selectedTask.projectId ? c.accent + '12' : 'transparent' }]}>
-                                  <Text style={{ color: !selectedTask.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
-                                  {!selectedTask.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
-                                </TouchableOpacity>
-                                {pickableProjects.map((proj, i) => (
-                                  <TouchableOpacity
-                                    key={proj.id}
-                                    onPress={() => { updateTaskProject(selectedTask.id, proj.id); setShowEditProjectDropdown(false); }}
-                                    style={[s.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: selectedTask.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
-                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: proj.color, marginRight: 8 }} />
-                                    <Text style={{ color: selectedTask.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
-                                    {selectedTask.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
-                                  </TouchableOpacity>
-                                ))}
-                              </View>
-                            )}
-                          </>
-                        )}
-
-                        <Text style={[s.label, { color: c.sub }]}>{tr.timeEstimate}</Text>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <TextInput
-                            placeholder={tr.hoursPlaceholder}
-                            placeholderTextColor={c.sub}
-                            value={editEstHours}
-                            onChangeText={setEditEstHours}
-                            keyboardType="number-pad"
-                            style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                          />
-                          <TextInput
-                            placeholder={tr.minutesPlaceholder}
-                            placeholderTextColor={c.sub}
-                            value={editEstMins}
-                            onChangeText={setEditEstMins}
-                            keyboardType="number-pad"
-                            style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                          />
-                        </View>
-
-                        <Text style={[s.label, { color: c.sub }]}>{tr.deadline}</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginBottom: 8 }}>
-                          <View style={{ flexDirection: 'row', gap: 7 }}>
-                            {DEADLINE_PRESETS.map(preset => {
-                              const d = new Date(); d.setDate(d.getDate() + preset.days);
-                              const iso = d.toISOString();
-                              const isSelected = editDeadline && new Date(editDeadline).toDateString() === d.toDateString();
-                              return (
-                                <TouchableOpacity
-                                  key={preset.label}
-                                  onPress={() => setEditDeadline(isSelected ? null : iso)}
-                                  style={[s.sortChip, { backgroundColor: isSelected ? c.accent : c.dim, borderColor: isSelected ? c.accent : c.border }]}>
-                                  <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>{preset.label}</Text>
-                                </TouchableOpacity>
-                              );
-                            })}
-                            <TouchableOpacity
-                              onPress={() => { Keyboard.dismiss(); setShowEditDeadlineCal(v => !v); }}
-                              style={[s.sortChip, { backgroundColor: showEditDeadlineCal ? c.accent + '20' : c.dim, borderColor: showEditDeadlineCal ? c.accent : c.border }]}>
-                              <IconSymbol name="calendar" size={13} color={showEditDeadlineCal ? c.accent : c.sub} />
-                              <Text style={{ color: showEditDeadlineCal ? c.accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>{tr.select}</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </ScrollView>
-
-                        {editDeadline && (
-                          <View style={[s.badge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50', alignSelf: 'flex-start', marginBottom: 8 }]}>
-                            <IconSymbol name="calendar" size={11} color={c.accent} />
-                            <Text style={{ color: c.accent, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                              {new Date(editDeadline).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
-                            </Text>
-                            <TouchableOpacity onPress={() => setEditDeadline(null)} style={{ marginLeft: 6 }}>
-                              <IconSymbol name="xmark" size={11} color={c.accent} />
-                            </TouchableOpacity>
-                          </View>
-                        )}
-
-                        {showEditDeadlineCal && (
-                          <View style={[s.inlineCalendar, { borderColor: c.border, backgroundColor: c.dim }]}>
-                            <CalendarGrid
-                              year={editDeadlineCalYear} month={editDeadlineCalMonth}
-                              markedDays={new Set()}
-                              selectedDate={editDeadline ? new Date(editDeadline).toDateString() : null}
-                              todayDate={today}
-                              weeks={editDlWeeks}
-                              months={MONTHS_UA}
-                              weekdays={WEEKDAYS_SHORT}
-                              onPrevMonth={() => { if (editDeadlineCalMonth === 0) { setEditDeadlineCalMonth(11); setEditDeadlineCalYear(y => y - 1); } else setEditDeadlineCalMonth(m => m - 1); }}
-                              onNextMonth={() => { if (editDeadlineCalMonth === 11) { setEditDeadlineCalMonth(0); setEditDeadlineCalYear(y => y + 1); } else setEditDeadlineCalMonth(m => m + 1); }}
-                              onSelectDay={(d) => { setEditDeadline(d.toISOString()); setShowEditDeadlineCal(false); }}
-                              c={c}
-                            />
-                          </View>
-                        )}
-
-                        {/* Recurrence (edit) */}
-                        <TouchableOpacity
-                          onPress={() => setEditRepeat(v => !v)}
-                          style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1,
-                            paddingHorizontal: 11, paddingVertical: 9, marginTop: 8,
-                            borderColor: editRepeat ? c.accent + '55' : c.border,
-                            backgroundColor: editRepeat ? c.accent + '10' : c.dim }}>
-                          <IconSymbol name="repeat" size={13} color={editRepeat ? c.accent : c.sub} />
-                          <Text style={{ color: editRepeat ? c.accent : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 6, flex: 1 }}>
-                            {tr.repeat ?? 'Повторювати'}
-                          </Text>
-                          <View style={{ width: 36, height: 22, borderRadius: 11, backgroundColor: editRepeat ? c.accent : c.border, justifyContent: 'center', paddingHorizontal: 2 }}>
-                            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff', alignSelf: editRepeat ? 'flex-end' : 'flex-start' }} />
-                          </View>
-                        </TouchableOpacity>
-
-                        {editRepeat && (
-                          <View style={{ borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 7,
-                            borderColor: c.accent + '40', backgroundColor: c.accent + '08' }}>
-                            <View style={{ flexDirection: 'row', gap: 5, marginBottom: 10 }}>
-                              {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => {
-                                const labels = { daily: 'Щодня', weekly: 'Щотижня', monthly: 'Щомісяця', yearly: 'Щороку' };
-                                const on = editRepeatFreq === f;
-                                return (
-                                  <TouchableOpacity key={f} onPress={() => { setEditRepeatFreq(f); if (f !== 'weekly') setEditRepeatDays([]); }}
-                                    style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
-                                      backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                                    <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{labels[f]}</Text>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                              <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>Кожні</Text>
-                              <TouchableOpacity onPress={() => setEditRepeatInterval(i => Math.max(1, i - 1))}
-                                style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-                                <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>−</Text>
-                              </TouchableOpacity>
-                              <Text style={{ color: c.accent, fontSize: 16, fontWeight: '800', minWidth: 24, textAlign: 'center' }}>{editRepeatInterval}</Text>
-                              <TouchableOpacity onPress={() => setEditRepeatInterval(i => Math.min(99, i + 1))}
-                                style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-                                <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>+</Text>
-                              </TouchableOpacity>
-                              <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
-                                {editRepeatFreq === 'daily' ? (editRepeatInterval === 1 ? 'день' : 'дн.') :
-                                 editRepeatFreq === 'weekly' ? (editRepeatInterval === 1 ? 'тиждень' : 'тиж.') :
-                                 editRepeatFreq === 'monthly' ? (editRepeatInterval === 1 ? 'місяць' : 'міс.') : 'рік'}
-                              </Text>
-                            </View>
-                            {editRepeatFreq === 'weekly' && (
-                              <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
-                                {['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map((d, i) => {
-                                  const on = editRepeatDays.includes(i);
-                                  return (
-                                    <TouchableOpacity key={i} onPress={() => setEditRepeatDays(prev => on ? prev.filter(x => x !== i) : [...prev, i])}
-                                      style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8,
-                                        backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                                      <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{d}</Text>
-                                    </TouchableOpacity>
-                                  );
-                                })}
-                              </View>
-                            )}
-                            <View style={{ flexDirection: 'row', gap: 7 }}>
-                              {(['never', 'until'] as const).map(type => {
-                                const labels = { never: 'Ніколи', until: 'До дати' };
-                                const on = editRepeatEndType === type;
-                                return (
-                                  <TouchableOpacity key={type} onPress={() => setEditRepeatEndType(type)}
-                                    style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
-                                      backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                                    <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>{labels[type]}</Text>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-                            {editRepeatEndType === 'until' && (
-                              <View style={{ marginTop: 8 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1,
-                                  paddingHorizontal: 11, paddingVertical: 9,
-                                  borderColor: editRepeatUntil ? c.accent + '55' : c.border,
-                                  backgroundColor: editRepeatUntil ? c.accent + '10' : c.dim }}>
-                                  <IconSymbol name="calendar" size={13} color={editRepeatUntil ? c.accent : c.sub} />
-                                  <TextInput
-                                    placeholder="YYYY-MM-DD"
-                                    placeholderTextColor={c.sub}
-                                    value={editRepeatUntil}
-                                    onChangeText={setEditRepeatUntil}
-                                    style={{ color: editRepeatUntil ? c.accent : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1, padding: 0 }}
-                                  />
-                                </View>
-                              </View>
-                            )}
-                          </View>
-                        )}
-
-                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 20, marginBottom: 8 }}>
-                          <TouchableOpacity onPress={() => { setIsEditingTask(false); setShowEditDeadlineCal(false); setShowEditProjectDropdown(false); }} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                            <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={saveTaskEdit} style={[s.btn, { flex: 2, backgroundColor: c.accent }]}>
-                            <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </>
-                    ) : detailTab === 'info' ? (
-                    <>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
-                      <AnimatedCheck
-                        checked={selectedTask.status === 'done'}
-                        color="#10B981"
-                        borderColor={c.border}
-                        size={22}
-                        radius={7}
-                        onPress={() => toggleTask(selectedTask.id)}
-                        hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
-                        style={{ marginTop: 2 }}
-                      />
-                      <Text style={[s.detailTitle, { color: c.text, flex: 1, marginHorizontal: 10 }]}>{selectedTask.title}</Text>
-                      <View style={[s.prioBadge, { backgroundColor: PRIORITY[selectedTask.priority].color + '22' }]}>
-                        <View style={[s.dot, { backgroundColor: PRIORITY[selectedTask.priority].color }]} />
-                        <Text style={{ color: PRIORITY[selectedTask.priority].color, fontSize: 11, fontWeight: '700', marginLeft: 4 }}>
-                          {PRIORITY[selectedTask.priority].label}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {selectedTask.description ? <Text style={[s.detailDesc, { color: c.sub }]}>{selectedTask.description}</Text> : null}
-
-                    {/* Статус: перенести завдання в іншу колонку прямо з деталей.
-                        Раніше це вимагало входу в режим редагування, тож
-                        перевести «В роботі» в інший статус було нікуди. */}
-                    <View style={{ marginTop: 12 }}>
-                      <Text style={[s.label, { color: c.sub }]}>{tr.status}</Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                        {taskStatuses.map(column => {
-                          const active = taskStatusColumn(selectedTask, taskStatuses).id === column.id;
-                          return (
-                            <TouchableOpacity
-                              key={column.id}
-                              onPress={() => setTaskColumn(selectedTask.id, column.id)}
-                              activeOpacity={0.7}
-                              accessibilityRole="button"
-                              accessibilityState={{ selected: active }}
-                              accessibilityLabel={column.name}
-                              style={{
-                                minHeight: 36,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                borderRadius: 10,
-                                borderWidth: 1,
-                                paddingHorizontal: 11,
-                                paddingVertical: 8,
-                                backgroundColor: active ? column.color + '20' : c.dim,
-                                borderColor: active ? column.color : c.border,
-                              }}>
-                              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: column.color, marginRight: 6 }} />
-                              <Text style={{ color: active ? column.color : c.sub, fontSize: 12, fontWeight: active ? '700' : '600' }}>
-                                {column.name}
-                              </Text>
-                              {/* Галочка, а не лише колір: вибраний стан не має
-                                  триматись виключно на кольорі. */}
-                              {active && <IconSymbol name="checkmark" size={11} color={column.color} style={{ marginLeft: 5 }} />}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-
-                    {/* Meta badges */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 }}>
-                      <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                        <IconSymbol name="calendar" size={11} color={c.sub} />
-                        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '500', marginLeft: 4 }}>
-                          {new Date(selectedTask.createdAt).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
-                        </Text>
-                      </View>
-                      {selectedTask.deadline && (
-                        <View style={[s.badge, { backgroundColor: isOverdue(selectedTask) ? '#EF444420' : c.dim, borderColor: isOverdue(selectedTask) ? '#EF444440' : c.border }]}>
-                          <IconSymbol name="flag" size={11} color={isOverdue(selectedTask) ? '#EF4444' : c.sub} />
-                          <Text style={{ color: isOverdue(selectedTask) ? '#EF4444' : c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                            Дедлайн: {new Date(selectedTask.deadline).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
-                          </Text>
-                        </View>
-                      )}
-                      {selectedTask.estimatedMinutes && (
-                        <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                          <IconSymbol name="timer" size={11} color={c.sub} />
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                            {selectedTask.estimatedMinutes >= 60
-                              ? `${Math.floor(selectedTask.estimatedMinutes / 60)}г ${selectedTask.estimatedMinutes % 60 > 0 ? `${selectedTask.estimatedMinutes % 60}хв` : ''}`
-                              : `${selectedTask.estimatedMinutes}хв`}
-                          </Text>
-                        </View>
-                      )}
-                      {selectedTask.recurrence && (
-                        <View style={[s.badge, { backgroundColor: c.accent + '15', borderColor: c.accent + '35' }]}>
-                          <IconSymbol name="repeat" size={11} color={c.accent} />
-                          <Text style={{ color: c.accent, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                            {selectedTask.recurrence.freq === 'daily' ? 'Щодня' :
-                             selectedTask.recurrence.freq === 'weekly' ? 'Щотижня' :
-                             selectedTask.recurrence.freq === 'monthly' ? 'Щомісяця' : 'Щороку'}
-                            {selectedTask.recurrence.interval > 1 ? ` ×${selectedTask.recurrence.interval}` : ''}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Reminder row */}
-                    <View style={{ marginTop: 7 }}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          if (showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId) {
-                            setShowReminderPicker(false);
-                          } else {
-                            openReminderPicker(selectedTask.id);
-                          }
-                        }}
-                        style={[s.badge, { backgroundColor: selectedTask.reminderAt ? '#F59E0B20' : c.dim, borderColor: selectedTask.reminderAt ? '#F59E0B50' : c.border, alignSelf: 'flex-start' }]}>
-                        <IconSymbol name="bell" size={11} color={selectedTask.reminderAt ? '#F59E0B' : c.sub} />
-                        <Text style={{ color: selectedTask.reminderAt ? '#F59E0B' : c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                          {selectedTask.reminderAt
-                            ? `Нагадування: ${new Date(selectedTask.reminderAt).toLocaleString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
-                            : tr.reminderDate}
-                        </Text>
-                        {selectedTask.reminderAt && (
-                          <TouchableOpacity
-                            onPress={(e) => { e.stopPropagation(); removeReminder(selectedTask.id); }}
-                            style={{ marginLeft: 6 }}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                            <IconSymbol name="xmark" size={10} color="#F59E0B" />
-                          </TouchableOpacity>
-                        )}
-                      </TouchableOpacity>
-
-                      {showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId && (
-                        <View style={[s.reminderPickerBox, { borderColor: c.border, backgroundColor: c.dim }]}>
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 8 }}>{tr.reminderDate}</Text>
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-                            <View style={{ flexDirection: 'row', gap: 7 }}>
-                              {[{ label: tr.dateToday, days: 0 }, { label: tr.dateTomorrow, days: 1 }, { label: tr.datePlus2, days: 2 }, { label: tr.datePlus7, days: 7 }].map(preset => {
-                                const d = new Date(); d.setDate(d.getDate() + preset.days);
-                                const iso = d.toISOString();
-                                const isSelected = reminderDate && new Date(reminderDate).toDateString() === d.toDateString();
-                                return (
-                                  <TouchableOpacity
-                                    key={preset.label}
-                                    onPress={() => {
-                                      const nd = new Date(d);
-                                      nd.setHours(parseInt(reminderHours || '0', 10), parseInt(reminderMins || '0', 10), 0, 0);
-                                      setReminderDate(nd.toISOString());
-                                    }}
-                                    style={[s.sortChip, { backgroundColor: isSelected ? '#F59E0B' : c.dim, borderColor: isSelected ? '#F59E0B' : c.border }]}>
-                                    <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>{preset.label}</Text>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-                          </ScrollView>
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 8 }}>{tr.timeLabel}</Text>
-                          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-                            <TextInput
-                              value={reminderHours}
-                              onChangeText={v => setReminderHours(v.replace(/\D/g, '').slice(0, 2))}
-                              keyboardType="number-pad"
-                              placeholder={lang === 'uk' ? 'ГГ' : 'HH'}
-                              placeholderTextColor={c.sub}
-                              style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                            />
-                            <Text style={{ color: c.sub, fontSize: 18, fontWeight: '700' }}>:</Text>
-                            <TextInput
-                              value={reminderMins}
-                              onChangeText={v => setReminderMins(v.replace(/\D/g, '').slice(0, 2))}
-                              keyboardType="number-pad"
-                              placeholder={lang === 'uk' ? 'ХХ' : 'MM'}
-                              placeholderTextColor={c.sub}
-                              style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1, textAlign: 'center' }]}
-                            />
-                          </View>
-                          <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <TouchableOpacity onPress={() => setShowReminderPicker(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                              <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={saveReminder} style={[s.btn, { flex: 2, backgroundColor: '#F59E0B' }]}>
-                              <IconSymbol name="bell" size={14} color="#fff" />
-                              <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 6 }}>{tr.setReminder}</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Project changer */}
-                    {pickableProjects.length > 0 && (
-                      <View style={{ marginTop: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                          <IconSymbol name="folder" size={12} color={c.sub} />
-                          <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0 }]}>{lang === 'uk' ? 'ПРОЕКТ' : 'PROJECT'}</Text>
-                        </View>
-                        {/* Dropdown trigger */}
-                        <TouchableOpacity
-                          onPress={() => setShowDetailProjectDropdown(v => !v)}
-                          style={[s.dropdownBtn, { backgroundColor: c.dim, borderColor: showDetailProjectDropdown ? c.accent : c.border }]}>
-                          {(() => {
-                            const sel = projects.find(p => p.id === selectedTask.projectId);
-                            return sel ? (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
-                                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
-                                <Text style={{ color: sel.color, fontSize: 13, fontWeight: '600', flex: 1 }}>{sel.name}</Text>
-                              </View>
-                            ) : (
-                              <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', flex: 1 }}>{tr.noProject}</Text>
-                            );
-                          })()}
-                          <IconSymbol name={showDetailProjectDropdown ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
-                        </TouchableOpacity>
-                        {showDetailProjectDropdown && (
-                          <View style={[s.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
-                            <TouchableOpacity
-                              onPress={() => { updateTaskProject(selectedTask.id, null); setShowDetailProjectDropdown(false); }}
-                              style={[s.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !selectedTask.projectId ? c.accent + '12' : 'transparent' }]}>
-                              <Text style={{ color: !selectedTask.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
-                              {!selectedTask.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
-                            </TouchableOpacity>
-                            {pickableProjects.map((proj, i) => (
-                              <TouchableOpacity
-                                key={proj.id}
-                                onPress={() => { updateTaskProject(selectedTask.id, proj.id); setShowDetailProjectDropdown(false); }}
-                                style={[s.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: selectedTask.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
-                                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: proj.color, marginRight: 8 }} />
-                                <Text style={{ color: selectedTask.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
-                                {selectedTask.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
-                      </View>
-                    )}
-
-                    {/* Subtasks section */}
-                    <View style={{ marginTop: 14, borderRadius: 16, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderWidth: 1, borderColor: c.border, padding: 12 }}>
-
-                    {selectedTask.subtasks.length > 0 && (
-                      <View style={{ marginBottom: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                          <IconSymbol name="list.bullet" size={13} color={c.sub} />
-                          <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0, flex: 1 }]}>
-                            {tr.subtasks} · {selectedTask.subtasks.filter(x => x.done).length}/{selectedTask.subtasks.length}
-                          </Text>
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{getProgress(selectedTask)}%</Text>
-                        </View>
-                        <View style={s.progressBg}>
-                          <View style={[s.progressFill, { width: `${getProgress(selectedTask)}%`, backgroundColor: selectedTask.status === 'done' ? '#10B981' : c.accent }]} />
-                        </View>
-                      </View>
-                    )}
-
-                    {!selectedTask.subtasks.length && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                        <IconSymbol name="list.bullet" size={13} color={c.sub} />
-                        <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0 }]}>{tr.subtasks}</Text>
-                      </View>
-                    )}
-
-                    {(() => {
-                      // completed subtasks go to end
-                      const sortedSubs = [...selectedTask.subtasks].sort((a, b) => Number(a.done) - Number(b.done));
-                      const LIMIT = 4;
-                      const hasMore = sortedSubs.length > LIMIT;
-                      const displaySubs = hasMore ? sortedSubs.slice(0, LIMIT) : sortedSubs;
-                      return (
-                        <View style={{ gap: 7 }}>
-                          {displaySubs.map((sub) => {
-                            const originalIdx = selectedTask.subtasks.findIndex(s => s.id === sub.id);
-                            if (editingSubId === sub.id) {
-                              return (
-                                <View key={sub.id} style={[s.subRow, { backgroundColor: c.dim, borderColor: c.accent + '80' }]}>
-                                  <View style={[s.subCheck, { borderColor: c.accent, backgroundColor: 'transparent' }]} />
-                                  <TextInput
-                                    value={editingSubText}
-                                    onChangeText={setEditingSubText}
-                                    autoFocus
-                                    onSubmitEditing={() => saveSubEdit(selectedTask.id, sub.id, editingSubText)}
-                                    returnKeyType="done"
-                                    style={[s.subTitle, { color: c.text, flex: 1, marginHorizontal: 10 }]}
-                                  />
-                                  <TouchableOpacity onPress={() => saveSubEdit(selectedTask.id, sub.id, editingSubText)}>
-                                    <IconSymbol name="checkmark.circle.fill" size={20} color={c.accent} />
-                                  </TouchableOpacity>
-                                </View>
-                              );
-                            }
-                            return (
-                              <TouchableOpacity
-                                key={sub.id}
-                                activeOpacity={0.7}
-                                onPress={() => toggleSubtask(selectedTask.id, sub.id)}
-                                onLongPress={() => showSubtaskActions(selectedTask.id, sub, originalIdx, selectedTask.subtasks.length)}
-                                delayLongPress={350}
-                                style={[s.subRow, { backgroundColor: c.dim, borderColor: sub.done ? '#10B98130' : c.border }]}>
-                                <View style={[s.subCheck, { borderColor: sub.done ? '#10B981' : c.border, backgroundColor: sub.done ? '#10B981' : 'transparent' }]}>
-                                  {sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
-                                </View>
-                                <Text style={[s.subTitle, { color: sub.done ? c.sub : c.text, textDecorationLine: sub.done ? 'line-through' : 'none', flex: 1, marginHorizontal: 10 }]}>{sub.title}</Text>
-                                <TouchableOpacity onPress={() => showSubtaskActions(selectedTask.id, sub, originalIdx, selectedTask.subtasks.length)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                                  <IconSymbol name="ellipsis" size={14} color={c.sub} />
-                                </TouchableOpacity>
-                              </TouchableOpacity>
-                            );
-                          })}
-
-                          {hasMore && (
-                            <TouchableOpacity
-                              onPress={() => {
-                                setSelected(null);
-                                setEditingSubId(null);
-                                router.push({ pathname: '/subtasks', params: { taskId: selectedTask.id } });
-                              }}
-                              style={[s.viewAllBtn, { backgroundColor: c.accent + '12', borderColor: c.accent + '40' }]}>
-                              <IconSymbol name="list.bullet" size={14} color={c.accent} />
-                              <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 8 }}>
-                                {lang === 'uk' ? 'Переглянути всі' : 'View all'} · {selectedTask.subtasks.length}
-                              </Text>
-                              <IconSymbol name="chevron.right" size={12} color={c.accent} />
-                            </TouchableOpacity>
-                          )}
-
-                          <View style={[s.addSubRow, { borderColor: c.border, backgroundColor: c.dim }]}>
-                            <IconSymbol name="plus" size={15} color={c.sub} />
-                            <TextInput
-                              placeholder={tr.addSubtask}
-                              placeholderTextColor={c.sub}
-                              value={newSubtask}
-                              onChangeText={setNewSubtask}
-                              onSubmitEditing={() => addSubtask(selectedTask.id)}
-                              returnKeyType="done"
-                              onFocus={() => setTimeout(() => detailScrollRef.current?.scrollToEnd({ animated: true }), 300)}
-                              style={[s.subInput, { color: c.text, flex: 1, marginLeft: 8 }]}
-                            />
-                            {newSubtask.trim() ? (
-                              <TouchableOpacity onPress={() => addSubtask(selectedTask.id)}>
-                                <IconSymbol name="checkmark.circle.fill" size={20} color={c.accent} />
-                              </TouchableOpacity>
-                            ) : null}
-                          </View>
-                        </View>
-                      );
-                    })()}
-
-                    </View>{/* end subtasks block */}
-
-                    {/* Quick timer launch from info tab */}
-                    {selectedTask.status === 'active' && (
-                      <TouchableOpacity
-                        onPress={() => { setDetailTab('timer'); if (!isTimerRunning) startTimer(); }}
-                        style={[s.btn, { marginTop: 14, backgroundColor: isTimerRunning ? '#6366F120' : '#6366F1EE', borderWidth: isTimerRunning ? 1 : 0, borderColor: '#6366F150' }]}>
-                        <IconSymbol name={isTimerRunning ? 'timer' : 'play.fill'} size={15} color={isTimerRunning ? '#6366F1' : '#fff'} />
-                        <Text style={{ color: isTimerRunning ? '#6366F1' : '#fff', fontWeight: '700', marginLeft: 7 }}>
-                          {isTimerRunning ? `${lang === 'uk' ? 'Таймер' : 'Timer'}: ${fmtClock(calcElapsedSeconds(selectedTask))}` : (lang === 'uk' ? 'Запустити таймер' : 'Start timer')}
-                        </Text>
-                        {isTimerRunning && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#6366F1', marginLeft: 6 }} />}
-                      </TouchableOpacity>
-                    )}
-
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                      <TouchableOpacity
-                        onPress={() => deleteTask(selectedTask.id, selectedTask.title)}
-                        style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
-                        <IconSymbol name="trash" size={15} color="#EF4444" />
-                        <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => toggleTask(selectedTask.id)}
-                        style={[s.btn, { flex: 2, backgroundColor: selectedTask.status === 'done' ? '#374151' : c.accent }]}>
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>{selectedTask.status === 'done' ? tr.restore : tr.completed}</Text>
-                      </TouchableOpacity>
-                    </View>
-                    </>
-                    ) : null}
-                  </ScrollView>
-                </BlurView>
-              )}
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {/* ─── Recording Modal ─── */}
       <Modal visible={!!recordingTaskId} transparent animationType="fade" statusBarTranslucent
@@ -3663,11 +2474,63 @@ export default function TasksScreen() {
 // ─── Compact Card ────────────────────────────────────────────────────────────
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
-function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, overdueLabel, priorityLabel, subtasksLabel }: {
+/**
+ * Рядок списку: анімаційна обгортка навколо картки.
+ *
+ * Окремий компонент, щоб renderItem не створював елементи анімації
+ * заново — і щоб memo нижче мала що порівнювати.
+ */
+const TaskListItem = React.memo(function TaskListItem({
+  task, index, animate, motion, statusColumn, onPress, onToggle,
+  c, isDark, projects, overdueLabel, priorityLabel, subtasksLabel,
+}: {
+  task: Task;
+  index: number;
+  animate: boolean;
+  motion: ReturnType<typeof useMotion>;
+  statusColumn: TaskStatusColumn;
+  onPress: (task: Task) => void;
+  onToggle: (task: Task) => void;
+  c: any;
+  isDark: boolean;
+  projects: Project[];
+  overdueLabel: string;
+  priorityLabel: string;
+  subtasksLabel: string;
+}) {
+  return (
+    <Animated.View
+      entering={animate ? motion.entering(FadeInDown.duration(200).delay(Math.min(index, 10) * 40)) : undefined}
+      exiting={motion.entering(FadeOutUp.duration(150))}
+      layout={motion.entering(LinearTransition.springify())}>
+      <CompactCard
+        task={task}
+        statusColumn={statusColumn}
+        onPress={onPress}
+        onToggle={onToggle}
+        c={c}
+        isDark={isDark}
+        projects={projects}
+        overdueLabel={overdueLabel}
+        priorityLabel={priorityLabel}
+        subtasksLabel={subtasksLabel}
+      />
+    </Animated.View>
+  );
+});
+
+/**
+ * Мемоізована: у списку її примірників стільки ж, скільки завдань, а екран
+ * перемальовується щосекунди, поки йде таймер. Щоб memo працювала,
+ * колбеки приймають завдання аргументом — інакше виклик довелося б
+ * загортати в стрілку, нову при кожному рендері.
+ */
+const CompactCard = React.memo(function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, overdueLabel, priorityLabel, subtasksLabel }: {
   task: Task;
   statusColumn: TaskStatusColumn;
-  onPress: () => void;
-  onToggle: () => void;
+  /** Завдання приходить аргументом, щоб екран міг тримати колбек стабільним. */
+  onPress: (task: Task) => void;
+  onToggle: (task: Task) => void;
   c: any;
   isDark: boolean;
   projects: Project[];
@@ -3707,7 +2570,7 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
   ].filter(Boolean).join(', ');
 
   return (
-    <PressableScale onPress={onPress}>
+    <PressableScale onPress={() => onPress(task)}>
       <BlurView
         intensity={isDark ? 18 : 35}
         tint={isDark ? 'dark' : 'light'}
@@ -3720,7 +2583,7 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
           borderColor={c.border}
           size={18}
           radius={5}
-          onPress={onToggle}
+          onPress={() => onToggle(task)}
           hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
           accessibilityRole="checkbox"
           accessibilityLabel={task.title}
@@ -3782,106 +2645,8 @@ function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, project
       </BlurView>
     </PressableScale>
   );
-}
+});
 
-// ─── Board Card ─────────────────────────────────────────────────────────────
-function BoardCard({ task, onPress, onToggle, c, isDark, todayLabel, yesterdayLabel, tomorrowLabel, locale }: {
-  task: Task;
-  onPress: () => void;
-  onToggle: () => void;
-  c: any;
-  isDark: boolean;
-  todayLabel: string;
-  yesterdayLabel: string;
-  tomorrowLabel: string;
-  locale: string;
-}) {
-  const overdue = isOverdue(task);
-  const isDone = task.status === 'done';
-  return (
-    <PressableScale onPress={onPress} style={{ marginBottom: 8 }}>
-      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={s.boardCard}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 7 }}>
-          <AnimatedCheck
-            checked={isDone}
-            color="#10B981"
-            borderColor={c.border}
-            size={18}
-            radius={5}
-            onPress={onToggle}
-            hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
-            style={{ marginTop: 1 }}
-          />
-          <View style={{ flex: 1 }}>
-            <Text numberOfLines={3} style={{ color: c.text, fontSize: 12, fontWeight: '600', lineHeight: 17, opacity: isDone ? 0.45 : 1, textDecorationLine: isDone ? 'line-through' : 'none' }}>
-              {task.title}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 7, gap: 5 }}>
-              <View style={[s.dot, { backgroundColor: PRIORITY_COLORS[task.priority] }]} />
-              {task.deadline && (
-                <Text style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 10, fontWeight: '500' }}>
-                  {deadlineLabel(task.deadline!, todayLabel, yesterdayLabel, tomorrowLabel, locale)}
-                </Text>
-              )}
-            </View>
-          </View>
-        </View>
-      </BlurView>
-    </PressableScale>
-  );
-}
-
-// ─── Calendar Grid ───────────────────────────────────────────────────────────
-function CalendarGrid({ year, month, markedDays, selectedDate, todayDate, weeks, onPrevMonth, onNextMonth, onSelectDay, c, months, weekdays }: {
-  year: number; month: number; markedDays: Set<string>; selectedDate: string | null;
-  todayDate: Date; weeks: (number | null)[][]; onPrevMonth: () => void; onNextMonth: () => void;
-  onSelectDay: (d: Date) => void; c: any;
-  months: string[]; weekdays: string[];
-}) {
-  return (
-    <>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-        <TouchableOpacity onPress={onPrevMonth} style={s.navBtn}>
-          <IconSymbol name="chevron.left" size={20} color={c.sub} />
-        </TouchableOpacity>
-        <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontWeight: '700' }}>
-          {months[month]} {year}
-        </Text>
-        <TouchableOpacity onPress={onNextMonth} style={s.navBtn}>
-          <IconSymbol name="chevron.right" size={20} color={c.sub} />
-        </TouchableOpacity>
-      </View>
-      <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-        {weekdays.map(d => (
-          <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
-        ))}
-      </View>
-      {weeks.map((week, wi) => (
-        <View key={wi} style={{ flexDirection: 'row', marginBottom: 4 }}>
-          {week.map((day, di) => {
-            if (!day) return <View key={di} style={{ flex: 1 }} />;
-            const dayDate = new Date(year, month, day);
-            const keyStr = `${year}-${month}-${day}`;
-            const isToday = dayDate.toDateString() === todayDate.toDateString();
-            const isSel = selectedDate === dayDate.toDateString();
-            const hasMark = markedDays.has(keyStr);
-            return (
-              <TouchableOpacity
-                key={di}
-                onPress={() => onSelectDay(dayDate)}
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}>
-                <View style={[s.dayCell, isSel && { backgroundColor: c.accent }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }]}>
-                  <Text style={{ color: isSel ? '#fff' : isToday ? c.accent : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
-                </View>
-                {hasMark && !isSel && <View style={[s.daydot, { backgroundColor: c.accent }]} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ))}
-    </>
-  );
-}
 
 // ─── Stat Cell ───────────────────────────────────────────────────────────────
 function StatCell({ value, label, color, sub }: any) {
@@ -3922,11 +2687,11 @@ const s = StyleSheet.create({
   pct:            { fontSize: 11, fontWeight: '600', minWidth: 30, fontVariant: ['tabular-nums'] },
   colLabel:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   emptyCol:       { borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 24, alignItems: 'center' },
-  fab:            { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 108 : 88, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  fab:            { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:   { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:          { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.88 },
-  detailSheet:    { borderRadius: 24, borderWidth: 1, padding: 20, maxHeight: Dimensions.get('window').height * 0.88, overflow: 'hidden' },
+  sheet:          { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  detailSheet:    { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   inlineCalendar: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 8 },
   reminderPickerBox: { borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 8 },
   handleRow:      { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },

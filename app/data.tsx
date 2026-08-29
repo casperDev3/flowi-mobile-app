@@ -5,7 +5,7 @@ import { File, Paths } from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -21,13 +21,15 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAutoBackup } from '@/store/auto-backup';
 import { BACKUP_KEYS } from '@/store/backup-keys';
-import { loadData, saveData } from '@/store/storage';
+import { loadData, notifyStorageChanged, saveData } from '@/store/storage';
 import { SYNC_ARRAY_KEYS, saveSynced } from '@/store/synced-storage';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const ALL_KEYS = [
   { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
   { key: 'task_statuses',     label: 'Статуси задач', icon: 'rectangle.3.group', color: '#8B5CF6' },
   { key: 'transactions',      label: 'Транзакції',  icon: 'banknote',           color: '#0EA5E9' },
+  { key: 'accounts',          label: 'Рахунки',     icon: 'creditcard.fill',    color: '#0EA5E9' },
   { key: 'time_entries',      label: 'Записи часу', icon: 'timer',              color: '#6366F1' },
   { key: 'notes',             label: 'Нотатки',     icon: 'note.text',          color: '#F59E0B' },
   { key: 'projects',          label: 'Проекти',     icon: 'folder.fill',        color: '#10B981' },
@@ -48,7 +50,7 @@ const ALL_KEYS = [
 
 // export key maps storage key → JSON key (snake_case → camelCase where needed)
 const EXPORT_KEY_MAP: Record<string, string> = {
-  tasks: 'tasks', task_statuses: 'taskStatuses', transactions: 'transactions', time_entries: 'timeEntries',
+  tasks: 'tasks', task_statuses: 'taskStatuses', transactions: 'transactions', accounts: 'accounts', time_entries: 'timeEntries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
   meetings: 'meetings', health_entries_v2: 'healthEntries',
   workouts: 'workouts', exercises: 'exercises', workout_programs: 'workoutPrograms',
@@ -57,7 +59,7 @@ const EXPORT_KEY_MAP: Record<string, string> = {
   health_vaccines: 'healthVaccines', health_habits: 'healthHabits',
 };
 const IMPORT_KEY_MAP: Record<string, string> = {
-  tasks: 'tasks', taskStatuses: 'task_statuses', transactions: 'transactions', timeEntries: 'time_entries',
+  tasks: 'tasks', taskStatuses: 'task_statuses', transactions: 'transactions', accounts: 'accounts', timeEntries: 'time_entries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
   meetings: 'meetings', healthEntries: 'health_entries_v2',
   workouts: 'workouts', exercises: 'exercises', workoutPrograms: 'workout_programs',
@@ -68,7 +70,7 @@ const IMPORT_KEY_MAP: Record<string, string> = {
   categories: 'categories',
 };
 
-// Службові ключі синхронізації — очищуються разом з даними, але НЕ: auth, app_mode, onboarding, lang, notificationsEnabled
+// Службові ключі синхронізації — очищуються разом з даними, але НЕ: auth, app_mode, lang, notificationsEnabled
 const SERVICE_CLEAR_KEYS = [
   'sync_outbox',
   'sync_pending_conflicts',
@@ -99,6 +101,7 @@ function formatBackupTime(date: Date | null): string {
 type Counts = Record<string, number>;
 
 export default function DataScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { triggerBackup, getLastBackupTime, getLastBackupUri, isAutoBackupEnabled, setAutoBackupEnabled } = useAutoBackup();
@@ -111,7 +114,9 @@ export default function DataScreen() {
   const [restoring, setRestoring] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
-  const c = {
+  // Палітра — у useMemo: рядки статистики під React.memo інакше
+  // перемальовувалися б через новий об'єкт кольорів на кожен рендер.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
@@ -119,10 +124,7 @@ export default function DataScreen() {
     sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
-    overlay:isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
-    sheet:  isDark ? '#1A1830' : '#F8F6FF',
-  };
+  }), [isDark]);
 
   const loadCounts = useCallback(async () => {
     const results = await Promise.all(ALL_KEYS.map(k => loadData<any[]>(k.key, [])));
@@ -137,12 +139,12 @@ export default function DataScreen() {
     isAutoBackupEnabled().then(setAutoBackup);
   }, [loadCounts, getLastBackupTime, isAutoBackupEnabled]);
 
-  const handleAutoBackupToggle = async (val: boolean) => {
+  const handleAutoBackupToggle = useCallback(async (val: boolean) => {
     setAutoBackup(val);
     await setAutoBackupEnabled(val);
-  };
+  }, [setAutoBackupEnabled]);
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     if (exporting) return;
     setExporting(true);
     try {
@@ -172,9 +174,9 @@ export default function DataScreen() {
     } finally {
       setExporting(false);
     }
-  };
+  }, [exporting]);
 
-  const handleImport = async () => {
+  const handleImport = useCallback(async () => {
     if (importing) return;
     setImporting(true);
     try {
@@ -234,9 +236,9 @@ export default function DataScreen() {
       Alert.alert('Помилка', 'Не вдалося прочитати файл. Перевірте формат JSON.');
       setImporting(false);
     }
-  };
+  }, [importing, loadCounts, router]);
 
-  const handleBackupNow = async () => {
+  const handleBackupNow = useCallback(async () => {
     if (backingUp) return;
     setBackingUp(true);
     const path = await triggerBackup();
@@ -247,9 +249,9 @@ export default function DataScreen() {
     } else {
       Alert.alert('Помилка', 'Не вдалося створити резервну копію.');
     }
-  };
+  }, [backingUp, triggerBackup, getLastBackupTime]);
 
-  const handleOpenLastBackup = async () => {
+  const handleOpenLastBackup = useCallback(async () => {
     if (openingBackup) return;
     setOpeningBackup(true);
     try {
@@ -266,9 +268,9 @@ export default function DataScreen() {
     } finally {
       setOpeningBackup(false);
     }
-  };
+  }, [openingBackup, getLastBackupUri]);
 
-  const handleRestoreFromBackup = async () => {
+  const handleRestoreFromBackup = useCallback(async () => {
     if (restoring) return;
     setRestoring(true);
     try {
@@ -337,9 +339,9 @@ export default function DataScreen() {
       Alert.alert('Помилка', 'Не вдалося прочитати файл резервної копії.');
       setRestoring(false);
     }
-  };
+  }, [restoring, getLastBackupUri, loadCounts, router]);
 
-  const handleClear = () =>
+  const handleClear = useCallback(() =>
     Alert.alert(
       'Очистити всі дані?',
       'Цю дію неможливо скасувати. Всі записи будуть видалені.\nАкаунт і налаштування залишаться.',
@@ -356,10 +358,15 @@ export default function DataScreen() {
                 text: 'Видалити все', style: 'destructive',
                 onPress: async () => {
                   // Remove all BACKUP_KEYS data + service/sync keys
-                  await AsyncStorage.multiRemove([
+                  const cleared = [
                     ...(BACKUP_KEYS as readonly string[]),
                     ...(SERVICE_CLEAR_KEYS as readonly string[]),
-                  ]);
+                  ];
+                  await AsyncStorage.multiRemove(cleared);
+                  // multiRemove іде повз saveData, тож підписники сховища про
+                  // очищення не дізнались би. Стор активних таймерів після
+                  // цього повернув би стертий реєстр першим же стартом.
+                  cleared.forEach(notifyStorageChanged);
                   const empty: Counts = {};
                   ALL_KEYS.forEach(k => { empty[k.key] = 0; });
                   setCounts(empty);
@@ -370,7 +377,7 @@ export default function DataScreen() {
           ),
         },
       ],
-    );
+    ), []);
 
   const totalItems = Object.values(counts).reduce((s, v) => s + v, 0);
 
@@ -387,7 +394,7 @@ export default function DataScreen() {
           <View style={{ width: 36 }} />
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]} showsVerticalScrollIndicator={false}>
 
           {/* ─── Auto-backup ─── */}
           <Text style={[st.sectionLabel, { color: c.sub }]}>АВТО-РЕЗЕРВУВАННЯ</Text>
@@ -526,17 +533,17 @@ export default function DataScreen() {
               <Text style={[st.statVal, { color: c.accent }]}>{totalItems}</Text>
             </View>
             {ALL_KEYS.map((item, i) => (
-              <View
+              <StatRow
                 key={item.key}
-                style={[st.statRow, i < ALL_KEYS.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                <View style={[st.statDot, { backgroundColor: item.color + '20' }]}>
-                  <IconSymbol name={item.icon as IconSymbolName} size={13} color={item.color} />
-                </View>
-                <Text style={[st.statLabel, { color: c.sub }]}>{item.label}</Text>
-                <Text style={[st.statVal, { color: counts[item.key] ? c.text : c.sub }]}>
-                  {counts[item.key] ?? 0}
-                </Text>
-              </View>
+                icon={item.icon as IconSymbolName}
+                color={item.color}
+                label={item.label}
+                value={counts[item.key] ?? 0}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={i === ALL_KEYS.length - 1}
+              />
             ))}
           </BlurView>
         </ScrollView>
@@ -545,6 +552,33 @@ export default function DataScreen() {
     </View>
   );
 }
+
+// ─── Рядок статистики ────────────────────────────────────────────────────────
+
+interface StatRowProps {
+  icon: IconSymbolName;
+  color: string;
+  label: string;
+  value: number;
+  text: string;
+  sub: string;
+  border: string;
+  last: boolean;
+}
+
+const StatRow = React.memo(function StatRow(
+  { icon, color, label, value, text, sub, border, last }: StatRowProps,
+) {
+  return (
+    <View style={[st.statRow, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+      <View style={[st.statDot, { backgroundColor: color + '20' }]}>
+        <IconSymbol name={icon} size={13} color={color} />
+      </View>
+      <Text style={[st.statLabel, { color: sub }]}>{label}</Text>
+      <Text style={[st.statVal, { color: value ? text : sub }]}>{value}</Text>
+    </View>
+  );
+});
 
 const st = StyleSheet.create({
   header:      { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' },

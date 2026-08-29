@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -24,6 +25,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { setProjectArchived } from '@/utils/projectUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 export interface Project {
   id: string;
@@ -43,10 +45,72 @@ export interface Project {
 
 interface Task { id: string; projectId?: string; status: string; }
 
+/** Скільки задач у проєкті — всього, активних, виконаних. */
+interface ProjectCounts { total: number; active: number; done: number; }
+
+const EMPTY_COUNTS: ProjectCounts = { total: 0, active: 0, done: 0 };
 
 const PROJECT_COLORS = ['#7C3AED', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1'];
 
+interface ProjectCardProps {
+  project: Project;
+  counts: ProjectCounts;
+  isDark: boolean;
+  borderColor: string;
+  textColor: string;
+  subColor: string;
+  onPress: (project: Project) => void;
+  onDelete: (id: string) => void;
+}
+
+/**
+ * Картка мемоізована: без цього кожен рендер екрана (наприклад, набір
+ * тексту в модалці) перемальовує BlurView для всіх проєктів.
+ */
+const ProjectCard = React.memo(function ProjectCard({
+  project, counts, isDark, borderColor, textColor, subColor, onPress, onDelete,
+}: ProjectCardProps) {
+  const pct = counts.total > 0 ? Math.round((counts.done / counts.total) * 100) : 0;
+  return (
+    <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(project)}>
+      <BlurView
+        intensity={isDark ? 20 : 40}
+        tint={isDark ? 'dark' : 'light'}
+        style={[st.card, { borderColor }]}>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: counts.total > 0 ? 12 : 0 }}>
+          <View style={[st.colorBadge, { backgroundColor: project.color + '25', borderColor: project.color + '60' }]}>
+            <View style={[st.colorDot, { backgroundColor: project.color }]} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={{ color: textColor, fontSize: 15, fontWeight: '700' }}>{project.name}</Text>
+            <Text style={{ color: subColor, fontSize: 12, marginTop: 2 }}>
+              {counts.total === 0 ? 'Немає завдань' : `${counts.active} активних · ${counts.done} виконано`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => onDelete(project.id)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={{ padding: 4 }}>
+            <IconSymbol name="trash" size={16} color={subColor} />
+          </TouchableOpacity>
+        </View>
+
+        {counts.total > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={[st.progressBg, { flex: 1 }]}>
+              <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: project.color }]} />
+            </View>
+            <Text style={{ color: subColor, fontSize: 10, fontWeight: '700' }}>{pct}%</Text>
+          </View>
+        )}
+      </BlurView>
+    </TouchableOpacity>
+  );
+});
+
 export default function ProjectsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -76,6 +140,23 @@ export default function ProjectsScreen() {
   const archivedProjects = useMemo(() => projects.filter(p => !!p.archivedAt), [projects]);
   const visibleProjects = showArchived ? archivedProjects : liveProjects;
 
+  /**
+   * Один прохід по задачах замість трьох на кожен проєкт: раніше екран
+   * робив O(проєкти × задачі) фільтрувань на кожному рендері.
+   */
+  const countsByProject = useMemo(() => {
+    const map = new Map<string, ProjectCounts>();
+    tasks.forEach(t => {
+      if (!t.projectId) return;
+      const cur = map.get(t.projectId) ?? { total: 0, active: 0, done: 0 };
+      cur.total += 1;
+      if (t.status === 'active') cur.active += 1;
+      else if (t.status === 'done') cur.done += 1;
+      map.set(t.projectId, cur);
+    });
+    return map;
+  }, [tasks]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadAll().finally(() => setRefreshing(false));
@@ -89,21 +170,21 @@ export default function ProjectsScreen() {
     if (initialized) void saveSynced('projects', projects);
   }, [projects, initialized]);
 
-  const openAdd = () => {
+  const openAdd = useCallback(() => {
     setEditing(null);
     setName('');
     setColor(PROJECT_COLORS[0]);
     setShowModal(true);
-  };
+  }, []);
 
-  const openEdit = (p: Project) => {
+  const openEdit = useCallback((p: Project) => {
     setEditing(p);
     setName(p.name);
     setColor(p.color);
     setShowModal(true);
-  };
+  }, []);
 
-  const closeModal = () => setShowModal(false);
+  const closeModal = useCallback(() => setShowModal(false), []);
 
   const save = () => {
     if (!name.trim()) return;
@@ -132,18 +213,15 @@ export default function ProjectsScreen() {
     apply();
   };
 
-  const deleteProject = (id: string) => {
+  const deleteProject = useCallback((id: string) => {
     Alert.alert('Видалити проект?', "Завдання проекту залишаться, але без прив'язки.", [
       { text: 'Скасувати', style: 'cancel' },
       { text: 'Видалити', style: 'destructive', onPress: () => setProjects(prev => prev.filter(p => p.id !== id)) },
     ]);
-  };
+  }, []);
 
-  const taskCount = (projectId: string) => tasks.filter(t => t.projectId === projectId).length;
-  const activeCount = (projectId: string) => tasks.filter(t => t.projectId === projectId && t.status === 'active').length;
-  const doneCount = (projectId: string) => tasks.filter(t => t.projectId === projectId && t.status === 'done').length;
-
-  const c = {
+  // Палітра стабільна між рендерами — інакше React.memo на картці не спрацює.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
@@ -152,62 +230,82 @@ export default function ProjectsScreen() {
     accent: '#7C3AED',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-  };
+  }), [isDark]);
+
+  // Шапка їде разом зі списком, як і раніше, — тому вона ListHeaderComponent,
+  // а не окремий фіксований блок над FlatList.
+  const listHeader = (
+    <>
+      {/* Header */}
+      <View style={{ marginTop: 14, marginBottom: 28, flexDirection: 'row', alignItems: 'center' }}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[st.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
+          <IconSymbol name="chevron.left" size={17} color={c.sub} />
+        </TouchableOpacity>
+        <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 12 }]}>Проекти</Text>
+        <TouchableOpacity
+          onPress={openAdd}
+          style={[st.headerBtn, { backgroundColor: c.accent, borderColor: c.accent }]}>
+          <IconSymbol name="plus" size={17} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Живі / Архів. З'являється лише коли архів не порожній —
+          інакше це кнопка, яка нікуди не веде. */}
+      {archivedProjects.length > 0 && (
+        <View style={{ flexDirection: 'row', gap: 7, marginBottom: 18 }}>
+          {([
+            { key: false, label: 'Живі', count: liveProjects.length },
+            { key: true, label: 'Архів', count: archivedProjects.length },
+          ] as const).map(opt => (
+            <TouchableOpacity
+              key={String(opt.key)}
+              onPress={() => setShowArchived(opt.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: showArchived === opt.key }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 6,
+                paddingHorizontal: 13, paddingVertical: 8, borderRadius: 10, borderWidth: 1,
+                backgroundColor: showArchived === opt.key ? c.accent + '18' : c.dim,
+                borderColor: showArchived === opt.key ? c.accent : c.border,
+              }}>
+              <Text style={{ color: showArchived === opt.key ? c.accent : c.sub, fontWeight: '700', fontSize: 13 }}>
+                {opt.label}
+              </Text>
+              <Text style={{ color: c.sub, fontSize: 12 }}>{opt.count}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </>
+  );
 
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+        <FlatList
+          data={visibleProjects}
+          keyExtractor={project => project.id}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
-
-          {/* Header */}
-          <View style={{ marginTop: 14, marginBottom: 28, flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={[st.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-              <IconSymbol name="chevron.left" size={17} color={c.sub} />
-            </TouchableOpacity>
-            <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 12 }]}>Проекти</Text>
-            <TouchableOpacity
-              onPress={openAdd}
-              style={[st.headerBtn, { backgroundColor: c.accent, borderColor: c.accent }]}>
-              <IconSymbol name="plus" size={17} color="#fff" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Живі / Архів. З'являється лише коли архів не порожній —
-              інакше це кнопка, яка нікуди не веде. */}
-          {archivedProjects.length > 0 && (
-            <View style={{ flexDirection: 'row', gap: 7, marginBottom: 18 }}>
-              {([
-                { key: false, label: 'Живі', count: liveProjects.length },
-                { key: true, label: 'Архів', count: archivedProjects.length },
-              ] as const).map(opt => (
-                <TouchableOpacity
-                  key={String(opt.key)}
-                  onPress={() => setShowArchived(opt.key)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: showArchived === opt.key }}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 6,
-                    paddingHorizontal: 13, paddingVertical: 8, borderRadius: 10, borderWidth: 1,
-                    backgroundColor: showArchived === opt.key ? c.accent + '18' : c.dim,
-                    borderColor: showArchived === opt.key ? c.accent : c.border,
-                  }}>
-                  <Text style={{ color: showArchived === opt.key ? c.accent : c.sub, fontWeight: '700', fontSize: 13 }}>
-                    {opt.label}
-                  </Text>
-                  <Text style={{ color: c.sub, fontSize: 12 }}>{opt.count}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+          ListHeaderComponent={listHeader}
+          renderItem={({ item }) => (
+            <ProjectCard
+              project={item}
+              counts={countsByProject.get(item.id) ?? EMPTY_COUNTS}
+              isDark={isDark}
+              borderColor={c.border}
+              textColor={c.text}
+              subColor={c.sub}
+              onPress={openEdit}
+              onDelete={deleteProject}
+            />
           )}
-
-          {/* Empty */}
-          {visibleProjects.length === 0 && (
+          ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 64 }}>
               <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
                 <IconSymbol name="folder" size={32} color={c.accent} />
@@ -225,54 +323,8 @@ export default function ProjectsScreen() {
                 <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.newProject}</Text>
               </TouchableOpacity>
             </View>
-          )}
-
-          {/* Project cards */}
-          <View style={{ gap: 10 }}>
-            {visibleProjects.map(project => {
-              const total = taskCount(project.id);
-              const active = activeCount(project.id);
-              const done = doneCount(project.id);
-              const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-              return (
-                <TouchableOpacity key={project.id} activeOpacity={0.75} onPress={() => openEdit(project)}>
-                  <BlurView
-                    intensity={isDark ? 20 : 40}
-                    tint={isDark ? 'dark' : 'light'}
-                    style={[st.card, { borderColor: c.border }]}>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: total > 0 ? 12 : 0 }}>
-                      <View style={[st.colorBadge, { backgroundColor: project.color + '25', borderColor: project.color + '60' }]}>
-                        <View style={[st.colorDot, { backgroundColor: project.color }]} />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{project.name}</Text>
-                        <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
-                          {total === 0 ? 'Немає завдань' : `${active} активних · ${done} виконано`}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => deleteProject(project.id)}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        style={{ padding: 4 }}>
-                        <IconSymbol name="trash" size={16} color={c.sub} />
-                      </TouchableOpacity>
-                    </View>
-
-                    {total > 0 && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={[st.progressBg, { flex: 1 }]}>
-                          <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: project.color }]} />
-                        </View>
-                        <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700' }}>{pct}%</Text>
-                      </View>
-                    )}
-                  </BlurView>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
+          }
+        />
       </SafeAreaView>
 
       {/* Add/Edit Modal */}

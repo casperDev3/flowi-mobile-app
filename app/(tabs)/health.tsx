@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -33,8 +32,14 @@ import {
   HEALTH_ACCENTS, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
 import { HealthEntry, getMonthEntries, getWeeklyInsights } from '@/utils/healthUtils';
+import { useResponsive } from '@/hooks/use-responsive';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 
 export default function HealthHubScreen() {
+  const { sizeClass } = useResponsive();
+  // Дві колонки на телефоні, три на середньому вікні, чотири на широкому.
+  const tileColumns = sizeClass === 'expanded' ? 4 : sizeClass === 'medium' ? 3 : 2;
+  const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -97,6 +102,30 @@ export default function HealthHubScreen() {
   const insights = useMemo(() => getWeeklyInsights(h.entries).slice(0, 2), [h.entries]);
   const insightLabel: Record<string, string> = { steps: tr.steps, sleep: tr.sleep, water: tr.water, calories: tr.calories };
 
+  // Розділи здоровʼя одним списком: до цього вони були вшиті парами в
+  // рядки, тож змінити кількість колонок означало переписати розмітку.
+  const tiles = useMemo(() => [
+    { route: '/workouts',         title: tr.workoutsLabel,     icon: 'figure.run'      as const, color: ACCENT_STEPS,
+      hint: tr.workoutsSub },
+    { route: '/health-nutrition', title: tr.nutrition,         icon: 'flame.fill'      as const, color: ACCENT_CAL,
+      stat: `${cal.net} / ${goals.calories} ${tr.unitKcal}` },
+    { route: '/health-activity',  title: tr.activity,          icon: 'figure.walk'     as const, color: ACCENT_STEPS,
+      stat: stepsStat },
+    { route: '/health-sleep',     title: tr.sleepRecovery,     icon: 'moon.fill'       as const, color: ACCENT_SLEEP,
+      stat: today.sleep ? fmtSleep(today.sleep) : tr.noData },
+    { route: '/health-vitals',    title: tr.bodyMetrics,       icon: 'heart.fill'      as const, color: ACCENT_PULSE,
+      stat: latestWeight ? `${latestWeight} ${tr.unitKg} · ${bmi ? bmi.toFixed(1) : '—'}` : tr.noData },
+    { route: '/health-prevention',title: tr.prevention,        icon: 'cross.case.fill' as const, color: HEALTH_ACCENTS.prevention,
+      hint: tr.medsSub, badge: medsDue },
+    { route: '/health-body',      title: tr.bodyMeasurements,  icon: 'ruler.fill'      as const, color: ACCENT_WEIGHT,
+      stat: latestWeight ? `${latestWeight} ${tr.unitKg}` : tr.bodyMeasurementsSub },
+    { route: '/health-profile',   title: tr.healthProfile,     icon: 'person.fill'     as const, color: ACCENT_PROT,
+      hint: profile ? `${goals.calories} ${tr.unitKcal} · ${goals.protein} ${tr.unitGram}` : tr.profileHint },
+    { route: '/health-habits',    title: tr.habits,            icon: 'star.fill'       as const, color: '#F59E0B',
+      stat: habitsTotal > 0 ? `${habitsDone}/${habitsTotal}` : undefined,
+      hint: habitsTotal === 0 ? tr.habitsSub : undefined },
+  ], [tr, cal.net, goals, stepsStat, today.sleep, latestWeight, bmi, medsDue, profile, habitsDone, habitsTotal]);
+
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
@@ -107,7 +136,7 @@ export default function HealthHubScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 120 : 100 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset + 32 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 
@@ -191,39 +220,27 @@ export default function HealthHubScreen() {
 
           {/* Розділи */}
           <Text style={[s.kicker, { color: c.sub }]}>{tr.sections}</Text>
-          <View style={{ gap: 12 }}>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <HubTile title={tr.workoutsLabel} icon="figure.run" color={ACCENT_STEPS} hint={tr.workoutsSub}
-                onPress={() => router.push('/workouts')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-              <HubTile title={tr.nutrition} icon="flame.fill" color={ACCENT_CAL} stat={`${cal.net} / ${goals.calories} кк`}
-                onPress={() => router.push('/health-nutrition')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-            </View>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <HubTile title={tr.activity} icon="figure.walk" color={ACCENT_STEPS} stat={stepsStat}
-                onPress={() => router.push('/health-activity')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-              <HubTile title={tr.sleepRecovery} icon="moon.fill" color={ACCENT_SLEEP} stat={today.sleep ? fmtSleep(today.sleep) : tr.noData}
-                onPress={() => router.push('/health-sleep')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-            </View>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <HubTile title={tr.bodyMetrics} icon="heart.fill" color={ACCENT_PULSE} stat={latestWeight ? `${latestWeight} кг · ${bmi ? bmi.toFixed(1) : '—'}` : tr.noData}
-                onPress={() => router.push('/health-vitals')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-              <HubTile title={tr.prevention} icon="cross.case.fill" color={HEALTH_ACCENTS.prevention} hint={tr.medsSub} badge={medsDue}
-                onPress={() => router.push('/health-prevention')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-            </View>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <HubTile title={tr.bodyMeasurements} icon="ruler.fill" color={ACCENT_WEIGHT}
-                stat={latestWeight ? `${latestWeight} кг` : tr.bodyMeasurementsSub}
-                onPress={() => router.push('/health-body')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-              <HubTile title={tr.healthProfile} icon="person.fill" color={ACCENT_PROT}
-                hint={profile ? `${goals.calories} кк · ${goals.protein} г` : tr.profileHint}
-                onPress={() => router.push('/health-profile')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-            </View>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <HubTile title={tr.habits} icon="star.fill" color="#F59E0B"
-                stat={habitsTotal > 0 ? `${habitsDone}/${habitsTotal}` : undefined}
-                hint={habitsTotal === 0 ? tr.habitsSub : undefined}
-                onPress={() => router.push('/health-habits')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-            </View>
+          {/* Плитки розділів. Кількість колонок від ширини вікна: на
+              планшеті два стовпці дали б плитки завширшки з пів екрана
+              при висоті 112pt — смуги, а не картки. */}
+          <View style={s.tileGrid}>
+            {tiles.map(tile => (
+              <View key={tile.route} style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
+                <HubTile
+                  title={tile.title}
+                  icon={tile.icon}
+                  color={tile.color}
+                  stat={tile.stat}
+                  hint={tile.hint}
+                  badge={tile.badge}
+                  onPress={() => router.push(tile.route as never)}
+                  isDark={isDark}
+                  border={c.border}
+                  text={c.text}
+                  sub={c.sub}
+                />
+              </View>
+            ))}
           </View>
 
         </ScrollView>
@@ -263,6 +280,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, isD
   activeMonth: Date; setActiveMonth: (d: Date) => void;
   isDark: boolean; c: any; tr: any; locale: string;
 }) {
+  const { height } = useResponsive();
   const now = new Date();
   const monthEntries = useMemo(() => getMonthEntries(entries, activeMonth), [entries, activeMonth]);
   return (
@@ -284,7 +302,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, isD
               <MonthPicker month={activeMonth} onChange={setActiveMonth} months={tr.months}
                 accentColor={ACCENT} textColor={c.text} subColor={c.sub} dimColor={c.dim} borderColor={c.border} />
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: Dimensions.get('window').height * 0.58 }}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: height * 0.58 }}>
               {monthEntries.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                   <IconSymbol name="heart.fill" size={38} color={c.sub} />
@@ -337,6 +355,10 @@ function getEntryCfg(entry: HealthEntry, tr: any) {
 }
 
 const s = StyleSheet.create({
+  // Проміжок робиться внутрішнім відступом, а не gap: відсоткова ширина
+  // не віднімає gap, і на чотирьох колонках рядок переповнювався б.
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6 },
+  tileCell: { padding: 6 },
   pageTitle:    { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
   kicker:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginLeft: 2 },
   card:         { borderRadius: 18, borderWidth: 1, padding: 16, overflow: 'hidden' },

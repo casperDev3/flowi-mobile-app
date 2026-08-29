@@ -10,6 +10,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
 import { useScreenView } from '@/hooks/use-screen-view';
+import { useContentWidth } from '@/hooks/use-content-width';
+import { useResponsive } from '@/hooks/use-responsive';
 import { loadData } from '@/store/storage';
 import { useI18n } from '@/store/i18n';
 import { Events, track } from '@/utils/analytics';
@@ -20,6 +22,11 @@ import {
 } from '@/utils/preventionUtils';
 
 export default function PreventionScreen() {
+  const contentWidth = useContentWidth();
+  const { sizeClass } = useResponsive();
+  // Дві колонки на телефоні, три на середньому вікні, чотири на широкому:
+  // на планшеті дві плитки заввишки 112pt розтягувались би у смуги.
+  const tileColumns = sizeClass === 'expanded' ? 4 : sizeClass === 'medium' ? 3 : 2;
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -67,26 +74,34 @@ export default function PreventionScreen() {
           <Text style={[s.title, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.prevention}</Text>
         </View>
 
-        <View style={{ paddingHorizontal: 16, gap: 12 }}>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <HubTile title={tr.meds} icon="pills.fill" color={HEALTH_ACCENTS.prevention}
-              stat={activeMeds ? `${tr.medActive}: ${activeMeds}` : tr.medsSub} badge={medsDue}
-              onPress={() => router.push('/health-meds')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-            <HubTile title={tr.checkups} icon="cross.case.fill" color={ACCENT_PULSE}
-              stat={checkups.length ? `${checkups.length}` : tr.checkupsSub}
-              onPress={() => router.push('/health-checkups')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <HubTile title={tr.vaccines} icon="syringe" color={ACCENT_CAL}
-              stat={vaccines.length ? `${vaccines.length}` : tr.vaccinesSub}
-              onPress={() => router.push('/health-vaccines')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
-            <HubTile title={tr.habits} icon="checklist" color={ACCENT_PROT}
-              stat={habits.length ? `${habitsLeft} ${tr.dueToday}` : tr.habitsSub} badge={habitsLeft}
-              onPress={() => router.push('/health-habits')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+        <View style={[contentWidth, { paddingHorizontal: 16 }]}>
+          {/* Відʼємні поля сітки гасять padding крайніх комірок, тож на телефоні
+              зовнішні відступи лишаються такими самими, як були з gap: 12. */}
+          <View style={s.tileGrid}>
+            <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
+              <HubTile title={tr.meds} icon="pills.fill" color={HEALTH_ACCENTS.prevention}
+                stat={activeMeds ? `${tr.medActive}: ${activeMeds}` : tr.medsSub} badge={medsDue}
+                onPress={() => router.push('/health-meds')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+            </View>
+            <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
+              <HubTile title={tr.checkups} icon="cross.case.fill" color={ACCENT_PULSE}
+                stat={checkups.length ? `${checkups.length}` : tr.checkupsSub}
+                onPress={() => router.push('/health-checkups')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+            </View>
+            <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
+              <HubTile title={tr.vaccines} icon="syringe" color={ACCENT_CAL}
+                stat={vaccines.length ? `${vaccines.length}` : tr.vaccinesSub}
+                onPress={() => router.push('/health-vaccines')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+            </View>
+            <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
+              <HubTile title={tr.habits} icon="checklist" color={ACCENT_PROT}
+                stat={habits.length ? `${habitsLeft} ${tr.dueToday}` : tr.habitsSub} badge={habitsLeft}
+                onPress={() => router.push('/health-habits')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+            </View>
           </View>
 
           {/* Експорт звіту для лікаря */}
-          <TouchableOpacity onPress={exportReport} activeOpacity={0.85} style={{ marginTop: 4 }}>
+          <TouchableOpacity onPress={exportReport} activeOpacity={0.85} style={{ marginTop: 16 }}>
             <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.report, { borderColor: ACCENT + '40' }]}>
               <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
                 <IconSymbol name="square.and.arrow.up" size={18} color={ACCENT} />
@@ -107,5 +122,7 @@ export default function PreventionScreen() {
 const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
   title:  { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
+  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6, marginVertical: -6 },
+  tileCell: { padding: 6 },
   report: { borderRadius: 16, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
 });

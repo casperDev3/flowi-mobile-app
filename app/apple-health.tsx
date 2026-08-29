@@ -1,22 +1,20 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
-  Dimensions,
+  FlatList,
   Linking,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   HK_AVAILABLE,
@@ -30,8 +28,10 @@ import {
   fetchWorkouts,
   initHealthKit,
 } from '@/store/healthkit';
+import { useResponsive } from '@/hooks/use-responsive';
+import { useContentWidth, CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
+import { fmtSleep } from '@/utils/healthTheme';
 
-const { width: W } = Dimensions.get('window');
 
 const WORKOUT_NAMES: Record<number, string> = {
   1: 'Американський футбол', 2: 'Стрільба з лука', 3: 'Бадмінтон', 4: 'Бейсбол',
@@ -57,14 +57,10 @@ function fmtDuration(sec: number) {
   return `${m} хв`;
 }
 
-function fmtSleep(mins: number) {
-  const h = Math.floor(mins / 60), m = mins % 60;
-  if (h > 0 && m > 0) return `${h}г ${m}хв`;
-  if (h > 0) return `${h} год`;
-  return `${m} хв`;
-}
-
 const DAYS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+
+/** Проміжок між картками метрик; від нього рахується їхня ширина. */
+const GRID_GAP = 10;
 
 function MiniBarChart({ values, color, maxVal, height = 48 }: { values: (number | null)[]; color: string; maxVal?: number; height?: number }) {
   const max = maxVal ?? Math.max(...values.map(v => v ?? 0), 1);
@@ -84,8 +80,9 @@ function MiniBarChart({ values, color, maxVal, height = 48 }: { values: (number 
 }
 
 function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: string }) {
+  const { width } = useResponsive();
   if (!samples.length) return null;
-  const W_CHART = W - 64;
+  const W_CHART = width - 64;
   const H = 56;
   const values = samples.map(s => s.value);
   const min = Math.min(...values), max = Math.max(...values, min + 1);
@@ -117,9 +114,18 @@ function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: 
 }
 
 export default function AppleHealthScreen() {
+  const contentWidth = useContentWidth();
+  const { width, sizeClass } = useResponsive();
+  // Дві колонки на телефоні, три на середньому вікні, чотири на широкому.
+  const metricColumns = sizeClass === 'expanded' ? 4 : sizeClass === 'medium' ? 3 : 2;
+  // Ширина картки рахується від колонки контенту (вона обмежена 720pt), а не
+  // від вікна: інакше на планшеті дві картки по пів екрана вилазили б за неї.
+  const cardWidth = useMemo(() => {
+    const column = Math.min(width, CONTENT_MAX_WIDTH) - 32; // 16pt поля з боків
+    return (column - GRID_GAP * (metricColumns - 1)) / metricColumns;
+  }, [width, metricColumns]);
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -168,21 +174,32 @@ export default function AppleHealthScreen() {
       }
     });
     return () => sub.remove();
-  }, []);
+    // load — стабільний useCallback без залежностей, тож ефект не перезапускається.
+  }, [load]);
 
-  const c = {
+  // Палітра — у useMemo, щоб React.memo на картках метрик і тренувань
+  // не збивався новим обʼєктом на кожен ререндер (а їх тут багато: синхронізація
+  // оновлює стан чотири рази поспіль).
+  const c = useMemo(() => ({
     bg1: isDark ? '#080F18' : '#EFF8F4',
     bg2: isDark ? '#0F1A2A' : '#E0F2EE',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(16,185,129,0.15)',
     text: isDark ? '#E8FFF7' : '#0A2018',
     sub: isDark ? 'rgba(232,255,247,0.62)' : 'rgba(10,32,24,0.58)',
     dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  };
+  }), [isDark]);
 
   const weekLabels = week.map(d => {
     const date = new Date(d.date);
     return DAYS_SHORT[date.getDay() === 0 ? 6 : date.getDay() - 1];
   });
+
+  // Кожне тренування унікальне за моментом початку; індекс — запобіжник
+  // на випадок двох записів з однаковим startDate з різних джерел.
+  const workoutKey = useCallback((wo: HKWorkout, i: number) => `${wo.startDate}-${i}`, []);
+  const renderWorkout = useCallback(({ item }: { item: HKWorkout }) => (
+    <WorkoutCard wo={item} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+  ), [isDark, c]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -235,7 +252,17 @@ export default function AppleHealthScreen() {
             );
           }} />
         ) : (
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          // Список тренувань за 30 днів може бути довгим, тож він
+          // віртуалізований, а вся решта екрана поїхала в шапку списку.
+          <FlatList
+            data={workouts}
+            keyExtractor={workoutKey}
+            renderItem={renderWorkout}
+            ItemSeparatorComponent={WorkoutSeparator}
+            contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 40 }]}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+            <>
 
             {/* WIP banner */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#F59E0B44', backgroundColor: '#F59E0B12', padding: 14, marginBottom: 18 }}>
@@ -247,19 +274,25 @@ export default function AppleHealthScreen() {
 
             {/* Today summary grid */}
             <Text style={[s.sectionTitle, { color: c.text, marginTop: 4, marginBottom: 12 }]}>Сьогодні</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP }}>
               <MetricCard label="Кроки" value={today?.steps ? today.steps.toLocaleString('uk-UA') : '—'} unit=""
-                icon="figure.walk" color="#0EA5E9" isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+                icon="figure.walk" color="#0EA5E9" width={cardWidth}
+                isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               <MetricCard label="Активні кк" value={today?.activeCalories ? `${today.activeCalories}` : '—'} unit="кк"
-                icon="flame.fill" color="#F97316" isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+                icon="flame.fill" color="#F97316" width={cardWidth}
+                isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               <MetricCard label="Дистанція" value={today?.distanceKm != null ? `${today.distanceKm}` : '—'} unit="км"
-                icon="map.fill" color="#10B981" isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+                icon="map.fill" color="#10B981" width={cardWidth}
+                isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               <MetricCard label="Поверхи" value={today?.flightsClimbed ? `${today.flightsClimbed}` : '—'} unit="пов"
-                icon="arrow.up.circle.fill" color="#8B5CF6" isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+                icon="arrow.up.circle.fill" color="#8B5CF6" width={cardWidth}
+                isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               <MetricCard label="Сон" value={today?.sleepMinutes ? fmtSleep(today.sleepMinutes) : '—'} unit=""
-                icon="moon.fill" color="#6366F1" isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+                icon="moon.fill" color="#6366F1" width={cardWidth}
+                isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               <MetricCard label="Вага" value={today?.weight != null ? `${today.weight}` : '—'} unit="кг"
-                icon="scalemass.fill" color="#EC4899" isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+                icon="scalemass.fill" color="#EC4899" width={cardWidth}
+                isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
             </View>
 
             {/* Heart rate */}
@@ -328,63 +361,31 @@ export default function AppleHealthScreen() {
               </>
             )}
 
-            {/* Workouts */}
+            {/* Workouts: заголовок лишається в шапці, картки віддані FlatList */}
             {workouts.length > 0 && (
-              <>
-                <Text style={[s.sectionTitle, { color: c.text, marginTop: 24, marginBottom: 12 }]}>
-                  Тренування (30 днів)
-                </Text>
-                <View style={{ gap: 8 }}>
-                  {workouts.map((wo, i) => {
-                    const d = new Date(wo.startDate);
-                    const dateStr = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
-                    const timeStr = d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
-                    return (
-                      <BlurView key={i} intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
-                        style={[s.workoutCard, { borderColor: c.border }]}>
-                        <View style={[s.workoutIcon, { backgroundColor: '#10B98122' }]}>
-                          <IconSymbol name="figure.run" size={18} color="#10B981" />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>
-                            {workoutName(wo.activityId)}
-                          </Text>
-                          <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
-                            {dateStr} · {timeStr} · {wo.sourceName}
-                          </Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{fmtDuration(wo.duration)}</Text>
-                          <Text style={{ color: '#F97316', fontSize: 11, fontWeight: '600', marginTop: 2 }}>
-                            {Math.round(wo.calories)} кк
-                          </Text>
-                          {wo.distance > 0 && (
-                            <Text style={{ color: '#0EA5E9', fontSize: 11, fontWeight: '600' }}>
-                              {(wo.distance / 1000).toFixed(1)} км
-                            </Text>
-                          )}
-                        </View>
-                      </BlurView>
-                    );
-                  })}
-                </View>
-              </>
+              <Text style={[s.sectionTitle, { color: c.text, marginTop: 24, marginBottom: 12 }]}>
+                Тренування (30 днів)
+              </Text>
             )}
 
-          </ScrollView>
+            </>
+            }
+          />
         )}
       </SafeAreaView>
     </View>
   );
 }
 
-function MetricCard({ label, value, unit, icon, color, isDark, border, text, sub }: {
-  label: string; value: string; unit: string; icon: any; color: string;
+const MetricCard = React.memo(function MetricCard({ label, value, unit, icon, color, width, isDark, border, text, sub }: {
+  label: string; value: string; unit: string; icon: IconSymbolName; color: string;
+  /** Рахує екран — картка не має знати ні про вікно, ні про кількість колонок. */
+  width: number;
   isDark: boolean; border: string; text: string; sub: string;
 }) {
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ width: (W - 42) / 2, borderRadius: 16, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14 }}>
+      style={{ width, borderRadius: 16, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
         <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name={icon} size={14} color={color} />
@@ -396,7 +397,48 @@ function MetricCard({ label, value, unit, icon, color, isDark, border, text, sub
       </Text>
     </BlurView>
   );
+});
+
+/** Проміжок 8pt між картками тренувань — той самий, що давав gap у ScrollView. */
+function WorkoutSeparator() {
+  return <View style={{ height: 8 }} />;
 }
+
+const WorkoutCard = React.memo(function WorkoutCard({ wo, isDark, border, text, sub }: {
+  wo: HKWorkout; isDark: boolean; border: string; text: string; sub: string;
+}) {
+  const d = new Date(wo.startDate);
+  const dateStr = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+  const timeStr = d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
+      style={[s.workoutCard, { borderColor: border }]}>
+      <View style={[s.workoutIcon, { backgroundColor: '#10B98122' }]}>
+        <IconSymbol name="figure.run" size={18} color="#10B981" />
+      </View>
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text style={{ color: text, fontSize: 13, fontWeight: '700' }}>
+          {workoutName(wo.activityId)}
+        </Text>
+        <Text style={{ color: sub, fontSize: 11, marginTop: 2 }}>
+          {dateStr} · {timeStr} · {wo.sourceName}
+        </Text>
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={{ color: text, fontSize: 13, fontWeight: '700' }}>{fmtDuration(wo.duration)}</Text>
+        <Text style={{ color: '#F97316', fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+          {Math.round(wo.calories)} кк
+        </Text>
+        {wo.distance > 0 && (
+          <Text style={{ color: '#0EA5E9', fontSize: 11, fontWeight: '600' }}>
+            {(wo.distance / 1000).toFixed(1)} км
+          </Text>
+        )}
+      </View>
+    </BlurView>
+  );
+});
 
 function HRStatBox({ label, value, unit, color, c }: { label: string; value: number | null | undefined; unit: string; color: string; c: any }) {
   return (

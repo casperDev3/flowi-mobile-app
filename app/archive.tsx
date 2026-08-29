@@ -1,11 +1,10 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
-  Platform,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,6 +19,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
@@ -50,7 +50,109 @@ type SortBy = 'newest' | 'oldest' | 'priority' | 'name';
 
 const PRIORITY_ORDER: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 
+interface Palette {
+  border: string;
+  text: string;
+  sub: string;
+  accent: string;
+  dim: string;
+}
+
+interface ArchiveCardProps {
+  task: Task;
+  isDark: boolean;
+  c: Palette;
+  restoreLabel: string;
+  deleteLabel: string;
+  onRestore: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+/**
+ * Картка винесена й мемоізована: у списку на сотні виконаних завдань
+ * перемальовування всіх рядків на кожен tap по фільтру помітне оком.
+ */
+const ArchiveCard = React.memo(function ArchiveCard({
+  task, isDark, c, restoreLabel, deleteLabel, onRestore, onDelete,
+}: ArchiveCardProps) {
+  const prioColor = PRIORITY[task.priority].color;
+  return (
+    <BlurView
+      intensity={isDark ? 18 : 35}
+      tint={isDark ? 'dark' : 'light'}
+      style={[ar.card, { borderColor: c.border }]}>
+      {/* Green left stripe */}
+      <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: c.accent, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 }} />
+
+      <View style={{ marginLeft: 8, flex: 1 }}>
+        {/* Title row */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7 }}>
+          <AnimatedCheck
+            checked={true}
+            size={18}
+            radius={5}
+            color="#10B981"
+            /* read-only: no onPress */
+          />
+          <Text
+            style={{ color: c.sub, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 9, textDecorationLine: 'line-through', lineHeight: 18 }}
+            numberOfLines={2}>
+            {task.title}
+          </Text>
+        </View>
+
+        {/* Badge row */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 27 }}>
+          <View style={[ar.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: prioColor }} />
+            <Text style={{ color: prioColor, fontSize: 10, fontWeight: '700', marginLeft: 4 }}>
+              {PRIORITY[task.priority].label}
+            </Text>
+          </View>
+          {task.subtasks.length > 0 && (
+            <View style={[ar.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
+              <IconSymbol name="list.bullet" size={10} color={c.sub} />
+              <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>
+                {task.subtasks.filter(s => s.done).length}/{task.subtasks.length}
+              </Text>
+            </View>
+          )}
+          {task.deadline && (
+            <View style={[ar.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
+              <IconSymbol name="calendar" size={10} color={c.sub} />
+              <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>
+                {deadlineLabel(task.deadline)}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* Action buttons */}
+      <View style={{ flexDirection: 'row', gap: 6, marginLeft: 10 }}>
+        <TouchableOpacity
+          onPress={() => onRestore(task.id)}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          accessibilityRole="button"
+          accessibilityLabel={restoreLabel}
+          style={[ar.iconBtn, { backgroundColor: c.accent + '18', borderColor: c.accent + '40' }]}>
+          <IconSymbol name="arrow.uturn.backward" size={14} color={c.accent} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => onDelete(task.id)}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          accessibilityRole="button"
+          accessibilityLabel={deleteLabel}
+          style={[ar.iconBtn, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.28)' }]}>
+          <IconSymbol name="trash" size={14} color="#EF4444" />
+        </TouchableOpacity>
+      </View>
+    </BlurView>
+  );
+});
+
 export default function ArchiveScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -62,41 +164,41 @@ export default function ArchiveScreen() {
     loadData<Task[]>('tasks', []).then(setTasks);
   }, []));
 
-  const done = tasks
+  const done = useMemo(() => tasks
     .filter(t => t.status === 'done' && (filterPriority === null || t.priority === filterPriority))
     .sort((a, b) => {
       if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       if (sort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       if (sort === 'priority') return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
       return a.title.localeCompare(b.title, 'uk');
+    }), [tasks, filterPriority, sort]);
+
+  const restore = useCallback((id: string) => {
+    setTasks(prev => {
+      const updated = prev.map(t => (t.id === id ? { ...t, status: 'active' as Status } : t));
+      void saveSynced('tasks', updated);
+      return updated;
     });
+  }, []);
 
-  const restore = (id: string) => {
-    const updated = tasks.map(t =>
-      t.id === id
-        ? { ...t, status: 'active' as Status }
-        : t
-    );
-    setTasks(updated);
-    void saveSynced('tasks', updated);
-  };
-
-  const deleteForever = (id: string) => {
+  const deleteForever = useCallback((id: string) => {
     Alert.alert(
       'Видалити назавжди?',
       'Завдання буде видалено без можливості відновлення.',
       [
         { text: 'Скасувати', style: 'cancel' },
         { text: 'Видалити', style: 'destructive', onPress: () => {
-          const updated = tasks.filter(t => t.id !== id);
-          setTasks(updated);
-          void saveSynced('tasks', updated);
+          setTasks(prev => {
+            const updated = prev.filter(t => t.id !== id);
+            void saveSynced('tasks', updated);
+            return updated;
+          });
         }},
       ]
     );
-  };
+  }, []);
 
-  const clearAll = () => {
+  const clearAll = useCallback(() => {
     if (done.length === 0) return;
     Alert.alert(
       'Очистити архів?',
@@ -104,15 +206,19 @@ export default function ArchiveScreen() {
       [
         { text: 'Скасувати', style: 'cancel' },
         { text: 'Очистити', style: 'destructive', onPress: () => {
-          const updated = tasks.filter(t => t.status !== 'done');
-          setTasks(updated);
-          void saveSynced('tasks', updated);
+          setTasks(prev => {
+            const updated = prev.filter(t => t.status !== 'done');
+            void saveSynced('tasks', updated);
+            return updated;
+          });
         }},
       ]
     );
-  };
+  }, [done.length]);
 
-  const c = {
+  // Палітра стабільна між рендерами — інакше React.memo на картці
+  // не спрацює: новий об'єкт кольорів щоразу рахувався б як зміна пропа.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
     bg2:    isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
@@ -120,7 +226,19 @@ export default function ArchiveScreen() {
     sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#10B981',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  };
+  }), [isDark]);
+
+  const renderItem = useCallback(({ item }: { item: Task }) => (
+    <ArchiveCard
+      task={item}
+      isDark={isDark}
+      c={c}
+      restoreLabel={tr.restore}
+      deleteLabel={tr.delete}
+      onRestore={restore}
+      onDelete={deleteForever}
+    />
+  ), [isDark, c, tr.restore, tr.delete, restore, deleteForever]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -196,11 +314,16 @@ export default function ArchiveScreen() {
           ))}
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}>
-
-          {done.length === 0 && (
+        {/* Архів росте без стелі — список віртуалізований, інакше
+            кількасот BlurView-карток монтуються всі одразу. */}
+        <FlatList
+          data={done}
+          keyExtractor={task => task.id}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }]}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          renderItem={renderItem}
+          ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 72 }}>
               <View style={[ar.emptyIcon, { backgroundColor: c.accent + '15', borderColor: c.accent + '25' }]}>
                 <IconSymbol name="archivebox.fill" size={32} color={c.accent} />
@@ -208,88 +331,8 @@ export default function ArchiveScreen() {
               <Text style={{ color: c.sub, fontSize: 15, marginTop: 18, fontWeight: '600' }}>Архів порожній</Text>
               <Text style={{ color: c.sub, fontSize: 13, marginTop: 5, opacity: 0.7 }}>Виконані завдання з’являться тут</Text>
             </View>
-          )}
-
-          <View style={{ gap: 8 }}>
-            {done.map(task => {
-              const prioColor = PRIORITY[task.priority].color;
-              return (
-                <BlurView
-                  key={task.id}
-                  intensity={isDark ? 18 : 35}
-                  tint={isDark ? 'dark' : 'light'}
-                  style={[ar.card, { borderColor: c.border }]}>
-                  {/* Green left stripe */}
-                  <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: c.accent, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 }} />
-
-                  <View style={{ marginLeft: 8, flex: 1 }}>
-                    {/* Title row */}
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7 }}>
-                      <AnimatedCheck
-                        checked={true}
-                        size={18}
-                        radius={5}
-                        color="#10B981"
-                        /* read-only: no onPress */
-                      />
-                      <Text
-                        style={{ color: c.sub, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 9, textDecorationLine: 'line-through', lineHeight: 18 }}
-                        numberOfLines={2}>
-                        {task.title}
-                      </Text>
-                    </View>
-
-                    {/* Badge row */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 27 }}>
-                      <View style={[ar.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: prioColor }} />
-                        <Text style={{ color: prioColor, fontSize: 10, fontWeight: '700', marginLeft: 4 }}>
-                          {PRIORITY[task.priority].label}
-                        </Text>
-                      </View>
-                      {task.subtasks.length > 0 && (
-                        <View style={[ar.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                          <IconSymbol name="list.bullet" size={10} color={c.sub} />
-                          <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>
-                            {task.subtasks.filter(s => s.done).length}/{task.subtasks.length}
-                          </Text>
-                        </View>
-                      )}
-                      {task.deadline && (
-                        <View style={[ar.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                          <IconSymbol name="calendar" size={10} color={c.sub} />
-                          <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>
-                            {deadlineLabel(task.deadline)}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Action buttons */}
-                  <View style={{ flexDirection: 'row', gap: 6, marginLeft: 10 }}>
-                    <TouchableOpacity
-                      onPress={() => restore(task.id)}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      accessibilityRole="button"
-                      accessibilityLabel={tr.restore}
-                      style={[ar.iconBtn, { backgroundColor: c.accent + '18', borderColor: c.accent + '40' }]}>
-                      <IconSymbol name="arrow.uturn.backward" size={14} color={c.accent} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => deleteForever(task.id)}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      accessibilityRole="button"
-                      accessibilityLabel={tr.delete}
-                      style={[ar.iconBtn, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.28)' }]}>
-                      <IconSymbol name="trash" size={14} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                </BlurView>
-              );
-            })}
-          </View>
-        </ScrollView>
+          }
+        />
       </SafeAreaView>
     </View>
   );
@@ -303,7 +346,6 @@ const ar = StyleSheet.create({
   chip:       { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
   emptyIcon:  { width: 80, height: 80, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   card:       { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  doneCheck:  { width: 18, height: 18, borderRadius: 5, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   badge:      { flexDirection: 'row', alignItems: 'center', borderRadius: 7, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 3 },
   iconBtn:    { width: 32, height: 32, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

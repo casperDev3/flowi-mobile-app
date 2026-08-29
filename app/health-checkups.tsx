@@ -1,9 +1,10 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text,
+  TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,15 +16,20 @@ import { cancelById, scheduleDateReminder } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
-import { ACCENT_PULSE, getHealthColors } from '@/utils/healthTheme';
+import type { Translations } from '@/store/translations';
+import { ACCENT_PULSE, type HealthColors, getHealthColors } from '@/utils/healthTheme';
 import { CHECKUPS_KEY, Checkup, CheckupKind, genId } from '@/utils/preventionUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 export default function CheckupsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const c = getHealthColors(isDark);
+  // Палітра — у useMemo, інакше React.memo на картці не спрацює:
+  // getHealthColors повертає новий обʼєкт на кожен ререндер.
+  const c = useMemo(() => getHealthColors(isDark), [isDark]);
   useScreenView('health_checkups');
 
   const [items, setItems] = useState<Checkup[]>([]);
@@ -39,7 +45,6 @@ export default function CheckupsScreen() {
   useEffect(() => { loadData<Checkup[]>(CHECKUPS_KEY, []).then(d => { setItems(d); setInitialized(true); }); }, []);
   useEffect(() => { if (initialized) void saveSynced(CHECKUPS_KEY, items); }, [items, initialized]);
 
-  const kindLabel = (k: CheckupKind) => k === 'analysis' ? tr.kindAnalysis : k === 'visit' ? tr.kindVisit : tr.kindProcedure;
 
   const create = async () => {
     if (!title.trim()) return;
@@ -59,9 +64,17 @@ export default function CheckupsScreen() {
     setKind('analysis'); setTitle(''); setDate(new Date().toISOString().slice(0, 10)); setResult(''); setNextDate(''); setAdd(false);
   };
 
-  const remove = async (item: Checkup) => { await cancelById(item.notifId); setItems(p => p.filter(x => x.id !== item.id)); };
+  // Колбек мусить бути стабільним і приймати елемент аргументом — інакше
+  // нова стрілка на кожен ререндер зводить React.memo картки нанівець.
+  const remove = useCallback(async (item: Checkup) => {
+    await cancelById(item.notifId);
+    setItems(p => p.filter(x => x.id !== item.id));
+  }, []);
 
-  const fmtD = (d: string) => new Date(d).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  const keyExtractor = useCallback((item: Checkup) => item.id, []);
+  const renderItem = useCallback(({ item }: { item: Checkup }) => (
+    <CheckupCard item={item} onRemove={remove} isDark={isDark} c={c} tr={tr} locale={locale} />
+  ), [remove, isDark, c, tr, locale]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -77,31 +90,16 @@ export default function CheckupsScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-          {items.length === 0 ? <Empty c={c} text={tr.checkupsSub} icon="cross.case.fill" /> : items.map(item => (
-            <BlurView key={item.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: ACCENT_PULSE + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="cross.case.fill" size={17} color={ACCENT_PULSE} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{item.title}</Text>
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{kindLabel(item.kind)} · {fmtD(item.date)}</Text>
-                </View>
-                <TouchableOpacity onPress={() => remove(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
-                  <IconSymbol name="trash" size={15} color={c.sub} />
-                </TouchableOpacity>
-              </View>
-              {item.result ? <Text style={{ color: c.text, fontSize: 13, marginTop: 8 }}>{item.result}</Text> : null}
-              {item.nextDate ? (
-                <View style={[s.next, { borderColor: ACCENT_PULSE + '40', backgroundColor: ACCENT_PULSE + '12' }]}>
-                  <IconSymbol name="bell.fill" size={11} color={ACCENT_PULSE} />
-                  <Text style={{ color: ACCENT_PULSE, fontSize: 11, fontWeight: '700', marginLeft: 6 }}>{tr.upcoming}: {fmtD(item.nextDate)}</Text>
-                </View>
-              ) : null}
-            </BlurView>
-          ))}
-        </ScrollView>
+        {/* Історія обстежень накопичується роками, тож список
+            віртуалізований: ScrollView тримав би в памʼяті всі картки. */}
+        <FlatList
+          data={items}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<Empty c={c} text={tr.checkupsSub} icon="cross.case.fill" />}
+        />
       </SafeAreaView>
 
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
@@ -134,6 +132,38 @@ export default function CheckupsScreen() {
     </View>
   );
 }
+
+const CheckupCard = React.memo(function CheckupCard({ item, onRemove, isDark, c, tr, locale }: {
+  item: Checkup; onRemove: (item: Checkup) => void; isDark: boolean;
+  c: HealthColors; tr: Translations; locale: string;
+}) {
+  const fmtD = (d: string) => new Date(d).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  const kindLabel = item.kind === 'analysis' ? tr.kindAnalysis : item.kind === 'visit' ? tr.kindVisit : tr.kindProcedure;
+
+  return (
+    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: ACCENT_PULSE + '20', alignItems: 'center', justifyContent: 'center' }}>
+          <IconSymbol name="cross.case.fill" size={17} color={ACCENT_PULSE} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{item.title}</Text>
+          <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{kindLabel} · {fmtD(item.date)}</Text>
+        </View>
+        <TouchableOpacity onPress={() => onRemove(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
+          <IconSymbol name="trash" size={15} color={c.sub} />
+        </TouchableOpacity>
+      </View>
+      {item.result ? <Text style={{ color: c.text, fontSize: 13, marginTop: 8 }}>{item.result}</Text> : null}
+      {item.nextDate ? (
+        <View style={[s.next, { borderColor: ACCENT_PULSE + '40', backgroundColor: ACCENT_PULSE + '12' }]}>
+          <IconSymbol name="bell.fill" size={11} color={ACCENT_PULSE} />
+          <Text style={{ color: ACCENT_PULSE, fontSize: 11, fontWeight: '700', marginLeft: 6 }}>{tr.upcoming}: {fmtD(item.nextDate)}</Text>
+        </View>
+      ) : null}
+    </BlurView>
+  );
+});
 
 const s = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },

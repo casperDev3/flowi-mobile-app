@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -26,10 +25,13 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useMotion } from '@/hooks/use-motion';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { loadData } from '@/store/storage';
+import { mergeTaskStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
+import { groupTodayTasks } from '@/utils/todayGroups';
 import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { isSameDay } from '@/utils/dateUtils';
-import { Transaction, calcTotals, filterByMonth, txCurrency } from '@/utils/financeUtils';
+import { Transaction, calcTotals, filterByMonth } from '@/utils/financeUtils';
+import { resolveTxCurrency, type Account } from '@/utils/accounts';
 import {
   ACCENT, ACCENT_CAL, ACCENT_SLEEP, ACCENT_STEPS, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
@@ -37,6 +39,10 @@ import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, calcNetCalories, computeGo
 import { Habit, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { Task, isOverdue } from '@/utils/taskUtils';
 import { haptic } from '@/utils/haptics';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { formatDuration } from '@/utils/durationFormat';
+import { BUILTIN_CURRENCIES, formatCurrency, type Currency } from '@/utils/financeUtils';
+import { useResponsive } from '@/hooks/use-responsive';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -68,7 +74,35 @@ const QUICK_WATER  = 250;
  */
 const TODAY_PREVIEW_LIMIT = 3;
 
+/**
+ * Обгортка секції дашборду.
+ *
+ * Оголошена на рівні модуля, а не всередині екрана: локальна стрілка дає
+ * новий тип компонента при кожному рендері, і React перемонтовує всі
+ * вісім секцій — разом з їхніми анімаціями появи.
+ *
+ * На широкому екрані секції лягають у дві колонки. Дашборд із восьми
+ * карток в одну колонку на планшеті — це смуга контенту посеред
+ * порожнечі, а прокрутка вдвічі довша за потрібну.
+ */
+function Section({ index, wide, motion, children }: {
+  index: number;
+  wide: boolean;
+  motion: ReturnType<typeof useMotion>;
+  children: React.ReactNode;
+}) {
+  return (
+    <Animated.View
+      style={wide ? { width: '48.5%' } : undefined}
+      entering={motion.entering(FadeInDown.duration(250).delay(index * 50))}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export default function TodayScreen() {
+  const tabBarInset = useTabBarInset();
+  const { isWide } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -79,19 +113,28 @@ export default function TodayScreen() {
 
   const [tasks,    setTasks]    = useState<Task[]>([]);
   const [txs,      setTxs]      = useState<Transaction[]>([]);
+  // Рахунки потрібні лише як довідник валют: у нових операцій валюта живе на
+  // рахунку, а поле currency лишилося тільки в записах, створених до рахунків.
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  // Валюта зведення. До цього екран рахував лише UAH і підписував «₴»:
+  // у користувача з іншою валютою фінанси мовчки зникали зі зведення.
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [primaryCode, setPrimaryCode] = useState('UAH');
   const [time,     setTime]     = useState<TimeEntry[]>([]);
   const [health,   setHealth]   = useState<HealthEntry[]>([]);
   const [profile,  setProfile]  = useState<HealthProfile | null>(null);
   const [meetings, setMeetings] = useState<TodayMeeting[]>([]);
   const [habits,   setHabits]   = useState<Habit[]>([]);
+  const [statusColumns, setStatusColumns] = useState<TaskStatusColumn[]>([]);
   const [notesCount, setNotesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const firstLoadDone = useRef(false);
 
   const load = useCallback(async () => {
-    const [t, x, tm, h, p, m, hb, notes] = await Promise.all([
+    const [t, cols, x, tm, h, p, m, hb, notes, curs, primary, accs] = await Promise.all([
       loadData<Task[]>('tasks', []),
+      loadData<TaskStatusColumn[]>('task_statuses', []),
       loadData<Transaction[]>('transactions', []),
       loadData<TimeEntry[]>('time_entries', []),
       loadData<HealthEntry[]>('health_entries_v2', []),
@@ -99,10 +142,16 @@ export default function TodayScreen() {
       loadData<TodayMeeting[]>('meetings', []),
       loadData<Habit[]>('health_habits', []),
       loadData<{ updatedAt?: string; createdAt?: string }[]>('notes', []),
+      loadData<Currency[]>('finance_currencies', []),
+      loadData<string>('finance_primary_currency', 'UAH'),
+      loadData<Account[]>('accounts', []),
     ]);
-    setTasks(t); setTxs(x); setTime(tm); setHealth(h); setProfile(p);
+    setTasks(t); setStatusColumns(cols); setTxs(x); setTime(tm); setHealth(h); setProfile(p);
     setMeetings(m); setHabits(hb);
     setNotesCount(Array.isArray(notes) ? notes.length : 0);
+    setCurrencies(Array.isArray(curs) ? curs : []);
+    setPrimaryCode(typeof primary === 'string' && primary ? primary : 'UAH');
+    setAccounts(Array.isArray(accs) ? accs : []);
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -149,14 +198,13 @@ export default function TodayScreen() {
    * перша трійка, а й загальна кількість — щоб знати, чи показувати «показати
    * всі», і що написати на кнопці статистики.
    */
-  const todayTasks = useMemo(() => {
-    const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
-    return tasks
-      .filter(t => t.status === 'active'
-        && ((t.deadline && isSameDay(new Date(t.deadline), today)) || isOverdue(t)))
-      .sort((a, b) => (order[a.priority] ?? 1) - (order[b.priority] ?? 1));
+  const columns = useMemo(() => mergeTaskStatusColumns(statusColumns), [statusColumns]);
+
+  const todayGroups = useMemo(
+    () => groupTodayTasks(tasks, columns, today, TODAY_PREVIEW_LIMIT),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks]);
+    [tasks, columns],
+  );
 
   // Health
   const goals = useMemo(() => {
@@ -173,11 +221,25 @@ export default function TodayScreen() {
   const sleep  = lastForDay(health, 'sleep', today);
 
   // Finance (UAH)
+  const primaryCurrency = useMemo<Currency>(
+    () => [...BUILTIN_CURRENCIES, ...currencies].find(cur => cur.code === primaryCode)
+       ?? BUILTIN_CURRENCIES[0],
+    [currencies, primaryCode],
+  );
+
+  /**
+   * Зведення дня рахує лише оборот основної валюти. Перекази сюди не
+   * потрапляють: `calcTotals` бере тільки 'income' і 'expense', тож переїзд
+   * грошей між своїми рахунками не роздуває ні дохід, ні витрату місяця.
+   */
   const fin = useMemo(() => {
-    const month = filterByMonth(txs.filter(t => txCurrency(t) === 'UAH'), today);
+    const month = filterByMonth(
+      txs.filter(t => resolveTxCurrency(t, accounts) === primaryCode),
+      today,
+    );
     return calcTotals(month);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txs]);
+  }, [txs, accounts, primaryCode]);
 
   // Time today
   const trackedSec = time
@@ -241,21 +303,16 @@ export default function TodayScreen() {
 
   // ─── Formatters ────────────────────────────────────────────────────────────
 
-  const hUnit = lang === 'uk' ? 'г' : 'h';
-  const mUnit = lang === 'uk' ? 'хв' : 'm';
-  const fmtTime = (sec: number) => {
-    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
-    if (h > 0) return `${h}${hUnit} ${m}${mUnit}`;
-    return `${m}${mUnit}`;
-  };
-  const fmtMoney = (n: number) =>
-    `${n < 0 ? '−' : ''}${Math.abs(Math.round(n)).toLocaleString(locale)} ₴`;
-
-  const Section = ({ index, children }: { index: number; children: React.ReactNode }) => (
-    <Animated.View entering={motion.entering(FadeInDown.duration(250).delay(index * 50))}>
-      {children}
-    </Animated.View>
+  const durationUnits = useMemo(
+    () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
+    [tr.unitHour, tr.unitHourLong, tr.unitMinute],
   );
+  const fmtTime = useCallback((sec: number) => formatDuration(sec, durationUnits), [durationUnits]);
+  const fmtMoney = useCallback(
+    (n: number) => formatCurrency(n, primaryCurrency, locale),
+    [primaryCurrency, locale],
+  );
+
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -275,7 +332,7 @@ export default function TodayScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset + 24 }}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 
@@ -288,10 +345,11 @@ export default function TodayScreen() {
             </>
           )}
 
-          {loaded && <>
+          {loaded && (
+          <View style={isWide ? s.grid : undefined}>
 
           {/* 1. Завдання на сьогодні */}
-          <Section index={0}>
+          <Section index={0} wide={isWide} motion={motion}>
             <View style={{ marginBottom: 12 }}>
               <View style={s.sectionRow}>
                 <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayTasks}</Text>
@@ -310,23 +368,38 @@ export default function TodayScreen() {
                   </View>
                 </View>
               </View>
-              <TodayTaskRow
-                tasks={todayTasks.slice(0, TODAY_PREVIEW_LIMIT)}
-                isDark={isDark}
-                c={c}
-                tr={tr}
-                onToggle={handleToggleTask}
-                onOpen={openTaskDetails}
-              />
-              {todayTasks.length > TODAY_PREVIEW_LIMIT && (
+              {/* Групи за статусом. «У процесі» йде першою і не обрізається:
+                  на екрані дня спершу те, що робиться просто зараз. Заголовок
+                  групи показуємо лише коли груп справді кілька — над єдиним
+                  списком він був би шумом. */}
+              {todayGroups.groups.map(group => (
+                <View key={group.id}>
+                  {todayGroups.groups.length > 1 && (
+                    <View style={s.groupRow}>
+                      <View style={[s.groupDot, { backgroundColor: group.color }]} />
+                      <Text style={[s.groupName, { color: c.sub }]}>{group.name}</Text>
+                      <Text style={[s.groupCount, { color: c.sub }]}>{group.tasks.length}</Text>
+                    </View>
+                  )}
+                  <TodayTaskRow
+                    tasks={group.tasks}
+                    isDark={isDark}
+                    c={c}
+                    tr={tr}
+                    onToggle={handleToggleTask}
+                    onOpen={openTaskDetails}
+                  />
+                </View>
+              ))}
+              {todayGroups.hidden > 0 && (
                 <ShowAllRow
-                  label={tr.showAllCount.replace('{count}', String(todayTasks.length))}
+                  label={tr.showAllCount.replace('{count}', String(todayGroups.total))}
                   color={ACCENT_TASK}
                   c={c}
                   onPress={() => router.push('/')}
                 />
               )}
-              {todayTasks.length === 0 && (
+              {todayGroups.total === 0 && (
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
               )}
             </View>
@@ -334,7 +407,7 @@ export default function TodayScreen() {
 
           {/* 2. Зустрічі сьогодні */}
           {todayMeetings.length > 0 && (
-            <Section index={1}>
+            <Section index={1} wide={isWide} motion={motion}>
               <View style={{ marginBottom: 12 }}>
                 <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayMeetings}</Text>
                 {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(m => (
@@ -365,7 +438,7 @@ export default function TodayScreen() {
           )}
 
           {/* 3. Здоровʼя — hero-стрічка кілець */}
-          <Section index={2}>
+          <Section index={2} wide={isWide} motion={motion}>
             <PressableScale
               onPress={() => router.push('/health')}
               accessibilityRole="button"
@@ -390,7 +463,7 @@ export default function TodayScreen() {
           </Section>
 
           {/* 4. Швидкі дії */}
-          <Section index={3}>
+          <Section index={3} wide={isWide} motion={motion}>
             <QuickActions
               isDark={isDark}
               c={c}
@@ -404,7 +477,7 @@ export default function TodayScreen() {
 
           {/* 5. Звички */}
           {habits.length > 0 && (
-            <Section index={4}>
+            <Section index={4} wide={isWide} motion={motion}>
               <View style={{ marginBottom: 12 }}>
                 <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayHabits}</Text>
                 {habits.map(h => {
@@ -444,7 +517,7 @@ export default function TodayScreen() {
           )}
 
           {/* 6. Фінанси + Час — сітка 2 колонки */}
-          <Section index={5}>
+          <Section index={5} wide={isWide} motion={motion}>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
               <StatTile
                 c={c} isDark={isDark}
@@ -476,7 +549,7 @@ export default function TodayScreen() {
           </Section>
 
           {/* 7. Спільне */}
-          <Section index={6}>
+          <Section index={6} wide={isWide} motion={motion}>
             <PressableScale
               onPress={() => router.push('/(tabs)/shared')}
               accessibilityRole="button"
@@ -501,7 +574,7 @@ export default function TodayScreen() {
           </Section>
 
           {/* 8. Швидкі переходи з лічильниками за сьогодні */}
-          <Section index={7}>
+          <Section index={7} wide={isWide} motion={motion}>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
               <NavStat
                 icon="calendar"
@@ -514,7 +587,7 @@ export default function TodayScreen() {
               />
               <NavStat
                 icon="checklist"
-                count={todayTasks.length}
+                count={todayGroups.total}
                 label={tr.tabTasks}
                 color={ACCENT_TASK}
                 c={c}
@@ -533,7 +606,8 @@ export default function TodayScreen() {
             </View>
           </Section>
 
-          </>}
+          </View>
+          )}
 
         </ScrollView>
       </SafeAreaView>
@@ -579,6 +653,9 @@ function StatTile({ c, isDark, icon, color, title, onPress, children }: {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
+  // Дві колонки з рівним проміжком. alignItems: 'flex-start' — щоб картка
+  // не розтягувалася до висоти сусідки й не лишала порожнечі всередині.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', columnGap: 12 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -601,6 +678,10 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   badge: { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
+  groupRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 4 },
+  groupDot:   { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
+  groupName:  { flex: 1, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
+  groupCount: { fontSize: 11, fontWeight: '700', opacity: 0.7 },
   sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',

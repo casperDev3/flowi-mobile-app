@@ -3,9 +3,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Dimensions,
   Platform,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -16,6 +16,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
+import { formatDuration, formatDurationShort } from '@/utils/durationFormat';
+import { useI18n } from '@/store/i18n';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,44 +57,24 @@ interface FlatEntry {
 
 type Period = 'today' | 'week' | 'month' | 'all';
 
+const PERIODS: Period[] = ['today', 'week', 'month', 'all'];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const PERIOD_LABELS: Record<Period, string> = {
-  today: 'Сьогодні',
-  week:  'Тиждень',
-  month: 'Місяць',
-  all:   'Весь час',
-};
-
-const MONTHS_SHORT = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
-const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
-
-const fmtDur = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h > 0 && m > 0) return `${h}г ${m}хв`;
-  if (h > 0) return `${h} год`;
-  return `${m || 0} хв`;
-};
-
-const fmtDurShort = (s: number) => {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h > 0) return `${h}г`;
-  if (m > 0) return `${m}хв`;
-  return '0';
-};
 
 function dayKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-function dayLabel(dateStr: string): string {
+/** Підписи «Сьогодні»/«Вчора» приходять зі словника: раніше вони були вшиті
+    українською й лишалися такими в англійському інтерфейсі. */
+function dayLabel(dateStr: string, todayStr: string, yesterdayStr: string, locale: string): string {
   const [y, mo, d] = dateStr.split('-').map(Number);
   const date = new Date(y, mo - 1, d);
   const now = new Date();
-  if (date.toDateString() === now.toDateString()) return 'Сьогодні';
+  if (date.toDateString() === now.toDateString()) return todayStr;
   const yest = new Date(); yest.setDate(now.getDate() - 1);
-  if (date.toDateString() === yest.toDateString()) return 'Вчора';
-  return date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' });
+  if (date.toDateString() === yest.toDateString()) return yesterdayStr;
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 }
 
 function periodStart(period: Period): Date | null {
@@ -106,7 +89,9 @@ function periodStart(period: Period): Date | null {
 
 interface BarData { key: string; label: string; sublabel?: string; seconds: number; isToday?: boolean; }
 
-function buildChartBars(entries: FlatEntry[], period: Period): BarData[] {
+/** `monthsShort` і `weekdays` — зі словника: локальні копії масивів давали
+    українські підписи на осі навіть в англійському інтерфейсі. */
+function buildChartBars(entries: FlatEntry[], period: Period, monthsShort: string[], weekdays: string[]): BarData[] {
   const now = new Date();
 
   if (period === 'today') {
@@ -139,7 +124,7 @@ function buildChartBars(entries: FlatEntry[], period: Period): BarData[] {
       const date = new Date(y, mo - 1, d);
       const dow = (date.getDay() + 6) % 7; // Mon=0
       const isToday = date.toDateString() === now.toDateString();
-      return { key: k, label: WEEKDAYS[dow], sublabel: `${d}`, seconds: s, isToday };
+      return { key: k, label: weekdays[dow], sublabel: `${d}`, seconds: s, isToday };
     });
   }
 
@@ -168,16 +153,13 @@ function buildChartBars(entries: FlatEntry[], period: Period): BarData[] {
     return Array.from(weekMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([wk, { seconds, dates }]) => {
-        const [y, mo, d] = wk.split('-').map(Number);
-        const mon = new Date(y, mo - 1, d);
-        const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
         // Clamp to period range
         const rangeStart = dates[0];
         const rangeEnd = dates[dates.length - 1];
         const sameMonth = rangeStart.getMonth() === rangeEnd.getMonth();
         const label = sameMonth
-          ? `${rangeStart.getDate()}–${rangeEnd.getDate()} ${MONTHS_SHORT[rangeStart.getMonth()]}`
-          : `${rangeStart.getDate()} ${MONTHS_SHORT[rangeStart.getMonth()]}–${rangeEnd.getDate()} ${MONTHS_SHORT[rangeEnd.getMonth()]}`;
+          ? `${rangeStart.getDate()}–${rangeEnd.getDate()} ${monthsShort[rangeStart.getMonth()]}`
+          : `${rangeStart.getDate()} ${monthsShort[rangeStart.getMonth()]}–${rangeEnd.getDate()} ${monthsShort[rangeEnd.getMonth()]}`;
         const containsToday = dates.some(d2 => d2.toDateString() === now.toDateString());
         return { key: wk, label, seconds, isToday: containsToday };
       });
@@ -204,17 +186,27 @@ function buildChartBars(entries: FlatEntry[], period: Period): BarData[] {
   return Array.from(filled.entries()).map(([k, s]) => {
     const [y, mo] = k.split('-').map(Number);
     const isThisMonth = y === now.getFullYear() && mo === now.getMonth() + 1;
-    return { key: k, label: MONTHS_SHORT[mo - 1], sublabel: mo === 1 || isThisMonth ? String(y) : undefined, seconds: s, isToday: isThisMonth };
+    return { key: k, label: monthsShort[mo - 1], sublabel: mo === 1 || isThisMonth ? String(y) : undefined, seconds: s, isToday: isThisMonth };
   });
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-const SCREEN_W = Dimensions.get('window').width;
 
 export default function TimeRecordsScreen() {
+  const contentWidth = useContentWidth();
+  const { tr, lang } = useI18n();
+  // Одиниці приходять зі словника: до цього кожен екран мав власну копію
+  // форматування з вшитими «год» і «хв».
+  const durationUnits = useMemo(
+    () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
+    [tr.unitHour, tr.unitHourLong, tr.unitMinute],
+  );
+  const fmtDurLocal = useCallback((s: number) => formatDuration(s, durationUnits), [durationUnits]);
+  const fmtDurShortLocal = useCallback((s: number) => formatDurationShort(s, durationUnits), [durationUnits]);
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
   const [tasks, setTasks]       = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -229,7 +221,16 @@ export default function TimeRecordsScreen() {
     ]).then(([t, p]) => { setTasks(t); setProjects(p); });
   }, []));
 
-  const c = {
+  const periodLabels = useMemo<Record<Period, string>>(() => ({
+    today: tr.periodToday,
+    week:  tr.periodWeek,
+    month: tr.periodMonth,
+    all:   tr.periodAll,
+  }), [tr.periodToday, tr.periodWeek, tr.periodMonth, tr.periodAll]);
+
+  // Мемоізовано, бо палітра йде пропом у React.memo-рядок списку: новий
+  // обʼєкт на кожен рендер зводив би memo нанівець.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0A0C18' : '#EEF0FF',
     bg2:    isDark ? '#121525' : '#E2E5FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(180,175,255,0.4)',
@@ -237,7 +238,7 @@ export default function TimeRecordsScreen() {
     sub:    isDark ? 'rgba(238,238,255,0.62)' : 'rgba(26,27,51,0.58)',
     accent: '#6366F1',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  };
+  }), [isDark]);
 
   // Flat list of completed entries with projectId
   const allEntries = useMemo<FlatEntry[]>(() => {
@@ -294,7 +295,10 @@ export default function TimeRecordsScreen() {
   const taskCount    = useMemo(() => new Set(filtered.map(e => e.taskId)).size, [filtered]);
 
   // Chart
-  const chartBars   = useMemo(() => buildChartBars(filtered, period), [filtered, period]);
+  const chartBars   = useMemo(
+    () => buildChartBars(filtered, period, tr.monthsShort, tr.weekdays),
+    [filtered, period, tr.monthsShort, tr.weekdays],
+  );
   const maxBarSec   = useMemo(() => Math.max(...chartBars.map(b => b.seconds), 1), [chartBars]);
 
   // Chart dimensions per period
@@ -303,18 +307,221 @@ export default function TimeRecordsScreen() {
   const barWidth   = period === 'today' ? 10 : period === 'week' ? 34 : 56;
   const barGap     = period === 'today' ? 3  : period === 'week' ? 10 : 10;
 
-  // List grouped by day
-  const grouped = useMemo(() => {
+  // Пошук проєкту за id — мапою, а не find() на кожен рядок списку.
+  const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);
+
+  // Sections grouped by day
+  const sections = useMemo(() => {
     const map = new Map<string, FlatEntry[]>();
     for (const e of filtered) {
       const k = dayKey(e.startedAt);
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(e);
     }
-    return Array.from(map.entries()).map(([k, entries]) => ({ key: k, entries }));
-  }, [filtered]);
+    return Array.from(map.entries()).map(([k, data]) => ({
+      key: k,
+      title: dayLabel(k, tr.today, tr.yesterday, locale),
+      dayTotal: data.reduce((a, e) => a + e.duration, 0),
+      data,
+    }));
+  }, [filtered, tr.today, tr.yesterday, locale]);
 
-  const clearFilters = () => { setFilterProjectId(null); setFilterTaskId(null); };
+  const clearFilters = useCallback(() => { setFilterProjectId(null); setFilterTaskId(null); }, []);
+  const hasFilters = !!(filterProjectId || filterTaskId);
+
+  const chartTitle = period === 'today' ? tr.byHours
+    : period === 'week' ? tr.byDays
+    : period === 'month' ? tr.byWeeks
+    : tr.byMonths;
+
+  const listHeader = (
+    <>
+      {/* Period pills */}
+      <View style={{ flexDirection: 'row', gap: 7, marginBottom: 14 }}>
+        {PERIODS.map(p => (
+          <TouchableOpacity
+            key={p}
+            onPress={() => { setPeriod(p); clearFilters(); }}
+            style={[s.chip, { flex: 1, justifyContent: 'center', backgroundColor: period === p ? c.accent : c.dim, borderColor: period === p ? c.accent : c.border }]}>
+            <Text style={{ color: period === p ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>
+              {periodLabels[p]}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Stats */}
+      <BlurView intensity={isDark ? 18 : 30} tint={isDark ? 'dark' : 'light'} style={[s.statsRow, { borderColor: c.border }]}>
+        <StatCell value={fmtDurLocal(totalSeconds)} label={tr.totalTime} color={c.accent} sub={c.sub} />
+        <View style={{ width: 1, backgroundColor: c.border, alignSelf: 'stretch', marginVertical: 12 }} />
+        <StatCell value={String(sessionCount)} label={tr.sessionsCount} color={c.text} sub={c.sub} />
+        <View style={{ width: 1, backgroundColor: c.border, alignSelf: 'stretch', marginVertical: 12 }} />
+        <StatCell value={String(taskCount)} label={tr.tasksCount} color={c.text} sub={c.sub} />
+      </BlurView>
+
+      {/* Chart */}
+      {chartBars.some(b => b.seconds > 0) && (
+        <View style={[s.chartCard, { borderColor: c.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.65)' }]}>
+          {/* Chart title + y-axis hint */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', flex: 1 }}>
+              {chartTitle}
+            </Text>
+            <Text style={{ color: c.sub, fontSize: 10 }}>макс {fmtDurLocal(maxBarSec)}</Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+            {/* Y-axis */}
+            <View style={{ width: 30, alignItems: 'flex-end', paddingRight: 5, height: CHART_H + 24, justifyContent: 'space-between', paddingBottom: 24 }}>
+              <Text style={{ color: c.sub, fontSize: 9 }}>{fmtDurShortLocal(maxBarSec)}</Text>
+              <Text style={{ color: c.sub, fontSize: 9 }}>{fmtDurShortLocal(maxBarSec / 2)}</Text>
+              <Text style={{ color: c.sub, fontSize: 9 }}>0</Text>
+            </View>
+
+            {/* Y-axis grid lines + bars */}
+            <View style={{ flex: 1 }}>
+              {/* Horizontal grid */}
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: CHART_H, justifyContent: 'space-between', pointerEvents: 'none' }}>
+                {[0, 1, 2].map(i => (
+                  <View key={i} style={{ height: 1, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }} />
+                ))}
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: CHART_H + 24, gap: barGap, paddingBottom: 24, paddingHorizontal: 2 }}>
+                  {chartBars.map((bar) => {
+                    const ratio    = bar.seconds / maxBarSec;
+                    const barH     = bar.seconds > 0 ? Math.max(BAR_MIN_H, Math.round(ratio * (CHART_H - 2))) : BAR_MIN_H;
+                    const noData   = bar.seconds === 0;
+                    const barColor = noData
+                      ? (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)')
+                      : bar.isToday
+                      ? c.accent
+                      : c.accent + 'BB';
+
+                    return (
+                      <View key={bar.key} style={{ alignItems: 'center', width: barWidth }}>
+                        {/* Value label on top */}
+                        {!noData && ratio > 0.1 && (
+                          <Text style={{ color: bar.isToday ? c.accent : c.sub, fontSize: period === 'today' ? 7 : 9, fontWeight: '600', marginBottom: 3, textAlign: 'center' }}>
+                            {fmtDurShortLocal(bar.seconds)}
+                          </Text>
+                        )}
+                        <View style={{ width: barWidth, height: barH, borderRadius: barWidth <= 12 ? 3 : 6, backgroundColor: barColor }} />
+                        {/* X-axis label */}
+                        <Text
+                          style={{ color: bar.isToday ? c.accent : c.sub, fontSize: period === 'today' ? 7 : period === 'all' ? 9 : 10, fontWeight: bar.isToday ? '700' : '400', marginTop: 5, textAlign: 'center' }}
+                          numberOfLines={1}>
+                          {bar.label}
+                        </Text>
+                        {bar.sublabel && (
+                          <Text style={{ color: c.sub, fontSize: 8, textAlign: 'center', opacity: 0.7 }} numberOfLines={1}>
+                            {bar.sublabel}
+                          </Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* ── Filters ── */}
+      {/* Project filter */}
+      {activeProjects.length > 0 && (
+        <View style={{ marginBottom: 10 }}>
+          <Text style={[s.filterLabel, { color: c.sub }]}>{tr.project}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', gap: 7, paddingRight: 4 }}>
+              <TouchableOpacity
+                onPress={clearFilters}
+                style={[s.chip, { backgroundColor: !filterProjectId ? c.accent : c.dim, borderColor: !filterProjectId ? c.accent : c.border }]}>
+                <Text style={{ color: !filterProjectId ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>{tr.all}</Text>
+              </TouchableOpacity>
+              {activeProjects.map(proj => {
+                const projTotal = periodFiltered.filter(e => e.projectId === proj.id).reduce((a, e) => a + e.duration, 0);
+                const active = filterProjectId === proj.id;
+                return (
+                  <TouchableOpacity
+                    key={proj.id}
+                    onPress={() => { setFilterProjectId(active ? null : proj.id); setFilterTaskId(null); }}
+                    style={[s.chip, { backgroundColor: active ? proj.color : c.dim, borderColor: active ? proj.color : c.border, gap: 6 }]}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: active ? '#fff' : proj.color }} />
+                    <Text style={{ color: active ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{proj.name}</Text>
+                    <Text style={{ color: active ? 'rgba(255,255,255,0.7)' : c.sub, fontSize: 11 }}>{fmtDurLocal(projTotal)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Task filter */}
+      {activeTasks.length > 1 && (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={[s.filterLabel, { color: c.sub }]}>{tr.tasks}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', gap: 7, paddingRight: 4 }}>
+              <TouchableOpacity
+                onPress={() => setFilterTaskId(null)}
+                style={[s.chip, { backgroundColor: !filterTaskId ? c.accent : c.dim, borderColor: !filterTaskId ? c.accent : c.border }]}>
+                <Text style={{ color: !filterTaskId ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>{tr.all}</Text>
+              </TouchableOpacity>
+              {activeTasks.map(t => {
+                const base = filterProjectId ? periodFiltered.filter(e => e.projectId === filterProjectId) : periodFiltered;
+                const taskTotal = base.filter(e => e.taskId === t.id).reduce((a, e) => a + e.duration, 0);
+                const active = filterTaskId === t.id;
+                const proj = t.projectId ? projectById.get(t.projectId) : null;
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    onPress={() => setFilterTaskId(active ? null : t.id)}
+                    style={[s.chip, { backgroundColor: active ? c.accent : c.dim, borderColor: active ? c.accent : c.border, gap: 5 }]}>
+                    {proj && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active ? '#fff' : proj.color }} />}
+                    <Text style={{ color: active ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{t.title}</Text>
+                    <Text style={{ color: active ? 'rgba(255,255,255,0.7)' : c.sub, fontSize: 11 }}>{fmtDurLocal(taskTotal)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Active filter badges */}
+      {hasFilters && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+          {filterProjectId && (() => {
+            const proj = projectById.get(filterProjectId);
+            return proj ? (
+              <View style={[s.activeBadge, { backgroundColor: proj.color + '20', borderColor: proj.color + '50' }]}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color }} />
+                <Text style={{ color: proj.color, fontSize: 11, fontWeight: '600' }}>{proj.name}</Text>
+                <TouchableOpacity onPress={clearFilters} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <IconSymbol name="xmark" size={10} color={proj.color} />
+                </TouchableOpacity>
+              </View>
+            ) : null;
+          })()}
+          {filterTaskId && (() => {
+            const task = tasks.find(t => t.id === filterTaskId);
+            return task ? (
+              <View style={[s.activeBadge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50' }]}>
+                <Text style={{ color: c.accent, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>{task.title}</Text>
+                <TouchableOpacity onPress={() => setFilterTaskId(null)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <IconSymbol name="xmark" size={10} color={c.accent} />
+                </TouchableOpacity>
+              </View>
+            ) : null;
+          })()}
+        </View>
+      )}
+    </>
+  );
 
   return (
     <View style={{ flex: 1 }}>
@@ -326,269 +533,115 @@ export default function TimeRecordsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <IconSymbol name="chevron.left" size={20} color={c.accent} />
           </TouchableOpacity>
-          <Text style={[s.title, { color: c.text }]}>Записи часу</Text>
-          {(filterProjectId || filterTaskId) ? (
+          <Text style={[s.title, { color: c.text }]}>{tr.timeRecordsTitle}</Text>
+          {hasFilters ? (
             <TouchableOpacity onPress={clearFilters} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>Скинути</Text>
+              <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>{tr.reset}</Text>
             </TouchableOpacity>
           ) : <View style={{ width: 46 }} />}
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }}
-          showsVerticalScrollIndicator={false}>
-
-          {/* Period pills */}
-          <View style={{ flexDirection: 'row', gap: 7, marginBottom: 14 }}>
-            {(['today', 'week', 'month', 'all'] as Period[]).map(p => (
-              <TouchableOpacity
-                key={p}
-                onPress={() => { setPeriod(p); clearFilters(); }}
-                style={[s.chip, { flex: 1, justifyContent: 'center', backgroundColor: period === p ? c.accent : c.dim, borderColor: period === p ? c.accent : c.border }]}>
-                <Text style={{ color: period === p ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>
-                  {PERIOD_LABELS[p]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Stats */}
-          <BlurView intensity={isDark ? 18 : 30} tint={isDark ? 'dark' : 'light'} style={[s.statsRow, { borderColor: c.border }]}>
-            <StatCell value={fmtDur(totalSeconds)} label="Загальний час" color={c.accent} sub={c.sub} />
-            <View style={{ width: 1, backgroundColor: c.border, alignSelf: 'stretch', marginVertical: 12 }} />
-            <StatCell value={String(sessionCount)} label="Сесій" color={c.text} sub={c.sub} />
-            <View style={{ width: 1, backgroundColor: c.border, alignSelf: 'stretch', marginVertical: 12 }} />
-            <StatCell value={String(taskCount)} label="Завдань" color={c.text} sub={c.sub} />
-          </BlurView>
-
-          {/* Chart */}
-          {chartBars.some(b => b.seconds > 0) && (
-            <View style={[s.chartCard, { borderColor: c.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.65)' }]}>
-              {/* Chart title + y-axis hint */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', flex: 1 }}>
-                  {period === 'today' ? 'По годинах'
-                    : period === 'week' ? 'По днях'
-                    : period === 'month' ? 'По тижнях'
-                    : 'По місяцях'}
-                </Text>
-                <Text style={{ color: c.sub, fontSize: 10 }}>макс {fmtDur(maxBarSec)}</Text>
-              </View>
-
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-                {/* Y-axis */}
-                <View style={{ width: 30, alignItems: 'flex-end', paddingRight: 5, height: CHART_H + 24, justifyContent: 'space-between', paddingBottom: 24 }}>
-                  <Text style={{ color: c.sub, fontSize: 9 }}>{fmtDurShort(maxBarSec)}</Text>
-                  <Text style={{ color: c.sub, fontSize: 9 }}>{fmtDurShort(maxBarSec / 2)}</Text>
-                  <Text style={{ color: c.sub, fontSize: 9 }}>0</Text>
-                </View>
-
-                {/* Y-axis grid lines + bars */}
-                <View style={{ flex: 1 }}>
-                  {/* Horizontal grid */}
-                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: CHART_H, justifyContent: 'space-between', pointerEvents: 'none' }}>
-                    {[0, 1, 2].map(i => (
-                      <View key={i} style={{ height: 1, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }} />
-                    ))}
-                  </View>
-
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: CHART_H + 24, gap: barGap, paddingBottom: 24, paddingHorizontal: 2 }}>
-                      {chartBars.map((bar) => {
-                        const ratio    = bar.seconds / maxBarSec;
-                        const barH     = bar.seconds > 0 ? Math.max(BAR_MIN_H, Math.round(ratio * (CHART_H - 2))) : BAR_MIN_H;
-                        const noData   = bar.seconds === 0;
-                        const barColor = noData
-                          ? (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)')
-                          : bar.isToday
-                          ? c.accent
-                          : c.accent + 'BB';
-
-                        return (
-                          <View key={bar.key} style={{ alignItems: 'center', width: barWidth }}>
-                            {/* Value label on top */}
-                            {!noData && ratio > 0.1 && (
-                              <Text style={{ color: bar.isToday ? c.accent : c.sub, fontSize: period === 'today' ? 7 : 9, fontWeight: '600', marginBottom: 3, textAlign: 'center' }}>
-                                {fmtDurShort(bar.seconds)}
-                              </Text>
-                            )}
-                            <View style={{ width: barWidth, height: barH, borderRadius: barWidth <= 12 ? 3 : 6, backgroundColor: barColor }} />
-                            {/* X-axis label */}
-                            <Text
-                              style={{ color: bar.isToday ? c.accent : c.sub, fontSize: period === 'today' ? 7 : period === 'all' ? 9 : 10, fontWeight: bar.isToday ? '700' : '400', marginTop: 5, textAlign: 'center' }}
-                              numberOfLines={1}>
-                              {bar.label}
-                            </Text>
-                            {bar.sublabel && (
-                              <Text style={{ color: c.sub, fontSize: 8, textAlign: 'center', opacity: 0.7 }} numberOfLines={1}>
-                                {bar.sublabel}
-                              </Text>
-                            )}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  </ScrollView>
-                </View>
+        <SectionList
+          sections={sections}
+          keyExtractor={item => item.id}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 18, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
+          showsVerticalScrollIndicator={false}
+          // Заголовки днів не липкі — так було й до віртуалізації.
+          stickySectionHeadersEnabled={false}
+          ListHeaderComponent={listHeader}
+          renderSectionHeader={({ section }) => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
+                {section.title}
+              </Text>
+              <View style={[s.badge, { backgroundColor: c.accent + '18', borderColor: c.accent + '40' }]}>
+                <IconSymbol name="clock" size={10} color={c.accent} />
+                <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700', marginLeft: 4 }}>{fmtDurLocal(section.dayTotal)}</Text>
               </View>
             </View>
           )}
-
-          {/* ── Filters ── */}
-          {/* Project filter */}
-          {activeProjects.length > 0 && (
-            <View style={{ marginBottom: 10 }}>
-              <Text style={[s.filterLabel, { color: c.sub }]}>Проект</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: 'row', gap: 7, paddingRight: 4 }}>
-                  <TouchableOpacity
-                    onPress={() => { setFilterProjectId(null); setFilterTaskId(null); }}
-                    style={[s.chip, { backgroundColor: !filterProjectId ? c.accent : c.dim, borderColor: !filterProjectId ? c.accent : c.border }]}>
-                    <Text style={{ color: !filterProjectId ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>Всі</Text>
-                  </TouchableOpacity>
-                  {activeProjects.map(proj => {
-                    const projTotal = periodFiltered.filter(e => e.projectId === proj.id).reduce((a, e) => a + e.duration, 0);
-                    const active = filterProjectId === proj.id;
-                    return (
-                      <TouchableOpacity
-                        key={proj.id}
-                        onPress={() => { setFilterProjectId(active ? null : proj.id); setFilterTaskId(null); }}
-                        style={[s.chip, { backgroundColor: active ? proj.color : c.dim, borderColor: active ? proj.color : c.border, gap: 6 }]}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: active ? '#fff' : proj.color }} />
-                        <Text style={{ color: active ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{proj.name}</Text>
-                        <Text style={{ color: active ? 'rgba(255,255,255,0.7)' : c.sub, fontSize: 11 }}>{fmtDur(projTotal)}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-            </View>
+          // Картки самі несуть marginBottom: 7; футер добирає решту відступу
+          // між групами до колишніх 27.
+          renderSectionFooter={() => <View style={{ height: 20 }} />}
+          renderItem={({ item }) => (
+            <EntryRow
+              entry={item}
+              proj={item.projectId ? projectById.get(item.projectId) ?? null : null}
+              isDark={isDark}
+              border={c.border}
+              text={c.text}
+              sub={c.sub}
+              dim={c.dim}
+              accent={c.accent}
+              duration={fmtDurLocal(item.duration)}
+              range={`${item.startedAt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} → ${item.endedAt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`}
+            />
           )}
-
-          {/* Task filter */}
-          {activeTasks.length > 1 && (
-            <View style={{ marginBottom: 14 }}>
-              <Text style={[s.filterLabel, { color: c.sub }]}>Завдання</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: 'row', gap: 7, paddingRight: 4 }}>
-                  <TouchableOpacity
-                    onPress={() => setFilterTaskId(null)}
-                    style={[s.chip, { backgroundColor: !filterTaskId ? c.accent : c.dim, borderColor: !filterTaskId ? c.accent : c.border }]}>
-                    <Text style={{ color: !filterTaskId ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>Всі</Text>
-                  </TouchableOpacity>
-                  {activeTasks.map(t => {
-                    const base = filterProjectId ? periodFiltered.filter(e => e.projectId === filterProjectId) : periodFiltered;
-                    const taskTotal = base.filter(e => e.taskId === t.id).reduce((a, e) => a + e.duration, 0);
-                    const active = filterTaskId === t.id;
-                    const proj = t.projectId ? projects.find(p => p.id === t.projectId) : null;
-                    return (
-                      <TouchableOpacity
-                        key={t.id}
-                        onPress={() => setFilterTaskId(active ? null : t.id)}
-                        style={[s.chip, { backgroundColor: active ? c.accent : c.dim, borderColor: active ? c.accent : c.border, gap: 5 }]}>
-                        {proj && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active ? '#fff' : proj.color }} />}
-                        <Text style={{ color: active ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{t.title}</Text>
-                        <Text style={{ color: active ? 'rgba(255,255,255,0.7)' : c.sub, fontSize: 11 }}>{fmtDur(taskTotal)}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Active filter badges */}
-          {(filterProjectId || filterTaskId) && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-              {filterProjectId && (() => {
-                const proj = projects.find(p => p.id === filterProjectId);
-                return proj ? (
-                  <View style={[s.activeBadge, { backgroundColor: proj.color + '20', borderColor: proj.color + '50' }]}>
-                    <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color }} />
-                    <Text style={{ color: proj.color, fontSize: 11, fontWeight: '600' }}>{proj.name}</Text>
-                    <TouchableOpacity onPress={() => { setFilterProjectId(null); setFilterTaskId(null); }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                      <IconSymbol name="xmark" size={10} color={proj.color} />
-                    </TouchableOpacity>
-                  </View>
-                ) : null;
-              })()}
-              {filterTaskId && (() => {
-                const task = tasks.find(t => t.id === filterTaskId);
-                return task ? (
-                  <View style={[s.activeBadge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50' }]}>
-                    <Text style={{ color: c.accent, fontSize: 11, fontWeight: '600' }} numberOfLines={1}>{task.title}</Text>
-                    <TouchableOpacity onPress={() => setFilterTaskId(null)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                      <IconSymbol name="xmark" size={10} color={c.accent} />
-                    </TouchableOpacity>
-                  </View>
-                ) : null;
-              })()}
-            </View>
-          )}
-
-          {/* Sessions list */}
-          {grouped.length === 0 ? (
+          ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 48 }}>
               <IconSymbol name="timer" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, fontWeight: '600', marginTop: 14 }}>Немає записів</Text>
+              <Text style={{ color: c.sub, fontSize: 15, fontWeight: '600', marginTop: 14 }}>{tr.noRecords}</Text>
+              {/* Порожньо через фільтри — даємо вихід із глухого кута,
+                  інакше екран виглядає як «записів взагалі немає». */}
+              {hasFilters && (
+                <TouchableOpacity
+                  onPress={clearFilters}
+                  style={[s.emptyAction, { backgroundColor: c.accent }]}>
+                  <IconSymbol name="xmark" size={12} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', marginLeft: 6 }}>{tr.resetAllFilters}</Text>
+                </TouchableOpacity>
+              )}
             </View>
-          ) : (
-            grouped.map(({ key, entries }) => {
-              const dayTotal = entries.reduce((a, e) => a + e.duration, 0);
-              return (
-                <View key={key} style={{ marginBottom: 20 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
-                      {dayLabel(key)}
-                    </Text>
-                    <View style={[s.badge, { backgroundColor: c.accent + '18', borderColor: c.accent + '40' }]}>
-                      <IconSymbol name="clock" size={10} color={c.accent} />
-                      <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700', marginLeft: 4 }}>{fmtDur(dayTotal)}</Text>
-                    </View>
-                  </View>
-
-                  {entries.map(entry => {
-                    const proj = entry.projectId ? projects.find(p => p.id === entry.projectId) : null;
-                    return (
-                      <BlurView
-                        key={entry.id}
-                        intensity={isDark ? 16 : 30}
-                        tint={isDark ? 'dark' : 'light'}
-                        style={[s.entryCard, { borderColor: c.border }]}>
-                        <View style={[s.entryBar, { backgroundColor: proj?.color ?? c.accent }]} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
-                            {entry.taskTitle}
-                          </Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                            {proj && (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color }} />
-                                <Text style={{ color: c.sub, fontSize: 10, fontWeight: '500' }}>{proj.name}</Text>
-                              </View>
-                            )}
-                            <Text style={{ color: c.sub, fontSize: 11 }}>
-                              {entry.startedAt.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
-                              {' → '}
-                              {entry.endedAt.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                          <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>{fmtDur(entry.duration)}</Text>
-                        </View>
-                      </BlurView>
-                    );
-                  })}
-                </View>
-              );
-            })
-          )}
-        </ScrollView>
+          }
+        />
       </SafeAreaView>
     </View>
   );
 }
+
+interface EntryRowProps {
+  entry: FlatEntry;
+  proj: Project | null;
+  isDark: boolean;
+  border: string;
+  text: string;
+  sub: string;
+  dim: string;
+  accent: string;
+  /** Готові рядки, а не секунди й дати: щоб не тягти сюди форматування. */
+  duration: string;
+  range: string;
+}
+
+/** Рядок сесії окремим memo-компонентом: без нього зміна фільтра
+    перемальовувала б усі картки, а не лише ті, що справді змінилися. */
+const EntryRow = React.memo(function EntryRow({ entry, proj, isDark, border, text, sub, dim, accent, duration, range }: EntryRowProps) {
+  return (
+    <BlurView
+      intensity={isDark ? 16 : 30}
+      tint={isDark ? 'dark' : 'light'}
+      style={[s.entryCard, { borderColor: border }]}>
+      <View style={[s.entryBar, { backgroundColor: proj?.color ?? accent }]} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+          {entry.taskTitle}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+          {proj && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color }} />
+              <Text style={{ color: sub, fontSize: 10, fontWeight: '500' }}>{proj.name}</Text>
+            </View>
+          )}
+          <Text style={{ color: sub, fontSize: 11 }}>{range}</Text>
+        </View>
+      </View>
+      <View style={[s.badge, { backgroundColor: dim, borderColor: border }]}>
+        <Text style={{ color: text, fontSize: 12, fontWeight: '700' }}>{duration}</Text>
+      </View>
+    </BlurView>
+  );
+});
 
 function StatCell({ value, label, color, sub }: { value: string; label: string; color: string; sub: string }) {
   return (
@@ -611,4 +664,5 @@ const s = StyleSheet.create({
   activeBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
   entryCard:   { flexDirection: 'row', alignItems: 'center', borderRadius: 13, borderWidth: 1, paddingRight: 12, paddingVertical: 11, marginBottom: 7, overflow: 'hidden', gap: 10 },
   entryBar:    { width: 3, alignSelf: 'stretch', borderRadius: 2, marginLeft: 11 },
+  emptyAction: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 11 },
 });

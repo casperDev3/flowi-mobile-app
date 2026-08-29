@@ -37,3 +37,30 @@ export function nextMonth(d: Date): Date {
 export function isInMonth(date: Date, month: Date): boolean {
   return isSameMonth(date, month);
 }
+
+// ─── Сітка місяця для календарів ──────────────────────────────────────────────
+
+/**
+ * Клітинки місяця, розкладені по тижнях: null — порожнє місце до першого
+ * або після останнього числа.
+ *
+ * Тиждень починається з понеділка. getDay() віддає 0 для неділі, тож її
+ * зсув — шість, а не мінус один; помилка тут зсуває весь місяць на день
+ * і помітна лише при погляді на конкретне число.
+ *
+ * Останній тиждень добивається порожніми клітинками до семи, щоб рядки
+ * сітки мали однакову довжину й не «стрибали» шириною.
+ */
+export function monthGrid(year: number, month: number): (number | null)[][] {
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const lead = firstWeekday === 0 ? 6 : firstWeekday - 1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const cells: (number | null)[] = Array(lead).fill(null);
+  for (let day = 1; day <= daysInMonth; day++) cells.push(day);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}

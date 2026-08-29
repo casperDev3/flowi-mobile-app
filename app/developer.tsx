@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Linking,
   Platform,
@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const SOCIALS: {
   key: string;
@@ -65,10 +66,11 @@ const SOCIALS: {
 ];
 
 export default function DeveloperScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
-  const c = {
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
     bg2:    isDark ? '#14121E' : '#EBEBF5',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
@@ -76,8 +78,7 @@ export default function DeveloperScreen() {
     sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
-    accent: '#7C3AED',
-  };
+  }), [isDark]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -97,7 +98,7 @@ export default function DeveloperScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* Developer card */}

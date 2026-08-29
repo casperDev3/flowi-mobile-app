@@ -1,5 +1,5 @@
 import { BlurView } from 'expo-blur';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -8,7 +8,6 @@ import { PressableScale } from '@/components/shared/PressableScale';
 import { Motion } from '@/constants/motion';
 import { useMotion } from '@/hooks/use-motion';
 import type { Translations } from '@/store/translations';
-import { isSameDay } from '@/utils/dateUtils';
 import { PRIORITY_COLORS, Task, isOverdue } from '@/utils/taskUtils';
 
 interface Props {
@@ -34,16 +33,22 @@ interface RowProps {
 function TodayTaskItem({ task, isDark, c, onToggle, onOpen }: RowProps) {
   const { reduced } = useMotion();
 
-  // Local checked state drives the animation; the task disappears from
-  // the filtered list after onToggle propagates, so this is transient.
-  const [localChecked, setLocalChecked] = useState(false);
+  const done = task.status === 'done';
 
-  const titleOpacity = useSharedValue(1);
+  // Локальна відмітка веде анімацію, поки зміна не долетіла зі сховища.
+  // Завершене завдання більше не зникає зі списку — воно лишається в дні
+  // закресленим, тож стан мусить іти від САМОГО завдання, а не бути
+  // одноразовим «поставили галочку й забули».
+  const [localChecked, setLocalChecked] = useState(done);
+  useEffect(() => { setLocalChecked(done); }, [done]);
+
+  const titleOpacity = useSharedValue(done ? 0.45 : 1);
   const titleStyle   = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
 
   const handleToggle = () => {
-    setLocalChecked(true);
-    titleOpacity.value = withTiming(0.45, {
+    const next = !localChecked;
+    setLocalChecked(next);
+    titleOpacity.value = withTiming(next ? 0.45 : 1, {
       duration: reduced ? 0 : Motion.duration.normal,
     });
     onToggle(task.id);
@@ -73,11 +78,19 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen }: RowProps) {
           accessibilityState={{ checked: localChecked }}
         />
         <Animated.Text
-          style={[s.title, { color: c.text }, titleStyle]}
+          style={[
+            s.title,
+            { color: c.text },
+            // Закреслення — ознака зробленого, яку видно без читання. Відмітку
+            // можна зняти тим самим натисканням: завдання лишається в дні саме
+            // для того, щоб помилкове «готово» можна було відкотити.
+            done && { textDecorationLine: 'line-through' as const },
+            titleStyle,
+          ]}
           numberOfLines={1}>
           {task.title}
         </Animated.Text>
-        {isOverdue(task) && (
+        {!done && isOverdue(task) && (
           <View style={s.overdueBadge}>
             <Text style={s.overdueText}>!</Text>
           </View>
@@ -90,21 +103,18 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen }: RowProps) {
 // ─── Public component ─────────────────────────────────────────────────────────
 
 export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle, onOpen }: Props) {
-  const today = new Date();
   const motion = useMotion();
 
-  const relevant = tasks
-    .filter(t =>
-      t.status === 'active' &&
-      ((t.deadline && isSameDay(new Date(t.deadline), today)) || isOverdue(t)),
-    )
-    .sort((a, b) => {
-      const p: Record<string, number> = { high: 0, medium: 1, low: 2 };
-      return (p[a.priority] ?? 1) - (p[b.priority] ?? 1);
-    })
-    .slice(0, 5);
-
-  if (!relevant.length) return null;
+  // Компонент НІЧОГО не відбирає й не сортує — малює рівно те, що дали.
+  //
+  // Раніше тут стояв власний фільтр «дедлайн сьогодні або прострочено» плюс
+  // сортування за пріоритетом і зріз до п'яти — копія правил екрана. Копія
+  // мовчки розійшлася з оригіналом, щойно екран навчився показувати завдання
+  // «У процесі» незалежно від дедлайну: група приходила сюди заповненою, а
+  // фільтр викидав її вміст, і на екрані лишався заголовок ні над чим.
+  // Відбір живе в utils/todayGroups.ts — в одному місці.
+  if (!tasks.length) return null;
+  const relevant = tasks;
 
   return (
     <View style={{ marginBottom: 4 }}>

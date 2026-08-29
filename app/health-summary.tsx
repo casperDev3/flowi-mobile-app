@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,11 +12,14 @@ import { useHealthEntries } from '@/hooks/use-health-entries';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useChartType } from '@/store/chart-prefs';
 import { useI18n } from '@/store/i18n';
+import type { Translations } from '@/store/translations';
 import {
-  ACCENT, ACCENT_CAL, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT, fmtSleep, getHealthColors,
+  ACCENT, ACCENT_CAL, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
+  type HealthColors, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
 import { Agg, Period, buildTrend } from '@/utils/healthPeriods';
 import { EntryType, HealthEntry } from '@/utils/healthUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 interface Metric { type: EntryType; label: string; color: string; agg: Agg; unit: string; goal?: number; }
 
@@ -29,25 +32,32 @@ function fmtMetric(m: Metric, v: number): string {
 }
 
 export default function HealthSummaryScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
-  const c = getHealthColors(isDark);
+  // Палітра й список метрик — у useMemo, бо SummaryCard обгорнутий у
+  // React.memo: новий обʼєкт на кожен ререндер зводив би memo нанівець,
+  // а кожна картка заново перебирає всі записи через buildTrend.
+  const c = useMemo(() => getHealthColors(isDark), [isDark]);
   useScreenView('health_summary');
 
   const h = useHealthEntries();
   const [period, setPeriod] = useState<Period>('week');
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = async () => { setRefreshing(true); await h.reload(); setRefreshing(false); };
+  const reload = h.reload;
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true); await reload(); setRefreshing(false);
+  }, [reload]);
 
-  const metrics: Metric[] = [
+  const metrics: Metric[] = useMemo(() => [
     { type: 'calories', label: tr.calories, color: ACCENT_CAL,    agg: 'sum', unit: 'кк', goal: h.goals.calories },
     { type: 'steps',    label: tr.steps,    color: ACCENT_STEPS,  agg: 'sum', unit: '',   goal: h.goals.steps },
     { type: 'water',    label: tr.water,    color: ACCENT,        agg: 'sum', unit: 'мл', goal: h.goals.water },
     { type: 'sleep',    label: tr.sleep,    color: ACCENT_SLEEP,  agg: 'avg', unit: 'sleep' },
     { type: 'weight',   label: tr.weight,   color: ACCENT_WEIGHT, agg: 'avg', unit: 'кг' },
     { type: 'pulse',    label: tr.pulse,    color: ACCENT_PULSE,  agg: 'avg', unit: 'уд' },
-  ];
+  ], [tr, h.goals]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -64,7 +74,7 @@ export default function HealthSummaryScreen() {
           <PeriodSelector period={period} onChange={setPeriod} color={ACCENT} c={c} tr={tr} />
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}
+        <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
           {metrics.map(m => (
             <SummaryCard key={m.type} m={m} period={period} entries={h.entries} isDark={isDark} c={c} tr={tr} />
@@ -75,8 +85,8 @@ export default function HealthSummaryScreen() {
   );
 }
 
-function SummaryCard({ m, period, entries, isDark, c, tr }: {
-  m: Metric; period: Period; entries: HealthEntry[]; isDark: boolean; c: any; tr: any;
+const SummaryCard = React.memo(function SummaryCard({ m, period, entries, isDark, c, tr }: {
+  m: Metric; period: Period; entries: HealthEntry[]; isDark: boolean; c: HealthColors; tr: Translations;
 }) {
   const [chartType, setChartType] = useChartType(m.type);
   const d = buildTrend(entries, m.type, period, m.agg, tr.weekdays, tr.monthsShort);
@@ -106,7 +116,7 @@ function SummaryCard({ m, period, entries, isDark, c, tr }: {
       )}
     </BlurView>
   );
-}
+});
 
 const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },

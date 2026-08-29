@@ -1,10 +1,10 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Dimensions,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -24,6 +24,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useResponsive } from '@/hooks/use-responsive';
+import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 
 interface ContainerItem {
   id: string;
@@ -47,13 +49,209 @@ const PALETTE = [
   '#F97316', '#EF4444', '#EC4899', '#8B5CF6',
   '#6366F1', '#0EA5E9', '#10B981', '#F59E0B',
 ];
-const { width: SCREEN_W } = Dimensions.get('window');
-const CARD_W = (SCREEN_W - 48) / 2;
+
+/** Відступ між плитками сітки — і по горизонталі, і між рядами. */
+const GRID_GAP = 12;
+
+/** Українське відмінювання лічильника речей: 1 річ / 2 речі / 5 речей. */
+function itemsWord(n: number): string {
+  return n === 1 ? 'річ' : n < 5 ? 'речі' : 'речей';
+}
+
+// ─── Плитка контейнера ────────────────────────────────────────────────────────
+
+interface ContainerCardProps {
+  container: Container;
+  cardWidth: number;
+  isDark: boolean;
+  textColor: string;
+  subColor: string;
+  onPress: (id: string) => void;
+}
+
+/**
+ * Плитка мемоізована: у сітці на сотні контейнерів кожен набір символу
+ * в пошуку інакше переганяв би всі градієнти заново.
+ */
+const ContainerCard = React.memo(function ContainerCard({
+  container: con, cardWidth, isDark, textColor, subColor, onPress,
+}: ContainerCardProps) {
+  return (
+    <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(con.id)}>
+      <View style={{
+        width: cardWidth, borderRadius: 18, overflow: 'hidden',
+        borderWidth: 1, borderColor: con.color + '35',
+      }}>
+        {/* Colored top band */}
+        <LinearGradient
+          colors={[con.color + '30', con.color + '10']}
+          style={{ paddingTop: 16, paddingHorizontal: 14, paddingBottom: 12 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 13,
+            backgroundColor: con.color + '30', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+            <IconSymbol name="shippingbox.fill" size={20} color={con.color} />
+          </View>
+          <Text style={{ color: textColor, fontSize: 15, fontWeight: '800', letterSpacing: -0.3 }} numberOfLines={2}>
+            {con.name}
+          </Text>
+          {con.location ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
+              <IconSymbol name="location.fill" size={10} color={subColor} />
+              <Text style={{ color: subColor, fontSize: 11, fontWeight: '500' }} numberOfLines={1}>{con.location}</Text>
+            </View>
+          ) : null}
+        </LinearGradient>
+
+        {/* Item count row */}
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          paddingHorizontal: 14, paddingVertical: 10,
+          backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.6)',
+        }}>
+          <Text style={{ color: subColor, fontSize: 12, fontWeight: '500' }}>
+            {con.items.length > 0
+              ? `${con.items.length} ${itemsWord(con.items.length)}`
+              : 'Порожньо'}
+          </Text>
+          <View style={{ width: 22, height: 22, borderRadius: 7,
+            backgroundColor: con.color + '25', alignItems: 'center', justifyContent: 'center' }}>
+            <IconSymbol name="chevron.right" size={11} color={con.color} />
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// ─── Знайдена річ ─────────────────────────────────────────────────────────────
+
+interface SearchHit { item: ContainerItem; container: Container }
+
+interface SearchRowProps {
+  hit: SearchHit;
+  isDark: boolean;
+  textColor: string;
+  subColor: string;
+  onPress: (containerId: string) => void;
+}
+
+const SearchRow = React.memo(function SearchRow({
+  hit, isDark, textColor, subColor, onPress,
+}: SearchRowProps) {
+  const { item, container } = hit;
+  return (
+    <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(container.id)}>
+      <BlurView intensity={isDark ? 20 : 38} tint={isDark ? 'dark' : 'light'}
+        style={{ borderRadius: 14, borderWidth: 1, borderColor: container.color + '40',
+          padding: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' }}>
+        <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: container.color, borderRadius: 2, marginRight: 12 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: textColor, fontSize: 14, fontWeight: '700' }}>{item.name}</Text>
+          {item.note ? (
+            <Text style={{ color: subColor, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{item.note}</Text>
+          ) : null}
+          {item.tags.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+              {item.tags.map(tag => (
+                <View key={tag} style={{ backgroundColor: container.color + '20', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{ color: container.color, fontSize: 10, fontWeight: '600' }}>#{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4,
+          backgroundColor: container.color + '20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: container.color }} />
+          <Text style={{ color: container.color, fontSize: 11, fontWeight: '700' }}>{container.name}</Text>
+        </View>
+      </BlurView>
+    </TouchableOpacity>
+  );
+});
+
+// ─── Річ усередині контейнера ─────────────────────────────────────────────────
+
+interface ItemRowProps {
+  item: ContainerItem;
+  accent: string;
+  isDark: boolean;
+  textColor: string;
+  subColor: string;
+  borderColor: string;
+  onEdit: (item: ContainerItem) => void;
+  onDelete: (item: ContainerItem) => void;
+}
+
+const ItemRow = React.memo(function ItemRow({
+  item, accent, isDark, textColor, subColor, borderColor, onEdit, onDelete,
+}: ItemRowProps) {
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'flex-start',
+      paddingHorizontal: 14, paddingVertical: 13,
+      borderRadius: 14,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.75)',
+      borderWidth: 1, borderColor,
+    }}>
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: accent, marginTop: 5, marginRight: 12 }} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: textColor, fontSize: 14, fontWeight: '700' }}>{item.name}</Text>
+        {item.note ? (
+          <Text style={{ color: subColor, fontSize: 12, marginTop: 3, lineHeight: 17 }}>{item.note}</Text>
+        ) : null}
+        {item.tags.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
+            {item.tags.map(tag => (
+              <View key={tag} style={{ backgroundColor: accent + '20', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                <Text style={{ color: accent, fontSize: 11, fontWeight: '600' }}>#{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 6, marginLeft: 8 }}>
+        <TouchableOpacity
+          onPress={() => onEdit(item)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <IconSymbol name="pencil" size={13} color={subColor} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => onDelete(item)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <IconSymbol name="xmark" size={13} color={subColor} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
+
+// ─── Екран ────────────────────────────────────────────────────────────────────
 
 export default function ContainersScreen() {
+  const contentWidth = useContentWidth();
+  const { width, sizeClass, isWide } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
   const router = useRouter();
+
+  /**
+   * Скільки плиток у ряд. На телефоні — дві, як було; ширше екран —
+   * більше колонок, інакше на планшеті сітка з двох плиток виглядає як
+   * два величезні прямокутники з порожнечею довкола.
+   */
+  const columns = sizeClass === 'expanded' ? 4 : sizeClass === 'medium' ? 3 : 2;
+
+  /**
+   * Ширина плитки. Рахується при рендері, а не при імпорті: у Split View
+   * ширина змінюється без перезапуску екрана. На широкому екрані колонка
+   * контенту обмежена стелею useContentWidth — від неї й рахуємо.
+   */
+  const cardWidth = useMemo(() => {
+    // Телефон: формула лишається дослівно тією, що була, — нуль регресії.
+    if (!isWide) return (width - 48) / 2;
+    const available = Math.min(width, CONTENT_MAX_WIDTH) - 32;
+    return (available - GRID_GAP * (columns - 1)) / columns;
+  }, [width, isWide, columns]);
 
   const [containers, setContainers] = useState<Container[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -72,7 +270,6 @@ export default function ContainersScreen() {
   const [newItemName, setNewItemName] = useState('');
   const [newItemTags, setNewItemTags] = useState('');
   const [newItemNote, setNewItemNote] = useState('');
-  const addInputRef = useRef<TextInput>(null);
 
   // Item edit modal
   const [editItem, setEditItem] = useState<ContainerItem | null>(null);
@@ -106,10 +303,11 @@ export default function ContainersScreen() {
   }), [isDark]);
 
   // Search
+  const isSearching = search.trim().length > 0;
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
     const q = search.toLowerCase();
-    const res: { item: ContainerItem; container: Container }[] = [];
+    const res: SearchHit[] = [];
     containers.forEach(con => con.items.forEach(item => {
       if (
         item.name.toLowerCase().includes(q) ||
@@ -128,15 +326,15 @@ export default function ContainersScreen() {
   );
 
   // ── CRUD containers ────────────────────────────────────────────────────────
-  const openNew = () => {
+  const openNew = useCallback(() => {
     setEditingId(null); setCName(''); setCLocation(''); setCColor(PALETTE[0]);
     setShowForm(true);
-  };
+  }, []);
 
-  const openEdit = (con: Container) => {
+  const openEdit = useCallback((con: Container) => {
     setEditingId(con.id); setCName(con.name); setCLocation(con.location); setCColor(con.color);
     setShowForm(true);
-  };
+  }, []);
 
   const saveContainer = () => {
     const name = cName.trim();
@@ -181,22 +379,6 @@ export default function ContainersScreen() {
     setNewItemNote('');
   };
 
-  const deleteItem = (containerId: string, itemId: string) => {
-    setContainers(p => p.map(con =>
-      con.id === containerId
-        ? { ...con, items: con.items.filter(i => i.id !== itemId) }
-        : con
-    ));
-  };
-
-  const openItemEdit = (containerId: string, item: ContainerItem) => {
-    setEditItem(item);
-    setEditItemContainerId(containerId);
-    setEditItemName(item.name);
-    setEditItemTags(item.tags.join(', '));
-    setEditItemNote(item.note ?? '');
-  };
-
   const saveItemEdit = () => {
     if (!editItem || !editItemContainerId) return;
     const name = editItemName.trim();
@@ -221,6 +403,33 @@ export default function ContainersScreen() {
     setEditItem(null);
     setEditItemContainerId(null);
   };
+
+  // Колбеки приймають елемент аргументом, а не замикають його в інлайн-стрілці:
+  // інакше React.memo на рядках списку не мав би сенсу.
+  const openDetail = useCallback((id: string) => setDetailId(id), []);
+
+  const openSearchHit = useCallback((containerId: string) => {
+    setSearch('');
+    setDetailId(containerId);
+  }, []);
+
+  const handleItemEdit = useCallback((item: ContainerItem) => {
+    if (!detailId) return;
+    setEditItem(item);
+    setEditItemContainerId(detailId);
+    setEditItemName(item.name);
+    setEditItemTags(item.tags.join(', '));
+    setEditItemNote(item.note ?? '');
+  }, [detailId]);
+
+  const handleItemDelete = useCallback((item: ContainerItem) => {
+    if (!detailId) return;
+    setContainers(p => p.map(con =>
+      con.id === detailId
+        ? { ...con, items: con.items.filter(i => i.id !== item.id) }
+        : con
+    ));
+  }, [detailId]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -256,54 +465,54 @@ export default function ContainersScreen() {
           )}
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
-
-          {/* Search results */}
-          {search.trim().length > 0 && (
-            <View style={{ marginBottom: 20 }}>
+        {isSearching ? (
+          /* Пошук іде по ВСІХ речах усіх контейнерів — результатів можуть бути
+             сотні, тому список віртуалізований. */
+          <FlatList
+            data={searchResults}
+            keyExtractor={hit => `${hit.container.id}:${hit.item.id}`}
+            contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            ListHeaderComponent={
               <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
                 {searchResults.length > 0 ? `Знайдено: ${searchResults.length}` : 'Нічого не знайдено'}
               </Text>
-              {searchResults.map(({ item, container }) => (
-                <TouchableOpacity key={item.id} activeOpacity={0.75}
-                  onPress={() => { setSearch(''); setDetailId(container.id); }}
-                  style={{ marginBottom: 8 }}>
-                  <BlurView intensity={isDark ? 20 : 38} tint={isDark ? 'dark' : 'light'}
-                    style={{ borderRadius: 14, borderWidth: 1, borderColor: container.color + '40',
-                      padding: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' }}>
-                    <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: container.color, borderRadius: 2, marginRight: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{item.name}</Text>
-                      {item.note ? (
-                        <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{item.note}</Text>
-                      ) : null}
-                      {item.tags.length > 0 && (
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                          {item.tags.map(tag => (
-                            <View key={tag} style={{ backgroundColor: container.color + '20', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                              <Text style={{ color: container.color, fontSize: 10, fontWeight: '600' }}>#{tag}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4,
-                      backgroundColor: container.color + '20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: container.color }} />
-                      <Text style={{ color: container.color, fontSize: 11, fontWeight: '700' }}>{container.name}</Text>
-                    </View>
-                  </BlurView>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* Grid */}
-          {search.trim().length === 0 && (
-            containers.length === 0 ? (
+            }
+            renderItem={({ item }) => (
+              <SearchRow
+                hit={item}
+                isDark={isDark}
+                textColor={c.text}
+                subColor={c.sub}
+                onPress={openSearchHit}
+              />
+            )}
+          />
+        ) : (
+          /* key прив'язаний до кількості колонок: FlatList не вміє міняти
+             numColumns на льоту, а в Split View вона змінюється. */
+          <FlatList
+            key={`grid-${columns}`}
+            data={containers}
+            numColumns={columns}
+            keyExtractor={con => con.id}
+            contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
+            columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
+            renderItem={({ item }) => (
+              <ContainerCard
+                container={item}
+                cardWidth={cardWidth}
+                isDark={isDark}
+                textColor={c.text}
+                subColor={c.sub}
+                onPress={openDetail}
+              />
+            )}
+            ListEmptyComponent={
               <View style={{ alignItems: 'center', paddingVertical: 60 }}>
                 <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                   <IconSymbol name="shippingbox.fill" size={32} color={ACCENT} />
@@ -317,56 +526,9 @@ export default function ContainersScreen() {
                   <Text style={{ color: ACCENT, fontWeight: '700' }}>{tr.newContainer}</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                {containers.map(con => (
-                  <TouchableOpacity key={con.id} activeOpacity={0.75} onPress={() => setDetailId(con.id)}>
-                    <View style={{
-                      width: CARD_W, borderRadius: 18, overflow: 'hidden',
-                      borderWidth: 1, borderColor: con.color + '35',
-                    }}>
-                      {/* Colored top band */}
-                      <LinearGradient
-                        colors={[con.color + '30', con.color + '10']}
-                        style={{ paddingTop: 16, paddingHorizontal: 14, paddingBottom: 12 }}>
-                        <View style={{ width: 40, height: 40, borderRadius: 13,
-                          backgroundColor: con.color + '30', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                          <IconSymbol name="shippingbox.fill" size={20} color={con.color} />
-                        </View>
-                        <Text style={{ color: c.text, fontSize: 15, fontWeight: '800', letterSpacing: -0.3 }} numberOfLines={2}>
-                          {con.name}
-                        </Text>
-                        {con.location ? (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
-                            <IconSymbol name="location.fill" size={10} color={c.sub} />
-                            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '500' }} numberOfLines={1}>{con.location}</Text>
-                          </View>
-                        ) : null}
-                      </LinearGradient>
-
-                      {/* Item count row */}
-                      <View style={{
-                        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                        paddingHorizontal: 14, paddingVertical: 10,
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.6)',
-                      }}>
-                        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500' }}>
-                          {con.items.length > 0
-                            ? `${con.items.length} ${con.items.length === 1 ? 'річ' : con.items.length < 5 ? 'речі' : 'речей'}`
-                            : 'Порожньо'}
-                        </Text>
-                        <View style={{ width: 22, height: 22, borderRadius: 7,
-                          backgroundColor: con.color + '25', alignItems: 'center', justifyContent: 'center' }}>
-                          <IconSymbol name="chevron.right" size={11} color={con.color} />
-                        </View>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )
-          )}
-        </ScrollView>
+            }
+          />
+        )}
       </SafeAreaView>
 
       {/* ── Container Form Modal ─────────────────────────────────────────────── */}
@@ -536,7 +698,6 @@ export default function ContainersScreen() {
                       paddingHorizontal: 12, paddingVertical: 10 }}>
                       <IconSymbol name="plus" size={14} color={c.sub} />
                       <TextInput
-                        ref={addInputRef}
                         placeholder="Нова річ..."
                         placeholderTextColor={c.sub}
                         value={newItemName}
@@ -596,13 +757,35 @@ export default function ContainersScreen() {
                   )}
                 </View>
 
-                {/* Items */}
-                <ScrollView
+                {/* Items. Речей в одному контейнері може бути дуже багато —
+                    список віртуалізований. */}
+                <FlatList
+                  data={detail.items}
+                  keyExtractor={item => item.id}
                   contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
                   showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled">
-
-                  {detail.items.length === 0 ? (
+                  keyboardShouldPersistTaps="handled"
+                  ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+                  ListHeaderComponent={
+                    detail.items.length > 0 ? (
+                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
+                        {detail.items.length} {itemsWord(detail.items.length)}
+                      </Text>
+                    ) : null
+                  }
+                  renderItem={({ item }) => (
+                    <ItemRow
+                      item={item}
+                      accent={detail.color}
+                      isDark={isDark}
+                      textColor={c.text}
+                      subColor={c.sub}
+                      borderColor={c.border}
+                      onEdit={handleItemEdit}
+                      onDelete={handleItemDelete}
+                    />
+                  )}
+                  ListEmptyComponent={
                     <View style={{ alignItems: 'center', paddingVertical: 40 }}>
                       <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: detail.color + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                         <IconSymbol name="archivebox" size={26} color={detail.color} />
@@ -610,52 +793,8 @@ export default function ContainersScreen() {
                       <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>{tr.noItems}</Text>
                       <Text style={{ color: c.sub, fontSize: 13 }}>Введи назву вище і натисни ↑</Text>
                     </View>
-                  ) : (
-                    <>
-                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
-                        {detail.items.length} {detail.items.length === 1 ? 'річ' : detail.items.length < 5 ? 'речі' : 'речей'}
-                      </Text>
-                      {detail.items.map(item => (
-                        <View key={item.id} style={{
-                          flexDirection: 'row', alignItems: 'flex-start',
-                          paddingHorizontal: 14, paddingVertical: 13,
-                          marginBottom: 8, borderRadius: 14,
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.75)',
-                          borderWidth: 1, borderColor: c.border,
-                        }}>
-                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: detail.color, marginTop: 5, marginRight: 12 }} />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{item.name}</Text>
-                            {item.note ? (
-                              <Text style={{ color: c.sub, fontSize: 12, marginTop: 3, lineHeight: 17 }}>{item.note}</Text>
-                            ) : null}
-                            {item.tags.length > 0 && (
-                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
-                                {item.tags.map(tag => (
-                                  <View key={tag} style={{ backgroundColor: detail.color + '20', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                                    <Text style={{ color: detail.color, fontSize: 11, fontWeight: '600' }}>#{tag}</Text>
-                                  </View>
-                                ))}
-                              </View>
-                            )}
-                          </View>
-                          <View style={{ flexDirection: 'row', gap: 6, marginLeft: 8 }}>
-                            <TouchableOpacity
-                              onPress={() => openItemEdit(detail.id, item)}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                              <IconSymbol name="pencil" size={13} color={c.sub} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => deleteItem(detail.id, item.id)}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                              <IconSymbol name="xmark" size={13} color={c.sub} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ))}
-                    </>
-                  )}
-                </ScrollView>
+                  }
+                />
               </KeyboardAvoidingView>
             </SafeAreaView>
           </LinearGradient>

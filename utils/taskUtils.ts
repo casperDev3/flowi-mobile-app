@@ -2,7 +2,7 @@ import { isSameMonth } from './dateUtils';
 
 export type Priority = 'high' | 'medium' | 'low';
 export type Status = 'active' | 'done';
-export type SortBy = 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
+export type SortBy = 'status' | 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
 export type Filter = 'all' | 'active' | 'done';
 
 export interface SubTask {
@@ -101,6 +101,9 @@ export function filterTasksByMonth(tasks: Task[], month: Date): Task[] {
 export function sortTasks(tasks: Task[], by: SortBy): Task[] {
   return [...tasks].sort((a, b) => {
     switch (by) {
+      // Усередині статусної групи порядок задає пріоритет: сам статус уже
+      // винесений у заголовок групи й сортувати за ним удруге нема сенсу.
+      case 'status':
       case 'priority':
         return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
       case 'newest':

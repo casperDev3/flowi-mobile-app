@@ -24,7 +24,7 @@ const SIZE   = 64;
 const STROKE = 5;
 const R      = (SIZE - STROKE) / 2;           // 29.5
 const CIRC   = 2 * Math.PI * R;               // ≈185.35
-const ANIM_DURATION = Motion.duration.slow * 2; // 800 ms
+const ANIM_DURATION = Motion.duration.slow * 2; // 520 ms
 
 // ─── Props (unchanged external API) ──────────────────────────────────────────
 

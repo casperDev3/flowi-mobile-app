@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
@@ -32,10 +32,12 @@ import {
   calcTDEE,
   computeGoals,
 } from '@/utils/healthUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 const ACCENT = '#10B981';
 
 export default function HealthProfileScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -65,20 +67,22 @@ export default function HealthProfileScreen() {
     router.back();
   }, [profile, router]);
 
-  const c = {
+  // Палітра — у useMemo: інакше кожен ререндер (а тут їх багато, бо
+  // поля вводу пишуть у стан на кожен символ) створює новий обʼєкт.
+  const c = useMemo(() => ({
     bg1:   isDark ? '#0C0C14' : '#F4F2FF',
     bg2:   isDark ? '#14121E' : '#EAE6FF',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
     text:  isDark ? '#F0EEFF' : '#1A1433',
     sub:   isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     dim:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  };
+  }), [isDark]);
 
   const sexOpts: { key: Sex; label: string }[] = [
     { key: 'male', label: tr.male },
     { key: 'female', label: tr.female },
   ];
-  const goalOpts: { key: FitnessGoal; label: string; icon: string }[] = [
+  const goalOpts: { key: FitnessGoal; label: string; icon: IconSymbolName }[] = [
     { key: 'lose', label: tr.goalLose, icon: 'arrow.down.right' },
     { key: 'maintain', label: tr.goalMaintain, icon: 'equal' },
     { key: 'gain', label: tr.goalGain, icon: 'arrow.up.right' },
@@ -103,7 +107,7 @@ export default function HealthProfileScreen() {
         </View>
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 120 }]} showsVerticalScrollIndicator={false}>
 
             {/* Стать */}
             <Text style={[s.label, { color: c.sub }]}>{tr.sexLabel}</Text>
@@ -150,7 +154,7 @@ export default function HealthProfileScreen() {
               {goalOpts.map(o => (
                 <TouchableOpacity key={o.key} onPress={() => setProfile(p => ({ ...p, goal: o.key }))}
                   style={[s.segBtn, { flexDirection: 'column', gap: 4, paddingVertical: 12, borderColor: profile.goal === o.key ? ACCENT : c.border, backgroundColor: profile.goal === o.key ? ACCENT + '20' : c.dim }]}>
-                  <IconSymbol name={o.icon as any} size={16} color={profile.goal === o.key ? ACCENT : c.sub} />
+                  <IconSymbol name={o.icon} size={16} color={profile.goal === o.key ? ACCENT : c.sub} />
                   <Text style={{ color: profile.goal === o.key ? ACCENT : c.text, fontWeight: '700', fontSize: 13 }}>{o.label}</Text>
                 </TouchableOpacity>
               ))}

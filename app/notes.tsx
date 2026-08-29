@@ -1,10 +1,10 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  Dimensions,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import Animated, { FadeInDown, FadeOutUp, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -27,6 +27,8 @@ import { useMotion } from '@/hooks/use-motion';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useResponsive } from '@/hooks/use-responsive';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 interface Note {
   id: string;
@@ -51,7 +53,42 @@ function relativeDate(iso: string): string {
   return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
 }
 
+interface NoteCardProps {
+  note: Note;
+  isDark: boolean;
+  borderColor: string;
+  textColor: string;
+  subColor: string;
+  onPress: (note: Note) => void;
+}
+
+/**
+ * Рядок списку мемоізований: без цього кожна зміна сортування або
+ * перемальовування екрана переганяє всі BlurView-картки заново.
+ */
+const NoteCard = React.memo(function NoteCard({
+  note, isDark, borderColor, textColor, subColor, onPress,
+}: NoteCardProps) {
+  return (
+    <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(note)}>
+      <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[ns.noteCard, { borderColor }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: note.body ? 7 : 0 }}>
+          <Text style={[ns.noteTitle, { color: textColor, flex: 1 }]} numberOfLines={1}>
+            {note.title || 'Без назви'}
+          </Text>
+          <Text style={[ns.noteDate, { color: subColor }]}>{relativeDate(note.updatedAt)}</Text>
+        </View>
+        {note.body ? (
+          <Text style={[ns.noteBody, { color: subColor }]} numberOfLines={3}>{note.body}</Text>
+        ) : null}
+      </BlurView>
+    </TouchableOpacity>
+  );
+});
+
 export default function NotesScreen() {
+  const contentWidth = useContentWidth();
+  const { height } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -87,19 +124,19 @@ export default function NotesScreen() {
   // Undo-тост (Stack-скрін — нижнє положення)
   const { show: showUndo, element: undoElement } = useUndoToast(false);
 
-  const openNew = () => {
+  const openNew = useCallback(() => {
     setEditTitle('');
     setEditBody('');
     setIsNew(true);
     setSelected({ id: Date.now().toString(), title: '', body: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-  };
+  }, []);
 
-  const openEdit = (note: Note) => {
+  const openEdit = useCallback((note: Note) => {
     setEditTitle(note.title);
     setEditBody(note.body);
     setIsNew(false);
     setSelected(note);
-  };
+  }, []);
 
   const saveNote = () => {
     if (!editTitle.trim() && !editBody.trim()) {
@@ -151,7 +188,8 @@ export default function NotesScreen() {
     );
   };
 
-  const c = {
+  // Палітра стабільна між рендерами — інакше React.memo на картці не спрацює.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#100D08' : '#FFFBF4',
     bg2:    isDark ? '#1A1510' : '#FFF3DC',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(245,158,11,0.2)',
@@ -160,7 +198,22 @@ export default function NotesScreen() {
     accent: '#F59E0B',
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(16,13,8,0.98)' : 'rgba(255,251,245,0.98)',
-  };
+  }), [isDark]);
+
+  const sortedNotes = useMemo(() => [...notes].sort((a, b) => {
+    if (sort === 'newest') return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    if (sort === 'oldest') return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+    return (a.title || 'Без назви').localeCompare(b.title || 'Без назви', 'uk');
+  }), [notes, sort]);
+
+  /** У віртуалізованому списку елементи монтуються заново при прокрутці:
+   *  без цього прапорця картки «в'їжджали» б щоразу, коли повертаються у вікно. */
+  const animatedNotes = useRef<Set<string>>(new Set());
+  const shouldAnimateNote = useCallback((id: string) => {
+    if (animatedNotes.current.has(id)) return false;
+    animatedNotes.current.add(id);
+    return true;
+  }, []);
 
   return (
     <View style={{ flex: 1 }}>
@@ -207,12 +260,31 @@ export default function NotesScreen() {
           </View>
         )}
 
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }}
+        {/* Нотаток може накопичитися сотні — список віртуалізований. */}
+        <FlatList
+          data={sortedNotes}
+          keyExtractor={note => note.id}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
-
-          {notes.length === 0 && (
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+          renderItem={({ item, index }) => (
+            <Animated.View
+              entering={shouldAnimateNote(item.id)
+                ? motion.entering(FadeInDown.duration(200).delay(Math.min(index, 10) * 40))
+                : undefined}
+              layout={motion.entering(LinearTransition.springify())}>
+              <NoteCard
+                note={item}
+                isDark={isDark}
+                borderColor={c.border}
+                textColor={c.text}
+                subColor={c.sub}
+                onPress={openEdit}
+              />
+            </Animated.View>
+          )}
+          ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 72 }}>
               <IconSymbol name="note.text" size={44} color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 15, marginTop: 16, fontWeight: '600' }}>{tr.noNotes}</Text>
@@ -226,36 +298,8 @@ export default function NotesScreen() {
                 <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addNote}</Text>
               </TouchableOpacity>
             </View>
-          )}
-
-          <View style={{ gap: 10 }}>
-            {[...notes].sort((a, b) => {
-              if (sort === 'newest') return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-              if (sort === 'oldest') return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-              return (a.title || 'Без назви').localeCompare(b.title || 'Без назви', 'uk');
-            }).map((note, i) => (
-              <Animated.View
-                key={note.id}
-                entering={motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40))}
-                exiting={motion.entering(FadeOutUp.duration(150))}
-                layout={motion.entering(LinearTransition.springify())}>
-                <TouchableOpacity activeOpacity={0.75} onPress={() => openEdit(note)}>
-                  <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[ns.noteCard, { borderColor: c.border }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: note.body ? 7 : 0 }}>
-                      <Text style={[ns.noteTitle, { color: c.text, flex: 1 }]} numberOfLines={1}>
-                        {note.title || 'Без назви'}
-                      </Text>
-                      <Text style={[ns.noteDate, { color: c.sub }]}>{relativeDate(note.updatedAt)}</Text>
-                    </View>
-                    {note.body ? (
-                      <Text style={[ns.noteBody, { color: c.sub }]} numberOfLines={3}>{note.body}</Text>
-                    ) : null}
-                  </BlurView>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </View>
-        </ScrollView>
+          }
+        />
       </SafeAreaView>
 
       {/* FAB */}
@@ -279,7 +323,7 @@ export default function NotesScreen() {
               <BlurView
                 intensity={isDark ? 50 : 70}
                 tint={isDark ? 'dark' : 'light'}
-                style={[ns.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                style={[ns.sheet, { maxHeight: height * 0.82, borderColor: c.border, backgroundColor: c.sheet }]}>
 
                 <View style={ns.handleRow}>
                   <View style={{ flex: 1 }}>
@@ -313,7 +357,7 @@ export default function NotesScreen() {
                 />
                 <View style={[ns.divider, { backgroundColor: c.border }]} />
                 <ScrollView
-                  style={{ maxHeight: Dimensions.get('window').height * 0.38 }}
+                  style={{ maxHeight: height * 0.38 }}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}>
                   <TextInput
@@ -351,7 +395,7 @@ const ns = StyleSheet.create({
   fab:         { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: Dimensions.get('window').height * 0.82 },
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   divider:     { height: 1, marginVertical: 12 },

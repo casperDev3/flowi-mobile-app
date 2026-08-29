@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Modal,
   Platform,
   Pressable,
@@ -28,6 +29,8 @@ import { isOnlineMode } from '@/store/app-mode';
 import { cancelMeetingNotification, scheduleMeetingNotification } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useContentWidth } from '@/hooks/use-content-width';
+import { formatDuration } from '@/utils/durationFormat';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
 let AVAudio: any = null;
@@ -138,12 +141,6 @@ function addDays(d: Date, n: number): Date {
   return r;
 }
 
-function chunk<T>(arr: T[], n: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
-  return out;
-}
-
 function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date): Meeting[] {
   if (!meeting.recurrence) return [meeting];
   const { freq, interval, daysOfWeek, until } = meeting.recurrence;
@@ -189,11 +186,13 @@ function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date): Meetin
   return instances;
 }
 
+// Одиниці вшиті українською, як і решта рядків цього екрана (див. звіт);
+// сама форма береться зі спільної утиліти, щоб екран не розходився з
+// рештою застосунку через власну копію тих самих трьох гілок.
+const DURATION_UNITS = { hour: 'г', hourLong: 'год', minute: 'хв' };
+
 function durLabel(minutes: number): string {
-  if (minutes < 60) return `${minutes} хв`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m ? `${h}г ${m}хв` : `${h} год`;
+  return formatDuration(minutes * 60, DURATION_UNITS);
 }
 
 function dayLabel(dateStr: string): string {
@@ -212,7 +211,10 @@ function dayLabel(dateStr: string): string {
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
 function useColors(isDark: boolean) {
-  return {
+  // Стабільне посилання, поки не змінилася тема: MeetingCard під React.memo
+  // порівнює пропси за посиланням, і новий обʼєкт палітри на кожен рендер
+  // екрана зводив би мемоізацію нанівець.
+  return useMemo(() => ({
     bg1:    isDark ? '#0A0C18' : '#EEF0FF',
     bg2:    isDark ? '#121525' : '#E2E5FF',
     card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.75)',
@@ -222,73 +224,16 @@ function useColors(isDark: boolean) {
     text:   isDark ? '#F2F0FF' : '#1A1830',
     sub:    isDark ? 'rgba(210,205,255,0.62)' : 'rgba(80,70,140,0.58)',
     accent: ACCENT,
-  };
-}
-
-// ─── CalendarGrid ─────────────────────────────────────────────────────────────
-
-function CalendarGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMonth, onSelectDay, c }: {
-  year: number; month: number; markedDays: Set<string>; selectedDate: string | null;
-  onPrevMonth: () => void; onNextMonth: () => void;
-  onSelectDay: (d: Date) => void; c: ReturnType<typeof useColors>;
-}) {
-  const fd = (() => { const dow = new Date(year, month, 1).getDay(); return dow === 0 ? 6 : dow - 1; })();
-  const dim = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < fd; i++) cells.push(null);
-  for (let i = 1; i <= dim; i++) cells.push(i);
-  while (cells.length % 7 !== 0) cells.push(null);
-  const weeks = chunk(cells, 7);
-  const todayStr = toDateStr(today);
-
-  return (
-    <View style={[{ borderRadius: 14, borderWidth: 1, padding: 12 }, { borderColor: c.border }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-        <TouchableOpacity onPress={onPrevMonth} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-          <IconSymbol name="chevron.left" size={18} color={c.sub} />
-        </TouchableOpacity>
-        <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontWeight: '700' }}>
-          {MONTHS_UA[month]} {year}
-        </Text>
-        <TouchableOpacity onPress={onNextMonth} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-          <IconSymbol name="chevron.right" size={18} color={c.sub} />
-        </TouchableOpacity>
-      </View>
-      <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-        {WEEKDAYS_SHORT.map(d => (
-          <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
-        ))}
-      </View>
-      {weeks.map((week, wi) => (
-        <View key={wi} style={{ flexDirection: 'row', marginBottom: 2 }}>
-          {week.map((day, di) => {
-            if (!day) return <View key={di} style={{ flex: 1 }} />;
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const isToday = dateStr === todayStr;
-            const isSel = selectedDate === dateStr;
-            const hasMark = markedDays.has(dateStr);
-            return (
-              <TouchableOpacity key={di} onPress={() => onSelectDay(new Date(dateStr + 'T00:00'))}
-                style={{ flex: 1, alignItems: 'center', paddingVertical: 3 }}>
-                <View style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: isSel ? ACCENT : 'transparent',
-                  borderWidth: !isSel && isToday ? 1.5 : 0, borderColor: ACCENT }}>
-                  <Text style={{ color: isSel ? '#fff' : isToday ? ACCENT : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
-                </View>
-                {hasMark && !isSel && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: ACCENT, marginTop: 1 }} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ))}
-    </View>
-  );
+  }), [isDark]);
 }
 
 // ─── MeetingCard ──────────────────────────────────────────────────────────────
 
-function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = false, isRecurring = false }: {
-  mtg: Meeting; onPress: () => void; onDelete: () => void; onRecord?: () => void;
+// Мемоізована: у місячному й квартальному зрізі карток бувають сотні, і без
+// цього кожен рендер екрана перемальовував би їх усі. Колбеки приймають саму
+// зустріч аргументом — інлайн-стрілка на кожну картку ламала б порівняння.
+const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = false, isRecurring = false }: {
+  mtg: Meeting; onPress: (m: Meeting) => void; onDelete: (m: Meeting) => void; onRecord?: (m: Meeting) => void;
   isDark: boolean; c: ReturnType<typeof useColors>; showDate?: boolean; isRecurring?: boolean;
 }) {
   const dur = durLabel(mtg.durationMinutes);
@@ -299,7 +244,7 @@ function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = f
   const dateDisp = showDate ? dayLabel(mtg.date) : null;
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.78}>
+    <TouchableOpacity onPress={() => onPress(mtg)} activeOpacity={0.78}>
       <View style={[s.card, { opacity: isPast && !isNow ? 0.5 : 1, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.72)' }]}>
         {/* Left accent bar */}
         <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: mtg.color, borderTopLeftRadius: 12, borderBottomLeftRadius: 12 }} />
@@ -345,7 +290,7 @@ function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = f
 
           {/* Record */}
           {onRecord && (
-            <TouchableOpacity onPress={e => { e.stopPropagation(); onRecord(); }}
+            <TouchableOpacity onPress={e => { e.stopPropagation(); onRecord(mtg); }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={{ width: 28, height: 28, borderRadius: 8,
                 backgroundColor: (mtg.recordings?.length ?? 0) > 0 ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.07)',
@@ -356,7 +301,7 @@ function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = f
           )}
 
           {/* Delete */}
-          <TouchableOpacity onPress={e => { e.stopPropagation(); onDelete(); }}
+          <TouchableOpacity onPress={e => { e.stopPropagation(); onDelete(mtg); }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name="trash" size={12} color="#EF4444" />
@@ -365,7 +310,17 @@ function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = f
       </View>
     </TouchableOpacity>
   );
-}
+});
+
+// ─── Рядок списку ─────────────────────────────────────────────────────────────
+
+// День і тиждень показують плаский перелік, місяць і квартал — групи по днях.
+// Обидва зводяться до одного масиву, щоб список їхав через FlatList.
+type MeetingRow =
+  | { kind: 'group'; key: string; label: string; count: number }
+  | { kind: 'meeting'; key: string; mtg: Meeting; gap: number };
+
+const meetingRowKey = (r: MeetingRow) => r.key;
 
 // ─── WeekStrip ────────────────────────────────────────────────────────────────
 
@@ -411,6 +366,7 @@ function WeekStrip({ weekStart, meetingsByDate, selected, onSelect, c }: {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function MeetingsScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const c = useColors(isDark);
@@ -511,7 +467,6 @@ export default function MeetingsScreen() {
   }, [expandedMeetings]);
 
   const spanRange = useMemo(() => {
-    const todayStr = toDateStr(today);
     if (span === 'day') return { start: selectedDay, end: selectedDay };
     if (span === 'week') {
       return { start: toDateStr(weekStart), end: toDateStr(addDays(weekStart, 6)) };
@@ -932,163 +887,177 @@ export default function MeetingsScreen() {
     return todayStr >= spanRange.start && todayStr <= spanRange.end;
   }, [spanRange]);
 
+  // ─── Список ───────────────────────────────────────────────────────────────
+
+  // Повторювані зустрічі розгортаються в тимчасові копії; редагування,
+  // видалення й запис мають потрапити в оригінал, а не в копію.
+  const resolveOrig = useCallback(
+    (m: Meeting) => (m._origId ? (meetings.find(x => x.id === m._origId) ?? m) : m),
+    [meetings],
+  );
+
+  const handleCardPress  = useCallback((m: Meeting) => setSelectedMtg(resolveOrig(m)), [resolveOrig]);
+  const handleCardDelete = useCallback((m: Meeting) => deleteMeeting(resolveOrig(m).id), [resolveOrig, deleteMeeting]);
+  const handleCardRecord = useCallback((m: Meeting) => setRecordingMtgId(resolveOrig(m).id), [resolveOrig]);
+
+  // Заголовок групи і її картки йдуть поспіль одним плоским масивом: за
+  // квартал зустрічей бувають сотні, а ScrollView тримав би їх усі
+  // змонтованими одночасно.
+  const rows = useMemo<MeetingRow[]>(() => {
+    if (span === 'day' || span === 'week') {
+      return dayMeetings.map(mtg => ({ kind: 'meeting' as const, key: mtg.id, mtg, gap: 8 }));
+    }
+    const out: MeetingRow[] = [];
+    groupedMeetings.forEach(group => {
+      out.push({ kind: 'group', key: `group_${group.date}`, label: group.label, count: group.items.length });
+      group.items.forEach((mtg, idx) =>
+        out.push({ kind: 'meeting', key: mtg.id, mtg, gap: idx === group.items.length - 1 ? 16 : 8 }));
+    });
+    return out;
+  }, [span, dayMeetings, groupedMeetings]);
+
+  const renderRow = useCallback(({ item }: { item: MeetingRow }) => {
+    if (item.kind === 'group') {
+      return (
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
+            {item.label}
+          </Text>
+          <View style={{ backgroundColor: ACCENT + '18', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2 }}>
+            <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>{item.count}</Text>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View style={{ marginBottom: item.gap }}>
+        <MeetingCard mtg={item.mtg} isDark={isDark} c={c}
+          isRecurring={!!item.mtg._origId}
+          onPress={handleCardPress}
+          onDelete={handleCardDelete}
+          onRecord={handleCardRecord} />
+      </View>
+    );
+  }, [c, isDark, handleCardPress, handleCardDelete, handleCardRecord]);
+
+  const isDaySpan = span === 'day' || span === 'week';
+
+  const listEmpty = useMemo(() => (
+    <TouchableOpacity onPress={() => openAdd(isDaySpan ? selectedDay : undefined)} activeOpacity={0.7}
+      style={[s.emptyBox, { borderColor: c.border }]}>
+      <IconSymbol name="calendar.badge.plus" size={28} color={c.sub} />
+      <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600', marginTop: 10 }}>Немає зустрічей</Text>
+      <Text style={{ color: c.sub, fontSize: 12, opacity: 0.7, marginTop: 4 }}>Натисніть, щоб додати</Text>
+    </TouchableOpacity>
+  ), [c.border, c.sub, isDaySpan, selectedDay, openAdd]);
+
+  const listFooter = useMemo(() => {
+    if (!isDaySpan || rows.length === 0) return null;
+    return (
+      <TouchableOpacity onPress={() => openAdd(selectedDay)} activeOpacity={0.7}
+        style={[s.addMoreBtn, { borderColor: c.border }]}>
+        <IconSymbol name="plus" size={13} color={c.sub} />
+        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', marginLeft: 6 }}>Додати зустріч</Text>
+      </TouchableOpacity>
+    );
+  }, [isDaySpan, rows.length, c.border, c.sub, selectedDay, openAdd]);
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <LinearGradient colors={[c.bg1, c.bg2]} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
 
-        {/* ── Header ── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, gap: 10 }}>
-          <TouchableOpacity onPress={() => router.back()}
-            style={[s.hBtn, { borderColor: c.border, backgroundColor: c.dim }]}>
-            <IconSymbol name="chevron.left" size={18} color={c.sub} />
-          </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>Зустрічі</Text>
-          </View>
-          <TouchableOpacity onPress={goToday}
-            style={[s.hBtn, { borderColor: isCurrentPeriod ? ACCENT + '50' : c.border, backgroundColor: isCurrentPeriod ? ACCENT + '14' : c.dim }]}>
-            <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? ACCENT : c.sub} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowGcalSheet(true)}
-            style={[s.hBtn, { borderColor: gcalToken ? '#34A853' + '50' : c.border, backgroundColor: gcalToken ? '#34A853' + '15' : c.dim }]}>
-            {gcalImporting
-              ? <ActivityIndicator size="small" color="#34A853" />
-              : <IconSymbol name={gcalToken ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={17} color={gcalToken ? '#34A853' : c.sub} />}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => openAdd()}
-            style={[s.hBtn, { borderColor: ACCENT + '50', backgroundColor: ACCENT + '14' }]}>
-            <IconSymbol name="plus" size={18} color={ACCENT} />
-          </TouchableOpacity>
-        </View>
+        {/* Шапка, перемикачі та підсумки тримаються тієї самої колонки, що й
+            список: інакше на планшеті вони розтягуються на всю ширину, поки
+            картки стоять по центру. На телефоні стиль порожній — нічого не
+            змінюється. */}
+        <View style={contentWidth}>
 
-        {/* ── Span tabs ── */}
-        <View style={{ flexDirection: 'row', marginHorizontal: 16, marginBottom: 14, backgroundColor: c.dim, borderRadius: 13, padding: 3 }}>
-          {(Object.keys(SPAN_LABELS) as Span[]).map(key => (
-            <TouchableOpacity key={key} onPress={() => setSpan(key)}
-              style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 11,
-                backgroundColor: span === key ? ACCENT : 'transparent' }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: span === key ? '#fff' : c.sub }}>
-                {SPAN_LABELS[key]}
-              </Text>
+          {/* ── Header ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, gap: 10 }}>
+            <TouchableOpacity onPress={() => router.back()}
+              style={[s.hBtn, { borderColor: c.border, backgroundColor: c.dim }]}>
+              <IconSymbol name="chevron.left" size={18} color={c.sub} />
             </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* ── Period navigation ── */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 }}>
-          <TouchableOpacity onPress={goBack}
-            style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name="chevron.left" size={15} color={c.sub} />
-          </TouchableOpacity>
-          <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 14, fontWeight: '700' }}>{spanTitle}</Text>
-          <TouchableOpacity onPress={goFwd}
-            style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name="chevron.right" size={15} color={c.sub} />
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Stats row ── */}
-        <View style={{ flexDirection: 'row', gap: 10, marginHorizontal: 16, marginBottom: 14 }}>
-          <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
-            style={[s.statCard, { borderColor: c.border, flex: 1 }]}>
-            <Text style={{ color: ACCENT, fontSize: 22, fontWeight: '800' }}>{stats.total}</Text>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>зустрічей</Text>
-          </BlurView>
-          <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
-            style={[s.statCard, { borderColor: c.border, flex: 1 }]}>
-            <Text style={{ color: ACCENT, fontSize: 22, fontWeight: '800' }}>{stats.timeStr}</Text>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>загальний час</Text>
-          </BlurView>
-        </View>
-
-        {/* ── Week strip ── */}
-        {span === 'week' && (
-          <View style={{ paddingHorizontal: 16, marginBottom: 14 }}>
-            <WeekStrip weekStart={weekStart} meetingsByDate={meetingsByDate} selected={selectedDay} onSelect={setSelectedDay} c={c} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>Зустрічі</Text>
+            </View>
+            <TouchableOpacity onPress={goToday}
+              style={[s.hBtn, { borderColor: isCurrentPeriod ? ACCENT + '50' : c.border, backgroundColor: isCurrentPeriod ? ACCENT + '14' : c.dim }]}>
+              <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? ACCENT : c.sub} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowGcalSheet(true)}
+              style={[s.hBtn, { borderColor: gcalToken ? '#34A853' + '50' : c.border, backgroundColor: gcalToken ? '#34A853' + '15' : c.dim }]}>
+              {gcalImporting
+                ? <ActivityIndicator size="small" color="#34A853" />
+                : <IconSymbol name={gcalToken ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={17} color={gcalToken ? '#34A853' : c.sub} />}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openAdd()}
+              style={[s.hBtn, { borderColor: ACCENT + '50', backgroundColor: ACCENT + '14' }]}>
+              <IconSymbol name="plus" size={18} color={ACCENT} />
+            </TouchableOpacity>
           </View>
-        )}
 
-        {/* ── Content ── */}
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }} showsVerticalScrollIndicator={false}>
+          {/* ── Span tabs ── */}
+          <View style={{ flexDirection: 'row', marginHorizontal: 16, marginBottom: 14, backgroundColor: c.dim, borderRadius: 13, padding: 3 }}>
+            {(Object.keys(SPAN_LABELS) as Span[]).map(key => (
+              <TouchableOpacity key={key} onPress={() => setSpan(key)}
+                style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 11,
+                  backgroundColor: span === key ? ACCENT : 'transparent' }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: span === key ? '#fff' : c.sub }}>
+                  {SPAN_LABELS[key]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-          {/* Day view: timeline */}
-          {(span === 'day' || (span === 'week' && selectedDay)) && (() => {
-            const list = span === 'day' ? (meetingsByDate[selectedDay] ?? []) : dayMeetings;
-            return (
-              <View>
-                {list.length === 0 ? (
-                  <TouchableOpacity onPress={() => openAdd(selectedDay)} activeOpacity={0.7}
-                    style={[s.emptyBox, { borderColor: c.border }]}>
-                    <IconSymbol name="calendar.badge.plus" size={28} color={c.sub} />
-                    <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600', marginTop: 10 }}>Немає зустрічей</Text>
-                    <Text style={{ color: c.sub, fontSize: 12, opacity: 0.7, marginTop: 4 }}>Натисніть, щоб додати</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={{ gap: 8 }}>
-                    {list.map(mtg => {
-                      const origMtg = mtg._origId ? (meetings.find(m => m.id === mtg._origId) ?? mtg) : mtg;
-                      return (
-                        <MeetingCard key={mtg.id} mtg={mtg} isDark={isDark} c={c}
-                          isRecurring={!!mtg._origId}
-                          onPress={() => setSelectedMtg(origMtg)}
-                          onDelete={() => deleteMeeting(origMtg.id)}
-                          onRecord={() => setRecordingMtgId(origMtg.id)} />
-                      );
-                    })}
-                    <TouchableOpacity onPress={() => openAdd(selectedDay)} activeOpacity={0.7}
-                      style={[s.addMoreBtn, { borderColor: c.border }]}>
-                      <IconSymbol name="plus" size={13} color={c.sub} />
-                      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', marginLeft: 6 }}>Додати зустріч</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            );
-          })()}
+          {/* ── Period navigation ── */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 }}>
+            <TouchableOpacity onPress={goBack}
+              style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
+              <IconSymbol name="chevron.left" size={15} color={c.sub} />
+            </TouchableOpacity>
+            <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 14, fontWeight: '700' }}>{spanTitle}</Text>
+            <TouchableOpacity onPress={goFwd}
+              style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
+              <IconSymbol name="chevron.right" size={15} color={c.sub} />
+            </TouchableOpacity>
+          </View>
 
-          {/* Month/Quarter view: grouped by date */}
-          {(span === 'month' || span === 'quarter') && (
-            <View>
-              {groupedMeetings.length === 0 ? (
-                <TouchableOpacity onPress={() => openAdd()} activeOpacity={0.7}
-                  style={[s.emptyBox, { borderColor: c.border }]}>
-                  <IconSymbol name="calendar.badge.plus" size={28} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600', marginTop: 10 }}>Немає зустрічей</Text>
-                  <Text style={{ color: c.sub, fontSize: 12, opacity: 0.7, marginTop: 4 }}>Натисніть, щоб додати</Text>
-                </TouchableOpacity>
-              ) : (
-                groupedMeetings.map(group => (
-                  <View key={group.date} style={{ marginBottom: 16 }}>
-                    {/* Date header */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 }}>
-                        {group.label}
-                      </Text>
-                      <View style={{ backgroundColor: ACCENT + '18', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2 }}>
-                        <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>{group.items.length}</Text>
-                      </View>
-                    </View>
-                    <View style={{ gap: 8 }}>
-                      {group.items.map(mtg => {
-                        const origMtg = mtg._origId ? (meetings.find(m => m.id === mtg._origId) ?? mtg) : mtg;
-                        return (
-                          <MeetingCard key={mtg.id} mtg={mtg} isDark={isDark} c={c}
-                            isRecurring={!!mtg._origId}
-                            onPress={() => setSelectedMtg(origMtg)}
-                            onDelete={() => deleteMeeting(origMtg.id)}
-                            onRecord={() => setRecordingMtgId(origMtg.id)} />
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))
-              )}
+          {/* ── Stats row ── */}
+          <View style={{ flexDirection: 'row', gap: 10, marginHorizontal: 16, marginBottom: 14 }}>
+            <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
+              style={[s.statCard, { borderColor: c.border, flex: 1 }]}>
+              <Text style={{ color: ACCENT, fontSize: 22, fontWeight: '800' }}>{stats.total}</Text>
+              <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>зустрічей</Text>
+            </BlurView>
+            <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
+              style={[s.statCard, { borderColor: c.border, flex: 1 }]}>
+              <Text style={{ color: ACCENT, fontSize: 22, fontWeight: '800' }}>{stats.timeStr}</Text>
+              <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>загальний час</Text>
+            </BlurView>
+          </View>
+
+          {/* ── Week strip ── */}
+          {span === 'week' && (
+            <View style={{ paddingHorizontal: 16, marginBottom: 14 }}>
+              <WeekStrip weekStart={weekStart} meetingsByDate={meetingsByDate} selected={selectedDay} onSelect={setSelectedDay} c={c} />
             </View>
           )}
+        </View>
 
-        </ScrollView>
+        {/* ── Content ── */}
+        <FlatList
+          style={{ flex: 1 }}
+          data={rows}
+          keyExtractor={meetingRowKey}
+          renderItem={renderRow}
+          ListEmptyComponent={listEmpty}
+          ListFooterComponent={listFooter}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
+          showsVerticalScrollIndicator={false}
+        />
       </SafeAreaView>
 
       {/* FAB */}

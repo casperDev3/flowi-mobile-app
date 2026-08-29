@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
@@ -30,12 +31,13 @@ export default function AccountScreen() {
   const router = useRouter();
   const { tr } = useI18n();
   const { user, updateProfile, changePassword, deleteAccount } = useAuth();
+  // Керування акаунтом — теж форма: на планшеті тримаємо її в колонці,
+  // інакше кнопка збереження відʼїжджає від свого поля на пів екрана вправо.
+  const contentWidth = useContentWidth();
 
   const c = {
     ...getScreenColors('auth', isDark),
-    input:  isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-    red:    '#EF4444',
-    green:  '#10B981',
+    red: '#EF4444',
   };
 
   // ── Name ──────────────────────────────────────────────────────────────────
@@ -180,7 +182,7 @@ export default function AccountScreen() {
           style={{ flex: 1 }}
         >
           <ScrollView
-            contentContainerStyle={st.scroll}
+            contentContainerStyle={[st.scroll, contentWidth]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -359,11 +361,15 @@ export default function AccountScreen() {
   );
 }
 
-function SectionLabel({ label, color }: { label: string; color: string }) {
+// Мемоізовано: екран перемальовується на кожну літеру в будь-якому полі,
+// а підписи секцій залежать лише від двох рядків.
+const SectionLabel = React.memo(function SectionLabel(
+  { label, color }: { label: string; color: string },
+) {
   return (
     <Text style={[st.sectionLabel, { color }]}>{label.toUpperCase()}</Text>
   );
-}
+});
 
 const st = StyleSheet.create({
   header: {

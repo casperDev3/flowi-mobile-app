@@ -1,9 +1,10 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text,
+  TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,15 +16,20 @@ import { cancelById, scheduleDateReminder } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
-import { ACCENT_CAL, getHealthColors } from '@/utils/healthTheme';
+import type { Translations } from '@/store/translations';
+import { ACCENT_CAL, type HealthColors, getHealthColors } from '@/utils/healthTheme';
 import { VACCINES_KEY, Vaccine, genId } from '@/utils/preventionUtils';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 export default function VaccinesScreen() {
+  const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const c = getHealthColors(isDark);
+  // Палітра — у useMemo, інакше React.memo на картці не спрацює:
+  // getHealthColors повертає новий обʼєкт на кожен ререндер.
+  const c = useMemo(() => getHealthColors(isDark), [isDark]);
   useScreenView('health_vaccines');
 
   const [items, setItems] = useState<Vaccine[]>([]);
@@ -56,8 +62,17 @@ export default function VaccinesScreen() {
     setName(''); setDate(new Date().toISOString().slice(0, 10)); setDoseNo(''); setNextDate(''); setAdd(false);
   };
 
-  const remove = async (item: Vaccine) => { await cancelById(item.notifId); setItems(p => p.filter(x => x.id !== item.id)); };
-  const fmtD = (d: string) => new Date(d).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  // Колбек мусить бути стабільним і приймати елемент аргументом — інакше
+  // нова стрілка на кожен ререндер зводить React.memo картки нанівець.
+  const remove = useCallback(async (item: Vaccine) => {
+    await cancelById(item.notifId);
+    setItems(p => p.filter(x => x.id !== item.id));
+  }, []);
+
+  const keyExtractor = useCallback((item: Vaccine) => item.id, []);
+  const renderItem = useCallback(({ item }: { item: Vaccine }) => (
+    <VaccineCard item={item} onRemove={remove} isDark={isDark} c={c} tr={tr} locale={locale} />
+  ), [remove, isDark, c, tr, locale]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -73,30 +88,16 @@ export default function VaccinesScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-          {items.length === 0 ? <Empty c={c} text={tr.vaccinesSub} icon="syringe" /> : items.map(item => (
-            <BlurView key={item.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="syringe" size={17} color={ACCENT_CAL} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{item.name}{item.doseNo ? ` · №${item.doseNo}` : ''}</Text>
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{fmtD(item.date)}</Text>
-                </View>
-                <TouchableOpacity onPress={() => remove(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
-                  <IconSymbol name="trash" size={15} color={c.sub} />
-                </TouchableOpacity>
-              </View>
-              {item.nextDate ? (
-                <View style={[s.next, { borderColor: ACCENT_CAL + '40', backgroundColor: ACCENT_CAL + '12' }]}>
-                  <IconSymbol name="bell.fill" size={11} color={ACCENT_CAL} />
-                  <Text style={{ color: ACCENT_CAL, fontSize: 11, fontWeight: '700', marginLeft: 6 }}>{tr.upcoming}: {fmtD(item.nextDate)}</Text>
-                </View>
-              ) : null}
-            </BlurView>
-          ))}
-        </ScrollView>
+        {/* Історія щеплень накопичується роками, тож список
+            віртуалізований: ScrollView тримав би в памʼяті всі картки. */}
+        <FlatList
+          data={items}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<Empty c={c} text={tr.vaccinesSub} icon="syringe" />}
+        />
       </SafeAreaView>
 
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
@@ -127,6 +128,36 @@ export default function VaccinesScreen() {
     </View>
   );
 }
+
+const VaccineCard = React.memo(function VaccineCard({ item, onRemove, isDark, c, tr, locale }: {
+  item: Vaccine; onRemove: (item: Vaccine) => void; isDark: boolean;
+  c: HealthColors; tr: Translations; locale: string;
+}) {
+  const fmtD = (d: string) => new Date(d).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+
+  return (
+    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
+          <IconSymbol name="syringe" size={17} color={ACCENT_CAL} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{item.name}{item.doseNo ? ` · №${item.doseNo}` : ''}</Text>
+          <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{fmtD(item.date)}</Text>
+        </View>
+        <TouchableOpacity onPress={() => onRemove(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
+          <IconSymbol name="trash" size={15} color={c.sub} />
+        </TouchableOpacity>
+      </View>
+      {item.nextDate ? (
+        <View style={[s.next, { borderColor: ACCENT_CAL + '40', backgroundColor: ACCENT_CAL + '12' }]}>
+          <IconSymbol name="bell.fill" size={11} color={ACCENT_CAL} />
+          <Text style={{ color: ACCENT_CAL, fontSize: 11, fontWeight: '700', marginLeft: 6 }}>{tr.upcoming}: {fmtD(item.nextDate)}</Text>
+        </View>
+      ) : null}
+    </BlurView>
+  );
+});
 
 const s = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },

@@ -1,9 +1,8 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -18,15 +17,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
+import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
+import { monthGrid } from '@/utils/dateUtils';
+import {
+  BUILTIN_CURRENCIES, formatCurrency, type Currency, type Transaction,
+} from '@/utils/financeUtils';
+import { type Account, type AccountKind } from '@/utils/accounts';
+import { useResponsive } from '@/hooks/use-responsive';
+import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 
-type TxType = 'income' | 'expense';
-interface Transaction {
-  id: string; type: TxType; category: string; amount: number; note: string; date: string;
-}
+/**
+ * Категорію мають лише дохід і витрата, тож розріз «за категоріями» знає саме
+ * ці два види. Переказ у цей перелік свідомо не входить: категорії в нього
+ * немає, і додати його сюди означало б завести порожній розділ, який завжди
+ * показує «нічого».
+ *
+ * Сам `Transaction` береться з utils/financeUtils — власна копія типу знала б
+ * лише 'income' | 'expense', і компілятор не показав би жодного місця, де
+ * переказ не розглянуто.
+ */
+type CatType = 'income' | 'expense';
 interface CategoryDef { name: string; icon: IconSymbolName; }
 
-const DEFAULT_CATEGORIES: Record<TxType, CategoryDef[]> = {
+const DEFAULT_CATEGORIES: Record<CatType, CategoryDef[]> = {
   income: [
     { name: 'Зарплата',   icon: 'briefcase.fill' },
     { name: 'Фріланс',    icon: 'laptopcomputer' },
@@ -45,6 +59,16 @@ const DEFAULT_CATEGORIES: Record<TxType, CategoryDef[]> = {
   ],
 };
 
+/**
+ * Іконка за видом рахунку, а не за полем `icon`: воно довільне й може містити
+ * назву символу, якої в збірці немає, — тоді рядок лишився б без картинки.
+ */
+const ACCOUNT_KIND_ICONS: Record<AccountKind, IconSymbolName> = {
+  cash:    'banknote',
+  card:    'creditcard.fill',
+  savings: 'building.columns.fill',
+};
+
 const CAT_COLORS = [
   '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
   '#EC4899', '#F97316', '#14B8A6', '#6366F1', '#A855F7', '#64748B',
@@ -53,12 +77,31 @@ const CAT_COLORS = [
 const MONTHS_UA      = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
 const MONTHS_UA_FULL = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const WEEKDAYS_UA    = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
-const W = Dimensions.get('window').width;
-const fmt = (n: number) => n.toLocaleString('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 });
 const fmtShort = (n: number) => {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}к`;
   return String(Math.round(n));
 };
+
+/**
+ * Палітра екрана. Винесена з тіла компонента, щоб `useMemo` віддавав той
+ * самий об'єкт між рендерами — інакше мемоізовані картки бачать «нові»
+ * кольори на кожен рендер і перемальовуються дарма.
+ */
+function makeColors(isDark: boolean) {
+  return {
+    bg1:    isDark ? '#080E18' : '#EFF5FF',
+    bg2:    isDark ? '#0F1A2E' : '#E0ECFF',
+    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
+    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(140,180,240,0.35)',
+    text:   isDark ? '#F0F5FF' : '#0A1020',
+    sub:    isDark ? 'rgba(240,245,255,0.62)' : 'rgba(10,16,32,0.58)',
+    green:  '#10B981',
+    red:    '#EF4444',
+    accent: '#0EA5E9',
+    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    hole:   isDark ? '#0C1420' : '#E8F0FC',
+  };
+}
 
 type Period = 'week' | 'month' | '3months' | 'year' | 'all';
 
@@ -72,7 +115,7 @@ function getPeriodStart(period: Period): Date | null {
 }
 
 // ─── Pie slice (no SVG) ──────────────────────────────────────────────────────
-function PieSlice({ from, sweep, color, size }: { from: number; sweep: number; color: string; size: number }) {
+const PieSlice = React.memo(function PieSlice({ from, sweep, color, size }: { from: number; sweep: number; color: string; size: number }) {
   if (sweep <= 0.5) return null;
   if (sweep > 180) {
     return (
@@ -95,9 +138,9 @@ function PieSlice({ from, sweep, color, size }: { from: number; sweep: number; c
       </View>
     </View>
   );
-}
+});
 
-function DonutChart({ data, size = 180, holeRatio = 0.56, holeBg }: {
+const DonutChart = React.memo(function DonutChart({ data, size = 180, holeRatio = 0.56, holeBg }: {
   data: { value: number; color: string }[];
   size?: number; holeRatio?: number; holeBg: string;
 }) {
@@ -123,10 +166,10 @@ function DonutChart({ data, size = 180, holeRatio = 0.56, holeBg }: {
       }} />
     </View>
   );
-}
+});
 
 // ─── Trend line chart (rotated Views) ────────────────────────────────────────
-function SparkLine({ data, color, height = 64, width }: {
+const SparkLine = React.memo(function SparkLine({ data, color, height = 64, width }: {
   data: number[]; color: string; height: number; width: number;
 }) {
   if (data.length < 2) return null;
@@ -183,15 +226,26 @@ function SparkLine({ data, color, height = 64, width }: {
       }} />
     </View>
   );
-}
+});
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function FinanceStatsScreen() {
+  const contentWidth = useContentWidth();
+  const { width, isWide } = useResponsive();
   const isDark = useColorScheme() === 'dark';
+  const { tr, lang } = useI18n();
   const [txs, setTxs] = useState<Transaction[]>([]);
-  const [cats, setCats] = useState<Record<TxType, CategoryDef[]>>(DEFAULT_CATEGORIES);
+  // Порожній стан показуємо лише після читання сховища: інакше він блимає
+  // на першому кадрі, поки транзакції ще не приїхали.
+  const [loaded, setLoaded] = useState(false);
+  const [cats, setCats] = useState<Record<CatType, CategoryDef[]>>(DEFAULT_CATEGORIES);
+  // Рахунки потрібні для розрізу витрат по місцях, де лежать гроші, і як
+  // довідник валют для їхніх підсумків.
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [primaryCurrency, setPrimaryCurrency] = useState('UAH');
+  const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
   const [period, setPeriod] = useState<Period>('month');
-  const [catTab, setCatTab] = useState<TxType>('expense');
+  const [catTab, setCatTab] = useState<CatType>('expense');
 
   // Custom date range
   const [showCal, setShowCal]       = useState(false);
@@ -229,21 +283,7 @@ export default function FinanceStatsScreen() {
     }
   };
 
-  // Calendar grid helpers
-  const firstDayOfMonth = useMemo(() => {
-    const d = new Date(calYear, calMonth, 1).getDay();
-    return d === 0 ? 6 : d - 1;
-  }, [calYear, calMonth]);
-  const daysInMonth = useMemo(() => new Date(calYear, calMonth + 1, 0).getDate(), [calYear, calMonth]);
-  const calWeeks = useMemo(() => {
-    const cells: (number | null)[] = [];
-    for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
-    for (let i = 1; i <= daysInMonth; i++) cells.push(i);
-    while (cells.length % 7 !== 0) cells.push(null);
-    const weeks: (number | null)[][] = [];
-    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-    return weeks;
-  }, [firstDayOfMonth, daysInMonth]);
+  const calWeeks = useMemo(() => monthGrid(calYear, calMonth), [calYear, calMonth]);
 
   const markedDays = useMemo(() => {
     const set = new Set<string>();
@@ -255,30 +295,56 @@ export default function FinanceStatsScreen() {
   }, [txs]);
 
   useEffect(() => {
-    loadData<Transaction[]>('transactions', []).then(setTxs);
-    loadData<CategoryRow[]>('categories', []).then(rows => {
+    Promise.all([
+      loadData<Transaction[]>('transactions', []),
+      loadData<CategoryRow[]>('categories', []),
+      loadData<string>('finance_primary_currency', 'UAH'),
+      loadData<Currency[]>('finance_currencies', []),
+      loadData<Account[]>('accounts', []),
+    ]).then(([loadedTxs, rows, primCur, curList, accs]) => {
+      setTxs(loadedTxs);
       setCats(categoryRowsToMap(Array.isArray(rows) ? rows : [], DEFAULT_CATEGORIES));
+      setPrimaryCurrency(primCur || 'UAH');
+      setCustomCurrencies(Array.isArray(curList) ? curList : []);
+      setAccounts(Array.isArray(accs) ? accs : []);
+      setLoaded(true);
     });
   }, []);
 
-  const getCatIcon = (name: string, type: TxType): IconSymbolName =>
-    cats[type].find(c => c.name === name)?.icon ??
-    DEFAULT_CATEGORIES[type].find(c => c.name === name)?.icon ??
-    'ellipsis.circle.fill';
+  const getCatIcon = useCallback(
+    (name: string, type: CatType): IconSymbolName =>
+      cats[type].find(cat => cat.name === name)?.icon ??
+      DEFAULT_CATEGORIES[type].find(cat => cat.name === name)?.icon ??
+      'ellipsis.circle.fill',
+    [cats],
+  );
 
-  const c = {
-    bg1:    isDark ? '#080E18' : '#EFF5FF',
-    bg2:    isDark ? '#0F1A2E' : '#E0ECFF',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(140,180,240,0.35)',
-    text:   isDark ? '#F0F5FF' : '#0A1020',
-    sub:    isDark ? 'rgba(240,245,255,0.62)' : 'rgba(10,16,32,0.58)',
-    green:  '#10B981',
-    red:    '#EF4444',
-    accent: '#0EA5E9',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    hole:   isDark ? '#0C1420' : '#E8F0FC',
-  };
+  const c = useMemo(() => makeColors(isDark), [isDark]);
+
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+
+  // Статистика показує ті самі суми, що й «Фінанси», тож і валюта та сама —
+  // вшитий ₴ брехав би всім, хто веде облік у іншій валюті.
+  const currency = useMemo<Currency>(
+    () => [...BUILTIN_CURRENCIES, ...customCurrencies].find(cur => cur.code === primaryCurrency)
+      ?? BUILTIN_CURRENCIES[0],
+    [customCurrencies, primaryCurrency],
+  );
+  const fmt = useCallback((n: number) => formatCurrency(n, currency, locale), [currency, locale]);
+
+  /**
+   * Форматування у валюті конкретного рахунку — для розрізу по рахунках, де
+   * гривневий гаманець і доларова картка стоять поруч. Зводити їх в одну суму
+   * ця фаза не вміє, тож кожен рядок підписаний власною валютою.
+   */
+  const fmtIn = useCallback(
+    (n: number, code: string) => formatCurrency(
+      n,
+      [...BUILTIN_CURRENCIES, ...customCurrencies].find(cur => cur.code === code) ?? currency,
+      locale,
+    ),
+    [customCurrencies, currency, locale],
+  );
 
   const periodStart = useMemo(() => getPeriodStart(period), [period]);
   const periodTxs   = useMemo(() => {
@@ -289,8 +355,25 @@ export default function FinanceStatsScreen() {
     return periodStart ? txs.filter(t => new Date(t.date) >= periodStart!) : txs;
   }, [txs, periodStart, hasCustomRange, rangeStart, rangeEnd]);
 
-  const income  = periodTxs.filter(t => t.type === 'income' ).reduce((s, t) => s + t.amount, 0);
-  const expense = periodTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  /**
+   * Оборот періоду — усе, крім переказів.
+   *
+   * Переказ між своїми рахунками не заробили й не витратили: він лише міняє
+   * місце, де лежать гроші. Раніше його доводилося писати парою «витрата +
+   * дохід», і місяць, у якому користувач просто зняв гроші з картки, показував
+   * зайвий дохід і зайву витрату на ту саму суму — обидва графіки, донат і
+   * тренд балансу брехали на подвійну суму переказу.
+   *
+   * Усі підсумки нижче рахуються саме з цього списку, а `periodTxs` лишається
+   * повним — календар діапазону мусить позначати дні переказів теж.
+   */
+  const periodFlow = useMemo(() => periodTxs.filter(t => t.type !== 'transfer'), [periodTxs]);
+  /** Ті самі транзакції за весь час — для помісячних стовпчиків. */
+  const flowTxs = useMemo(() => txs.filter(t => t.type !== 'transfer'), [txs]);
+  const transferCount = periodTxs.length - periodFlow.length;
+
+  const income  = periodFlow.filter(t => t.type === 'income' ).reduce((s, t) => s + t.amount, 0);
+  const expense = periodFlow.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const balance = income - expense;
   const savingsPct = income > 0 ? Math.max(0, Math.round((balance / income) * 100)) : 0;
 
@@ -301,7 +384,7 @@ export default function FinanceStatsScreen() {
         const d = new Date();
         d.setDate(d.getDate() - (6 - i));
         const dayKey = d.toDateString();
-        const f = periodTxs.filter(t => new Date(t.date).toDateString() === dayKey);
+        const f = periodFlow.filter(t => new Date(t.date).toDateString() === dayKey);
         const dow = d.getDay();
         return {
           label: WEEKDAYS_UA[dow === 0 ? 6 : dow - 1],
@@ -316,7 +399,7 @@ export default function FinanceStatsScreen() {
       const offset = count - 1 - i;
       const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
-      const f = txs.filter(t => {
+      const f = flowTxs.filter(t => {
         const td = new Date(t.date);
         return `${td.getFullYear()}-${td.getMonth()}` === key;
       });
@@ -326,16 +409,20 @@ export default function FinanceStatsScreen() {
         expense: f.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
       };
     });
-  }, [txs, periodTxs, period]);
+  }, [flowTxs, periodFlow, period]);
 
   const maxBar = Math.max(...chartData.map(m => Math.max(m.income, m.expense)), 1);
 
   // ── Cumulative balance trend ─────────────────────────────────────────────
   const trendData = useMemo(() => {
-    if (periodTxs.length < 2) return [];
-    const sorted = [...periodTxs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    if (periodFlow.length < 2) return [];
+    const sorted = [...periodFlow].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     let running = 0;
     const pts: number[] = [];
+    // Гілка «інакше мінус» була найнебезпечнішим місцем екрана: переказ під неї
+    // потрапляв як витрата, і лінія балансу провалювалася на кожному
+    // перекладанні грошей між власними рахунками. Тепер переказів у списку
+    // немає взагалі, тож ділення на дохід/витрату однозначне.
     sorted.forEach(t => {
       running += t.type === 'income' ? t.amount : -t.amount;
       pts.push(running);
@@ -343,25 +430,27 @@ export default function FinanceStatsScreen() {
     if (pts.length <= 40) return pts;
     const step = Math.floor(pts.length / 40);
     return pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
-  }, [periodTxs]);
+  }, [periodFlow]);
 
   // ── Category stats ───────────────────────────────────────────────────────
   const categoryStats = useMemo(() => {
     const map: Record<string, number> = {};
-    periodTxs.filter(t => t.type === catTab).forEach(t => {
+    // `catTab` — лише 'income' | 'expense', тож переказ сюди не потрапляє й не
+    // заводить категорію-привид із порожньою назвою.
+    periodFlow.filter(t => t.type === catTab).forEach(t => {
       map[t.category] = (map[t.category] ?? 0) + t.amount;
     });
     const total = Object.values(map).reduce((s, v) => s + v, 0);
     return Object.entries(map)
       .map(([cat, amt], i) => ({ cat, amt, pct: total > 0 ? (amt / total) * 100 : 0, color: CAT_COLORS[i % CAT_COLORS.length] }))
       .sort((a, b) => b.amt - a.amt);
-  }, [periodTxs, catTab]);
+  }, [periodFlow, catTab]);
 
   // ── Day-of-week expense stats ────────────────────────────────────────────
   const weekdayStats = useMemo(() => {
     const sums   = [0, 0, 0, 0, 0, 0, 0];
     const counts = [0, 0, 0, 0, 0, 0, 0];
-    periodTxs.filter(t => t.type === 'expense').forEach(t => {
+    periodFlow.filter(t => t.type === 'expense').forEach(t => {
       const dow = new Date(t.date).getDay();
       const idx = dow === 0 ? 6 : dow - 1;
       sums[idx]   += t.amount;
@@ -374,23 +463,72 @@ export default function FinanceStatsScreen() {
       count: counts[i],
       pct:   sums[i] / maxSum,
     }));
-  }, [periodTxs]);
+  }, [periodFlow]);
 
   // ── Quick stats ──────────────────────────────────────────────────────────
-  const txCount      = periodTxs.length;
-  const expenseTxs   = periodTxs.filter(t => t.type === 'expense');
+  // Лічильник показує операції обороту: він стоїть поруч із «сер/день», і
+  // рахувати в ньому перекази означало б ділити витрати на завелике число
+  // операцій у голові користувача.
+  const txCount      = periodFlow.length;
+  const expenseTxs   = periodFlow.filter(t => t.type === 'expense');
   const largestTx    = expenseTxs.reduce<Transaction | null>((max, t) => !max || t.amount > max.amount ? t : max, null);
   const periodDays   = hasCustomRange
     ? Math.max(1, Math.ceil((rangeEnd!.getTime() - rangeStart!.getTime()) / 86400000) + 1)
     : periodStart ? Math.max(1, Math.ceil((Date.now() - periodStart.getTime()) / 86400000)) : 30;
   const avgDailyExp  = expense / periodDays;
 
-  const balanceDonutData = income + expense > 0
-    ? [{ value: income, color: c.green }, { value: expense, color: c.red }]
-    : [];
+  /**
+   * Витрати періоду в розрізі рахунків — звідки саме пішли гроші.
+   *
+   * Показуємо лише коли рахунків більше одного: з єдиним гаманцем цей розділ
+   * просто вдруге повторив би загальну суму витрат.
+   *
+   * Архівні рахунки не відсіюємо: якщо витрата в періоді була, приховати рядок
+   * означало б втратити частину суми без пояснення.
+   */
+  const accountStats = useMemo(() => {
+    if (accounts.length < 2) return [];
+    const spent: Record<string, number> = {};
+    for (const t of periodFlow) {
+      if (t.type !== 'expense') continue;
+      spent[t.accountId] = (spent[t.accountId] ?? 0) + t.amount;
+    }
+    const rows = accounts
+      .map(a => ({ account: a, spent: spent[a.id] ?? 0 }))
+      .filter(r => r.spent > 0)
+      .sort((a, b) => b.spent - a.spent);
+    const max = rows.reduce((m, r) => Math.max(m, r.spent), 0);
+    return rows.map(r => ({ ...r, pct: max > 0 ? r.spent / max : 0 }));
+  }, [accounts, periodFlow]);
+
+  const balanceDonutData = useMemo(
+    () => (income + expense > 0
+      ? [{ value: income, color: c.green }, { value: expense, color: c.red }]
+      : []),
+    [income, expense, c.green, c.red],
+  );
+
+  const categoryDonutData = useMemo(
+    () => categoryStats.map(item => ({ value: item.amt, color: item.color })),
+    [categoryStats],
+  );
 
   const trendColor = balance >= 0 ? c.green : c.red;
-  const SPARK_W = W - 76;
+  // Графік живе всередині колонки, обмеженої CONTENT_MAX_WIDTH: на планшеті
+  // ширина вікна значно більша, і без стелі лінія вилазила б за картку.
+  // 76 = поля прокрутки (20+20) + внутрішні поля картки (18+18).
+  const SPARK_W = Math.min(width, CONTENT_MAX_WIDTH) - 76;
+
+  const summaryCards = [
+    { label: 'Доходи',       value: fmt(income),      color: c.green },
+    { label: 'Витрати',      value: fmt(expense),     color: c.red },
+    { label: 'Баланс',       value: fmt(balance),     color: balance >= 0 ? c.green : c.red },
+    { label: 'Заощадження',  value: `${savingsPct}%`, color: c.accent },
+  ];
+  // На широкому екрані всі чотири підсумки вміщаються в один ряд.
+  const summaryRows = isWide
+    ? [summaryCards]
+    : [summaryCards.slice(0, 2), summaryCards.slice(2)];
 
   return (
     <View style={{ flex: 1 }}>
@@ -414,7 +552,7 @@ export default function FinanceStatsScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
           {/* ── Custom range chip ── */}
@@ -431,6 +569,26 @@ export default function FinanceStatsScreen() {
               <IconSymbol name="xmark" size={11} color={c.accent} />
             </TouchableOpacity>
           )}
+
+          {loaded && txs.length === 0 ? (
+            /* Порожня статистика — глухий кут: графіки нулів не пояснюють,
+               що робити далі, тому веде одразу до створення транзакції. */
+            <View style={{ alignItems: 'center', paddingVertical: 64 }}>
+              <View style={[s.emptyIcon, { backgroundColor: c.accent + '15' }]}>
+                <IconSymbol name="chart.bar.fill" size={34} color={c.accent} />
+              </View>
+              <Text style={{ color: c.text, fontSize: 17, fontWeight: '700', marginTop: 16 }}>
+                {tr.noTransactions}
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/explore', params: { create: '1' } })}
+                style={[s.emptyBtn, { backgroundColor: c.accent }]}>
+                <IconSymbol name="plus" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', marginLeft: 8 }}>{tr.add}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+          <>
 
           {/* ── Period selector (hidden when custom range active) ── */}
           {!hasCustomRange && (
@@ -453,14 +611,23 @@ export default function FinanceStatsScreen() {
           )}
 
           {/* ── Summary row ── */}
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-            <SummCard label="Доходи"  value={fmt(income)}  color={c.green} border={c.border} isDark={isDark} />
-            <SummCard label="Витрати" value={fmt(expense)} color={c.red}   border={c.border} isDark={isDark} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 18 }}>
-            <SummCard label="Баланс"      value={fmt(balance)}      color={balance >= 0 ? c.green : c.red} border={c.border} isDark={isDark} />
-            <SummCard label="Заощадження" value={`${savingsPct}%`}  color={c.accent} border={c.border} isDark={isDark} />
-          </View>
+          {summaryRows.map((row, ri) => (
+            <View key={ri} style={{ flexDirection: 'row', gap: 8, marginBottom: ri === summaryRows.length - 1 ? 18 : 8 }}>
+              {row.map(card => (
+                <SummCard key={card.label} label={card.label} value={card.value} color={card.color} border={c.border} isDark={isDark} />
+              ))}
+            </View>
+          ))}
+
+          {/* ── Перекази в підсумки не входять ── */}
+          {transferCount > 0 && (
+            <View style={[s.hintRow, { backgroundColor: c.accent + '15', borderColor: c.accent + '30' }]}>
+              <IconSymbol name="arrow.left.arrow.right" size={14} color={c.accent} />
+              <Text style={{ flex: 1, color: c.sub, fontSize: 12, lineHeight: 17, marginLeft: 8 }}>
+                {tr.transfersNotCounted} ({transferCount})
+              </Text>
+            </View>
+          )}
 
           {/* ── Balance trend ── */}
           {trendData.length >= 2 && (
@@ -494,7 +661,7 @@ export default function FinanceStatsScreen() {
             sub={c.sub}
           />
           <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
-            {txs.length === 0 ? (
+            {flowTxs.length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 16 }}>Немає даних</Text>
             ) : (
               <>
@@ -592,6 +759,38 @@ export default function FinanceStatsScreen() {
             </BlurView>
           )}
 
+          {/* ── Витрати в розрізі рахунків ── */}
+          {accountStats.length > 0 && (
+            <>
+              <SectionTitle text={tr.accounts} sub={c.sub} />
+              <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
+                <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
+                  {tr.expenses}
+                </Text>
+                {accountStats.map((row, i) => (
+                  <View key={row.account.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, i > 0 && { marginTop: 12 }]}>
+                    <View style={[s.catIcon, { backgroundColor: c.accent + '20' }]}>
+                      <IconSymbol name={ACCOUNT_KIND_ICONS[row.account.kind]} size={15} color={c.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+                        <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }} numberOfLines={1}>
+                          {row.account.name}
+                        </Text>
+                        <Text style={{ color: c.red, fontSize: 13, fontWeight: '800' }}>
+                          {fmtIn(row.spent, row.account.currency)}
+                        </Text>
+                      </View>
+                      <View style={{ height: 4, backgroundColor: c.dim, borderRadius: 2, overflow: 'hidden' }}>
+                        <View style={{ height: '100%', width: `${row.pct * 100}%`, backgroundColor: c.accent, borderRadius: 2 }} />
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </BlurView>
+            </>
+          )}
+
           {/* ── Day-of-week spending ── */}
           {expenseTxs.length > 0 && (
             <>
@@ -615,7 +814,7 @@ export default function FinanceStatsScreen() {
           {/* ── Category breakdown ── */}
           <SectionTitle text="За категоріями" sub={c.sub} />
           <View style={[s.segRow, { backgroundColor: c.card, borderColor: c.border, marginBottom: 14 }]}>
-            {(['expense', 'income'] as TxType[]).map(t => (
+            {(['expense', 'income'] as CatType[]).map(t => (
               <TouchableOpacity
                 key={t}
                 onPress={() => setCatTab(t)}
@@ -638,7 +837,7 @@ export default function FinanceStatsScreen() {
               {/* Donut + legend side by side */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 18 }}>
                 <DonutChart
-                  data={categoryStats.map(s => ({ value: s.amt, color: s.color }))}
+                  data={categoryDonutData}
                   size={130}
                   holeRatio={0.52}
                   holeBg={c.hole}
@@ -693,13 +892,16 @@ export default function FinanceStatsScreen() {
             </BlurView>
           )}
 
+          </>
+          )}
+
         </ScrollView>
       </SafeAreaView>
 
       {/* ─── Calendar Range Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <Pressable style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.28)', justifyContent: 'flex-end' }} onPress={() => setShowCal(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }}>
+          <Pressable onPress={e => e.stopPropagation()} style={[{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }, contentWidth]}>
             <BlurView intensity={isDark ? 55 : 72} tint={isDark ? 'dark' : 'light'} style={[s.calSheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,16,30,0.97)' : 'rgba(245,248,255,0.97)' }]}>
 
               {/* Handle + close */}
@@ -832,20 +1034,20 @@ export default function FinanceStatsScreen() {
 }
 
 // ─── Helper components ───────────────────────────────────────────────────────
-function SectionTitle({ text, sub }: { text: string; sub: string }) {
+const SectionTitle = React.memo(function SectionTitle({ text, sub }: { text: string; sub: string }) {
   return <Text style={[s.sectionTitle, { color: sub }]}>{text}</Text>;
-}
+});
 
-function SummCard({ label, value, color, border, isDark }: { label: string; value: string; color: string; border: string; isDark: boolean }) {
+const SummCard = React.memo(function SummCard({ label, value, color, border, isDark }: { label: string; value: string; color: string; border: string; isDark: boolean }) {
   return (
     <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.summCard, { borderColor: border, flex: 1 }]}>
       <Text style={{ color, fontSize: 10, fontWeight: '600', marginBottom: 5, opacity: 0.55 }}>{label}</Text>
       <Text style={{ color, fontSize: 15, fontWeight: '800', letterSpacing: -0.3 }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
     </BlurView>
   );
-}
+});
 
-function QuickStat({ icon, label, value, color, border, isDark }: { icon: IconSymbolName; label: string; value: string; color: string; border: string; isDark: boolean }) {
+const QuickStat = React.memo(function QuickStat({ icon, label, value, color, border, isDark }: { icon: IconSymbolName; label: string; value: string; color: string; border: string; isDark: boolean }) {
   return (
     <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.summCard, { borderColor: border, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
       <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: color + '20', alignItems: 'center', justifyContent: 'center' }}>
@@ -857,16 +1059,16 @@ function QuickStat({ icon, label, value, color, border, isDark }: { icon: IconSy
       </View>
     </BlurView>
   );
-}
+});
 
-function LegendDot({ color, label, sub }: { color: string; label: string; sub: string }) {
+const LegendDot = React.memo(function LegendDot({ color, label, sub }: { color: string; label: string; sub: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
       <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
       <Text style={{ color: sub, fontSize: 11, fontWeight: '600' }}>{label}</Text>
     </View>
   );
-}
+});
 
 const s = StyleSheet.create({
   header:       { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' },
@@ -887,4 +1089,7 @@ const s = StyleSheet.create({
   navBtn:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   dayCell:      { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   calBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingVertical: 11 },
+  hintRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 18 },
+  emptyIcon:    { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  emptyBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 14, marginTop: 20 },
 });

@@ -7,12 +7,15 @@ import {HapticTab} from '@/components/haptic-tab';
 import {IconSymbol} from '@/components/ui/icon-symbol';
 import {useColorScheme} from '@/hooks/use-color-scheme';
 import {useI18n} from '@/store/i18n';
+import {useResponsive} from '@/hooks/use-responsive';
+import {TAB_BAR_HEIGHT} from '@/constants/nav';
 
 export const unstable_settings = { initialRouteName: 'today' };
 
 export default function TabLayout() {
     const isDark = useColorScheme() === 'dark';
     const {tr} = useI18n();
+    const {isWide} = useResponsive();
 
     return (
         <Tabs
@@ -23,12 +26,12 @@ export default function TabLayout() {
                 tabBarInactiveTintColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(80,60,120,0.45)',
                 tabBarShowLabel: true,
                 tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: -2 },
-                tabBarStyle: {
+                tabBarStyle: isWide ? {display: 'none'} : {
                     position: 'absolute',
                     borderTopWidth: 0,
                     elevation: 0,
                     backgroundColor: 'transparent',
-                    height: Platform.OS === 'ios' ? 88 : 68,
+                    height: TAB_BAR_HEIGHT,
                     paddingTop: 10
                 },
                 tabBarBackground: () =>

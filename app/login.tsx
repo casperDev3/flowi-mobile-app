@@ -19,11 +19,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
 import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
-import { saveData } from '@/store/storage';
 import { syncNow } from '@/store/sync-engine';
 import { haptic } from '@/utils/haptics';
 
@@ -37,6 +37,9 @@ export default function LoginScreen() {
   const { tr } = useI18n();
   const { login } = useAuth();
   const { online, setOnline } = useAppMode();
+  // Форма входу лишається колонкою сталої ширини: на планшеті поле на всю
+  // ширину вікна змушує око бігати від мітки до курсора через пів екрана.
+  const contentWidth = useContentWidth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,7 +51,6 @@ export default function LoginScreen() {
 
   const c = {
     ...getScreenColors('auth', isDark),
-    input:       isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
     errorBorder: '#EF4444',
     red:         '#EF4444',
   };
@@ -85,7 +87,6 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(trimEmail, password);
-      await saveData('welcome_done', true);
       router.replace('/(tabs)');
       // З офлайну увійшли заради онлайн-функцій — пропонуємо увімкнути
       if (!online) {
@@ -133,7 +134,7 @@ export default function LoginScreen() {
           style={{ flex: 1 }}
         >
           <ScrollView
-            contentContainerStyle={st.scroll}
+            contentContainerStyle={[st.scroll, contentWidth]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >

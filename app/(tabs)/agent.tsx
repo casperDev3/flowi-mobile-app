@@ -1,9 +1,11 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
+  type ListRenderItem,
   Platform,
   ScrollView,
   StyleSheet,
@@ -18,6 +20,8 @@ import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useContentWidth } from '@/hooks/use-content-width';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,9 +63,68 @@ function fmtTime(ts: number) {
   return `${h}:${m}`;
 }
 
+// ── Message bubble ───────────────────────────────────────────────────────────
+
+interface BubbleColors {
+  text: string;
+  sub: string;
+  userBubble: string;
+  aiBubble: string;
+  aiBorder: string;
+}
+
+/** Підпис відповіді агента: та сама пара «іконка + назва» і в бульбашці, і в очікуванні. */
+function AiLabel({ sub }: { sub: string }) {
+  return (
+    <View style={st.aiLabel}>
+      <View style={st.aiLabelIcon}>
+        <IconSymbol name="brain" size={10} color={ACCENT} />
+      </View>
+      <Text style={{ color: sub, fontSize: 10, fontWeight: '600' }}>OpenClaw</Text>
+    </View>
+  );
+}
+
+/**
+ * Мемоізовано: екран перемальовується на кожну літеру в полі вводу, а вже
+ * надіслані повідомлення після відправки не змінюються ніколи.
+ */
+const MessageRow = React.memo(function MessageRow(
+  { msg, colors }: { msg: Message; colors: BubbleColors },
+) {
+  const mine = msg.role === 'user';
+  return (
+    <View style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '82%' }}>
+      {!mine && <AiLabel sub={colors.sub} />}
+      <View style={{
+        borderRadius: 18,
+        borderBottomRightRadius: mine ? 4 : 18,
+        borderBottomLeftRadius: mine ? 18 : 4,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        backgroundColor: mine ? colors.userBubble : colors.aiBubble,
+        borderWidth: mine ? 0 : 1,
+        borderColor: colors.aiBorder,
+      }}>
+        <Text style={{ color: mine ? '#fff' : colors.text, fontSize: 14, lineHeight: 20 }}>
+          {msg.content}
+        </Text>
+      </View>
+      <Text style={{
+        color: colors.sub, fontSize: 10, marginTop: 3,
+        alignSelf: mine ? 'flex-end' : 'flex-start',
+      }}>
+        {fmtTime(msg.ts)}
+      </Text>
+    </View>
+  );
+});
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function AgentScreen() {
+  const contentWidth = useContentWidth();
+  const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
 
   // Config
@@ -77,7 +140,7 @@ export default function AgentScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<Message>>(null);
 
   // Settings form (buffer before saving)
   const [formHost, setFormHost] = useState('');
@@ -104,7 +167,9 @@ export default function AgentScreen() {
   }, [config, initialized]);
 
   // ── Theme colors ─────────────────────────────────────────────────────────
-  const c = {
+  // Сталий обʼєкт: інакше кожен ререндер віддавав би бульбашкам нову палітру
+  // і React.memo на них не спрацьовувала б жодного разу.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0A0818' : '#F5F0FF',
     bg2:    isDark ? '#130F22' : '#EDE6FF',
     card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.80)',
@@ -115,7 +180,7 @@ export default function AgentScreen() {
     userBubble:  ACCENT,
     aiBubble:    isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.9)',
     aiBorder:    isDark ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.15)',
-  };
+  }), [isDark]);
 
   // ── Connection test ──────────────────────────────────────────────────────
   const testConnection = useCallback(async (cfg: AgentConfig): Promise<boolean> => {
@@ -174,7 +239,7 @@ export default function AgentScreen() {
     setInput('');
     setSending(true);
 
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
 
     try {
       const res = await fetch(`${baseUrl(config)}/v1/chat/completions`, {
@@ -205,7 +270,7 @@ export default function AgentScreen() {
         ts: Date.now(),
       };
       setMessages(prev => [...prev, aiMsg]);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
     } catch (err: any) {
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -218,6 +283,12 @@ export default function AgentScreen() {
       setSending(false);
     }
   }, [input, sending, status, messages, config]);
+
+  // Колбек винесено, щоб FlatList не отримувала нову функцію на кожен ререндер.
+  const renderMessage = useCallback<ListRenderItem<Message>>(
+    ({ item }) => <MessageRow msg={item} colors={c} />,
+    [c],
+  );
 
   // ── Status dot ──────────────────────────────────────────────────────────
   const statusDot = {
@@ -269,7 +340,7 @@ export default function AgentScreen() {
           {showSettings && (
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 20, paddingBottom: Platform.OS === 'ios' ? 112 : 92 }}
+              contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: tabBarInset + 24 }]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled">
 
@@ -415,7 +486,7 @@ export default function AgentScreen() {
                   </Text>
 
                   {/* Suggestions */}
-                  <View style={{ gap: 8, marginTop: 24, width: '100%' }}>
+                  <View style={[{ gap: 8, marginTop: 24, width: '100%' }, contentWidth]}>
                     {[
                       '📋 Покажи мої завдання на сьогодні',
                       '🌐 Що нового у tech-новинах?',
@@ -433,105 +504,68 @@ export default function AgentScreen() {
 
               {/* Messages */}
               {messages.length > 0 && (
-                <ScrollView
-                  ref={scrollRef}
+                <FlatList
+                  ref={listRef}
+                  data={messages}
+                  keyExtractor={m => m.id}
+                  renderItem={renderMessage}
                   style={{ flex: 1 }}
-                  contentContainerStyle={{ padding: 16, gap: 12 }}
+                  contentContainerStyle={[contentWidth, { padding: 16, gap: 12 }]}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
-                  onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
-
-                  {messages.map(msg => (
-                    <View key={msg.id} style={{
-                      alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                      maxWidth: '82%',
-                    }}>
-                      {msg.role === 'assistant' && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                          <View style={{ width: 18, height: 18, borderRadius: 6, backgroundColor: ACCENT + '25',
-                            alignItems: 'center', justifyContent: 'center' }}>
-                            <IconSymbol name="brain" size={10} color={ACCENT} />
-                          </View>
-                          <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600' }}>OpenClaw</Text>
+                  onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+                  ListFooterComponent={
+                    /* Індикатор очікування — частина стрічки, щоб їхав разом із нею. */
+                    sending ? (
+                      <View style={{ alignSelf: 'flex-start', maxWidth: '60%' }}>
+                        <AiLabel sub={c.sub} />
+                        <View style={{ borderRadius: 18, borderBottomLeftRadius: 4, paddingHorizontal: 16,
+                          paddingVertical: 12, backgroundColor: c.aiBubble, borderWidth: 1, borderColor: c.aiBorder,
+                          flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <ActivityIndicator size="small" color={ACCENT} />
+                          <Text style={{ color: c.sub, fontSize: 13 }}>Думаю...</Text>
                         </View>
-                      )}
-                      <View style={{
-                        borderRadius: 18,
-                        borderBottomRightRadius: msg.role === 'user' ? 4 : 18,
-                        borderBottomLeftRadius: msg.role === 'assistant' ? 4 : 18,
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        backgroundColor: msg.role === 'user' ? c.userBubble : c.aiBubble,
-                        borderWidth: msg.role === 'assistant' ? 1 : 0,
-                        borderColor: c.aiBorder,
-                      }}>
-                        <Text style={{
-                          color: msg.role === 'user' ? '#fff' : c.text,
-                          fontSize: 14,
-                          lineHeight: 20,
-                        }}>
-                          {msg.content}
-                        </Text>
                       </View>
-                      <Text style={{ color: c.sub, fontSize: 10, marginTop: 3,
-                        alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                        {fmtTime(msg.ts)}
-                      </Text>
-                    </View>
-                  ))}
-
-                  {/* Thinking indicator */}
-                  {sending && (
-                    <View style={{ alignSelf: 'flex-start', maxWidth: '60%' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                        <View style={{ width: 18, height: 18, borderRadius: 6, backgroundColor: ACCENT + '25',
-                          alignItems: 'center', justifyContent: 'center' }}>
-                          <IconSymbol name="brain" size={10} color={ACCENT} />
-                        </View>
-                        <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600' }}>OpenClaw</Text>
-                      </View>
-                      <View style={{ borderRadius: 18, borderBottomLeftRadius: 4, paddingHorizontal: 16,
-                        paddingVertical: 12, backgroundColor: c.aiBubble, borderWidth: 1, borderColor: c.aiBorder,
-                        flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <ActivityIndicator size="small" color={ACCENT} />
-                        <Text style={{ color: c.sub, fontSize: 13 }}>Думаю...</Text>
-                      </View>
-                    </View>
-                  )}
-                </ScrollView>
+                    ) : null
+                  }
+                />
               )}
 
               {/* Input bar */}
               <View style={[st.inputBar, { borderColor: c.border, backgroundColor: isDark ? 'rgba(13,10,24,0.95)' : 'rgba(245,240,255,0.95)' }]}>
-                {messages.length > 0 && (
+                {/* Смуга тягнеться на всю ширину заради лінії й фону, а поле —
+                    ні: на планшеті рядок вводу шириною з вікно неможливо читати. */}
+                <View style={[st.inputBarInner, contentWidth]}>
+                  {messages.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setMessages([])}
+                      style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <IconSymbol name="trash" size={15} color={c.sub} />
+                    </TouchableOpacity>
+                  )}
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: c.dim,
+                    borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 12,
+                    paddingVertical: 8, minHeight: 42, gap: 8 }}>
+                    <TextInput
+                      style={{ flex: 1, fontSize: 14, color: c.text, maxHeight: 100 }}
+                      placeholder="Напиши повідомлення..."
+                      placeholderTextColor={c.sub}
+                      value={input}
+                      onChangeText={setInput}
+                      multiline
+                      onSubmitEditing={sendMessage}
+                    />
+                  </View>
                   <TouchableOpacity
-                    onPress={() => setMessages([])}
-                    style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
-                      backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                    <IconSymbol name="trash" size={15} color={c.sub} />
+                    onPress={sendMessage}
+                    disabled={!input.trim() || sending}
+                    style={{ width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: !input.trim() || sending ? c.dim : ACCENT }}>
+                    <IconSymbol name="arrow.up" size={18} color={!input.trim() || sending ? c.sub : '#fff'} />
                   </TouchableOpacity>
-                )}
-                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: c.dim,
-                  borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 12,
-                  paddingVertical: 8, minHeight: 42, gap: 8 }}>
-                  <TextInput
-                    style={{ flex: 1, fontSize: 14, color: c.text, maxHeight: 100 }}
-                    placeholder="Напиши повідомлення..."
-                    placeholderTextColor={c.sub}
-                    value={input}
-                    onChangeText={setInput}
-                    multiline
-                    onSubmitEditing={sendMessage}
-                  />
                 </View>
-                <TouchableOpacity
-                  onPress={sendMessage}
-                  disabled={!input.trim() || sending}
-                  style={{ width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: !input.trim() || sending ? c.dim : ACCENT }}>
-                  <IconSymbol name="arrow.up" size={18} color={!input.trim() || sending ? c.sub : '#fff'} />
-                </TouchableOpacity>
               </View>
             </>
           )}
@@ -583,9 +617,19 @@ const st = StyleSheet.create({
     overflow: 'hidden', marginTop: 16,
   },
   inputBar: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
     paddingHorizontal: 12, paddingVertical: 10,
     borderTopWidth: 1,
     paddingBottom: Platform.OS === 'ios' ? 34 : 14,
+  },
+  inputBarInner: {
+    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+  },
+  aiLabel: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4,
+  },
+  aiLabelIcon: {
+    width: 18, height: 18, borderRadius: 6,
+    backgroundColor: ACCENT + '25',
+    alignItems: 'center', justifyContent: 'center',
   },
 });

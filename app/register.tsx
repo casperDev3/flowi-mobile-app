@@ -19,11 +19,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
 import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
-import { saveData } from '@/store/storage';
 import { syncNow } from '@/store/sync-engine';
 import { haptic } from '@/utils/haptics';
 
@@ -37,6 +37,9 @@ export default function RegisterScreen() {
   const { tr } = useI18n();
   const { register } = useAuth();
   const { online, setOnline } = useAppMode();
+  // Та сама колонка сталої ширини, що й на вході: форма з чотирьох полів,
+  // розтягнута на планшет, читається як таблиця, а не як послідовність кроків.
+  const contentWidth = useContentWidth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -51,8 +54,7 @@ export default function RegisterScreen() {
 
   const c = {
     ...getScreenColors('auth', isDark),
-    errorBorder: '#EF4444',
-    red:         '#EF4444',
+    red: '#EF4444',
   };
 
   const validateEmailFormat = (val: string): boolean => {
@@ -100,7 +102,6 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(trimEmail, password, name.trim() || undefined);
-      await saveData('welcome_done', true);
       router.replace('/(tabs)');
       // З офлайну зареєструвались заради онлайн-функцій — пропонуємо увімкнути
       if (!online) {
@@ -150,7 +151,7 @@ export default function RegisterScreen() {
           style={{ flex: 1 }}
         >
           <ScrollView
-            contentContainerStyle={st.scroll}
+            contentContainerStyle={[st.scroll, contentWidth]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >

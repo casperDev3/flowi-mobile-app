@@ -3,7 +3,7 @@
     "name": "Flowi",
     "slug": "f-tracking-app",
     "version": "0.0.3",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/logo_app.png",
     "scheme": "ftrackingapp",
     "userInterfaceStyle": "automatic",

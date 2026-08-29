@@ -6,9 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Radius, getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useContentWidth } from '@/hooks/use-content-width';
 import { useAppMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
-import { saveData } from '@/store/storage';
 
 export default function WelcomeScreen() {
   const cs = useColorScheme();
@@ -16,11 +16,14 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const { tr } = useI18n();
   const { setOnline } = useAppMode();
+  // Перший екран додатку: на планшеті картка з кнопками не має розповзатися
+  // на всю ширину — три кнопки завширшки з вікно виглядають як панель, а не
+  // як вибір із трьох варіантів.
+  const contentWidth = useContentWidth();
 
   const c = getScreenColors('auth', isDark);
 
-  const handleStartOffline = async () => {
-    await saveData('welcome_done', true);
+  const handleStartOffline = () => {
     setOnline(false);
     router.replace('/(tabs)');
   };
@@ -30,42 +33,44 @@ export default function WelcomeScreen() {
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={st.safe}>
-        {/* Logo block */}
-        <View style={st.logoBlock}>
-          <Image
-            source={require('@/assets/logo_app.png')}
-            style={st.logo}
-            resizeMode="contain"
-          />
-          <Text style={[st.appName, { color: c.text }]}>Flowi</Text>
-          <Text style={[st.subtitle, { color: c.sub }]}>{tr.welcomeSubtitle}</Text>
-        </View>
+        <View style={[st.column, contentWidth]}>
+          {/* Logo block */}
+          <View style={st.logoBlock}>
+            <Image
+              source={require('@/assets/logo_app.png')}
+              style={st.logo}
+              resizeMode="contain"
+            />
+            <Text style={[st.appName, { color: c.text }]}>Flowi</Text>
+            <Text style={[st.subtitle, { color: c.sub }]}>{tr.welcomeSubtitle}</Text>
+          </View>
 
-        {/* Buttons block */}
-        <View style={[st.card, { backgroundColor: c.card, borderColor: c.border }]}>
-          <TouchableOpacity
-            style={[st.primaryBtn, { backgroundColor: c.accent }]}
-            activeOpacity={0.82}
-            onPress={() => router.push('/login')}
-          >
-            <Text style={st.primaryBtnText}>{tr.authLogin}</Text>
-          </TouchableOpacity>
+          {/* Buttons block */}
+          <View style={[st.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <TouchableOpacity
+              style={[st.primaryBtn, { backgroundColor: c.accent }]}
+              activeOpacity={0.82}
+              onPress={() => router.push('/login')}
+            >
+              <Text style={st.primaryBtnText}>{tr.authLogin}</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[st.secondaryBtn, { borderColor: c.accent }]}
-            activeOpacity={0.82}
-            onPress={() => router.push('/register')}
-          >
-            <Text style={[st.secondaryBtnText, { color: c.accent }]}>{tr.authRegister}</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[st.secondaryBtn, { borderColor: c.accent }]}
+              activeOpacity={0.82}
+              onPress={() => router.push('/register')}
+            >
+              <Text style={[st.secondaryBtnText, { color: c.accent }]}>{tr.authRegister}</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={st.ghostBtn}
-            activeOpacity={0.7}
-            onPress={handleStartOffline}
-          >
-            <Text style={[st.ghostBtnText, { color: c.sub }]}>{tr.startOffline}</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={st.ghostBtn}
+              activeOpacity={0.7}
+              onPress={handleStartOffline}
+            >
+              <Text style={[st.ghostBtnText, { color: c.sub }]}>{tr.startOffline}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Bottom spacer */}
@@ -80,6 +85,9 @@ const st = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 28,
+  },
+  column: {
+    width: '100%',
   },
   logoBlock: {
     alignItems: 'center',

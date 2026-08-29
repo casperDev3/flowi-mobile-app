@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -29,8 +29,21 @@ import { getAllScheduledNotifications } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
 import { Lang } from '@/store/translations';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useContentWidth } from '@/hooks/use-content-width';
+import { useResponsive } from '@/hooks/use-responsive';
+
+/**
+ * Натискання рядка йде через один спільний колбек, а маршрут приходить
+ * аргументом. Інакше кожен рядок отримував би свіжу інлайн-стрілку на кожному
+ * рендері, і React.memo нижче не рятувала б від перерендеру всього списку.
+ */
+type RowPress = (route?: Href) => void;
 
 export default function SettingsScreen() {
+  const contentWidth = useContentWidth();
+  const tabBarInset = useTabBarInset();
+  const { isWide } = useResponsive();
   const cs = useColorScheme();
   useScreenView('settings');
   const isDark = cs === 'dark';
@@ -53,12 +66,12 @@ export default function SettingsScreen() {
     loadData<boolean>('pref_task_reminders', true).then(v => setTaskReminders(v));
   }, []));
 
-  const handleTaskRemindersToggle = (val: boolean) => {
+  const handleTaskRemindersToggle = useCallback((val: boolean) => {
     setTaskReminders(val);
     saveData('pref_task_reminders', val);
-  };
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     Alert.alert(
       tr.authLogout,
       tr.logoutConfirm,
@@ -67,18 +80,18 @@ export default function SettingsScreen() {
         { text: tr.authLogout, style: 'destructive', onPress: () => void logout() },
       ],
     );
-  };
+  }, [tr, logout]);
 
   // Гейт для ручних синк-дій: потрібні онлайн-режим і акаунт.
-  const guardSync = (fn: () => void | Promise<void>) => {
+  const guardSync = useCallback((fn: () => void | Promise<void>) => {
     if (!online || status !== 'authed') {
       Alert.alert(tr.syncNeedsOnlineAuth);
       return;
     }
     void fn();
-  };
+  }, [online, status, tr]);
 
-  const handleOnlineToggle = (v: boolean) => {
+  const handleOnlineToggle = useCallback((v: boolean) => {
     if (v && status !== 'authed') {
       Alert.alert(
         tr.onlineNeedsAccount,
@@ -102,27 +115,61 @@ export default function SettingsScreen() {
         ],
       );
     }
-  };
+  }, [status, tr, router, setOnline, syncNow]);
 
-  const c = {
+  // ── Стабільні дії рядків ───────────────────────────────────────────────────
+  const go = useCallback<RowPress>(route => {
+    if (route) router.push(route);
+  }, [router]);
+
+  const openThemeModal = useCallback(() => setShowThemeModal(true), []);
+  const openLangModal = useCallback(() => setShowLangModal(true), []);
+  const closeThemeModal = useCallback(() => setShowThemeModal(false), []);
+  const closeLangModal = useCallback(() => setShowLangModal(false), []);
+
+  const handleSyncNow = useCallback(() => guardSync(() => syncNow()), [guardSync, syncNow]);
+
+  const handlePushAll = useCallback(() => guardSync(() => {
+    Alert.alert(tr.syncPushAll, tr.syncPushAllMsg, [
+      { text: tr.cancel, style: 'cancel' },
+      { text: tr.yes, onPress: () => void pushAllToServer() },
+    ]);
+  }), [guardSync, tr]);
+
+  const handlePullAll = useCallback(() => guardSync(() => {
+    Alert.alert(tr.syncPullAll, tr.syncPullAllMsg, [
+      { text: tr.cancel, style: 'cancel' },
+      { text: tr.yes, onPress: () => void pullAllFromServer() },
+    ]);
+  }), [guardSync, tr]);
+
+  const handleInDevelopment = useCallback(() => {
+    Alert.alert(tr.inDevelopment, tr.inDevelopmentMsg);
+  }, [tr]);
+
+  // Палітра — у useMemo: інакше кожен рендер створює новий об'єкт, і всі
+  // рядки-нащадки під React.memo однаково перемальовуються.
+  const c = useMemo(() => ({
     bg1:    isDark ? '#0C0C14' : '#F5F5FA',
     bg2:    isDark ? '#14121E' : '#EBEBF5',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.80)',
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
     text:   isDark ? '#F0EEFF' : '#1A1433',
     sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
     accent: '#7C3AED',
-    red:    '#EF4444',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-    green:  '#10B981',
-  };
+  }), [isDark]);
 
-  const THEME_LABELS: Record<ThemeOption, string> = { system: tr.themeSystem, light: tr.themeLight, dark: tr.themeDark };
-  const LANG_LABELS: Record<Lang, string> = { uk: tr.langUk, en: tr.langEn };
+  const THEME_LABELS: Record<ThemeOption, string> = useMemo(
+    () => ({ system: tr.themeSystem, light: tr.themeLight, dark: tr.themeDark }),
+    [tr],
+  );
+  const LANG_LABELS: Record<Lang, string> = useMemo(
+    () => ({ uk: tr.langUk, en: tr.langEn }),
+    [tr],
+  );
 
   // ── Динамічне значення рядку Синхронізації ──────────────────────────────────
-  const syncValue = (() => {
+  const syncValue = useMemo(() => {
     if (!online) return tr.offlineBadge;
     if (status !== 'authed') return tr.syncGuestHint.slice(0, 18) + '…';
     if (syncState === 'error') return tr.syncError;
@@ -137,7 +184,12 @@ export default function SettingsScreen() {
       return new Date(lastSyncAt).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: '2-digit', month: '2-digit' });
     }
     return undefined;
-  })();
+  }, [online, status, syncState, pendingCount, lastSyncAt, lang, tr]);
+
+  // На планшеті секції лягають у дві колонки: список налаштувань інакше
+  // перетворюється на вузьку стрічку посеред порожнього екрана.
+  const gridStyle = isWide ? st.grid : undefined;
+  const colStyle = isWide ? st.col : undefined;
 
   return (
     <View style={{ flex: 1 }}>
@@ -145,367 +197,387 @@ export default function SettingsScreen() {
 
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 104 : 84 }}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 16 }]}
           showsVerticalScrollIndicator={false}>
 
           <View style={{ marginTop: 10, marginBottom: 28 }}>
             <Text style={[st.pageTitle, { color: c.text }]}>{tr.settings}</Text>
           </View>
 
-          {/* Акаунт */}
-          <SectionLabel label={tr.sectionAccount} color={c.sub} />
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            {status === 'authed' && user ? (
-              <>
-                <View style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                  <View style={[st.iconBox, { backgroundColor: '#7C3AED20' }]}>
-                    <IconSymbol name="person.fill" size={17} color="#7C3AED" />
-                  </View>
-                  <Text style={[st.rowLabel, { color: c.text, flex: 1 }]} numberOfLines={1}>{user.email}</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => router.push('/account')}
-                  style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                  <View style={[st.iconBox, { backgroundColor: '#7C3AED20' }]}>
-                    <IconSymbol name="person.crop.circle" size={17} color="#7C3AED" />
-                  </View>
-                  <Text style={[st.rowLabel, { color: c.text, flex: 1 }]}>{tr.accountManage}</Text>
-                  <IconSymbol name="chevron.right" size={16} color={c.sub} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleLogout}
-                  style={st.row}>
-                  <View style={[st.iconBox, { backgroundColor: '#EF444420' }]}>
-                    <IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color="#EF4444" />
-                  </View>
-                  <Text style={[st.rowLabel, { color: '#EF4444', flex: 1 }]}>{tr.authLogout}</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity
-                  onPress={() => router.push('/login')}
-                  style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                  <View style={[st.iconBox, { backgroundColor: '#7C3AED20' }]}>
-                    <IconSymbol name="person.fill" size={17} color="#7C3AED" />
-                  </View>
-                  <Text style={[st.rowLabel, { color: c.text, flex: 1 }]}>{tr.authLogin}</Text>
-                  <IconSymbol name="chevron.right" size={16} color={c.sub} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => router.push('/register')}
-                  style={st.row}>
-                  <View style={[st.iconBox, { backgroundColor: '#0EA5E920' }]}>
-                    <IconSymbol name="person.badge.plus" size={17} color="#0EA5E9" />
-                  </View>
-                  <Text style={[st.rowLabel, { color: c.text, flex: 1 }]}>{tr.authRegister}</Text>
-                  <IconSymbol name="chevron.right" size={16} color={c.sub} />
-                </TouchableOpacity>
-              </>
-            )}
-          </BlurView>
+          <View style={gridStyle}>
 
-          {/* Режим роботи */}
-          <SectionLabel label={tr.workMode} color={c.sub} />
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <ToggleRow
-              icon={online ? 'wifi' : 'icloud.slash'}
-              iconColor="#0EA5E9"
-              label={online ? tr.modeOnline : tr.modeOffline}
-              value={online}
-              onChange={handleOnlineToggle}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last
-            />
-          </BlurView>
-          <Text style={{ color: c.sub, fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 6, marginBottom: 18 }}>
-            {tr.offlineDesc}
-          </Text>
+            {/* Акаунт */}
+            <View style={colStyle}>
+              <SectionLabel label={tr.sectionAccount} color={c.sub} />
+              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+                {status === 'authed' && user ? (
+                  <>
+                    <View style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                      <View style={[st.iconBox, { backgroundColor: '#7C3AED20' }]}>
+                        <IconSymbol name="person.fill" size={17} color="#7C3AED" />
+                      </View>
+                      <Text style={[st.rowLabel, { color: c.text, flex: 1 }]} numberOfLines={1}>{user.email}</Text>
+                    </View>
+                    <SettingRow
+                      icon="person.crop.circle"
+                      iconColor="#7C3AED"
+                      label={tr.accountManage}
+                      route="/account"
+                      onPress={go}
+                      text={c.text}
+                      sub={c.sub}
+                      border={c.border}
+                      last={false}
+                    />
+                    <TouchableOpacity
+                      onPress={handleLogout}
+                      style={st.row}>
+                      <View style={[st.iconBox, { backgroundColor: '#EF444420' }]}>
+                        <IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color="#EF4444" />
+                      </View>
+                      <Text style={[st.rowLabel, { color: '#EF4444', flex: 1 }]}>{tr.authLogout}</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <SettingRow
+                      icon="person.fill"
+                      iconColor="#7C3AED"
+                      label={tr.authLogin}
+                      route="/login"
+                      onPress={go}
+                      text={c.text}
+                      sub={c.sub}
+                      border={c.border}
+                      last={false}
+                    />
+                    <SettingRow
+                      icon="person.badge.plus"
+                      iconColor="#0EA5E9"
+                      label={tr.authRegister}
+                      route="/register"
+                      onPress={go}
+                      text={c.text}
+                      sub={c.sub}
+                      border={c.border}
+                      last
+                    />
+                  </>
+                )}
+              </BlurView>
+            </View>
 
-          {/* Support — first */}
-          <SectionLabel label={tr.sectionSupport} color={c.sub} />
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <SettingRow
-              icon="heart.fill"
-              iconColor="#EF4444"
-              label={tr.donate}
-              value="PayPal · Donatello"
-              onPress={() => router.push('/donate')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="person.fill"
-              iconColor="#7C3AED"
-              label={tr.developer}
-              value="Igor Lialiuk"
-              onPress={() => router.push('/developer')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last
-            />
-          </BlurView>
+            {/* Режим роботи */}
+            <View style={colStyle}>
+              <SectionLabel label={tr.workMode} color={c.sub} />
+              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+                <ToggleRow
+                  icon={online ? 'wifi' : 'icloud.slash'}
+                  iconColor="#0EA5E9"
+                  label={online ? tr.modeOnline : tr.modeOffline}
+                  value={online}
+                  onChange={handleOnlineToggle}
+                  text={c.text}
+                  border={c.border}
+                  last
+                />
+              </BlurView>
+              <Text style={{ color: c.sub, fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 6, marginBottom: 18 }}>
+                {tr.offlineDesc}
+              </Text>
+            </View>
 
-          {/* Розробка */}
-          <SectionLabel label={tr.sectionDev} color={c.sub} />
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <SettingRow
-              icon="ladybug.fill"
-              iconColor="#EF4444"
-              label={tr.bugList}
-              value={tr.bugsValue}
-              onPress={() => router.push('/bugs')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="lightbulb.fill"
-              iconColor="#8B5CF6"
-              label={tr.ideas}
-              value={tr.features}
-              onPress={() => router.push('/ideas')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last
-            />
-          </BlurView>
+            {/* Support — first */}
+            <View style={colStyle}>
+              <SectionLabel label={tr.sectionSupport} color={c.sub} />
+              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+                <SettingRow
+                  icon="heart.fill"
+                  iconColor="#EF4444"
+                  label={tr.donate}
+                  value="PayPal · Donatello"
+                  route="/donate"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="person.fill"
+                  iconColor="#7C3AED"
+                  label={tr.developer}
+                  value="Igor Lialiuk"
+                  route="/developer"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last
+                />
+              </BlurView>
+            </View>
 
-          {/* Appearance */}
-          <SectionLabel label={tr.sectionAppearance} color={c.sub} />
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <SettingRow
-              icon="paintbrush"
-              iconColor="#8B5CF6"
-              label={tr.theme}
-              value={THEME_LABELS[theme]}
-              onPress={() => setShowThemeModal(true)}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="globe"
-              iconColor="#0EA5E9"
-              label={tr.language}
-              value={LANG_LABELS[lang]}
-              onPress={() => setShowLangModal(true)}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last
-            />
-          </BlurView>
+            {/* Розробка */}
+            <View style={colStyle}>
+              <SectionLabel label={tr.sectionDev} color={c.sub} />
+              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+                <SettingRow
+                  icon="ladybug.fill"
+                  iconColor="#EF4444"
+                  label={tr.bugList}
+                  value={tr.bugsValue}
+                  route="/bugs"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="lightbulb.fill"
+                  iconColor="#8B5CF6"
+                  label={tr.ideas}
+                  value={tr.features}
+                  route="/ideas"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last
+                />
+              </BlurView>
+            </View>
 
-          {/* Notifications */}
-          <SectionLabel label={tr.sectionNotifications} color={c.sub} />
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <NotifRow
-              label={tr.notifications}
-              scheduledCount={scheduledCount}
-              onPress={() => router.push('/notifications')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              accent={c.accent}
-              last={false}
-            />
-            <ToggleRow
-              icon="checklist"
-              iconColor="#7C3AED"
-              label={tr.taskReminders}
-              value={taskReminders}
-              onChange={handleTaskRemindersToggle}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last
-            />
-          </BlurView>
+            {/* Appearance */}
+            <View style={colStyle}>
+              <SectionLabel label={tr.sectionAppearance} color={c.sub} />
+              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+                <SettingRow
+                  icon="paintbrush"
+                  iconColor="#8B5CF6"
+                  label={tr.theme}
+                  value={THEME_LABELS[theme]}
+                  onPress={openThemeModal}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="globe"
+                  iconColor="#0EA5E9"
+                  label={tr.language}
+                  value={LANG_LABELS[lang]}
+                  onPress={openLangModal}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last
+                />
+              </BlurView>
+            </View>
 
-          {/* Tools */}
-          <SectionLabel label="Інструменти" color={c.sub} />
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <SettingRow
-              icon="calendar"
-              iconColor="#6366F1"
-              label={tr.meetings}
-              value={undefined}
-              onPress={() => router.push('/meetings')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="timer"
-              iconColor="#6366F1"
-              label="Трекер часу"
-              value={undefined}
-              onPress={() => router.push('/(tabs)/time')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="chart.pie.fill"
-              iconColor="#0EA5E9"
-              label="Планування бюджету"
-              value={undefined}
-              onPress={() => router.push('/budget')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="shippingbox.fill"
-              iconColor="#F97316"
-              label={tr.containers}
-              value={undefined}
-              onPress={() => router.push('/containers')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="person.2.fill"
-              iconColor="#7C3AED"
-              label={tr.sharedTitle}
-              value={undefined}
-              onPress={() => router.push('/(tabs)/shared')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="brain"
-              iconColor="#8B5CF6"
-              label="OpenClaw Agent"
-              value={undefined}
-              onPress={() => router.push('/(tabs)/agent')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last
-            />
-          </BlurView>
+            {/* Notifications */}
+            <View style={colStyle}>
+              <SectionLabel label={tr.sectionNotifications} color={c.sub} />
+              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+                <NotifRow
+                  label={tr.notifications}
+                  scheduledCount={scheduledCount}
+                  route="/notifications"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  accent={c.accent}
+                  last={false}
+                />
+                <ToggleRow
+                  icon="checklist"
+                  iconColor="#7C3AED"
+                  label={tr.taskReminders}
+                  value={taskReminders}
+                  onChange={handleTaskRemindersToggle}
+                  text={c.text}
+                  border={c.border}
+                  last
+                />
+              </BlurView>
+            </View>
 
-          {/* Data */}
-          <SectionLabel label={tr.sectionData} color={c.sub} />
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <SettingRow
-              icon="arrow.triangle.2.circlepath"
-              iconColor="#7C3AED"
-              label={tr.sync}
-              value={syncValue}
-              onPress={() => router.push('/sync')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="arrow.triangle.2.circlepath"
-              iconColor="#10B981"
-              label={tr.syncNow}
-              value={syncState === 'syncing' ? '…' : undefined}
-              onPress={() => guardSync(() => syncNow())}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="arrow.up.circle"
-              iconColor="#0EA5E9"
-              label={tr.syncPushAll}
-              value={undefined}
-              onPress={() => guardSync(() => {
-                Alert.alert(tr.syncPushAll, tr.syncPushAllMsg, [
-                  { text: tr.cancel, style: 'cancel' },
-                  { text: tr.yes, onPress: () => void pushAllToServer() },
-                ]);
-              })}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="arrow.down.circle"
-              iconColor="#F59E0B"
-              label={tr.syncPullAll}
-              value={undefined}
-              onPress={() => guardSync(() => {
-                Alert.alert(tr.syncPullAll, tr.syncPullAllMsg, [
-                  { text: tr.cancel, style: 'cancel' },
-                  { text: tr.yes, onPress: () => void pullAllFromServer() },
-                ]);
-              })}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="externaldrive"
-              iconColor="#6366F1"
-              label={tr.dataManagement}
-              value={undefined}
-              onPress={() => router.push('/data')}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last
-            />
-          </BlurView>
+            {/* Tools */}
+            <View style={colStyle}>
+              <SectionLabel label={tr.navGroupTools} color={c.sub} />
+              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+                <SettingRow
+                  icon="calendar"
+                  iconColor="#6366F1"
+                  label={tr.meetings}
+                  route="/meetings"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="timer"
+                  iconColor="#6366F1"
+                  label={tr.navTimeTracker}
+                  route="/(tabs)/time"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="chart.pie.fill"
+                  iconColor="#0EA5E9"
+                  label={tr.navBudget}
+                  route="/budget"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="shippingbox.fill"
+                  iconColor="#F97316"
+                  label={tr.containers}
+                  route="/containers"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="person.2.fill"
+                  iconColor="#7C3AED"
+                  label={tr.sharedTitle}
+                  route="/(tabs)/shared"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="brain"
+                  iconColor="#8B5CF6"
+                  label={tr.navAgent}
+                  route="/(tabs)/agent"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last
+                />
+              </BlurView>
+            </View>
 
-          {/* About */}
-          <SectionLabel label={tr.sectionAbout} color={c.sub} />
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-            <InfoRow
-              icon="info"
-              iconColor={c.sub}
-              label={tr.version}
-              value="0.0.1"
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="heart.fill"
-              iconColor="#EF4444"
-              label={tr.rateApp}
-              onPress={() => Alert.alert(tr.inDevelopment, tr.inDevelopmentMsg)}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last={false}
-            />
-            <SettingRow
-              icon="paperplane.fill"
-              iconColor="#0EA5E9"
-              label={tr.sendFeedback}
-              onPress={() => Alert.alert(tr.inDevelopment, tr.inDevelopmentMsg)}
-              text={c.text}
-              sub={c.sub}
-              border={c.border}
-              last
-            />
-          </BlurView>
+            {/* Data */}
+            <View style={colStyle}>
+              <SectionLabel label={tr.sectionData} color={c.sub} />
+              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+                <SettingRow
+                  icon="arrow.triangle.2.circlepath"
+                  iconColor="#7C3AED"
+                  label={tr.sync}
+                  value={syncValue}
+                  route="/sync"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="arrow.triangle.2.circlepath"
+                  iconColor="#10B981"
+                  label={tr.syncNow}
+                  value={syncState === 'syncing' ? '…' : undefined}
+                  onPress={handleSyncNow}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="arrow.up.circle"
+                  iconColor="#0EA5E9"
+                  label={tr.syncPushAll}
+                  onPress={handlePushAll}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="arrow.down.circle"
+                  iconColor="#F59E0B"
+                  label={tr.syncPullAll}
+                  onPress={handlePullAll}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="externaldrive"
+                  iconColor="#6366F1"
+                  label={tr.dataManagement}
+                  route="/data"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last
+                />
+              </BlurView>
+            </View>
+
+            {/* About */}
+            <View style={colStyle}>
+              <SectionLabel label={tr.sectionAbout} color={c.sub} />
+              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+                <InfoRow
+                  icon="info"
+                  iconColor={c.sub}
+                  label={tr.version}
+                  value="0.0.1"
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="heart.fill"
+                  iconColor="#EF4444"
+                  label={tr.rateApp}
+                  onPress={handleInDevelopment}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
+                  icon="paperplane.fill"
+                  iconColor="#0EA5E9"
+                  label={tr.sendFeedback}
+                  onPress={handleInDevelopment}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last
+                />
+              </BlurView>
+            </View>
+
+          </View>
 
           {/* App footer */}
           <View style={[st.footerCard, { opacity: 0.45 }]}>
@@ -524,9 +596,9 @@ export default function SettingsScreen() {
       </SafeAreaView>
 
       {/* ─── Theme Modal ─── */}
-      <Modal visible={showThemeModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowThemeModal(false)}>
+      <Modal visible={showThemeModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeThemeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={() => setShowThemeModal(false)}>
+          <Pressable style={st.overlay} onPress={closeThemeModal}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={st.handleRow}>
@@ -534,7 +606,7 @@ export default function SettingsScreen() {
                   <View style={[st.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
                     <TouchableOpacity
-                      onPress={() => setShowThemeModal(false)}
+                      onPress={closeThemeModal}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       accessibilityRole="button"
                       accessibilityLabel={tr.close}>
@@ -564,9 +636,9 @@ export default function SettingsScreen() {
       </Modal>
 
       {/* ─── Language Modal ─── */}
-      <Modal visible={showLangModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowLangModal(false)}>
+      <Modal visible={showLangModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeLangModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={() => setShowLangModal(false)}>
+          <Pressable style={st.overlay} onPress={closeLangModal}>
             <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={st.handleRow}>
@@ -574,7 +646,7 @@ export default function SettingsScreen() {
                   <View style={[st.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
                     <TouchableOpacity
-                      onPress={() => setShowLangModal(false)}
+                      onPress={closeLangModal}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       accessibilityRole="button"
                       accessibilityLabel={tr.close}>
@@ -607,15 +679,32 @@ function SectionLabel({ label, color }: { label: string; color: string }) {
   return <Text style={[st.sectionLabel, { color }]}>{label.toUpperCase()}</Text>;
 }
 
-function SettingRow({ icon, iconColor, label, value, onPress, text, sub, border, last }: any) {
+interface SettingRowProps {
+  icon: IconSymbolName;
+  iconColor: string;
+  label: string;
+  value?: string;
+  /** Маршрут переходу; порожній для рядків-дій. */
+  route?: Href;
+  onPress: RowPress;
+  text: string;
+  sub: string;
+  border: string;
+  last?: boolean;
+}
+
+const SettingRow = React.memo(function SettingRow(
+  { icon, iconColor, label, value, route, onPress, text, sub, border, last }: SettingRowProps,
+) {
+  const handlePress = useCallback(() => onPress(route), [onPress, route]);
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={label}
       style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
-        <IconSymbol name={icon as IconSymbolName} size={17} color={iconColor} />
+        <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -624,13 +713,26 @@ function SettingRow({ icon, iconColor, label, value, onPress, text, sub, border,
       </View>
     </TouchableOpacity>
   );
+});
+
+interface ToggleRowProps {
+  icon: IconSymbolName;
+  iconColor: string;
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  text: string;
+  border: string;
+  last?: boolean;
 }
 
-function ToggleRow({ icon, iconColor, label, value, onChange, text, sub, border, last }: any) {
+const ToggleRow = React.memo(function ToggleRow(
+  { icon, iconColor, label, value, onChange, text, border, last }: ToggleRowProps,
+) {
   return (
     <View style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
-        <IconSymbol name={icon as IconSymbolName} size={17} color={iconColor} />
+        <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
       <Switch
@@ -642,12 +744,27 @@ function ToggleRow({ icon, iconColor, label, value, onChange, text, sub, border,
       />
     </View>
   );
+});
+
+interface NotifRowProps {
+  label: string;
+  scheduledCount: number;
+  route?: Href;
+  onPress: RowPress;
+  text: string;
+  sub: string;
+  border: string;
+  accent: string;
+  last?: boolean;
 }
 
-function NotifRow({ label, scheduledCount, onPress, text, sub, border, accent, last }: any) {
+const NotifRow = React.memo(function NotifRow(
+  { label, scheduledCount, route, onPress, text, sub, border, accent, last }: NotifRowProps,
+) {
+  const handlePress = useCallback(() => onPress(route), [onPress, route]);
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={handlePress}
       style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: '#F59E0B20' }]}>
         <IconSymbol name="bell.badge" size={17} color="#F59E0B" />
@@ -663,38 +780,49 @@ function NotifRow({ label, scheduledCount, onPress, text, sub, border, accent, l
       </View>
     </TouchableOpacity>
   );
+});
+
+interface InfoRowProps {
+  icon: IconSymbolName;
+  iconColor: string;
+  label: string;
+  value: string;
+  text: string;
+  sub: string;
+  border: string;
+  last?: boolean;
 }
 
-function InfoRow({ icon, iconColor, label, value, text, sub, border, last }: any) {
+const InfoRow = React.memo(function InfoRow(
+  { icon, iconColor, label, value, text, sub, border, last }: InfoRowProps,
+) {
   return (
     <View style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '18' }]}>
-        <IconSymbol name={icon as IconSymbolName} size={17} color={iconColor} />
+        <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
       <Text style={[st.rowValue, { color: sub }]}>{value}</Text>
     </View>
   );
-}
+});
 
 const st = StyleSheet.create({
   pageTitle:   { fontSize: 34, fontWeight: '800', letterSpacing: -0.8 },
   sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 20, marginLeft: 4 },
+  // Дві колонки вмикаються лише на широкому екрані; на телефоні обгортки
+  // лишаються без стилю й розкладка не змінюється.
+  grid:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  col:         { width: '48%' },
   card:        { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
   row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
-  dangerRow:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
   iconBox:     { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   rowLabel:    { fontSize: 14, fontWeight: '500' },
   rowValue:    { fontSize: 13, fontWeight: '500' },
-  dangerLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: '#EF4444' },
-  appBadge:    { width: 52, height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 },
   footerCard:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28, marginBottom: 8 },
   footerLogo:  { width: 26, height: 26, borderRadius: 7 },
   footerName:  { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
   footerBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  bugBanner:   { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1.5, padding: 14, overflow: 'hidden' },
-  bugBannerIcon:{ width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  bugChevron:  { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: '90%' },
@@ -703,5 +831,4 @@ const st = StyleSheet.create({
   sheetTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 12 },
   optionRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   optionLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
-  btn:         { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

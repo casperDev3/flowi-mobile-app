@@ -1,4 +1,7 @@
 import {
+  SIDEBAR_WIDTH,
+  screenContentWidth,
+  sidebarVisible,
   DEFAULT_COLLAPSED_GROUP_IDS,
   NAV_GROUPS,
   isGroupCollapsed,
@@ -85,5 +88,30 @@ describe('згортання груп сайдбара', () => {
     // Захист від «оптимізації», яка сховала б за розкривачками весь сайдбар.
     const alwaysVisible = NAV_GROUPS.filter(g => !g.id).flatMap(g => g.items);
     expect(alwaysVisible.length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe('ширина, доступна екрану', () => {
+  it('на широкому екрані сайдбар забирає свої 232pt', () => {
+    // Саме цього не враховували Контейнери: сітка будувала ряд на 720pt у
+    // колонці 582pt і обрізала карти праворуч.
+    expect(screenContentWidth(1194, true, '/containers', SIDEBAR_WIDTH)).toBe(1194 - SIDEBAR_WIDTH);
+  });
+
+  it('на телефоні нічого не віднімається', () => {
+    expect(screenContentWidth(390, false, '/containers', SIDEBAR_WIDTH)).toBe(390);
+  });
+
+  it('на авторизаційних екранах сайдбара немає навіть на планшеті', () => {
+    // Віднімати там 232pt означало б звужувати екран ні за що.
+    for (const route of ['/welcome', '/login', '/register', '/forgot-password']) {
+      expect(screenContentWidth(1194, true, route, SIDEBAR_WIDTH)).toBe(1194);
+      expect(sidebarVisible(true, route)).toBe(false);
+    }
+  });
+
+  it('ширина не буває відʼємною', () => {
+    // Split View може дати вікно вужче за сам сайдбар.
+    expect(screenContentWidth(180, true, '/containers', SIDEBAR_WIDTH)).toBe(0);
   });
 });

@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { NavSidebar } from '@/components/shared/NavSidebar';
+import { SIDEBAR_HIDDEN_ON, sidebarVisible } from '@/constants/nav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useOrientationLock } from '@/hooks/use-orientation-lock';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -72,7 +73,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
  * Екрани входу — самодостатні: користувач ще не всередині додатку, і
  * навігація по розділах йому нікуди не веде.
  */
-const SIDEBAR_HIDDEN_ON = ['/welcome', '/login', '/register', '/forgot-password'];
 
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
@@ -83,7 +83,7 @@ function RootLayoutContent() {
   // Сайдбар живе ТУТ, а не в (tabs)/_layout: інакше Stack-екрани
   // (Проєкти, Нотатки, Контейнери…) відкривалися б поверх нього, і
   // постійна навігація зникала б рівно там, де вона найпотрібніша.
-  const showSidebar = isWide && !SIDEBAR_HIDDEN_ON.includes(pathname);
+  const showSidebar = sidebarVisible(isWide, pathname);
 
   return (
     <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>

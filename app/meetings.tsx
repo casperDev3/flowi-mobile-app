@@ -23,8 +23,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/shared/MeetingFormSheet';
 
+import { DetailPane } from '@/components/shared/DetailPane';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useResponsive } from '@/hooks/use-responsive';
+import { useI18n } from '@/store/i18n';
 import { isOnlineMode } from '@/store/app-mode';
 import { cancelMeetingNotification, scheduleMeetingNotification } from '@/store/notifications';
 import { loadData } from '@/store/storage';
@@ -232,9 +235,9 @@ function useColors(isDark: boolean) {
 // Мемоізована: у місячному й квартальному зрізі карток бувають сотні, і без
 // цього кожен рендер екрана перемальовував би їх усі. Колбеки приймають саму
 // зустріч аргументом — інлайн-стрілка на кожну картку ламала б порівняння.
-const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = false, isRecurring = false }: {
+const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = false, isRecurring = false, selected = false }: {
   mtg: Meeting; onPress: (m: Meeting) => void; onDelete: (m: Meeting) => void; onRecord?: (m: Meeting) => void;
-  isDark: boolean; c: ReturnType<typeof useColors>; showDate?: boolean; isRecurring?: boolean;
+  isDark: boolean; c: ReturnType<typeof useColors>; showDate?: boolean; isRecurring?: boolean; selected?: boolean;
 }) {
   const dur = durLabel(mtg.durationMinutes);
   const mtgDt = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
@@ -244,10 +247,17 @@ const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, on
   const dateDisp = showDate ? dayLabel(mtg.date) : null;
 
   return (
-    <TouchableOpacity onPress={() => onPress(mtg)} activeOpacity={0.78}>
-      <View style={[s.card, { opacity: isPast && !isNow ? 0.5 : 1, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.72)' }]}>
+    // Вибране підсвічуємо лише фоном і ширшою (абсолютно позиційованою)
+    // смужкою: рамка додала б картці висоти, і на телефоні список смикнувся б
+    // від самого лише дотику.
+    <TouchableOpacity onPress={() => onPress(mtg)} activeOpacity={0.78}
+      accessibilityRole="button" accessibilityState={{ selected }}>
+      <View style={[s.card, {
+        opacity: !selected && isPast && !isNow ? 0.5 : 1,
+        backgroundColor: selected ? mtg.color + '20' : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.72)',
+      }]}>
         {/* Left accent bar */}
-        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: mtg.color, borderTopLeftRadius: 12, borderBottomLeftRadius: 12 }} />
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: selected ? 5 : 3, backgroundColor: mtg.color, borderTopLeftRadius: 12, borderBottomLeftRadius: 12 }} />
 
         <View style={{ marginLeft: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {/* Time column */}
@@ -370,6 +380,10 @@ export default function MeetingsScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const c = useColors(isDark);
+  const { tr } = useI18n();
+  // Три колонки вмикаються тільки на `expanded`; вужче деталь лишається листом.
+  const { isExpanded, height } = useResponsive();
+  const detailScrollRef = useRef<ScrollView | null>(null);
 
   // Data
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -393,8 +407,10 @@ export default function MeetingsScreen() {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  // Detail popup
-  const [selectedMtg, setSelectedMtg]     = useState<Meeting | null>(null);
+  // Деталь. Зберігаємо ключ РОЗГОРНУТОГО екземпляра, а не сам обʼєкт: у
+  // колонці деталь лишається відкритою під час редагування й запису, і знімок
+  // зустрічі, зроблений у мить натискання, показував би вчорашні дані.
+  const [selectedKey, setSelectedKey]     = useState<string | null>(null);
 
   // Add/edit modal
   const [showForm, setShowForm]           = useState(false);
@@ -896,9 +912,16 @@ export default function MeetingsScreen() {
     [meetings],
   );
 
-  const handleCardPress  = useCallback((m: Meeting) => setSelectedMtg(resolveOrig(m)), [resolveOrig]);
+  const handleCardPress  = useCallback((m: Meeting) => setSelectedKey(m.id), []);
   const handleCardDelete = useCallback((m: Meeting) => deleteMeeting(resolveOrig(m).id), [resolveOrig, deleteMeeting]);
   const handleCardRecord = useCallback((m: Meeting) => setRecordingMtgId(resolveOrig(m).id), [resolveOrig]);
+
+  // Якщо зустріч видалили (або вона випала з розгорнутого діапазону) — вибір
+  // сам зникає, і колонка повертається до підказки.
+  const selectedMtg = useMemo(
+    () => (selectedKey ? expandedMeetings.find(m => m.id === selectedKey) ?? null : null),
+    [selectedKey, expandedMeetings],
+  );
 
   // Заголовок групи і її картки йдуть поспіль одним плоским масивом: за
   // квартал зустрічей бувають сотні, а ScrollView тримав би їх усі
@@ -933,12 +956,13 @@ export default function MeetingsScreen() {
       <View style={{ marginBottom: item.gap }}>
         <MeetingCard mtg={item.mtg} isDark={isDark} c={c}
           isRecurring={!!item.mtg._origId}
+          selected={item.mtg.id === selectedKey}
           onPress={handleCardPress}
           onDelete={handleCardDelete}
           onRecord={handleCardRecord} />
       </View>
     );
-  }, [c, isDark, handleCardPress, handleCardDelete, handleCardRecord]);
+  }, [c, isDark, selectedKey, handleCardPress, handleCardDelete, handleCardRecord]);
 
   const isDaySpan = span === 'day' || span === 'week';
 
@@ -962,10 +986,144 @@ export default function MeetingsScreen() {
     );
   }, [isDaySpan, rows.length, c.border, c.sub, selectedDay, openAdd]);
 
+  // ─── Деталь зустрічі ──────────────────────────────────────────────────────
+
+  // Приймає РОЗГОРНУТИЙ екземпляр: дата й позначка повтору мусять збігатися з
+  // тим, що людина натиснула в списку. Дії натомість адресують оригінал —
+  // саме він лежить у сховищі, копії повторів існують лише в памʼяті.
+  const renderDetail = useCallback((mtg: Meeting) => {
+    const orig = resolveOrig(mtg);
+    const recordings = mtg.recordings ?? [];
+
+    // На вузькому екрані деталь — модальний лист, і iOS не покаже другу
+    // модалку, доки перша не зникла; звідси закриття й пауза. У колонці
+    // деталь нікуди не дівається, тож пауза лише гальмувала б дію.
+    const openOverDetail = (run: () => void) => {
+      if (isExpanded) { run(); return; }
+      setSelectedKey(null);
+      setTimeout(run, 300);
+    };
+
+    return (
+      <View>
+        {/* Смужка-«ручка» має сенс лише там, де лист тягнуть пальцем. */}
+        {!isExpanded && (
+          <View style={{ alignItems: 'center', marginBottom: 16 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
+          </View>
+        )}
+
+        {/* Color bar + title */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+          <View style={{ width: 4, height: 44, borderRadius: 2, backgroundColor: mtg.color }} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, letterSpacing: -0.4 }}>
+              {mtg.title}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: mtg.color }}>
+                {mtg.time || '--:--'}
+              </Text>
+              <Text style={{ fontSize: 13, color: c.sub }}>·</Text>
+              <Text style={{ fontSize: 13, color: c.sub }}>{durLabel(mtg.durationMinutes)}</Text>
+              {mtg._origId && (
+                <IconSymbol name="repeat" size={12} color={mtg.color + 'BB'} />
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Date */}
+        <View style={[s.detailRow, { backgroundColor: c.dim, borderRadius: 12, marginBottom: 8 }]}>
+          <IconSymbol name="calendar" size={15} color={c.sub} />
+          <Text style={{ fontSize: 14, color: c.text, marginLeft: 10 }}>{dayLabel(mtg.date)}</Text>
+        </View>
+
+        {/* Location */}
+        {mtg.location ? (
+          <View style={[s.detailRow, { backgroundColor: c.dim, borderRadius: 12, marginBottom: 8 }]}>
+            <IconSymbol name="mappin" size={15} color={c.sub} />
+            <Text style={{ fontSize: 14, color: c.text, marginLeft: 10, flex: 1 }}>{mtg.location}</Text>
+          </View>
+        ) : null}
+
+        {/* Link */}
+        {mtg.link ? (
+          <View style={[s.detailRow, { backgroundColor: ACCENT + '12', borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: ACCENT + '30' }]}>
+            <IconSymbol name="link" size={15} color={ACCENT} />
+            <Text style={{ fontSize: 14, color: ACCENT, marginLeft: 10, flex: 1, fontWeight: '600' }} numberOfLines={1}>
+              {mtg.link}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Notes */}
+        {mtg.notes ? (
+          <View style={[s.detailRow, { backgroundColor: c.dim, borderRadius: 12, marginBottom: 8, alignItems: 'flex-start', paddingTop: 12, paddingBottom: 12 }]}>
+            <IconSymbol name="note.text" size={15} color={c.sub} />
+            <Text style={{ fontSize: 13, color: c.sub, marginLeft: 10, flex: 1, lineHeight: 19 }}>
+              {mtg.notes}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Recordings */}
+        {recordings.length > 0 && (
+          <View style={{ marginBottom: 8 }}>
+            <Text style={{ fontSize: 11, color: c.sub, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+              ЗАПИСИ ({recordings.length})
+            </Text>
+            {recordings.map((uri, idx) => (
+              <View key={uri} style={[s.detailRow, { backgroundColor: ACCENT + '10', borderRadius: 12, marginBottom: 6, borderWidth: 1, borderColor: ACCENT + '25' }]}>
+                <IconSymbol name="waveform" size={15} color={ACCENT} />
+                <Text style={{ fontSize: 13, color: c.text, marginLeft: 10, flex: 1 }}>
+                  Запис {idx + 1}
+                </Text>
+                <TouchableOpacity onPress={() => playRecording(uri)}
+                  style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconSymbol name={playingUri === uri ? 'pause.fill' : 'play.fill'} size={12} color={ACCENT} />
+                </TouchableOpacity>
+                {/* Запис живе в оригіналі — видаляємо звідти, а не з копії. */}
+                <TouchableOpacity onPress={() => deleteRecording(orig.id, uri)}
+                  style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#EF444415', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
+                  <IconSymbol name="trash" size={12} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Action buttons */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+          {/* Record */}
+          <TouchableOpacity
+            onPress={() => openOverDetail(() => setRecordingMtgId(orig.id))}
+            style={[s.btn, { flex: 1, backgroundColor: ACCENT + '18', borderWidth: 1, borderColor: ACCENT + '40' }]}>
+            <IconSymbol name="mic.fill" size={16} color={ACCENT} />
+            <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '700' }}>Записати</Text>
+          </TouchableOpacity>
+
+          {/* Edit */}
+          <TouchableOpacity
+            onPress={() => openOverDetail(() => openEdit(orig))}
+            style={[s.btn, { flex: 1, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
+            <IconSymbol name="pencil" size={16} color={c.text} />
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>Редагувати</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }, [c, isExpanded, playingUri, playRecording, deleteRecording, openEdit, resolveOrig]);
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <LinearGradient colors={[c.bg1, c.bg2]} style={{ flex: 1 }}>
+      {/* На широкому екрані список і деталь стоять поруч — той самий
+          DetailPane, що в Завданнях, Фінансах і Проєктах. На вузькому деталь
+          лишається модальним листом поверх списку. */}
+      <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
+      <View style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
 
         {/* Шапка, перемикачі та підсумки тримаються тієї самої колонки, що й
@@ -1060,130 +1218,34 @@ export default function MeetingsScreen() {
         />
       </SafeAreaView>
 
-      {/* FAB */}
+      {/* FAB живе всередині лівої колонки: інакше на широкому екрані він
+          висів би над панеллю деталі. */}
       <TouchableOpacity onPress={() => openAdd()} activeOpacity={0.85}
         style={[s.fab, { backgroundColor: ACCENT }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </TouchableOpacity>
+      </View>
 
-      {/* ── Meeting Detail Modal ── */}
-      <Modal visible={!!selectedMtg} transparent animationType="slide" statusBarTranslucent
-        onRequestClose={() => setSelectedMtg(null)}>
-        <Pressable style={s.overlay} onPress={() => setSelectedMtg(null)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
-            {selectedMtg && (
-              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-                style={[s.sheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,10,20,0.98)' : 'rgba(245,244,255,0.98)' }]}>
-                <ScrollView showsVerticalScrollIndicator={false}>
-
-                {/* Handle */}
-                <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                  <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
-                </View>
-
-                {/* Color bar + title */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-                  <View style={{ width: 4, height: 44, borderRadius: 2, backgroundColor: selectedMtg.color }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, letterSpacing: -0.4 }}>
-                      {selectedMtg.title}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: selectedMtg.color }}>
-                        {selectedMtg.time || '--:--'}
-                      </Text>
-                      <Text style={{ fontSize: 13, color: c.sub }}>·</Text>
-                      <Text style={{ fontSize: 13, color: c.sub }}>{durLabel(selectedMtg.durationMinutes)}</Text>
-                      {selectedMtg._origId && (
-                        <IconSymbol name="repeat" size={12} color={selectedMtg.color + 'BB'} />
-                      )}
-                    </View>
-                  </View>
-                </View>
-
-                {/* Date */}
-                <View style={[s.detailRow, { backgroundColor: c.dim, borderRadius: 12, marginBottom: 8 }]}>
-                  <IconSymbol name="calendar" size={15} color={c.sub} />
-                  <Text style={{ fontSize: 14, color: c.text, marginLeft: 10 }}>{dayLabel(selectedMtg.date)}</Text>
-                </View>
-
-                {/* Location */}
-                {selectedMtg.location ? (
-                  <View style={[s.detailRow, { backgroundColor: c.dim, borderRadius: 12, marginBottom: 8 }]}>
-                    <IconSymbol name="mappin" size={15} color={c.sub} />
-                    <Text style={{ fontSize: 14, color: c.text, marginLeft: 10, flex: 1 }}>{selectedMtg.location}</Text>
-                  </View>
-                ) : null}
-
-                {/* Link */}
-                {selectedMtg.link ? (
-                  <View style={[s.detailRow, { backgroundColor: ACCENT + '12', borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: ACCENT + '30' }]}>
-                    <IconSymbol name="link" size={15} color={ACCENT} />
-                    <Text style={{ fontSize: 14, color: ACCENT, marginLeft: 10, flex: 1, fontWeight: '600' }} numberOfLines={1}>
-                      {selectedMtg.link}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {/* Notes */}
-                {selectedMtg.notes ? (
-                  <View style={[s.detailRow, { backgroundColor: c.dim, borderRadius: 12, marginBottom: 8, alignItems: 'flex-start', paddingTop: 12, paddingBottom: 12 }]}>
-                    <IconSymbol name="note.text" size={15} color={c.sub} />
-                    <Text style={{ fontSize: 13, color: c.sub, marginLeft: 10, flex: 1, lineHeight: 19 }}>
-                      {selectedMtg.notes}
-                    </Text>
-                  </View>
-                ) : null}
-
-                {/* Recordings */}
-                {(selectedMtg.recordings?.length ?? 0) > 0 && (
-                  <View style={{ marginBottom: 8 }}>
-                    <Text style={{ fontSize: 11, color: c.sub, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                      ЗАПИСИ ({selectedMtg.recordings!.length})
-                    </Text>
-                    {selectedMtg.recordings!.map((uri, idx) => (
-                      <View key={uri} style={[s.detailRow, { backgroundColor: ACCENT + '10', borderRadius: 12, marginBottom: 6, borderWidth: 1, borderColor: ACCENT + '25' }]}>
-                        <IconSymbol name="waveform" size={15} color={ACCENT} />
-                        <Text style={{ fontSize: 13, color: c.text, marginLeft: 10, flex: 1 }}>
-                          Запис {idx + 1}
-                        </Text>
-                        <TouchableOpacity onPress={() => playRecording(uri)}
-                          style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
-                          <IconSymbol name={playingUri === uri ? 'pause.fill' : 'play.fill'} size={12} color={ACCENT} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => { deleteRecording(selectedMtg.id, uri); setSelectedMtg(m => m ? { ...m, recordings: (m.recordings ?? []).filter(r => r !== uri) } : null); }}
-                          style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#EF444415', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
-                          <IconSymbol name="trash" size={12} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {/* Action buttons */}
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-                  {/* Record */}
-                  <TouchableOpacity
-                    onPress={() => { setSelectedMtg(null); setTimeout(() => setRecordingMtgId(selectedMtg.id), 300); }}
-                    style={[s.btn, { flex: 1, backgroundColor: ACCENT + '18', borderWidth: 1, borderColor: ACCENT + '40' }]}>
-                    <IconSymbol name="mic.fill" size={16} color={ACCENT} />
-                    <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '700' }}>Записати</Text>
-                  </TouchableOpacity>
-
-                  {/* Edit */}
-                  <TouchableOpacity
-                    onPress={() => { setSelectedMtg(null); setTimeout(() => openEdit(selectedMtg), 300); }}
-                    style={[s.btn, { flex: 1, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
-                    <IconSymbol name="pencil" size={16} color={c.text} />
-                    <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>Редагувати</Text>
-                  </TouchableOpacity>
-                </View>
-                </ScrollView>
-              </BlurView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <DetailPane
+        open={!!selectedMtg}
+        wide={isExpanded}
+        onClose={() => setSelectedKey(null)}
+        isDark={isDark}
+        sheetColor={isDark ? 'rgba(10,10,20,0.98)' : 'rgba(245,244,255,0.98)'}
+        borderColor={c.border}
+        maxHeight={height * 0.86}
+        scrollRef={detailScrollRef}
+        empty={
+          <>
+            <IconSymbol name="calendar" size={40} color={c.sub} />
+            <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 12, paddingHorizontal: 16 }}>
+              {tr.meetingPickHint}
+            </Text>
+          </>
+        }>
+        {selectedMtg ? renderDetail(selectedMtg) : null}
+      </DetailPane>
+      </View>
 
       <MeetingFormSheet
         visible={showForm}

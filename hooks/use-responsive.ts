@@ -13,6 +13,9 @@
  * перераховується разом із вікном.
  */
 import { useWindowDimensions } from 'react-native';
+import { usePathname } from 'expo-router';
+
+import { SIDEBAR_WIDTH, screenContentWidth } from '@/constants/nav';
 
 import { type SizeClass, sizeClassFor } from '@/constants/tokens';
 
@@ -51,4 +54,20 @@ export function useResponsive(): Responsive {
     isWide: sizeClass !== 'compact',
     landscape: width > height,
   };
+}
+
+/**
+ * Ширина, доступна САМОМУ екрану: вікно мінус постійний сайдбар.
+ *
+ * Окремий хук, а не поле Responsive, бо він читає маршрут (usePathname) — на
+ * авторизаційних екранах сайдбара немає навіть на планшеті, і віднімати там
+ * 232pt означало б звужувати екран ні за що.
+ *
+ * Будь-яка сітка, що ділить ширину на колонки, мусить брати ЦЕ значення, а не
+ * responsive.width.
+ */
+export function useScreenWidth(): number {
+  const { width, isWide } = useResponsive();
+  const pathname = usePathname();
+  return screenContentWidth(width, isWide, pathname, SIDEBAR_WIDTH);
 }

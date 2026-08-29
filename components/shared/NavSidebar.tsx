@@ -28,14 +28,16 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   DEFAULT_COLLAPSED_GROUP_IDS,
   NAV_GROUPS,
+  SIDEBAR_WIDTH,
   isGroupCollapsed,
   isRouteActive,
 } from '@/constants/nav';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
 
-/** Ширина підібрана під найдовшу назву українською («Планування бюджету»). */
-export const SIDEBAR_WIDTH = 232;
+// Ширина живе в constants/nav.ts: її читають і хуки компонування, а імпорт
+// звідси тягнув би в них i18n і AsyncStorage.
+export { SIDEBAR_WIDTH } from '@/constants/nav';
 
 const COLLAPSED_KEY = 'nav_collapsed_groups';
 

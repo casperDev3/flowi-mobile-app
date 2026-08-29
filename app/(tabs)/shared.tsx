@@ -38,7 +38,7 @@ import { requestNotificationPermissions } from '@/store/notifications';
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 import { WS_BASE } from '@/store/api-config';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { formatDuration } from '@/utils/durationFormat';
@@ -75,6 +75,10 @@ async function api(path: string, method = 'GET', body?: object): Promise<any> {
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+/** Ширина колонки груп у двоколонковій розкладці. Її мусять знати двоє:
+ *  самі стилі й розрахунок сітки розділів — інакше вони розійдуться. */
+const GROUPS_COLUMN_WIDTH = 340;
 
 type SectionType = 'shopping' | 'tasks' | 'notes';
 type Priority    = 'high' | 'medium' | 'low';
@@ -141,14 +145,28 @@ interface PendingChange {
 export default function SharedScreen() {
   const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
-  const { width, isWide } = useResponsive();
+  const { width, isWide, isExpanded } = useResponsive();
+  // Дві колонки одночасно (групи ліворуч, вміст групи праворуч) вмикаються
+  // лише на `expanded`. На `medium` список груп забрав би третину ширини, і
+  // вкладкам розділів лишилося б менше місця, ніж вони мають на телефоні —
+  // там і далі працює перемикання viewMode.
+  const twoPane = isExpanded;
   // На планшеті панель деталі — бічна колонка, а не майже весь екран:
   // 92% ширини сховали б список секцій, заради якого її й відкривають.
   const SIDEBAR_W = isWide ? Math.min(Math.round(width * 0.5), 460) : Math.round(width * 0.92);
   // Картки груп і списків — рядки з іконкою й назвою, а не плитки. Колонка
   // вмісту обмежена 720pt, тож третя колонка зробила б їх нечитабельно
   // вузькими; на планшеті виправдані рівно дві.
-  const gridCols = isWide ? 2 : 1;
+  // У двоколонковій розкладці список груп сам завширшки з телефонний екран,
+  // тож ділити його ще навпіл нема на що — пара колонок лишається тільки
+  // розділам, які займають широку праву частину.
+  const groupCols   = twoPane ? 1 : (isWide ? 2 : 1);
+  // Дві колонки розділів — лише якщо права частина справді широка. Раніше це
+  // рахувалося від ширини ВІКНА, хоча в двоколонковій розкладці правій частині
+  // дістається вікно мінус сайдбар (232pt) мінус колонка груп: на 1024pt
+  // виходило дві колонки в смузі, де ледве вміщається одна.
+  const paneWidth = useScreenWidth() - (isExpanded ? GROUPS_COLUMN_WIDTH : 0);
+  const sectionCols = paneWidth >= 560 ? 2 : 1;
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const { tr, lang } = useI18n();
@@ -839,6 +857,11 @@ export default function SharedScreen() {
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   function enterGroup(g: GroupData) {
+    // У двох колонках групу перемикають прямо зі списку, не проходячи через
+    // «назад». Відкрита панель розділу лишилася б показувати елементи
+    // попередньої групи, тож згортаємо її тут. На телефоні гілка не працює:
+    // туди заходять зі списку, де activeGroup вже порожній.
+    if (activeGroup && activeGroup.id !== g.id) closeSidebar(true);
     setActiveGroup(g); setViewMode('group'); setActiveTab('shopping');
     setSectionSearch(''); setSectionSearchOpen(false);
     if (deviceId) { connectWS(g, deviceId); syncGroup(g, deviceId); }
@@ -1016,8 +1039,8 @@ export default function SharedScreen() {
   const currentSections = sectionsByTab[activeTab];
 
   // Рядки для сітки: на телефоні — як були, на планшеті добиті до пари.
-  const groupRows  = useMemo(() => padToGrid(filteredGroups, gridCols), [filteredGroups, gridCols]);
-  const sectionRows = useMemo(() => padToGrid(currentSections, gridCols), [currentSections, gridCols]);
+  const groupRows  = useMemo(() => padToGrid(filteredGroups, groupCols), [filteredGroups, groupCols]);
+  const sectionRows = useMemo(() => padToGrid(currentSections, sectionCols), [currentSections, sectionCols]);
 
   // ─── Секції віртуалізованого списку елементів ─────────────────────────────
   // Активні й виконані — дві секції одного списку. Ознака `last` рахується
@@ -1038,19 +1061,24 @@ export default function SharedScreen() {
 
   const sidebarType = sidebarSection?.type;
 
+  // У двох колонках обрана група мусить лишатися підсвіченою: інакше не
+  // видно, чиї саме розділи показує права частина.
+  const selectedGroupId = twoPane ? activeGroup?.id : undefined;
+
   const renderGroupRow = useCallback(({ item }: { item: GroupData | null }) => (
     item
-      ? <GroupCard group={item} c={c} isDark={isDark} lang={lang} grid={gridCols > 1} onPress={onGroupPress} />
+      ? <GroupCard group={item} c={c} isDark={isDark} lang={lang} grid={groupCols > 1}
+          selected={item.id === selectedGroupId} onPress={onGroupPress} />
       : <View style={{ flex: 1 }} />
-  ), [c, isDark, lang, gridCols, onGroupPress]);
+  ), [c, isDark, lang, groupCols, selectedGroupId, onGroupPress]);
 
   const renderSectionRow = useCallback(({ item }: { item: SharedSection | null }) => (
     item
       ? <SectionCard
           section={item} counts={sectionCounts[item.id]} c={c} isDark={isDark}
-          grid={gridCols > 1} onPress={onSectionPress} onLongPress={onSectionLongPress} />
+          grid={sectionCols > 1} onPress={onSectionPress} onLongPress={onSectionLongPress} />
       : <View style={{ flex: 1 }} />
-  ), [c, isDark, gridCols, sectionCounts, onSectionPress, onSectionLongPress]);
+  ), [c, isDark, sectionCols, sectionCounts, onSectionPress, onSectionLongPress]);
 
   const renderItemRow = useCallback(({ item, index, section }: {
     item: LocalItem; index: number;
@@ -1097,6 +1125,20 @@ export default function SharedScreen() {
     return true;
   };
 
+  // ── Що показувати з двох частин ──────────────────────────────────────────
+  // На широкому екрані список груп нікуди не зникає, а праворуч живе вміст
+  // обраної групи. На вузькому лишається старе перемикання viewMode: місця
+  // під дві колонки немає, і ховати список — правильно.
+  const showGroupsPane = twoPane || viewMode === 'groups';
+  const showGroupPane  = twoPane ? !!activeGroup : viewMode === 'group';
+
+  // Рядка «оберіть групу» у словнику немає, а translations.ts зараз правлять
+  // сусідні екрани — щоб не чіпати спільний файл, беремо мову тим самим
+  // прийомом, що вже вживають sectionLabel/sectionPh вище.
+  const pickGroupHint = lang === 'uk'
+    ? 'Оберіть групу зі списку ліворуч'
+    : 'Pick a group from the list on the left';
+
   return (
     <OfflineOverlay reason='offline' mode='banner'>
     <OfflineOverlay reason='guest'>
@@ -1108,10 +1150,14 @@ export default function SharedScreen() {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={c.accent} />
           </View>
-        ) : viewMode === 'groups' ? (
+        ) : (
+          <View style={{ flex: 1, flexDirection: twoPane ? 'row' : 'column' }}>
 
+          {showGroupsPane && (
           /* ══════════════════════════════ GROUPS LIST ══════════════════════════════ */
-          <>
+          <View style={twoPane
+            ? [st.groupsColumn, { borderRightColor: c.border }]
+            : { flex: 1 }}>
             <View style={st.header}>
               <Text style={[st.title, { color: c.text }]}>{tr.sharedTitle}</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1146,12 +1192,12 @@ export default function SharedScreen() {
             )}
 
             <FlatList
-              key={`groups-${gridCols}`}
+              key={`groups-${groupCols}`}
               data={groupRows}
               keyExtractor={(g, i) => g?.id ?? `pad-${i}`}
               renderItem={renderGroupRow}
-              numColumns={gridCols}
-              columnWrapperStyle={gridCols > 1 ? st.gridRow : undefined}
+              numColumns={groupCols}
+              columnWrapperStyle={groupCols > 1 ? st.gridRow : undefined}
               contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }]}
               showsVerticalScrollIndicator={false}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroups} tintColor={c.accent} />}
@@ -1197,21 +1243,26 @@ export default function SharedScreen() {
                 </View>
               }
             />
-          </>
+          </View>
+          )}
 
-        ) : (
+          {showGroupPane ? (
 
           /* ════════════════════════════ GROUP DETAIL ════════════════════════════ */
-          <>
+          <View style={{ flex: 1 }}>
             {/* Header */}
             <View style={st.header}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                {/* У двох колонках список груп видно поруч, тож «назад» нема
+                    куди вести — кнопка лишається тільки вузькому екрану. */}
+                {!twoPane && (
                 <TouchableOpacity onPress={goBackToGroups}
                   accessibilityRole="button" accessibilityLabel={tr.cancel}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   style={[st.headerBtn, { backgroundColor: c.dim }]}>
                   <IconSymbol name="chevron.left" size={18} color={c.text} />
                 </TouchableOpacity>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={[st.groupHeaderName, { color: c.text }]} numberOfLines={1}>{activeGroup?.name}</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -1303,12 +1354,12 @@ export default function SharedScreen() {
 
             {/* Sections list */}
             <FlatList
-              key={`sections-${gridCols}`}
+              key={`sections-${sectionCols}`}
               data={sectionRows}
               keyExtractor={(s, i) => s?.id ?? `pad-${i}`}
               renderItem={renderSectionRow}
-              numColumns={gridCols}
-              columnWrapperStyle={gridCols > 1 ? st.gridRow : undefined}
+              numColumns={sectionCols}
+              columnWrapperStyle={sectionCols > 1 ? st.gridRow : undefined}
               contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }]}
               showsVerticalScrollIndicator={false}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshGroup} tintColor={c.accent} />}
@@ -1346,12 +1397,27 @@ export default function SharedScreen() {
                 </View>
               }
             />
-          </>
+          </View>
+
+          ) : twoPane ? (
+            // Порожня половина екрана без пояснення читається як помилка
+            // рендеру — тому підказка, а не просто фон.
+            <View style={st.pickPane}>
+              <View style={[st.emptyIconBox, { backgroundColor: c.accent + '12' }]}>
+                <IconSymbol name="person.2.fill" size={32} color={c.accent + '80'} />
+              </View>
+              <Text style={[st.emptyDesc, { color: c.sub, textAlign: 'center' }]}>
+                {groups.length ? pickGroupHint : tr.noGroupsHint}
+              </Text>
+            </View>
+          ) : null}
+
+          </View>
         )}
       </SafeAreaView>
 
       {/* ── FAB ── */}
-      {viewMode === 'group' && !sidebarSection && (
+      {showGroupPane && !sidebarSection && (
         <TouchableOpacity onPress={() => setShowAddSectionModal(true)}
           style={[st.fab, { backgroundColor: c.accent, bottom: tabBarInset + 20 }]}>
           <IconSymbol name="plus" size={26} color="#fff" />
@@ -2143,16 +2209,22 @@ const ItemRow = React.memo(function ItemRow({ item, isLast, type, c, onToggle, o
 // планшеті їх видно вдвічі більше, а перемальовує їх кожне оновлення
 // лічильників, що приходить по WebSocket.
 
-const GroupCard = React.memo(function GroupCard({ group, c, isDark, lang, grid, onPress }: {
+const GroupCard = React.memo(function GroupCard({ group, c, isDark, lang, grid, selected, onPress }: {
   group: GroupData; c: any; isDark: boolean; lang: 'uk' | 'en'; grid: boolean;
+  /** Група, вміст якої показує права колонка (лише широкий екран). */
+  selected?: boolean;
   onPress: (g: GroupData) => void;
 }) {
   const handlePress = useCallback(() => onPress(group), [onPress, group]);
   return (
     <TouchableOpacity onPress={handlePress} activeOpacity={0.75}
+      accessibilityRole="button" accessibilityState={{ selected: !!selected }}
       style={[{ marginBottom: 12 }, grid && { flex: 1 }]}>
       <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-        style={[st.groupCard, { borderColor: c.border }, grid && { flex: 1 }]}>
+        style={[st.groupCard,
+          { borderColor: selected ? c.accent : c.border },
+          selected && { backgroundColor: c.accent + '14' },
+          grid && { flex: 1 }]}>
         <View style={[st.groupIconBox, { backgroundColor: c.accent + '15' }]}>
           <IconSymbol name="person.2.fill" size={20} color={c.accent} />
         </View>
@@ -2275,6 +2347,10 @@ const st = StyleSheet.create({
   sectionCard:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   sectionCardName: { fontSize: 16, fontWeight: '600' },
   gridRow:         { gap: 12 },
+  // Ліва колонка зі списком груп. 340pt — ширина, за якої рядок «іконка +
+  // назва + учасники» вміщується без переносу; решта йде вмісту групи.
+  groupsColumn:    { width: GROUPS_COLUMN_WIDTH, borderRightWidth: StyleSheet.hairlineWidth },
+  pickPane:        { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   sectionIconBox:  { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   emptyIconBox:    { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle:      { fontSize: 17, fontWeight: '700', marginTop: 10, marginBottom: 6 },

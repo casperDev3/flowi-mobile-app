@@ -133,3 +133,55 @@ export function isRouteActive(route: string, pathname: string): boolean {
  * На широкому екрані панелі немає — див. useTabBarInset().
  */
 export const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 88 : 68;
+
+// ─── Ширина, доступна екрану ──────────────────────────────────────────────────
+
+/**
+ * Ширина сайдбара. Живе в маніфесті, а не в самому компоненті, з практичної
+ * причини: її мусять читати хуки компонування, а імпорт із компонента тягне
+ * за собою i18n і AsyncStorage — і будь-який тест, що торкається розмірів,
+ * падає на відсутньому нативному модулі.
+ *
+ * Значення підібране під найдовшу назву українською («Трекер часу»).
+ */
+export const SIDEBAR_WIDTH = 232;
+
+/**
+ * Маршрути, на яких сайдбара немає навіть на широкому екрані.
+ *
+ * Живе тут, а не в app/_layout.tsx, бо це знання потрібне двом різним речам:
+ * самому лейауту (чи малювати панель) і кожному екрану, що рахує сітку від
+ * ширини (чи належать йому ті 232pt). Копія цього списку в другому місці
+ * розійшлася б рівно тоді, коли додасться новий такий маршрут.
+ *
+ * НЕ плутати з гвардом гостя: раніше та сама константа виконувала обидві
+ * ролі, і дописування сюди нового екрана мовчки робило б його
+ * «авторизаційним» — тобто відкритим без входу.
+ */
+export const SIDEBAR_HIDDEN_ON: readonly string[] = [
+  '/welcome', '/login', '/register', '/forgot-password',
+];
+
+/** Чи видно сайдбар зараз. */
+export function sidebarVisible(isWide: boolean, pathname: string): boolean {
+  return isWide && !SIDEBAR_HIDDEN_ON.includes(pathname);
+}
+
+/**
+ * Скільки ширини реально дістається екрану.
+ *
+ * useResponsive().width — це ширина ВІКНА, а сайдбар у app/_layout.tsx стоїть
+ * у рядку поруч зі Stack, тобто ці 232pt екрану не належать. Екран, який
+ * рахує сітку від width, на iPad 1194pt будує ряд на 720pt у колонці 582pt і
+ * обрізає карти праворуч — саме це й сталося з Контейнерами.
+ */
+export function screenContentWidth(
+  windowWidth: number,
+  isWide: boolean,
+  pathname: string,
+  sidebarWidth: number,
+): number {
+  return sidebarVisible(isWide, pathname)
+    ? Math.max(windowWidth - sidebarWidth, 0)
+    : windowWidth;
+}

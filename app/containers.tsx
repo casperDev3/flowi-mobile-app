@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -24,8 +24,10 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { DETAIL_COLUMN_WIDTH, DetailPane } from '@/components/shared/DetailPane';
+import { sizeClassFor } from '@/constants/tokens';
 
 interface ContainerItem {
   id: string;
@@ -63,6 +65,8 @@ function itemsWord(n: number): string {
 interface ContainerCardProps {
   container: Container;
   cardWidth: number;
+  /** Обрана коробка — та, вміст якої показано в колонці деталі. */
+  selected: boolean;
   isDark: boolean;
   textColor: string;
   subColor: string;
@@ -74,13 +78,15 @@ interface ContainerCardProps {
  * в пошуку інакше переганяв би всі градієнти заново.
  */
 const ContainerCard = React.memo(function ContainerCard({
-  container: con, cardWidth, isDark, textColor, subColor, onPress,
+  container: con, cardWidth, selected, isDark, textColor, subColor, onPress,
 }: ContainerCardProps) {
   return (
     <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(con.id)}>
+      {/* Товщина рамки НЕ змінюється від вибору: інакше вміст плитки
+          сіпався б на піксель щоразу, коли обирають іншу коробку. */}
       <View style={{
         width: cardWidth, borderRadius: 18, overflow: 'hidden',
-        borderWidth: 1, borderColor: con.color + '35',
+        borderWidth: 1, borderColor: selected ? con.color : con.color + '35',
       }}>
         {/* Colored top band */}
         <LinearGradient
@@ -105,7 +111,9 @@ const ContainerCard = React.memo(function ContainerCard({
         <View style={{
           flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
           paddingHorizontal: 14, paddingVertical: 10,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.6)',
+          backgroundColor: selected
+            ? con.color + '22'
+            : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.6)',
         }}>
           <Text style={{ color: subColor, fontSize: 12, fontWeight: '500' }}>
             {con.items.length > 0
@@ -128,6 +136,8 @@ interface SearchHit { item: ContainerItem; container: Container }
 
 interface SearchRowProps {
   hit: SearchHit;
+  /** Коробка цієї речі зараз відкрита в деталі. */
+  selected: boolean;
   isDark: boolean;
   textColor: string;
   subColor: string;
@@ -135,13 +145,13 @@ interface SearchRowProps {
 }
 
 const SearchRow = React.memo(function SearchRow({
-  hit, isDark, textColor, subColor, onPress,
+  hit, selected, isDark, textColor, subColor, onPress,
 }: SearchRowProps) {
   const { item, container } = hit;
   return (
     <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(container.id)}>
       <BlurView intensity={isDark ? 20 : 38} tint={isDark ? 'dark' : 'light'}
-        style={{ borderRadius: 14, borderWidth: 1, borderColor: container.color + '40',
+        style={{ borderRadius: 14, borderWidth: 1, borderColor: selected ? container.color : container.color + '40',
           padding: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' }}>
         <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: container.color, borderRadius: 2, marginRight: 12 }} />
         <View style={{ flex: 1 }}>
@@ -229,17 +239,34 @@ const ItemRow = React.memo(function ItemRow({
 
 export default function ContainersScreen() {
   const contentWidth = useContentWidth();
-  const { width, sizeClass, isWide } = useResponsive();
+  const { width, height, isWide, isExpanded } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
   const router = useRouter();
 
   /**
+   * Ширина, що дістається САМОМУ екрану. На широкому екрані сайдбар стоїть
+   * ліворуч від Stack (app/_layout.tsx), в одному рядку з ним, тож 232pt
+   * ширини вікна екранові не належать зовсім.
+   */
+  const screenWidth = useScreenWidth();
+
+  /**
+   * Місце, яке лишається сітці коробок. На expanded праворуч постійно
+   * стоїть колонка деталі, тож сітка живе НЕ на всю ширину вікна — інакше
+   * плитки рахувалися б по простору, якого в них немає.
+   */
+  const listWidth = isExpanded ? Math.max(screenWidth - DETAIL_COLUMN_WIDTH, 0) : screenWidth;
+
+  /**
    * Скільки плиток у ряд. На телефоні — дві, як було; ширше екран —
    * більше колонок, інакше на планшеті сітка з двох плиток виглядає як
-   * два величезні прямокутники з порожнечею довкола.
+   * два величезні прямокутники з порожнечею довкола. Клас рахується від
+   * ширини самої сітки, а не вікна: із колонкою деталі 840pt вікна дають
+   * список завширшки як у телефона.
    */
-  const columns = sizeClass === 'expanded' ? 4 : sizeClass === 'medium' ? 3 : 2;
+  const listClass = sizeClassFor(listWidth);
+  const columns = listClass === 'expanded' ? 4 : listClass === 'medium' ? 3 : 2;
 
   /**
    * Ширина плитки. Рахується при рендері, а не при імпорті: у Split View
@@ -249,9 +276,9 @@ export default function ContainersScreen() {
   const cardWidth = useMemo(() => {
     // Телефон: формула лишається дослівно тією, що була, — нуль регресії.
     if (!isWide) return (width - 48) / 2;
-    const available = Math.min(width, CONTENT_MAX_WIDTH) - 32;
+    const available = Math.min(listWidth, CONTENT_MAX_WIDTH) - 32;
     return (available - GRID_GAP * (columns - 1)) / columns;
-  }, [width, isWide, columns]);
+  }, [width, listWidth, isWide, columns]);
 
   const [containers, setContainers] = useState<Container[]>([]);
   const [initialized, setInitialized] = useState(false);
@@ -265,8 +292,9 @@ export default function ContainersScreen() {
   const [cLocation, setCLocation] = useState('');
   const [cColor, setCColor] = useState(PALETTE[0]);
 
-  // Detail modal
+  // Деталь: модальний лист на телефоні, колонка праворуч на широкому екрані
   const [detailId, setDetailId] = useState<string | null>(null);
+  const detailScrollRef = useRef<ScrollView | null>(null);
   const [newItemName, setNewItemName] = useState('');
   const [newItemTags, setNewItemTags] = useState('');
   const [newItemNote, setNewItemNote] = useState('');
@@ -352,7 +380,7 @@ export default function ContainersScreen() {
     setShowForm(false);
   };
 
-  const deleteContainer = (id: string) => {
+  const deleteContainer = useCallback((id: string) => {
     Alert.alert(tr.deleteContainer, tr.cannotUndo, [
       { text: tr.cancel, style: 'cancel' },
       { text: tr.delete, style: 'destructive', onPress: () => {
@@ -360,10 +388,10 @@ export default function ContainersScreen() {
         setDetailId(null);
       }},
     ]);
-  };
+  }, [tr]);
 
   // ── CRUD items ─────────────────────────────────────────────────────────────
-  const addItem = (containerId: string) => {
+  const addItem = useCallback((containerId: string) => {
     const name = newItemName.trim();
     if (!name) return;
     const item: ContainerItem = {
@@ -377,7 +405,7 @@ export default function ContainersScreen() {
     setNewItemName('');
     setNewItemTags('');
     setNewItemNote('');
-  };
+  }, [newItemName, newItemTags, newItemNote]);
 
   const saveItemEdit = () => {
     if (!editItem || !editItemContainerId) return;
@@ -408,10 +436,20 @@ export default function ContainersScreen() {
   // інакше React.memo на рядках списку не мав би сенсу.
   const openDetail = useCallback((id: string) => setDetailId(id), []);
 
+  /**
+   * Тап по знайденій речі.
+   *
+   * На телефоні деталь перекриває список, тож тримати пошук під нею немає
+   * сенсу — рядок очищається, і користувач опиняється в коробці, як і раніше.
+   *
+   * На широкому екрані список і деталь видно одночасно: пошук ЛИШАЄТЬСЯ,
+   * а праворуч відкривається коробка знайденої речі. Так результати по всіх
+   * коробках можна перебирати один за одним, не набираючи запит заново.
+   */
   const openSearchHit = useCallback((containerId: string) => {
-    setSearch('');
+    if (!isExpanded) setSearch('');
     setDetailId(containerId);
-  }, []);
+  }, [isExpanded]);
 
   const handleItemEdit = useCallback((item: ContainerItem) => {
     if (!detailId) return;
@@ -431,11 +469,156 @@ export default function ContainersScreen() {
     ));
   }, [detailId]);
 
+  /**
+   * Вміст коробки. Той самий у колонці й у модальному листі — DetailPane
+   * відповідає лише за обрамлення.
+   *
+   * Речі виводяться звичайним map, а не FlatList: DetailPane уже загорнув
+   * дітей у ScrollView, а вкладати віртуалізований список у ScrollView того
+   * ж напрямку не можна — RN на це лається й ламає віртуалізацію.
+   */
+  const renderDetail = useCallback((con: Container) => (
+    <View>
+      {/* Шапка деталі */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{con.name}</Text>
+          {con.location ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <IconSymbol name="location.fill" size={12} color={c.sub} />
+              <Text style={{ color: c.sub, fontSize: 13 }}>{con.location}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8, marginLeft: 12 }}>
+          <TouchableOpacity onPress={() => openEdit(con)}
+            accessibilityRole="button" accessibilityLabel={tr.editContainer}
+            style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: c.border, backgroundColor: c.dim }}>
+            <IconSymbol name="pencil" size={14} color={c.sub} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => deleteContainer(con.id)}
+            accessibilityRole="button" accessibilityLabel={tr.deleteContainer}
+            style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: 'rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.08)' }}>
+            <IconSymbol name="trash" size={14} color="#EF4444" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setDetailId(null)}
+            accessibilityRole="button" accessibilityLabel={tr.close}
+            style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: c.border, backgroundColor: c.dim }}>
+            <IconSymbol name="xmark" size={14} color={c.sub} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Додавання речі — так само прямо в деталі */}
+      <View style={{ marginTop: 16 }}>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+            backgroundColor: c.dim, borderRadius: 12, borderWidth: 1, borderColor: c.border,
+            paddingHorizontal: 12, paddingVertical: 10 }}>
+            <IconSymbol name="plus" size={14} color={c.sub} />
+            <TextInput
+              placeholder="Нова річ..."
+              placeholderTextColor={c.sub}
+              value={newItemName}
+              onChangeText={setNewItemName}
+              onSubmitEditing={() => addItem(con.id)}
+              returnKeyType="done"
+              style={{ flex: 1, fontSize: 14, color: c.text }}
+            />
+            {newItemName.length > 0 && (
+              <TouchableOpacity onPress={() => setNewItemName('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <IconSymbol name="xmark.circle.fill" size={15} color={c.sub} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            onPress={() => addItem(con.id)}
+            disabled={!newItemName.trim()}
+            accessibilityRole="button"
+            accessibilityLabel={tr.addItem}
+            style={{
+              width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: newItemName.trim() ? con.color : c.dim,
+            }}>
+            <IconSymbol name="arrow.up" size={18} color={newItemName.trim() ? '#fff' : c.sub} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Теги й нотатка з'являються лише коли є що додавати */}
+        {newItemName.length > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8,
+            backgroundColor: c.dim, borderRadius: 10, borderWidth: 1, borderColor: c.border,
+            paddingHorizontal: 12, paddingVertical: 8 }}>
+            <IconSymbol name="tag" size={12} color={c.sub} />
+            <TextInput
+              placeholder="Теги через кому: зима, одяг"
+              placeholderTextColor={c.sub}
+              value={newItemTags}
+              onChangeText={setNewItemTags}
+              onSubmitEditing={() => addItem(con.id)}
+              returnKeyType="done"
+              style={{ flex: 1, fontSize: 13, color: c.text }}
+            />
+          </View>
+        )}
+        {newItemName.length > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 6,
+            backgroundColor: c.dim, borderRadius: 10, borderWidth: 1, borderColor: c.border,
+            paddingHorizontal: 12, paddingVertical: 8 }}>
+            <IconSymbol name="text.alignleft" size={12} color={c.sub} style={{ marginTop: 2 }} />
+            <TextInput
+              placeholder="Нотатка: де лежить, стан, розмір..."
+              placeholderTextColor={c.sub}
+              value={newItemNote}
+              onChangeText={setNewItemNote}
+              multiline
+              style={{ flex: 1, fontSize: 13, color: c.text }}
+            />
+          </View>
+        )}
+      </View>
+
+      {/* Речі */}
+      {con.items.length > 0 ? (
+        <View style={{ marginTop: 18, gap: 8 }}>
+          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+            {con.items.length} {itemsWord(con.items.length)}
+          </Text>
+          {con.items.map(item => (
+            <ItemRow
+              key={item.id}
+              item={item}
+              accent={con.color}
+              isDark={isDark}
+              textColor={c.text}
+              subColor={c.sub}
+              borderColor={c.border}
+              onEdit={handleItemEdit}
+              onDelete={handleItemDelete}
+            />
+          ))}
+        </View>
+      ) : (
+        <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+          <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: con.color + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <IconSymbol name="archivebox" size={26} color={con.color} />
+          </View>
+          <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>{tr.noItems}</Text>
+          <Text style={{ color: c.sub, fontSize: 13 }}>Введи назву вище і натисни ↑</Text>
+        </View>
+      )}
+    </View>
+  ), [c, isDark, tr, newItemName, newItemTags, newItemNote, addItem, deleteContainer, openEdit, handleItemEdit, handleItemDelete]);
+
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        {/* Широкий екран: коробки зліва, вміст обраної — праворуч.
+            Вузький: деталь лишається модальним листом поверх списку. */}
+        <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
+        <View style={{ flex: 1 }}>
 
         {/* Header */}
         <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -483,6 +666,7 @@ export default function ContainersScreen() {
             renderItem={({ item }) => (
               <SearchRow
                 hit={item}
+                selected={item.container.id === detailId}
                 isDark={isDark}
                 textColor={c.text}
                 subColor={c.sub}
@@ -506,6 +690,7 @@ export default function ContainersScreen() {
               <ContainerCard
                 container={item}
                 cardWidth={cardWidth}
+                selected={item.id === detailId}
                 isDark={isDark}
                 textColor={c.text}
                 subColor={c.sub}
@@ -529,6 +714,25 @@ export default function ContainersScreen() {
             }
           />
         )}
+        </View>
+
+        <DetailPane
+          open={!!detail}
+          wide={isExpanded}
+          onClose={() => setDetailId(null)}
+          isDark={isDark}
+          sheetColor={c.sheet}
+          borderColor={c.border}
+          maxHeight={height * 0.86}
+          scrollRef={detailScrollRef}
+          empty={
+            <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 }}>
+              {tr.containerPickHint}
+            </Text>
+          }>
+          {detail ? renderDetail(detail) : null}
+        </DetailPane>
+        </View>
       </SafeAreaView>
 
       {/* ── Container Form Modal ─────────────────────────────────────────────── */}
@@ -654,151 +858,6 @@ export default function ContainersScreen() {
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
-      </Modal>
-
-      {/* ── Container Detail Modal ─────────────────────────────────────────────── */}
-      <Modal visible={!!detail} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDetailId(null)}>
-        {detail && (
-          <LinearGradient colors={[c.bg1, c.bg2]} style={{ flex: 1 }}>
-            <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-              <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-
-                {/* Detail header */}
-                <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14, flexDirection: 'row', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>{detail.name}</Text>
-                    {detail.location ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                        <IconSymbol name="location.fill" size={12} color={c.sub} />
-                        <Text style={{ color: c.sub, fontSize: 13 }}>{detail.location}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 8, marginLeft: 12 }}>
-                    <TouchableOpacity onPress={() => openEdit(detail)}
-                      style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: c.border, backgroundColor: c.dim }}>
-                      <IconSymbol name="pencil" size={14} color={c.sub} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => deleteContainer(detail.id)}
-                      style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: 'rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.08)' }}>
-                      <IconSymbol name="trash" size={14} color="#EF4444" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setDetailId(null)}
-                      style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: c.border, backgroundColor: c.dim }}>
-                      <IconSymbol name="xmark" size={14} color={c.sub} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Inline add item */}
-                <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-                      backgroundColor: c.dim, borderRadius: 12, borderWidth: 1, borderColor: c.border,
-                      paddingHorizontal: 12, paddingVertical: 10 }}>
-                      <IconSymbol name="plus" size={14} color={c.sub} />
-                      <TextInput
-                        placeholder="Нова річ..."
-                        placeholderTextColor={c.sub}
-                        value={newItemName}
-                        onChangeText={setNewItemName}
-                        onSubmitEditing={() => addItem(detail.id)}
-                        returnKeyType="done"
-                        style={{ flex: 1, fontSize: 14, color: c.text }}
-                      />
-                      {newItemName.length > 0 && (
-                        <TouchableOpacity onPress={() => setNewItemName('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                          <IconSymbol name="xmark.circle.fill" size={15} color={c.sub} />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => addItem(detail.id)}
-                      disabled={!newItemName.trim()}
-                      style={{
-                        width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: newItemName.trim() ? detail.color : c.dim,
-                      }}>
-                      <IconSymbol name="arrow.up" size={18} color={newItemName.trim() ? '#fff' : c.sub} />
-                    </TouchableOpacity>
-                  </View>
-                  {/* Tags input */}
-                  {newItemName.length > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8,
-                      backgroundColor: c.dim, borderRadius: 10, borderWidth: 1, borderColor: c.border,
-                      paddingHorizontal: 12, paddingVertical: 8 }}>
-                      <IconSymbol name="tag" size={12} color={c.sub} />
-                      <TextInput
-                        placeholder="Теги через кому: зима, одяг"
-                        placeholderTextColor={c.sub}
-                        value={newItemTags}
-                        onChangeText={setNewItemTags}
-                        onSubmitEditing={() => addItem(detail.id)}
-                        returnKeyType="done"
-                        style={{ flex: 1, fontSize: 13, color: c.text }}
-                      />
-                    </View>
-                  )}
-                  {/* Note input */}
-                  {newItemName.length > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 6,
-                      backgroundColor: c.dim, borderRadius: 10, borderWidth: 1, borderColor: c.border,
-                      paddingHorizontal: 12, paddingVertical: 8 }}>
-                      <IconSymbol name="text.alignleft" size={12} color={c.sub} style={{ marginTop: 2 }} />
-                      <TextInput
-                        placeholder="Нотатка: де лежить, стан, розмір..."
-                        placeholderTextColor={c.sub}
-                        value={newItemNote}
-                        onChangeText={setNewItemNote}
-                        multiline
-                        style={{ flex: 1, fontSize: 13, color: c.text }}
-                      />
-                    </View>
-                  )}
-                </View>
-
-                {/* Items. Речей в одному контейнері може бути дуже багато —
-                    список віртуалізований. */}
-                <FlatList
-                  data={detail.items}
-                  keyExtractor={item => item.id}
-                  contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-                  ListHeaderComponent={
-                    detail.items.length > 0 ? (
-                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
-                        {detail.items.length} {itemsWord(detail.items.length)}
-                      </Text>
-                    ) : null
-                  }
-                  renderItem={({ item }) => (
-                    <ItemRow
-                      item={item}
-                      accent={detail.color}
-                      isDark={isDark}
-                      textColor={c.text}
-                      subColor={c.sub}
-                      borderColor={c.border}
-                      onEdit={handleItemEdit}
-                      onDelete={handleItemDelete}
-                    />
-                  )}
-                  ListEmptyComponent={
-                    <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                      <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: detail.color + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                        <IconSymbol name="archivebox" size={26} color={detail.color} />
-                      </View>
-                      <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>{tr.noItems}</Text>
-                      <Text style={{ color: c.sub, fontSize: 13 }}>Введи назву вище і натисни ↑</Text>
-                    </View>
-                  }
-                />
-              </KeyboardAvoidingView>
-            </SafeAreaView>
-          </LinearGradient>
-        )}
       </Modal>
     </View>
   );

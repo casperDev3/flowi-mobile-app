@@ -1,4 +1,5 @@
-import type { Task } from './taskUtils';
+import { DONE_VISIBLE_DAYS, completedWithinDays } from './taskUtils';
+import type { Filter, SortBy, Status, SubTask, Task } from './taskUtils';
 
 export interface TaskStatusColumn {
   id: string;
@@ -90,6 +91,70 @@ export function orderColumnsForList(columns: TaskStatusColumn[]): TaskStatusColu
     if (left.id === right.id) return 0;
     if (left.id === IN_PROGRESS_COLUMN_ID) return -1;
     if (right.id === IN_PROGRESS_COLUMN_ID) return 1;
+    // Завершене — завжди наприкінці, незалежно від позиції на дошці. У списку
+    // «Готово» це підсумок дня, а не етап потоку: кастомна колонка, яку
+    // користувач поставив після неї, інакше опинялась би нижче зробленого.
+    if (left.isDone !== right.isDone) return left.isDone ? 1 : -1;
     return left.position - right.position;
   });
+}
+/**
+ * Куди веде завдання відмітка підзавдання.
+ *
+ * `null` означає «не чіпати статус завдання взагалі» — і це головна відповідь
+ * тут. Раніше кожне перемикання переписувало status і kanbanColumnId, тож одна
+ * закрита підзадача з шести викидала завдання з «У процесі» назад у «До
+ * роботи»: людина відмічала прогрес, а натомість втрачала стан роботи.
+ *
+ * Рухає завдання ЛИШЕ закриття останньої підзадачі, і рухає в «На перевірці»,
+ * а не в «Готово»: підзадачі скінчились, але результат ще не приймали. Саме
+ * тому status лишається 'active' — колонка перевірки має isDone=false, і
+ * поставити тут 'done' означало б завершити завдання за спиною користувача.
+ *
+ * Правило живе в утиліті, бо його копії стоять на двох екранах (список завдань
+ * і окремий екран підзавдань) і одного разу вже мовчки розійшлися.
+ *
+ * @param subtasksAfterToggle підзавдання ПІСЛЯ перемикання, а не до нього.
+ */
+export function subtaskToggleTransition(
+  task: Pick<Task, 'status' | 'kanbanColumnId'>,
+  subtasksAfterToggle: readonly Pick<SubTask, 'done'>[],
+): { status: Status; kanbanColumnId: string } | null {
+  // Завершене завдання галочка в підзавданні не воскрешає: вихід із «Готово» —
+  // окреме свідоме рішення, а не побічний ефект відмітки в списку.
+  if (task.status === 'done') return null;
+  // Зняття відмітки нікуди не веде: незакрита підзадача лишає завдання там,
+  // де воно було, включно з колонкою, яку користувач виставив руками.
+  if (subtasksAfterToggle.length === 0) return null;
+  if (!subtasksAfterToggle.every(sub => sub.done)) return null;
+  return { status: 'active', kanbanColumnId: REVIEW_COLUMN_ID };
+}
+
+/**
+ * Чи лишається завдання в списку при вибраному фільтрі та групуванні.
+ *
+ * Виняток один і він навмисний: групування за статусом — це погляд на дошку,
+ * а не на список активного. Дошка без колонки «Готово» неповна — не видно, що
+ * вже зроблено, і немає де зняти помилкову відмітку. Базовий фільтр 'active'
+ * ховав завершені завжди, тож група «Готово» не з'являлась ніколи.
+ *
+ * Для сортувань за датою поділ інший (по днях), і там 'active' лишається
+ * дослівним: домішувати туди завершені означало б засмічувати кожен день.
+ */
+export function taskVisibleInList(
+  task: Task,
+  filter: Filter,
+  sort: SortBy,
+  now: Date = new Date(),
+): boolean {
+  if (task.status !== 'done') {
+    return filter === 'all' || task.status === filter;
+  }
+
+  // Завершене видно, лише поки воно свіже. Список завдань — про роботу, а не
+  // про історію: сотня закритих справ ховає те, заради чого екран відкривають.
+  // Старіше живе в Архіві, і саме туди по нього й ідуть.
+  const visible = filter === 'all' || filter === 'done'
+    || (filter === 'active' && sort === 'status');
+  return visible && completedWithinDays(task, DONE_VISIBLE_DAYS, now);
 }

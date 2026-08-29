@@ -18,6 +18,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
+import { subtaskToggleTransition } from '@/utils/taskStatuses';
 import { useContentWidth } from '@/hooks/use-content-width';
 
 type Priority = 'high' | 'medium' | 'low';
@@ -26,6 +27,8 @@ interface SubTask { id: string; title: string; done: boolean; }
 interface Task {
   id: string; title: string; description: string;
   priority: Priority; status: Status; subtasks: SubTask[];
+  /** Колонка дошки: відмітка останньої підзадачі веде завдання «На перевірку». */
+  kanbanColumnId?: string;
   createdAt: string; estimatedMinutes?: number; deadline?: string; projectId?: string;
 }
 
@@ -107,13 +110,17 @@ export default function SubtasksScreen() {
   const toggleSubtask = useCallback(async (subId: string) => {
     if (!task) return;
     const subtasks = task.subtasks.map(s => s.id === subId ? { ...s, done: !s.done } : s);
-    const status: Status = subtasks.length > 0 && subtasks.every(s => s.done) ? 'done' : 'active';
-    await persistTask({ ...task, subtasks, status });
-    if (status !== 'done') return;
+    // Те саме правило, що й у списку завдань, і навмисно з тієї самої утиліти:
+    // раніше тут стояла власна копія, яка ще й позначала завдання завершеним.
+    // null — статус і колонку не чіпаємо взагалі.
+    const transition = subtaskToggleTransition(task, subtasks);
+    await persistTask({ ...task, subtasks, ...(transition ?? {}) });
+    if (!transition) return;
 
-    // Завершене завдання не трекають, а кнопки «Стоп» у деталі для нього вже
-    // не показують — тому зупиняємо тут, ПІСЛЯ власного запису 'tasks': стор
-    // дописує сесію тим самим read-modify-write.
+    // Підзадачі скінчились — рахувати час далі нема за чим, а кнопки «Стоп»
+    // тут немає. Зупиняємо ПІСЛЯ власного запису 'tasks': стор дописує сесію
+    // тим самим read-modify-write. Колонку він виставить у «На перевірці» —
+    // рівно ту саму, що вже поклав перехід вище, тож розбіжності не буде.
     await stopTimerForTask(task.id);
     // Стор дописав завершену сесію прямо у сховище. Без перечитування
     // наступний persistTask затер би її застарілим локальним об'єктом.

@@ -44,7 +44,7 @@ import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import { filterTasksByMonth, taskMatchesSearch } from '@/utils/taskUtils';
-import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, orderColumnsForList, taskColumnId, taskStatusColumn } from '@/utils/taskStatuses';
+import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, orderColumnsForList, subtaskToggleTransition, taskColumnId, taskStatusColumn, taskVisibleInList } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
@@ -482,7 +482,9 @@ export default function TasksScreen() {
   const filtered = useMemo(() => {
     const monthFiltered = filterTasksByMonth(sorted, activeMonth);
     return monthFiltered.filter(t => {
-      if (filter !== 'all' && t.status !== filter) return false;
+      // Правило видимості — в утиліті: у режимі групування за статусом
+      // завершені лишаються, щоб група «Готово» взагалі мала з чого зʼявитись.
+      if (!taskVisibleInList(t, filter, sort)) return false;
       if (dateFilter) {
         const d = new Date(t.createdAt);
         if (d.toDateString() !== dateFilter) return false;
@@ -492,7 +494,7 @@ export default function TasksScreen() {
       if (filterPriority && t.priority !== filterPriority) return false;
       return true;
     });
-  }, [sorted, activeMonth, filter, dateFilter, search, filterProject, filterPriority]);
+  }, [sorted, activeMonth, filter, sort, dateFilter, search, filterProject, filterPriority]);
 
   // Overdue tasks pulled into a dedicated top section (list view, active/all filter only)
   const overdueItems = useMemo(
@@ -813,12 +815,17 @@ export default function TasksScreen() {
   }, [newSubtask]);
 
   const toggleSubtask = useCallback((taskId: string, subId: string) => {
-    // Останнє закрите підзавдання завершує завдання — і мусить зупинити його
-    // таймер так само, як чекбокс завдання.
     const current = tasksRef.current.find(t => t.id === taskId);
-    const becomingDone = !!current && current.subtasks.length > 0
-      && current.subtasks.every(s => s.id === subId ? !s.done : s.done);
-    if (becomingDone && getTimerForTask(taskId)) pendingTimerStops.current.push(taskId);
+    const nextSubs = current?.subtasks.map(s => s.id === subId ? { ...s, done: !s.done } : s) ?? [];
+    // Єдине джерело правила «куди веде відмітка підзавдання» — утиліта.
+    // null означає, що ні статус, ні колонку чіпати не можна: відмітка не
+    // останньої підзадачі не мусить викидати завдання з «У процесі».
+    const transition = current ? subtaskToggleTransition(current, nextSubs) : null;
+    // Закрита остання підзадача — робота скінчилась, тож таймер зупиняємо так
+    // само, як від чекбокса завдання. Зупинка сама переставляє завдання в «На
+    // перевірці», тобто пише ТУ САМУ колонку, що й перехід вище: два
+    // механізми збігаються, а не воюють за значення.
+    if (transition && getTimerForTask(taskId)) pendingTimerStops.current.push(taskId);
 
     const patch = (t: Task): Task => {
       if (t.id !== taskId) return t;
@@ -828,8 +835,7 @@ export default function TasksScreen() {
       return {
         ...t,
         subtasks,
-        status: subtasks.length > 0 && subtasks.every(s => s.done) ? 'done' : 'active',
-        kanbanColumnId: subtasks.length > 0 && subtasks.every(s => s.done) ? DONE_COLUMN_ID : ACTIVE_COLUMN_ID,
+        ...(transition ?? {}),
         history: [...(t.history ?? []), makeHistoryEvent(histType, targetSub?.title)],
       };
     };

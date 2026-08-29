@@ -168,3 +168,48 @@ export function applyTaskFilters(
     return true;
   });
 }
+
+/**
+ * Коли завдання завершили.
+ *
+ * Окремого поля під це немає, тож ідемо ланцюжком від найточнішого до
+ * найгрубішого: остання подія 'done' в історії → updatedAt → нічого. Остання
+ * ланка важлива: у завдання, закритого до появи історії, дати завершення
+ * просто не існує, і вигадувати її (наприклад, беручи createdAt) означало б
+ * витягувати на екран дня випадкові старі завдання.
+ */
+export function completedAt(task: Task): Date | null {
+  const events = (task.history ?? []).filter(event => event.type === 'done');
+  const last = events[events.length - 1];
+  if (last?.at) return new Date(last.at);
+  if (task.updatedAt) return new Date(task.updatedAt);
+  return null;
+}
+
+/** Скільки днів завершене завдання лишається в списку завдань. Старіше — в Архіві. */
+export const DONE_VISIBLE_DAYS = 2;
+
+/**
+ * Чи завершене завдання ще «свіже».
+ *
+ * Список завдань — про роботу, а не про історію: сотня закритих справ під
+ * активними ховає те, заради чого екран відкривають. Вікно рахується в
+ * КАЛЕНДАРНИХ добах, а не в годинах: закрите вчора ввечері мусить бути видно
+ * зранку, а не зникати через двадцять годин.
+ *
+ * Завдання без жодної дати завершення (закрите до появи історії) вважається
+ * старим: вигадувати йому «сьогодні» означало б назавжди прибити його до
+ * верху списку.
+ */
+export function completedWithinDays(
+  task: Task,
+  days: number = DONE_VISIBLE_DAYS,
+  now: Date = new Date(),
+): boolean {
+  const at = completedAt(task);
+  if (!at) return false;
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const from = new Date(startOfToday);
+  from.setDate(from.getDate() - (days - 1));
+  return at.getTime() >= from.getTime();
+}

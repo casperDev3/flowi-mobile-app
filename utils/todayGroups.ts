@@ -19,7 +19,9 @@ import {
   taskColumnId,
   type TaskStatusColumn,
 } from './taskStatuses';
-import { isOverdue, type Task } from './taskUtils';
+import { completedAt, isOverdue, type Task } from './taskUtils';
+
+export { completedAt } from './taskUtils';
 
 export interface TodayGroup {
   id: string;
@@ -38,22 +40,6 @@ export interface TodayGroups {
 
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
-/**
- * Коли завдання завершили.
- *
- * Окремого поля під це немає, тож ідемо ланцюжком від найточнішого до
- * найгрубішого: остання подія 'done' в історії → updatedAt → нічого. Остання
- * ланка важлива: у завдання, закритого до появи історії, дати завершення
- * просто не існує, і вигадувати її (наприклад, беручи createdAt) означало б
- * витягувати на екран дня випадкові старі завдання.
- */
-export function completedAt(task: Task): Date | null {
-  const events = (task.history ?? []).filter(event => event.type === 'done');
-  const last = events[events.length - 1];
-  if (last?.at) return new Date(last.at);
-  if (task.updatedAt) return new Date(task.updatedAt);
-  return null;
-}
 
 function byPriority(a: Task, b: Task): number {
   return (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);

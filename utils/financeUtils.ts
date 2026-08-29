@@ -130,6 +130,26 @@ export function groupLabel(
   return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 }
 
+/**
+ * Час операції числом. Бита дата НЕ викидає запис зі стрічки — лише опускає
+ * його вниз: мовчки з'їдена операція для користувача виглядає як зниклі гроші.
+ */
+function txTime(t: Transaction): number {
+  const ms = new Date(t.date).getTime();
+  return Number.isNaN(ms) ? -Infinity : ms;
+}
+
+/**
+ * Денні групи стрічки — ВІД НАЙНОВІШОГО дня, і всередині дня від найновішої
+ * операції.
+ *
+ * Порядок тут не косметика. Раніше групи віддавалися в порядку появи в
+ * масиві, а масив приходить із сховища як є: applyPullItems дописує прилетілі
+ * синком записи В КІНЕЦЬ, поповнення скарбнички додає свій переказ спереду,
+ * скасоване видалення повертає операцію в хвіст. Сьогоднішня операція з іншого
+ * пристрою опинялася під усіма старішими днями — і скарга звучала як «фінанси
+ * не показують усі актуальні операції».
+ */
 export function groupTransactions(
   txs: Transaction[],
   todayStr: string,
@@ -138,6 +158,8 @@ export function groupTransactions(
 ): TxGroup[] {
   const map: Record<string, TxGroup> = {};
   const order: string[] = [];
+  /** Ключ сортування дня. Будь-яка мить дня годиться — дні не перетинаються. */
+  const dayTime: Record<string, number> = {};
 
   txs.forEach(t => {
     const d = new Date(t.date);
@@ -151,6 +173,7 @@ export function groupTransactions(
         dayExpenseByCur: {},
       };
       order.push(key);
+      dayTime[key] = txTime(t);
     }
     map[key].items.push(t);
     // Переказ лишається в `items` (стрічка мусить його показати), але в денний
@@ -161,7 +184,57 @@ export function groupTransactions(
     target[cur] = (target[cur] ?? 0) + t.amount;
   });
 
-  return order.map(k => map[k]);
+  order.sort((a, b) => dayTime[b] - dayTime[a]);
+  return order.map(k => {
+    const group = map[k];
+    group.items.sort((x, y) => txTime(y) - txTime(x));
+    return group;
+  });
+}
+
+/**
+ * Список операцій для запису у сховище: те, що тримає екран, ПЛЮС те, що
+ * з'явилося у сховищі повз нього.
+ *
+ * Поки екран фінансів відкритий, у ключ 'transactions' пишуть і інші: рушій
+ * синхронізації (застосування чужих змін), поповнення скарбнички, відновлення
+ * бекапу. `saveSynced` рахує різницю з тим, що вже лежить у сховищі, тож
+ * збереження самого лише React-стану оголошувало б такі записи ВИДАЛЕНИМИ —
+ * стирало локально й відправляло тумбстоун в outbox, тобто вбивало операцію на
+ * всіх пристроях.
+ *
+ * Просто долити все зайве, як це робить mergeAccountsForSave, не можна:
+ * операції, на відміну від рахунків, справді видаляються. Тому третій
+ * аргумент — id, які екран БАЧИВ (завантажив або сам записав). Відсутність
+ * баченого в `next` — це видалення; відсутність небаченого — це запис, про
+ * який екран просто не знає.
+ */
+export function mergeTransactionsForSave(
+  stored: Transaction[],
+  next: Transaction[],
+  seenIds: ReadonlySet<string>,
+): Transaction[] {
+  const known = new Set(next.map(t => t.id));
+  const extra = stored.filter(t => !known.has(t.id) && !seenIds.has(t.id));
+  return extra.length ? [...next, ...extra] : next;
+}
+
+/**
+ * Фільтр стрічки по рахунку, звірений зі стрічкою рахунків.
+ *
+ * Обраний рахунок може зникнути з-під фільтра, поки екран відкритий: його
+ * архівували тут-таки або на іншому пристрої, і синхронізація донесла зміну.
+ * Фільтр при цьому лишався б чинним — стрічка показувала б операції одного
+ * рахунку, а жодна картка вгорі не була б підсвічена. Зняти його не було б чим
+ * (повторний тап знімає фільтр лише з видимої картки), і виглядало б це рівно
+ * як «фінанси показують не всі операції».
+ */
+export function resolveAccountFilter(
+  selected: string | null,
+  visibleIds: string[],
+): string | null {
+  if (!selected) return null;
+  return visibleIds.includes(selected) ? selected : null;
 }
 
 export function filterByMonth(txs: Transaction[], month: Date): Transaction[] {

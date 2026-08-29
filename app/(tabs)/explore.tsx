@@ -38,7 +38,7 @@ import {
 } from '@/store/migrations';
 import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
 import {
-  filterByMonth, groupTransactions,
+  filterByMonth, groupTransactions, mergeTransactionsForSave, resolveAccountFilter,
   calcTotalsByCurrency, formatCurrency,
   appendTransactionHistory, BUILTIN_CURRENCIES,
   type Currency, type Transaction, type TxHistoryEvent,
@@ -54,6 +54,10 @@ import { useMotion } from '@/hooks/use-motion';
 import { isSameDay } from '@/utils/dateUtils';
 import { haptic } from '@/utils/haptics';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useStorageRefresh } from '@/hooks/use-storage-refresh';
+import {
+  DEFAULT_CATEGORIES_EN, DEFAULT_CATEGORIES_UK, type CategoryDef,
+} from '@/utils/financeCategories';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { DetailPane } from '@/components/shared/DetailPane';
 
@@ -77,46 +81,6 @@ interface AccountDraft {
   opening: string;
 }
 
-interface CategoryDef { name: string; icon: IconSymbolName; }
-
-const DEFAULT_CATEGORIES_UK: Record<CatType, CategoryDef[]> = {
-  income: [
-    { name: 'Зарплата',   icon: 'briefcase.fill' },
-    { name: 'Фріланс',    icon: 'laptopcomputer' },
-    { name: 'Інвестиції', icon: 'chart.line.uptrend.xyaxis' },
-    { name: 'Подарунок',  icon: 'gift.fill' },
-    { name: 'Інше',       icon: 'ellipsis.circle.fill' },
-  ],
-  expense: [
-    { name: 'Їжа',        icon: 'fork.knife' },
-    { name: 'Транспорт',  icon: 'car.fill' },
-    { name: 'Розваги',    icon: 'gamecontroller.fill' },
-    { name: "Здоров'я",   icon: 'cross.fill' },
-    { name: 'Комунальні', icon: 'house.fill' },
-    { name: 'Одяг',       icon: 'tag.fill' },
-    { name: 'Інше',       icon: 'ellipsis.circle.fill' },
-  ],
-};
-
-const DEFAULT_CATEGORIES_EN: Record<CatType, CategoryDef[]> = {
-  income: [
-    { name: 'Salary',      icon: 'briefcase.fill' },
-    { name: 'Freelance',   icon: 'laptopcomputer' },
-    { name: 'Investments', icon: 'chart.line.uptrend.xyaxis' },
-    { name: 'Gift',        icon: 'gift.fill' },
-    { name: 'Other',       icon: 'ellipsis.circle.fill' },
-  ],
-  expense: [
-    { name: 'Food',          icon: 'fork.knife' },
-    { name: 'Transport',     icon: 'car.fill' },
-    { name: 'Entertainment', icon: 'gamecontroller.fill' },
-    { name: 'Health',        icon: 'cross.fill' },
-    { name: 'Utilities',     icon: 'house.fill' },
-    { name: 'Clothing',      icon: 'tag.fill' },
-    { name: 'Other',         icon: 'ellipsis.circle.fill' },
-  ],
-};
-
 const ICON_SUGGESTIONS: IconSymbolName[] = [
   'briefcase.fill', 'laptopcomputer', 'chart.line.uptrend.xyaxis', 'gift.fill',
   'fork.knife', 'car.fill', 'gamecontroller.fill', 'cross.fill', 'house.fill',
@@ -139,6 +103,12 @@ function cleanAmountInput(raw: string): string {
   const i = cleaned.search(/[.,]/);
   return i < 0 ? cleaned : cleaned.slice(0, i + 1) + cleaned.slice(i + 1).replace(/[.,]/g, '');
 }
+
+/**
+ * Ключі, які екран показує і які пишуть повз нього: синхронізація з іншого
+ * пристрою, поповнення скарбнички на /banks, відновлення бекапу.
+ */
+const REFRESH_KEYS = ['transactions', 'accounts'] as const;
 
 function chunk<T>(arr: T[], n: number): T[][] {
   const out: T[][] = [];
@@ -243,9 +213,18 @@ export default function FinanceScreen() {
     [currencyByCode],
   );
 
+  /**
+   * id операцій, які екран уже бачив: завантажив зі сховища або сам туди
+   * записав. Без цього списку збереження не відрізнить «користувач видалив»
+   * від «екран про це ще не знає» — див. mergeTransactionsForSave.
+   */
+  const seenTxIds = useRef<Set<string>>(new Set());
+
   const loadTxs = useCallback(async () => {
     const data = await loadData<Transaction[]>('transactions', []);
-    setTxs(data);
+    const list = Array.isArray(data) ? data : [];
+    seenTxIds.current = new Set(list.map(t => t.id));
+    setTxs(list);
   }, []);
 
   const loadAccounts = useCallback(async () => {
@@ -268,11 +247,29 @@ export default function FinanceScreen() {
     }
   }, [txsInitialized, loadTxs, loadAccounts]));
 
+  const reloadFromStorage = useCallback(async () => {
+    await Promise.all([loadTxs(), loadAccounts()]);
+  }, [loadTxs, loadAccounts]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadTxs(), loadAccounts()]);
+    await reloadFromStorage();
     setRefreshing(false);
-  }, [loadTxs, loadAccounts]);
+  }, [reloadFromStorage]);
+
+  /**
+   * Перечитуємо, щойно в сховище записали повз екран.
+   *
+   * `useFocusEffect` вище спрацьовує лише на вході на вкладку. Поки вкладка
+   * ВІДКРИТА, синхронізація кладе прилетілу операцію прямо в 'transactions', і
+   * без цієї підписки стрічка не змінювалась би НІКОЛИ, доки користувач сам не
+   * піде й не повернеться — саме те, на що скаржились: фінанси показують не
+   * всі актуальні операції.
+   *
+   * `trackWrite` обгортає ВЛАСНІ записи екрана: поки такий запис у польоті,
+   * сигнал від нього ж ігнорується, інакше збереження ганяло б себе по колу.
+   */
+  const trackWrite = useStorageRefresh(REFRESH_KEYS, reloadFromStorage, txsInitialized);
 
   // Open add-transaction modal when navigated with ?create=1 (e.g. from Today quick actions)
   const { create: createParam } = useLocalSearchParams<{ create?: string }>();
@@ -286,10 +283,37 @@ export default function FinanceScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createParam]);
 
+  /**
+   * Операції записуємо, доливши те, що з'явилось у сховищі повз екран.
+   *
+   * Поки вкладка відкрита, у ключ 'transactions' пишуть і інші: синхронізація
+   * (чужі зміни), поповнення скарбнички на /banks, відновлення бекапу. Запис
+   * самого лише React-стану `saveSynced` прочитав би як «операція зникла» і
+   * поставив би в outbox тумбстоун — запис помер би на всіх пристроях, а
+   * користувач побачив би саме те, на що скаржився: фінанси показують не всі
+   * актуальні операції.
+   */
+  const persistTxs = useCallback(async (next: Transaction[]) => {
+    const merged = await trackWrite(async () => {
+      const stored = await loadData<Transaction[]>('transactions', []);
+      const result = mergeTransactionsForSave(
+        Array.isArray(stored) ? stored : [],
+        next,
+        seenTxIds.current,
+      );
+      seenTxIds.current = new Set(result.map(t => t.id));
+      await saveSynced('transactions', result);
+      return result;
+    });
+    // Долите має стати видимим — повторний прохід ефекту вже нічого не долиє,
+    // тож циклу немає.
+    if (merged.length !== next.length) setTxs(merged);
+  }, [trackWrite]);
+
   // Save to storage
   useEffect(() => {
-    if (initialized) void saveSynced('transactions', txs);
-  }, [txs, initialized]);
+    if (initialized) void persistTxs(txs);
+  }, [txs, initialized, persistTxs]);
 
   // Undo-тост (таб — над таб-баром)
   const { show: showUndo, element: undoElement } = useUndoToast(true);
@@ -333,13 +357,16 @@ export default function FinanceScreen() {
    * зник би з сервера й з усіх пристроїв.
    */
   const persistAccounts = useCallback(async (next: Account[]) => {
-    const stored = await loadData<Account[]>('accounts', []);
-    const merged = mergeAccountsForSave(Array.isArray(stored) ? stored : [], next);
-    await saveSynced('accounts', merged);
+    const merged = await trackWrite(async () => {
+      const stored = await loadData<Account[]>('accounts', []);
+      const result = mergeAccountsForSave(Array.isArray(stored) ? stored : [], next);
+      await saveSynced('accounts', result);
+      return result;
+    });
     // Долиті рахунки мають стати видимими — і повторний прохід ефекту вже
     // нічого не долиє, тож циклу немає.
     if (merged.length !== next.length) setAccounts(merged);
-  }, []);
+  }, [trackWrite]);
 
   // Початковий залишок переїхав у Account.openingBalance, тож ключ
   // 'finance_balance_adjustments' екран більше не читає й не переписує —
@@ -398,6 +425,14 @@ export default function FinanceScreen() {
   };
 
   const visibleAccounts = useMemo(() => activeAccounts(accounts), [accounts]);
+
+  // Рахунок може зникнути зі стрічки, поки екран відкритий (архівували тут або
+  // на іншому пристрої). Фільтр по ньому лишався б чинним, але невидимим —
+  // і зняти його не було б чим.
+  useEffect(() => {
+    setAccountFilter(prev => resolveAccountFilter(prev, visibleAccounts.map(a => a.id)));
+  }, [visibleAccounts]);
+
   const accountBalances = useMemo(() => {
     const out: Record<string, number> = {};
     accounts.forEach(a => { out[a.id] = accountBalance(a, txs); });
@@ -1147,7 +1182,10 @@ export default function FinanceScreen() {
                 <View style={[s.menuIconBox, { backgroundColor: '#0EA5E9' + '25' }]}>
                   <IconSymbol name="chart.pie.fill" size={15} color="#0EA5E9" />
                 </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>Планування бюджету</Text>
+                {/* Через tr.*, а не рядком: підпис того самого розділу вже
+                    розійшовся з сайдбаром і Налаштуваннями саме тому, що жив
+                    у трьох місцях, а перекладався в одному. */}
+                <Text style={[s.menuLabel, { color: c.text }]}>{tr.navBudget}</Text>
                 <IconSymbol name="chevron.right" size={13} color={c.sub} />
               </TouchableOpacity>
 

@@ -414,6 +414,7 @@ export interface Translations {
 
   // Meetings screen
   meetingsTitle: string;
+  meetingPickHint: string;
   noMeetings: string;
   addMeetingBtn: string;
   meetingCount: string;
@@ -736,6 +737,7 @@ export interface Translations {
   containerItems: string;
   itemTags: string;
   itemNote: string;
+  containerPickHint: string;
 
   // Undo toast
   undo: string;
@@ -877,6 +879,24 @@ export interface Translations {
   timerLabel: string;
   parallelTimers: string;
 
+  /** Витрати, що не потрапили в ліміт через іншу валюту. */
+  budgetUncounted: string;
+
+  /** Деталь проєкту. Див. utils/projectStats. */
+  projectDeadline: string;
+  projectDescription: string;
+  projectTasks: string;
+  projectTracked: string;
+  projectOverdueTasks: string;
+  projectNearest: string;
+  projectAddTask: string;
+  projectNoTasks: string;
+  projectNoTasksHint: string;
+  projectPickHint: string;
+  projectDone: string;
+  projectTimelineSpread: string;
+  projectTimelineEmpty: string;
+
   /** Циферблати таймера. Див. utils/timerDials. */
   dialPicker: string;
   dialDigits: string;
@@ -912,7 +932,7 @@ const uk: Translations = {
   navGroupTools: 'Інструменти',
   navGroupMore: 'Ще',
   navTimeTracker: 'Трекер часу',
-  navBudget: 'Планування бюджету',
+  navBudget: 'Бюджет',
   navAgent: 'OpenClaw Agent',
   detailEmptyTitle: 'Оберіть завдання',
   detailEmptyHint: 'Деталі, підзавдання й таймер зʼявляться тут.',
@@ -1335,6 +1355,7 @@ const uk: Translations = {
   projectName: 'Назва проекту',
 
   meetingsTitle: 'Зустрічі',
+  meetingPickHint: 'Оберіть зустріч, щоб побачити деталі',
   noMeetings: 'Немає зустрічей',
   addMeetingBtn: 'Додати зустріч',
   meetingCount: 'зустрічей',
@@ -1633,6 +1654,7 @@ const uk: Translations = {
   containerItems: 'Речі',
   itemTags: 'Теги (через кому)',
   itemNote: 'Нотатка (необов\'язково)',
+  containerPickHint: 'Оберіть коробку, щоб побачити її вміст',
 
   undo: 'Скасувати',
   taskMarkedDone: 'Завдання виконано',
@@ -1722,6 +1744,20 @@ const uk: Translations = {
   exitFullscreen: 'Вийти',
   startTimerAction: 'Запустити таймер',
   stopTimerAction: 'Зупинити таймер',
+  budgetUncounted: 'не враховано — немає курсу',
+  projectDeadline: 'Термін проєкту',
+  projectDescription: 'Опис',
+  projectTasks: 'Задачі',
+  projectTracked: 'Відпрацьовано',
+  projectOverdueTasks: 'прострочено',
+  projectNearest: 'Найближча задача',
+  projectAddTask: 'Додати задачу',
+  projectNoTasks: 'Задач ще немає',
+  projectNoTasksHint: 'Додайте першу — вона одразу потрапить у цей проєкт',
+  projectPickHint: 'Оберіть проєкт, щоб побачити його задачі',
+  projectDone: 'виконано',
+  projectTimelineSpread: 'розкид дедлайнів',
+  projectTimelineEmpty: 'дедлайнів немає',
   dialPicker: 'Циферблат',
   dialDigits: 'Цифри',
   dialRings: 'Кільця',
@@ -1746,7 +1782,7 @@ const en: Translations = {
   navGroupTools: 'Tools',
   navGroupMore: 'More',
   navTimeTracker: 'Time Tracker',
-  navBudget: 'Budget Planning',
+  navBudget: 'Budget',
   navAgent: 'OpenClaw Agent',
   detailEmptyTitle: 'Select a task',
   detailEmptyHint: 'Details, subtasks and timer will appear here.',
@@ -2169,6 +2205,7 @@ const en: Translations = {
   projectName: 'Project name',
 
   meetingsTitle: 'Meetings',
+  meetingPickHint: 'Pick a meeting to see its details',
   noMeetings: 'No meetings',
   addMeetingBtn: 'Add meeting',
   meetingCount: 'meetings',
@@ -2467,6 +2504,7 @@ const en: Translations = {
   containerItems: 'Items',
   itemTags: 'Tags (comma separated)',
   itemNote: 'Note (optional)',
+  containerPickHint: 'Pick a box to see what is inside',
 
   undo: 'Undo',
   taskMarkedDone: 'Task completed',
@@ -2556,6 +2594,20 @@ const en: Translations = {
   exitFullscreen: 'Exit',
   startTimerAction: 'Start timer',
   stopTimerAction: 'Stop timer',
+  budgetUncounted: 'not counted — no exchange rate',
+  projectDeadline: 'Project deadline',
+  projectDescription: 'Description',
+  projectTasks: 'Tasks',
+  projectTracked: 'Tracked',
+  projectOverdueTasks: 'overdue',
+  projectNearest: 'Next task due',
+  projectAddTask: 'Add a task',
+  projectNoTasks: 'No tasks yet',
+  projectNoTasksHint: 'Add the first one — it lands in this project',
+  projectPickHint: 'Pick a project to see its tasks',
+  projectDone: 'done',
+  projectTimelineSpread: 'deadline spread',
+  projectTimelineEmpty: 'no deadlines',
   dialPicker: 'Dial',
   dialDigits: 'Digits',
   dialRings: 'Rings',

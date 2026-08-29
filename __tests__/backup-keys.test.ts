@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 import { BACKUP_KEYS } from '../store/backup-keys';
 import { SYNC_ARRAY_KEYS, SYNC_SINGLETON_KEYS } from '../store/sync-contract';
 
@@ -6,6 +9,7 @@ const ALL_KEYS_FROM_DATA = [
   'tasks',
   'task_statuses',
   'transactions',
+  'accounts',
   'time_entries',
   'notes',
   'projects',
@@ -72,5 +76,74 @@ describe('BACKUP_KEYS', () => {
   it('профіль здоров\'я і нагадування синхронізуються, а не лише бекапляться', () => {
     expect(SYNC_SINGLETON_KEYS).toContain('health_profile');
     expect(SYNC_SINGLETON_KEYS).toContain('health_reminders');
+  });
+});
+
+/**
+ * Другий список, який уміє розійтися з контрактом, — ручний експорт/імпорт JSON
+ * у `app/data.tsx`. Він НЕ похідний від `BACKUP_KEYS`: це два рукописні мапи
+ * «ключ сховища ↔ ключ JSON». Автобекап ключ підхопить, а файл, який
+ * користувач зберігає собі, — ні, і дізнається він про це вже після імпорту.
+ *
+ * Ціна саме для рахунків найвища: транзакція посилається на рахунок по
+ * `accountId`. Імпорт без колекції `accounts` лишає операції з посиланням у
+ * нікуди — гроші є, а місця, де вони лежать, немає.
+ *
+ * Мапи не експортуються з `app/data.tsx` (екран тягне expo-модулі), тому
+ * читаємо джерело — так само, як `nav-routes-exist` читає дерево маршрутів.
+ */
+const DATA_SRC = fs.readFileSync(path.join(__dirname, '..', 'app', 'data.tsx'), 'utf8');
+
+function mapBody(name: string): string {
+  const match = DATA_SRC.match(new RegExp(`const ${name}[^=]*=\\s*\\{([\\s\\S]*?)\\n\\};`));
+  if (!match) throw new Error(`${name} не знайдено в app/data.tsx`);
+  return match[1];
+}
+
+// Ключі, яких у файловому експорті свідомо немає СЬОГОДНІ. Це не схвалення:
+// для budget_limits / finance_currencies / finance_balance_adjustments це
+// успадкована прогалина (експорт-імпорт втрачає ліміти бюджету й власні
+// валюти). Список існує, щоб додавання НОВОГО синхронізованого ключа було
+// свідомим рішенням, а не забуттям.
+const NOT_IN_JSON_EXPORT: readonly string[] = [
+  'budget_limits',
+  'finance_currencies',
+  'finance_balance_adjustments',
+  // Експортується окремим рядком (`payload['categories']`), бо це об'єкт, а не масив.
+  'categories',
+  // Таймери, що йдуть просто зараз — стан, а не дані; переносити його у файл нема сенсу.
+  'active_timers',
+];
+
+describe('ручний експорт/імпорт JSON (app/data.tsx)', () => {
+  const exportBody = mapBody('EXPORT_KEY_MAP');
+  const importBody = mapBody('IMPORT_KEY_MAP');
+
+  it('покриває кожен синхронізований масив, крім явно виключених', () => {
+    const missing = SYNC_ARRAY_KEYS
+      .filter(key => !NOT_IN_JSON_EXPORT.includes(key))
+      .filter(key => !new RegExp(`(^|[\\s,{])${key}:`).test(exportBody));
+
+    expect(missing).toEqual([]);
+  });
+
+  it('імпорт приймає назад усе, що вміє віддати експорт', () => {
+    const missing = SYNC_ARRAY_KEYS
+      .filter(key => !NOT_IN_JSON_EXPORT.includes(key))
+      .filter(key => !importBody.includes(`'${key}'`));
+
+    expect(missing).toEqual([]);
+  });
+
+  it('рахунки потрапляють і у файл, і назад — інакше імпорт лишає транзакції без рахунку', () => {
+    expect(exportBody).toMatch(/(^|[\s,{])accounts:/);
+    expect(importBody).toContain("'accounts'");
+  });
+
+  it('список виключень не містить ключів, яких немає в контракті', () => {
+    const stale = NOT_IN_JSON_EXPORT.filter(
+      key => !(SYNC_ARRAY_KEYS as readonly string[]).includes(key),
+    );
+    expect(stale).toEqual([]);
   });
 });

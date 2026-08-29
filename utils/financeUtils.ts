@@ -1,6 +1,24 @@
+/**
+ * utils/financeUtils.ts — операції та підсумки.
+ *
+ * Головний інваріант: ПЕРЕКАЗ НЕ Є ОБОРОТОМ. `type='transfer'` — це переїзд
+ * власних грошей між своїми ж рахунками, тож він не додається ні до доходів,
+ * ні до витрат, ні до перенесеного залишку — ані в підсумках місяця, ані в
+ * денних підсумках стрічки. Раніше переказ доводилося писати парою «витрата +
+ * дохід», і місяць, у якому користувач просто зняв гроші з картки, показував
+ * зайвий дохід і зайву витрату на ту саму суму.
+ *
+ * У стрічці переказ ЛИШАЄТЬСЯ видимим — його малює екран окремим виглядом;
+ * прибрано лише його внесок у цифри.
+ *
+ * Валюта операції визначається її рахунком (`accountId`). Поле `currency`
+ * лишається тільки для записів, створених до появи рахунків, — див.
+ * `resolveTxCurrency` в utils/accounts.ts.
+ */
+
 import { isSameMonth, startOfMonth } from './dateUtils';
 
-export type TxType = 'income' | 'expense';
+export type TxType = 'income' | 'expense' | 'transfer';
 
 export interface TxHistoryEvent {
   id: string;
@@ -14,9 +32,26 @@ export interface Transaction {
   updatedAt?: string;
   type: TxType;
   category: string;
+  /** Списана сума — з рахунку `accountId`. */
   amount: number;
   note: string;
   date: string;
+  /**
+   * Рахунок-джерело: звідси беруться і гроші, і валюта операції.
+   */
+  accountId: string;
+  /** Рахунок-призначення. Лише для type='transfer'. */
+  toAccountId?: string;
+  /**
+   * Зарахована сума. Лише для type='transfer' і лише коли валюти рахунків
+   * різні: списано 100 USD — зараховано 4100 UAH. У межах однієї валюти
+   * дорівнює `amount` і не зберігається.
+   */
+  toAmount?: number;
+  /**
+   * Успадковане поле. Джерело істини про валюту — рахунок; тут воно лишилося
+   * заради записів, створених до появи рахунків.
+   */
   currency?: string;
   history?: TxHistoryEvent[];
 }
@@ -118,6 +153,9 @@ export function groupTransactions(
       order.push(key);
     }
     map[key].items.push(t);
+    // Переказ лишається в `items` (стрічка мусить його показати), але в денний
+    // підсумок не йде: гроші не заробили й не витратили, а переклали.
+    if (t.type === 'transfer') return;
     const cur = txCurrency(t);
     const target = t.type === 'income' ? map[key].dayIncomeByCur : map[key].dayExpenseByCur;
     target[cur] = (target[cur] ?? 0) + t.amount;
@@ -139,6 +177,10 @@ export function filterByMonth(txs: Transaction[], month: Date): Transaction[] {
  *
  * Returns a map keyed by currency code. Includes any currency that has any
  * activity OR a non-zero manual adjustment.
+ *
+ * Перекази пропускаються ЦІЛКОМ — і в місяці, і в перенесеному залишку. Вони
+ * не змінюють суму грошей у валюті, лише її розкладку по рахунках, тож
+ * баланси окремих рахунків рахує accountBalance, а не ця функція.
  */
 export function calcTotalsByCurrency(
   allTxs: Transaction[],
@@ -153,6 +195,7 @@ export function calcTotalsByCurrency(
   };
 
   for (const t of allTxs) {
+    if (t.type === 'transfer') continue;
     const code = txCurrency(t);
     const d = new Date(t.date);
     if (isSameMonth(d, activeMonth)) {
@@ -184,7 +227,13 @@ export function calcTotalsByCurrency(
   return out;
 }
 
-/** Back-compat: totals for one month, no carryover, all currencies summed (legacy). */
+/**
+ * Back-compat: totals for one month, no carryover, all currencies summed.
+ *
+ * Перекази сюди не потрапляють: фільтри беруть лише 'income' і 'expense', і
+ * 'transfer' відсіюється сам. Лишаємо це явним, бо саме на цій функції
+ * тримається екран дня.
+ */
 export function calcTotals(txs: Transaction[]) {
   const income  = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const expense = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);

@@ -20,17 +20,27 @@ import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { monthGrid } from '@/utils/dateUtils';
-import { BUILTIN_CURRENCIES, formatCurrency, type Currency } from '@/utils/financeUtils';
+import {
+  BUILTIN_CURRENCIES, formatCurrency, type Currency, type Transaction,
+} from '@/utils/financeUtils';
+import { type Account, type AccountKind } from '@/utils/accounts';
 import { useResponsive } from '@/hooks/use-responsive';
 import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 
-type TxType = 'income' | 'expense';
-interface Transaction {
-  id: string; type: TxType; category: string; amount: number; note: string; date: string;
-}
+/**
+ * Категорію мають лише дохід і витрата, тож розріз «за категоріями» знає саме
+ * ці два види. Переказ у цей перелік свідомо не входить: категорії в нього
+ * немає, і додати його сюди означало б завести порожній розділ, який завжди
+ * показує «нічого».
+ *
+ * Сам `Transaction` береться з utils/financeUtils — власна копія типу знала б
+ * лише 'income' | 'expense', і компілятор не показав би жодного місця, де
+ * переказ не розглянуто.
+ */
+type CatType = 'income' | 'expense';
 interface CategoryDef { name: string; icon: IconSymbolName; }
 
-const DEFAULT_CATEGORIES: Record<TxType, CategoryDef[]> = {
+const DEFAULT_CATEGORIES: Record<CatType, CategoryDef[]> = {
   income: [
     { name: 'Зарплата',   icon: 'briefcase.fill' },
     { name: 'Фріланс',    icon: 'laptopcomputer' },
@@ -47,6 +57,16 @@ const DEFAULT_CATEGORIES: Record<TxType, CategoryDef[]> = {
     { name: 'Одяг',       icon: 'tag.fill' },
     { name: 'Інше',       icon: 'ellipsis.circle.fill' },
   ],
+};
+
+/**
+ * Іконка за видом рахунку, а не за полем `icon`: воно довільне й може містити
+ * назву символу, якої в збірці немає, — тоді рядок лишився б без картинки.
+ */
+const ACCOUNT_KIND_ICONS: Record<AccountKind, IconSymbolName> = {
+  cash:    'banknote',
+  card:    'creditcard.fill',
+  savings: 'building.columns.fill',
 };
 
 const CAT_COLORS = [
@@ -218,11 +238,14 @@ export default function FinanceStatsScreen() {
   // Порожній стан показуємо лише після читання сховища: інакше він блимає
   // на першому кадрі, поки транзакції ще не приїхали.
   const [loaded, setLoaded] = useState(false);
-  const [cats, setCats] = useState<Record<TxType, CategoryDef[]>>(DEFAULT_CATEGORIES);
+  const [cats, setCats] = useState<Record<CatType, CategoryDef[]>>(DEFAULT_CATEGORIES);
+  // Рахунки потрібні для розрізу витрат по місцях, де лежать гроші, і як
+  // довідник валют для їхніх підсумків.
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [primaryCurrency, setPrimaryCurrency] = useState('UAH');
   const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
   const [period, setPeriod] = useState<Period>('month');
-  const [catTab, setCatTab] = useState<TxType>('expense');
+  const [catTab, setCatTab] = useState<CatType>('expense');
 
   // Custom date range
   const [showCal, setShowCal]       = useState(false);
@@ -277,17 +300,19 @@ export default function FinanceStatsScreen() {
       loadData<CategoryRow[]>('categories', []),
       loadData<string>('finance_primary_currency', 'UAH'),
       loadData<Currency[]>('finance_currencies', []),
-    ]).then(([loadedTxs, rows, primCur, curList]) => {
+      loadData<Account[]>('accounts', []),
+    ]).then(([loadedTxs, rows, primCur, curList, accs]) => {
       setTxs(loadedTxs);
       setCats(categoryRowsToMap(Array.isArray(rows) ? rows : [], DEFAULT_CATEGORIES));
       setPrimaryCurrency(primCur || 'UAH');
       setCustomCurrencies(Array.isArray(curList) ? curList : []);
+      setAccounts(Array.isArray(accs) ? accs : []);
       setLoaded(true);
     });
   }, []);
 
   const getCatIcon = useCallback(
-    (name: string, type: TxType): IconSymbolName =>
+    (name: string, type: CatType): IconSymbolName =>
       cats[type].find(cat => cat.name === name)?.icon ??
       DEFAULT_CATEGORIES[type].find(cat => cat.name === name)?.icon ??
       'ellipsis.circle.fill',
@@ -307,6 +332,20 @@ export default function FinanceStatsScreen() {
   );
   const fmt = useCallback((n: number) => formatCurrency(n, currency, locale), [currency, locale]);
 
+  /**
+   * Форматування у валюті конкретного рахунку — для розрізу по рахунках, де
+   * гривневий гаманець і доларова картка стоять поруч. Зводити їх в одну суму
+   * ця фаза не вміє, тож кожен рядок підписаний власною валютою.
+   */
+  const fmtIn = useCallback(
+    (n: number, code: string) => formatCurrency(
+      n,
+      [...BUILTIN_CURRENCIES, ...customCurrencies].find(cur => cur.code === code) ?? currency,
+      locale,
+    ),
+    [customCurrencies, currency, locale],
+  );
+
   const periodStart = useMemo(() => getPeriodStart(period), [period]);
   const periodTxs   = useMemo(() => {
     if (hasCustomRange) {
@@ -316,8 +355,25 @@ export default function FinanceStatsScreen() {
     return periodStart ? txs.filter(t => new Date(t.date) >= periodStart!) : txs;
   }, [txs, periodStart, hasCustomRange, rangeStart, rangeEnd]);
 
-  const income  = periodTxs.filter(t => t.type === 'income' ).reduce((s, t) => s + t.amount, 0);
-  const expense = periodTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  /**
+   * Оборот періоду — усе, крім переказів.
+   *
+   * Переказ між своїми рахунками не заробили й не витратили: він лише міняє
+   * місце, де лежать гроші. Раніше його доводилося писати парою «витрата +
+   * дохід», і місяць, у якому користувач просто зняв гроші з картки, показував
+   * зайвий дохід і зайву витрату на ту саму суму — обидва графіки, донат і
+   * тренд балансу брехали на подвійну суму переказу.
+   *
+   * Усі підсумки нижче рахуються саме з цього списку, а `periodTxs` лишається
+   * повним — календар діапазону мусить позначати дні переказів теж.
+   */
+  const periodFlow = useMemo(() => periodTxs.filter(t => t.type !== 'transfer'), [periodTxs]);
+  /** Ті самі транзакції за весь час — для помісячних стовпчиків. */
+  const flowTxs = useMemo(() => txs.filter(t => t.type !== 'transfer'), [txs]);
+  const transferCount = periodTxs.length - periodFlow.length;
+
+  const income  = periodFlow.filter(t => t.type === 'income' ).reduce((s, t) => s + t.amount, 0);
+  const expense = periodFlow.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const balance = income - expense;
   const savingsPct = income > 0 ? Math.max(0, Math.round((balance / income) * 100)) : 0;
 
@@ -328,7 +384,7 @@ export default function FinanceStatsScreen() {
         const d = new Date();
         d.setDate(d.getDate() - (6 - i));
         const dayKey = d.toDateString();
-        const f = periodTxs.filter(t => new Date(t.date).toDateString() === dayKey);
+        const f = periodFlow.filter(t => new Date(t.date).toDateString() === dayKey);
         const dow = d.getDay();
         return {
           label: WEEKDAYS_UA[dow === 0 ? 6 : dow - 1],
@@ -343,7 +399,7 @@ export default function FinanceStatsScreen() {
       const offset = count - 1 - i;
       const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
-      const f = txs.filter(t => {
+      const f = flowTxs.filter(t => {
         const td = new Date(t.date);
         return `${td.getFullYear()}-${td.getMonth()}` === key;
       });
@@ -353,16 +409,20 @@ export default function FinanceStatsScreen() {
         expense: f.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
       };
     });
-  }, [txs, periodTxs, period]);
+  }, [flowTxs, periodFlow, period]);
 
   const maxBar = Math.max(...chartData.map(m => Math.max(m.income, m.expense)), 1);
 
   // ── Cumulative balance trend ─────────────────────────────────────────────
   const trendData = useMemo(() => {
-    if (periodTxs.length < 2) return [];
-    const sorted = [...periodTxs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    if (periodFlow.length < 2) return [];
+    const sorted = [...periodFlow].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     let running = 0;
     const pts: number[] = [];
+    // Гілка «інакше мінус» була найнебезпечнішим місцем екрана: переказ під неї
+    // потрапляв як витрата, і лінія балансу провалювалася на кожному
+    // перекладанні грошей між власними рахунками. Тепер переказів у списку
+    // немає взагалі, тож ділення на дохід/витрату однозначне.
     sorted.forEach(t => {
       running += t.type === 'income' ? t.amount : -t.amount;
       pts.push(running);
@@ -370,25 +430,27 @@ export default function FinanceStatsScreen() {
     if (pts.length <= 40) return pts;
     const step = Math.floor(pts.length / 40);
     return pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
-  }, [periodTxs]);
+  }, [periodFlow]);
 
   // ── Category stats ───────────────────────────────────────────────────────
   const categoryStats = useMemo(() => {
     const map: Record<string, number> = {};
-    periodTxs.filter(t => t.type === catTab).forEach(t => {
+    // `catTab` — лише 'income' | 'expense', тож переказ сюди не потрапляє й не
+    // заводить категорію-привид із порожньою назвою.
+    periodFlow.filter(t => t.type === catTab).forEach(t => {
       map[t.category] = (map[t.category] ?? 0) + t.amount;
     });
     const total = Object.values(map).reduce((s, v) => s + v, 0);
     return Object.entries(map)
       .map(([cat, amt], i) => ({ cat, amt, pct: total > 0 ? (amt / total) * 100 : 0, color: CAT_COLORS[i % CAT_COLORS.length] }))
       .sort((a, b) => b.amt - a.amt);
-  }, [periodTxs, catTab]);
+  }, [periodFlow, catTab]);
 
   // ── Day-of-week expense stats ────────────────────────────────────────────
   const weekdayStats = useMemo(() => {
     const sums   = [0, 0, 0, 0, 0, 0, 0];
     const counts = [0, 0, 0, 0, 0, 0, 0];
-    periodTxs.filter(t => t.type === 'expense').forEach(t => {
+    periodFlow.filter(t => t.type === 'expense').forEach(t => {
       const dow = new Date(t.date).getDay();
       const idx = dow === 0 ? 6 : dow - 1;
       sums[idx]   += t.amount;
@@ -401,16 +463,43 @@ export default function FinanceStatsScreen() {
       count: counts[i],
       pct:   sums[i] / maxSum,
     }));
-  }, [periodTxs]);
+  }, [periodFlow]);
 
   // ── Quick stats ──────────────────────────────────────────────────────────
-  const txCount      = periodTxs.length;
-  const expenseTxs   = periodTxs.filter(t => t.type === 'expense');
+  // Лічильник показує операції обороту: він стоїть поруч із «сер/день», і
+  // рахувати в ньому перекази означало б ділити витрати на завелике число
+  // операцій у голові користувача.
+  const txCount      = periodFlow.length;
+  const expenseTxs   = periodFlow.filter(t => t.type === 'expense');
   const largestTx    = expenseTxs.reduce<Transaction | null>((max, t) => !max || t.amount > max.amount ? t : max, null);
   const periodDays   = hasCustomRange
     ? Math.max(1, Math.ceil((rangeEnd!.getTime() - rangeStart!.getTime()) / 86400000) + 1)
     : periodStart ? Math.max(1, Math.ceil((Date.now() - periodStart.getTime()) / 86400000)) : 30;
   const avgDailyExp  = expense / periodDays;
+
+  /**
+   * Витрати періоду в розрізі рахунків — звідки саме пішли гроші.
+   *
+   * Показуємо лише коли рахунків більше одного: з єдиним гаманцем цей розділ
+   * просто вдруге повторив би загальну суму витрат.
+   *
+   * Архівні рахунки не відсіюємо: якщо витрата в періоді була, приховати рядок
+   * означало б втратити частину суми без пояснення.
+   */
+  const accountStats = useMemo(() => {
+    if (accounts.length < 2) return [];
+    const spent: Record<string, number> = {};
+    for (const t of periodFlow) {
+      if (t.type !== 'expense') continue;
+      spent[t.accountId] = (spent[t.accountId] ?? 0) + t.amount;
+    }
+    const rows = accounts
+      .map(a => ({ account: a, spent: spent[a.id] ?? 0 }))
+      .filter(r => r.spent > 0)
+      .sort((a, b) => b.spent - a.spent);
+    const max = rows.reduce((m, r) => Math.max(m, r.spent), 0);
+    return rows.map(r => ({ ...r, pct: max > 0 ? r.spent / max : 0 }));
+  }, [accounts, periodFlow]);
 
   const balanceDonutData = useMemo(
     () => (income + expense > 0
@@ -530,6 +619,16 @@ export default function FinanceStatsScreen() {
             </View>
           ))}
 
+          {/* ── Перекази в підсумки не входять ── */}
+          {transferCount > 0 && (
+            <View style={[s.hintRow, { backgroundColor: c.accent + '15', borderColor: c.accent + '30' }]}>
+              <IconSymbol name="arrow.left.arrow.right" size={14} color={c.accent} />
+              <Text style={{ flex: 1, color: c.sub, fontSize: 12, lineHeight: 17, marginLeft: 8 }}>
+                {tr.transfersNotCounted} ({transferCount})
+              </Text>
+            </View>
+          )}
+
           {/* ── Balance trend ── */}
           {trendData.length >= 2 && (
             <>
@@ -562,7 +661,7 @@ export default function FinanceStatsScreen() {
             sub={c.sub}
           />
           <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
-            {txs.length === 0 ? (
+            {flowTxs.length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 16 }}>Немає даних</Text>
             ) : (
               <>
@@ -660,6 +759,38 @@ export default function FinanceStatsScreen() {
             </BlurView>
           )}
 
+          {/* ── Витрати в розрізі рахунків ── */}
+          {accountStats.length > 0 && (
+            <>
+              <SectionTitle text={tr.accounts} sub={c.sub} />
+              <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
+                <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
+                  {tr.expenses}
+                </Text>
+                {accountStats.map((row, i) => (
+                  <View key={row.account.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, i > 0 && { marginTop: 12 }]}>
+                    <View style={[s.catIcon, { backgroundColor: c.accent + '20' }]}>
+                      <IconSymbol name={ACCOUNT_KIND_ICONS[row.account.kind]} size={15} color={c.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+                        <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }} numberOfLines={1}>
+                          {row.account.name}
+                        </Text>
+                        <Text style={{ color: c.red, fontSize: 13, fontWeight: '800' }}>
+                          {fmtIn(row.spent, row.account.currency)}
+                        </Text>
+                      </View>
+                      <View style={{ height: 4, backgroundColor: c.dim, borderRadius: 2, overflow: 'hidden' }}>
+                        <View style={{ height: '100%', width: `${row.pct * 100}%`, backgroundColor: c.accent, borderRadius: 2 }} />
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </BlurView>
+            </>
+          )}
+
           {/* ── Day-of-week spending ── */}
           {expenseTxs.length > 0 && (
             <>
@@ -683,7 +814,7 @@ export default function FinanceStatsScreen() {
           {/* ── Category breakdown ── */}
           <SectionTitle text="За категоріями" sub={c.sub} />
           <View style={[s.segRow, { backgroundColor: c.card, borderColor: c.border, marginBottom: 14 }]}>
-            {(['expense', 'income'] as TxType[]).map(t => (
+            {(['expense', 'income'] as CatType[]).map(t => (
               <TouchableOpacity
                 key={t}
                 onPress={() => setCatTab(t)}
@@ -958,6 +1089,7 @@ const s = StyleSheet.create({
   navBtn:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   dayCell:      { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   calBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingVertical: 11 },
+  hintRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 18 },
   emptyIcon:    { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   emptyBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 14, marginTop: 20 },
 });

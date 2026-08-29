@@ -23,18 +23,18 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
-import { BUILTIN_CURRENCIES, formatCurrency, type Currency } from '@/utils/financeUtils';
+import {
+  BUILTIN_CURRENCIES, formatCurrency, type Currency, type Transaction,
+} from '@/utils/financeUtils';
+import { resolveTxCurrency, type Account } from '@/utils/accounts';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TxType = 'income' | 'expense';
-
-interface Transaction {
-  id: string; type: TxType; category: string; amount: number; note: string; date: string;
-  currency?: string;
-}
+// `Transaction` навмисно імпортується з utils/financeUtils, а не описується
+// тут: власна копія типу знала лише 'income' | 'expense' і мовчки ховала б
+// появу переказів — компілятор не сказав би, що екран їх не розглянув.
 
 interface BudgetLimit {
   /** Дорівнює `category` — синхронізація ідентифікує запис саме за ним. */
@@ -120,6 +120,9 @@ export default function BudgetScreen() {
 
   const [budgets, setBudgets]         = useState<BudgetLimit[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  // Довідник валют: у нової операції валюта береться з її рахунку, а поле
+  // currency лишилося тільки в записах, створених до появи рахунків.
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [primaryCurrency, setPrimaryCurrency] = useState<string>('UAH');
   const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
   const [activeMonth, setActiveMonth] = useState(() => {
@@ -141,14 +144,16 @@ export default function BudgetScreen() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [savedBudgets, txs, primCur, curList] = await Promise.all([
+      const [savedBudgets, txs, primCur, curList, accs] = await Promise.all([
         loadData<BudgetLimit[]>('budget_limits', []),
         loadData<Transaction[]>('transactions', []),
         loadData<string>('finance_primary_currency', 'UAH'),
         loadData<Currency[]>('finance_currencies', []),
+        loadData<Account[]>('accounts', []),
       ]);
       setPrimaryCurrency(primCur || 'UAH');
       setCustomCurrencies(Array.isArray(curList) ? curList : []);
+      setAccounts(Array.isArray(accs) ? accs : []);
 
       // Merge saved budgets with defaults (add new default categories that don't exist yet)
       const merged = [...savedBudgets];
@@ -180,31 +185,40 @@ export default function BudgetScreen() {
   const currencySymbol = currency.symbol;
   const fmt = useCallback((n: number) => formatCurrency(n, currency, locale), [currency, locale]);
 
-  // Actual spending per category for selected month — only primary currency transactions
+  /**
+   * Фактичні витрати за категоріями обраного місяця — лише основна валюта.
+   *
+   * `type === 'expense'` тут навмисно строге порівняння, а не «все, що не
+   * дохід»: переказ між своїми рахунками витратою не є, і зарахувати його в
+   * ліміт означало б з'їдати бюджет «Інше» щоразу, коли гроші просто зняли з
+   * картки. Категорії в переказу немає взагалі, тож він ще й створив би
+   * порожній рядок у списку.
+   */
   const actualByCategory = useMemo(() => {
     const map: Record<string, number> = {};
     transactions
       .filter(tx =>
         tx.type === 'expense' &&
         isSameMonth(tx.date, activeMonth) &&
-        (tx.currency == null || tx.currency === primaryCurrency),
+        resolveTxCurrency(tx, accounts) === primaryCurrency,
       )
       .forEach(tx => {
         map[tx.category] = (map[tx.category] ?? 0) + tx.amount;
       });
     return map;
-  }, [transactions, activeMonth, primaryCurrency]);
+  }, [transactions, accounts, activeMonth, primaryCurrency]);
 
-  // Count of expense transactions in OTHER currencies this month (for info badge)
+  // Скільки витрат місяця лишилося поза бюджетом через іншу валюту — для
+  // підказки під шапкою. Перекази не рахуємо й тут: вони не витрати в жодній
+  // валюті, і згадка про них лише збивала б з пантелику.
   const otherCurrencyCount = useMemo(() => {
     return transactions.filter(
       tx =>
         tx.type === 'expense' &&
         isSameMonth(tx.date, activeMonth) &&
-        tx.currency != null &&
-        tx.currency !== primaryCurrency,
+        resolveTxCurrency(tx, accounts) !== primaryCurrency,
     ).length;
-  }, [transactions, activeMonth, primaryCurrency]);
+  }, [transactions, accounts, activeMonth, primaryCurrency]);
 
   // Merged display list: saved budgets + auto-added from transactions
   const displayBudgets = useMemo(() => {

@@ -4,7 +4,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { Currency, TxGroup, Transaction } from '@/utils/financeUtils';
-import { txCurrency } from '@/utils/financeUtils';
+import { accountById, creditedAmount, isTransfer, resolveTxCurrency, type Account } from '@/utils/accounts';
 
 interface Colors {
   sub: string;
@@ -13,6 +13,12 @@ interface Colors {
   red: string;
   border: string;
   dim: string;
+  /**
+   * Колір переказу. Навмисно НЕ зелений і НЕ червоний: переказ не дохід і не
+   * витрата, і фарбувати його як витрату (як було раніше) означало показувати
+   * втрату грошей там, де вони просто переїхали між власними рахунками.
+   */
+  neutral: string;
 }
 
 interface TransactionGroupProps {
@@ -23,18 +29,21 @@ interface TransactionGroupProps {
   fmt: (n: number, cur: Currency) => string;
   currencyByCode: Record<string, Currency>;
   primaryCode?: string;
+  /** Рахунки потрібні і для валюти операції, і для назв у переказі. */
+  accounts: Account[];
   getCatIcon: (cat: string, type: 'income' | 'expense') => IconSymbolName;
   onSelect: (tx: Transaction) => void;
   todayLabel: string;
   yesterdayLabel: string;
   incomeLabel: string;
   expenseLabel: string;
+  transferLabel: string;
 }
 
 export function TransactionGroup({
-  group, compact, isDark, c, fmt, currencyByCode, primaryCode = 'UAH',
+  group, compact, isDark, c, fmt, currencyByCode, primaryCode = 'UAH', accounts,
   getCatIcon, onSelect,
-  todayLabel, yesterdayLabel, incomeLabel, expenseLabel,
+  todayLabel, yesterdayLabel, incomeLabel, expenseLabel, transferLabel,
 }: TransactionGroupProps) {
   const displayLabel =
     group.label === '__today__' ? todayLabel :
@@ -49,7 +58,7 @@ export function TransactionGroup({
 
   return (
     <View style={{ marginBottom: 16 }}>
-      {/* Group header */}
+      {/* Group header — денні підсумки без переказів (їх не рахує groupTransactions) */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
         <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1, minWidth: 80 }}>
           {displayLabel}
@@ -77,13 +86,33 @@ export function TransactionGroup({
       {/* Transactions */}
       <View style={{ gap: compact ? 8 : 2 }}>
         {group.items.map((tx, idx) => {
+          // Вигляд переказу вмикає САМ `type`, а не звужувач `isTransfer`:
+          // запис без адресата — зламані дані, але малювати його червоною
+          // витратою означало б брехати про те, що сталося з грошима.
+          const transfer = tx.type === 'transfer';
           const isIncome = tx.type === 'income';
-          const color = isIncome ? c.green : c.red;
-          const iconName = getCatIcon(tx.category, tx.type);
+          const color = transfer ? c.neutral : isIncome ? c.green : c.red;
+          const iconName: IconSymbolName = transfer
+            ? 'arrow.left.arrow.right'
+            : getCatIcon(tx.category, isIncome ? 'income' : 'expense');
           const txDate = new Date(tx.date);
           const isFirst = idx === 0;
           const isLast = idx === group.items.length - 1;
-          const cur = curOf(txCurrency(tx));
+          const cur = curOf(resolveTxCurrency(tx, accounts));
+
+          const fromAccount = accountById(accounts, tx.accountId);
+          const toAccount = transfer ? accountById(accounts, tx.toAccountId) : undefined;
+          const title = transfer
+            ? `${fromAccount?.name ?? '—'} → ${toAccount?.name ?? '—'}`
+            : tx.category;
+
+          // Друга сума потрібна лише коли валюти різні: у межах однієї валюти
+          // `toAmount` не зберігається, і дублювати ту саму цифру ні до чого.
+          const credited = isTransfer(tx) ? creditedAmount(tx) : null;
+          const creditedCur = toAccount ? curOf(toAccount.currency) : cur;
+          const showCredited = credited !== null && credited !== tx.amount;
+
+          const sign = transfer ? '' : isIncome ? '+' : '−';
 
           if (compact) {
             return (
@@ -97,7 +126,7 @@ export function TransactionGroup({
                     <IconSymbol name={iconName} size={19} color={color} />
                   </View>
                   <View style={{ flex: 1, marginLeft: 11 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }} numberOfLines={1}>{tx.category}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }} numberOfLines={1}>{title}</Text>
                     {tx.note ? <Text style={{ fontSize: 12, color: c.sub, marginTop: 2 }} numberOfLines={1}>{tx.note}</Text> : null}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}>
                       <IconSymbol name="clock" size={10} color={c.sub} />
@@ -106,7 +135,9 @@ export function TransactionGroup({
                       </Text>
                       <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: c.sub + '80' }} />
                       <View style={{ backgroundColor: color + '20', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                        <Text style={{ color, fontSize: 9, fontWeight: '700' }}>{isIncome ? incomeLabel : expenseLabel}</Text>
+                        <Text style={{ color, fontSize: 9, fontWeight: '700' }}>
+                          {transfer ? transferLabel : isIncome ? incomeLabel : expenseLabel}
+                        </Text>
                       </View>
                       {cur.code !== primaryCode && (
                         <View style={{ backgroundColor: c.dim, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
@@ -115,9 +146,16 @@ export function TransactionGroup({
                       )}
                     </View>
                   </View>
-                  <Text style={{ fontSize: 15, fontWeight: '800', color, marginLeft: 10 }}>
-                    {isIncome ? '+' : '−'}{fmt(tx.amount, cur)}
-                  </Text>
+                  <View style={{ alignItems: 'flex-end', marginLeft: 10 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color }}>
+                      {sign}{fmt(tx.amount, cur)}
+                    </Text>
+                    {showCredited && (
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: c.sub, marginTop: 2 }}>
+                        → {fmt(credited, creditedCur)}
+                      </Text>
+                    )}
+                  </View>
                 </BlurView>
               </TouchableOpacity>
             );
@@ -140,12 +178,19 @@ export function TransactionGroup({
                   <IconSymbol name={iconName} size={14} color={color} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 9 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }} numberOfLines={1}>{tx.category}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }} numberOfLines={1}>{title}</Text>
                   {tx.note ? <Text style={{ fontSize: 11, marginTop: 1, color: c.sub }} numberOfLines={1}>{tx.note}</Text> : null}
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '800', color }}>
-                  {isIncome ? '+' : '−'}{fmt(tx.amount, cur)}
-                </Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color }}>
+                    {sign}{fmt(tx.amount, cur)}
+                  </Text>
+                  {showCredited && (
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: c.sub, marginTop: 1 }}>
+                      → {fmt(credited, creditedCur)}
+                    </Text>
+                  )}
+                </View>
               </BlurView>
             </TouchableOpacity>
           );

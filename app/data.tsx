@@ -21,7 +21,7 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAutoBackup } from '@/store/auto-backup';
 import { BACKUP_KEYS } from '@/store/backup-keys';
-import { loadData, saveData } from '@/store/storage';
+import { loadData, notifyStorageChanged, saveData } from '@/store/storage';
 import { SYNC_ARRAY_KEYS, saveSynced } from '@/store/synced-storage';
 import { useContentWidth } from '@/hooks/use-content-width';
 
@@ -29,6 +29,7 @@ const ALL_KEYS = [
   { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
   { key: 'task_statuses',     label: 'Статуси задач', icon: 'rectangle.3.group', color: '#8B5CF6' },
   { key: 'transactions',      label: 'Транзакції',  icon: 'banknote',           color: '#0EA5E9' },
+  { key: 'accounts',          label: 'Рахунки',     icon: 'creditcard.fill',    color: '#0EA5E9' },
   { key: 'time_entries',      label: 'Записи часу', icon: 'timer',              color: '#6366F1' },
   { key: 'notes',             label: 'Нотатки',     icon: 'note.text',          color: '#F59E0B' },
   { key: 'projects',          label: 'Проекти',     icon: 'folder.fill',        color: '#10B981' },
@@ -49,7 +50,7 @@ const ALL_KEYS = [
 
 // export key maps storage key → JSON key (snake_case → camelCase where needed)
 const EXPORT_KEY_MAP: Record<string, string> = {
-  tasks: 'tasks', task_statuses: 'taskStatuses', transactions: 'transactions', time_entries: 'timeEntries',
+  tasks: 'tasks', task_statuses: 'taskStatuses', transactions: 'transactions', accounts: 'accounts', time_entries: 'timeEntries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
   meetings: 'meetings', health_entries_v2: 'healthEntries',
   workouts: 'workouts', exercises: 'exercises', workout_programs: 'workoutPrograms',
@@ -58,7 +59,7 @@ const EXPORT_KEY_MAP: Record<string, string> = {
   health_vaccines: 'healthVaccines', health_habits: 'healthHabits',
 };
 const IMPORT_KEY_MAP: Record<string, string> = {
-  tasks: 'tasks', taskStatuses: 'task_statuses', transactions: 'transactions', timeEntries: 'time_entries',
+  tasks: 'tasks', taskStatuses: 'task_statuses', transactions: 'transactions', accounts: 'accounts', timeEntries: 'time_entries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
   meetings: 'meetings', healthEntries: 'health_entries_v2',
   workouts: 'workouts', exercises: 'exercises', workoutPrograms: 'workout_programs',
@@ -69,7 +70,7 @@ const IMPORT_KEY_MAP: Record<string, string> = {
   categories: 'categories',
 };
 
-// Службові ключі синхронізації — очищуються разом з даними, але НЕ: auth, app_mode, onboarding, lang, notificationsEnabled
+// Службові ключі синхронізації — очищуються разом з даними, але НЕ: auth, app_mode, lang, notificationsEnabled
 const SERVICE_CLEAR_KEYS = [
   'sync_outbox',
   'sync_pending_conflicts',
@@ -357,10 +358,15 @@ export default function DataScreen() {
                 text: 'Видалити все', style: 'destructive',
                 onPress: async () => {
                   // Remove all BACKUP_KEYS data + service/sync keys
-                  await AsyncStorage.multiRemove([
+                  const cleared = [
                     ...(BACKUP_KEYS as readonly string[]),
                     ...(SERVICE_CLEAR_KEYS as readonly string[]),
-                  ]);
+                  ];
+                  await AsyncStorage.multiRemove(cleared);
+                  // multiRemove іде повз saveData, тож підписники сховища про
+                  // очищення не дізнались би. Стор активних таймерів після
+                  // цього повернув би стертий реєстр першим же стартом.
+                  cleared.forEach(notifyStorageChanged);
                   const empty: Counts = {};
                   ALL_KEYS.forEach(k => { empty[k.key] = 0; });
                   setCounts(empty);

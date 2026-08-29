@@ -6,23 +6,64 @@
  * Замінює нижні таби, а не доповнює їх: два конкурентні набори навігації
  * на одному екрані змушують щоразу вирішувати, яким користуватися.
  * На вузькому екрані сайдбар не рендериться взагалі — там таби.
+ *
+ * Групи згортаються, бо повний перелік не влазить: 17 пунктів по 44pt (мінімум
+ * тач-таргета за HIG, нижче не можна) плюс заголовки й бренд — це ~950pt проти
+ * 834pt висоти альбомного 11″ iPad. Тобто до цього сайдбар скролився ЗАВЖДИ, і
+ * останні пункти доводилося шукати прокруткою в панелі, сенс якої — бачити
+ * розділи без пошуку.
+ *
+ * Згорнутість запам'ятовується локально (saveData, не saveSynced): це
+ * налаштування ЦЬОГО екрана, а не дані користувача. На телефоні сайдбара немає
+ * зовсім, а на 13″ iPad усе влазить і без згортання — синхронізувати такий
+ * вибір між пристроями означало б нав'язувати вибір, зроблений для іншої
+ * діагоналі.
  */
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { NAV_GROUPS, isRouteActive } from '@/constants/nav';
+import {
+  DEFAULT_COLLAPSED_GROUP_IDS,
+  NAV_GROUPS,
+  isGroupCollapsed,
+  isRouteActive,
+} from '@/constants/nav';
 import { useI18n } from '@/store/i18n';
+import { loadData, saveData } from '@/store/storage';
 
 /** Ширина підібрана під найдовшу назву українською («Планування бюджету»). */
 export const SIDEBAR_WIDTH = 232;
+
+const COLLAPSED_KEY = 'nav_collapsed_groups';
 
 export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boolean }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tr } = useI18n();
+
+  const [collapsed, setCollapsed] = useState<readonly string[]>(DEFAULT_COLLAPSED_GROUP_IDS);
+
+  // До першого читання показуємо ДЕФОЛТ, а не «все розгорнуто»: інакше сайдбар
+  // на мить розгортався б на повну висоту й осідав — смикання при кожному
+  // старті помітніше, ніж група, що з'явилась на кадр пізніше.
+  useEffect(() => {
+    loadData<string[]>(COLLAPSED_KEY, [...DEFAULT_COLLAPSED_GROUP_IDS])
+      .then(setCollapsed)
+      .catch(e => { if (__DEV__) console.warn('[nav] згорнуті групи не прочитались:', e); });
+  }, []);
+
+  const toggleGroup = useCallback((id: string) => {
+    setCollapsed(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      void saveData(COLLAPSED_KEY, next).catch(e => {
+        if (__DEV__) console.warn('[nav] згорнуті групи не збереглись:', e);
+      });
+      return next;
+    });
+  }, []);
 
   const c = {
     bg:       isDark ? '#0E0C1A' : '#F4F0FF',
@@ -40,35 +81,65 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
       <Text style={[st.brand, { color: c.accent }]}>Flowi</Text>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
-        {NAV_GROUPS.map((group, gi) => (
-          <View key={gi} style={{ marginBottom: 14 }}>
-            {group.titleKey && (
-              <Text style={[st.groupTitle, { color: c.sub }]}>
-                {String(tr[group.titleKey]).toUpperCase()}
-              </Text>
-            )}
+        {NAV_GROUPS.map((group, gi) => {
+          const hidden = isGroupCollapsed(group, collapsed, pathname);
+          // Заголовок групи, яку можна згорнути, — кнопка; решта лишається
+          // звичайним підписом, щоб не обіцяти дію, якої немає.
+          const collapsible = Boolean(group.id);
 
-            {group.items.map(item => {
-              const active = isRouteActive(item.route, pathname);
-              return (
-                <TouchableOpacity
-                  key={item.route}
-                  onPress={() => router.push(item.route as never)}
-                  activeOpacity={0.7}
-                  accessibilityRole="menuitem"
-                  accessibilityState={{ selected: active }}
-                  style={[st.row, active && { backgroundColor: c.activeBg }]}>
-                  <IconSymbol name={item.icon} size={19} color={active ? c.accent : c.sub} />
-                  <Text
-                    numberOfLines={1}
-                    style={[st.label, { color: active ? c.accent : c.text, fontWeight: active ? '700' : '500' }]}>
-                    {String(tr[item.labelKey])}
+          return (
+            <View key={group.id ?? `g${gi}`} style={{ marginBottom: hidden ? 6 : 14 }}>
+              {group.titleKey && (
+                collapsible ? (
+                  <TouchableOpacity
+                    onPress={() => toggleGroup(group.id!)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: !hidden }}
+                    style={st.groupHead}>
+                    <IconSymbol
+                      name={hidden ? 'chevron.right' : 'chevron.down'}
+                      size={13}
+                      color={c.sub}
+                    />
+                    <Text style={[st.groupTitle, { color: c.sub, flex: 1, marginLeft: 4 }]}>
+                      {String(tr[group.titleKey]).toUpperCase()}
+                    </Text>
+                    {/* Лічильник лише в згорнутому стані: коли пункти видно,
+                        він переказував би те, що й так на екрані. */}
+                    {hidden && (
+                      <Text style={[st.groupCount, { color: c.sub }]}>{group.items.length}</Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={[st.groupTitle, { color: c.sub, paddingHorizontal: 10 }]}>
+                    {String(tr[group.titleKey]).toUpperCase()}
                   </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ))}
+                )
+              )}
+
+              {!hidden && group.items.map(item => {
+                const active = isRouteActive(item.route, pathname);
+                return (
+                  <TouchableOpacity
+                    key={item.route}
+                    onPress={() => router.push(item.route as never)}
+                    activeOpacity={0.7}
+                    accessibilityRole="menuitem"
+                    accessibilityState={{ selected: active }}
+                    style={[st.row, active && { backgroundColor: c.activeBg }]}>
+                    <IconSymbol name={item.icon} size={19} color={active ? c.accent : c.sub} />
+                    <Text
+                      numberOfLines={1}
+                      style={[st.label, { color: active ? c.accent : c.text, fontWeight: active ? '700' : '500' }]}>
+                      {String(tr[item.labelKey])}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -77,7 +148,12 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
 const st = StyleSheet.create({
   root:       { borderRightWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10 },
   brand:      { fontSize: 20, fontWeight: '800', paddingHorizontal: 10, marginBottom: 18 },
-  groupTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, paddingHorizontal: 10, marginBottom: 6 },
+  // 32 — свідомо менше за 44: це заголовок, а не пункт призначення. Промах по
+  // ньому нічого не ламає (розгорнулась зайва група), тож повний тач-таргет
+  // тут коштував би рядків, заради яких усе й затівалося.
+  groupHead:  { flexDirection: 'row', alignItems: 'center', minHeight: 32, paddingHorizontal: 10, borderRadius: 8 },
+  groupTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 6 },
+  groupCount: { fontSize: 10, fontWeight: '700', marginBottom: 6, opacity: 0.8 },
   // 44 — мінімальний тач-таргет за HIG; на планшеті промахуються частіше,
   // бо палець тягнеться через увесь екран.
   row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 10, borderRadius: 10 },

@@ -1,15 +1,25 @@
 /**
  * utils/taskTimer.ts — облік часу, витраченого на завдання.
  *
- * Сесія вважається активною, доки в неї немає endedAt. Її тривалість не
- * зберігається в даних, бо вона змінюється щосекунди: поле `duration`
- * заповнюється лише при зупинці. Тому «скільки зараз» доводиться щоразу
- * рахувати від startedAt, і саме тут живе ця різниця.
+ * Інваріант змінився разом із появою реєстру active_timers:
+ *   task.timeEntries — сесії, що ЗАВЕРШИЛИСЬ (endedAt є завжди);
+ *   active_timers    — сесія, що ТРИВАЄ (див. utils/activeTimers.ts).
+ *
+ * Тому питання «чи йде таймер» тут більше не ставлять — на нього відповідає
+ * стор, який єдиний володіє реєстром. Цьому файлу лишилась арифметика: він
+ * рахує секунди, а мітку старту активної сесії отримує ззовні. Раніше він
+ * шукав її сам, серед записів без endedAt — таких записів більше не буває.
  */
 
 export interface TimeEntry {
   id: string;
   startedAt: string;
+  /**
+   * Після переїзду на реєстр — є завжди. Поле лишається опційним лише заради
+   * даних, записаних до переїзду: міграція їх вичищає, але старий бекап або
+   * пристрій зі старою версією можуть принести відкритий запис назад. Такий
+   * запис не має тривалості, тож у підсумки він не потрапляє.
+   */
   endedAt?: string;
   /** Секунди. Осмислене лише для завершених сесій. */
   duration: number;
@@ -17,18 +27,6 @@ export interface TimeEntry {
 
 export interface TimedTask {
   timeEntries?: TimeEntry[];
-}
-
-/** Сесія, що триває просто зараз. undefined, якщо таймер стоїть. */
-export function getActiveTimerEntry(task: TimedTask): TimeEntry | undefined {
-  return (task.timeEntries ?? []).find(e => !e.endedAt);
-}
-
-/** Скільки триває активна сесія, у секундах. 0, якщо таймер стоїть. */
-export function activeSessionSeconds(task: TimedTask, now: number = Date.now()): number {
-  const active = getActiveTimerEntry(task);
-  if (!active) return 0;
-  return elapsedSince(active.startedAt, now);
 }
 
 /**
@@ -40,20 +38,26 @@ export function elapsedSince(startedAt: string, now: number = Date.now()): numbe
   return Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
 }
 
-/** Увесь витрачений час, включно з незавершеною сесією. */
-export function totalSecondsIncludingActive(task: TimedTask, now: number = Date.now()): number {
-  return (task.timeEntries ?? []).reduce(
-    (acc, e) => acc + (e.endedAt ? e.duration : elapsedSince(e.startedAt, now)),
-    0,
-  );
+/** Завершені сесії завдання — саме їх показує список і рахують підсумки. */
+export function completedSessions(task: TimedTask): TimeEntry[] {
+  return (task.timeEntries ?? []).filter(e => e.endedAt);
 }
 
 /** Увесь витрачений час, лише завершені сесії. */
 export function totalTrackedSeconds(task: TimedTask): number {
-  return (task.timeEntries ?? []).reduce((acc, e) => acc + (e.endedAt ? e.duration : 0), 0);
+  return completedSessions(task).reduce((acc, e) => acc + e.duration, 0);
 }
 
-/** Кількість завершених сесій. */
-export function completedSessionCount(task: TimedTask): number {
-  return (task.timeEntries ?? []).filter(e => e.endedAt).length;
+/**
+ * Увесь витрачений час разом із сесією, що триває.
+ *
+ * `activeStartedAt` приходить із реєстру активних таймерів, а не з завдання:
+ * завдання про свою поточну сесію більше нічого не знає.
+ */
+export function totalSecondsIncludingActive(
+  task: TimedTask,
+  activeStartedAt?: string,
+  now: number = Date.now(),
+): number {
+  return totalTrackedSeconds(task) + (activeStartedAt ? elapsedSince(activeStartedAt, now) : 0);
 }

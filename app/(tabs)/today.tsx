@@ -25,10 +25,13 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useMotion } from '@/hooks/use-motion';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { loadData } from '@/store/storage';
+import { mergeTaskStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
+import { groupTodayTasks } from '@/utils/todayGroups';
 import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { isSameDay } from '@/utils/dateUtils';
-import { Transaction, calcTotals, filterByMonth, txCurrency } from '@/utils/financeUtils';
+import { Transaction, calcTotals, filterByMonth } from '@/utils/financeUtils';
+import { resolveTxCurrency, type Account } from '@/utils/accounts';
 import {
   ACCENT, ACCENT_CAL, ACCENT_SLEEP, ACCENT_STEPS, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
@@ -110,6 +113,9 @@ export default function TodayScreen() {
 
   const [tasks,    setTasks]    = useState<Task[]>([]);
   const [txs,      setTxs]      = useState<Transaction[]>([]);
+  // Рахунки потрібні лише як довідник валют: у нових операцій валюта живе на
+  // рахунку, а поле currency лишилося тільки в записах, створених до рахунків.
+  const [accounts, setAccounts] = useState<Account[]>([]);
   // Валюта зведення. До цього екран рахував лише UAH і підписував «₴»:
   // у користувача з іншою валютою фінанси мовчки зникали зі зведення.
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -119,14 +125,16 @@ export default function TodayScreen() {
   const [profile,  setProfile]  = useState<HealthProfile | null>(null);
   const [meetings, setMeetings] = useState<TodayMeeting[]>([]);
   const [habits,   setHabits]   = useState<Habit[]>([]);
+  const [statusColumns, setStatusColumns] = useState<TaskStatusColumn[]>([]);
   const [notesCount, setNotesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const firstLoadDone = useRef(false);
 
   const load = useCallback(async () => {
-    const [t, x, tm, h, p, m, hb, notes, curs, primary] = await Promise.all([
+    const [t, cols, x, tm, h, p, m, hb, notes, curs, primary, accs] = await Promise.all([
       loadData<Task[]>('tasks', []),
+      loadData<TaskStatusColumn[]>('task_statuses', []),
       loadData<Transaction[]>('transactions', []),
       loadData<TimeEntry[]>('time_entries', []),
       loadData<HealthEntry[]>('health_entries_v2', []),
@@ -136,12 +144,14 @@ export default function TodayScreen() {
       loadData<{ updatedAt?: string; createdAt?: string }[]>('notes', []),
       loadData<Currency[]>('finance_currencies', []),
       loadData<string>('finance_primary_currency', 'UAH'),
+      loadData<Account[]>('accounts', []),
     ]);
-    setTasks(t); setTxs(x); setTime(tm); setHealth(h); setProfile(p);
+    setTasks(t); setStatusColumns(cols); setTxs(x); setTime(tm); setHealth(h); setProfile(p);
     setMeetings(m); setHabits(hb);
     setNotesCount(Array.isArray(notes) ? notes.length : 0);
     setCurrencies(Array.isArray(curs) ? curs : []);
     setPrimaryCode(typeof primary === 'string' && primary ? primary : 'UAH');
+    setAccounts(Array.isArray(accs) ? accs : []);
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -188,14 +198,13 @@ export default function TodayScreen() {
    * перша трійка, а й загальна кількість — щоб знати, чи показувати «показати
    * всі», і що написати на кнопці статистики.
    */
-  const todayTasks = useMemo(() => {
-    const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
-    return tasks
-      .filter(t => t.status === 'active'
-        && ((t.deadline && isSameDay(new Date(t.deadline), today)) || isOverdue(t)))
-      .sort((a, b) => (order[a.priority] ?? 1) - (order[b.priority] ?? 1));
+  const columns = useMemo(() => mergeTaskStatusColumns(statusColumns), [statusColumns]);
+
+  const todayGroups = useMemo(
+    () => groupTodayTasks(tasks, columns, today, TODAY_PREVIEW_LIMIT),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks]);
+    [tasks, columns],
+  );
 
   // Health
   const goals = useMemo(() => {
@@ -218,11 +227,19 @@ export default function TodayScreen() {
     [currencies, primaryCode],
   );
 
+  /**
+   * Зведення дня рахує лише оборот основної валюти. Перекази сюди не
+   * потрапляють: `calcTotals` бере тільки 'income' і 'expense', тож переїзд
+   * грошей між своїми рахунками не роздуває ні дохід, ні витрату місяця.
+   */
   const fin = useMemo(() => {
-    const month = filterByMonth(txs.filter(t => txCurrency(t) === primaryCode), today);
+    const month = filterByMonth(
+      txs.filter(t => resolveTxCurrency(t, accounts) === primaryCode),
+      today,
+    );
     return calcTotals(month);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txs, primaryCode]);
+  }, [txs, accounts, primaryCode]);
 
   // Time today
   const trackedSec = time
@@ -351,23 +368,38 @@ export default function TodayScreen() {
                   </View>
                 </View>
               </View>
-              <TodayTaskRow
-                tasks={todayTasks.slice(0, TODAY_PREVIEW_LIMIT)}
-                isDark={isDark}
-                c={c}
-                tr={tr}
-                onToggle={handleToggleTask}
-                onOpen={openTaskDetails}
-              />
-              {todayTasks.length > TODAY_PREVIEW_LIMIT && (
+              {/* Групи за статусом. «У процесі» йде першою і не обрізається:
+                  на екрані дня спершу те, що робиться просто зараз. Заголовок
+                  групи показуємо лише коли груп справді кілька — над єдиним
+                  списком він був би шумом. */}
+              {todayGroups.groups.map(group => (
+                <View key={group.id}>
+                  {todayGroups.groups.length > 1 && (
+                    <View style={s.groupRow}>
+                      <View style={[s.groupDot, { backgroundColor: group.color }]} />
+                      <Text style={[s.groupName, { color: c.sub }]}>{group.name}</Text>
+                      <Text style={[s.groupCount, { color: c.sub }]}>{group.tasks.length}</Text>
+                    </View>
+                  )}
+                  <TodayTaskRow
+                    tasks={group.tasks}
+                    isDark={isDark}
+                    c={c}
+                    tr={tr}
+                    onToggle={handleToggleTask}
+                    onOpen={openTaskDetails}
+                  />
+                </View>
+              ))}
+              {todayGroups.hidden > 0 && (
                 <ShowAllRow
-                  label={tr.showAllCount.replace('{count}', String(todayTasks.length))}
+                  label={tr.showAllCount.replace('{count}', String(todayGroups.total))}
                   color={ACCENT_TASK}
                   c={c}
                   onPress={() => router.push('/')}
                 />
               )}
-              {todayTasks.length === 0 && (
+              {todayGroups.total === 0 && (
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
               )}
             </View>
@@ -555,7 +587,7 @@ export default function TodayScreen() {
               />
               <NavStat
                 icon="checklist"
-                count={todayTasks.length}
+                count={todayGroups.total}
                 label={tr.tabTasks}
                 color={ACCENT_TASK}
                 c={c}
@@ -646,6 +678,10 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   badge: { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
+  groupRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 4 },
+  groupDot:   { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
+  groupName:  { flex: 1, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
+  groupCount: { fontSize: 11, fontWeight: '700', opacity: 0.7 },
   sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -4,11 +4,16 @@
  * Вкладка таймера в деталі завдання: скільки натікло, кнопка старт/стоп
  * і перелік сесій.
  *
- * Два місця тут показують час, що біжить — велике табло і рядок сесії,
- * яка триває. Обидва йдуть через ElapsedClock: значення обчислюється від
- * startedAt на кожному тіку, а не при рендері екрана. Інакше вони
- * оновлювалися б лише тоді, коли екран перемальовується з якоїсь іншої
- * причини, і час стояв би на місці, поки його витрачають.
+ * Сесія, що триває, більше не живе серед timeEntries — вона приходить
+ * пропом `activeStartedAt` із реєстру active_timers. Тому список нижче — це
+ * рівно завершені сесії, а активна показана окремим рядком зверху: інакше
+ * довелося б вигадувати для неї запис, якого в даних завдання немає.
+ *
+ * Два місця тут показують час, що біжить — велике табло і рядок активної
+ * сесії. Обидва йдуть через ElapsedClock: значення обчислюється від startedAt
+ * на кожному тіку, а не при рендері екрана. Інакше вони оновлювалися б лише
+ * тоді, коли екран перемальовується з якоїсь іншої причини, і час стояв би на
+ * місці, поки його витрачають.
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -17,10 +22,8 @@ import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 import {
-  activeSessionSeconds,
-  completedSessionCount,
+  completedSessions,
   elapsedSince,
-  getActiveTimerEntry,
   totalTrackedSeconds,
   type TimedTask,
 } from '@/utils/taskTimer';
@@ -28,6 +31,8 @@ import {
 export interface TaskTimerTabProps {
   task: TimedTask & { status: 'active' | 'done' };
   running: boolean;
+  /** ISO-мітка старту сесії, що триває. Undefined, якщо таймер стоїть. */
+  activeStartedAt?: string;
   onStart: () => void;
   onStop: () => void;
   colors: { text: string; sub: string; border: string; dim: string };
@@ -43,40 +48,44 @@ const RUNNING = '#6366F1';
 const STOP = '#EF4444';
 
 export function TaskTimerTab({
-  task, running, onStart, onStop, colors: c, tr, locale, fmtClock, fmtDur,
+  task, running, activeStartedAt, onStart, onStop, colors: c, tr, locale, fmtClock, fmtDur,
 }: TaskTimerTabProps) {
-  const entries = task.timeEntries ?? [];
-  const active = getActiveTimerEntry(task);
+  const sessions = completedSessions(task);
+  const live = running && !!activeStartedAt;
   const time = (iso: string) => new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  const day = (iso: string) => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 
   return (
     <View>
       <View style={{ alignItems: 'center', paddingVertical: 20 }}>
         <Text style={[st.caption, { color: c.sub }]}>
-          {running ? tr.currentSession : tr.trackedTime}
+          {live ? tr.currentSession : tr.trackedTime}
         </Text>
 
         <ElapsedClock
-          running={running}
-          seconds={() => running ? activeSessionSeconds(task) : totalTrackedSeconds(task)}
+          running={live}
+          seconds={now => (live && activeStartedAt ? elapsedSince(activeStartedAt, now) : totalTrackedSeconds(task))}
           format={fmtClock}
           style={[st.bigClock, { color: c.text }]}
         />
 
-        {running && active ? (
+        {live && activeStartedAt ? (
           <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
-            {tr.startedAtLabel} {time(active.startedAt)}
+            {tr.startedAtLabel} {time(activeStartedAt)}
           </Text>
         ) : null}
 
-        {!running && entries.length > 0 ? (
+        {!live && sessions.length > 0 ? (
           <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
-            {tr.sessionsCount}: {completedSessionCount(task)}
+            {tr.sessionsCount}: {sessions.length}
           </Text>
         ) : null}
       </View>
 
-      {task.status === 'active' && (
+      {/* Кнопку показуємо і завершеному завданню, поки на ньому щось іде:
+          інакше таймер, який лишився з часів, коли завдання ще було активним,
+          неможливо зупинити з цього екрана. */}
+      {(task.status === 'active' || running) && (
         <TouchableOpacity
           onPress={running ? onStop : onStart}
           accessibilityRole="button"
@@ -88,46 +97,45 @@ export function TaskTimerTab({
         </TouchableOpacity>
       )}
 
-      {entries.length > 0 && (
+      {(live || sessions.length > 0) && (
         <View style={{ marginTop: 18 }}>
           <Text style={[st.label, { color: c.sub }]}>{tr.sessions}</Text>
-          {/* Найновіша сесія зверху. */}
-          {[...entries].reverse().map(entry => {
-            const live = !entry.endedAt;
-            return (
-              <View
-                key={entry.id}
-                style={[st.row, {
-                  borderColor: live ? RUNNING + '40' : c.border,
-                  backgroundColor: live ? RUNNING + '08' : c.dim,
-                }]}>
-                <IconSymbol name="timer" size={14} color={live ? RUNNING : c.sub} />
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  {live ? (
-                    <ElapsedClock
-                      running
-                      seconds={() => elapsedSince(entry.startedAt)}
-                      format={fmtClock}
-                      style={[st.rowValue, { color: c.text }]}
-                    />
-                  ) : (
-                    <Text style={[st.rowValue, { color: c.text }]}>{fmtDur(entry.duration)}</Text>
-                  )}
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
-                    {new Date(entry.startedAt).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-                    {' · '}
-                    {time(entry.startedAt)}
-                    {entry.endedAt ? ` → ${time(entry.endedAt)}` : ''}
-                  </Text>
-                </View>
-                {live && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: RUNNING }} />}
+
+          {live && activeStartedAt ? (
+            <View style={[st.row, { borderColor: RUNNING + '40', backgroundColor: RUNNING + '08' }]}>
+              <IconSymbol name="timer" size={14} color={RUNNING} />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <ElapsedClock
+                  running
+                  seconds={now => elapsedSince(activeStartedAt, now)}
+                  format={fmtClock}
+                  style={[st.rowValue, { color: c.text }]}
+                />
+                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                  {day(activeStartedAt)}{' · '}{time(activeStartedAt)}
+                </Text>
               </View>
-            );
-          })}
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: RUNNING }} />
+            </View>
+          ) : null}
+
+          {/* Найновіша сесія зверху. */}
+          {[...sessions].reverse().map(entry => (
+            <View key={entry.id} style={[st.row, { borderColor: c.border, backgroundColor: c.dim }]}>
+              <IconSymbol name="timer" size={14} color={c.sub} />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={[st.rowValue, { color: c.text }]}>{fmtDur(entry.duration)}</Text>
+                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                  {day(entry.startedAt)}{' · '}{time(entry.startedAt)}
+                  {entry.endedAt ? ` → ${time(entry.endedAt)}` : ''}
+                </Text>
+              </View>
+            </View>
+          ))}
         </View>
       )}
 
-      {entries.length === 0 && task.status === 'active' && (
+      {!live && sessions.length === 0 && task.status === 'active' && (
         <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 12 }}>
           {tr.timerHint}
         </Text>

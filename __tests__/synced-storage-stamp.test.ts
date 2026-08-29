@@ -26,6 +26,7 @@ jest.mock('@/store/storage', () => ({
 }));
 
 import { diffItems, saveSynced, stampUpdatedAt } from '@/store/synced-storage';
+import { mergeAccountsForSave, type Account } from '@/utils/accounts';
 
 interface Row {
   id: string;
@@ -134,5 +135,41 @@ describe('saveSynced штампує при записі', () => {
     // сигнал «змінено» — потрапляння саме t1 в outbox.
     const queued = read<{ local_id: string }[]>('sync_outbox', []);
     expect(queued.map(item => item.local_id)).toEqual(['t1']);
+  });
+});
+
+describe('запис зі стану екрана і рахунок, долитий синком', () => {
+  const own: Account = {
+    id: 'acct-own', name: 'Гаманець', kind: 'cash', currency: 'UAH',
+    openingBalance: 0, createdAt: '2026-01-01T00:00:00.000Z',
+  };
+  const pulled = { ...own, id: 'acct-pulled', name: 'Депозит' };
+
+  test('масив без записаного синком рахунку кладе в outbox тумбстоун', async () => {
+    // Саме це й ставало з рахунком, що прилетів у сховище, поки екран
+    // відкритий: наступне збереження зі стану оголошувало його видаленим —
+    // на сервері й на всіх пристроях.
+    mockStore.set('accounts', JSON.stringify([own, pulled]));
+
+    await saveSynced('accounts', [own]);
+
+    const outbox = read<{ collection: string; local_id: string; deleted: boolean }[]>(
+      'sync_outbox', [],
+    );
+    expect(outbox).toContainEqual(
+      expect.objectContaining({ collection: 'accounts', local_id: 'acct-pulled', deleted: true }),
+    );
+    expect(read<{ id: string }[]>('accounts', []).map(a => a.id)).toEqual(['acct-own']);
+  });
+
+  test('долитий перед записом — тумбстоуна немає', async () => {
+    mockStore.set('accounts', JSON.stringify([own, pulled]));
+
+    await saveSynced('accounts', mergeAccountsForSave([own, pulled], [own]));
+
+    const outbox = read<{ deleted: boolean }[]>('sync_outbox', []);
+    expect(outbox.some(i => i.deleted)).toBe(false);
+    expect(read<{ id: string }[]>('accounts', []).map(a => a.id))
+      .toEqual(['acct-own', 'acct-pulled']);
   });
 });

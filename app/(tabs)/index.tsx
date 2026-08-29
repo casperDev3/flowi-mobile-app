@@ -39,11 +39,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
+import { useTimerContext } from '@/store/timer-context';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import { filterTasksByMonth, taskMatchesSearch } from '@/utils/taskUtils';
-import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, taskColumnId, taskStatusColumn } from '@/utils/taskStatuses';
+import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, orderColumnsForList, taskColumnId, taskStatusColumn } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
@@ -52,6 +53,7 @@ import { useCalendarNav, type CalSpan } from '@/hooks/use-calendar-nav';
 import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/use-task-editor';
 import { DetailPane } from '@/components/shared/DetailPane';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
+import { PickerField } from '@/components/shared/PickerField';
 import { TaskHistoryTab, type HistoryEventType, type TaskHistoryEvent } from '@/components/tasks/TaskHistoryTab';
 import { TaskTimerTab } from '@/components/tasks/TaskTimerTab';
 import { TaskEditForm } from '@/components/tasks/TaskEditForm';
@@ -59,7 +61,7 @@ import { CalendarGrid } from '@/components/tasks/CalendarGrid';
 import { TaskReminderRow } from '@/components/tasks/TaskReminderRow';
 import { TaskSubtasks } from '@/components/tasks/TaskSubtasks';
 import { TaskCalendarView } from '@/components/tasks/TaskCalendarView';
-import { getActiveTimerEntry, totalSecondsIncludingActive, totalTrackedSeconds } from '@/utils/taskTimer';
+import { totalSecondsIncludingActive } from '@/utils/taskTimer';
 import { monthGrid } from '@/utils/dateUtils';
 import { initialReminderDraft, resolveReminderMoment } from '@/utils/reminderTime';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
@@ -71,7 +73,7 @@ try { AVAudio = require('expo-av').Audio; } catch {}
 
 type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
-type SortBy = 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
+type SortBy = 'status' | 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
 type Filter = 'all' | 'active' | 'done';
 type ViewMode = 'list' | 'calendar';
 
@@ -233,6 +235,7 @@ export default function TasksScreen() {
     low:    { label: tr.priorityLow,    color: PRIORITY_COLORS.low    },
   };
   const SORT_OPTIONS: { key: SortBy; label: string; icon: string }[] = [
+    { key: 'status',    label: tr.sortStatus,    icon: 'rectangle.3.group' },
     { key: 'deadline',  label: tr.sortDeadline,  icon: 'flag' },
     { key: 'priority',  label: tr.sortPriority,  icon: 'exclamationmark.circle' },
     { key: 'newest',    label: tr.sortNewest,    icon: 'arrow.down.circle' },
@@ -248,6 +251,10 @@ export default function TasksScreen() {
   const MONTHS_UA = tr.months;
   const WEEKDAYS_SHORT = tr.weekdays;
   const [tasks, setTasks] = useState<Task[]>([]);
+  // Таймери завдань живуть у сторі, а не в цьому екрані: ту саму сесію можна
+  // зупинити з вкладки часу або з іншого пристрою, і локальний стан про це
+  // ніколи б не дізнався.
+  const { startTaskTimer, stopTimerForTask, getTimerForTask, tasksRevision } = useTimerContext();
   const [projects, setProjects] = useState<Project[]>([]);
 
   // Пікери показують лише ЖИВІ проєкти, а `projects` лишається повним.
@@ -263,7 +270,7 @@ export default function TasksScreen() {
   const [activeMonth, setActiveMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('active');
-  const [sort, setSort] = useState<SortBy>('deadline');
+  const [sort, setSort] = useState<SortBy>('status');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   // Search & extra filters
@@ -274,7 +281,6 @@ export default function TasksScreen() {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const [showAdd, setShowAdd] = useState(false);
-  const [showDetailProjectDropdown, setShowDetailProjectDropdown] = useState(false);
 
   // Recurrence for add task
 
@@ -369,10 +375,35 @@ export default function TasksScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openParam, initialized, router]);
 
+  /**
+   * Завдання, чий таймер треба зупинити, щойно наш власний запис 'tasks'
+   * долетить до сховища. Стор зупиняє таймер через read-modify-write того
+   * самого ключа — якби він прочитав список ДО нашого запису, або статус
+   * «готово», або дописана сесія загубилися б залежно від того, хто написав
+   * останнім.
+   */
+  const pendingTimerStops = useRef<string[]>([]);
+
   // Save to storage
   useEffect(() => {
-    if (initialized) void saveSynced('tasks', tasks);
-  }, [tasks, initialized]);
+    if (!initialized) return;
+    void saveSynced('tasks', tasks).then(() => {
+      if (pendingTimerStops.current.length === 0) return;
+      const ids = pendingTimerStops.current;
+      pendingTimerStops.current = [];
+      for (const id of ids) void stopTimerForTask(id);
+    });
+  }, [tasks, initialized, stopTimerForTask]);
+
+  // Стор пише 'tasks' повз наш стан: старт таймера дописує історію і рухає
+  // колонку, зупинка — додає завершену сесію. Без перечитування наступний
+  // запис цього екрана затер би все це своїм застарілим списком.
+  useEffect(() => {
+    if (!initialized || tasksRevision === 0) return;
+    loadData<Task[]>('tasks', [])
+      .then(setTasks)
+      .catch(e => { if (__DEV__) console.warn('[tasks] перечитування після запису стору не вдалося:', e); });
+  }, [tasksRevision, initialized]);
 
   useEffect(() => {
     if (meetingsInit) void saveSynced('meetings', meetings);
@@ -391,9 +422,11 @@ export default function TasksScreen() {
     setShowReminderPicker(false);
   }, [selected?.id]);
 
-  // Timer interval — run while selected task has active timer entry
-  const selectedTaskForTimer = selected ? tasks.find(t => t.id === selected.id) : null;
-  const isTimerRunning = selectedTaskForTimer ? !!getActiveTimerEntry(selectedTaskForTimer) : false;
+  // Джерело правди про «йде» — реєстр активних таймерів у сторі. Читання
+  // синхронне, але реактивне: стор оновлює стан разом із ref, тож цей рендер
+  // уже бачить актуальний запис.
+  const activeTimer = selected ? getTimerForTask(selected.id) : undefined;
+  const isTimerRunning = !!activeTimer;
 
   const todayStr = today.toDateString();
   // Tasks due today (deadline = today) — both done and not done
@@ -435,6 +468,9 @@ export default function TasksScreen() {
           if (!b.deadline) return -1;
           return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
         }
+        // Усередині статусної групи порядок задає пріоритет: сам статус уже
+        // винесений у заголовок групи.
+        case 'status':
         case 'priority': return pOrd[a.priority] - pOrd[b.priority];
         case 'newest':   return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         case 'oldest':   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -478,7 +514,14 @@ export default function TasksScreen() {
     groupsSource.forEach(t => {
       let key: string;
       let label: string;
-      if (sort === 'deadline') {
+      if (sort === 'status') {
+        // Групи за колонкою дошки. Ті самі, що на екрані дня, і тим самим
+        // правилом порядку — orderColumnsForList нижче ставить «У процесі»
+        // попереду решти.
+        const column = taskStatusColumn(t, taskStatuses);
+        key = column.id;
+        label = column.name;
+      } else if (sort === 'deadline') {
         if (!t.deadline) {
           key = '__no_deadline__';
           label = tr.withoutDeadline;
@@ -495,19 +538,25 @@ export default function TasksScreen() {
       if (!map[key]) { map[key] = { label, tasks: [] }; order.push(key); }
       map[key].tasks.push(t);
     });
+    if (sort === 'status') {
+      // Порядок груп задає дошка, а не порядок появи завдань у списку.
+      const rank = new Map(orderColumnsForList(taskStatuses).map((column, i) => [column.id, i]));
+      order.sort((a, b) => (rank.get(a) ?? 99) - (rank.get(b) ?? 99));
+      return order.map(k => map[k]);
+    }
     const noDeadlineIdx = order.indexOf('__no_deadline__');
     if (noDeadlineIdx > 0) {
       order.splice(noDeadlineIdx, 1);
       order.push('__no_deadline__');
     }
     return order.map(k => map[k]);
-  }, [groupsSource, sort]);
+  }, [groupsSource, sort, taskStatuses]);
 
   // Пошук навмисно не враховано: у нього власна гілка порожнього стану,
   // і змішувати їх означало б радити «скинути фільтри» людині, яка
   // просто нічого не знайшла за запитом.
-  const hasFiltersBesidesSearch = filter !== 'active' || sort !== 'deadline' || !!dateFilter || !!filterProject || !!filterPriority;
-  const hasActiveFilters = filter !== 'active' || sort !== 'deadline' || !!dateFilter || !!filterProject || !!filterPriority || !!search.trim();
+  const hasFiltersBesidesSearch = filter !== 'active' || sort !== 'status' || !!dateFilter || !!filterProject || !!filterPriority;
+  const hasActiveFilters = filter !== 'active' || sort !== 'status' || !!dateFilter || !!filterProject || !!filterPriority || !!search.trim();
 
   const addTask = useCallback(() => {
     const draft = composer.draft;
@@ -545,8 +594,15 @@ export default function TasksScreen() {
           text: tr.delete,
           style: 'destructive',
           onPress: () => {
+            // Видалення завдання мусить прибрати і його таймер: інакше в
+            // реєстрі лишається запис із taskId, що вказує в нікуди, — він
+            // далі цокає у fullscreen-сітці, а зупинити його нема звідки.
+            // Черга, а не прямий виклик — див. коментар до pendingTimerStops.
+            // Витрачений час при цьому не губиться: stopTimer дзеркалить сесію
+            // в 'time_entries', які переживають видалення завдання.
+            if (getTimerForTask(id)) pendingTimerStops.current.push(id);
             setTasks(p => p.filter(t => t.id !== id));
-            if (selected?.id === id) { setSelected(null); setShowDetailProjectDropdown(false); }
+            if (selected?.id === id) setSelected(null);
             // Undo: повернути задачу до списку
             if (taskToDelete) {
               showUndo(tr.taskDeleted, () => {
@@ -557,7 +613,7 @@ export default function TasksScreen() {
         },
       ],
     );
-  }, [selected, tr, showUndo]);
+  }, [selected, tr, showUndo, getTimerForTask]);
 
   // ─── Recording ──────────────────────────────────────────────────────────────
   const startRecording = useCallback(async (taskId: string) => {
@@ -648,6 +704,10 @@ export default function TasksScreen() {
     const column = taskStatuses.find(item => item.id === columnId);
     if (!column) return;
     haptic.light();
+    // Перенесення в колонку «готово» — така сама зупинка таймера, як і
+    // чекбокс: інакше відлік лишався б на завершеному завданні, а кнопку
+    // «Стоп» у деталі до нього вже не показують.
+    if (column.isDone && getTimerForTask(id)) pendingTimerStops.current.push(id);
     setTasks(prev => prev.map(t => {
       if (t.id !== id) return t;
       if (taskStatusColumn(t, taskStatuses).id === column.id) return t;
@@ -661,7 +721,7 @@ export default function TasksScreen() {
         history: [...(t.history ?? []), makeHistoryEvent(column.isDone ? 'done' : 'active', column.name)],
       };
     }));
-  }, [taskStatuses]);
+  }, [taskStatuses, getTimerForTask]);
 
   const toggleTask = useCallback((id: string) => {
     haptic.light();
@@ -674,21 +734,19 @@ export default function TasksScreen() {
       const status: Status = t.status === 'done' ? 'active' : 'done';
       const kanbanColumnId = status === 'done' ? DONE_COLUMN_ID : ACTIVE_COLUMN_ID;
       const histType: HistoryEventType = status === 'done' ? 'done' : 'active';
-      // Also stop active timer if completing task
-      const timeEntries = status === 'done'
-        ? (t.timeEntries ?? []).map(e => {
-            if (e.endedAt) return e;
-            const now = new Date();
-            return { ...e, endedAt: now.toISOString(), duration: Math.max(0, Math.floor((now.getTime() - new Date(e.startedAt).getTime()) / 1000)) };
-          })
-        : (t.timeEntries ?? []);
+      // timeEntries тут не чіпаємо: завершену сесію допише стор при зупинці —
+      // він єдиний знає, коли вона почалась.
       return {
         ...t, status, kanbanColumnId,
         subtasks: t.subtasks.map(s => ({ ...s, done: status === 'done' })),
-        timeEntries,
         history: [...(t.history ?? []), makeHistoryEvent(histType)],
       };
     };
+
+    // «Готово» зупиняє таймер завдання: тримати відлік на завершеному
+    // завданні означало б накопичувати час, якого ніхто не витрачає.
+    // Черга, а не прямий виклик — див. коментар до pendingTimerStops.
+    if (becomingDone && getTimerForTask(id)) pendingTimerStops.current.push(id);
     setTasks(p => {
       const updated = p.map(patch);
       const task = p.find(t => t.id === id);
@@ -716,12 +774,30 @@ export default function TasksScreen() {
     // Тост undo лише при позначенні виконаним
     if (becomingDone && prevTask) {
       const snapshot = prevTask;
+      /**
+       * Відкочуємо ЛИШЕ те, що змінив чекбокс, а не підміняємо завдання цілим
+       * знімком. Знімок зроблено ДО зупинки таймера, а стор дописує завершену
+       * сесію (і подію timer_stop) уже після нашого запису 'tasks' — підміна
+       * стерла б її назавжди, лишивши дзеркало в 'time_entries' без пари.
+       */
+      const restore = (t: Task): Task => t.id !== id ? t : {
+        ...t,
+        status: snapshot.status,
+        kanbanColumnId: snapshot.kanbanColumnId,
+        // Прапорці підзавдань повертаємо за id: решту полів підзавдання
+        // чекбокс завдання не чіпав.
+        subtasks: t.subtasks.map(sub => {
+          const before = snapshot.subtasks.find(x => x.id === sub.id);
+          return before ? { ...sub, done: before.done } : sub;
+        }),
+        history: [...(t.history ?? []), makeHistoryEvent('active')],
+      };
       showUndo(tr.taskMarkedDone, () => {
-        setTasks(prev => prev.map(t => t.id === id ? snapshot : t));
-        setSelected(prev => prev?.id === id ? snapshot : prev);
+        setTasks(prev => prev.map(restore));
+        setSelected(prev => prev?.id === id ? restore(prev) : prev);
       });
     }
-  }, [showUndo, tr.taskMarkedDone]);
+  }, [showUndo, tr.taskMarkedDone, getTimerForTask]);
 
   const addSubtask = useCallback((taskId: string) => {
     if (!newSubtask.trim()) return;
@@ -737,6 +813,13 @@ export default function TasksScreen() {
   }, [newSubtask]);
 
   const toggleSubtask = useCallback((taskId: string, subId: string) => {
+    // Останнє закрите підзавдання завершує завдання — і мусить зупинити його
+    // таймер так само, як чекбокс завдання.
+    const current = tasksRef.current.find(t => t.id === taskId);
+    const becomingDone = !!current && current.subtasks.length > 0
+      && current.subtasks.every(s => s.id === subId ? !s.done : s.done);
+    if (becomingDone && getTimerForTask(taskId)) pendingTimerStops.current.push(taskId);
+
     const patch = (t: Task): Task => {
       if (t.id !== taskId) return t;
       const targetSub = t.subtasks.find(s => s.id === subId);
@@ -752,7 +835,7 @@ export default function TasksScreen() {
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, []);
+  }, [getTimerForTask]);
 
   const deleteSubtask = useCallback((taskId: string, subId: string) => {
     const patch = (t: Task): Task => t.id === taskId ? { ...t, subtasks: t.subtasks.filter(s => s.id !== subId) } : t;
@@ -822,6 +905,17 @@ export default function TasksScreen() {
     return true;
   }, []);
 
+  // Списки для полів вибору в деталі. Мемоізовані: PickerField тримає їх у
+  // useMemo фільтрації, і новий масив на кожен рендер знецінював би це.
+  const statusOptions = useMemo(
+    () => taskStatuses.map(column => ({ id: column.id, label: column.name, color: column.color })),
+    [taskStatuses],
+  );
+  const projectOptions = useMemo(
+    () => pickableProjects.map(project => ({ id: project.id, label: project.name, color: project.color })),
+    [pickableProjects],
+  );
+
   const handleSelectTask = useCallback((task: Task) => setSelected(task), []);
   const handleToggleTask = useCallback((task: Task) => toggleTask(task.id), [toggleTask]);
 
@@ -829,12 +923,17 @@ export default function TasksScreen() {
     if (!editor.draft.title.trim() || !selected) return;
     const estimatedMinutes = draftEstimatedMinutes(editor.draft);
     const recurrence = draftRecurrence(editor.draft);
+    const column = taskStatuses.find(item => item.id === editor.draft.statusId) ?? taskStatuses[0];
+    // Вибір done-статусу в редакторі — теж завершення завдання, і таймер на
+    // ньому далі йти не має.
+    if (column.isDone && getTimerForTask(selected.id)) pendingTimerStops.current.push(selected.id);
+
     const patch = (t: Task): Task => t.id !== selected.id ? t : {
       ...t,
       title: editor.draft.title.trim(),
       description: editor.draft.desc.trim(),
       priority: editor.draft.priority,
-      status: (taskStatuses.find(column => column.id === editor.draft.statusId) ?? taskStatuses[0]).isDone ? 'done' : 'active',
+      status: column.isDone ? 'done' : 'active',
       kanbanColumnId: editor.draft.statusId,
       estimatedMinutes,
       deadline: editor.draft.deadline ?? undefined,
@@ -848,7 +947,7 @@ export default function TasksScreen() {
     setSelected(prev => prev?.id === selected.id ? patch(prev) : prev);
     editor.finish();
     // Чернетка тепер один об'єкт, тож і залежність одна замість тринадцяти.
-  }, [editor, selected, taskStatuses]);
+  }, [editor, selected, taskStatuses, getTimerForTask]);
 
   const openReminderPicker = useCallback((taskId: string, subtaskId?: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -918,53 +1017,28 @@ export default function TasksScreen() {
 
   const startTimer = useCallback(() => {
     if (!selected) return;
-    const entry: TaskTimeEntry = { id: Date.now().toString(), startedAt: new Date().toISOString(), duration: 0 };
-    const evt = makeHistoryEvent('timer_start');
-    setTasks(p => p.map(t => t.id !== selected.id ? t : {
-      ...t,
-      timeEntries: [...(t.timeEntries ?? []), entry],
-      history: [...(t.history ?? []), evt],
-    }));
-  }, [selected]);
+    // Беремо свіжу копію: у `selected` лежить знімок на момент відкриття, а
+    // стору важливі саме поточні колонка і статус — від них залежить, чи
+    // переїде завдання в «У процесі».
+    const task = tasksRef.current.find(t => t.id === selected.id) ?? selected;
+    void startTaskTimer({
+      id: task.id,
+      title: task.title,
+      kanbanColumnId: task.kanbanColumnId,
+      status: task.status,
+    });
+  }, [selected, startTaskTimer]);
 
+  // Дзеркалення сесії в 'time_entries' і дозапис у timeEntries завдання робить
+  // стор — однаково для деталі завдання, вкладки часу і fullscreen-сітки.
   const stopTimer = useCallback(() => {
     if (!selected) return;
-    const now = new Date();
-    const evt = makeHistoryEvent('timer_stop');
-    // sessionDuration is captured inside the setTasks updater (runs synchronously)
-    // so we can read it immediately after setTasks returns.
-    let sessionDuration = 0;
-
-    setTasks(p => p.map(t => {
-      if (t.id !== selected.id) return t;
-      const timeEntries = (t.timeEntries ?? []).map(e => {
-        if (e.endedAt) return e;
-        const duration = Math.max(0, Math.floor((now.getTime() - new Date(e.startedAt).getTime()) / 1000));
-        sessionDuration = duration; // capture for time_entries write
-        return { ...e, endedAt: now.toISOString(), duration };
-      });
-      return { ...t, timeEntries, history: [...(t.history ?? []), evt] };
-    }));
-
-    // Mirror session to shared 'time_entries' so time-stats/time-records see it
-    if (sessionDuration > 0) {
-      const hour = now.getHours();
-      const shift: 'morning' | 'day' | 'evening' | 'night' =
-        hour >= 6 && hour < 12 ? 'morning'
-        : hour >= 12 && hour < 18 ? 'day'
-        : hour >= 18 ? 'evening'
-        : 'night';
-      type _TimeEntry = { id: string; task: string; shift: string; duration: number; date: string };
-      const tEntry: _TimeEntry = { id: `task_${Date.now()}`, task: selected.title, shift, duration: sessionDuration, date: now.toISOString() };
-      void loadData<_TimeEntry[]>('time_entries', []).then(existing =>
-        saveSynced('time_entries', [tEntry, ...existing]),
-      );
-    }
-  }, [selected]);
+    void stopTimerForTask(selected.id);
+  }, [selected, stopTimerForTask]);
 
   const clearAllFilters = useCallback(() => {
     setFilter('active');
-    setSort('deadline');
+    setSort('status');
     setFilterProject(null);
     setFilterPriority(null);
     setDateFilter(null);
@@ -1130,6 +1204,7 @@ export default function TasksScreen() {
                       <TaskTimerTab
                         task={selectedTask}
                         running={isTimerRunning}
+                        activeStartedAt={activeTimer?.startedAt}
                         onStart={startTimer}
                         onStop={stopTimer}
                         colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
@@ -1195,45 +1270,21 @@ export default function TasksScreen() {
 
                     {selectedTask.description ? <Text style={[s.detailDesc, { color: c.sub }]}>{selectedTask.description}</Text> : null}
 
-                    {/* Статус: перенести завдання в іншу колонку прямо з деталей.
-                        Раніше це вимагало входу в режим редагування, тож
-                        перевести «В роботі» в інший статус було нікуди. */}
-                    <View style={{ marginTop: 12 }}>
-                      <Text style={[s.label, { color: c.sub }]}>{tr.status}</Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                        {taskStatuses.map(column => {
-                          const active = taskStatusColumn(selectedTask, taskStatuses).id === column.id;
-                          return (
-                            <TouchableOpacity
-                              key={column.id}
-                              onPress={() => setTaskColumn(selectedTask.id, column.id)}
-                              activeOpacity={0.7}
-                              accessibilityRole="button"
-                              accessibilityState={{ selected: active }}
-                              accessibilityLabel={column.name}
-                              style={{
-                                minHeight: 36,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                borderRadius: 10,
-                                borderWidth: 1,
-                                paddingHorizontal: 11,
-                                paddingVertical: 8,
-                                backgroundColor: active ? column.color + '20' : c.dim,
-                                borderColor: active ? column.color : c.border,
-                              }}>
-                              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: column.color, marginRight: 6 }} />
-                              <Text style={{ color: active ? column.color : c.sub, fontSize: 12, fontWeight: active ? '700' : '600' }}>
-                                {column.name}
-                              </Text>
-                              {/* Галочка, а не лише колір: вибраний стан не має
-                                  триматись виключно на кольорі. */}
-                              {active && <IconSymbol name="checkmark" size={11} color={column.color} style={{ marginLeft: 5 }} />}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
+                    {/* Статус і проєкт — однакове поле вибору: обидва
+                        відкривають аркуш зі списком, а при більш ніж пʼятьох
+                        варіантах ще й із пошуком. Раніше тут стояли два різні
+                        способи вибирати поруч — розсип чипів і інлайн-список,
+                        що розсовував вміст. */}
+                    <PickerField
+                      label={tr.status}
+                      icon="rectangle.3.group"
+                      options={statusOptions}
+                      value={taskStatusColumn(selectedTask, taskStatuses).id}
+                      onSelect={id => { if (id) setTaskColumn(selectedTask.id, id); }}
+                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
+                      isDark={isDark}
+                      tr={tr}
+                    />
 
                     {/* Meta badges */}
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 }}>
@@ -1299,51 +1350,18 @@ export default function TasksScreen() {
                       locale={locale}
                     />
 
-                    {/* Project changer */}
                     {pickableProjects.length > 0 && (
-                      <View style={{ marginTop: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                          <IconSymbol name="folder" size={12} color={c.sub} />
-                          <Text style={[s.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0 }]}>{lang === 'uk' ? 'ПРОЕКТ' : 'PROJECT'}</Text>
-                        </View>
-                        {/* Dropdown trigger */}
-                        <TouchableOpacity
-                          onPress={() => setShowDetailProjectDropdown(v => !v)}
-                          style={[s.dropdownBtn, { backgroundColor: c.dim, borderColor: showDetailProjectDropdown ? c.accent : c.border }]}>
-                          {(() => {
-                            const sel = projects.find(p => p.id === selectedTask.projectId);
-                            return sel ? (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
-                                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
-                                <Text style={{ color: sel.color, fontSize: 13, fontWeight: '600', flex: 1 }}>{sel.name}</Text>
-                              </View>
-                            ) : (
-                              <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', flex: 1 }}>{tr.noProject}</Text>
-                            );
-                          })()}
-                          <IconSymbol name={showDetailProjectDropdown ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
-                        </TouchableOpacity>
-                        {showDetailProjectDropdown && (
-                          <View style={[s.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
-                            <TouchableOpacity
-                              onPress={() => { updateTaskProject(selectedTask.id, null); setShowDetailProjectDropdown(false); }}
-                              style={[s.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !selectedTask.projectId ? c.accent + '12' : 'transparent' }]}>
-                              <Text style={{ color: !selectedTask.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
-                              {!selectedTask.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
-                            </TouchableOpacity>
-                            {pickableProjects.map((proj, i) => (
-                              <TouchableOpacity
-                                key={proj.id}
-                                onPress={() => { updateTaskProject(selectedTask.id, proj.id); setShowDetailProjectDropdown(false); }}
-                                style={[s.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: selectedTask.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
-                                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: proj.color, marginRight: 8 }} />
-                                <Text style={{ color: selectedTask.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
-                                {selectedTask.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
-                      </View>
+                      <PickerField
+                        label={lang === 'uk' ? 'Проєкт' : 'Project'}
+                        icon="folder"
+                        options={projectOptions}
+                        value={selectedTask.projectId ?? null}
+                        onSelect={id => updateTaskProject(selectedTask.id, id)}
+                        emptyOption={{ label: tr.noProject }}
+                        colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
+                        isDark={isDark}
+                        tr={tr}
+                      />
                     )}
 
                     <TaskSubtasks
@@ -1375,9 +1393,24 @@ export default function TasksScreen() {
                         onPress={() => { setDetailTab('timer'); if (!isTimerRunning) startTimer(); }}
                         style={[s.btn, { marginTop: 14, backgroundColor: isTimerRunning ? '#6366F120' : '#6366F1EE', borderWidth: isTimerRunning ? 1 : 0, borderColor: '#6366F150' }]}>
                         <IconSymbol name={isTimerRunning ? 'timer' : 'play.fill'} size={15} color={isTimerRunning ? '#6366F1' : '#fff'} />
+                        {/* Годинник — СУСІД підпису, а не вкладений у нього <Text>.
+                            На iOS вкладений текст не є окремою в'юхою: він згортається
+                            в атрибутований рядок батька, тож перемальовування дочірнього
+                            компонента саме по собі нічого на екрані не змінює — число
+                            оновлювалося б лише тоді, коли перемальовується батьківський
+                            <Text>. Саме так годинник і завмирав на планшеті, де панель
+                            деталі висить постійно й перемальовувати її нема з чого. */}
                         <Text style={{ color: isTimerRunning ? '#6366F1' : '#fff', fontWeight: '700', marginLeft: 7 }}>
-                          {isTimerRunning ? `${lang === 'uk' ? 'Таймер' : 'Timer'}: ${formatClock(totalSecondsIncludingActive(selectedTask))}` : (lang === 'uk' ? 'Запустити таймер' : 'Start timer')}
+                          {activeTimer ? `${tr.timerLabel}: ` : tr.startTimerAction}
                         </Text>
+                        {activeTimer && (
+                          <ElapsedClock
+                            running
+                            seconds={now => totalSecondsIncludingActive(selectedTask, activeTimer.startedAt, now)}
+                            format={formatClock}
+                            style={{ color: '#6366F1', fontWeight: '700' }}
+                          />
+                        )}
                         {isTimerRunning && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#6366F1', marginLeft: 6 }} />}
                       </TouchableOpacity>
                     )}
@@ -1444,9 +1477,9 @@ export default function TasksScreen() {
                       <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
                     </TouchableOpacity>
                   )}
-                  {sort !== 'deadline' && (
+                  {sort !== 'status' && (
                     <TouchableOpacity
-                      onPress={() => setSort('deadline')}
+                      onPress={() => setSort('status')}
                       style={[s.activeChip, { backgroundColor: c.accent + '15', borderColor: c.accent + '40' }]}>
                       <IconSymbol name="arrow.up.arrow.down" size={10} color={c.accent} />
                       <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>

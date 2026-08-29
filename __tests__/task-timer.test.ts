@@ -1,8 +1,6 @@
 import {
-  activeSessionSeconds,
-  completedSessionCount,
+  completedSessions,
   elapsedSince,
-  getActiveTimerEntry,
   totalSecondsIncludingActive,
   totalTrackedSeconds,
   type TimedTask,
@@ -12,23 +10,8 @@ const NOW = new Date('2026-08-27T12:00:00Z').getTime();
 const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString();
 
 const done = (id: string, duration: number) => ({ id, startedAt: ago(9999), endedAt: ago(9000), duration });
-const running = (id: string, secondsAgo: number) => ({ id, startedAt: ago(secondsAgo), duration: 0 });
-
-describe('getActiveTimerEntry', () => {
-  it('знаходить сесію без endedAt', () => {
-    const task: TimedTask = { timeEntries: [done('a', 60), running('b', 30)] };
-    expect(getActiveTimerEntry(task)?.id).toBe('b');
-  });
-
-  it('без записів — undefined, а не падіння', () => {
-    expect(getActiveTimerEntry({})).toBeUndefined();
-    expect(getActiveTimerEntry({ timeEntries: [] })).toBeUndefined();
-  });
-
-  it('усі сесії завершені — undefined', () => {
-    expect(getActiveTimerEntry({ timeEntries: [done('a', 60)] })).toBeUndefined();
-  });
-});
+/** Форма запису зі старих даних: до переїзду на реєстр сесія жила тут без endedAt. */
+const legacyOpen = (id: string, secondsAgo: number) => ({ id, startedAt: ago(secondsAgo), duration: 0 });
 
 describe('elapsedSince', () => {
   it('рахує різницю в секундах', () => {
@@ -45,32 +28,31 @@ describe('elapsedSince', () => {
 });
 
 describe('підрахунок часу', () => {
-  const task: TimedTask = { timeEntries: [done('a', 600), done('b', 300), running('c', 45)] };
+  const task: TimedTask = { timeEntries: [done('a', 600), done('b', 300)] };
 
-  it('totalTrackedSeconds рахує лише завершені', () => {
+  it('totalTrackedSeconds підсумовує завершені сесії', () => {
     expect(totalTrackedSeconds(task)).toBe(900);
   });
 
-  it('totalSecondsIncludingActive додає поточну сесію', () => {
-    // Різниця між двома підрахунками — це те, що досі йде. Якби активну
-    // сесію брали за її duration (нуль до зупинки), час зникав би з
-    // очей рівно поки його витрачають.
-    expect(totalSecondsIncludingActive(task, NOW)).toBe(945);
+  it('totalSecondsIncludingActive додає сесію з реєстру', () => {
+    // Різниця між двома підрахунками — це те, що досі йде. Мітка старту
+    // приходить ззовні: у самому завданні активної сесії вже немає.
+    expect(totalSecondsIncludingActive(task, ago(45), NOW)).toBe(945);
+    expect(totalSecondsIncludingActive(task, undefined, NOW)).toBe(900);
   });
 
-  it('activeSessionSeconds — лише поточна', () => {
-    expect(activeSessionSeconds(task, NOW)).toBe(45);
-    expect(activeSessionSeconds({ timeEntries: [done('a', 600)] }, NOW)).toBe(0);
-  });
-
-  it('completedSessionCount не рахує ту, що триває', () => {
-    expect(completedSessionCount(task)).toBe(2);
+  it('відкритий запис зі старих даних не потрапляє в підсумки', () => {
+    // Міграція такі записи виносить у реєстр, але старий бекап чи пристрій
+    // зі старою версією можуть принести їх назад. Тривалості в них немає —
+    // порахувати їх означало б додати нуль і показати зайву сесію.
+    const legacy: TimedTask = { timeEntries: [done('a', 600), legacyOpen('c', 45)] };
+    expect(totalTrackedSeconds(legacy)).toBe(600);
+    expect(completedSessions(legacy).map(e => e.id)).toEqual(['a']);
   });
 
   it('порожнє завдання дає нулі, а не NaN', () => {
     expect(totalTrackedSeconds({})).toBe(0);
-    expect(totalSecondsIncludingActive({}, NOW)).toBe(0);
-    expect(activeSessionSeconds({}, NOW)).toBe(0);
-    expect(completedSessionCount({})).toBe(0);
+    expect(totalSecondsIncludingActive({}, undefined, NOW)).toBe(0);
+    expect(completedSessions({})).toEqual([]);
   });
 });

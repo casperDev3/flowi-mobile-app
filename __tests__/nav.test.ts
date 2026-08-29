@@ -1,4 +1,9 @@
-import { NAV_GROUPS, isRouteActive } from '../constants/nav';
+import {
+  DEFAULT_COLLAPSED_GROUP_IDS,
+  NAV_GROUPS,
+  isGroupCollapsed,
+  isRouteActive,
+} from '../constants/nav';
 
 describe('isRouteActive', () => {
   it('групу-дужки не видно в адресі', () => {
@@ -45,5 +50,40 @@ describe('NAV_GROUPS', () => {
       const active = items.filter(i => isRouteActive(i.route, pathname));
       expect(active.map(a => a.route)).toEqual([item.route]);
     }
+  });
+});
+
+describe('згортання груп сайдбара', () => {
+  const tools = NAV_GROUPS.find(g => g.id === 'tools')!;
+  const more = NAV_GROUPS.find(g => g.id === 'more')!;
+  const top = NAV_GROUPS.find(g => !g.id)!;
+
+  it('групи без id не згортаються ніколи', () => {
+    // Найчастіші розділи й Налаштування — те, заради чого сайдбар існує.
+    expect(isGroupCollapsed(top, ['more', 'tools', undefined as never], '/')).toBe(false);
+  });
+
+  it('за замовчуванням згорнуте лише «Ще»', () => {
+    expect(isGroupCollapsed(more, DEFAULT_COLLAPSED_GROUP_IDS, '/')).toBe(true);
+    expect(isGroupCollapsed(tools, DEFAULT_COLLAPSED_GROUP_IDS, '/')).toBe(false);
+  });
+
+  it('група з поточним розділом розгортається попри згорнутість', () => {
+    // Інакше на екрані «Баги» жоден пункт не підсвічений, і незрозуміло, де ви.
+    expect(isGroupCollapsed(more, ['more'], '/bugs')).toBe(false);
+    expect(isGroupCollapsed(more, ['more'], '/notes')).toBe(false);
+    // Розділ із СУСІДНЬОЇ групи такої поблажки не дає.
+    expect(isGroupCollapsed(more, ['more'], '/projects')).toBe(true);
+  });
+
+  it('дефолт складається з наявних id, а не з вигаданих', () => {
+    const ids = NAV_GROUPS.map(g => g.id).filter(Boolean);
+    for (const id of DEFAULT_COLLAPSED_GROUP_IDS) expect(ids).toContain(id);
+  });
+
+  it('згорнути можна не все: частина пунктів лишається видимою завжди', () => {
+    // Захист від «оптимізації», яка сховала б за розкривачками весь сайдбар.
+    const alwaysVisible = NAV_GROUPS.filter(g => !g.id).flatMap(g => g.items);
+    expect(alwaysVisible.length).toBeGreaterThanOrEqual(5);
   });
 });

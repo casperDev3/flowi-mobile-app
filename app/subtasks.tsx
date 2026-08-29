@@ -17,6 +17,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useTimerContext } from '@/store/timer-context';
 import { useContentWidth } from '@/hooks/use-content-width';
 
 type Priority = 'high' | 'medium' | 'low';
@@ -74,6 +75,7 @@ export default function SubtasksScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { taskId } = useLocalSearchParams<{ taskId: string }>();
+  const { stopTimerForTask } = useTimerContext();
 
   const [task, setTask] = useState<Task | null>(null);
   const [newSubtask, setNewSubtask] = useState('');
@@ -107,7 +109,18 @@ export default function SubtasksScreen() {
     const subtasks = task.subtasks.map(s => s.id === subId ? { ...s, done: !s.done } : s);
     const status: Status = subtasks.length > 0 && subtasks.every(s => s.done) ? 'done' : 'active';
     await persistTask({ ...task, subtasks, status });
-  }, [task, persistTask]);
+    if (status !== 'done') return;
+
+    // Завершене завдання не трекають, а кнопки «Стоп» у деталі для нього вже
+    // не показують — тому зупиняємо тут, ПІСЛЯ власного запису 'tasks': стор
+    // дописує сесію тим самим read-modify-write.
+    await stopTimerForTask(task.id);
+    // Стор дописав завершену сесію прямо у сховище. Без перечитування
+    // наступний persistTask затер би її застарілим локальним об'єктом.
+    const fresh = await loadData<Task[]>('tasks', []);
+    const updated = fresh.find(t => t.id === task.id);
+    if (updated) setTask(updated);
+  }, [task, persistTask, stopTimerForTask]);
 
   const deleteSubtask = useCallback(async (subId: string) => {
     if (!task) return;

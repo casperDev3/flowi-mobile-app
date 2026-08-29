@@ -147,6 +147,8 @@ const MAPPING: Record<string, MaterialIconName> = {
   'equal': 'drag-handle',
   'arrow.up.right': 'north-east',
   'arrow.down.right': 'south-east',
+  // Повноекранний режим таймерів (вкладка Time).
+  'arrow.up.left.and.arrow.down.right': 'fullscreen',
   'pills.fill': 'medication',
   'cross.case.fill': 'medical-services',
   'syringe': 'vaccines',

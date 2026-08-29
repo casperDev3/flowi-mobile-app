@@ -9,7 +9,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useAppMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
-import { saveData } from '@/store/storage';
 
 export default function WelcomeScreen() {
   const cs = useColorScheme();
@@ -24,8 +23,7 @@ export default function WelcomeScreen() {
 
   const c = getScreenColors('auth', isDark);
 
-  const handleStartOffline = async () => {
-    await saveData('welcome_done', true);
+  const handleStartOffline = () => {
     setOnline(false);
     router.replace('/(tabs)');
   };

@@ -1,12 +1,11 @@
 import 'react-native-get-random-values'; // полефіл crypto.getRandomValues (до будь-якого використання crypto)
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { Stack, usePathname, useRouter } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import 'react-native-reanimated';
 
-import { Onboarding } from '@/components/onboarding/Onboarding';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { NavSidebar } from '@/components/shared/NavSidebar';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -16,10 +15,9 @@ import { initReporting } from '@/utils/reporting';
 import { AppModeProvider, useAppMode } from '@/store/app-mode';
 import { AuthProvider, useAuth } from '@/store/auth';
 import { AutoBackupProvider } from '@/store/auto-backup';
-import { runStorageMigrations } from '@/store/migrations';
+import { ensureStorageMigrations } from '@/store/migrations';
 import { SyncProvider } from '@/store/sync-engine';
 import { I18nProvider } from '@/store/i18n';
-import { loadData } from '@/store/storage';
 import { ThemeProvider } from '@/store/theme-context';
 import { TimerProvider } from '@/store/timer-context';
 
@@ -41,52 +39,30 @@ const SHEET_OPTIONS = {
 };
 
 /**
- * Гейт першого запуску.
- * Рендерить null (чорний екран) доки не стануть відомі:
- *   - app_mode (modeReady)
- *   - auth status (!== 'loading')
- *   - welcome_done прапор
- * Тоді, якщо НЕ welcome_done І гість → redirect '/welcome' (одноразово).
+ * Гейт стартового екрана.
+ * Після відновлення режиму й сесії гість в online-режимі завжди бачить
+ * стандартний вибір «Увійти / Зареєструватись». Свідомо обраний offline-режим
+ * лишається доступним без авторизації.
  */
 function AuthGate({ children }: { children: React.ReactNode }) {
   const cs = useColorScheme();
   const isDark = cs === 'dark';
   const { status: authStatus } = useAuth();
-  const { ready: modeReady } = useAppMode();
-  const [welcomeDone, setWelcomeDone] = useState<boolean | null>(null);
-  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
-  const router = useRouter();
-  const hasRedirected = useRef(false);
+  const { online, ready: modeReady } = useAppMode();
+  const pathname = usePathname();
 
-  useEffect(() => {
-    Promise.all([
-      loadData<boolean>('welcome_done', false),
-      loadData<boolean>('onboarding_done', false),
-    ]).then(([wd, od]) => {
-      setWelcomeDone(Boolean(wd));
-      setOnboardingDone(Boolean(od));
-    });
-  }, []);
-
-  const allReady = modeReady && authStatus !== 'loading' && welcomeDone !== null && onboardingDone !== null;
-
-  useEffect(() => {
-    if (!allReady) return;
-    if (hasRedirected.current) return;
-    // Якщо онбординг не завершено — Onboarding-модал покаже себе сам
-    // і після завершення сам перейде на /welcome. Не редіректимо тут.
-    if (!onboardingDone) return;
-    if (!welcomeDone && authStatus === 'guest') {
-      hasRedirected.current = true;
-      router.replace('/welcome');
-    }
-  }, [allReady, welcomeDone, onboardingDone, authStatus, router]);
+  const allReady = modeReady && authStatus !== 'loading';
 
   // Поки не готові — показуємо порожній фон (уникаємо миготіння)
   if (!allReady) {
     return (
       <View style={{ flex: 1, backgroundColor: isDark ? '#0C0C14' : '#F4F2FF' }} />
     );
+  }
+
+  const isAuthScreen = SIDEBAR_HIDDEN_ON.includes(pathname);
+  if (authStatus === 'guest' && online && !isAuthScreen) {
+    return <Redirect href="/welcome" />;
   }
 
   return <>{children}</>;
@@ -158,7 +134,6 @@ function RootLayoutContent() {
         </Stack>
         </View>
         </View>
-        <Onboarding />
         <StatusBar style={isDark ? 'light' : 'dark'} />
       </AuthGate>
     </NavigationThemeProvider>
@@ -172,8 +147,10 @@ function SyncGate({ children }: { children: React.ReactNode }) {
   // Міграції мусять завершитись ДО першого обміну: рушій читає колекції за
   // їхньою поточною формою, і синк застарілої форми запише на сервер сміття.
   // UI при цьому не блокуємо — притримуємо лише синхронізацію.
+  // ensureStorageMigrations, а не runStorageMigrations: на ту саму обіцянку
+  // чекає TimerProvider, перш ніж прочитати реєстр таймерів.
   useEffect(() => {
-    runStorageMigrations()
+    ensureStorageMigrations()
       .catch(e => {
         // Ковтати це мовчки не можна: далі синк читатиме колекції в застарілій
         // формі. Форму він тепер переживе (див. sync-engine), але дані такого

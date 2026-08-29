@@ -24,7 +24,6 @@ import { ApiError, OfflineError } from '@/store/api';
 import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
-import { saveData } from '@/store/storage';
 import { syncNow } from '@/store/sync-engine';
 import { haptic } from '@/utils/haptics';
 
@@ -103,7 +102,6 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(trimEmail, password, name.trim() || undefined);
-      await saveData('welcome_done', true);
       router.replace('/(tabs)');
       // З офлайну зареєструвались заради онлайн-функцій — пропонуємо увімкнути
       if (!online) {

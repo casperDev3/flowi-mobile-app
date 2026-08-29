@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, useFocusEffect } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
@@ -18,6 +18,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MonthPicker } from '@/components/shared/MonthPicker';
+import { isSameMonth as sameMonth } from '@/utils/dateUtils';
+import { budgetTxCurrency, formatUncounted, uncountedSpendByCategory } from '@/utils/budgetUtils';
+import { expenseCategoryPresets } from '@/utils/financeCategories';
+import type { CategoryRow } from '@/store/migrations';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
@@ -26,7 +30,7 @@ import { saveSynced } from '@/store/synced-storage';
 import {
   BUILTIN_CURRENCIES, formatCurrency, type Currency, type Transaction,
 } from '@/utils/financeUtils';
-import { resolveTxCurrency, type Account } from '@/utils/accounts';
+import { type Account } from '@/utils/accounts';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 
@@ -49,16 +53,6 @@ interface BudgetLimit {
 
 const ACCENT = '#0EA5E9';
 
-const DEFAULT_BUDGET_CATEGORIES: BudgetLimit[] = [
-  { category: 'Їжа',        icon: 'fork.knife',           limit: 0 },
-  { category: 'Транспорт',  icon: 'car.fill',             limit: 0 },
-  { category: 'Розваги',    icon: 'gamecontroller.fill',  limit: 0 },
-  { category: "Здоров'я",   icon: 'cross.fill',           limit: 0 },
-  { category: 'Комунальні', icon: 'house.fill',           limit: 0 },
-  { category: 'Одяг',       icon: 'tag.fill',             limit: 0 },
-  { category: 'Інше',       icon: 'ellipsis.circle.fill', limit: 0 },
-];
-
 const ICON_OPTIONS: IconSymbolName[] = [
   'fork.knife', 'car.fill', 'gamecontroller.fill', 'cross.fill', 'house.fill',
   'tag.fill', 'ellipsis.circle.fill', 'cart.fill', 'bag.fill', 'creditcard.fill',
@@ -71,8 +65,11 @@ const ICON_OPTIONS: IconSymbolName[] = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isSameMonth(dateStr: string, month: Date): boolean {
-  const d = new Date(dateStr);
-  return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth();
+  // Делегує спільній утиліті замість власного порівняння: копія цієї умови
+  // жила тут із власною сигнатурою, і будь-яка правка правила про місяць
+  // (наприклад, перехід на локальний час) полагодила б лише одне з двох місць.
+  const at = new Date(dateStr);
+  return !Number.isNaN(at.getTime()) && sameMonth(at, month);
 }
 
 function chunk<T>(arr: T[], n: number): T[][] {
@@ -144,28 +141,47 @@ export default function BudgetScreen() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const [savedBudgets, txs, primCur, curList, accs] = await Promise.all([
+      const [savedBudgets, txs, primCur, curList, accs, catRows] = await Promise.all([
         loadData<BudgetLimit[]>('budget_limits', []),
         loadData<Transaction[]>('transactions', []),
         loadData<string>('finance_primary_currency', 'UAH'),
         loadData<Currency[]>('finance_currencies', []),
         loadData<Account[]>('accounts', []),
+        loadData<CategoryRow[]>('categories', []),
       ]);
       setPrimaryCurrency(primCur || 'UAH');
       setCustomCurrencies(Array.isArray(curList) ? curList : []);
       setAccounts(Array.isArray(accs) ? accs : []);
 
-      // Merge saved budgets with defaults (add new default categories that don't exist yet)
-      const merged = [...savedBudgets];
-      for (const def of DEFAULT_BUDGET_CATEGORIES) {
-        if (!merged.find(b => b.category === def.category)) {
-          merged.push(def);
+      // Форму даних перевіряємо ДО використання, а не сподіваємось на неї.
+      // Екран падав саме тут: `budget_limits` чи `transactions` у вигляді
+      // обʼєкта (стара форма, недоїхала міграція, підмінений бекап) давали
+      // «Invalid attempt to spread non-iterable instance» просто на відкритті,
+      // без жодного натяку на причину. Порожній список — поганий стан, але
+      // видимий; виняток на монтуванні — це чорний екран.
+      const limitRows = Array.isArray(savedBudgets)
+        ? savedBudgets.filter((row): row is BudgetLimit => !!row && typeof row === 'object')
+        : [];
+      const txRows = Array.isArray(txs)
+        ? txs.filter((row): row is Transaction => !!row && typeof row === 'object')
+        : [];
+
+      // Пресети беремо з категорій, під якими операції лежать НАСПРАВДІ, а не
+      // зі свого зашитого списку. Бюджет звіряє витрати з лімітами за рядком
+      // назви: доки список був зашитий українською, англійський інтерфейс
+      // давав сім порожніх українських рядків, а ліміт на «Їжа» не зменшувався
+      // ніколи — витрата лежала в «Food».
+      const presets = expenseCategoryPresets(Array.isArray(catRows) ? catRows : [], lang);
+      const merged = [...limitRows];
+      for (const def of presets) {
+        if (!merged.find(b => b.category === def.name)) {
+          merged.push({ category: def.name, icon: def.icon, limit: 0 });
         }
       }
       setBudgets(merged);
-      setTransactions(txs);
+      setTransactions(txRows);
     })();
-  }, []));
+  }, [lang]));
 
   const saveBudgets = useCallback((next: BudgetLimit[]) => {
     setBudgets(next);
@@ -195,12 +211,16 @@ export default function BudgetScreen() {
    * порожній рядок у списку.
    */
   const actualByCategory = useMemo(() => {
-    const map: Record<string, number> = {};
+    // Object.create(null): ключ — назва категорії, яку набрав користувач.
+    // У звичайному літералі 'constructor' і 'toString' уже «є», тож
+    // `map[cat] ?? 0` дало б успадковану функцію замість нуля, а сума
+    // категорії перетворилася б на NaN.
+    const map: Record<string, number> = Object.create(null);
     transactions
       .filter(tx =>
         tx.type === 'expense' &&
         isSameMonth(tx.date, activeMonth) &&
-        resolveTxCurrency(tx, accounts) === primaryCurrency,
+        budgetTxCurrency(tx, accounts, primaryCurrency) === primaryCurrency,
       )
       .forEach(tx => {
         map[tx.category] = (map[tx.category] ?? 0) + tx.amount;
@@ -216,15 +236,36 @@ export default function BudgetScreen() {
       tx =>
         tx.type === 'expense' &&
         isSameMonth(tx.date, activeMonth) &&
-        resolveTxCurrency(tx, accounts) !== primaryCurrency,
+        budgetTxCurrency(tx, accounts, primaryCurrency) !== primaryCurrency,
     ).length;
   }, [transactions, accounts, activeMonth, primaryCurrency]);
+
+  /**
+   * Витрати категорії в ЧУЖИХ валютах — ті, що в ліміт не потрапили.
+   *
+   * Показуємо їх під самою категорією, а не лише лічильником у шапці: доти
+   * ліміт міг світитися зеленим, коли поруч лежали неврахованих 120 $, і
+   * екран про це мовчав саме там, де на нього дивляться.
+   */
+  const uncountedByCategory = useMemo(
+    () => uncountedSpendByCategory(transactions, accounts, activeMonth, primaryCurrency),
+    [transactions, accounts, activeMonth, primaryCurrency],
+  );
+
+  const symbolFor = useCallback(
+    (code: string) =>
+      [...BUILTIN_CURRENCIES, ...customCurrencies].find(cur => cur.code === code)?.symbol ?? code,
+    [customCurrencies],
+  );
 
   // Merged display list: saved budgets + auto-added from transactions
   const displayBudgets = useMemo(() => {
     const result: BudgetLimit[] = [...budgets];
     // Auto-add categories from transactions that aren't already tracked
-    Object.keys(actualByCategory).forEach(cat => {
+    // Категорії беремо з ОБОХ джерел: та, у якій витрачали лише долари, не
+    // має зникати зі списку тільки тому, що в основній валюті по ній нуль.
+    [...Object.keys(actualByCategory), ...Object.keys(uncountedByCategory)].forEach(cat => {
+      if (!cat) return;
       if (!result.find(b => b.category === cat)) {
         result.push({ category: cat, icon: 'ellipsis.circle.fill' as IconSymbolName, limit: 0 });
       }
@@ -234,7 +275,7 @@ export default function BudgetScreen() {
       const diff = (actualByCategory[b.category] ?? 0) - (actualByCategory[a.category] ?? 0);
       return diff !== 0 ? diff : a.category.localeCompare(b.category, 'uk');
     });
-  }, [budgets, actualByCategory]);
+  }, [budgets, actualByCategory, uncountedByCategory]);
 
   // Total budget and total spent
   const totals = useMemo(() => {
@@ -294,6 +335,16 @@ export default function BudgetScreen() {
 
         {/* Header */}
         <View style={st.header}>
+          {/* Екран відкривається зі Stack із headerShown:false, тож іншого
+              шляху назад, окрім жесту, тут не було — на відміну від усіх
+              сусідніх Stack-екранів фінансів. */}
+          <TouchableOpacity
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel={tr.back}
+            style={[st.headerBtn, { backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
+            <IconSymbol name="chevron.left" size={17} color={c.sub} />
+          </TouchableOpacity>
           <Text style={[st.title, { color: c.text }]}>Бюджет</Text>
           <TouchableOpacity
             onPress={() => setShowAddModal(true)}
@@ -378,6 +429,8 @@ export default function BudgetScreen() {
                   item={item}
                   spent={actualByCategory[item.category] ?? 0}
                   isAutoAdded={!budgets.some(b => b.category === item.category)}
+                  uncounted={formatUncounted(uncountedByCategory[item.category], symbolFor, locale)}
+                  uncountedLabel={tr.budgetUncounted}
                   divider={idx < displayBudgets.length - 1}
                   c={c}
                   fmt={fmt}
@@ -601,12 +654,15 @@ function ProgressBar({ spent, limit, c }: { spent: number; limit: number; c: Bud
  * передається аргументом натискання, а не замиканням.
  */
 const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
-  item, spent, isAutoAdded, divider, c, fmt, onPress,
+  item, spent, isAutoAdded, uncounted, uncountedLabel, divider, c, fmt, onPress,
 }: {
   item: BudgetLimit;
   spent: number;
   /** Категорія прийшла з транзакцій, а не з налаштованого бюджету. */
   isAutoAdded: boolean;
+  /** Витрати в чужих валютах, уже відформатовані: «120 $ · 45 €». */
+  uncounted: string;
+  uncountedLabel: string;
   divider: boolean;
   c: BudgetColors;
   fmt: (n: number) => string;
@@ -634,6 +690,14 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
               )}
             </Text>
           </View>
+          {/* Неврахованого не буває «трохи»: або воно є, або рядка немає.
+              Показуємо ПІД прогресом, щоб не заважати читати сам ліміт, але
+              в межах тієї ж картки — інакше зв'язок із категорією губиться. */}
+          {uncounted ? (
+            <Text style={{ fontSize: 11, color: c.sub }}>
+              ⚠ {uncounted} {uncountedLabel}
+            </Text>
+          ) : null}
           {item.limit > 0 ? (
             <View style={[st.progressTrack, { backgroundColor: c.dim }]}>
               <View style={[st.progressFill, { backgroundColor: barColor, width: `${pct * 100}%` as any }]} />
@@ -654,9 +718,9 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
-  title:        { fontSize: 34, fontWeight: '800', letterSpacing: -0.8 },
-  headerBtn:    { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  header:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
+  title:        { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, flex: 1, textAlign: 'center' },
+  headerBtn:    { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   summaryCard:  { borderRadius: 18, borderWidth: 1, overflow: 'hidden', padding: 16, marginBottom: 16 },
   card:         { borderRadius: 18, borderWidth: 1, overflow: 'hidden', marginBottom: 16 },
   categoryRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },

@@ -11,15 +11,14 @@
  * кого взагалі беремо, в якому порядку йдуть групи і що ховаємо під «показати
  * всі». Кожна перевірена тестом.
  */
-import { isSameDay } from './dateUtils';
 import {
   IN_PROGRESS_COLUMN_ID,
-  REVIEW_COLUMN_ID,
   orderColumnsForList,
   taskColumnId,
   type TaskStatusColumn,
 } from './taskStatuses';
-import { completedAt, isOverdue, type Task } from './taskUtils';
+import { isTodayTask } from './taskToday';
+import { type Task } from './taskUtils';
 
 export { completedAt } from './taskUtils';
 
@@ -58,21 +57,10 @@ export function groupTodayTasks(
   today: Date,
   limit: number,
 ): TodayGroups {
-  const relevant = tasks.filter(task => {
-    // Завершене лишається в дні, але тільки якщо завершене САМЕ СЬОГОДНІ.
-    // Інакше екран дня поступово перетворився б на архів: усе, що колись
-    // закрили, назавжди осідало б унизу.
-    if (task.status === 'done') {
-      const at = completedAt(task);
-      return at !== null && isSameDay(at, today);
-    }
-    const column = taskColumnId(task, columns);
-    // Робота йде або результат чекає на приймання — завдання належить дню
-    // незалежно від дедлайну. Саме ці два стани описують «сьогодні» краще за
-    // дату: дедлайн може бути через тиждень, а робиться воно зараз.
-    if (column === IN_PROGRESS_COLUMN_ID || column === REVIEW_COLUMN_ID) return true;
-    return (task.deadline && isSameDay(new Date(task.deadline), today)) || isOverdue(task);
-  });
+  // Кого взагалі беремо — питає спільне правило: те саме, що вирішує склад
+  // статусних груп у списку завдань. Копія цієї умови жила тут і одного разу
+  // вже розійшлася з копією в taskListSections.ts.
+  const relevant = tasks.filter(task => isTodayTask(task, columns, today));
 
   const buckets = new Map<string, Task[]>();
   for (const task of relevant) {

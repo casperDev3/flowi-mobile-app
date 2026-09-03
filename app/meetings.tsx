@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/shared/MeetingFormSheet';
+import { MeetingFormSheet, MeetingFormData } from '@/components/shared/MeetingFormSheet';
 
 import { DetailPane } from '@/components/shared/DetailPane';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -32,8 +32,12 @@ import { isOnlineMode } from '@/store/app-mode';
 import { cancelMeetingNotification, scheduleMeetingNotification } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useTimerContext } from '@/store/timer-context';
 import { useContentWidth } from '@/hooks/use-content-width';
-import { formatDuration } from '@/utils/durationFormat';
+import { ElapsedClock } from '@/components/tasks/ElapsedClock';
+import { formatClock, formatDuration } from '@/utils/durationFormat';
+import { elapsedSince } from '@/utils/taskTimer';
+import { findTimerForMeeting, meetingTrackedSeconds, type Meeting } from '@/utils/meetings';
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
 let AVAudio: any = null;
@@ -41,21 +45,9 @@ try { AVAudio = require('expo-av').Audio; } catch {}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Meeting {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  durationMinutes: number;
-  location?: string;
-  link?: string;
-  notes?: string;
-  color: string;
-  recurrence?: RecurrenceRule;
-  _origId?: string;    // runtime-only: set on expanded recurring instances
-  gcalId?: string;     // Google Calendar event ID (for dedup)
-  recordings?: string[]; // local audio file URIs
-}
+// Meeting живе в utils/meetings.ts: той самий тип читає екран «Сьогодні», і
+// поки копій було дві, поле, додане в одну з них (timeEntries таймера),
+// затиралося при першому ж збереженні з іншого екрана.
 
 type Span = 'day' | 'week' | 'month' | 'quarter';
 
@@ -235,9 +227,11 @@ function useColors(isDark: boolean) {
 // Мемоізована: у місячному й квартальному зрізі карток бувають сотні, і без
 // цього кожен рендер екрана перемальовував би їх усі. Колбеки приймають саму
 // зустріч аргументом — інлайн-стрілка на кожну картку ламала б порівняння.
-const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = false, isRecurring = false, selected = false }: {
+const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = false, isRecurring = false, selected = false, tracking = false }: {
   mtg: Meeting; onPress: (m: Meeting) => void; onDelete: (m: Meeting) => void; onRecord?: (m: Meeting) => void;
   isDark: boolean; c: ReturnType<typeof useColors>; showDate?: boolean; isRecurring?: boolean; selected?: boolean;
+  /** Іде таймер цієї наради. Керування — у деталі, тут лише позначка. */
+  tracking?: boolean;
 }) {
   const dur = durLabel(mtg.durationMinutes);
   const mtgDt = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
@@ -278,6 +272,10 @@ const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, on
               {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color, flexShrink: 0 }} />}
               <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
               {isRecurring && <IconSymbol name="repeat" size={11} color={mtg.color + 'CC'} />}
+              {/* Позначка «трекається зараз» потрібна саме в списку: інакше про
+                  запущений таймер знав би лише той екран, з якого його
+                  запустили. */}
+              {tracking && <IconSymbol name="timer" size={11} color="#10B981" />}
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {mtg.location ? (
@@ -381,6 +379,9 @@ export default function MeetingsScreen() {
   const router = useRouter();
   const c = useColors(isDark);
   const { tr } = useI18n();
+  // Реєстр таймерів — той самий, що у завдань: старт наради має бути видно на
+  // вкладці «Час» і в повноекранній сітці, а не лише тут.
+  const { activeTimers, startMeetingTimer, stopTimer, meetingsRevision } = useTimerContext();
   // Три колонки вмикаються тільки на `expanded`; вужче деталь лишається листом.
   const { isExpanded, height } = useResponsive();
   const detailScrollRef = useRef<ScrollView | null>(null);
@@ -455,6 +456,16 @@ export default function MeetingsScreen() {
     setMeetings(updated);
     if (initialized) void saveSynced('meetings', updated);
   }, [initialized]);
+
+  // Стоп таймера дописує сесію в 'meetings' повз наш стан. Без перечитування
+  // наступне збереження з цього екрана (правка, аудіозапис) віддифилось би від
+  // застарілого масиву й затерло щойно записану сесію.
+  useEffect(() => {
+    if (!initialized) return;
+    loadData<Meeting[]>('meetings', []).then(setMeetings).catch(e => {
+      if (__DEV__) console.warn('[meetings] перечитування після стопу не вдалось:', e);
+    });
+  }, [meetingsRevision, initialized]);
 
   // ─── Computed ─────────────────────────────────────────────────────────────
 
@@ -912,6 +923,23 @@ export default function MeetingsScreen() {
     [meetings],
   );
 
+  /**
+   * Старт/стоп таймера наради. Адресує ОРИГІНАЛ: у повторюваної наради всі
+   * входження — копії одного запису, і сесія мусить лягти в нього, інакше
+   * протрекований час зник би разом із тимчасовою копією.
+   */
+  const toggleMeetingTimer = useCallback(async (meeting: Meeting) => {
+    const running = findTimerForMeeting(activeTimers, meeting.id);
+    if (running) await stopTimer(running.id);
+    else await startMeetingTimer({ id: meeting.id, title: meeting.title });
+  }, [activeTimers, startMeetingTimer, stopTimer]);
+
+  /** Які наради трекаються просто зараз — для позначки в списку. */
+  const runningMeetingIds = useMemo(
+    () => new Set(activeTimers.map(t => t.meetingId).filter(Boolean) as string[]),
+    [activeTimers],
+  );
+
   const handleCardPress  = useCallback((m: Meeting) => setSelectedKey(m.id), []);
   const handleCardDelete = useCallback((m: Meeting) => deleteMeeting(resolveOrig(m).id), [resolveOrig, deleteMeeting]);
   const handleCardRecord = useCallback((m: Meeting) => setRecordingMtgId(resolveOrig(m).id), [resolveOrig]);
@@ -956,13 +984,14 @@ export default function MeetingsScreen() {
       <View style={{ marginBottom: item.gap }}>
         <MeetingCard mtg={item.mtg} isDark={isDark} c={c}
           isRecurring={!!item.mtg._origId}
+          tracking={runningMeetingIds.has(item.mtg._origId ?? item.mtg.id)}
           selected={item.mtg.id === selectedKey}
           onPress={handleCardPress}
           onDelete={handleCardDelete}
           onRecord={handleCardRecord} />
       </View>
     );
-  }, [c, isDark, selectedKey, handleCardPress, handleCardDelete, handleCardRecord]);
+  }, [c, isDark, selectedKey, runningMeetingIds, handleCardPress, handleCardDelete, handleCardRecord]);
 
   const isDaySpan = span === 'day' || span === 'week';
 
@@ -994,6 +1023,11 @@ export default function MeetingsScreen() {
   const renderDetail = useCallback((mtg: Meeting) => {
     const orig = resolveOrig(mtg);
     const recordings = mtg.recordings ?? [];
+    // Таймер і час — властивість ОРИГІНАЛУ: копії повторів існують лише в
+    // памʼяті, і показувати на них окремий лічильник означало б обіцяти те,
+    // чого в даних немає.
+    const timer = findTimerForMeeting(activeTimers, orig.id);
+    const tracked = meetingTrackedSeconds(orig);
 
     // На вузькому екрані деталь — модальний лист, і iOS не покаже другу
     // модалку, доки перша не зникла; звідси закриття й пауза. У колонці
@@ -1093,6 +1127,49 @@ export default function MeetingsScreen() {
           </View>
         )}
 
+        {/* Таймер наради. Реєстр той самий, що у завдань (active_timers), тому
+            запущена звідси нарада видно й на вкладці «Час», і в повноекранній
+            сітці. Завершена сесія лягає в timeEntries самої наради. */}
+        <View style={[s.detailRow, {
+          backgroundColor: timer ? '#10B98112' : c.dim, borderRadius: 12, marginBottom: 8,
+          borderWidth: timer ? 1 : 0, borderColor: '#10B98140',
+        }]}>
+          <IconSymbol name="timer" size={15} color={timer ? '#10B981' : c.sub} />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            {timer ? (
+              <ElapsedClock
+                running
+                seconds={now => elapsedSince(timer.startedAt, now)}
+                format={formatClock}
+                style={{ fontSize: 15, fontWeight: '800', color: '#10B981' }}
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: c.text }}>
+                {tracked > 0 ? formatDuration(tracked, DURATION_UNITS) : 'Час не трекався'}
+              </Text>
+            )}
+            {timer && tracked > 0 ? (
+              <Text style={{ fontSize: 11, color: c.sub, marginTop: 2 }}>
+                Разом до цього: {formatDuration(tracked, DURATION_UNITS)}
+              </Text>
+            ) : null}
+          </View>
+          <TouchableOpacity
+            onPress={() => { void toggleMeetingTimer(orig); }}
+            accessibilityRole="button"
+            accessibilityLabel={timer ? 'Зупинити таймер наради' : 'Почати таймер наради'}
+            style={[s.btn, {
+              paddingHorizontal: 14, gap: 6,
+              backgroundColor: (timer ? '#EF4444' : '#10B981') + '18',
+              borderWidth: 1, borderColor: (timer ? '#EF4444' : '#10B981') + '40',
+            }]}>
+            <IconSymbol name={timer ? 'stop.fill' : 'play.fill'} size={13} color={timer ? '#EF4444' : '#10B981'} />
+            <Text style={{ color: timer ? '#EF4444' : '#10B981', fontSize: 13, fontWeight: '700' }}>
+              {timer ? 'Стоп' : 'Старт'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Action buttons */}
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
           {/* Record */}
@@ -1113,7 +1190,8 @@ export default function MeetingsScreen() {
         </View>
       </View>
     );
-  }, [c, isExpanded, playingUri, playRecording, deleteRecording, openEdit, resolveOrig]);
+  }, [c, isExpanded, playingUri, playRecording, deleteRecording, openEdit, resolveOrig,
+      activeTimers, toggleMeetingTimer]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 

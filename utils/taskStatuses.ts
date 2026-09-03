@@ -140,12 +140,19 @@ export function subtaskToggleTransition(
  *
  * Для сортувань за датою поділ інший (по днях), і там 'active' лишається
  * дослівним: домішувати туди завершені означало б засмічувати кожен день.
+ *
+ * @param scope 'today' звужує вікно завершених до САМОГО сьогодні. Вікно
+ *   DONE_VISIBLE_DAYS охоплює ще й учора — доречно в погляді «весь список»,
+ *   але в денному режимі вчорашня закрита справа висить серед сьогоднішніх і
+ *   вдає незавершену роботу. Це те саме правило, що на екрані «Сьогодні»
+ *   (utils/taskToday.ts), просто застосоване на крок раніше — на видимості.
  */
 export function taskVisibleInList(
   task: Task,
   filter: Filter,
   sort: SortBy,
   now: Date = new Date(),
+  scope: 'today' | 'all' = 'all',
 ): boolean {
   if (task.status !== 'done') {
     return filter === 'all' || task.status === filter;
@@ -156,5 +163,12 @@ export function taskVisibleInList(
   // Старіше живе в Архіві, і саме туди по нього й ідуть.
   const visible = filter === 'all' || filter === 'done'
     || (filter === 'active' && sort === 'status');
-  return visible && completedWithinDays(task, DONE_VISIBLE_DAYS, now);
+  if (!visible) return false;
+
+  // Фільтр «Виконані» — це свідома вимога показати зроблене; звужувати його до
+  // одного дня означало б зламати єдиний спосіб переглянути закрите за тиждень.
+  if (scope === 'today' && filter !== 'done') {
+    return completedWithinDays(task, 1, now);
+  }
+  return completedWithinDays(task, DONE_VISIBLE_DAYS, now);
 }

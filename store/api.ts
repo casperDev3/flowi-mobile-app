@@ -6,6 +6,9 @@
  *  - Токени: access/refresh зберігаються в expo-secure-store.
  *  - 401 → одна спроба /auth/refresh/ → повтор; якщо знову 401 → clear tokens +
  *    подія 'session-expired'.
+ *  - Оновлення токена — single-flight: скільки б запитів одночасно не впіймали
+ *    401, у мережу піде РІВНО одне /auth/refresh/ (сервер ротує refresh і кладе
+ *    старий у блокліст, тож другий паралельний запит убив би живу сесію).
  *  - Таймаут ~15 с через AbortController.
  */
 
@@ -127,7 +130,7 @@ async function parseErrorBody(res: Response): Promise<ApiError> {
 }
 
 /** Спроба оновити access-токен через /auth/refresh/. Повертає true якщо успішно. */
-async function tryRefresh(): Promise<boolean> {
+async function performRefresh(): Promise<boolean> {
   try {
     const refresh = await SecureStore.getItemAsync(REFRESH_SECURE_KEY);
     if (!refresh) return false;
@@ -145,6 +148,33 @@ async function tryRefresh(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Оновлення токена, дедупліковане на час польоту (як на вебі, lib/api.ts).
+ *
+ * Синк шле запити пачками, тож коли access протухає, кілька з них ловлять 401
+ * майже одночасно. Доти кожен стріляв своїм /auth/refresh/ з ОДНИМ І ТИМ САМИМ
+ * refresh-токеном, а на сервері ROTATE_REFRESH_TOKENS + BLACKLIST_AFTER_ROTATION:
+ * перший запит ротував пару і клав стару в блокліст, другий отримував на неї 401
+ * і йшов шляхом «сесія мертва» — clearTokens() стирав щойно видану валідну пару.
+ * Саме це виглядало як випадкові вилогінювання посеред роботи.
+ *
+ * Тепер у мережу йде рівно один запит, решта чекають на його результат. Ті, хто
+ * чекав, ОБОВʼЯЗКОВО мусять перечитати токен після await (getAccessToken нижче):
+ * значення, прочитане до входу в чергу, вже застаріле — саме воно й дало 401.
+ */
+let _refreshInFlight: Promise<boolean> | null = null;
+
+function tryRefresh(): Promise<boolean> {
+  if (_refreshInFlight) return _refreshInFlight;
+  const run = performRefresh().finally(() => {
+    // Порівняння з run, а не безумовне обнулення: інакше запізніла відповідь
+    // старого польоту скинула б посилання на вже наступний, живий refresh.
+    if (_refreshInFlight === run) _refreshInFlight = null;
+  });
+  _refreshInFlight = run;
+  return run;
 }
 
 // ─── Публічний apiFetch ──────────────────────────────────────────────────────
@@ -168,11 +198,12 @@ export async function apiFetch<T>(
 
   let res = await doFetch(path, init);
 
-  // 401 + auth → одна спроба refresh → повтор
+  // 401 + auth → одна спроба refresh (спільна на всі паралельні запити) → повтор
   if (res.status === 401 && auth) {
     const refreshed = await tryRefresh();
     if (refreshed) {
-      // Оновлюємо заголовок свіжим токеном
+      // Читаємо токен саме ТУТ, після await: якщо оновлення робив хтось інший,
+      // у headers лежить уже мертвий токен, з яким повтор дасть 401 і вихід.
       const newToken = await getAccessToken();
       if (newToken) (headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`;
       res = await doFetch(path, { ...init, headers });

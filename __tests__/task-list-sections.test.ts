@@ -1,26 +1,29 @@
 /**
- * __tests__/task-list-sections.test.ts — межа між «сьогодні» і «майбутнім»
- * у списку завдань, згрупованому за статусом.
+ * __tests__/task-list-sections.test.ts — межа між «сьогодні» і рештою списку
+ * у вкладці завдань, згрупованій за статусом.
  *
- * Баг, який тут зафіксовано: статусні групи збирали завдання з БУДЬ-ЯКИМ
- * дедлайном, тож справа на завтра чи на листопад стояла в «До роботи» поруч
- * із сьогоднішньою. Друга половина тестів стежить, щоб правило не розійшлося
- * з правилом екрана дня — розходження копій тут уже траплялось.
+ * Баг, який тут зафіксовано, повторювався тричі. Спершу статусні групи збирали
+ * завдання з БУДЬ-ЯКИМ дедлайном, тож справа на листопад стояла в «До роботи»
+ * поруч із сьогоднішньою. Потім майбутнє винесли в денні секції — але беклог
+ * без дедлайну лишився в статусах, і для людини з півсотнею таких завдань
+ * вкладка як показувала все, так і показувала. Потім і те, і те склали в
+ * згорнуті шухляди — і денний режим усе одно читався як «ось завдання за інші
+ * дні», просто дрібнішим шрифтом.
+ *
+ * Тому головне, що тут перевіряється, — несьогоднішнє у scope 'today' не
+ * потрапляє в результат ВЗАГАЛІ: ні секцією, ні порожнім заголовком.
+ *
+ * Саме правило «сьогодні» тут не перевіряється: воно спільне з екраном дня і
+ * має власний файл — task-today.test.ts.
  */
 
-import {
-  belongsInStatusGroups,
-  buildStatusListSections,
-} from '../utils/taskListSections';
+import { buildStatusListSections } from '../utils/taskListSections';
 import {
   ACTIVE_COLUMN_ID,
   DONE_COLUMN_ID,
   IN_PROGRESS_COLUMN_ID,
-  REVIEW_COLUMN_ID,
   mergeTaskStatusColumns,
-  type TaskStatusColumn,
 } from '../utils/taskStatuses';
-import { groupTodayTasks } from '../utils/todayGroups';
 import type { Task } from '../utils/taskUtils';
 
 const COLUMNS = mergeTaskStatusColumns([]);
@@ -31,7 +34,6 @@ const day = (y: number, m: number, d: number) => new Date(y, m, d, 12, 0, 0).toI
 const TOMORROW = day(2026, 8, 4);
 const NEXT_WEEK = day(2026, 8, 10);
 const NEXT_MONTH = day(2026, 9, 15);
-const YESTERDAY = day(2026, 8, 2);
 const TODAY_ISO = day(2026, 8, 3);
 
 function task(over: Partial<Task> & { id: string }): Task {
@@ -45,8 +47,8 @@ function task(over: Partial<Task> & { id: string }): Task {
   } as Task;
 }
 
-/** Підпис денної секції в тестах — сам ключ дати, щоб перевіряти саме порядок. */
-const label = (d: Date) => `d:${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+const keys = (sections: { key: string }[]) => sections.map(section => section.key);
+const ids = (section: { tasks: Task[] }) => section.tasks.map(t => t.id);
 
 beforeAll(() => {
   // isOverdue звіряється з реальним «зараз», а не з переданим `today`, тож без
@@ -59,136 +61,76 @@ afterAll(() => {
   jest.useRealTimers();
 });
 
-describe('belongsInStatusGroups', () => {
-  it('дедлайн сьогодні лишається в статусних групах', () => {
-    expect(belongsInStatusGroups(task({ id: 'a', deadline: TODAY_ISO }), COLUMNS, TODAY)).toBe(true);
-  });
-
-  it('дедлайн завтра йде в денну секцію, а не в статуси', () => {
-    // Власне баг: «завтра» — це не «до роботи на сьогодні».
-    expect(belongsInStatusGroups(task({ id: 'a', deadline: TOMORROW }), COLUMNS, TODAY)).toBe(false);
-  });
-
-  it('дедлайн через місяць теж не потрапляє в статуси', () => {
-    expect(belongsInStatusGroups(task({ id: 'a', deadline: NEXT_MONTH }), COLUMNS, TODAY)).toBe(false);
-  });
-
-  it('завдання без дедлайну лишається в статусах', () => {
-    // Беклог — це не «майбутній день»: у того, хто дедлайнів не ставить,
-    // винесення таких завдань униз лишило б базовий екран порожнім.
-    expect(belongsInStatusGroups(task({ id: 'a' }), COLUMNS, TODAY)).toBe(true);
-  });
-
-  it('«У процесі» з майбутнім дедлайном лишається в статусах', () => {
-    const t = task({ id: 'a', deadline: NEXT_WEEK, kanbanColumnId: IN_PROGRESS_COLUMN_ID });
-    expect(belongsInStatusGroups(t, COLUMNS, TODAY)).toBe(true);
-  });
-
-  it('«На перевірці» з майбутнім дедлайном теж лишається в статусах', () => {
-    // Окремий тест навмисно: пропустити цю колонку — рівно те мовчазне
-    // розходження з todayGroups, від якого застерігають коментарі там.
-    const t = task({ id: 'a', deadline: NEXT_WEEK, kanbanColumnId: REVIEW_COLUMN_ID });
-    expect(belongsInStatusGroups(t, COLUMNS, TODAY)).toBe(true);
-  });
-
-  it('завершене з майбутнім дедлайном лишається в «Готово»', () => {
-    const t = task({ id: 'a', status: 'done', deadline: NEXT_WEEK });
-    expect(belongsInStatusGroups(t, COLUMNS, TODAY)).toBe(true);
-  });
-
-  it('завершене з учорашнім дедлайном лишається в «Готово»', () => {
-    const t = task({ id: 'a', status: 'done', deadline: YESTERDAY });
-    expect(belongsInStatusGroups(t, COLUMNS, TODAY)).toBe(true);
-  });
-
-  it('прострочене активне лишається в статусах, а не творить учорашню секцію', () => {
-    expect(belongsInStatusGroups(task({ id: 'a', deadline: YESTERDAY }), COLUMNS, TODAY)).toBe(true);
-  });
-
-  it('майбутнє в кастомній не-done колонці все одно йде в денну секцію', () => {
-    // Виняток стосується лише двох системних колонок роботи, а не будь-якої
-    // колонки, яку користувач створив сам.
-    const columns = mergeTaskStatusColumns([
-      { id: 'custom', name: 'Обговорення', color: '#EC4899', position: 5, isDone: false },
-    ]);
-    const t = task({ id: 'a', deadline: TOMORROW, kanbanColumnId: 'custom' });
-    expect(belongsInStatusGroups(t, columns, TODAY)).toBe(false);
-  });
-});
-
-describe('buildStatusListSections', () => {
-  it('усі статусні секції стоять перед усіма денними', () => {
+describe('scope «today»', () => {
+  it('у результаті лише денна робота: ні беклогу, ні майбутніх днів', () => {
     const sections = buildStatusListSections(
       [
         task({ id: 'future', deadline: TOMORROW }),
         task({ id: 'today', deadline: TODAY_ISO }),
         task({ id: 'backlog' }),
       ],
-      COLUMNS, TODAY, label,
+      COLUMNS, TODAY,
     );
-    expect(sections.map(section => section.key)).toEqual([ACTIVE_COLUMN_ID, 'day:2026-09-04']);
-    expect(sections[0].tasks.map(t => t.id)).toEqual(['today', 'backlog']);
-    expect(sections[1].tasks.map(t => t.id)).toEqual(['future']);
+    expect(keys(sections)).toEqual([ACTIVE_COLUMN_ID]);
+    expect(ids(sections[0])).toEqual(['today']);
   });
 
-  it('«У процесі» перша серед статусних, «Готово» остання', () => {
+  it('беклог не дає ані секції, ані завдання в статусній групі', () => {
+    // Власне баг: завдання без дедлайну — це не «до роботи на сьогодні».
+    // Порожній масив тут навмисний: екран мусить показати порожній стан із
+    // кнопкою «Показати всі», а не список із самих заголовків.
+    expect(buildStatusListSections([task({ id: 'backlog' })], COLUMNS, TODAY)).toEqual([]);
+  });
+
+  it('майбутній день не дає секції навіть коли денна робота є', () => {
+    const sections = buildStatusListSections(
+      [
+        task({ id: 'today', deadline: TODAY_ISO }),
+        task({ id: 'week', deadline: NEXT_WEEK }),
+        task({ id: 'month', deadline: NEXT_MONTH }),
+      ],
+      COLUMNS, TODAY,
+    );
+    expect(keys(sections)).toEqual([ACTIVE_COLUMN_ID]);
+    expect(ids(sections[0])).toEqual(['today']);
+  });
+
+  it('неспарсовний дедлайн просто відсіюється, а не творить секцію «Invalid Date»', () => {
+    // Усі порівняння з Invalid Date дають false, тож таке завдання денною
+    // роботою не є — і секції по собі лишати не має права.
+    expect(buildStatusListSections([task({ id: 'broken', deadline: 'не-дата' })], COLUMNS, TODAY))
+      .toEqual([]);
+  });
+
+  it('«У процесі» перша, «Готово» остання', () => {
     const sections = buildStatusListSections(
       [
         task({ id: 'done', status: 'done' }),
-        task({ id: 'plain' }),
+        task({ id: 'plain', deadline: TODAY_ISO }),
         task({ id: 'running', kanbanColumnId: IN_PROGRESS_COLUMN_ID }),
       ],
-      COLUMNS, TODAY, label,
+      COLUMNS, TODAY,
     );
-    expect(sections.map(section => section.key)).toEqual([
-      IN_PROGRESS_COLUMN_ID, ACTIVE_COLUMN_ID, DONE_COLUMN_ID,
-    ]);
+    expect(keys(sections)).toEqual([IN_PROGRESS_COLUMN_ID, ACTIVE_COLUMN_ID, DONE_COLUMN_ID]);
   });
 
-  it('денні секції йдуть за зростанням дати незалежно від порядку на вході', () => {
+  it('завершене лишається в «Готово», хай навіть його дедлайн у майбутньому', () => {
+    // Завершене — підсумок, а не робота на майбутнє: відсіяти його за
+    // дедлайном 10 вересня означало б спорожнити «Готово» і сховати зроблене.
+    // Скільки завершеного сюди доходить, вирішує taskVisibleInList вище.
     const sections = buildStatusListSections(
-      [
-        task({ id: 'week', deadline: NEXT_WEEK }),
-        task({ id: 'month', deadline: NEXT_MONTH }),
-        task({ id: 'tomorrow', deadline: TOMORROW }),
-      ],
-      COLUMNS, TODAY, label,
+      [task({ id: 'done', status: 'done', deadline: NEXT_WEEK })],
+      COLUMNS, TODAY,
     );
-    expect(sections.map(section => section.key)).toEqual([
-      'day:2026-09-04', 'day:2026-09-10', 'day:2026-10-15',
-    ]);
+    expect(keys(sections)).toEqual([DONE_COLUMN_ID]);
   });
 
   it('порожні колонки не дають секцій', () => {
-    const sections = buildStatusListSections([task({ id: 'a' })], COLUMNS, TODAY, label);
-    expect(sections).toHaveLength(1);
-    expect(sections[0].key).toBe(ACTIVE_COLUMN_ID);
-  });
-
-  it('підпис денної секції бере передана функція, а не сама утиліта', () => {
     const sections = buildStatusListSections(
-      [task({ id: 'a', deadline: TOMORROW })],
-      COLUMNS, TODAY, () => 'Завтра-з-i18n',
+      [task({ id: 'a', deadline: TODAY_ISO })],
+      COLUMNS, TODAY,
     );
-    expect(sections[0].label).toBe('Завтра-з-i18n');
-  });
-
-  it('ключ денної секції не стикається з id кастомної колонки', () => {
-    // Користувач може назвати колонку як завгодно, зокрема датою; без
-    // префікса день і колонка злилися б в одну секцію.
-    const columns = mergeTaskStatusColumns([
-      { id: '2026-09-04', name: 'Дивна колонка', color: '#EC4899', position: 5, isDone: false },
-    ]);
-    const sections = buildStatusListSections(
-      [
-        task({ id: 'inColumn', kanbanColumnId: '2026-09-04' }),
-        task({ id: 'onDay', deadline: TOMORROW }),
-      ],
-      columns, TODAY, label,
-    );
-    expect(sections.map(section => section.key)).toEqual(['2026-09-04', 'day:2026-09-04']);
-    expect(sections[0].tasks.map(t => t.id)).toEqual(['inColumn']);
-    expect(sections[1].tasks.map(t => t.id)).toEqual(['onDay']);
+    expect(keys(sections)).toEqual([ACTIVE_COLUMN_ID]);
   });
 
   it('порядок завдань усередині секції лишається вхідним', () => {
@@ -200,50 +142,62 @@ describe('buildStatusListSections', () => {
         task({ id: 'low', priority: 'low', deadline: TODAY_ISO }),
         task({ id: 'medium', priority: 'medium', deadline: TODAY_ISO }),
       ],
-      COLUMNS, TODAY, label,
+      COLUMNS, TODAY,
     );
-    expect(sections[0].tasks.map(t => t.id)).toEqual(['high', 'low', 'medium']);
+    expect(ids(sections[0])).toEqual(['high', 'low', 'medium']);
   });
 
-  it('колір секції приходить із колонки, у денної його немає', () => {
+  it('кастомна колонка з датою в id більше ні з чим не стикається', () => {
+    // Денні секції мали префікс «day:» саме через цей ризик; секцій немає —
+    // а тест лишається, бо він про те, що ключ секції = id колонки.
+    const columns = mergeTaskStatusColumns([
+      { id: '2026-09-04', name: 'Дивна колонка', color: '#EC4899', position: 5, isDone: false },
+    ]);
     const sections = buildStatusListSections(
-      [task({ id: 'today', deadline: TODAY_ISO }), task({ id: 'future', deadline: TOMORROW })],
-      COLUMNS, TODAY, label,
+      [
+        task({ id: 'inColumn', kanbanColumnId: '2026-09-04', deadline: TODAY_ISO }),
+        task({ id: 'plain', deadline: TODAY_ISO }),
+      ],
+      columns, TODAY,
+    );
+    expect(keys(sections)).toEqual([ACTIVE_COLUMN_ID, '2026-09-04']);
+    expect(ids(sections[0])).toEqual(['plain']);
+    expect(ids(sections[1])).toEqual(['inColumn']);
+  });
+
+  it('колір секції приходить із колонки', () => {
+    const sections = buildStatusListSections(
+      [task({ id: 'today', deadline: TODAY_ISO })],
+      COLUMNS, TODAY,
     );
     expect(sections[0].color).toBe(COLUMNS.find(c => c.id === ACTIVE_COLUMN_ID)?.color);
-    expect(sections[1].color).toBeUndefined();
   });
 });
 
-describe('зіпсована дата', () => {
-  it('неспарсовний дедлайн лишає завдання в статусах, а не творить секцію «Invalid Date»', () => {
-    // Усі порівняння з Invalid Date дають false, тож без окремої перевірки
-    // завдання падало в денний бакет із ключем «day:NaN-NaN-NaN», а той через
-    // лексикографічне сортування ставав ОСТАННЬОЮ секцією списку.
-    const broken = task({ id: 'broken', deadline: 'не-дата' });
-    expect(belongsInStatusGroups(broken, COLUMNS, TODAY)).toBe(true);
-
-    const sections = buildStatusListSections([broken], COLUMNS, TODAY, label);
-    expect(sections).toHaveLength(1);
-    expect(sections[0].key).toBe(ACTIVE_COLUMN_ID);
+describe('scope «all»', () => {
+  it('усе лягає в статусні групи — і беклог, і майбутнє', () => {
+    const sections = buildStatusListSections(
+      [
+        task({ id: 'future', deadline: NEXT_MONTH }),
+        task({ id: 'today', deadline: TODAY_ISO }),
+        task({ id: 'backlog' }),
+        task({ id: 'done', status: 'done' }),
+      ],
+      COLUMNS, TODAY, 'all',
+    );
+    expect(keys(sections)).toEqual([ACTIVE_COLUMN_ID, DONE_COLUMN_ID]);
+    expect(ids(sections[0])).toEqual(['future', 'today', 'backlog']);
   });
-});
 
-describe('узгодженість з екраном «Сьогодні»', () => {
-  // Страховка від мовчазного розходження двох правил: усе, що екран дня
-  // вважає сьогоднішнім, мусить лишитись у статусних групах списку.
-  const cases: { name: string; columns?: TaskStatusColumn[]; task: Task }[] = [
-    { name: 'дедлайн сьогодні', task: task({ id: 'a', deadline: TODAY_ISO }) },
-    { name: 'прострочене', task: task({ id: 'b', deadline: YESTERDAY }) },
-    { name: 'у процесі з майбутнім дедлайном', task: task({ id: 'c', deadline: NEXT_MONTH, kanbanColumnId: IN_PROGRESS_COLUMN_ID }) },
-    { name: 'на перевірці з майбутнім дедлайном', task: task({ id: 'd', deadline: NEXT_WEEK, kanbanColumnId: REVIEW_COLUMN_ID }) },
-    { name: 'завершене сьогодні', task: task({ id: 'e', status: 'done', deadline: NEXT_WEEK, history: [{ id: 'h', at: TODAY_ISO, type: 'done' }] }) },
-  ];
-
-  it.each(cases)('$name: те, що бере екран дня, лишається в статусах', ({ task: t, columns }) => {
-    const cols = columns ?? COLUMNS;
-    const today = groupTodayTasks([t], cols, TODAY, 99);
-    expect(today.groups.length).toBeGreaterThan(0);
-    expect(belongsInStatusGroups(t, cols, TODAY)).toBe(true);
+  it('порядок колонок той самий, що й у денному режимі', () => {
+    const sections = buildStatusListSections(
+      [
+        task({ id: 'done', status: 'done' }),
+        task({ id: 'plain', deadline: NEXT_MONTH }),
+        task({ id: 'running', deadline: NEXT_MONTH, kanbanColumnId: IN_PROGRESS_COLUMN_ID }),
+      ],
+      COLUMNS, TODAY, 'all',
+    );
+    expect(keys(sections)).toEqual([IN_PROGRESS_COLUMN_ID, ACTIVE_COLUMN_ID, DONE_COLUMN_ID]);
   });
 });

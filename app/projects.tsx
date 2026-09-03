@@ -33,12 +33,14 @@ import {
   type ProjectStats,
   type TimelineBucket,
 } from '@/utils/projectStats';
+import { ProjectAnalytics } from '@/components/projects/ProjectAnalytics';
 import { ProjectTimeline } from '@/components/projects/ProjectTimeline';
 import { DetailPane } from '@/components/shared/DetailPane';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTimerContext } from '@/store/timer-context';
 import { formatDuration } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
+import { mergeTaskStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { useContentWidth } from '@/hooks/use-content-width';
 
 export interface Project {
@@ -69,10 +71,24 @@ interface Task {
   title: string;
   projectId?: string;
   status: string;
+  /** Колонка дошки. Графік «Де стоять задачі» питає її через taskColumnId. */
+  kanbanColumnId?: string;
   deadline?: string;
   createdAt?: string;
+  /**
+   * Справжня дата початку роботи. Заповнена рідко — і саме тому Гантт малює
+   * смуги з нею й без неї по-різному: без startDate початок беруть із
+   * createdAt, і смуга показує вік запису, а не тривалість роботи.
+   */
+  startDate?: string;
   subtasks?: unknown[];
   timeEntries?: { startedAt: string; endedAt?: string; duration: number }[];
+  /**
+   * Журнал подій. Для графіка «Виконано по тижнях» це ЄДИНЕ джерело дати
+   * завершення: updatedAt зсувається від будь-якої правки й поставив би
+   * задачу в тиждень останнього перейменування.
+   */
+  history?: { at: string; type: string }[];
 }
 
 /** Скільки задач у проєкті — всього, активних, виконаних. */
@@ -242,6 +258,7 @@ export default function ProjectsScreen() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [statusColumns, setStatusColumns] = useState<TaskStatusColumn[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -256,12 +273,17 @@ export default function ProjectsScreen() {
   const detailScrollRef = useRef<ScrollView | null>(null);
 
   const loadAll = useCallback(async () => {
-    const [p, t] = await Promise.all([
+    const [p, t, columns] = await Promise.all([
       loadData<Project[]>('projects', []),
       loadData<Task[]>('tasks', []),
+      // Колонки дошки потрібні графіку «Де стоять задачі». Читаємо збережені й
+      // зливаємо з типовими тим самим mergeTaskStatusColumns, що й дошка: своя
+      // копія правила «яка колонка існує» розійшлася б із канбаном.
+      loadData<TaskStatusColumn[]>('task_statuses', []),
     ]);
     setProjects(p);
     setTasks(t);
+    setStatusColumns(columns);
   }, []);
 
   // Архівні ховаються зі списку, але лишаються в даних: стан явний
@@ -292,6 +314,16 @@ export default function ProjectsScreen() {
   const timelines = useMemo(
     () => new Map(visibleStats.map(stat => [stat.project.id, projectTimeline(stat.project, tasks)])),
     [visibleStats, tasks],
+  );
+
+  const columns = useMemo(() => mergeTaskStatusColumns(statusColumns), [statusColumns]);
+
+  // Аналітика дивиться на ТОЙ САМИЙ зріз, що й список карток: перемикач
+  // «Живі / Архів» має міняти і графіки теж, інакше цифри під списком
+  // описують не те, що над ними.
+  const analyticsProjects = useMemo(
+    () => visibleStats.map(stat => stat.project),
+    [visibleStats],
   );
 
   const liveProjects = useMemo(() => projects.filter(p => !p.archivedAt), [projects]);
@@ -432,6 +464,14 @@ export default function ProjectsScreen() {
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
   }), [isDark]);
+
+  // Окремий обʼєкт, а не сам `c`: аналітика бере з палітри рівно п'ять полів, і
+  // передавати їй увесь набір означало б перемальовувати графіки щоразу, коли
+  // в екрана зміниться будь-який інший колір.
+  const analyticsPalette = useMemo(
+    () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent }),
+    [c],
+  );
 
   const selectProject = useCallback((project: Project) => {
     haptic.light();
@@ -663,6 +703,20 @@ export default function ProjectsScreen() {
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
           ListHeaderComponent={listHeader}
+          // Аналітика — підвал списку, а не окремий екран: цифри під картками
+          // відповідають на питання, яке виникає саме після погляду на них
+          // («а куди все це рухається»), і зайвий перехід розірвав би цю
+          // послідовність. На порожньому списку компонент повертає null сам.
+          ListFooterComponent={
+            <ProjectAnalytics
+              projects={analyticsProjects}
+              tasks={tasks}
+              columns={columns}
+              scopeLabel={showArchived ? tr.archive : tr.projects}
+              wide={isExpanded}
+              palette={analyticsPalette}
+            />
+          }
           renderItem={({ item }) => (
             <ProjectCard
               project={item.project}

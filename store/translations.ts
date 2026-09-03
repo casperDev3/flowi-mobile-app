@@ -86,6 +86,8 @@ export interface Translations {
   resetAll: string;
   subtasksToday: string;
   noTasksToday: string;
+  noTasksTodayHint: string;
+  showAllTasks: string;
   meetings: string;
   addMeeting: string;
   active: string;
@@ -897,6 +899,46 @@ export interface Translations {
   projectTimelineSpread: string;
   projectTimelineEmpty: string;
 
+  /**
+   * Аналітика проєктів: чотири графіки й Гантт. Числа рахує
+   * utils/projectCharts.ts — тут лише підписи.
+   *
+   * Підписи навмисно не мають форм множини: українська вимагає три
+   * («1 задача», «2 задачі», «5 задач»), англійська дві, і копія цього правила
+   * в кожному з чотирьох графіків розійшлася б швидше, ніж хтось її помітив.
+   * Тому число завжди стоїть ПІСЛЯ двокрапки — так рядок правильний для
+   * будь-якого значення обома мовами.
+   */
+  projectAnalytics: string;
+  projectAnalyticsHint: string;
+  chartColumns: string;
+  chartDoneWeeks: string;
+  chartDeadlinesAhead: string;
+  chartTimeSpent: string;
+  chartWeeksSpan: string;
+  chartTimerSessions: string;
+  chartNoTasksInScope: string;
+  chartNoSessions: string;
+  chartDoneEarlier: string;
+  chartDoneUndated: string;
+  chartOverdueDebt: string;
+  chartBeyondHorizon: string;
+  chartNoDeadline: string;
+  ganttTitle: string;
+  ganttLegendReal: string;
+  ganttLegendEstimated: string;
+  ganttLegendColor: string;
+  ganttToday: string;
+  ganttNothingToDraw: string;
+  ganttNoStartDate: string;
+  ganttHidden: string;
+  ganttStartFromCreated: string;
+  ganttStartExact: string;
+  ganttEndDeadline: string;
+  ganttEndDone: string;
+  ganttEndOpen: string;
+  ganttDaysShort: string;
+
   /** Циферблати таймера. Див. utils/timerDials. */
   dialPicker: string;
   dialDigits: string;
@@ -1043,6 +1085,8 @@ const uk: Translations = {
   resetAll: 'Скинути все',
   subtasksToday: 'Підзавдання на сьогодні',
   noTasksToday: 'Немає завдань на сьогодні',
+  noTasksTodayHint: 'Решта роботи нікуди не зникла — вона в режимі «Всі».',
+  showAllTasks: 'Показати всі',
   meetings: 'Зустрічі',
   addMeeting: 'Додати зустріч',
   active: 'активних',
@@ -1758,6 +1802,35 @@ const uk: Translations = {
   projectDone: 'виконано',
   projectTimelineSpread: 'розкид дедлайнів',
   projectTimelineEmpty: 'дедлайнів немає',
+  projectAnalytics: 'Аналітика',
+  projectAnalyticsHint: 'Графіки йдуть за вибраним проєктом; «Витрачений час» лишається по всьому списку — одна смуга ні з чим не порівнюється',
+  chartColumns: 'Де стоять задачі',
+  chartDoneWeeks: 'Виконано по тижнях',
+  chartDeadlinesAhead: 'Дедлайни попереду',
+  chartTimeSpent: 'Витрачений час',
+  chartWeeksSpan: 'тижнів',
+  chartTimerSessions: 'сесії таймера',
+  chartNoTasksInScope: 'У цих проєктах немає задач',
+  chartNoSessions: 'Жодної завершеної сесії таймера',
+  chartDoneEarlier: 'Закрито раніше за це вікно',
+  chartDoneUndated: 'Завершених без дати завершення в журналі — у графік не потрапили',
+  chartOverdueDebt: 'Прострочено — це борг, а не план',
+  chartBeyondHorizon: 'З дедлайном далі за горизонт',
+  chartNoDeadline: 'Незавершених без дедлайну',
+  ganttTitle: 'Гантт',
+  ganttLegendReal: 'Справжня дата початку',
+  ganttLegendEstimated: 'Початок узято з дати створення — тривалість завищена',
+  ganttLegendColor: 'Колір смуги — колір проєкту',
+  ganttToday: 'Сьогодні',
+  ganttNothingToDraw: 'Немає задач, які можна покласти на шкалу',
+  ganttNoStartDate: 'Немає жодної смуги — задач без дати початку й без дати створення',
+  ganttHidden: 'Не вмістилось у шкалу',
+  ganttStartFromCreated: 'початок із дати створення',
+  ganttStartExact: 'точний початок',
+  ganttEndDeadline: 'до дедлайну',
+  ganttEndDone: 'фактично завершено',
+  ganttEndOpen: 'досі йде',
+  ganttDaysShort: 'дн.',
   dialPicker: 'Циферблат',
   dialDigits: 'Цифри',
   dialRings: 'Кільця',
@@ -1893,6 +1966,8 @@ const en: Translations = {
   resetAll: 'Reset All',
   subtasksToday: 'Subtasks today',
   noTasksToday: 'No tasks today',
+  noTasksTodayHint: 'The rest of your work is still there — under “All”.',
+  showAllTasks: 'Show all',
   meetings: 'Meetings',
   addMeeting: 'Add Meeting',
   active: 'active',
@@ -2608,6 +2683,35 @@ const en: Translations = {
   projectDone: 'done',
   projectTimelineSpread: 'deadline spread',
   projectTimelineEmpty: 'no deadlines',
+  projectAnalytics: 'Analytics',
+  projectAnalyticsHint: 'Charts follow the selected project; “Time spent” stays over the whole list — a single bar compares to nothing',
+  chartColumns: 'Where tasks sit',
+  chartDoneWeeks: 'Done by week',
+  chartDeadlinesAhead: 'Deadlines ahead',
+  chartTimeSpent: 'Time spent',
+  chartWeeksSpan: 'weeks',
+  chartTimerSessions: 'timer sessions',
+  chartNoTasksInScope: 'These projects have no tasks',
+  chartNoSessions: 'No finished timer sessions',
+  chartDoneEarlier: 'Closed before this window',
+  chartDoneUndated: 'Done without a completion date in the log — left out of the chart',
+  chartOverdueDebt: 'Overdue — that is debt, not a plan',
+  chartBeyondHorizon: 'Due beyond the horizon',
+  chartNoDeadline: 'Unfinished with no deadline',
+  ganttTitle: 'Gantt',
+  ganttLegendReal: 'Real start date',
+  ganttLegendEstimated: 'Start taken from the creation date — duration overstated',
+  ganttLegendColor: 'Bar colour is the project colour',
+  ganttToday: 'Today',
+  ganttNothingToDraw: 'No tasks that can go on the scale',
+  ganttNoStartDate: 'No bars at all — tasks with neither a start nor a creation date',
+  ganttHidden: 'Did not fit on the scale',
+  ganttStartFromCreated: 'start from the creation date',
+  ganttStartExact: 'exact start',
+  ganttEndDeadline: 'until the deadline',
+  ganttEndDone: 'actually finished',
+  ganttEndOpen: 'still running',
+  ganttDaysShort: 'd',
   dialPicker: 'Dial',
   dialDigits: 'Digits',
   dialRings: 'Rings',

@@ -39,11 +39,16 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
 import { useTimerContext } from '@/store/timer-context';
+// Meeting — спільний тип (utils/meetings.ts). Локальна копія тут не знала про
+// timeEntries таймера наради, а цей екран пише масив нарад назад у сховище:
+// перший же збіг «таймер зупинили → тут щось зберегли» коштував би сесії.
+import type { Meeting } from '@/utils/meetings';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import { filterTasksByMonth, isOverdue, taskMatchesSearch } from '@/utils/taskUtils';
-import { buildStatusListSections } from '@/utils/taskListSections';
+import { buildStatusListSections, type TaskListScope } from '@/utils/taskListSections';
+import { isTodayTask } from '@/utils/taskToday';
 import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, subtaskToggleTransition, taskColumnId, taskStatusColumn, taskVisibleInList } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
@@ -112,18 +117,6 @@ interface Task {
   recordings?: string[];
 }
 
-interface Meeting {
-  id: string;
-  title: string;
-  date: string;          // 'YYYY-MM-DD'
-  time: string;          // 'HH:MM'
-  durationMinutes: number;
-  location?: string;
-  link?: string;
-  notes?: string;
-  color: string;
-  recurrence?: RecurrenceRule;
-}
 
 const PRIORITY_COLORS: Record<Priority, string> = {
   high:   '#EF4444',
@@ -261,7 +254,7 @@ export default function TasksScreen() {
   // Таймери завдань живуть у сторі, а не в цьому екрані: ту саму сесію можна
   // зупинити з вкладки часу або з іншого пристрою, і локальний стан про це
   // ніколи б не дізнався.
-  const { startTaskTimer, stopTimerForTask, getTimerForTask, tasksRevision } = useTimerContext();
+  const { startTaskTimer, stopTimerForTask, getTimerForTask, tasksRevision, meetingsRevision } = useTimerContext();
   const [projects, setProjects] = useState<Project[]>([]);
 
   // Пікери показують лише ЖИВІ проєкти, а `projects` лишається повним.
@@ -279,6 +272,14 @@ export default function TasksScreen() {
   const [filter, setFilter] = useState<Filter>('active');
   const [sort, setSort] = useState<SortBy>('status');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  /**
+   * Що показує вкладка: денну роботу чи весь список.
+   *
+   * Стан навмисно НЕ зберігається між сесіями. «Сьогодні за замовчуванням» має
+   * означати саме це: людина, яка одного разу зазирнула в увесь беклог, не
+   * мусить назавжди отримати його при кожному відкритті вкладки.
+   */
+  const [scope, setScope] = useState<TaskListScope>('today');
 
   // Search & extra filters
   const [search, setSearch] = useState('');
@@ -416,6 +417,16 @@ export default function TasksScreen() {
     if (meetingsInit) void saveSynced('meetings', meetings);
   }, [meetings, meetingsInit]);
 
+  // Те саме, що з 'tasks', але для нарад: стоп таймера наради дописує
+  // завершену сесію в її timeEntries повз наш стан, а ефект вище зберігає
+  // масив цілком — без перечитування він затер би сесію застарілою копією.
+  useEffect(() => {
+    if (!meetingsInit || meetingsRevision === 0) return;
+    loadData<Meeting[]>('meetings', [])
+      .then(setMeetings)
+      .catch(e => { if (__DEV__) console.warn('[meetings] перечитування після запису стору не вдалося:', e); });
+  }, [meetingsRevision, meetingsInit]);
+
   // Ref для синхронного читання поточних tasks (використовується в callbacks без deps)
   const tasksRef = useRef<Task[]>([]);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
@@ -486,7 +497,15 @@ export default function TasksScreen() {
     });
   }, [tasks, sort]);
 
-  const filtered = useMemo(() => {
+  /**
+   * Набір без урахування денного скоупу — тобто те, що людина побачила б,
+   * перемкнувши тумблер на «Усі».
+   *
+   * Потрібен окремо, і не лише заради лічильника на тумблері: коли на сьогодні
+   * порожньо, порожній стан мусить чесно сказати, СКІЛЬКИ роботи лежить поза
+   * днем. Рахувати це «десь іще» означало б завести другу копію набору фільтрів.
+   */
+  const filteredAll = useMemo(() => {
     const monthFiltered = filterTasksByMonth(sorted, activeMonth);
     return monthFiltered.filter(t => {
       // Правило видимості — в утиліті: у режимі групування за статусом
@@ -503,6 +522,23 @@ export default function TasksScreen() {
     });
   }, [sorted, activeMonth, filter, sort, dateFilter, search, filterProject, filterPriority]);
 
+  const filtered = useMemo(() => {
+    if (scope === 'all') return filteredAll;
+    const now = new Date();
+    return filteredAll.filter(t => {
+      // У денному режимі «Готово» — це закрите СЬОГОДНІ, а не за вікном у два
+      // дні: вчорашня закрита справа серед сьогоднішніх вдає незавершену роботу.
+      if (!taskVisibleInList(t, filter, sort, now, 'today')) return false;
+      // Денний скоуп відсіює несьогоднішнє тут, а не в побудові секцій, і для
+      // ВСІХ сортувань однаково. Раніше при групуванні за статусом виняток був:
+      // несьогоднішнє доходило до buildStatusListSections і лягало в згорнуті
+      // шухляди під групами. Шухляди прибрано, а разом з ними й виняток —
+      // інакше `filtered` рахував би беклог видимим, і порожній екран у
+      // «Сьогодні» лишався б без жодного порожнього стану під ним.
+      return isTodayTask(t, taskStatuses, today);
+    });
+  }, [filteredAll, scope, filter, sort, taskStatuses, today]);
+
   // Overdue tasks pulled into a dedicated top section (list view, active/all filter only)
   const overdueItems = useMemo(
     () => (filter !== 'done' && viewMode === 'list')
@@ -518,14 +554,13 @@ export default function TasksScreen() {
   );
 
   const groups = useMemo<{ key: string; label: string; tasks: Task[] }[]>(() => {
-    // Статусні групи — це погляд на СЬОГОДНІ: правило, кого туди пускати, а
-    // кого віддати денній секції його дедлайну, живе в утиліті поруч із
-    // правилом екрана дня, щоб копії не розходились.
+    // Статусні групи — це погляд на СЬОГОДНІ: правило, кого туди пускати,
+    // живе в утиліті поруч із правилом екрана дня, щоб копії не розходились.
+    // Скоуп їй передаємо попри те, що `filtered` вже відсіяв несьогоднішнє:
+    // друга перевірка нічого не коштує, а от мовчазна залежність від порядку
+    // фільтрів коштувала б наступній правці.
     if (sort === 'status') {
-      return buildStatusListSections(
-        groupsSource, taskStatuses, today,
-        d => groupLabel(d, today, tr.today, tr.yesterday, tr.tomorrow, locale),
-      );
+      return buildStatusListSections(groupsSource, taskStatuses, today, scope);
     }
     const map: Record<string, { label: string; tasks: Task[] }> = {};
     const order: string[] = [];
@@ -555,7 +590,7 @@ export default function TasksScreen() {
       order.push('__no_deadline__');
     }
     return order.map(k => ({ key: k, ...map[k] }));
-  }, [groupsSource, sort, taskStatuses, today, tr, locale]);
+  }, [groupsSource, sort, scope, taskStatuses, today, tr, locale]);
 
   // Пошук навмисно не враховано: у нього власна гілка порожнього стану,
   // і змішувати їх означало б радити «скинути фільтри» людині, яка
@@ -567,7 +602,7 @@ export default function TasksScreen() {
     const draft = composer.draft;
     if (!draft.title.trim()) return;
     const selectedStatus = taskStatuses.find(column => column.id === draft.statusId) ?? taskStatuses[0];
-    setTasks(p => [{
+    const created: Task = {
       id: Date.now().toString(),
       title: draft.title.trim(),
       description: draft.desc.trim(),
@@ -582,11 +617,21 @@ export default function TasksScreen() {
       timeEntries: [],
       history: [makeHistoryEvent('created')],
       recurrence: draftRecurrence(draft),
-    }, ...p]);
+    };
+    setTasks(p => [created, ...p]);
+    // Щойно створене завдання МУСИТЬ лишитись на екрані.
+    //
+    // Денний режим ховає все, що не є роботою на сьогодні, а форма створення
+    // лишає дедлайн порожнім за замовчуванням — тобто типове нове завдання під
+    // це правило не підпадає й зникало одразу після «Додати». Для людини це
+    // невідрізнити від втрати даних: вона щойно натиснула кнопку й нічого не
+    // побачила. Тому створення, що виводить завдання з поточного обсягу, САМЕ
+    // розширює обсяг до «Усі» — дія користувача важить більше за фільтр.
+    if (!isTodayTask(created, taskStatuses, today)) setScope('all');
     composer.reset(ACTIVE_COLUMN_ID);
     setShowAdd(false);
     haptic.success();
-  }, [composer, taskStatuses]);
+  }, [composer, taskStatuses, today]);
 
   const deleteTask = useCallback((id: string, title?: string) => {
     const taskToDelete = tasksRef.current.find(t => t.id === id);
@@ -898,11 +943,31 @@ export default function TasksScreen() {
 
   // Стабільні посилання: інакше React.memo на картках нічого не дає.
   const sections = useMemo(
-    // key, а не позиція в масиві: денні секції зʼявляються й зникають, і без
-    // стабільного ключа заголовки перемонтовувались би на кожній зміні складу.
+    // key, а не позиція в масиві: групи зʼявляються й зникають разом зі своїм
+    // вмістом, і без стабільного ключа заголовки перемонтовувались би на
+    // кожній зміні складу.
     () => groups.map(group => ({ key: group.key, title: group.label, data: group.tasks })),
     [groups],
   );
+
+  /**
+   * Скільки роботи припадає на сьогодні. Рахується від НАБОРУ до денного
+   * скоупу, а не від побудованих секцій: у режимі «Усі» секції містять увесь
+   * список, і підрахунок по них показував би на тумблері «Сьогодні» його ж
+   * число. Прострочене входить сюди само — воно сьогоднішнє за правилом.
+   */
+  const todayCount = useMemo(
+    () => filteredAll.filter(t => isTodayTask(t, taskStatuses, today)).length,
+    [filteredAll, taskStatuses, today],
+  );
+  /** Скільки роботи лишається поза сьогоднішнім днем — число на тумблері «Усі». */
+  const beyondTodayCount = filteredAll.length - todayCount;
+  /**
+   * Порожній день при непорожньому списку. Пошук виключено навмисно: у нього
+   * власна гілка порожнього стану, і пропонувати «показати всі» людині, яка
+   * просто нічого не знайшла за запитом, означало б відповідати не на те питання.
+   */
+  const todayEmpty = scope === 'today' && !search.trim() && todayCount === 0 && beyondTodayCount > 0;
 
   /**
    * У віртуалізованому списку елементи монтуються заново при поверненні
@@ -1474,6 +1539,60 @@ export default function TasksScreen() {
               )}
             </View>
 
+            {/* Скоуп: денна робота чи весь список. Окремо від чипів фільтрів
+                і завжди на очах — це головний перемикач вкладки, а не одна з
+                прихованих у шторці опцій. У календарі його немає: там місяць,
+                і «сьогодні проти всього» нічого не означає. */}
+            {viewMode === 'list' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                <View style={{ flexDirection: 'row', gap: 6, backgroundColor: c.dim, borderRadius: 12, padding: 3, borderWidth: 1, borderColor: c.border }}>
+                  {([
+                    { key: 'today' as const, label: tr.today, count: todayCount },
+                    { key: 'all' as const, label: tr.allTasks, count: filteredAll.length },
+                  ]).map(option => {
+                    const active = scope === option.key;
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
+                        onPress={() => { haptic.light(); setScope(option.key); }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        accessibilityLabel={`${option.label}, ${option.count}`}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: active ? c.accent : 'transparent' }}>
+                        <Text style={{ color: active ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }}>{option.label}</Text>
+                        <Text style={{ color: active ? 'rgba(255,255,255,0.75)' : c.sub, fontSize: 11, fontWeight: '600' }}>{option.count}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Фільтри й скидання — поруч із перемикачем, а не в хедері:
+                    обидва органи керування звужують ОДИН набір завдань, і
+                    розводити їх по різних кінцях екрана означало б змушувати
+                    шукати причину, чому список порожній, у двох місцях.
+
+                    Два стани в одній кнопці: відкрити фільтри або скинути їх.
+                    Коли фільтри активні, короткий тап скидає, довгий — усе одно
+                    відкриває налаштування, щоб доступ до них не зникав. */}
+                <HeaderButton
+                  onPress={() => (hasActiveFilters ? clearAllFilters() : setShowFilterSheet(true))}
+                  onLongPress={() => setShowFilterSheet(true)}
+                  accessibilityLabel={hasActiveFilters ? tr.resetAllFilters : tr.filters}
+                  accessibilityHint={hasActiveFilters ? tr.filters : undefined}
+                  style={{
+                    marginLeft: 'auto',
+                    backgroundColor: hasActiveFilters ? '#EF444418' : c.dim,
+                    borderColor: hasActiveFilters ? '#EF444440' : c.border,
+                  }}>
+                  <IconSymbol
+                    name={hasActiveFilters ? 'arrow.counterclockwise' : 'line.3.horizontal.decrease'}
+                    size={17}
+                    color={hasActiveFilters ? '#EF4444' : c.sub}
+                  />
+                </HeaderButton>
+              </View>
+            )}
+
             {/* Active filter chips */}
             {hasActiveFilters && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 4 }}>
@@ -1674,8 +1793,28 @@ export default function TasksScreen() {
               </View>
             )}
 
+            {/* Порожній день — окрема гілка, і вона НЕ про фільтри. Стандартний
+                порожній стан радив би «додати завдання» або «скинути фільтри»,
+                тоді як насправді робота є: вона просто не на сьогодні. Тому
+                тут єдина осмислена дія — показати весь список. */}
+            {todayEmpty && viewMode === 'list' && (
+              <View style={{ alignItems: 'center', paddingVertical: 56 }}>
+                <IconSymbol name="checkmark.seal" size={40} color={c.sub} />
+                <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noTasksToday}</Text>
+                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7, textAlign: 'center' }}>{tr.noTasksTodayHint}</Text>
+                <TouchableOpacity
+                  onPress={() => setScope('all')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tr.showAllTasks}, ${beyondTodayCount}`}
+                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <IconSymbol name="list.bullet" size={15} color={c.accent} />
+                  <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.showAllTasks} · {beyondTodayCount}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Empty state */}
-            {filtered.length === 0 && (
+            {!todayEmpty && filtered.length === 0 && (
               <View style={{ alignItems: 'center', paddingVertical: 56 }}>
                 <IconSymbol name="checklist" size={40} color={c.sub} />
                 <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>
@@ -1794,26 +1933,10 @@ export default function TasksScreen() {
                 style={{ backgroundColor: viewMode === 'calendar' ? c.accent + '20' : c.dim, borderColor: viewMode === 'calendar' ? c.accent : c.border }}>
                 <IconSymbol name={viewMode === 'list' ? 'calendar' : 'list.bullet'} size={17} color={viewMode === 'calendar' ? c.accent : c.sub} />
               </HeaderButton>
-              {viewMode === 'list' && (
-                <HeaderButton
-                  onPress={() => (hasActiveFilters ? clearAllFilters() : setShowFilterSheet(true))}
-                  onLongPress={() => setShowFilterSheet(true)}
-                  accessibilityLabel={hasActiveFilters ? tr.resetAllFilters : tr.filters}
-                  accessibilityHint={hasActiveFilters ? tr.filters : undefined}
-                  style={{
-                    backgroundColor: hasActiveFilters ? '#EF444418' : c.dim,
-                    borderColor: hasActiveFilters ? '#EF444440' : c.border,
-                  }}>
-                  {/* Два стани в одній кнопці: відкрити фільтри або скинути їх.
-                      Коли фільтри активні, короткий тап скидає, довгий — усе
-                      одно відкриває налаштування, щоб доступ до них не зникав. */}
-                  <IconSymbol
-                    name={hasActiveFilters ? 'arrow.counterclockwise' : 'line.3.horizontal.decrease'}
-                    size={17}
-                    color={hasActiveFilters ? '#EF4444' : c.sub}
-                  />
-                </HeaderButton>
-              )}
+              {/* Кнопки фільтрів у хедері немає навмисно: вона переїхала в рядок
+                  із перемикачем «Сьогодні / Усі». Хедер лишається про режим
+                  екрана (список чи календар) і меню, а все, що звужує НАБІР
+                  завдань, стоїть в одному рядку — і перемикач, і фільтри. */}
               <HeaderButton
                 onPress={() => setShowOptionsMenu(v => !v)}
                 accessibilityLabel={tr.a11yOptions}

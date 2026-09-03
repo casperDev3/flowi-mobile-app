@@ -35,11 +35,19 @@ import {
   type ActiveTimer,
   type Shift,
 } from '@/utils/activeTimers';
+import {
+  buildMeetingTimer,
+  closeMeetingSession,
+  findTimerForMeeting,
+  meetingTimerId,
+  type Meeting,
+} from '@/utils/meetings';
 import { IN_PROGRESS_COLUMN_ID, REVIEW_COLUMN_ID } from '@/utils/taskStatuses';
 import type { Task, TaskHistoryEvent, HistoryEventType } from '@/utils/taskUtils';
 
 const TIMERS_KEY = 'active_timers';
 const TASKS_KEY = 'tasks';
+const MEETINGS_KEY = 'meetings';
 const TIME_ENTRIES_KEY = 'time_entries';
 
 /** Запис дзеркала у 'time_entries' — форма, якої чекають time-stats/time-records. */
@@ -59,6 +67,18 @@ export interface TimerTaskInput {
   status: 'active' | 'done';
 }
 
+/**
+ * Мінімум, потрібний для старту таймера наради.
+ *
+ * Колонки й статусу тут немає й не може бути: наради не живуть на дошці, тож
+ * старт нікуди її не пересуває, а стоп нікуди не повертає. Це не спрощення
+ * заради стислості — це вся різниця між двома видами таймера.
+ */
+export interface TimerMeetingInput {
+  id: string;
+  title: string;
+}
+
 export interface TimerContextValue {
   pendingTask: string;
   setPendingTask: (task: string) => void;
@@ -68,15 +88,21 @@ export interface TimerContextValue {
   timersReady: boolean;
   startTaskTimer: (task: TimerTaskInput) => Promise<void>;
   startAdHocTimer: (label: string, shift: Shift) => Promise<void>;
+  /** Нарада трекається так само, як завдання, — але без дошки, див. stopTimer. */
+  startMeetingTimer: (meeting: TimerMeetingInput) => Promise<void>;
   stopTimer: (id: string) => Promise<void>;
   stopTimerForTask: (taskId: string) => Promise<void>;
+  stopTimerForMeeting: (meetingId: string) => Promise<void>;
   getTimerForTask: (taskId: string) => ActiveTimer | undefined;
+  getTimerForMeeting: (meetingId: string) => ActiveTimer | undefined;
   /**
    * Інкрементується після кожного запису стору в 'tasks'. Екрани тримають
    * завдання у власному стані й не побачили б чужий запис у сховище —
    * ця лічилка каже їм перечитати.
    */
   tasksRevision: number;
+  /** Те саме для 'meetings': стоп таймера дописує сесію повз стан екрана. */
+  meetingsRevision: number;
 }
 
 const TimerContext = createContext<TimerContextValue>({
@@ -86,10 +112,14 @@ const TimerContext = createContext<TimerContextValue>({
   timersReady: false,
   startTaskTimer: async () => {},
   startAdHocTimer: async () => {},
+  startMeetingTimer: async () => {},
   stopTimer: async () => {},
   stopTimerForTask: async () => {},
+  stopTimerForMeeting: async () => {},
   getTimerForTask: () => undefined,
+  getTimerForMeeting: () => undefined,
   tasksRevision: 0,
+  meetingsRevision: 0,
 });
 
 function makeHistoryEvent(type: HistoryEventType, note?: string): TaskHistoryEvent {
@@ -119,6 +149,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
   const [timersReady, setTimersReady] = useState(false);
   const [tasksRevision, setTasksRevision] = useState(0);
+  const [meetingsRevision, setMeetingsRevision] = useState(0);
 
   // Мутації йдуть із колбеків і не можуть чекати на новий рендер, щоб побачити
   // результат попередньої — тому актуальний масив живе ще й у ref.
@@ -226,6 +257,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const getTimerForMeeting = useCallback(
+    (meetingId: string) => findTimerForMeeting(timersRef.current, meetingId),
+    [],
+  );
+
   /**
    * Read-modify-write 'tasks' — наявна конвенція репозиторію (так само роблять
    * archive.tsx, subtasks.tsx, today.tsx). Стор не має власного стану завдань,
@@ -243,6 +279,32 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         setTasksRevision(n => n + 1);
       } catch (e) {
         if (__DEV__) console.warn(`[timers] запис 'tasks' не вдався (${taskId}):`, e);
+      }
+    },
+    [],
+  );
+
+  /**
+   * Read-modify-write 'meetings' — дзеркало patchTask.
+   *
+   * Окремий прохід по сховищу, а не спільна функція із завданнями: ключі різні,
+   * а спроба узагальнити «патч запису в масиві» дала б параметризовану функцію,
+   * яку однаково довелось би читати з обома ключами в голові.
+   */
+  const patchMeeting = useCallback(
+    async (meetingId: string, patch: (meeting: Meeting) => Meeting) => {
+      try {
+        const meetings = await loadData<Meeting[]>(MEETINGS_KEY, []);
+        const index = meetings.findIndex(m => m.id === meetingId);
+        // Нараду могли видалити, поки таймер ішов. Сесії немає куди класти —
+        // але в 'time_entries' вона все одно потрапить, тож час не зникне.
+        if (index < 0) return;
+        const next = [...meetings];
+        next[index] = patch(meetings[index]);
+        await saveSynced(MEETINGS_KEY, next);
+        setMeetingsRevision(n => n + 1);
+      } catch (e) {
+        if (__DEV__) console.warn(`[timers] запис 'meetings' не вдався (${meetingId}):`, e);
       }
     },
     [],
@@ -326,6 +388,24 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     [mutateTimers],
   );
 
+  /**
+   * Старт таймера наради.
+   *
+   * Від startTaskTimer відрізняється рівно тим, чого в наради немає: ні
+   * перевірки «завершене не трекають», ні переносу в «У процесі», ні запису в
+   * історію. Лишається сам реєстр — і перевірка на свіжому списку, бо ту саму
+   * нараду могли запустити з іншого пристрою.
+   */
+  const startMeetingTimer = useCallback(
+    async (meeting: TimerMeetingInput) => {
+      const timer = buildMeetingTimer(meeting);
+      await mutateTimers(current =>
+        findTimerForMeeting(current, meeting.id) ? current : [...current, timer],
+      );
+    },
+    [mutateTimers],
+  );
+
   const stopTimer = useCallback(
     async (id: string) => {
       const endedAt = new Date();
@@ -375,10 +455,20 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         }));
       }
 
+      // 2б. Сесія наради лягає в timeEntries САМОЇ наради — та сама структура,
+      //     що в завдання. Колонки дошки в наради немає, тож увесь блок вище
+      //     (перенос у «На перевірці», історія) до неї не застосовується: не
+      //     через недогляд, а тому, що переносити нема куди.
+      if (timer.meetingId) {
+        await patchMeeting(timer.meetingId, m =>
+          closeMeetingSession(m, timer, endedAt, duration),
+        );
+      }
+
       // 3. Дзеркало для екранів часу.
       await mirrorToTimeEntries(timer, duration, endedAt);
     },
-    [mutateTimers, mirrorToTimeEntries, patchTask],
+    [mutateTimers, mirrorToTimeEntries, patchTask, patchMeeting],
   );
 
   const stopTimerForTask = useCallback(
@@ -393,6 +483,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     [stopTimer],
   );
 
+  const stopTimerForMeeting = useCallback(
+    async (meetingId: string) => {
+      // Як і в завдань: похідний id дає запасний шлях, коли власний список
+      // відстав від сховища (таймер запустили з іншого пристрою).
+      const known = findTimerForMeeting(timersRef.current, meetingId);
+      await stopTimer(known?.id ?? meetingTimerId(meetingId));
+    },
+    [stopTimer],
+  );
+
   const value = useMemo<TimerContextValue>(
     () => ({
       pendingTask,
@@ -401,10 +501,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       timersReady,
       startTaskTimer,
       startAdHocTimer,
+      startMeetingTimer,
       stopTimer,
       stopTimerForTask,
+      stopTimerForMeeting,
       getTimerForTask,
+      getTimerForMeeting,
       tasksRevision,
+      meetingsRevision,
     }),
     [
       pendingTask,
@@ -412,10 +516,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       timersReady,
       startTaskTimer,
       startAdHocTimer,
+      startMeetingTimer,
       stopTimer,
       stopTimerForTask,
+      stopTimerForMeeting,
       getTimerForTask,
+      getTimerForMeeting,
       tasksRevision,
+      meetingsRevision,
     ],
   );
 

@@ -69,3 +69,43 @@ test('нові ключі рахунків і переказів є в обох 
     expect(allTranslations.en[key].length).toBeGreaterThan(0);
   }
 });
+
+test('нові ключі аналітики проєктів є в обох мовах', () => {
+  const keys = [
+    'projectAnalytics',
+    'projectAnalyticsHint',
+    'chartColumns',
+    'chartDoneWeeks',
+    'chartDeadlinesAhead',
+    'chartTimeSpent',
+    'chartWeeksSpan',
+    'chartTimerSessions',
+    'chartNoTasksInScope',
+    'chartNoSessions',
+    'chartDoneEarlier',
+    'chartDoneUndated',
+    'chartOverdueDebt',
+    'chartBeyondHorizon',
+    'chartNoDeadline',
+    'ganttTitle',
+    'ganttLegendReal',
+    'ganttLegendEstimated',
+    'ganttLegendColor',
+    'ganttToday',
+    'ganttNothingToDraw',
+    'ganttNoStartDate',
+    'ganttHidden',
+    'ganttStartFromCreated',
+    'ganttStartExact',
+    'ganttEndDeadline',
+    'ganttEndDone',
+    'ganttEndOpen',
+    'ganttDaysShort',
+  ] as const;
+  for (const key of keys) {
+    expect(typeof allTranslations.uk[key]).toBe('string');
+    expect(allTranslations.uk[key].length).toBeGreaterThan(0);
+    expect(typeof allTranslations.en[key]).toBe('string');
+    expect(allTranslations.en[key].length).toBeGreaterThan(0);
+  }
+});

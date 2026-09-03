@@ -17,7 +17,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { MonthPicker } from '@/components/shared/MonthPicker';
@@ -43,15 +42,20 @@ import { useTimerContext } from '@/store/timer-context';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
-import { filterTasksByMonth, taskMatchesSearch } from '@/utils/taskUtils';
-import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, orderColumnsForList, subtaskToggleTransition, taskColumnId, taskStatusColumn, taskVisibleInList } from '@/utils/taskStatuses';
+import { filterTasksByMonth, isOverdue, taskMatchesSearch } from '@/utils/taskUtils';
+import { buildStatusListSections } from '@/utils/taskListSections';
+import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, subtaskToggleTransition, taskColumnId, taskStatusColumn, taskVisibleInList } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
 import { useResponsive } from '@/hooks/use-responsive';
+import { sheetColumnStyle } from '@/hooks/use-content-width';
+import { useTopInset } from '@/hooks/use-top-inset';
+import { useToday } from '@/hooks/use-today';
 import { useCalendarNav, type CalSpan } from '@/hooks/use-calendar-nav';
 import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/use-task-editor';
 import { DetailPane } from '@/components/shared/DetailPane';
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { PickerField } from '@/components/shared/PickerField';
 import { TaskHistoryTab, type HistoryEventType, type TaskHistoryEvent } from '@/components/tasks/TaskHistoryTab';
@@ -126,8 +130,6 @@ const PRIORITY_COLORS: Record<Priority, string> = {
   medium: '#F59E0B',
   low:    '#10B981',
 };
-const today = new Date();
-const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
 
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -135,7 +137,14 @@ function localDateStr(d: Date): string {
 
 
 
-function groupLabel(date: Date, todayLabel: string, yesterdayLabel: string, tomorrowLabel: string, locale: string) {
+/**
+ * `today` приходить параметром, а не з модульної константи: та фіксувалась у
+ * момент імпорту, і в застосунку, не закритому через північ, вчорашній день
+ * ще підписувався «Сьогодні». Джерело свіжого значення — useToday().
+ */
+function groupLabel(date: Date, today: Date, todayLabel: string, yesterdayLabel: string, tomorrowLabel: string, locale: string) {
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
   if (date.toDateString() === today.toDateString()) return todayLabel;
   if (date.toDateString() === yesterday.toDateString()) return yesterdayLabel;
   const diff = Math.ceil((date.getTime() - today.getTime()) / 86400000);
@@ -149,14 +158,6 @@ function getProgress(t: Task) {
   if (!t.subtasks.length) return 0;
   return Math.round((t.subtasks.filter(s => s.done).length / t.subtasks.length) * 100);
 }
-
-function isOverdue(task: Task): boolean {
-  if (!task.deadline || task.status === 'done') return false;
-  const d = new Date(task.deadline);
-  d.setHours(23, 59, 59, 999);
-  return d < today;
-}
-
 
 // ─── Timer helpers ────────────────────────────────────────────────────────────
 
@@ -208,7 +209,7 @@ function nextRecurrenceDate(fromDateStr: string, rule: RecurrenceRule): string |
 
 export default function TasksScreen() {
   const tabBarInset = useTabBarInset();
-  const { height, isExpanded } = useResponsive();
+  const { height, isExpanded, isWide } = useResponsive();
   // Деталь стає колонкою лише на expanded (≥840). На medium сайдбар уже
   // займає 232pt, і колонка вийшла б вужчою за 260pt — гірше, ніж на
   // весь екран. Там деталь лишається модалкою.
@@ -216,7 +217,13 @@ export default function TasksScreen() {
   const isDark = useColorScheme() === 'dark';
   useScreenView('tasks');
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  // Меню опцій живе в окремому Modal і мусить лягти рівно під кнопкою хедера,
+  // тож бере той самий інсет, що й сам хедер.
+  const topInset = useTopInset();
+  // «Сьогодні» мусить пережити північ у відкритому застосунку: від нього
+  // тепер залежить не лише підпис групи, а й те, чи завдання взагалі
+  // потрапить у статусні групи.
+  const today = useToday();
   const { tr, lang } = useI18n();
   // Одиниці приходять зі словника: до цього кожен екран мав власну копію
   // форматування з вшитими «год» і «хв».
@@ -510,49 +517,45 @@ export default function TasksScreen() {
     [filtered, overdueItems],
   );
 
-  const groups = useMemo(() => {
+  const groups = useMemo<{ key: string; label: string; tasks: Task[] }[]>(() => {
+    // Статусні групи — це погляд на СЬОГОДНІ: правило, кого туди пускати, а
+    // кого віддати денній секції його дедлайну, живе в утиліті поруч із
+    // правилом екрана дня, щоб копії не розходились.
+    if (sort === 'status') {
+      return buildStatusListSections(
+        groupsSource, taskStatuses, today,
+        d => groupLabel(d, today, tr.today, tr.yesterday, tr.tomorrow, locale),
+      );
+    }
     const map: Record<string, { label: string; tasks: Task[] }> = {};
     const order: string[] = [];
     groupsSource.forEach(t => {
       let key: string;
       let label: string;
-      if (sort === 'status') {
-        // Групи за колонкою дошки. Ті самі, що на екрані дня, і тим самим
-        // правилом порядку — orderColumnsForList нижче ставить «У процесі»
-        // попереду решти.
-        const column = taskStatusColumn(t, taskStatuses);
-        key = column.id;
-        label = column.name;
-      } else if (sort === 'deadline') {
+      if (sort === 'deadline') {
         if (!t.deadline) {
           key = '__no_deadline__';
           label = tr.withoutDeadline;
         } else {
           const d = new Date(t.deadline);
           key = d.toDateString();
-          label = groupLabel(d, tr.today, tr.yesterday, tr.tomorrow, locale);
+          label = groupLabel(d, today, tr.today, tr.yesterday, tr.tomorrow, locale);
         }
       } else {
         const d = new Date(t.createdAt);
         key = d.toDateString();
-        label = groupLabel(d, tr.today, tr.yesterday, tr.tomorrow, locale);
+        label = groupLabel(d, today, tr.today, tr.yesterday, tr.tomorrow, locale);
       }
       if (!map[key]) { map[key] = { label, tasks: [] }; order.push(key); }
       map[key].tasks.push(t);
     });
-    if (sort === 'status') {
-      // Порядок груп задає дошка, а не порядок появи завдань у списку.
-      const rank = new Map(orderColumnsForList(taskStatuses).map((column, i) => [column.id, i]));
-      order.sort((a, b) => (rank.get(a) ?? 99) - (rank.get(b) ?? 99));
-      return order.map(k => map[k]);
-    }
     const noDeadlineIdx = order.indexOf('__no_deadline__');
     if (noDeadlineIdx > 0) {
       order.splice(noDeadlineIdx, 1);
       order.push('__no_deadline__');
     }
-    return order.map(k => map[k]);
-  }, [groupsSource, sort, taskStatuses]);
+    return order.map(k => ({ key: k, ...map[k] }));
+  }, [groupsSource, sort, taskStatuses, today, tr, locale]);
 
   // Пошук навмисно не враховано: у нього власна гілка порожнього стану,
   // і змішувати їх означало б радити «скинути фільтри» людині, яка
@@ -895,7 +898,9 @@ export default function TasksScreen() {
 
   // Стабільні посилання: інакше React.memo на картках нічого не дає.
   const sections = useMemo(
-    () => groups.map(group => ({ title: group.label, data: group.tasks })),
+    // key, а не позиція в масиві: денні секції зʼявляються й зникають, і без
+    // стабільного ключа заголовки перемонтовувались би на кожній зміні складу.
+    () => groups.map(group => ({ key: group.key, title: group.label, data: group.tasks })),
     [groups],
   );
 
@@ -1114,7 +1119,7 @@ export default function TasksScreen() {
         const db = `${b.date}T${b.time || '00:00'}`;
         return da.localeCompare(db);
       });
-  }, [meetings]);
+  }, [meetings, today]);
 
   // ─── Meeting CRUD ────────────────────────────────────────────────────────────
   const openAddMeeting = useCallback((presetDate?: string) => {
@@ -1775,33 +1780,30 @@ export default function TasksScreen() {
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <View style={{ flex: 1, flexDirection: 'row' }}>
       <View style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <View style={{ flex: 1 }}>
 
         {/* Fixed Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.tasks}</Text>
-            <View style={{ flexDirection: 'row', gap: 7 }}>
-              <TouchableOpacity
+        <ScreenHeader
+          title={tr.tasks}
+          color={c.text}
+          actions={
+            <>
+              <HeaderButton
                 onPress={() => setViewMode(v => v === 'list' ? 'calendar' : 'list')}
-                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                accessibilityRole="button"
                 accessibilityLabel={viewMode === 'list' ? tr.calendarMode : tr.listMode}
-                style={[s.headerBtn, { backgroundColor: viewMode === 'calendar' ? c.accent + '20' : c.dim, borderColor: viewMode === 'calendar' ? c.accent : c.border }]}>
+                style={{ backgroundColor: viewMode === 'calendar' ? c.accent + '20' : c.dim, borderColor: viewMode === 'calendar' ? c.accent : c.border }}>
                 <IconSymbol name={viewMode === 'list' ? 'calendar' : 'list.bullet'} size={17} color={viewMode === 'calendar' ? c.accent : c.sub} />
-              </TouchableOpacity>
+              </HeaderButton>
               {viewMode === 'list' && (
-                <TouchableOpacity
+                <HeaderButton
                   onPress={() => (hasActiveFilters ? clearAllFilters() : setShowFilterSheet(true))}
                   onLongPress={() => setShowFilterSheet(true)}
-                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                  accessibilityRole="button"
                   accessibilityLabel={hasActiveFilters ? tr.resetAllFilters : tr.filters}
                   accessibilityHint={hasActiveFilters ? tr.filters : undefined}
-                  style={[s.headerBtn, {
+                  style={{
                     backgroundColor: hasActiveFilters ? '#EF444418' : c.dim,
                     borderColor: hasActiveFilters ? '#EF444440' : c.border,
-                  }]}>
+                  }}>
                   {/* Два стани в одній кнопці: відкрити фільтри або скинути їх.
                       Коли фільтри активні, короткий тап скидає, довгий — усе
                       одно відкриває налаштування, щоб доступ до них не зникав. */}
@@ -1810,18 +1812,16 @@ export default function TasksScreen() {
                     size={17}
                     color={hasActiveFilters ? '#EF4444' : c.sub}
                   />
-                </TouchableOpacity>
+                </HeaderButton>
               )}
-              <TouchableOpacity
+              <HeaderButton
                 onPress={() => setShowOptionsMenu(v => !v)}
-                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                accessibilityRole="button"
                 accessibilityLabel={tr.a11yOptions}
-                style={[s.headerBtn, { backgroundColor: hasActiveFilters ? c.accent : c.dim, borderColor: hasActiveFilters ? c.accent : c.border }]}>
+                style={{ backgroundColor: hasActiveFilters ? c.accent : c.dim, borderColor: hasActiveFilters ? c.accent : c.border }}>
                 <IconSymbol name="ellipsis" size={17} color={hasActiveFilters ? '#fff' : c.sub} />
-              </TouchableOpacity>
-            </View>
-          </View>
+              </HeaderButton>
+            </>
+          }>
           <MonthPicker
             month={activeMonth}
             onChange={m => { setActiveMonth(m); setDateFilter(null); }}
@@ -1834,7 +1834,7 @@ export default function TasksScreen() {
             dimColor={c.dim}
             borderColor={c.border}
           />
-        </View>
+        </ScreenHeader>
 
         {viewMode === 'list' ? (
           <SectionList
@@ -1877,7 +1877,7 @@ export default function TasksScreen() {
             {calendarView}
           </ScrollView>
         )}
-      </SafeAreaView>
+      </View>
 
       {/* FAB */}
       <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
@@ -2079,7 +2079,7 @@ export default function TasksScreen() {
             tint={isDark ? 'dark' : 'light'}
             style={{
               position: 'absolute',
-              top: insets.top + 62,
+              top: topInset + 62,
               right: 16,
               borderRadius: 18,
               borderWidth: 1,
@@ -2184,7 +2184,7 @@ export default function TasksScreen() {
       {/* ─── Filter & Sort Bottom Sheet ─── */}
       <Modal visible={showFilterSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
         <Pressable style={s.overlay} onPress={() => setShowFilterSheet(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+          <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={s.handleRow}>
@@ -2340,7 +2340,7 @@ export default function TasksScreen() {
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -2665,8 +2665,6 @@ function StatCell({ value, label, color, sub }: any) {
 }
 
 const s = StyleSheet.create({
-  pageTitle:      { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
-  headerBtn:      { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   searchBar:      { flexDirection: 'row', alignItems: 'center', borderRadius: 13, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 10, marginBottom: 0 },
   searchInput:    { flex: 1, fontSize: 14, fontWeight: '400', marginLeft: 8, paddingVertical: 0 },
   activeChip:     { flexDirection: 'row', alignItems: 'center', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5 },

@@ -40,6 +40,7 @@ import Animated, {
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Motion } from '@/constants/motion';
+import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ export function SheetModal({
   backdropDismiss = true,
 }: SheetModalProps) {
   const reduced = useReducedMotion() ?? false;
-  const { height } = useResponsive();
+  const { height, isWide } = useResponsive();
 
   /**
    * Дистанція, на яку лист їде за нижній край екрана.
@@ -185,6 +186,17 @@ export function SheetModal({
     transform: [{ translateY: translateY.value }],
   }));
 
+  /**
+   * Ширина колонки береться з useResponsive() — тобто з ВІКНА, а не з
+   * screenContentWidth(): Modal у RN — окреме нативне вікно на весь екран,
+   * сайдбара в ньому немає, і віднімання його 232pt зсунуло б аркуш ліворуч
+   * від центру.
+   *
+   * Статичні стилі стоять ПЕРЕД анімованим: Reanimated дописує transform
+   * поверх масиву, і зворотний порядок з'їв би translateY.
+   */
+  const columnStyle = sheetColumnStyle(isWide);
+
   // ── Рендер ────────────────────────────────────────────────────────────────
   if (!mounted) return null;
 
@@ -220,7 +232,7 @@ export function SheetModal({
 
         {/* Контейнер листа (flex-end) */}
         <View style={styles.outer} pointerEvents="box-none">
-          <Animated.View style={sheetStyle}>
+          <Animated.View style={[columnStyle, sheetStyle]}>
             {/*
              * Pressable зупиняє поширення дотиків до backdrop dismiss-Pressable.
              * Дочірні ScrollView/TextInput/кнопки перехоплюють свої дотики
@@ -269,6 +281,8 @@ const styles = StyleSheet.create({
   backdrop: {
     backgroundColor: '#000',
   },
+  // alignItems тут НЕ ставимо: 'center' стиснув би аркуш до ширини вмісту
+  // на телефоні. Центрування робить сам аркуш через alignSelf.
   outer: {
     flex: 1,
     justifyContent: 'flex-end',

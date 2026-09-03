@@ -13,12 +13,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { QuickAddSheet, QuickRecord } from '@/components/health/QuickAddSheet';
 import { HubTile } from '@/components/health/HubTile';
 import { RingCell } from '@/components/health/RingCell';
 import { MonthPicker } from '@/components/shared/MonthPicker';
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { SkeletonCard } from '@/components/shared/Skeleton';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -129,11 +129,9 @@ export default function HealthHubScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <View style={{ flex: 1 }}>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
-          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.health}</Text>
-        </View>
+        <ScreenHeader title={tr.health} color={c.text} />
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset + 32 }}
@@ -244,7 +242,7 @@ export default function HealthHubScreen() {
           </View>
 
         </ScrollView>
-      </SafeAreaView>
+      </View>
 
       {/* FAB → нижній попап швидкого вводу */}
       <View style={[s.fabContainer, { bottom: Platform.OS === 'ios' ? 108 : 88 }]} pointerEvents="box-none">
@@ -359,7 +357,6 @@ const s = StyleSheet.create({
   // не віднімає gap, і на чотирьох колонках рядок переповнювався б.
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6 },
   tileCell: { padding: 6 },
-  pageTitle:    { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
   kicker:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginLeft: 2 },
   card:         { borderRadius: 18, borderWidth: 1, padding: 16, overflow: 'hidden' },
   iconBtnSm:    { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

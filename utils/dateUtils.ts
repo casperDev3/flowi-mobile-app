@@ -8,6 +8,18 @@ export function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
+/**
+ * Ключ доби для групування — `2026-09-03` з ЛОКАЛЬНИХ полів дати.
+ *
+ * Свідомо не `toDateString()`: він локалізовано-залежний і timezone-небезпечний
+ * (CLAUDE.md прямо забороняє його для порівняння дат). Такий ключ ще й
+ * сортується лексикографічно = хронологічно, тож денні секції не потребують
+ * окремого парсингу дати для впорядкування.
+ */
+export function localDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function isSameMonth(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }

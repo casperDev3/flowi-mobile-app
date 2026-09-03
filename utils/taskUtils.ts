@@ -67,7 +67,12 @@ export function getProgress(t: Task): number {
   return Math.round((t.subtasks.filter(s => s.done).length / t.subtasks.length) * 100);
 }
 
-export function isOverdue(task: Task): boolean {
+/**
+ * Приймає структурний зріз, а не весь `Task`: екрани оголошують власні
+ * інтерфейси завдання (з recurrence, recordings тощо), і номінально
+ * несумісний тип змушував би або кастити, або тримати локальну копію правила.
+ */
+export function isOverdue(task: Pick<Task, 'deadline' | 'status'>): boolean {
   if (!task.deadline || task.status === 'done') return false;
   const d = new Date(task.deadline);
   d.setHours(23, 59, 59, 999);

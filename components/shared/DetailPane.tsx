@@ -42,8 +42,8 @@ export interface DetailPaneProps {
 export function DetailPane({
   open, wide, onClose, isDark, sheetColor, borderColor, maxHeight, scrollRef, empty, children,
 }: DetailPaneProps) {
-  // Колонка не має власного SafeAreaView (він лишився в списку зліва),
-  // тож верхній виріз доводиться враховувати самій.
+  // Колонка не має власного верхнього відступу (він лишився на хедері
+  // списку зліва), тож верхній виріз доводиться враховувати самій.
   const insets = useSafeAreaInsets();
 
   if (wide) {

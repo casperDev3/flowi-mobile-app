@@ -171,7 +171,8 @@ const onRefresh = useCallback(() => { setRefreshing(true); loadXxx().finally(() 
 - ScrollView у Stack-скрінах: `paddingBottom: 100`
 - Теми: завжди підтримувати dark/light через `useColorScheme()`
 - BlurView замість суцільних карток
-- Фіксований хедер: за межами ScrollView у SafeAreaView — `paddingTop:14, paddingBottom:10/14`
+- Фіксований хедер — тільки через `components/shared/ScreenHeader` (+ `HeaderButton`); верхній інсет дає `useTopInset()`, нативний `SafeAreaView edges={['top']}` в екранах не використовуємо
+- Bottom-sheet на планшеті — центрована колонка: `sheetColumnStyle(isWide)` з `@/hooks/use-content-width` (та сама стеля `CONTENT_MAX_WIDTH`, що й у вмісту екрана)
 
 ### Кольори (акценти по екранах)
 - Завдання: `#7C3AED` (фіолетовий)

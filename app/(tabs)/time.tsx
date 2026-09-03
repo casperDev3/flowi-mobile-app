@@ -15,9 +15,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/shared/PressableScale';
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
@@ -32,7 +33,7 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { elapsedSince } from '@/utils/taskTimer';
-import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { CONTENT_MAX_WIDTH, sheetColumnStyle, useContentWidth } from '@/hooks/use-content-width';
 import { monthGrid } from '@/utils/dateUtils';
 import type { ActiveTimer, Shift } from '@/utils/activeTimers';
 
@@ -285,26 +286,33 @@ export default function TimeScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <View style={{ flex: 1 }}>
 
         {/* Fixed Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.navTimeTracker}</Text>
-          {/* Розгортати нема чого, поки жоден таймер не йде. */}
-          {activeTimers.length > 0 && (
-            <TouchableOpacity
-              onPress={() => { haptic.light(); setFsOpen(true); }}
-              accessibilityLabel={tr.fullscreenTimers}
-              style={[s.headerBtn, { backgroundColor: c.indigo + '20', borderColor: c.indigo, marginRight: 8 }]}>
-              <IconSymbol name="arrow.up.left.and.arrow.down.right" size={17} color={c.indigo} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            onPress={() => setShowMenu(true)}
-            style={[s.headerBtn, { backgroundColor: dateFilter ? c.indigo + '20' : c.dim, borderColor: dateFilter ? c.indigo : c.border }]}>
-            <IconSymbol name="slider.horizontal.3" size={17} color={dateFilter ? c.indigo : c.sub} />
-          </TouchableOpacity>
-        </View>
+        <ScreenHeader
+          title={tr.navTimeTracker}
+          color={c.text}
+          paddingBottom={14}
+          actions={
+            <>
+              {/* Розгортати нема чого, поки жоден таймер не йде. */}
+              {activeTimers.length > 0 && (
+                <HeaderButton
+                  onPress={() => { haptic.light(); setFsOpen(true); }}
+                  accessibilityLabel={tr.fullscreenTimers}
+                  style={{ backgroundColor: c.indigo + '20', borderColor: c.indigo }}>
+                  <IconSymbol name="arrow.up.left.and.arrow.down.right" size={17} color={c.indigo} />
+                </HeaderButton>
+              )}
+              <HeaderButton
+                onPress={() => setShowMenu(true)}
+                accessibilityLabel={tr.filtersAndSort}
+                style={{ backgroundColor: dateFilter ? c.indigo + '20' : c.dim, borderColor: dateFilter ? c.indigo : c.border }}>
+                <IconSymbol name="slider.horizontal.3" size={17} color={dateFilter ? c.indigo : c.sub} />
+              </HeaderButton>
+            </>
+          }
+        />
 
         <SectionList
           sections={sections}
@@ -475,7 +483,7 @@ export default function TimeScreen() {
             </>
           }
         />
-      </SafeAreaView>
+      </View>
 
       {/* FAB */}
       <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.indigo }]}>
@@ -589,7 +597,7 @@ export default function TimeScreen() {
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
 
                 <View style={s.handleRow}>
@@ -660,7 +668,7 @@ export default function TimeScreen() {
       <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={s.handleRow}>
@@ -753,7 +761,7 @@ export default function TimeScreen() {
       <Modal visible={!!selected} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setSelected(null)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               {selected && (() => {
                 const cfg = SHIFTS[selected.shift];
                 return (
@@ -929,8 +937,6 @@ function InfoRow({ icon, label, value, text, sub, border, last }: any) {
 }
 
 const s = StyleSheet.create({
-  pageTitle:   { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
-  headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
   timerCard:   { borderRadius: 22, borderWidth: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20, overflow: 'hidden', alignItems: 'center' },
   cardTitle:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },

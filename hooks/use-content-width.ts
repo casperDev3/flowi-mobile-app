@@ -20,6 +20,24 @@ import { useResponsive } from '@/hooks/use-responsive';
 
 export const CONTENT_MAX_WIDTH = 720;
 
+/**
+ * Те саме правило для bottom-sheet-ів.
+ *
+ * Аркуш притиснутий до низу й тягнеться на всю ширину контейнера, тож на
+ * iPad у ландшафті це ~1170pt суцільної форми від краю до краю. Обмежуємо
+ * так само, як вміст екрана, і центруємо.
+ *
+ * Чиста функція, а не хук: аркуші живуть у StyleSheet-ах екранів, і кожному
+ * з них свій хук був би зайвим — `isWide` там уже є з useResponsive().
+ * width:'100%' у ОБОХ гілках навмисне: без нього аркуш у контейнері з
+ * alignSelf:'center' стиснувся б до ширини свого вмісту.
+ */
+export function sheetColumnStyle(isWide: boolean): ViewStyle {
+  return isWide
+    ? { width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' }
+    : { width: '100%' };
+}
+
 export function useContentWidth(): ViewStyle {
   const { isWide } = useResponsive();
   return useMemo(

@@ -16,7 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -31,6 +30,7 @@ import { ThemeOption, useTheme } from '@/store/theme-context';
 import { Lang } from '@/store/translations';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useTopInset } from '@/hooks/use-top-inset';
 import { useResponsive } from '@/hooks/use-responsive';
 
 /**
@@ -42,6 +42,7 @@ type RowPress = (route?: Href) => void;
 
 export default function SettingsScreen() {
   const contentWidth = useContentWidth();
+  const topInset = useTopInset();
   const tabBarInset = useTabBarInset();
   const { isWide } = useResponsive();
   const cs = useColorScheme();
@@ -195,7 +196,15 @@ export default function SettingsScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/*
+       * Інсет лягає на КОНТЕЙНЕР, а не в contentContainerStyle списку. Різниця
+       * помітна при першому ж прокручуванні: padding усередині ScrollView
+       * скролиться разом із вмістом, тож рядки налаштувань поїхали б під
+       * статус-бар, де немає ні blur, ні підкладки — лише наскрізний градієнт.
+       * Тут верхня межа самого ScrollView стоїть під статус-баром, і вміст
+       * фізично не може під нього зайти.
+       */}
+      <View style={{ flex: 1, paddingTop: topInset }}>
         <ScrollView
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 16 }]}
           showsVerticalScrollIndicator={false}>
@@ -593,7 +602,7 @@ export default function SettingsScreen() {
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 8 }}>© 2026</Text>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
 
       {/* ─── Theme Modal ─── */}
       <Modal visible={showThemeModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeThemeModal}>

@@ -14,7 +14,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -22,6 +21,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData, saveData } from '@/store/storage';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useTopInset } from '@/hooks/use-top-inset';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -124,6 +124,7 @@ const MessageRow = React.memo(function MessageRow(
 
 export default function AgentScreen() {
   const contentWidth = useContentWidth();
+  const topInset = useTopInset();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
 
@@ -311,7 +312,13 @@ export default function AgentScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/*
+       * Верхній інсет рахуємо в JS (див. hooks/use-top-inset.ts): нативний
+       * SafeAreaView прикладав padding окремим комітом після JS-лейауту, тож
+       * шапка встигала намалюватись під статус-баром, а на Android інколи
+       * лишалася там назавжди.
+       */}
+      <View style={{ flex: 1, paddingTop: topInset }}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -570,7 +577,7 @@ export default function AgentScreen() {
             </>
           )}
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </View>
     </OfflineOverlay>
   );

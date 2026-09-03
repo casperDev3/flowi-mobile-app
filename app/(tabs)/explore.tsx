@@ -16,13 +16,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FinanceSummary, KIND_COLOR, KIND_ICON } from '@/components/finance/FinanceSummary';
 import { TransactionGroup } from '@/components/finance/TransactionGroup';
 import { MonthPicker } from '@/components/shared/MonthPicker';
 import { PickerField, type PickerOption } from '@/components/shared/PickerField';
 import { PressableScale } from '@/components/shared/PressableScale';
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { SkeletonCard } from '@/components/shared/Skeleton';
 import { useUndoToast } from '@/components/shared/UndoToast';
@@ -54,6 +55,7 @@ import { useMotion } from '@/hooks/use-motion';
 import { isSameDay } from '@/utils/dateUtils';
 import { haptic } from '@/utils/haptics';
 import { useResponsive } from '@/hooks/use-responsive';
+import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import {
   DEFAULT_CATEGORIES_EN, DEFAULT_CATEGORIES_UK, type CategoryDef,
@@ -118,7 +120,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
 
 export default function FinanceScreen() {
   const tabBarInset = useTabBarInset();
-  const { height, isExpanded } = useResponsive();
+  const { height, isExpanded, isWide } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   useScreenView('finance');
   const insets = useSafeAreaInsets();
@@ -1039,29 +1041,28 @@ export default function FinanceScreen() {
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <View style={{ flex: 1, flexDirection: 'row' }}>
       <View style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <View style={{ flex: 1 }}>
 
         {/* Fixed Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.finance}</Text>
-            <TouchableOpacity
-              onPress={() => setCompact(v => !v)}
-              accessibilityRole="button"
-              accessibilityLabel={compact ? tr.listMode : tr.compactView}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[s.headerBtn, { backgroundColor: compact ? c.accent + '20' : c.dim, borderColor: compact ? c.accent : c.border }]}>
-              <IconSymbol name={compact ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={compact ? c.accent : c.sub} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setShowMenu(true)}
-              accessibilityRole="button"
-              accessibilityLabel={tr.filtersAndSort}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[s.headerBtn, { backgroundColor: dateFilter ? c.accent + '20' : c.dim, borderColor: dateFilter ? c.accent : c.border }]}>
-              <IconSymbol name="ellipsis" size={17} color={dateFilter ? c.accent : c.sub} />
-            </TouchableOpacity>
-          </View>
+        <ScreenHeader
+          title={tr.finance}
+          color={c.text}
+          actions={
+            <>
+              <HeaderButton
+                onPress={() => setCompact(v => !v)}
+                accessibilityLabel={compact ? tr.listMode : tr.compactView}
+                style={{ backgroundColor: compact ? c.accent + '20' : c.dim, borderColor: compact ? c.accent : c.border }}>
+                <IconSymbol name={compact ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={compact ? c.accent : c.sub} />
+              </HeaderButton>
+              <HeaderButton
+                onPress={() => setShowMenu(true)}
+                accessibilityLabel={tr.filtersAndSort}
+                style={{ backgroundColor: dateFilter ? c.accent + '20' : c.dim, borderColor: dateFilter ? c.accent : c.border }}>
+                <IconSymbol name="ellipsis" size={17} color={dateFilter ? c.accent : c.sub} />
+              </HeaderButton>
+            </>
+          }>
           <MonthPicker
             month={activeMonth}
             onChange={m => { setActiveMonth(m); setDateFilter(null); }}
@@ -1074,7 +1075,7 @@ export default function FinanceScreen() {
             dimColor={c.dim}
             borderColor={c.border}
           />
-        </View>
+        </ScreenHeader>
 
         <FlatList
           data={groups}
@@ -1107,7 +1108,7 @@ export default function FinanceScreen() {
             </Animated.View>
           )}
         />
-      </SafeAreaView>
+      </View>
 
       {/* FAB */}
       <PressableScale onPress={() => { haptic.medium(); openAdd(); }} scaleTo={0.92} style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
@@ -1245,7 +1246,7 @@ export default function FinanceScreen() {
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
 
                 <View style={s.handleRow}>
@@ -1549,7 +1550,7 @@ export default function FinanceScreen() {
       {/* ─── Primary Currency Picker ─── */}
       <Modal visible={showPrimaryPicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowPrimaryPicker(false)}>
         <Pressable style={s.overlay} onPress={() => setShowPrimaryPicker(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+          <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
@@ -1597,7 +1598,7 @@ export default function FinanceScreen() {
       <Modal visible={showCats} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { setShowCats(false); setShowAddCat(false); }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.overlay} onPress={() => { setShowCats(false); setShowAddCat(false); }}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -2014,8 +2015,6 @@ function InfoRow({ icon, label, value, color, text, sub, border, last }: any) {
 }
 
 const s = StyleSheet.create({
-  pageTitle:   { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
-  headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
   filterRow:   { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
   filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },

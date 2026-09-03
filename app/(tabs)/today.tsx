@@ -10,12 +10,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { RingCell } from '@/components/health/RingCell';
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { PressableScale } from '@/components/shared/PressableScale';
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { SkeletonCard } from '@/components/shared/Skeleton';
 import { SyncBadge } from '@/components/today/SyncBadge';
 import { QuickActions } from '@/components/today/QuickActions';
@@ -319,17 +319,15 @@ export default function TodayScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <View style={{ flex: 1 }}>
         {/* Header */}
-        <View style={s.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600' }}>{greet}</Text>
-            <Text style={[s.title, { color: c.text }]} numberOfLines={1}>
-              {dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}
-            </Text>
-          </View>
-          <SyncBadge />
-        </View>
+        <ScreenHeader
+          title={dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}
+          color={c.text}
+          titleStyle={s.title}
+          eyebrow={<Text style={{ color: c.sub, fontSize: 13, fontWeight: '600' }}>{greet}</Text>}
+          actions={<SyncBadge />}
+        />
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset + 24 }}
@@ -610,7 +608,7 @@ export default function TodayScreen() {
           )}
 
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
@@ -656,14 +654,9 @@ const s = StyleSheet.create({
   // Дві колонки з рівним проміжком. alignItems: 'flex-start' — щоб картка
   // не розтягувалася до висоти сусідки й не лишала порожнечі всередині.
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', columnGap: 12 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 10,
-  },
-  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.6, marginTop: 2 },
+  // lineHeight явний: ScreenHeader задає 38 під свої 32pt, і без переозначення
+  // 26-й кегль тягнув би за собою чужий міжрядковий інтервал.
+  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.6, lineHeight: 32, marginTop: 2 },
   card:  { borderRadius: 18, borderWidth: 1, padding: 14, overflow: 'hidden' },
   cardHead: {
     flexDirection: 'row',

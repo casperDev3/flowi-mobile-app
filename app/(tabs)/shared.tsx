@@ -25,7 +25,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -41,6 +41,7 @@ import { WS_BASE } from '@/store/api-config';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useTopInset } from '@/hooks/use-top-inset';
 import { formatDuration } from '@/utils/durationFormat';
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
@@ -169,6 +170,7 @@ export default function SharedScreen() {
   const sectionCols = paneWidth >= 560 ? 2 : 1;
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const { tr, lang } = useI18n();
   const { online } = useAppMode();
   const durationUnits = useMemo(
@@ -1145,7 +1147,13 @@ export default function SharedScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/*
+       * Верхній інсет рахуємо в JS (див. hooks/use-top-inset.ts): нативний
+       * SafeAreaView прикладав padding окремим комітом після JS-лейауту, тож
+       * шапка встигала намалюватись під статус-баром, а на Android інколи
+       * лишалася там назавжди.
+       */}
+      <View style={{ flex: 1, paddingTop: topInset }}>
         {!initialized ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={c.accent} />
@@ -1414,7 +1422,7 @@ export default function SharedScreen() {
 
           </View>
         )}
-      </SafeAreaView>
+      </View>
 
       {/* ── FAB ── */}
       {showGroupPane && !sidebarSection && (

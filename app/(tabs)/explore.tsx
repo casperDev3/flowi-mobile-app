@@ -58,7 +58,8 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import {
-  DEFAULT_CATEGORIES_EN, DEFAULT_CATEGORIES_UK, type CategoryDef,
+  DEFAULT_CATEGORIES_EN, DEFAULT_CATEGORIES_UK, categoryNameIssue, categoryOptions,
+  type CategoryDef,
 } from '@/utils/financeCategories';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { DetailPane } from '@/components/shared/DetailPane';
@@ -168,11 +169,6 @@ export default function FinanceScreen() {
   const [showAddCat, setShowAddCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState<IconSymbolName>('ellipsis.circle.fill');
-
-  // Inline add category inside Add Transaction modal
-  const [showInlineAddCat, setShowInlineAddCat] = useState(false);
-  const [inlineCatName, setInlineCatName] = useState('');
-  const [inlineCatIcon, setInlineCatIcon] = useState<IconSymbolName>('ellipsis.circle.fill');
 
   // Currency state
   const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
@@ -417,14 +413,25 @@ export default function FinanceScreen() {
     setNewCatName(''); setNewCatIcon('ellipsis.circle.fill'); setShowAddCat(false);
   };
 
-  const addInlineCategory = () => {
-    const trimmed = inlineCatName.trim();
-    if (!trimmed) return;
-    if (cats[catType].some(c => c.name === trimmed)) return;
-    setCats(prev => ({ ...prev, [catType]: [...prev[catType], { name: trimmed, icon: inlineCatIcon }] }));
+  /**
+   * Нова категорія прямо з форми операції. Питаємо ЛИШЕ назву: тип уже обрано
+   * перемикачем витрата/дохід, а іконку тут вибирати нема коли — її завжди
+   * можна поміняти в керуванні категоріями.
+   *
+   * Пишемо через `cats`, тобто тим самим ефектом, що зберігає ВЕСЬ масив
+   * (categoryMapToRows). Окремий поштучний запис поруч із ним поставив би
+   * тумбстоуни на все, чого немає в одному рядку.
+   */
+  const createFormCategory = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (categoryNameIssue(catType, trimmed, cats[catType].map(cat => cat.name))) return;
+    setCats(prev => ({
+      ...prev,
+      [catType]: [...prev[catType], { name: trimmed, icon: 'ellipsis.circle.fill' as IconSymbolName }],
+    }));
     setCategory(trimmed);
-    setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill'); setShowInlineAddCat(false);
-  };
+    haptic.success();
+  }, [catType, cats]);
 
   const visibleAccounts = useMemo(() => activeAccounts(accounts), [accounts]);
 
@@ -540,7 +547,6 @@ export default function FinanceScreen() {
     setAmount(''); setCategory(''); setNote(''); setToAmount('');
     setFormAccountId(defaultAccountId(accounts, lastAccountRef.current));
     setFormToAccountId(null);
-    setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill');
     setShowAdd(true);
   };
 
@@ -726,7 +732,6 @@ export default function FinanceScreen() {
     setEditingId(null);
     setAmount(''); setCategory(''); setNote(''); setToAmount('');
     setFormToAccountId(null);
-    setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill');
   };
 
   const deleteTx = (id: string) => {
@@ -786,6 +791,39 @@ export default function FinanceScreen() {
   const pickerColors = useMemo(
     () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }),
     [c.text, c.sub, c.border, c.dim, c.accent, c.sheet],
+  );
+
+  /**
+   * Список категорій форми: збережені ПЛЮС назви, під якими вже лежать
+   * операції. Друге доливання обовʼязкове — категорію могли прибрати з
+   * керування або завести ще до появи колекції `categories`, а операції під
+   * старою назвою лишились. Без неї стара назва зникла б із вибору, і та сама
+   * витрата пішла б у нову категорію, розколовши історію й бюджетний ліміт.
+   *
+   * Долиті назви живуть ЛИШЕ в списку і в `cats` не осідають: інакше ефект
+   * запису відправив би їх у колекцію як справжні категорії.
+   */
+  const categoryPickerOptions = useMemo<PickerOption[]>(
+    () => categoryOptions(categoryMapToRows(cats), txs, catType, lang)
+      .map(cat => ({ id: cat.name, label: cat.name, icon: cat.icon })),
+    [cats, txs, catType, lang],
+  );
+
+  /**
+   * «+» у пікері. Довжину перевіряємо ТУТ, а не в сховищі: categoryMapToRows
+   * мовчки відкидає задовгий id, і без цієї перевірки людина побачила б
+   * «додано», а категорія зникла б при наступному читанні.
+   */
+  const categoryCreateOption = useMemo(
+    () => ({
+      label: tr.newCategory,
+      validate: (name: string) =>
+        categoryNameIssue(catType, name, cats[catType].map(cat => cat.name)) === 'tooLong'
+          ? tr.categoryNameTooLong
+          : null,
+      onCreate: createFormCategory,
+    }),
+    [tr, catType, cats, createFormCategory],
   );
 
   /** Перемикач виду форми. Переказ не пропонуємо в редагуванні звичайної
@@ -1334,7 +1372,6 @@ export default function FinanceScreen() {
                           onPress={() => {
                             setTxType(t);
                             setCategory('');
-                            setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill');
                           }}
                           accessibilityRole="button"
                           accessibilityState={{ selected: txType === t }}
@@ -1447,72 +1484,17 @@ export default function FinanceScreen() {
                   )}
 
                   {txType !== 'transfer' && (
-                    <>
-                  {/* Category */}
-                  <Text style={[s.label, { color: c.sub }]}>{tr.category}</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
-                    {cats[catType].map(cat => {
-                      const isSelected = category === cat.name;
-                      return (
-                        <TouchableOpacity
-                          key={cat.name}
-                          onPress={() => setCategory(cat.name)}
-                          style={[s.catChip, { backgroundColor: isSelected ? c.accent : c.dim, borderColor: isSelected ? c.accent : c.border }]}>
-                          <IconSymbol name={cat.icon} size={13} color={isSelected ? '#fff' : c.sub} />
-                          <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{cat.name}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                    <TouchableOpacity
-                      onPress={() => { setShowInlineAddCat(v => !v); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill'); }}
-                      style={[s.catChip, { backgroundColor: showInlineAddCat ? c.accent + '20' : c.dim, borderColor: showInlineAddCat ? c.accent : c.border, borderStyle: 'dashed' }]}>
-                      <IconSymbol name="plus" size={13} color={showInlineAddCat ? c.accent : c.sub} />
-                      <Text style={{ color: showInlineAddCat ? c.accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{tr.newCategory}</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {showInlineAddCat && (
-                    <View style={[{ borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 10 }, { borderColor: c.border, backgroundColor: c.dim }]}>
-                      <TextInput
-                        placeholder={tr.category}
-                        placeholderTextColor={c.sub}
-                        value={inlineCatName}
-                        onChangeText={setInlineCatName}
-                        style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 10 }]}
-                        autoFocus
-                      />
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 10 }}>
-                        {ICON_SUGGESTIONS.slice(0, 20).map(icon => {
-                          const isSel = inlineCatIcon === icon;
-                          return (
-                            <TouchableOpacity
-                              key={icon}
-                              onPress={() => setInlineCatIcon(icon)}
-                              style={{ width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
-                                backgroundColor: isSel ? c.accent : isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
-                                borderWidth: isSel ? 0 : 1, borderColor: c.border }}>
-                              <IconSymbol name={icon} size={16} color={isSel ? '#fff' : c.sub} />
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      <View style={{ flexDirection: 'row', gap: 7 }}>
-                        <TouchableOpacity
-                          onPress={() => { setShowInlineAddCat(false); setInlineCatName(''); setInlineCatIcon('ellipsis.circle.fill'); }}
-                          style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                          <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={addInlineCategory}
-                          disabled={!inlineCatName.trim()}
-                          style={[s.btn, { flex: 2, backgroundColor: !inlineCatName.trim() ? c.dim : c.accent }]}>
-                          <IconSymbol name="plus" size={14} color={!inlineCatName.trim() ? c.sub : '#fff'} />
-                          <Text style={{ color: !inlineCatName.trim() ? c.sub : '#fff', fontWeight: '700', marginLeft: 5 }}>{tr.add}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-                    </>
+                    <PickerField
+                      label={tr.category}
+                      icon="tag.fill"
+                      options={categoryPickerOptions}
+                      value={category || null}
+                      onSelect={id => setCategory(id ?? '')}
+                      createOption={categoryCreateOption}
+                      colors={pickerColors}
+                      isDark={isDark}
+                      tr={tr}
+                    />
                   )}
 
                   {/* Note */}

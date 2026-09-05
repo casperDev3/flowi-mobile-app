@@ -103,6 +103,13 @@ export interface TimerContextValue {
   tasksRevision: number;
   /** Те саме для 'meetings': стоп таймера дописує сесію повз стан екрана. */
   meetingsRevision: number;
+  /**
+   * Те саме для 'time_entries'. Потрібна відтоді, як режим зосередження
+   * відкривається з кореневої кнопки: зупинка таймера там відбувається повз
+   * вкладку «Час», і без сигналу вона показувала б список «до зупинки» —
+   * що виглядає як загублена сесія, хоч сесія записана.
+   */
+  timeEntriesRevision: number;
 }
 
 const TimerContext = createContext<TimerContextValue>({
@@ -120,6 +127,7 @@ const TimerContext = createContext<TimerContextValue>({
   getTimerForMeeting: () => undefined,
   tasksRevision: 0,
   meetingsRevision: 0,
+  timeEntriesRevision: 0,
 });
 
 function makeHistoryEvent(type: HistoryEventType, note?: string): TaskHistoryEvent {
@@ -150,6 +158,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [timersReady, setTimersReady] = useState(false);
   const [tasksRevision, setTasksRevision] = useState(0);
   const [meetingsRevision, setMeetingsRevision] = useState(0);
+  const [timeEntriesRevision, setTimeEntriesRevision] = useState(0);
 
   // Мутації йдуть із колбеків і не можуть чекати на новий рендер, щоб побачити
   // результат попередньої — тому актуальний масив живе ще й у ref.
@@ -324,6 +333,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           date: endedAt.toISOString(),
         };
         await saveSynced(TIME_ENTRIES_KEY, [entry, ...existing]);
+        setTimeEntriesRevision(n => n + 1);
       } catch (e) {
         if (__DEV__) console.warn('[timers] дзеркало у time_entries не вдалося:', e);
       }
@@ -509,6 +519,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       getTimerForMeeting,
       tasksRevision,
       meetingsRevision,
+      timeEntriesRevision,
     }),
     [
       pendingTask,
@@ -524,6 +535,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       getTimerForMeeting,
       tasksRevision,
       meetingsRevision,
+      timeEntriesRevision,
     ],
   );
 

@@ -13,13 +13,13 @@ import { loadData, saveData } from './storage';
 import { saveSynced } from './synced-storage';
 import { sortTimers, taskTimerId, shiftForDate, type ActiveTimer } from '@/utils/activeTimers';
 import type { Account } from '@/utils/accounts';
+// Правило id живе в utils/recordIds: його читає ще й форма категорій, а
+// імпортувати цей файл із чистої логіки не можна — він тягне сховище.
+import { categoryRowId, isUsableId } from '@/utils/recordIds';
+
+export { categoryRowId, isUsableId };
 
 const MIGRATIONS_KEY = 'storage_migrations_applied';
-
-/** Порожній рядок як id зламав би syncRecordKey — такі записи пропускаємо. */
-function isUsableId(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && value.length <= 64;
-}
 
 /**
  * `finance_currencies` і `budget_limits` уже лежать масивами, але без `id`.
@@ -72,10 +72,6 @@ export interface CategoryRow {
   name: string;
   icon: string;
   updatedAt?: string;
-}
-
-export function categoryRowId(type: string, name: string): string {
-  return `${type}:${name}`;
 }
 
 /** `Record<TxType, CategoryDef[]>` → пласкі рядки. */

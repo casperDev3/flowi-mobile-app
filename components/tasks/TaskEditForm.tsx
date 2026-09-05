@@ -13,6 +13,7 @@ import React from 'react';
 import { Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { CalendarGrid } from '@/components/tasks/CalendarGrid';
+import { PickerField } from '@/components/shared/PickerField';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { useTaskEditor } from '@/hooks/use-task-editor';
 import type { Translations } from '@/store/translations';
@@ -47,6 +48,7 @@ export interface TaskEditFormProps {
   onSave: () => void;
   onCancel: () => void;
   colors: any;
+  isDark: boolean;
   tr: Translations;
   locale: string;
 }
@@ -55,7 +57,7 @@ export function TaskEditForm({
   title, submitLabel, editor, taskStatuses, pickableProjects, projects, deadlineWeeks,
   priorityMeta: PRIORITY, months: MONTHS_UA, weekdays: WEEKDAYS_SHORT,
   deadlinePresets: DEADLINE_PRESETS,
-  today, onSave, onCancel, colors: c, tr, locale,
+  today, onSave, onCancel, colors: c, isDark, tr, locale,
 }: TaskEditFormProps) {
   return (
     <>
@@ -97,47 +99,23 @@ export function TaskEditForm({
           </View>
         </ScrollView>
 
-        {pickableProjects.length > 0 && (
-          <>
-            <Text style={[st.label, { color: c.sub }]}>{tr.project}</Text>
-            <TouchableOpacity
-              onPress={() => editor.setShowProjectDropdown(v => !v)}
-              style={[st.dropdownBtn, { backgroundColor: c.dim, borderColor: editor.showProjectDropdown ? c.accent : c.border }]}>
-              {(() => {
-                const sel = projects.find(p => p.id === editor.draft.projectId);
-                return sel ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: sel.color }} />
-                    <Text style={{ color: sel.color, fontSize: 13, fontWeight: '600', flex: 1 }}>{sel.name}</Text>
-                  </View>
-                ) : (
-                  <Text style={{ color: c.sub, fontSize: 13, fontWeight: '500', flex: 1 }}>{tr.noProject}</Text>
-                );
-              })()}
-              <IconSymbol name={editor.showProjectDropdown ? 'chevron.up' : 'chevron.down'} size={14} color={c.sub} />
-            </TouchableOpacity>
-            {editor.showProjectDropdown && (
-              <View style={[st.dropdownList, { borderColor: c.border, backgroundColor: c.dim }]}>
-                <TouchableOpacity
-                  onPress={() => { editor.patch({ projectId: null }); editor.setShowProjectDropdown(false); }}
-                  style={[st.dropdownItem, { borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: !editor.draft.projectId ? c.accent + '12' : 'transparent' }]}>
-                  <Text style={{ color: !editor.draft.projectId ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1 }}>{tr.noProject}</Text>
-                  {!editor.draft.projectId && <IconSymbol name="checkmark" size={13} color={c.accent} />}
-                </TouchableOpacity>
-                {pickableProjects.map((proj, i) => (
-                  <TouchableOpacity
-                    key={proj.id}
-                    onPress={() => { editor.patch({ projectId: proj.id }); editor.setShowProjectDropdown(false); }}
-                    style={[st.dropdownItem, { borderBottomWidth: i < pickableProjects.length - 1 ? 1 : 0, borderBottomColor: c.border, backgroundColor: editor.draft.projectId === proj.id ? proj.color + '12' : 'transparent' }]}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: proj.color, marginRight: 8 }} />
-                    <Text style={{ color: editor.draft.projectId === proj.id ? proj.color : c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{proj.name}</Text>
-                    {editor.draft.projectId === proj.id && <IconSymbol name="checkmark" size={13} color={proj.color} />}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </>
-        )}
+        {/* Через PickerField, а не власний випадний список: він дає пошук і
+            один вигляд на всі пікери застосунку. Поле показується ЗАВЖДИ, навіть
+            коли живих проєктів немає: інакше задача, чий проєкт заархівували,
+            втрачала б і підпис, і спосіб від нього відчепитись. */}
+        <Text style={[st.label, { color: c.sub }]}>{tr.project}</Text>
+        <PickerField
+          label=""
+          options={pickableProjects.map(p => ({ id: p.id, label: p.name, color: p.color }))}
+          value={editor.draft.projectId ?? null}
+          onSelect={id => editor.patch({ projectId: id })}
+          emptyOption={{ label: tr.noProject }}
+          selectedLabel={projects.find(p => p.id === editor.draft.projectId)?.name ?? null}
+          alwaysSearch
+          colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
+          isDark={isDark}
+          tr={tr}
+        />
 
         <Text style={[st.label, { color: c.sub }]}>{tr.timeEstimate}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>

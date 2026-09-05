@@ -199,6 +199,8 @@ export interface Translations {
   defaultCategory: string;
   icon: string;
   newCategory: string;
+  /** Назва не влізла в id запису — перевіряє форма, бо сховище мовчки відкидає. */
+  categoryNameTooLong: string;
   incomes: string;
   expenses: string;
   catSalary: string;
@@ -1196,6 +1198,7 @@ const uk: Translations = {
   defaultCategory: 'стандартна',
   icon: 'Іконка',
   newCategory: 'Нова категорія',
+  categoryNameTooLong: 'Назва задовга — спробуйте коротшу',
   incomes: 'Доходи',
   expenses: 'Витрати',
   catSalary: 'Зарплата',
@@ -2077,6 +2080,7 @@ const en: Translations = {
   defaultCategory: 'default',
   icon: 'Icon',
   newCategory: 'New Category',
+  categoryNameTooLong: 'Name is too long — try a shorter one',
   incomes: 'Income',
   expenses: 'Expenses',
   catSalary: 'Salary',

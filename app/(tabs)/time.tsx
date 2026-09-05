@@ -20,7 +20,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/shared/PressableScale';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
-import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
@@ -75,7 +74,7 @@ export default function TimeScreen() {
   useScreenView('time');
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { pendingTask, setPendingTask, activeTimers, startAdHocTimer, startTaskTimer, stopTimer, tasksRevision } = useTimerContext();
+  const { pendingTask, setPendingTask, activeTimers, startAdHocTimer, startTaskTimer, stopTimer, tasksRevision, timeEntriesRevision } = useTimerContext();
   const { tr, lang } = useI18n();
   // Одиниці приходять зі словника: до цього кожен екран мав власну копію
   // форматування з вшитими «год» і «хв».
@@ -117,7 +116,6 @@ export default function TimeScreen() {
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [showCal, setShowCal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [fsOpen, setFsOpen] = useState(false);
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
 
@@ -139,6 +137,14 @@ export default function TimeScreen() {
       setInitialized(true);
     });
   }, []);
+
+  // Таймер тепер зупиняють і з кореневої кнопки режиму зосередження — тобто
+  // поверх ЦЬОГО екрана, без його розмонтування й без повернення фокуса.
+  // Лічилка стору — єдиний сигнал, що дзеркало сесії дописане; без неї список
+  // лишався б таким, яким був до зупинки.
+  useEffect(() => {
+    if (timeEntriesRevision > 0) void reloadEntries();
+  }, [timeEntriesRevision, reloadEntries]);
 
   // Підзавдання для рядків активних таймерів.
   //
@@ -294,23 +300,19 @@ export default function TimeScreen() {
           color={c.text}
           paddingBottom={14}
           actions={
-            <>
-              {/* Розгортати нема чого, поки жоден таймер не йде. */}
-              {activeTimers.length > 0 && (
-                <HeaderButton
-                  onPress={() => { haptic.light(); setFsOpen(true); }}
-                  accessibilityLabel={tr.fullscreenTimers}
-                  style={{ backgroundColor: c.indigo + '20', borderColor: c.indigo }}>
-                  <IconSymbol name="arrow.up.left.and.arrow.down.right" size={17} color={c.indigo} />
-                </HeaderButton>
-              )}
-              <HeaderButton
-                onPress={() => setShowMenu(true)}
-                accessibilityLabel={tr.filtersAndSort}
-                style={{ backgroundColor: dateFilter ? c.indigo + '20' : c.dim, borderColor: dateFilter ? c.indigo : c.border }}>
-                <IconSymbol name="slider.horizontal.3" size={17} color={dateFilter ? c.indigo : c.sub} />
-              </HeaderButton>
-            </>
+            /*
+              Входу в режим зосередження тут немає навмисно. Він один на весь
+              застосунок — плаваюча кнопка в app/_layout.tsx, бо «увімкнути
+              звідусіль» не можна зробити з шапки: Stack-екрани малюють власні
+              хедери. Друга кнопка саме тут дала б на цьому екрані два входи в
+              ту саму модалку з двома незалежними станами відкриття.
+            */
+            <HeaderButton
+              onPress={() => setShowMenu(true)}
+              accessibilityLabel={tr.filtersAndSort}
+              style={{ backgroundColor: dateFilter ? c.indigo + '20' : c.dim, borderColor: dateFilter ? c.indigo : c.border }}>
+              <IconSymbol name="slider.horizontal.3" size={17} color={dateFilter ? c.indigo : c.sub} />
+            </HeaderButton>
           }
         />
 
@@ -816,9 +818,6 @@ export default function TimeScreen() {
           </Pressable>
         </KeyboardAvoidingView>
       </Modal>
-
-      {/* Повноекранний режим малює себе сам, читаючи таймери зі стору. */}
-      <FullscreenTimers visible={fsOpen} onClose={() => { setFsOpen(false); void reloadEntries(); }} />
     </View>
   );
 }

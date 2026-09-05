@@ -1319,6 +1319,7 @@ export default function TasksScreen() {
                         onSave={saveTaskEdit}
                         onCancel={editor.finish}
                         colors={c}
+                        isDark={isDark}
                         tr={tr}
                         locale={locale}
                       />
@@ -1347,10 +1348,12 @@ export default function TasksScreen() {
                     {selectedTask.description ? <Text style={[s.detailDesc, { color: c.sub }]}>{selectedTask.description}</Text> : null}
 
                     {/* Статус і проєкт — однакове поле вибору: обидва
-                        відкривають аркуш зі списком, а при більш ніж пʼятьох
-                        варіантах ще й із пошуком. Раніше тут стояли два різні
-                        способи вибирати поруч — розсип чипів і інлайн-список,
-                        що розсовував вміст. */}
+                        відкривають аркуш зі списком. Раніше тут стояли два
+                        різні способи вибирати поруч — розсип чипів і
+                        інлайн-список, що розсовував вміст.
+                        Різниця лише в пошуку: статусів скінченна жменя, а
+                        проєкти накопичуються роками, тож у них пошук стоїть
+                        завжди (alwaysSearch), а не з шостого рядка. */}
                     <PickerField
                       label={tr.status}
                       icon="rectangle.3.group"
@@ -1434,6 +1437,14 @@ export default function TasksScreen() {
                         value={selectedTask.projectId ?? null}
                         onSelect={id => updateTaskProject(selectedTask.id, id)}
                         emptyOption={{ label: tr.noProject }}
+                        // Підпис шукається в ПОВНОМУ списку, а не в звуженому:
+                        // проєкт задачі могли заархівувати вже після того, як
+                        // її туди поклали, і без цього поле показувало б
+                        // «Без проєкту» на задачі, у якої проєкт є.
+                        selectedLabel={
+                          projects.find(p => p.id === selectedTask.projectId)?.name ?? null
+                        }
+                        alwaysSearch
                         colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
                         isDark={isDark}
                         tr={tr}
@@ -2519,6 +2530,7 @@ export default function TasksScreen() {
               onSave={addTask}
               onCancel={() => { composer.reset(ACTIVE_COLUMN_ID); setShowAdd(false); }}
               colors={c}
+              isDark={isDark}
               tr={tr}
               locale={locale}
             />

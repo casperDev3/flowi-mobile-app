@@ -1,7 +1,8 @@
 import {
   HealthEntry, HealthProfile,
   bmiCategory, calcBMI, calcBMR, calcCalorieTarget, calcNetCalories, calcProteinTarget, calcTDEE, calcWaterTarget,
-  computeGoals, estimateBodyFatNavy, getWeeklyInsights, lastForDay, leanMass, maxHR, stepsToKm, sumForDay,
+  clampProfileRanges, computeGoals, estimateBodyFatNavy, getWeeklyInsights, lastForDay, latestValue,
+  leanMass, maxHR, stepsToKm, sumForDay,
   waistToHeightRatio, waistToHipRatio, whrHealthy, whtrCategory,
 } from '@/utils/healthUtils';
 
@@ -81,7 +82,7 @@ describe('healthUtils — агрегати', () => {
     expect(sumForDay(entries, 'water', today)).toBe(750);
   });
 
-  test('lastForDay повертає найсвіжіше значення дня (newest-first)', () => {
+  test('lastForDay повертає найсвіжіше значення дня', () => {
     expect(lastForDay(entries, 'weight', today)).toBe(79.5);
     expect(lastForDay(entries, 'pulse', today)).toBeNull();
   });
@@ -176,5 +177,60 @@ describe('calcNetCalories', () => {
 
   test('результат цілий', () => {
     expect(Number.isInteger(calcNetCalories(1800.6, 400.2))).toBe(true);
+  });
+});
+
+describe('найсвіжіший запис не залежить від порядку в масиві', () => {
+  // Порядок health_entries_v2 нічим не гарантований: prepend роблять лише
+  // addEntry і HK-синк, а звичайний синк приносить записи в порядку сервера.
+  // Тому обидві функції мусять давати ту саму відповідь на перевернутому
+  // масиві — інакше з ваги порахуються чужі норми.
+  const iso = (daysAgo: number, hour: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    d.setHours(hour, 0, 0, 0);
+    return d.toISOString();
+  };
+  const newestFirst: HealthEntry[] = [
+    { id: '3', type: 'weight', value: 78, date: iso(0, 20) },
+    { id: '2', type: 'weight', value: 80, date: iso(0, 8) },
+    { id: '1', type: 'weight', value: 85, date: iso(30, 9) },
+  ];
+  const oldestFirst = [...newestFirst].reverse();
+
+  test('latestValue бере найновіше зважування в обох порядках', () => {
+    expect(latestValue(newestFirst, 'weight')).toBe(78);
+    expect(latestValue(oldestFirst, 'weight')).toBe(78);
+  });
+
+  test('lastForDay бере останнє за добу в обох порядках', () => {
+    const today = new Date();
+    expect(lastForDay(newestFirst, 'weight', today)).toBe(78);
+    expect(lastForDay(oldestFirst, 'weight', today)).toBe(78);
+  });
+
+  test('порожній пул — null, а не помилка', () => {
+    expect(latestValue([], 'weight')).toBeNull();
+    expect(latestValue(newestFirst, 'pulse')).toBeNull();
+  });
+});
+
+describe('межі профілю застосовуються на коміті', () => {
+  const base = { sex: 'male', age: 30, heightCm: 175, activity: 'moderate', goal: 'maintain' } as HealthProfile;
+
+  test('нижня межа підтягує занизьке значення', () => {
+    expect(clampProfileRanges({ ...base, age: 0, heightCm: 0 })).toMatchObject({ age: 10, heightCm: 100 });
+  });
+
+  test('верхня межа обрізає завелике', () => {
+    expect(clampProfileRanges({ ...base, age: 999, heightCm: 999 })).toMatchObject({ age: 120, heightCm: 250 });
+  });
+
+  test('коректні значення не чіпаються', () => {
+    expect(clampProfileRanges({ ...base, age: 41, heightCm: 183 })).toMatchObject({ age: 41, heightCm: 183 });
+  });
+
+  test('NaN дає мінімум, а не NaN у BMR', () => {
+    expect(clampProfileRanges({ ...base, age: NaN, heightCm: NaN })).toMatchObject({ age: 10, heightCm: 100 });
   });
 });

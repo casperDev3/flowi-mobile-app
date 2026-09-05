@@ -18,6 +18,7 @@ import {
   calcBMI,
   computeGoals,
   lastForDay,
+  latestValue,
   sumForDay,
 } from '@/utils/healthUtils';
 
@@ -163,10 +164,11 @@ export function useHealthEntries() {
     [entries],
   );
 
-  const latestWeight = useMemo(() => {
-    const all = entries.filter(e => e.type === 'weight');
-    return all.length ? all[0].value : null; // newest-first
-  }, [entries]);
+  // Через latestValue, а не all[0]: порядок health_entries_v2 гарантує лише
+  // локальне додавання (prepend), а звичайний синк приносить записи в порядку
+  // сервера. З ваги рахуються TDEE й усі норми, тож «якесь» зважування замість
+  // останнього — це неправильні числа без жодної ознаки, що вони неправильні.
+  const latestWeight = useMemo(() => latestValue(entries, 'weight'), [entries]);
 
   const goals = useMemo(() => computeGoals(profile, latestWeight ?? FALLBACK_WEIGHT), [profile, latestWeight]);
   const heightCm = profile?.heightCm ?? 175;

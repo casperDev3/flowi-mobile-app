@@ -28,9 +28,12 @@ import {
   HealthEntry,
   HealthProfile,
   PROFILE_KEY,
+  PROFILE_RANGES,
   Sex,
   calcTDEE,
+  clampProfileRanges,
   computeGoals,
+  latestValue,
 } from '@/utils/healthUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
 
@@ -52,8 +55,11 @@ export default function HealthProfileScreen() {
       const p = await loadData<HealthProfile | null>(PROFILE_KEY, null);
       if (p) setProfile({ ...DEFAULT_PROFILE, ...p });
       const entries = await loadData<HealthEntry[]>('health_entries_v2', []);
-      const weights = entries.filter(e => e.type === 'weight');
-      if (weights.length) setLatestWeight(weights[weights.length - 1].value);
+      // latestValue, а не вибір за позицією: тут раніше стояв
+      // weights[weights.length - 1], тобто в newest-first масиві —
+      // НАЙСТАРІШЕ зважування. Через це екран показував норми від однієї ваги,
+      // а решта застосунку рахувала від іншої.
+      setLatestWeight(latestValue(entries, 'weight'));
       setInitialized(true);
     })();
   }, []);
@@ -63,7 +69,12 @@ export default function HealthProfileScreen() {
   const tdee = useMemo(() => calcTDEE(profile, weightForCalc), [profile, weightForCalc]);
 
   const save = useCallback(async () => {
-    await saveSyncedValue(PROFILE_KEY, profile);
+    // Межі застосовуються ще раз саме тут, а не лише на blur: зберегти можна й
+    // не залишаючи поля (кнопка перехоплює натиск), і тоді в профіль поїхав би
+    // вік 0 — а з нього рахується BMR, тобто й усі норми.
+    const clamped = clampProfileRanges(profile);
+    setProfile(clamped);
+    await saveSyncedValue(PROFILE_KEY, clamped);
     router.back();
   }, [profile, router]);
 
@@ -124,13 +135,17 @@ export default function HealthProfileScreen() {
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <View style={{ flex: 1 }}>
                 <Text style={[s.label, { color: c.sub }]}>{tr.ageLabel}</Text>
-                <TextInput value={String(profile.age)} onChangeText={t => setProfile(p => ({ ...p, age: clampInt(t, 10, 120, p.age) }))}
+                <TextInput value={String(profile.age)}
+                  onChangeText={t => setProfile(p => ({ ...p, age: clampInt(t, PROFILE_RANGES.age.max, p.age) }))}
+                  onBlur={() => setProfile(clampProfileRanges)}
                   keyboardType="number-pad" placeholder="30" placeholderTextColor={c.sub}
                   style={[s.input, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.label, { color: c.sub }]}>{tr.heightLabel}</Text>
-                <TextInput value={String(profile.heightCm)} onChangeText={t => setProfile(p => ({ ...p, heightCm: clampInt(t, 100, 250, p.heightCm) }))}
+                <TextInput value={String(profile.heightCm)}
+                  onChangeText={t => setProfile(p => ({ ...p, heightCm: clampInt(t, PROFILE_RANGES.heightCm.max, p.heightCm) }))}
+                  onBlur={() => setProfile(clampProfileRanges)}
                   keyboardType="number-pad" placeholder="175" placeholderTextColor={c.sub}
                   style={[s.input, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]} />
               </View>
@@ -197,9 +212,23 @@ function PreviewRow({ label, value, color }: { label: string; value: string; col
   );
 }
 
-function clampInt(text: string, min: number, max: number, fallback: number): number {
-  const n = parseInt(text.replace(/[^0-9]/g, ''), 10);
-  if (isNaN(n)) return text === '' ? min : fallback;
+/**
+ * Обмеження ПІД ЧАС НАБОРУ — лише зверху.
+ *
+ * Нижньої межі тут навмисно немає: поле прив'язане до значення профілю, тож
+ * застосована на кожен символ нижня межа зробила б «17» недосяжним — після
+ * першої «1» поле стрибнуло б на 10 і далі дописувалось би до «101». Нижню
+ * межу застосовує clampProfileRanges на blur і перед збереженням, тобто тоді,
+ * коли користувач уже закінчив набирати.
+ *
+ * Порожнє поле дає 0, а не мінімум: інакше стерти введене й почати спочатку
+ * неможливо — поле щоразу підставляло б мінімум назад.
+ */
+function clampInt(text: string, max: number, fallback: number): number {
+  const digits = text.replace(/[^0-9]/g, '');
+  if (digits === '') return text === '' ? 0 : fallback;
+  const n = parseInt(digits, 10);
+  if (isNaN(n)) return fallback;
   return Math.min(max, Math.max(0, n));
 }
 

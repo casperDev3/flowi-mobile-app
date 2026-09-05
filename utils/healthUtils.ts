@@ -206,18 +206,66 @@ export function sumForDay(entries: HealthEntry[], type: EntryType, day: Date): n
 }
 
 /**
- * Останнє записане значення типу за день. Масив зберігається newest-first
- * (addEntry/HK-sync роблять prepend), тож найсвіжіше — це pool[0].
+ * Найсвіжіший запис пулу — за ДАТОЮ, а не за позицією в масиві.
+ *
+ * Раніше обидві функції нижче брали pool[0], спираючись на те, що масив
+ * newest-first: addEntry і HK-синк роблять prepend. Але порядок після
+ * ЗВИЧАЙНОГО синку не гарантує ніхто — у store немає жодного сортування
+ * health_entries_v2, і записи приїжджають у порядку сервера. Тобто інваріант
+ * тримався лише доти, доки записи створювались на цьому ж пристрої.
+ *
+ * Ціна помилки тут не косметична: з ваги рахуються TDEE, ліміт калорій, норма
+ * білка й води. Взяти «якесь» зважування замість останнього — це показати
+ * користувачу неправильні числа, не сказавши, що вони неправильні.
  */
-export function lastForDay(entries: HealthEntry[], type: EntryType, day: Date): number | null {
-  const pool = entries.filter(e => e.type === type && isSameDay(new Date(e.date), day));
-  return pool.length ? pool[0].value : null;
+function newestValue(pool: HealthEntry[]): number | null {
+  let best: HealthEntry | null = null;
+  let bestAt = -Infinity;
+  for (const entry of pool) {
+    const at = new Date(entry.date).getTime();
+    // Запис із побитою датою не має перемагати справний: NaN у порівнянні
+    // завжди дає false, тож він програє будь-якому, але лишається кандидатом,
+    // якщо справних немає взагалі.
+    if (best === null || at > bestAt) {
+      best = entry;
+      bestAt = at;
+    }
+  }
+  return best ? best.value : null;
 }
 
-/** Останнє значення типу серед усіх записів (newest-first → [0]) */
+/** Останнє записане значення типу за день. */
+export function lastForDay(entries: HealthEntry[], type: EntryType, day: Date): number | null {
+  return newestValue(entries.filter(e => e.type === type && isSameDay(new Date(e.date), day)));
+}
+
+/** Останнє значення типу серед усіх записів. */
 export function latestValue(entries: HealthEntry[], type: EntryType): number | null {
-  const pool = entries.filter(e => e.type === type);
-  return pool.length ? pool[0].value : null;
+  return newestValue(entries.filter(e => e.type === type));
+}
+
+/** Межі полів профілю. Живуть поруч із розрахунками, бо саме вони їх і споживають. */
+export const PROFILE_RANGES = {
+  age: { min: 10, max: 120 },
+  heightCm: { min: 100, max: 250 },
+} as const;
+
+/**
+ * Затиснути числові поля профілю в допустимі межі.
+ *
+ * Викликається на КОМІТІ (blur і збереження), а не на кожен натиск: нижню межу
+ * не можна застосовувати під час набору, бо поле прив'язане до значення
+ * профілю, і вік «17» став би неможливим — після першої «1» поле стрибнуло б
+ * на 10. Тому набір лише обмежує зверху, а нижню межу застосовує цей виклик.
+ */
+export function clampProfileRanges<T extends { age: number; heightCm: number }>(profile: T): T {
+  const clamp = (value: number, { min, max }: { min: number; max: number }) =>
+    Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : min;
+  return {
+    ...profile,
+    age: clamp(profile.age, PROFILE_RANGES.age),
+    heightCm: clamp(profile.heightCm, PROFILE_RANGES.heightCm),
+  };
 }
 
 // ─── Тижневі інсайти (тиждень-до-тижня) ───────────────────────────────────────

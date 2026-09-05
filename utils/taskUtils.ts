@@ -48,6 +48,13 @@ export interface Task {
   estimatedMinutes?: number;
   deadline?: string;
   projectId?: string;
+  /**
+   * Спринт проєкту (utils/sprintUtils.ts). Порожній/відсутній = беклог
+   * проєкту — це НЕ помилка й не привід для міграції: усі наявні завдання
+   * саме такі. У «Сьогодні» спринт не впливає ні на що: там тягне виключно
+   * власний deadline завдання.
+   */
+  sprintId?: string;
   reminderAt?: string;
   timeEntries?: TaskTimeEntry[];
   history?: TaskHistoryEvent[];

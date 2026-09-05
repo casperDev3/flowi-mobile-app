@@ -53,6 +53,7 @@ import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, subtaskToggle
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import type { Project } from '../projects';
+import { retargetTaskProject, sprintBadgeLabel, type Sprint } from '@/utils/sprintUtils';
 import { useResponsive } from '@/hooks/use-responsive';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
@@ -110,6 +111,13 @@ interface Task {
   estimatedMinutes?: number;
   deadline?: string;
   projectId?: string;
+  /**
+   * Спринт проєкту (utils/sprintUtils.ts). Порожній/відсутній = беклог
+   * проєкту — це НЕ помилка й не привід для міграції: усі наявні завдання
+   * саме такі. У «Сьогодні» спринт не впливає ні на що: там тягне виключно
+   * власний deadline завдання.
+   */
+  sprintId?: string;
   reminderAt?: string;
   timeEntries?: TaskTimeEntry[];
   history?: TaskHistoryEvent[];
@@ -256,6 +264,10 @@ export default function TasksScreen() {
   // ніколи б не дізнався.
   const { startTaskTimer, stopTimerForTask, getTimerForTask, tasksRevision, meetingsRevision } = useTimerContext();
   const [projects, setProjects] = useState<Project[]>([]);
+  // Спринти екран лише ЧИТАЄ — заради бейджа «Проєкт · Спринт». Створюють,
+  // перейменовують і закривають їх на сторінці проєкту, і другої точки входу
+  // в те саме рішення тут навмисно немає.
+  const [sprints, setSprints] = useState<Sprint[]>([]);
 
   // Пікери показують лише ЖИВІ проєкти, а `projects` лишається повним.
   // Це навмисно: підпис обраного значення шукається в повному списку, тож
@@ -341,16 +353,18 @@ export default function TasksScreen() {
   const [detailTab, setDetailTab] = useState<'info' | 'timer' | 'history'>('info');
 
   const loadAll = useCallback(async () => {
-    const [t, p, m, statuses] = await Promise.all([
+    const [t, p, m, statuses, s] = await Promise.all([
       loadData<Task[]>('tasks', []),
       loadData<Project[]>('projects', []),
       loadData<Meeting[]>('meetings', []),
       loadData<TaskStatusColumn[]>('task_statuses', []),
+      loadData<Sprint[]>('sprints', []),
     ]);
     setTasks(t);
     setProjects(p);
     setMeetings(m);
     setStoredTaskStatuses(statuses);
+    setSprints(s);
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -936,7 +950,9 @@ export default function TasksScreen() {
   }, []);
 
   const updateTaskProject = useCallback((taskId: string, projectId: string | null) => {
-    const patch = (t: Task): Task => t.id !== taskId ? t : { ...t, projectId: projectId ?? undefined };
+    // retargetTaskProject, а не просто підміна поля: разом із проєктом задача
+    // виходить зі спринта, бо спринт належав старому проєкту.
+    const patch = (t: Task): Task => t.id !== taskId ? t : retargetTaskProject(t, projectId ?? undefined);
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
   }, []);
@@ -1005,7 +1021,8 @@ export default function TasksScreen() {
     if (column.isDone && getTimerForTask(selected.id)) pendingTimerStops.current.push(selected.id);
 
     const patch = (t: Task): Task => t.id !== selected.id ? t : {
-      ...t,
+      // Спринт зникає разом зі зміною проєкту — див. retargetTaskProject.
+      ...retargetTaskProject(t, editor.draft.projectId ?? undefined),
       title: editor.draft.title.trim(),
       description: editor.draft.desc.trim(),
       priority: editor.draft.priority,
@@ -1877,6 +1894,7 @@ export default function TasksScreen() {
                           c={c}
                           isDark={isDark}
                           projects={projects}
+                          sprints={sprints}
                           overdueLabel={tr.overdueSection}
                           priorityLabel={PRIORITY[task.priority].label}
                           subtasksLabel={tr.subtasks}
@@ -1985,6 +2003,7 @@ export default function TasksScreen() {
                 c={c}
                 isDark={isDark}
                 projects={projects}
+                sprints={sprints}
                 overdueLabel={tr.overdueSection}
                 priorityLabel={PRIORITY[item.priority].label}
                 subtasksLabel={tr.subtasks}
@@ -2611,7 +2630,7 @@ const AnimatedText = Animated.createAnimatedComponent(Text);
  */
 const TaskListItem = React.memo(function TaskListItem({
   task, index, animate, motion, statusColumn, onPress, onToggle,
-  c, isDark, projects, overdueLabel, priorityLabel, subtasksLabel,
+  c, isDark, projects, sprints, overdueLabel, priorityLabel, subtasksLabel,
 }: {
   task: Task;
   index: number;
@@ -2623,6 +2642,7 @@ const TaskListItem = React.memo(function TaskListItem({
   c: any;
   isDark: boolean;
   projects: Project[];
+  sprints: Sprint[];
   overdueLabel: string;
   priorityLabel: string;
   subtasksLabel: string;
@@ -2640,6 +2660,7 @@ const TaskListItem = React.memo(function TaskListItem({
         c={c}
         isDark={isDark}
         projects={projects}
+        sprints={sprints}
         overdueLabel={overdueLabel}
         priorityLabel={priorityLabel}
         subtasksLabel={subtasksLabel}
@@ -2654,7 +2675,7 @@ const TaskListItem = React.memo(function TaskListItem({
  * колбеки приймають завдання аргументом — інакше виклик довелося б
  * загортати в стрілку, нову при кожному рендері.
  */
-const CompactCard = React.memo(function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, overdueLabel, priorityLabel, subtasksLabel }: {
+const CompactCard = React.memo(function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, sprints, overdueLabel, priorityLabel, subtasksLabel }: {
   task: Task;
   statusColumn: TaskStatusColumn;
   /** Завдання приходить аргументом, щоб екран міг тримати колбек стабільним. */
@@ -2663,6 +2684,8 @@ const CompactCard = React.memo(function CompactCard({ task, statusColumn, onPres
   c: any;
   isDark: boolean;
   projects: Project[];
+  /** Лише для підпису бейджа — картка спринти не змінює. */
+  sprints: Sprint[];
   /** Для VoiceOver: стан «прострочено» інакше ніяк не озвучується. */
   overdueLabel: string;
   /** Те саме для пріоритету — він переданий лише кольоровою крапкою. */
@@ -2672,6 +2695,10 @@ const CompactCard = React.memo(function CompactCard({ task, statusColumn, onPres
 }) {
   const overdue = isOverdue(task);
   const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
+  // «Проєкт · Спринт» одним підписом. Колір бейджа лишається проєктовим:
+  // спринт живе всередині проєкту, а не поруч із ним. Закритий спринт свій
+  // підпис зберігає — див. findSprint в utils/sprintUtils.ts.
+  const badgeLabel = sprintBadgeLabel(task, projects, sprints);
   const isDone = task.status === 'done';
   const doneSubtasks = task.subtasks.filter(sub => sub.done).length;
   const allSubtasksDone = task.subtasks.length > 0 && doneSubtasks === task.subtasks.length;
@@ -2695,7 +2722,7 @@ const CompactCard = React.memo(function CompactCard({ task, statusColumn, onPres
     task.subtasks.length > 0 ? `${subtasksLabel}: ${doneSubtasks}/${task.subtasks.length}` : null,
     overdue ? overdueLabel : null,
     priorityLabel,
-    proj?.name,
+    badgeLabel,
   ].filter(Boolean).join(', ');
 
   return (
@@ -2739,10 +2766,12 @@ const CompactCard = React.memo(function CompactCard({ task, statusColumn, onPres
               <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 10, fontWeight: '700' }}>{statusColumn.name}</Text>
             </View>
 
-            {proj && (
+            {proj && badgeLabel && (
               <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: proj.color + '16' }}>
                 <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: proj.color, marginRight: 4 }} />
-                <Text numberOfLines={1} style={{ color: proj.color, fontSize: 10, fontWeight: '600', maxWidth: 110 }}>{proj.name}</Text>
+                {/* maxWidth більший за колишні 110: у бейдж тепер уміщається
+                    ще й назва спринта, і на 110 від неї лишалося три літери. */}
+                <Text numberOfLines={1} style={{ color: proj.color, fontSize: 10, fontWeight: '600', maxWidth: 180 }}>{badgeLabel}</Text>
               </View>
             )}
 

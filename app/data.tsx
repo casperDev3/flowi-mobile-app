@@ -33,6 +33,10 @@ const ALL_KEYS = [
   { key: 'time_entries',      label: 'Записи часу', icon: 'timer',              color: '#6366F1' },
   { key: 'notes',             label: 'Нотатки',     icon: 'note.text',          color: '#F59E0B' },
   { key: 'projects',          label: 'Проекти',     icon: 'folder.fill',        color: '#10B981' },
+  // Плитка потрібна не лише заради лічильника: файловий експорт нижче
+  // збирає payload САМЕ по ALL_KEYS, тож ключ, якого тут немає, у файл не
+  // потрапляє — хоч би що стояло в EXPORT_KEY_MAP.
+  { key: 'sprints',           label: 'Спринти',     icon: 'flag.fill',          color: '#10B981' },
   { key: 'meetings',          label: 'Зустрічі',    icon: 'calendar',           color: '#6366F1' },
   { key: 'health_entries_v2', label: 'Здоров\'я',   icon: 'heart.fill',         color: '#10B981' },
   { key: 'workouts',          label: 'Тренування',  icon: 'figure.run',         color: '#0EA5E9' },
@@ -52,6 +56,7 @@ const ALL_KEYS = [
 const EXPORT_KEY_MAP: Record<string, string> = {
   tasks: 'tasks', task_statuses: 'taskStatuses', transactions: 'transactions', accounts: 'accounts', time_entries: 'timeEntries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
+  sprints: 'sprints',
   meetings: 'meetings', health_entries_v2: 'healthEntries',
   workouts: 'workouts', exercises: 'exercises', workout_programs: 'workoutPrograms',
   savings_jars: 'savingsJars', containers: 'containers',
@@ -61,6 +66,7 @@ const EXPORT_KEY_MAP: Record<string, string> = {
 const IMPORT_KEY_MAP: Record<string, string> = {
   tasks: 'tasks', taskStatuses: 'task_statuses', transactions: 'transactions', accounts: 'accounts', timeEntries: 'time_entries',
   notes: 'notes', projects: 'projects', bugs: 'bugs', ideas: 'ideas',
+  sprints: 'sprints',
   meetings: 'meetings', healthEntries: 'health_entries_v2',
   workouts: 'workouts', exercises: 'exercises', workoutPrograms: 'workout_programs',
   savingsJars: 'savings_jars', containers: 'containers',

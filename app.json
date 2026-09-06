@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flowi",
     "slug": "f-tracking-app",
-    "version": "0.0.3",
+    "version": "1.0.1",
     "orientation": "default",
     "icon": "./assets/logo_app.png",
     "scheme": "ftrackingapp",
@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.casper3.f-tracking-app",
       "appleTeamId": "D28SUT8PH4",
-      "buildNumber": "0.0.3"
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +21,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.casper3.ftrackingapp"
+      "package": "com.casper3.ftrackingapp",
+      "versionCode": 1
     },
     "web": {
       "output": "static",

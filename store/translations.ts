@@ -791,6 +791,9 @@ export interface Translations {
   syncConflictsCount: string;
   syncGuestHint: string;
   syncOfflineHint: string;
+  syncLocalOnlyTitle: string;
+  syncLocalOnlyHint: string;
+  syncLocalOnlyAction: string;
   localDesktopSync: string;
 
   // Offline banner (read-only mode)
@@ -1747,6 +1750,9 @@ const uk: Translations = {
   syncConflictsCount: 'конфліктів',
   syncGuestHint: 'Увійдіть або зареєструйтесь для синхронізації',
   syncOfflineHint: 'Увімкніть онлайн-режим для синхронізації',
+  syncLocalOnlyTitle: 'Є лише на цьому пристрої',
+  syncLocalOnlyHint: 'Ці записи жодного разу не доїхали до сервера, тож на інших пристроях їх немає. Звичайна синхронізація їх не відправить — вона працює з чергою, а вони до неї не потрапили.',
+  syncLocalOnlyAction: 'Відвантажити все на сервер',
   localDesktopSync: 'Локальна синхронізація з десктопом',
   offlineReadOnly: 'Офлайн: лише перегляд',
   a11yOptions: 'Опції',
@@ -2628,6 +2634,9 @@ const en: Translations = {
   syncConflictsCount: 'conflicts',
   syncGuestHint: 'Sign in or register to sync',
   syncOfflineHint: 'Enable online mode to sync',
+  syncLocalOnlyTitle: 'Only on this device',
+  syncLocalOnlyHint: 'These records have never reached the server, so other devices do not have them. A normal sync will not send them: it works from the queue, and they never entered it.',
+  syncLocalOnlyAction: 'Upload everything to server',
   localDesktopSync: 'Local desktop sync',
   offlineReadOnly: 'Offline: read only',
   a11yOptions: 'Options',

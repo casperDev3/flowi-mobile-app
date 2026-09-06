@@ -120,6 +120,10 @@ export function DialPicker({ visible, dial, timerLabel, onSelect, onClose, color
                       startedAt={startedAt}
                       size={PREVIEW_SIZE}
                       colors={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent }}
+                      isDark={isDark}
+                      /* smooth тут не буває НІКОЛИ: аркуш монтує всі десять
+                         циферблатів одночасно, і плавність перетворила б
+                         відкриття вибору на десять анімацій по 60 Гц. */
                     />
                   </View>
                   <Text

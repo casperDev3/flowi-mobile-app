@@ -268,3 +268,33 @@ describe('PickerField: підпис дії залежить від набран�
     expect(shows('Новий проект «Новий»')).toBe(true);
   });
 });
+
+describe('PickerField: рядок дії не ховається за клавіатурою', () => {
+  it('рядок створення НЕ лежить усередині прокрутного списку', () => {
+    // Аркуш прибитий до низу екрана. Поки рядок був останнім елементом
+    // ScrollView, клавіатура накривала його двічі — і як низ аркуша, і як
+    // хвіст прокрутки: людина набирала назву, якої немає, і не бачила нічого.
+    const tree = render(2, jest.fn(), {
+      createOption: { label: 'Нова категорія', onCreate: jest.fn() },
+    });
+    open(tree);
+    act(() => { searchInputs(tree)[0].props.onChangeText('Ліки'); });
+
+    const row = createRows(tree, 'Ліки')[0];
+    expect(row).toBeTruthy();
+
+    const insideScroll = (node: any): boolean => {
+      let current = node?.parent;
+      while (current) {
+        const name = typeof current.type === 'string'
+          ? current.type
+          : current.type?.displayName ?? current.type?.name ?? '';
+        if (String(name).includes('ScrollView')) return true;
+        current = current.parent;
+      }
+      return false;
+    };
+
+    expect(insideScroll(row)).toBe(false);
+  });
+});

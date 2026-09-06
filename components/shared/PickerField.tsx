@@ -23,9 +23,11 @@
  * інакше не було б куди набрати назву.
  */
 import { BlurView } from 'expo-blur';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -131,7 +133,30 @@ export function PickerField({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const insets = useSafeAreaInsets();
-  const { isWide } = useResponsive();
+  const { isWide, height: windowHeight } = useResponsive();
+
+  /**
+   * Висота клавіатури, поки аркуш відкритий.
+   *
+   * Аркуш прибитий до низу екрана, тож клавіатура накриває його низ: і
+   * останні варіанти списку, і — доки він там стояв — рядок створення.
+   * KeyboardAvoidingView для абсолютно спозиційованого аркуша поводиться
+   * по-різному на двох платформах, тому висота береться з події напряму.
+   *
+   * На iOS слухаємо WillChangeFrame, а не DidShow: інакше аркуш стрибає вже
+   * після того, як клавіатура доїхала. На Android WillShow не буває.
+   */
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (!open) { setKeyboardHeight(0); return; }
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const shown = Keyboard.addListener(showEvent, event => {
+      setKeyboardHeight(event?.endCoordinates?.height ?? 0);
+    });
+    const hidden = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => { shown.remove(); hidden.remove(); };
+  }, [open]);
 
   const selected = options.find(option => option.id === value) ?? null;
   // Обране, якого немає в списку, все одно мусить читатись — інакше поле
@@ -211,7 +236,17 @@ export function PickerField({
         <View
           style={[
             st.sheet,
-            { backgroundColor: c.sheet, paddingBottom: insets.bottom + 14 },
+            {
+              backgroundColor: c.sheet,
+              bottom: keyboardHeight,
+              // Домашній індикатор ховається за клавіатурою — його відступ
+              // потрібен лише тоді, коли її немає.
+              paddingBottom: keyboardHeight > 0 ? 14 : insets.bottom + 14,
+              // Висота рахується від ТОГО, ЩО ЛИШИЛОСЬ від екрана. Фіксовані
+              // 76% від повного екрана разом із підйомом на висоту клавіатури
+              // виштовхнули б верх аркуша за межу видимого.
+              maxHeight: Math.max(240, (windowHeight - keyboardHeight) * 0.76),
+            },
             // На планшеті аркуш на всю ширину дав би рядки завдовжки з екран.
             isWide && { maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
           ]}>
@@ -227,6 +262,40 @@ export function PickerField({
               autoCorrect={false}
               style={[st.search, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]}
             />
+          )}
+
+          {/* Рядок дії стоїть ОДРАЗУ під пошуком, а не в кінці списку.
+              Раніше він був останнім елементом прокрутки, а сам аркуш прибитий
+              до низу екрана — тож клавіатура накривала його двічі: і як низ
+              аркуша, і як хвіст прокрутки. Людина набирала назву, якої немає, і
+              не бачила нічого. Тут він поруч із тим, що набирають, і в полі
+              зору завжди.
+
+              Показуємо ЛИШЕ коли є що назвати й такого ще немає: інакше дія
+              поруч зі знайденим записом створювала б дубль. */}
+          {createOption && draftName && (
+            <TouchableOpacity
+              onPress={create}
+              disabled={Boolean(draftError)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: Boolean(draftError) }}
+              accessibilityLabel={createRowText}
+              style={[st.create, {
+                borderColor: draftError ? c.border : c.accent,
+                opacity: draftError ? 0.5 : 1,
+              }]}>
+              <IconSymbol name="plus" size={14} color={draftError ? c.sub : c.accent} />
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '700', color: draftError ? c.sub : c.accent }}>
+                {createRowText}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {draftError && (
+            <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
+              {draftError}
+            </Text>
           )}
 
           <ScrollView keyboardShouldPersistTaps="handled" style={{ marginTop: 10 }}>
@@ -259,32 +328,6 @@ export function PickerField({
               </Text>
             )}
 
-            {/* «+» показуємо ЛИШЕ коли є що назвати й такого ще немає: інакше
-                кнопка поруч зі знайденою категорією створювала б її дубль. */}
-            {createOption && draftName && (
-              <TouchableOpacity
-                onPress={create}
-                disabled={Boolean(draftError)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: Boolean(draftError) }}
-                accessibilityLabel={createRowText}
-                style={[st.create, {
-                  borderColor: draftError ? c.border : c.accent,
-                  opacity: draftError ? 0.5 : 1,
-                }]}>
-                <IconSymbol name="plus" size={14} color={draftError ? c.sub : c.accent} />
-                <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '700', color: draftError ? c.sub : c.accent }}>
-                  {createRowText}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {draftError && (
-              <Text style={{ color: c.sub, fontSize: 12, marginTop: 6, marginBottom: 4 }}>
-                {draftError}
-              </Text>
-            )}
           </ScrollView>
         </View>
       </Modal>
@@ -340,8 +383,8 @@ const st = StyleSheet.create({
   backdrop:   { ...StyleSheet.absoluteFillObject },
   sheet: {
     position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    maxHeight: '76%',
+    left: 0, right: 0,
+    // bottom і maxHeight задаються в компоненті: вони залежать від клавіатури.
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 16,

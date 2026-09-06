@@ -15,16 +15,14 @@ describe('focusButtonVisible на екранах входу', () => {
   it('гостю кнопки немає на жодній ширині', () => {
     // Гість ще не авторизований — таймерів у нього не буває.
     for (const route of SIDEBAR_HIDDEN_ON) {
-      expect(focusButtonVisible(route, true)).toBe(false);
-      expect(focusButtonVisible(route, false)).toBe(false);
+      expect(focusButtonVisible(route, true, 3)).toBe(false);
+      expect(focusButtonVisible(route, false, 3)).toBe(false);
     }
   });
 
-  it('на планшеті на решті екранів кнопка є завжди', () => {
-    // Правило «показувати лише коли таймер іде» скасовано свідомо: режим
-    // мусить відкриватись звідусіль, і порожній стан у ньому вже є.
+  it('на планшеті кнопка є, поки йде хоч один таймер', () => {
     for (const route of ['/', '/today', '/explore', '/notes', '/budget', '/meetings']) {
-      expect(focusButtonVisible(route, true)).toBe(true);
+      expect(focusButtonVisible(route, true, 1)).toBe(true);
     }
   });
 });
@@ -106,19 +104,31 @@ describe('focusButtonOffsets', () => {
 });
 
 describe('focusButtonVisible', () => {
+  it('без активних таймерів кнопки немає', () => {
+    // Режим показує те, що йде просто зараз. Кнопка, яка веде в порожню
+    // сітку, обіцяє, що там щось є.
+    expect(focusButtonVisible('/today', true, 0)).toBe(false);
+    expect(focusButtonVisible('/notes', true, 0)).toBe(false);
+  });
+
+  it('сміття замість кількості кнопку не показує', () => {
+    expect(focusButtonVisible('/today', true, Number.NaN)).toBe(false);
+    expect(focusButtonVisible('/today', true, -1)).toBe(false);
+  });
+
   it('на телефоні плаваючої кнопки немає — вхід лишається на вкладці «Час»', () => {
-    expect(focusButtonVisible('/today', false)).toBe(false);
-    expect(focusButtonVisible('/notes', false)).toBe(false);
+    expect(focusButtonVisible('/today', false, 2)).toBe(false);
+    expect(focusButtonVisible('/notes', false, 2)).toBe(false);
   });
 
-  it('на широкому екрані кнопка є', () => {
-    expect(focusButtonVisible('/today', true)).toBe(true);
-    expect(focusButtonVisible('/notes', true)).toBe(true);
+  it('на широкому екрані з активним таймером кнопка є', () => {
+    expect(focusButtonVisible('/today', true, 1)).toBe(true);
+    expect(focusButtonVisible('/notes', true, 5)).toBe(true);
   });
 
-  it('на екранах входу її немає навіть на планшеті', () => {
+  it('на екранах входу її немає навіть на планшеті з таймером', () => {
     for (const route of ['/welcome', '/login', '/register', '/forgot-password']) {
-      expect(focusButtonVisible(route, true)).toBe(false);
+      expect(focusButtonVisible(route, true, 3)).toBe(false);
     }
   });
 });

@@ -6,12 +6,10 @@
  * там вона забирала кут у власної дії екрана, і вхід лишився в шапці вкладки
  * «Час» (див. focusButtonVisible).
  *
- * Іконка — viewfinder, а не стрілки «на весь екран»: стрілки обіцяють
- * «збільшити те, що бачу», а кнопка відкриває інше — зведення таймерів, що
- * йдуть просто зараз. Рамка прицілу читається як «зосередитись», тобто як
- * назва режиму. Іконку таймера взяти не можна: нею в навігації позначений
- * розділ «Трекер часу», і два різні пункти з однією іконкою читались би як
- * той самий.
+ * Іконка — таймер. Вона збігається з іконкою розділу «Трекер часу» в
+ * навігації, і це свідомо: кнопка показується лише тоді, коли таймер справді
+ * йде, тож збіг читається як «те саме, що зараз рахується», а не як два
+ * різні пункти з однією картинкою.
  *
  * Чому не в шапці: Stack-екрани в цьому застосунку мають headerShown: false і
  * малюють власні ScreenHeader. Спільної шапки не існує, тож «увімкнути
@@ -51,7 +49,7 @@ export function FocusModeButton() {
   const { activeTimers } = useTimerContext();
   const [open, setOpen] = useState(false);
 
-  const visible = focusButtonVisible(pathname, isWide);
+  const visible = focusButtonVisible(pathname, isWide, activeTimers.length);
 
   // Пішли на екран входу (вихід з акаунта, редірект гостя) — режим закриваємо.
   // Інакше він лишився б відкритим у стані й вигулькнув би після повернення.
@@ -94,7 +92,7 @@ export function FocusModeButton() {
             borderColor: c.accent,
           },
         ]}>
-        <IconSymbol name="viewfinder" size={20} color={c.accent} />
+        <IconSymbol name="timer" size={20} color={c.accent} />
         {badge && (
           <View style={[s.badge, { backgroundColor: c.accent, borderColor: c.bg1 }]}>
             <Text style={s.badgeText} numberOfLines={1}>{badge}</Text>

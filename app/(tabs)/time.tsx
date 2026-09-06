@@ -313,10 +313,14 @@ export default function TimeScreen() {
                 кожним списком. Тут її роль перебирає шапка — і саме тут, бо
                 режим показує таймери, а це їхній розділ.
 
-                Умова обов'язкова: без неї на планшеті було б ДВА входи в ту
-                саму модалку з двома незалежними станами відкриття.
+                Умова на ширину обов'язкова: без неї на планшеті було б ДВА
+                входи в ту саму модалку з двома незалежними станами відкриття.
+
+                Умова на активні таймери — те саме правило, що й у плаваючої
+                кнопки: режим показує те, що йде просто зараз, і вхід у порожню
+                сітку обіцяв би, що там щось є.
               */}
-              {!isWide && (
+              {!isWide && activeTimers.length > 0 && (
                 <HeaderButton
                   onPress={() => { haptic.light(); setFsOpen(true); }}
                   accessibilityLabel={
@@ -325,7 +329,7 @@ export default function TimeScreen() {
                       : `${tr.fullscreenTimers}, ${tr.noActiveTimers}`
                   }
                   style={{ backgroundColor: c.indigo + '20', borderColor: c.indigo }}>
-                  <IconSymbol name="viewfinder" size={17} color={c.indigo} />
+                  <IconSymbol name="timer" size={17} color={c.indigo} />
                 </HeaderButton>
               )}
               <HeaderButton

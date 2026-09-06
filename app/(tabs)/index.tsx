@@ -52,6 +52,9 @@ import { isTodayTask } from '@/utils/taskToday';
 import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, subtaskToggleTransition, taskColumnId, taskStatusColumn, taskVisibleInList } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
+import { nextProjectColor } from '@/utils/projectColors';
+import { projectQuickAction } from '@/utils/projectQuickCreate';
+import { applyProjectQuickAction } from '@/utils/projectQuickApply';
 import type { Project } from '../projects';
 import { useResponsive } from '@/hooks/use-responsive';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
@@ -62,7 +65,7 @@ import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/u
 import { DetailPane } from '@/components/shared/DetailPane';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
-import { PickerField } from '@/components/shared/PickerField';
+import { PickerField, type PickerCreateOption } from '@/components/shared/PickerField';
 import { TaskHistoryTab, type HistoryEventType, type TaskHistoryEvent } from '@/components/tasks/TaskHistoryTab';
 import { TaskTimerTab } from '@/components/tasks/TaskTimerTab';
 import { TaskEditForm } from '@/components/tasks/TaskEditForm';
@@ -992,6 +995,83 @@ export default function TasksScreen() {
     [pickableProjects],
   );
 
+  /**
+   * Завести проєкт прямо з рядка пошуку в пікері — або повернути з архіву той,
+   * що вже так звався. Повертає id, який треба обрати.
+   *
+   * Список читається зі СХОВИЩА, а не береться зі стану екрана. Причина не в
+   * акуратності: saveSynced('projects', …) зберігає масив ЦІЛКОМ, і все, чого
+   * в ньому немає, синхронізація вважає видаленим. Екран же перечитує проєкти
+   * лише при поверненні фокуса, тож проєкт, привезений синком за час, поки
+   * відкритий список задач, у застарілому масиві відсутній — і запис поставив
+   * би на нього тумбстоун.
+   *
+   * Ефекту, що зберігав би `projects` при кожній зміні стану, тут навмисно
+   * немає: запис робиться один раз, рівно на дію людини.
+   */
+  const quickCreateProject = useCallback(async (typed: string): Promise<string | null> => {
+    const stored = await loadData<Project[]>('projects', []);
+    const result = applyProjectQuickAction(stored, typed, name => ({
+      id: Date.now().toString(),
+      name,
+      // Колір — не прикраса, а крапка біля задачі й колір на графіках, тож
+      // новий проєкт бере наступний ВІЛЬНИЙ колір палітри (спільне з вебом
+      // правило), а не завжди перший.
+      color: nextProjectColor(stored),
+      createdAt: new Date().toISOString(),
+    }));
+    if (result.projects) {
+      await saveSynced('projects', result.projects);
+      setProjects(result.projects);
+    } else if (result.projectId) {
+      // Писати нічого, але сховище могло піти вперед — хай екран це побачить.
+      setProjects(stored);
+    }
+
+    // Підпис кнопки рахується зі стану екрана, а дія — зі сховища, і за час,
+    // поки відкритий список задач, синк міг привезти проєкт із такою назвою.
+    // Тоді людина прочитала «Новий проект», а сталося повернення з архіву (або
+    // навпаки). Мовчки підмінити дію не можна — це рівно та брехня, заради
+    // усунення якої підпис і зробили залежним від набраного, — тож кажемо, що
+    // насправді відбулось.
+    const promised = projectQuickAction(projects, typed).kind;
+    if (result.kind !== promised) {
+      const done = stored.find(p => p.id === result.projectId) ?? null;
+      Alert.alert(
+        result.kind === 'restore' ? tr.unarchiveProject : tr.newProject,
+        done ? done.name : typed.trim(),
+      );
+    }
+    return result.projectId;
+  }, [projects, tr]);
+
+  /**
+   * Рядок «створити» для пікера проєктів; `assign` каже, куди подіти обраний.
+   *
+   * Підпис залежить від набраного: якщо така назва вже лежить в архіві, дія
+   * пропонує ПОВЕРНУТИ проєкт, а не завести двійника — інакше історія проєкту
+   * (задачі, час, графіки) почалася б заново під тією самою назвою. Точний
+   * збіг із живим проєктом ховає рядок сам PickerField, тож там вибір, а не
+   * створення.
+   */
+  const projectCreateOption = useCallback(
+    (assign: (id: string) => void): PickerCreateOption => ({
+      label: (name: string) => {
+        const action = projectQuickAction(projects, name);
+        // Для повернення з архіву показуємо назву ЗБЕРЕЖЕНОГО проєкту, а не
+        // набране: архівний «Ремонт» і набране «ремонт» — той самий проєкт, але
+        // «Повернути з архіву «ремонт»» людина не впізнає.
+        return action.kind === 'restore'
+          ? `${tr.unarchiveProject} «${action.project.name.trim()}»`
+          : `${tr.newProject} «${name}»`;
+      },
+      onCreate: (name: string) => {
+        void quickCreateProject(name).then(id => { if (id) assign(id); });
+      },
+    }),
+    [projects, tr, quickCreateProject],
+  );
+
   const handleSelectTask = useCallback((task: Task) => setSelected(task), []);
   const handleToggleTask = useCallback((task: Task) => toggleTask(task.id), [toggleTask]);
 
@@ -1310,6 +1390,7 @@ export default function TasksScreen() {
                         taskStatuses={taskStatuses}
                         pickableProjects={pickableProjects}
                         projects={projects}
+                        projectCreateOption={projectCreateOption(id => editor.patch({ projectId: id }))}
                         deadlineWeeks={editDlWeeks}
                         priorityMeta={PRIORITY}
                         months={MONTHS_UA}
@@ -1429,27 +1510,31 @@ export default function TasksScreen() {
                       locale={locale}
                     />
 
-                    {pickableProjects.length > 0 && (
-                      <PickerField
-                        label={lang === 'uk' ? 'Проєкт' : 'Project'}
-                        icon="folder"
-                        options={projectOptions}
-                        value={selectedTask.projectId ?? null}
-                        onSelect={id => updateTaskProject(selectedTask.id, id)}
-                        emptyOption={{ label: tr.noProject }}
-                        // Підпис шукається в ПОВНОМУ списку, а не в звуженому:
-                        // проєкт задачі могли заархівувати вже після того, як
-                        // її туди поклали, і без цього поле показувало б
-                        // «Без проєкту» на задачі, у якої проєкт є.
-                        selectedLabel={
-                          projects.find(p => p.id === selectedTask.projectId)?.name ?? null
-                        }
-                        alwaysSearch
-                        colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
-                        isDark={isDark}
-                        tr={tr}
-                      />
-                    )}
+                    {/* Поле показується ЗАВЖДИ, навіть коли живих проєктів
+                        немає. Раніше воно ховалося за `pickableProjects.length > 0`,
+                        і в порожньому застосунку перший проєкт із деталі задачі
+                        завести було нічим — а саме тут його найчастіше й
+                        заводять. */}
+                    <PickerField
+                      label={lang === 'uk' ? 'Проєкт' : 'Project'}
+                      icon="folder"
+                      options={projectOptions}
+                      value={selectedTask.projectId ?? null}
+                      onSelect={id => updateTaskProject(selectedTask.id, id)}
+                      emptyOption={{ label: tr.noProject }}
+                      // Підпис шукається в ПОВНОМУ списку, а не в звуженому:
+                      // проєкт задачі могли заархівувати вже після того, як
+                      // її туди поклали, і без цього поле показувало б
+                      // «Без проєкту» на задачі, у якої проєкт є.
+                      selectedLabel={
+                        projects.find(p => p.id === selectedTask.projectId)?.name ?? null
+                      }
+                      alwaysSearch
+                      createOption={projectCreateOption(id => updateTaskProject(selectedTask.id, id))}
+                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
+                      isDark={isDark}
+                      tr={tr}
+                    />
 
                     <TaskSubtasks
                       task={selectedTask}
@@ -2521,6 +2606,7 @@ export default function TasksScreen() {
               taskStatuses={taskStatuses}
               pickableProjects={pickableProjects}
               projects={projects}
+              projectCreateOption={projectCreateOption(id => composer.patch({ projectId: id }))}
               deadlineWeeks={dlWeeks}
               priorityMeta={PRIORITY}
               months={MONTHS_UA}

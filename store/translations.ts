@@ -414,6 +414,8 @@ export interface Translations {
   noTasksInProject: string;
   editProject: string;
   newProject: string;
+  /** Дія в пікері проєктів: така назва вже є в архіві, тож повертаємо її. */
+  unarchiveProject: string;
   projectName: string;
 
   // Meetings screen
@@ -1402,6 +1404,7 @@ const uk: Translations = {
   noTasksInProject: 'Немає завдань',
   editProject: 'Редагувати проект',
   newProject: 'Новий проект',
+  unarchiveProject: 'Повернути з архіву',
   projectName: 'Назва проекту',
 
   meetingsTitle: 'Зустрічі',
@@ -2287,6 +2290,7 @@ const en: Translations = {
   noTasksInProject: 'No tasks',
   editProject: 'Edit project',
   newProject: 'New project',
+  unarchiveProject: 'Restore from archive',
   projectName: 'Project name',
 
   meetingsTitle: 'Meetings',

@@ -13,7 +13,7 @@ import React from 'react';
 import { Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { CalendarGrid } from '@/components/tasks/CalendarGrid';
-import { PickerField } from '@/components/shared/PickerField';
+import { PickerField, type PickerCreateOption } from '@/components/shared/PickerField';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { useTaskEditor } from '@/hooks/use-task-editor';
 import type { Translations } from '@/store/translations';
@@ -37,6 +37,13 @@ export interface TaskEditFormProps {
   pickableProjects: EditFormProject[];
   /** Повний список — щоб підпис уже призначеного архівного проєкту не зник. */
   projects: EditFormProject[];
+  /**
+   * Рядок «створити проєкт» у пікері. Готовий приходить згори: рішення, що
+   * саме зробити з набраною назвою (створити чи повернути з архіву) і чим це
+   * записати, належить екранові — форма стану не має й сховища не знає.
+   * Без пропа поле лишається просто вибором зі списку.
+   */
+  projectCreateOption?: PickerCreateOption;
   /** Сітка місяця для вибору дедлайну. */
   deadlineWeeks: (number | null)[][];
   priorityMeta: Record<Priority, { label: string; color: string }>;
@@ -54,7 +61,7 @@ export interface TaskEditFormProps {
 }
 
 export function TaskEditForm({
-  title, submitLabel, editor, taskStatuses, pickableProjects, projects, deadlineWeeks,
+  title, submitLabel, editor, taskStatuses, pickableProjects, projects, projectCreateOption, deadlineWeeks,
   priorityMeta: PRIORITY, months: MONTHS_UA, weekdays: WEEKDAYS_SHORT,
   deadlinePresets: DEADLINE_PRESETS,
   today, onSave, onCancel, colors: c, isDark, tr, locale,
@@ -112,6 +119,7 @@ export function TaskEditForm({
           emptyOption={{ label: tr.noProject }}
           selectedLabel={projects.find(p => p.id === editor.draft.projectId)?.name ?? null}
           alwaysSearch
+          createOption={projectCreateOption}
           colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
           isDark={isDark}
           tr={tr}

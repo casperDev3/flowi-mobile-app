@@ -63,8 +63,17 @@ export interface PickerOption {
  * поруч (шукати / назвати) люди плутають.
  */
 export interface PickerCreateOption {
-  /** Підпис дії, напр. «Нова категорія». Набране покажемо поряд у лапках. */
-  label: string;
+  /**
+   * Рядок — підпис дії, напр. «Нова категорія»; набране покажемо поряд у лапках.
+   *
+   * Функція — коли дія залежить від набраного, і тоді вона віддає ВЕСЬ рядок
+   * разом із назвою, а список нічого не дописує. Це не примха: проєкт із такою
+   * назвою може лежати в архіві, і показати треба ЙОГО назву, а не набране.
+   * Для архівного «Ремонт» і набраного «ремонт» дописування набраного дало б
+   * «Повернути з архіву «ремонт»» — людина читає назву, якої в архіві немає,
+   * і не впізнає свій проєкт.
+   */
+  label: string | ((name: string) => string);
   /**
    * Чому саме цю назву зберегти не можна — готовий текст або null. Перевіряє
    * форма: межу довжини знає вона, а не список.
@@ -138,6 +147,14 @@ export function PickerField({
     [createOption, options, query],
   );
   const draftError = draftName && createOption?.validate ? createOption.validate(draftName) : null;
+  // Готовий рядок дії рахуємо тут, а не в розмітці: рядковий підпис отримує
+  // набране в лапках, а функція віддає весь рядок сама — вона могла підставити
+  // туди назву ЗБЕРЕЖЕНОГО запису, і дописувати до неї набране не можна.
+  const createRowText = !createOption || !draftName
+    ? ''
+    : typeof createOption.label === 'function'
+      ? createOption.label(draftName)
+      : `${createOption.label} «${draftName}»`;
 
   const choose = (id: string | null) => {
     haptic.light();
@@ -251,14 +268,14 @@ export function PickerField({
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: Boolean(draftError) }}
-                accessibilityLabel={`${createOption.label}: ${draftName}`}
+                accessibilityLabel={createRowText}
                 style={[st.create, {
                   borderColor: draftError ? c.border : c.accent,
                   opacity: draftError ? 0.5 : 1,
                 }]}>
                 <IconSymbol name="plus" size={14} color={draftError ? c.sub : c.accent} />
                 <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '700', color: draftError ? c.sub : c.accent }}>
-                  {createOption.label} «{draftName}»
+                  {createRowText}
                 </Text>
               </TouchableOpacity>
             )}

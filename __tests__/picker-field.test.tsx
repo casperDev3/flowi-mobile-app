@@ -136,9 +136,14 @@ describe('PickerField: пошук на вимогу', () => {
   });
 });
 
-/** Знайти рядок «створити» за його accessibilityLabel. */
+/**
+ * Знайти рядок «створити» за його accessibilityLabel.
+ *
+ * Формат саме такий, бо рядковий підпис отримує набране в лапках, а
+ * функція-підпис віддає весь рядок сама (див. PickerCreateOption.label).
+ */
 const createRows = (tree: any, name: string) =>
-  tree.root.findAll((n: any) => n.props?.accessibilityLabel === `Нова категорія: ${name}`);
+  tree.root.findAll((n: any) => n.props?.accessibilityLabel === `Нова категорія «${name}»`);
 
 describe('PickerField: створення нового запису', () => {
   it('поки нічого не набрано, створювати нічого не пропонує', () => {
@@ -223,5 +228,43 @@ describe('PickerField: створення нового запису', () => {
       (n: any) => typeof n.type === 'string' && typeof n.props?.children === 'string',
     ).map((n: any) => n.props.children);
     expect(texts).toContain('Без проєкту');
+  });
+});
+
+describe('PickerField: підпис дії залежить від набраного', () => {
+  it('функція-підпис бачить назву й потрапляє і в текст, і в accessibilityLabel', () => {
+    // Проєкт із такою назвою може лежати в архіві: у списку його немає, тож
+    // «+» показується, але зробити треба ПОВЕРНЕННЯ, а не створення — і
+    // прочитати це людина мусить ДО натиску, а не дізнатися після.
+    const onCreate = jest.fn();
+    const tree = render(2, jest.fn(), {
+      createOption: {
+        // Функція віддає ВЕСЬ рядок: для повернення вона підставляє назву
+        // ЗБЕРЕЖЕНОГО проєкту («Ремонт»), а не набране («ремонт»).
+        label: (name: string) =>
+          (name.toLowerCase() === 'ремонт'
+            ? 'Повернути з архіву «Ремонт»'
+            : `Новий проект «${name}»`),
+        onCreate,
+      },
+    });
+    open(tree);
+
+    /** Рядок видно й зчитувачу екрана, і оком — і це той САМИЙ рядок. */
+    const shows = (row: string) => {
+      const spoken = tree.root.findAll((n: any) => n.props?.accessibilityLabel === row);
+      const seen = tree.root.findAll(
+        (n: any) => typeof n.type === 'string' && n.props?.children === row,
+      );
+      return spoken.length > 0 && seen.length > 0;
+    };
+
+    // Набране в іншому регістрі — а в підписі стоїть назва з архіву, інакше
+    // людина не впізнає свій проєкт.
+    act(() => { searchInputs(tree)[0].props.onChangeText('ремонт'); });
+    expect(shows('Повернути з архіву «Ремонт»')).toBe(true);
+
+    act(() => { searchInputs(tree)[0].props.onChangeText('Новий'); });
+    expect(shows('Новий проект «Новий»')).toBe(true);
   });
 });

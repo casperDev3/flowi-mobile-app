@@ -23,7 +23,7 @@
 export type SchedulerTag = 'none' | 'live' | 'noop';
 
 /** Хто просив синк. Слот `_debounceTimer` один на всіх, і це видно тільки так. */
-export type ScheduleCaller = 'outbox' | 'ws' | 'fullSync' | 'rollback';
+export type ScheduleCaller = 'outbox' | 'ws' | 'fullSync' | 'rollback' | 'retryGate' | 'drain';
 
 /** Чому озброєний дебаунс зник, не вистріливши. */
 export type DebounceCancel = 'rearm' | 'flush' | 'syncNow';
@@ -148,7 +148,7 @@ const state: SyncDiagnostics = {
   debounce: {
     armed: 0, fired: 0,
     cancelled: { rearm: 0, flush: 0, syncNow: 0 },
-    byCaller: { outbox: 0, ws: 0, fullSync: 0, rollback: 0 },
+    byCaller: { outbox: 0, ws: 0, fullSync: 0, rollback: 0, retryGate: 0, drain: 0 },
     lastArmedAt: null, lastArmedDelayMs: null, lastCaller: null,
     dueAt: null, lastFiredAt: null, lastCancelAt: null, lastCancelBy: null,
   },

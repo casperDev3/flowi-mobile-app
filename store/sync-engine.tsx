@@ -626,7 +626,20 @@ function currentGate(): GateReason | null {
 async function doSync(trigger: SyncTrigger): Promise<void> {
   const gate = currentGate();
   recordSyncAttempt(gate, trigger);
-  if (gate) return;
+  if (gate) {
+    // Закритий гейт СПАЛЮВАВ тригер, а не відкладав його. scheduleSync гасить
+    // свій таймер ще до виклику (див. вище), тож вихід звідси нічого не
+    // переозброював: мутація лишалась в outbox до наступної випадкової
+    // причини синхронізуватись — поллінгу через 5 хв, повернення з фону або
+    // кнопки. Найгірший випадок 'busy': інший обмін уже йде, тобто мережа й
+    // токен справні, а свіжий запис усе одно нікуди не їде.
+    //
+    // Переозброюємо тільки на 'busy'. Для 'offline' і 'notAuthed' крутити
+    // таймер марно — там стан міняється ззовні, і на зміну вже підписані свої
+    // шляхи (ефект авторизації, повернення з фону, перемикач режиму).
+    if (gate === 'busy') scheduleSync(1500, 'retryGate');
+    return;
+  }
   _syncing = true;
   _syncStartedAt = Date.now();
   updateSyncState('syncing');
@@ -736,6 +749,17 @@ async function doSync(trigger: SyncTrigger): Promise<void> {
     _retryAttempt = 0;
     updateSyncState('idle');
     recordSyncOutcome('ok', Date.now() - _syncStartedAt);
+
+    // Outbox читається ОДИН раз на початку обміну. Усе, що користувач записав,
+    // поки обмін ішов, у цю відправку не потрапило, а власний scheduleSync
+    // такого запису застав _syncing = true й до цієї правки згорав на гейті.
+    // Умова саме «queued_at пізніший за початок обміну», а не «outbox не
+    // порожній»: інакше запис, який сервер стабільно відхиляє, крутив би
+    // цикл вічно.
+    const afterExchange = await loadOutbox();
+    if (afterExchange.some(item => item.queued_at > _syncStartedAt)) {
+      scheduleSync(1500, 'drain');
+    }
   } catch (error) {
     if (error instanceof OfflineError) {
       clearRetryTimer();

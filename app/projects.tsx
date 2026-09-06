@@ -26,6 +26,22 @@ import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { setProjectArchived } from '@/utils/projectUtils';
 import {
+  assignTaskToSprint,
+  clearTaskSprint,
+  createSprint,
+  isSprintClosed,
+  moveOpenSprintTasks,
+  projectBacklogTasks,
+  removeProjectSprints,
+  renameSprint,
+  setSprintClosed,
+  sprintMoveTargets,
+  sprintProgress,
+  sprintTasks,
+  sprintsForProject,
+  type Sprint,
+} from '@/utils/sprintUtils';
+import {
   compareArchived,
   compareLive,
   projectStats,
@@ -70,6 +86,13 @@ interface Task {
   id: string;
   title: string;
   projectId?: string;
+  /**
+   * Спринт проєкту (utils/sprintUtils.ts). Порожній/відсутній = беклог
+   * проєкту — це НЕ помилка й не привід для міграції: усі наявні завдання
+   * саме такі. У «Сьогодні» спринт не впливає ні на що: там тягне виключно
+   * власний deadline завдання.
+   */
+  sprintId?: string;
   status: string;
   /** Колонка дошки. Графік «Де стоять задачі» питає її через taskColumnId. */
   kanbanColumnId?: string;
@@ -258,6 +281,16 @@ export default function ProjectsScreen() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  // Спринти живуть тут, а не на окремому екрані: спринт існує лише всередині
+  // проєкту, і власного розділу навігації в нього немає.
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  /** Відкрита форма спринта: створення або перейменування наявного. */
+  const [sprintDraft, setSprintDraft] = useState<{ sprint: Sprint | null } | null>(null);
+  const [sprintName, setSprintName] = useState('');
+  /** Спринт, для якого відкрито діалог «куди перенести незавершені». */
+  const [closingSprint, setClosingSprint] = useState<Sprint | null>(null);
+  /** Задача, для якої відкрито вибір спринта. */
+  const [movingTask, setMovingTask] = useState<Task | null>(null);
   const [statusColumns, setStatusColumns] = useState<TaskStatusColumn[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -273,17 +306,19 @@ export default function ProjectsScreen() {
   const detailScrollRef = useRef<ScrollView | null>(null);
 
   const loadAll = useCallback(async () => {
-    const [p, t, columns] = await Promise.all([
+    const [p, t, columns, s] = await Promise.all([
       loadData<Project[]>('projects', []),
       loadData<Task[]>('tasks', []),
       // Колонки дошки потрібні графіку «Де стоять задачі». Читаємо збережені й
       // зливаємо з типовими тим самим mergeTaskStatusColumns, що й дошка: своя
       // копія правила «яка колонка існує» розійшлася б із канбаном.
       loadData<TaskStatusColumn[]>('task_statuses', []),
+      loadData<Sprint[]>('sprints', []),
     ]);
     setProjects(p);
     setTasks(t);
     setStatusColumns(columns);
+    setSprints(s);
   }, []);
 
   // Архівні ховаються зі списку, але лишаються в даних: стан явний
@@ -329,11 +364,33 @@ export default function ProjectsScreen() {
   const liveProjects = useMemo(() => projects.filter(p => !p.archivedAt), [projects]);
   const archivedProjects = useMemo(() => projects.filter(p => !!p.archivedAt), [projects]);
 
-  /** Задачі обраного проєкту: незавершені зверху, далі за дедлайном. */
+  /** Спринти обраного проєкту: відкриті в порядку створення, закриті в кінці. */
+  const projectSprints = useMemo(
+    () => (selectedId ? sprintsForProject(sprints, selectedId) : []),
+    [sprints, selectedId],
+  );
+
+  /**
+   * Задачі, які показує деталь проєкту: власні задачі проєкту ПЛЮС ті,
+   * що лежать у його спринтах, навіть якщо їхній projectId указує на інший проєкт.
+   *
+   * Друга половина умови — не про повноту списку, а про ДОСЯЖНІСТЬ. Пара
+   * (projectId, sprintId) розходиться тільки одним шляхом: правкою зі старішого
+   * клієнта, який міняв проєкт задачі, не знімаючи sprintId (тепер це робить
+   * retargetTaskProject), — і такий запис приїжджає звичайним синком. Якби ми
+   * фільтрували лише за projectId, така задача зникла б і зі спринта тут, і з
+   * беклогу свого нового проєкту (там вона зі sprintId), — тобто не була б видна
+   * жодному екрану, а зняти sprintId можна ТІЛЬКИ з рядка задачі тут. Зламаний
+   * стан мусить лишатись виправним, тому задача показується в спринті. Веб
+   * (components/projects/sprint-panel.tsx) розширює список рівно так само.
+   *
+   * Порядок: незавершені зверху, далі за дедлайном.
+   */
   const selectedTasks = useMemo(() => {
     if (!selectedId) return [];
+    const ownSprintIds = new Set(projectSprints.map(sprint => sprint.id));
     return tasks
-      .filter(t => t.projectId === selectedId)
+      .filter(t => t.projectId === selectedId || (!!t.sprintId && ownSprintIds.has(t.sprintId)))
       .sort((a, b) => {
         const aDone = a.status === 'done';
         const bDone = b.status === 'done';
@@ -343,7 +400,27 @@ export default function ProjectsScreen() {
         if (b.deadline) return 1;
         return 0;
       });
-  }, [tasks, selectedId]);
+  }, [tasks, selectedId, projectSprints]);
+
+  /**
+   * Задачі проєкту, розкладені по спринтах, і беклог наприкінці.
+   *
+   * Обидва списки рахують спільні хелпери (utils/sprintUtils.ts), а не екран:
+   * склад спринта та беклогу мусить визначатись в одному місці й однаково на всіх
+   * клієнтах — власна копія правила тут і була причиною розбіжності з вебом.
+   *
+   * Спринт бере задачі ЗА sprintId (sprintTasks), беклог — задачі проєкту БЕЗ
+   * спринта (projectBacklogTasks). Тому задача з чужим projectId потрапляє саме в
+   * спринт, а не в беклог — точно як у вебі.
+   */
+  const sprintGroups = useMemo(
+    () => projectSprints.map(sprint => ({ sprint, tasks: sprintTasks(selectedTasks, sprint.id) })),
+    [projectSprints, selectedTasks],
+  );
+  const backlogTasks = useMemo(
+    () => (selectedId ? projectBacklogTasks(selectedTasks, selectedId, projectSprints) : []),
+    [selectedTasks, selectedId, projectSprints],
+  );
 
   const selectedStats = selectedId ? statsById.get(selectedId) ?? null : null;
 
@@ -359,6 +436,12 @@ export default function ProjectsScreen() {
   useEffect(() => {
     if (initialized) void saveSynced('projects', projects);
   }, [projects, initialized]);
+
+  // Спринти пишуться ТІЛЬКИ через saveSynced, як і решта колекцій: запис повз
+  // нього не потрапив би в outbox і не доїхав би на інші пристрої.
+  useEffect(() => {
+    if (initialized) void saveSynced('sprints', sprints);
+  }, [sprints, initialized]);
 
   const openAdd = useCallback(() => {
     setEditing(null);
@@ -437,13 +520,22 @@ export default function ProjectsScreen() {
           // Діалог обіцяє «без прив'язки» — і код мусить це зробити. Доти
           // projectId лишався вказувати на проєкт, якого вже немає: фільтр за
           // ним ніколи не спрацьовував, а сміття жило в даних вічно.
+          //
+          // Разом із проєктом зникають і його спринти: projectId у спринті
+          // обов'язковий, тож без проєкту такий запис не видно з жодного
+          // екрана, але він і далі їздив би в синку.
           void (async () => {
             try {
-              const fresh = await loadData<Task[]>('tasks', []);
-              if (!fresh.some(t => t.projectId === id)) return;
-              const updated = fresh.map(t => (t.projectId === id ? { ...t, projectId: undefined } : t));
-              await saveSynced('tasks', updated);
-              setTasks(updated);
+              const [freshTasks, freshSprints] = await Promise.all([
+                loadData<Task[]>('tasks', []),
+                loadData<Sprint[]>('sprints', []),
+              ]);
+              const freed = removeProjectSprints(freshSprints, freshTasks, id);
+              if (freed.tasks.some((task, i) => task !== freshTasks[i])) {
+                await saveSynced('tasks', freed.tasks);
+                setTasks(freed.tasks);
+              }
+              if (freed.sprints.length !== freshSprints.length) setSprints(freed.sprints);
             } catch (e) {
               if (__DEV__) console.warn('[projects] відвʼязка задач не вдалася:', e);
             }
@@ -522,6 +614,128 @@ export default function ProjectsScreen() {
     }
   }, [newTaskTitle]);
 
+  // ─── Спринти ───────────────────────────────────────────────────────────────
+
+  const openSprintCreate = useCallback(() => {
+    setSprintDraft({ sprint: null });
+    setSprintName('');
+  }, []);
+
+  const openSprintRename = useCallback((sprint: Sprint) => {
+    setSprintDraft({ sprint });
+    setSprintName(sprint.name);
+  }, []);
+
+  const saveSprint = useCallback(() => {
+    const name = sprintName.trim();
+    if (!name || !sprintDraft) return;
+    const target = sprintDraft.sprint;
+    if (target) {
+      setSprints(prev => prev.map(s => (s.id === target.id ? renameSprint(s, name) : s)));
+    } else if (selectedId) {
+      // projectId береться з обраного проєкту: спринт без нього не існує.
+      setSprints(prev => [...prev, createSprint(selectedId, name)]);
+    }
+    setSprintDraft(null);
+    setSprintName('');
+    haptic.success();
+  }, [sprintName, sprintDraft, selectedId]);
+
+  /**
+   * Закриття спринта: спершу переносимо незавершені задачі, потім ставимо
+   * closedAt.
+   *
+   * Саме в цьому порядку — якщо застосунок помре посередині, гірше, що
+   * станеться, це відкритий спринт із уже перенесеною роботою. Зворотний
+   * порядок лишив би закритий спринт із задачами, які нікуди не поїхали.
+   *
+   * Задачі йдуть звичайним saveSynced: це N окремих правок записів, а не
+   * пакетна заміна колекції — кожна доїде на інший пристрій самостійно.
+   */
+  const closeSprint = useCallback(async (sprint: Sprint, target: Sprint | null) => {
+    try {
+      const fresh = await loadData<Task[]>('tasks', []);
+      const updated = moveOpenSprintTasks(fresh, sprint.id, target);
+      if (updated.some((task, i) => task !== fresh[i])) {
+        await saveSynced('tasks', updated);
+        setTasks(updated);
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('[projects] перенесення задач спринта не вдалося:', e);
+      return;
+    }
+    setSprints(prev => prev.map(s => (s.id === sprint.id ? setSprintClosed(s, true) : s)));
+    setClosingSprint(null);
+    haptic.success();
+  }, []);
+
+  /** Відкрити назад — просто зняти closedAt; задачі при цьому не рухаються. */
+  const reopenSprint = useCallback((sprint: Sprint) => {
+    setSprints(prev => prev.map(s => (s.id === sprint.id ? setSprintClosed(s, false) : s)));
+    haptic.light();
+  }, []);
+
+  /** Покласти задачу у спринт або повернути в беклог. */
+  const setTaskSprint = useCallback(async (taskId: string, sprint: Sprint | null) => {
+    try {
+      const fresh = await loadData<Task[]>('tasks', []);
+      const updated = fresh.map(t =>
+        t.id !== taskId ? t : (sprint ? assignTaskToSprint(t, sprint) : clearTaskSprint(t)));
+      await saveSynced('tasks', updated);
+      setTasks(updated);
+      haptic.light();
+    } catch (e) {
+      if (__DEV__) console.warn('[projects] зміна спринта задачі не вдалася:', e);
+    }
+    setMovingTask(null);
+  }, []);
+
+  /**
+   * Рядок задачі в деталі проєкту. Винесений з renderDetail, бо тепер його
+   * малюють кілька груп (кожен спринт і беклог), а не один список.
+   */
+  const renderTaskRow = useCallback((task: Task, project: Project) => {
+    const done = task.status === 'done';
+    return (
+      <View key={task.id} style={[st.taskRow, { borderColor: c.border }]}>
+        <TouchableOpacity
+          onPress={() => { void toggleTask(task.id); }}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: done }}
+          accessibilityLabel={task.title}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={[st.check, { borderColor: done ? project.color : c.sub }]}>
+          {done && <IconSymbol name="checkmark" size={11} color={project.color} />}
+        </TouchableOpacity>
+        {/* Тап по назві веде на екран Завдань: підзавдання, таймер і
+            нагадування живуть там, і другої копії тієї деталі тут не буде. */}
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          onPress={() => router.push({ pathname: '/(tabs)', params: { open: task.id } })}>
+          <Text
+            numberOfLines={1}
+            style={{ color: done ? c.sub : c.text, fontSize: 14, textDecorationLine: done ? 'line-through' : 'none' }}>
+            {task.title}
+          </Text>
+          {task.deadline ? (
+            <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{shortDate(task.deadline, locale)}</Text>
+          ) : null}
+        </TouchableOpacity>
+        {/* Розкладання по спринтах живе на самому рядку: перетягування в
+            вертикальному списку конфліктувало б із прокруткою, а окремий
+            режим «перемістити» довелося б спершу знайти. */}
+        <TouchableOpacity
+          onPress={() => setMovingTask(task)}
+          accessibilityRole="button"
+          accessibilityLabel={tr.sprintPick}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+          <IconSymbol name="arrow.left.arrow.right" size={13} color={c.sub} />
+        </TouchableOpacity>
+        <IconSymbol name="chevron.right" size={13} color={c.sub} />
+      </View>
+    );
+  }, [c, locale, toggleTask, router, tr]);
+
   const renderDetail = useCallback((stat: ProjectStats) => {
     const project = stat.project;
     return (
@@ -576,44 +790,93 @@ export default function ProjectsScreen() {
           </Text>
         ) : null}
 
+        {/* Спринти — тільки тут. Окремого розділу навігації в них немає:
+            спринт існує лише всередині проєкту, і його ім'я поза цим екраном
+            ні про що не говорить. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[st.detailLabel, { color: c.sub, flex: 1 }]}>{tr.sprints}</Text>
+          <TouchableOpacity
+            onPress={openSprintCreate}
+            accessibilityRole="button"
+            accessibilityLabel={tr.sprintNew}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={{ marginTop: 12 }}>
+            <IconSymbol name="plus" size={16} color={c.accent} />
+          </TouchableOpacity>
+        </View>
+
+        {projectSprints.length === 0 ? (
+          <Text style={{ color: c.sub, fontSize: 12, opacity: 0.8, lineHeight: 17 }}>
+            {tr.sprintNoSprintsHint}
+          </Text>
+        ) : null}
+
         <Text style={[st.detailLabel, { color: c.sub }]}>{tr.projectTasks}</Text>
 
-        {selectedTasks.length === 0 ? (
+        {selectedTasks.length === 0 && projectSprints.length === 0 ? (
           <View style={{ paddingVertical: 14 }}>
             <Text style={{ color: c.sub, fontSize: 13 }}>{tr.projectNoTasks}</Text>
             <Text style={{ color: c.sub, fontSize: 12, opacity: 0.75, marginTop: 3 }}>{tr.projectNoTasksHint}</Text>
           </View>
-        ) : selectedTasks.map(task => {
-          const done = task.status === 'done';
+        ) : null}
+
+        {/* Спочатку спринти (відкриті, далі закриті), потім беклог. Порядок
+            задає sprintsForProject — той самий, що у вебі. */}
+        {sprintGroups.map(({ sprint, tasks: groupTasks }) => {
+          const closed = isSprintClosed(sprint);
+          const progress = sprintProgress(groupTasks, sprint.id);
           return (
-            <View key={task.id} style={[st.taskRow, { borderColor: c.border }]}>
-              <TouchableOpacity
-                onPress={() => { void toggleTask(task.id); }}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: done }}
-                accessibilityLabel={task.title}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                style={[st.check, { borderColor: done ? project.color : c.sub }]}>
-                {done && <IconSymbol name="checkmark" size={11} color={project.color} />}
-              </TouchableOpacity>
-              {/* Тап по назві веде на екран Завдань: підзавдання, таймер і
-                  нагадування живуть там, і другої копії тієї деталі тут не буде. */}
-              <TouchableOpacity
-                style={{ flex: 1 }}
-                onPress={() => router.push({ pathname: '/(tabs)', params: { open: task.id } })}>
+            <View key={sprint.id} style={{ marginTop: 6 }}>
+              <View style={st.sprintHeader}>
+                <IconSymbol name={closed ? 'checkmark.circle' : 'flag'} size={13} color={closed ? c.sub : project.color} />
                 <Text
                   numberOfLines={1}
-                  style={{ color: done ? c.sub : c.text, fontSize: 14, textDecorationLine: done ? 'line-through' : 'none' }}>
-                  {task.title}
+                  style={{ flex: 1, color: closed ? c.sub : c.text, fontSize: 13, fontWeight: '700' }}>
+                  {sprint.name}
+                  {closed ? <Text style={{ fontWeight: '400' }}> · {tr.sprintClosedLabel}</Text> : null}
                 </Text>
-                {task.deadline ? (
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{shortDate(task.deadline, locale)}</Text>
-                ) : null}
-              </TouchableOpacity>
-              <IconSymbol name="chevron.right" size={13} color={c.sub} />
+                <Text style={{ color: c.sub, fontSize: 11, fontVariant: ['tabular-nums'] }}>
+                  {progress.done}/{progress.total}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => openSprintRename(sprint)}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.sprintRename}
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+                  <IconSymbol name="pencil" size={14} color={c.sub} />
+                </TouchableOpacity>
+                {/* Закриття — завжди через діалог перенесення, навіть коли
+                    незавершених немає: інакше та сама кнопка поводилась би
+                    по-різному залежно від невидимого стану. */}
+                <TouchableOpacity
+                  onPress={() => (closed ? reopenSprint(sprint) : setClosingSprint(sprint))}
+                  accessibilityRole="button"
+                  accessibilityLabel={closed ? tr.sprintReopen : tr.sprintClose}
+                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+                  <IconSymbol name={closed ? 'arrow.uturn.backward' : 'flag.fill'} size={14} color={c.sub} />
+                </TouchableOpacity>
+              </View>
+              {groupTasks.length === 0 ? (
+                <Text style={{ color: c.sub, fontSize: 12, opacity: 0.7, paddingVertical: 8 }}>{tr.sprintEmpty}</Text>
+              ) : groupTasks.map(task => renderTaskRow(task, project))}
             </View>
           );
         })}
+
+        {backlogTasks.length > 0 ? (
+          <View style={{ marginTop: 6 }}>
+            {/* Заголовок беклогу з'являється лише коли є що ділити: у проєкті
+                без спринтів це був би підпис над усіма задачами підряд. */}
+            {projectSprints.length > 0 ? (
+              <View style={st.sprintHeader}>
+                <IconSymbol name="tray" size={13} color={c.sub} />
+                <Text style={{ flex: 1, color: c.sub, fontSize: 13, fontWeight: '700' }}>{tr.sprintBacklog}</Text>
+                <Text style={{ color: c.sub, fontSize: 11, fontVariant: ['tabular-nums'] }}>{backlogTasks.length}</Text>
+              </View>
+            ) : null}
+            {backlogTasks.map(task => renderTaskRow(task, project))}
+          </View>
+        ) : null}
 
         <View style={[st.addRow, { borderColor: c.border, backgroundColor: c.dim }]}>
           <TextInput
@@ -635,7 +898,8 @@ export default function ProjectsScreen() {
       </View>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [c, locale, tr, selectedTasks, newTaskTitle, toggleTask, addTask, router]);
+  }, [c, locale, tr, selectedTasks, newTaskTitle, toggleTask, addTask, router,
+      projectSprints, sprintGroups, backlogTasks, renderTaskRow, openSprintCreate, openSprintRename, reopenSprint]);
 
   // Шапка їде разом зі списком, як і раніше, — тому вона ListHeaderComponent,
   // а не окремий фіксований блок над FlatList.
@@ -877,6 +1141,144 @@ export default function ProjectsScreen() {
           </Pressable>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ─── Спринт: створення / перейменування ─── */}
+      <Modal
+        visible={!!sprintDraft}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setSprintDraft(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={st.overlay} onPress={() => setSprintDraft(null)}>
+            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+              <BlurView
+                intensity={isDark ? 50 : 70}
+                tint={isDark ? 'dark' : 'light'}
+                style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                <Text style={[st.sheetTitle, { color: c.text }]}>
+                  {sprintDraft?.sprint ? tr.sprintRename : tr.sprintNew}
+                </Text>
+                <TextInput
+                  placeholder={tr.sprintNamePlaceholder}
+                  placeholderTextColor={c.sub}
+                  value={sprintName}
+                  onChangeText={setSprintName}
+                  onSubmitEditing={saveSprint}
+                  returnKeyType="done"
+                  autoFocus
+                  style={[st.input, { backgroundColor: c.dim, color: c.text }]}
+                />
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 22 }}>
+                  <TouchableOpacity onPress={() => setSprintDraft(null)} style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>
+                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={saveSprint}
+                    disabled={!sprintName.trim()}
+                    style={[st.btn, { flex: 2, backgroundColor: sprintName.trim() ? c.accent : c.dim }]}>
+                    <Text style={{ color: sprintName.trim() ? '#fff' : c.sub, fontWeight: '700' }}>
+                      {sprintDraft?.sprint ? tr.save : tr.create}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </BlurView>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── Закриття спринта: куди перенести незавершені ───
+          Список, а не Alert: цілей може бути скільки завгодно, а Alert на iOS
+          більше трьох кнопок не показує. */}
+      <Modal
+        visible={!!closingSprint}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setClosingSprint(null)}>
+        <Pressable style={st.overlay} onPress={() => setClosingSprint(null)}>
+          <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+            <BlurView
+              intensity={isDark ? 50 : 70}
+              tint={isDark ? 'dark' : 'light'}
+              style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <Text style={[st.sheetTitle, { color: c.text, marginBottom: 6 }]}>{tr.sprintMoveTitle}</Text>
+              <Text style={{ color: c.sub, fontSize: 12, marginBottom: 16 }}>{tr.sprintMoveHint}</Text>
+              <ScrollView style={{ maxHeight: height * 0.4 }} showsVerticalScrollIndicator={false}>
+                {closingSprint ? sprintMoveTargets(sprints, closingSprint).map(target => (
+                  <TouchableOpacity
+                    key={target.id}
+                    onPress={() => { void closeSprint(closingSprint, target); }}
+                    style={[st.pickRow, { borderColor: c.border }]}>
+                    <IconSymbol name="flag" size={14} color={c.accent} />
+                    <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{target.name}</Text>
+                  </TouchableOpacity>
+                )) : null}
+                <TouchableOpacity
+                  onPress={() => { if (closingSprint) void closeSprint(closingSprint, null); }}
+                  style={[st.pickRow, { borderColor: c.border }]}>
+                  <IconSymbol name="tray" size={14} color={c.sub} />
+                  <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{tr.sprintMoveToBacklog}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+              <TouchableOpacity onPress={() => setClosingSprint(null)} style={[st.btn, { marginTop: 16, backgroundColor: c.dim }]}>
+                <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+              </TouchableOpacity>
+            </BlurView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── Задача → спринт ─── */}
+      <Modal
+        visible={!!movingTask}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setMovingTask(null)}>
+        <Pressable style={st.overlay} onPress={() => setMovingTask(null)}>
+          <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+            <BlurView
+              intensity={isDark ? 50 : 70}
+              tint={isDark ? 'dark' : 'light'}
+              style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <Text style={[st.sheetTitle, { color: c.text, marginBottom: 6 }]}>{tr.sprintPick}</Text>
+              <Text numberOfLines={2} style={{ color: c.sub, fontSize: 12, marginBottom: 16 }}>{movingTask?.title}</Text>
+              <ScrollView style={{ maxHeight: height * 0.4 }} showsVerticalScrollIndicator={false}>
+                {/* Закриті спринти як ціль не пропонуються: покласти живу
+                    роботу в заморожену пачку означає сховати її від себе. */}
+                {projectSprints.filter(sprint => !isSprintClosed(sprint)).map(sprint => {
+                  const current = movingTask?.sprintId === sprint.id;
+                  return (
+                    <TouchableOpacity
+                      key={sprint.id}
+                      onPress={() => { if (movingTask) void setTaskSprint(movingTask.id, sprint); }}
+                      style={[st.pickRow, { borderColor: current ? c.accent : c.border }]}>
+                      <IconSymbol name="flag" size={14} color={current ? c.accent : c.sub} />
+                      <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{sprint.name}</Text>
+                      {current ? <IconSymbol name="checkmark" size={13} color={c.accent} /> : null}
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  onPress={() => { if (movingTask) void setTaskSprint(movingTask.id, null); }}
+                  style={[st.pickRow, { borderColor: movingTask?.sprintId ? c.border : c.accent }]}>
+                  <IconSymbol name="tray" size={14} color={movingTask?.sprintId ? c.sub : c.accent} />
+                  <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{tr.sprintBacklog}</Text>
+                  {movingTask?.sprintId ? null : <IconSymbol name="checkmark" size={13} color={c.accent} />}
+                </TouchableOpacity>
+                {projectSprints.length === 0 ? (
+                  <Text style={{ color: c.sub, fontSize: 12, paddingVertical: 10 }}>{tr.sprintNoSprints}</Text>
+                ) : null}
+              </ScrollView>
+              <TouchableOpacity onPress={() => setMovingTask(null)} style={[st.btn, { marginTop: 16, backgroundColor: c.dim }]}>
+                <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+              </TouchableOpacity>
+            </BlurView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -890,6 +1292,8 @@ const st = StyleSheet.create({
   check:       { width: 20, height: 20, borderRadius: 10, borderWidth: 1.6, alignItems: 'center', justifyContent: 'center' },
   addRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, marginTop: 14 },
   metaChip:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  sprintHeader:{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, paddingBottom: 4 },
+  pickRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, marginBottom: 8 },
 
   pageTitle:   { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
   headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

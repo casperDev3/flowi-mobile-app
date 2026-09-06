@@ -900,6 +900,27 @@ export interface Translations {
   projectTimelineEmpty: string;
 
   /**
+   * Спринти — іменовані пачки задач усередині проєкту (utils/sprintUtils.ts).
+   * Дат у спринта немає, тож і підписів про час тут теж немає.
+   */
+  sprints: string;
+  sprintNew: string;
+  sprintNamePlaceholder: string;
+  sprintRename: string;
+  sprintClose: string;
+  sprintReopen: string;
+  sprintClosedLabel: string;
+  sprintBacklog: string;
+  sprintNoSprints: string;
+  sprintNoSprintsHint: string;
+  sprintEmpty: string;
+  sprintMoveTitle: string;
+  sprintMoveHint: string;
+  sprintMoveToBacklog: string;
+  sprintPick: string;
+  sprintNoProject: string;
+
+  /**
    * Аналітика проєктів: чотири графіки й Гантт. Числа рахує
    * utils/projectCharts.ts — тут лише підписи.
    *
@@ -1802,6 +1823,22 @@ const uk: Translations = {
   projectDone: 'виконано',
   projectTimelineSpread: 'розкид дедлайнів',
   projectTimelineEmpty: 'дедлайнів немає',
+  sprints: 'Спринти',
+  sprintNew: 'Новий спринт',
+  sprintNamePlaceholder: 'Назва спринта',
+  sprintRename: 'Перейменувати спринт',
+  sprintClose: 'Закрити спринт',
+  sprintReopen: 'Відкрити знову',
+  sprintClosedLabel: 'закритий',
+  sprintBacklog: 'Беклог',
+  sprintNoSprints: 'Спринтів ще немає',
+  sprintNoSprintsHint: 'Спринт — іменована пачка задач проєкту. Дат у нього немає: у «Сьогодні» задачу тягне лише її власний дедлайн',
+  sprintEmpty: 'Порожній',
+  sprintMoveTitle: 'Куди перенести незавершені?',
+  sprintMoveHint: 'Завершені лишаються в закритому спринті як є',
+  sprintMoveToBacklog: 'У беклог проєкту',
+  sprintPick: 'Спринт',
+  sprintNoProject: 'Спочатку оберіть проєкт — задача без проєкту у спринт не потрапляє',
   projectAnalytics: 'Аналітика',
   projectAnalyticsHint: 'Графіки йдуть за вибраним проєктом; «Витрачений час» лишається по всьому списку — одна смуга ні з чим не порівнюється',
   chartColumns: 'Де стоять задачі',
@@ -2683,6 +2720,22 @@ const en: Translations = {
   projectDone: 'done',
   projectTimelineSpread: 'deadline spread',
   projectTimelineEmpty: 'no deadlines',
+  sprints: 'Sprints',
+  sprintNew: 'New sprint',
+  sprintNamePlaceholder: 'Sprint name',
+  sprintRename: 'Rename sprint',
+  sprintClose: 'Close sprint',
+  sprintReopen: 'Reopen',
+  sprintClosedLabel: 'closed',
+  sprintBacklog: 'Backlog',
+  sprintNoSprints: 'No sprints yet',
+  sprintNoSprintsHint: 'A sprint is just a named batch of the project tasks. It has no dates: Today still follows the task deadline alone',
+  sprintEmpty: 'Empty',
+  sprintMoveTitle: 'Where do the unfinished ones go?',
+  sprintMoveHint: 'Finished tasks stay in the closed sprint as they are',
+  sprintMoveToBacklog: 'To the project backlog',
+  sprintPick: 'Sprint',
+  sprintNoProject: 'Pick a project first — a task without one cannot join a sprint',
   projectAnalytics: 'Analytics',
   projectAnalyticsHint: 'Charts follow the selected project; “Time spent” stays over the whole list — a single bar compares to nothing',
   chartColumns: 'Where tasks sit',

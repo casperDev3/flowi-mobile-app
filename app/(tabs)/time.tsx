@@ -20,7 +20,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/shared/PressableScale';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
-import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
@@ -29,6 +28,7 @@ import { saveSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
 import { useI18n } from '@/store/i18n';
 import { haptic } from '@/utils/haptics';
+import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
@@ -75,7 +75,7 @@ export default function TimeScreen() {
   useScreenView('time');
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { pendingTask, setPendingTask, activeTimers, startAdHocTimer, startTaskTimer, stopTimer, tasksRevision } = useTimerContext();
+  const { pendingTask, setPendingTask, activeTimers, startAdHocTimer, startTaskTimer, stopTimer, tasksRevision, timeEntriesRevision } = useTimerContext();
   const { tr, lang } = useI18n();
   // Одиниці приходять зі словника: до цього кожен екран мав власну копію
   // форматування з вшитими «год» і «хв».
@@ -117,6 +117,9 @@ export default function TimeScreen() {
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [showCal, setShowCal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  // Режим зосередження — лише для вузького екрана: на широкому його відкриває
+  // плаваюча кнопка з кореневого лейауту, і другий стан тут дав би два
+  // незалежні «відкрито» на одну модалку.
   const [fsOpen, setFsOpen] = useState(false);
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
@@ -139,6 +142,14 @@ export default function TimeScreen() {
       setInitialized(true);
     });
   }, []);
+
+  // Таймер тепер зупиняють і з кореневої кнопки режиму зосередження — тобто
+  // поверх ЦЬОГО екрана, без його розмонтування й без повернення фокуса.
+  // Лічилка стору — єдиний сигнал, що дзеркало сесії дописане; без неї список
+  // лишався б таким, яким був до зупинки.
+  useEffect(() => {
+    if (timeEntriesRevision > 0) void reloadEntries();
+  }, [timeEntriesRevision, reloadEntries]);
 
   // Підзавдання для рядків активних таймерів.
   //
@@ -295,13 +306,30 @@ export default function TimeScreen() {
           paddingBottom={14}
           actions={
             <>
-              {/* Розгортати нема чого, поки жоден таймер не йде. */}
-              {activeTimers.length > 0 && (
+              {/*
+                Єдиний вхід у режим зосередження НА ТЕЛЕФОНІ. Плаваюча кнопка з
+                app/_layout.tsx показується лише на широкому екрані, бо на
+                вузькому вона забирала кут у власної дії екрана й висіла над
+                кожним списком. Тут її роль перебирає шапка — і саме тут, бо
+                режим показує таймери, а це їхній розділ.
+
+                Умова на ширину обов'язкова: без неї на планшеті було б ДВА
+                входи в ту саму модалку з двома незалежними станами відкриття.
+
+                Умова на активні таймери — те саме правило, що й у плаваючої
+                кнопки: режим показує те, що йде просто зараз, і вхід у порожню
+                сітку обіцяв би, що там щось є.
+              */}
+              {!isWide && activeTimers.length > 0 && (
                 <HeaderButton
                   onPress={() => { haptic.light(); setFsOpen(true); }}
-                  accessibilityLabel={tr.fullscreenTimers}
+                  accessibilityLabel={
+                    activeTimers.length > 0
+                      ? `${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`
+                      : `${tr.fullscreenTimers}, ${tr.noActiveTimers}`
+                  }
                   style={{ backgroundColor: c.indigo + '20', borderColor: c.indigo }}>
-                  <IconSymbol name="arrow.up.left.and.arrow.down.right" size={17} color={c.indigo} />
+                  <IconSymbol name="timer" size={17} color={c.indigo} />
                 </HeaderButton>
               )}
               <HeaderButton
@@ -817,8 +845,10 @@ export default function TimeScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Повноекранний режим малює себе сам, читаючи таймери зі стору. */}
-      <FullscreenTimers visible={fsOpen} onClose={() => { setFsOpen(false); void reloadEntries(); }} />
+      {/* Монтується лише на вузькому екрані — див. коментар біля fsOpen. */}
+      {!isWide && (
+        <FullscreenTimers visible={fsOpen} onClose={() => setFsOpen(false)} />
+      )}
     </View>
   );
 }

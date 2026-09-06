@@ -24,6 +24,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { PROJECT_COLORS } from '@/utils/projectColors';
 import { setProjectArchived } from '@/utils/projectUtils';
 import {
   assignTaskToSprint,
@@ -127,8 +128,6 @@ function shortDate(iso: string, locale: string): string {
 
 /** Стала «немає шкали»: новий [] на кожному рендері ламав би React.memo. */
 const EMPTY_BUCKETS: TimelineBucket[] = [];
-
-const PROJECT_COLORS = ['#7C3AED', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1'];
 
 interface ProjectCardProps {
   project: Project;

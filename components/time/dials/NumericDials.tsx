@@ -5,7 +5,25 @@
  * звичайні табличні цифри, семисегментне табло секундоміра й вокзальні картки.
  * Розділяє їх ціна за шириною — і саме вона, а не смак, вирішує, який із них
  * переживе вузьку клітинку.
+ *
+ * ГЛИБИНИ ТУТ МАЙЖЕ НЕМАЄ, І ЦЕ РІШЕННЯ, А НЕ НЕДОРОБКА.
+ *
+ * «Цифри» — гола типографіка: кегль size×0.3, тобто на планшеті за 170pt.
+ * Втоплення на такому кеглі читається не як глибина, а як розмита копія
+ * гліфа; до того ж це DEFAULT_DIAL і фолбек parseDialId — той, хто мусить
+ * виглядати правильно завжди. Він лишається чистим.
+ *
+ * «Табло» тримається на тому, що погашений сегмент не зникає, а тьмяніє до
+ * OFF_OPACITY = 0.09. Будь-яка тінь чи глянець того ж порядку прозорості
+ * зіллються з погашеними сегментами, і цифра перестане читатись; самі сегменти
+ * при цьому завтовшки 4.6 у полотні 100, тобто менше двох пунктів на превʼю —
+ * градієнта по такій смузі не видно, лише мул.
+ *
+ * Об'єм рідний лише картці «Табла»: вона й має бути об'ємною. Але шов по
+ * центру мусить лишитися найтемнішою лінією картки — саме він робить її
+ * табло, а не цифрою в рамці, тож градієнт лягає ПІД шов.
  */
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
@@ -13,12 +31,13 @@ import Svg, { Rect } from 'react-native-svg';
 import { useClockTick } from '@/hooks/use-clock-tick';
 import { formatClock } from '@/utils/durationFormat';
 import { elapsedSince } from '@/utils/taskTimer';
-import { TABULAR, pad, type DialProps } from './shared';
+import { TABULAR, pad, type DialRenderProps } from './shared';
 
 // ─── Цифри ────────────────────────────────────────────────────────────────────
 
-export function DigitsDial({ startedAt, size, colors }: DialProps) {
+export function DigitsDial({ startedAt, size, colors }: DialRenderProps) {
   const now = useClockTick(true);
+  // material свідомо не використовується — див. коментар до файла.
   return (
     <Text
       style={[
@@ -53,7 +72,7 @@ const DIGIT_SEGMENTS = [
 /** Погашений сегмент не зникає, а тьмяніє — інакше цифра щосекунди міняє вагу. */
 const OFF_OPACITY = 0.09;
 
-export function SegmentDial({ startedAt, size, colors }: DialProps) {
+export function SegmentDial({ startedAt, size, colors }: DialRenderProps) {
   const now = useClockTick(true);
   const seconds = elapsedSince(startedAt, now);
 
@@ -109,7 +128,7 @@ export function SegmentDial({ startedAt, size, colors }: DialProps) {
 
 // ─── Табло ────────────────────────────────────────────────────────────────────
 
-export function FlipDial({ startedAt, size, colors }: DialProps) {
+export function FlipDial({ startedAt, size, colors, material: m }: DialRenderProps) {
   const now = useClockTick(true);
   const seconds = elapsedSince(startedAt, now);
   const h = Math.floor(seconds / 3600);
@@ -133,8 +152,17 @@ export function FlipDial({ startedAt, size, colors }: DialProps) {
           <View
             style={[
               st.flipCard,
-              { width: cardW, borderColor: colors.border, backgroundColor: colors.border },
+              { width: cardW, borderColor: m.rim, backgroundColor: colors.border },
             ]}>
+            {/* Тіло картки: те саме джерело світла, що в решти циферблатів —
+                згори-ліворуч. Лежить найпершим, тобто ПІД цифрою і ПІД швом. */}
+            <LinearGradient
+              colors={[m.glass.from, m.glass.to]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
             <Text
               style={[
                 st.flipText,
@@ -143,8 +171,12 @@ export function FlipDial({ startedAt, size, colors }: DialProps) {
               ]}>
               {part}
             </Text>
-            {/* Поперечний шов — те, що робить картку табло, а не цифрою в рамці. */}
-            <View style={[st.seam, { backgroundColor: colors.border }]} />
+            {/* Поперечний шов — те, що робить картку табло, а не цифрою в рамці.
+                Він лишається найтемнішою лінією картки в ОБОХ темах: градієнт
+                лягає під нього, а колір бере окремий токен шва — тінь під
+                текстом у світлій темі світла, і шов від неї став би білою
+                смугою. */}
+            <View style={[st.seam, { backgroundColor: m.seam }]} />
           </View>
         </React.Fragment>
       ))}

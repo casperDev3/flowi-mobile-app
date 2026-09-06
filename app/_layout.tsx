@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { NavSidebar } from '@/components/shared/NavSidebar';
+import { FocusModeButton } from '@/components/time/FocusModeButton';
 import { SIDEBAR_HIDDEN_ON, sidebarVisible } from '@/constants/nav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useOrientationLock } from '@/hooks/use-orientation-lock';
@@ -132,6 +133,14 @@ function RootLayoutContent() {
           <Stack.Screen name="notifications" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
+        {/*
+          Кнопка режиму зосередження — сестра Stack, всередині цієї колонки, а
+          не поверх усього рядка. Так вона автоматично стоїть ПРАВОРУЧ від
+          сайдбара на планшеті: колонка вже посунута, і жодного left:
+          SIDEBAR_WIDTH рахувати не треба — друга копія знання про ширину
+          розійшлася б із першою.
+        */}
+        <FocusModeButton />
         </View>
         </View>
         <StatusBar style={isDark ? 'light' : 'dark'} />

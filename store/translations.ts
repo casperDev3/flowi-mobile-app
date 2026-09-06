@@ -199,6 +199,8 @@ export interface Translations {
   defaultCategory: string;
   icon: string;
   newCategory: string;
+  /** Назва не влізла в id запису — перевіряє форма, бо сховище мовчки відкидає. */
+  categoryNameTooLong: string;
   incomes: string;
   expenses: string;
   catSalary: string;
@@ -412,6 +414,8 @@ export interface Translations {
   noTasksInProject: string;
   editProject: string;
   newProject: string;
+  /** Дія в пікері проєктів: така назва вже є в архіві, тож повертаємо її. */
+  unarchiveProject: string;
   projectName: string;
 
   // Meetings screen
@@ -791,6 +795,9 @@ export interface Translations {
   syncConflictsCount: string;
   syncGuestHint: string;
   syncOfflineHint: string;
+  syncLocalOnlyTitle: string;
+  syncLocalOnlyHint: string;
+  syncLocalOnlyAction: string;
   localDesktopSync: string;
 
   // Offline banner (read-only mode)
@@ -1217,6 +1224,7 @@ const uk: Translations = {
   defaultCategory: 'стандартна',
   icon: 'Іконка',
   newCategory: 'Нова категорія',
+  categoryNameTooLong: 'Назва задовга — спробуйте коротшу',
   incomes: 'Доходи',
   expenses: 'Витрати',
   catSalary: 'Зарплата',
@@ -1417,6 +1425,7 @@ const uk: Translations = {
   noTasksInProject: 'Немає завдань',
   editProject: 'Редагувати проект',
   newProject: 'Новий проект',
+  unarchiveProject: 'Повернути з архіву',
   projectName: 'Назва проекту',
 
   meetingsTitle: 'Зустрічі',
@@ -1768,6 +1777,9 @@ const uk: Translations = {
   syncConflictsCount: 'конфліктів',
   syncGuestHint: 'Увійдіть або зареєструйтесь для синхронізації',
   syncOfflineHint: 'Увімкніть онлайн-режим для синхронізації',
+  syncLocalOnlyTitle: 'Є лише на цьому пристрої',
+  syncLocalOnlyHint: 'Ці записи жодного разу не доїхали до сервера, тож на інших пристроях їх немає. Звичайна синхронізація їх не відправить — вона працює з чергою, а вони до неї не потрапили.',
+  syncLocalOnlyAction: 'Відвантажити все на сервер',
   localDesktopSync: 'Локальна синхронізація з десктопом',
   offlineReadOnly: 'Офлайн: лише перегляд',
   a11yOptions: 'Опції',
@@ -2114,6 +2126,7 @@ const en: Translations = {
   defaultCategory: 'default',
   icon: 'Icon',
   newCategory: 'New Category',
+  categoryNameTooLong: 'Name is too long — try a shorter one',
   incomes: 'Income',
   expenses: 'Expenses',
   catSalary: 'Salary',
@@ -2314,6 +2327,7 @@ const en: Translations = {
   noTasksInProject: 'No tasks',
   editProject: 'Edit project',
   newProject: 'New project',
+  unarchiveProject: 'Restore from archive',
   projectName: 'Project name',
 
   meetingsTitle: 'Meetings',
@@ -2665,6 +2679,9 @@ const en: Translations = {
   syncConflictsCount: 'conflicts',
   syncGuestHint: 'Sign in or register to sync',
   syncOfflineHint: 'Enable online mode to sync',
+  syncLocalOnlyTitle: 'Only on this device',
+  syncLocalOnlyHint: 'These records have never reached the server, so other devices do not have them. A normal sync will not send them: it works from the queue, and they never entered it.',
+  syncLocalOnlyAction: 'Upload everything to server',
   localDesktopSync: 'Local desktop sync',
   offlineReadOnly: 'Offline: read only',
   a11yOptions: 'Options',

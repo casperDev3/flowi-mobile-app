@@ -29,12 +29,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TimerCell } from '@/components/time/TimerCell';
 import { TimerDial } from '@/components/time/dials/TimerDial';
 import { DialPicker } from '@/components/time/DialPicker';
-import { timerDialSize, timerGridLayout } from '@/utils/timerGrid';
+import { shouldSmoothDial } from '@/utils/dialSmooth';
+import { timerExpandedDialSize, timerFocusLayout } from '@/utils/timerGrid';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTimerDials } from '@/hooks/use-timer-dial';
+import { useMotion } from '@/hooks/use-motion';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
@@ -86,6 +88,7 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
   const { width, height, isCompact } = useResponsive();
+  const { reduced } = useMotion();
   const [pickerFor, setPickerFor] = useState<string | null>(null);
 
   // Список id — для чистки мапи циферблатів від зупинених таймерів.
@@ -168,21 +171,33 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
   }, []);
 
   // ── Геометрія сітки ────────────────────────────────────────────────────────
-  // Максимум 4 клітинки на екран: 1×4 у вузькому вікні, 2×2 у широкому.
-  // Далі розміри вже не зменшуються — п'ята клітинка їде в скрол, бо годинник,
-  // якого не видно з іншого кінця столу, не виконує свою єдину роботу.
-  const { cellHeight, widths } = timerGridLayout({
+  // Розкладка залежить від КІЛЬКОСТІ, а не від класу пристрою: один таймер бере
+  // весь екран, два-чотири стають рівною сіткою (форму диктують пропорції самої
+  // області, тож у Split View і в альбомі виходить різне), п'ять і більше —
+  // сітка з прокруткою, і лише там ще діє стеля колонок за шириною вікна.
+  const gridWidth = width - insets.left - insets.right - PAD * 2;
+  const gridHeight = height - insets.top - insets.bottom - HEADER_H - PAD * 2;
+  const layout = timerFocusLayout({
     count: activeTimers.length,
+    width: gridWidth,
+    height: gridHeight,
+    gap: GAP,
     maxColumns: isCompact ? 1 : 2,
     rowsPerScreen: isCompact ? 4 : 2,
-    gridWidth: width - insets.left - insets.right - PAD * 2,
-    gridHeight: height - insets.top - insets.bottom - HEADER_H - PAD * 2,
-    gap: GAP,
     minCellHeight: MIN_CELL_H,
   });
-  // Розгорнутий вигляд отримує більше полотна, але теж зі стелею: круглий
-  // циферблат на пів екрана перестає бути годинником і стає ілюстрацією.
-  const bigDialSize = Math.round(Math.max(140, Math.min(width * 0.46, height * 0.4, 320)));
+  // Розгорнутий вигляд рахується від тієї ж області. Стелі 320 тут більше
+  // немає: вона була підібрана під телефон і саме через неї на планшеті
+  // циферблат лишався маленьким посеред великого екрана.
+  const bigDialSize = timerExpandedDialSize(gridWidth, gridHeight);
+
+  // Плавний хід дістається лише циферблату, який на екрані ОДИН і великий.
+  // Розгорнутий вигляд — завжди один; у сітці це буває тільки при єдиному
+  // Вирішує РОЗМІР полотна, а не кількість таймерів: домовлено «рух там, де
+  // його видно». Коли таймерів багато, розкладка сама опускає полотно нижче
+  // порога, і плавність вимикається без окремого правила про кількість.
+  const smoothExpanded = shouldSmoothDial({ dialSize: bigDialSize, reduced });
+  const smoothGrid = shouldSmoothDial({ dialSize: layout.dialSize, reduced });
 
   // Таймер міг зупинитися з іншого екрана або пристрою, поки клітинка була
   // розгорнута — тоді просто повертаємось до сітки замість порожньої картки.
@@ -275,6 +290,8 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                     startedAt={expanded.startedAt}
                     size={bigDialSize}
                     colors={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent }}
+                    isDark={isDark}
+                    smooth={smoothExpanded}
                   />
                   <Text style={[st.caption, { color: c.sub }]}>{tr.currentSession}</Text>
                 </Pressable>
@@ -356,18 +373,24 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
             ) : (
               <ScrollView
                 contentContainerStyle={[st.grid, { padding: PAD }]}
+                // Поки сітка влазить в екран, гойдати її нема куди: пружина під
+                // пальцем на нерухомій сітці читається як «щось не догорнулось».
+                scrollEnabled={layout.scrolls}
                 showsVerticalScrollIndicator={false}>
                 {activeTimers.map((timer, index) => {
-                  const w = widths[index];
+                  const w = layout.widths[index];
                   return (
                   <TimerCell
                     key={timer.id}
                     timer={timer}
                     subtasks={taskById(timer.taskId)?.subtasks}
                     projectColor={projectColorFor(timer)}
-                    height={cellHeight}
+                    height={layout.cellHeight}
                     dial={dialFor(timer.id)}
-                    dialSize={timerDialSize(w, cellHeight)}
+                    /* Розмір один на всі клітинки: головного циферблата немає,
+                       а різні розміри поруч читаються саме як «оцей головніший». */
+                    dialSize={layout.dialSize}
+                    smooth={smoothGrid}
                     onPress={() => setExpandedId(timer.id)}
                     onStop={() => { void stopTimer(timer.id); }}
                     onPickDial={() => setPickerFor(timer.id)}

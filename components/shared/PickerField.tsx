@@ -15,11 +15,19 @@
  * Пошук зʼявляється лише коли варіантів справді багато (SEARCH_THRESHOLD).
  * Поле пошуку над трьома рядками — це зайвий елемент і зайвий фокус
  * клавіатури там, де все видно й так.
+ *
+ * Виняток — списки, що ростуть без межі: проєкти й категорії накопичуються
+ * роками, і шукати в них починають задовго до того, як їх стане шість. Такі
+ * місця просять пошук самі (`alwaysSearch`), а закриті переліки (статуси)
+ * лишаються під порогом. Рядок «створити» (`createOption`) пошук вмикає теж —
+ * інакше не було б куди набрати назву.
  */
 import { BlurView } from 'expo-blur';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -35,6 +43,7 @@ import { CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 import type { Translations } from '@/store/translations';
 import { haptic } from '@/utils/haptics';
+import { filterPickerOptions, pickerCreateName } from '@/utils/pickerOptions';
 
 /** Понад стільки варіантів — показуємо пошук. */
 export const SEARCH_THRESHOLD = 5;
@@ -44,6 +53,35 @@ export interface PickerOption {
   label: string;
   /** Кольорова крапка перед назвою. Без неї крапки просто немає. */
   color?: string;
+  /** Іконка замість крапки — категорії впізнають саме за нею. */
+  icon?: IconSymbolName;
+}
+
+/**
+ * Рядок «створити новий запис» під списком.
+ *
+ * Назву бере з поля пошуку: набране фільтрує список, і воно ж стає назвою,
+ * якщо нічого не знайшлося. Окремого поля вводу немає навмисно — два поля
+ * поруч (шукати / назвати) люди плутають.
+ */
+export interface PickerCreateOption {
+  /**
+   * Рядок — підпис дії, напр. «Нова категорія»; набране покажемо поряд у лапках.
+   *
+   * Функція — коли дія залежить від набраного, і тоді вона віддає ВЕСЬ рядок
+   * разом із назвою, а список нічого не дописує. Це не примха: проєкт із такою
+   * назвою може лежати в архіві, і показати треба ЙОГО назву, а не набране.
+   * Для архівного «Ремонт» і набраного «ремонт» дописування набраного дало б
+   * «Повернути з архіву «ремонт»» — людина читає назву, якої в архіві немає,
+   * і не впізнає свій проєкт.
+   */
+  label: string | ((name: string) => string);
+  /**
+   * Чому саме цю назву зберегти не можна — готовий текст або null. Перевіряє
+   * форма: межу довжини знає вона, а не список.
+   */
+  validate?: (name: string) => string | null;
+  onCreate: (name: string) => void;
 }
 
 export interface PickerFieldColors {
@@ -68,26 +106,80 @@ export interface PickerFieldProps {
    * завдання завжди десь на дошці лежить.
    */
   emptyOption?: { label: string };
+  /**
+   * Підпис обраного, коли його НЕМАЄ серед options.
+   *
+   * Списки навмисно звужені: у пікері проєктів лежать лише живі. Але задача
+   * могла бути покладена в проєкт, який відтоді заархівували, і тоді пошук
+   * обраного по options не знаходить нічого, а поле показує «Без проєкту» —
+   * тобто бреше про дані. Тут передається назва, знайдена в ПОВНОМУ списку.
+   *
+   * Дзеркало веб-версії (components/ui.tsx, проп selectedLabel).
+   */
+  selectedLabel?: string | null;
+  /** Показувати пошук незалежно від кількості (див. шапку файла). */
+  alwaysSearch?: boolean;
+  /** Дозволити завести новий запис прямо з аркуша. Пошук вмикає сам собою. */
+  createOption?: PickerCreateOption;
   colors: PickerFieldColors;
   isDark: boolean;
   tr: Translations;
 }
 
 export function PickerField({
-  label, icon, options, value, onSelect, emptyOption, colors: c, isDark, tr,
+  label, icon, options, value, onSelect, emptyOption, selectedLabel, alwaysSearch, createOption,
+  colors: c, isDark, tr,
 }: PickerFieldProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const insets = useSafeAreaInsets();
-  const { isWide } = useResponsive();
+  const { isWide, height: windowHeight } = useResponsive();
+
+  /**
+   * Висота клавіатури, поки аркуш відкритий.
+   *
+   * Аркуш прибитий до низу екрана, тож клавіатура накриває його низ: і
+   * останні варіанти списку, і — доки він там стояв — рядок створення.
+   * KeyboardAvoidingView для абсолютно спозиційованого аркуша поводиться
+   * по-різному на двох платформах, тому висота береться з події напряму.
+   *
+   * На iOS слухаємо WillChangeFrame, а не DidShow: інакше аркуш стрибає вже
+   * після того, як клавіатура доїхала. На Android WillShow не буває.
+   */
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (!open) { setKeyboardHeight(0); return; }
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const shown = Keyboard.addListener(showEvent, event => {
+      setKeyboardHeight(event?.endCoordinates?.height ?? 0);
+    });
+    const hidden = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => { shown.remove(); hidden.remove(); };
+  }, [open]);
 
   const selected = options.find(option => option.id === value) ?? null;
-  const withSearch = options.length > SEARCH_THRESHOLD;
+  // Обране, якого немає в списку, все одно мусить читатись — інакше поле
+  // показує «нічого не обрано» там, де насправді обрано заархівоване.
+  const fallbackLabel = !selected && value ? selectedLabel ?? null : null;
+  const withSearch = alwaysSearch || Boolean(createOption) || options.length > SEARCH_THRESHOLD;
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? options.filter(option => option.label.toLowerCase().includes(q)) : options;
-  }, [options, query]);
+  const visible = useMemo(() => filterPickerOptions(options, query), [options, query]);
+
+  /** Назва для «+» або null, якщо створювати нічого (порожньо чи вже є). */
+  const draftName = useMemo(
+    () => (createOption ? pickerCreateName(options, query) : null),
+    [createOption, options, query],
+  );
+  const draftError = draftName && createOption?.validate ? createOption.validate(draftName) : null;
+  // Готовий рядок дії рахуємо тут, а не в розмітці: рядковий підпис отримує
+  // набране в лапках, а функція віддає весь рядок сама — вона могла підставити
+  // туди назву ЗБЕРЕЖЕНОГО запису, і дописувати до неї набране не можна.
+  const createRowText = !createOption || !draftName
+    ? ''
+    : typeof createOption.label === 'function'
+      ? createOption.label(draftName)
+      : `${createOption.label} «${draftName}»`;
 
   const choose = (id: string | null) => {
     haptic.light();
@@ -96,12 +188,25 @@ export function PickerField({
     setQuery('');
   };
 
+  const create = () => {
+    if (!createOption || !draftName || draftError) return;
+    haptic.light();
+    createOption.onCreate(draftName);
+    setOpen(false);
+    setQuery('');
+  };
+
   return (
     <View style={{ marginTop: 12 }}>
-      <View style={st.labelRow}>
-        {icon ? <IconSymbol name={icon} size={12} color={c.sub} /> : null}
-        <Text style={[st.label, { color: c.sub, marginLeft: icon ? 5 : 0 }]}>{label}</Text>
-      </View>
+      {/* Порожній підпис не малюється взагалі. Порожня стрічка з власними
+          відступами лишала б над полем дірку рівно своєї висоти — а виглядало
+          це як зайвий проміжок між чужим підписом і самим полем. */}
+      {label ? (
+        <View style={st.labelRow}>
+          {icon ? <IconSymbol name={icon} size={12} color={c.sub} /> : null}
+          <Text style={[st.label, { color: c.sub, marginLeft: icon ? 5 : 0 }]}>{label}</Text>
+        </View>
+      ) : null}
 
       {/* 44pt — мінімальний тач-таргет за HIG. Попередній чип на 36pt
           промахувався саме на планшеті, де палець іде через увесь екран. */}
@@ -111,7 +216,9 @@ export function PickerField({
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${selected?.label ?? emptyOption?.label ?? ''}`}
         style={[st.trigger, { backgroundColor: c.dim, borderColor: open ? c.accent : c.border }]}>
-        {selected?.color ? <View style={[st.dot, { backgroundColor: selected.color }]} /> : null}
+        {selected?.icon
+          ? <IconSymbol name={selected.icon} size={15} color={selected.color ?? c.sub} />
+          : selected?.color ? <View style={[st.dot, { backgroundColor: selected.color }]} /> : null}
         <Text
           numberOfLines={1}
           style={{
@@ -120,7 +227,7 @@ export function PickerField({
             fontWeight: '600',
             color: selected ? (selected.color ?? c.text) : c.sub,
           }}>
-          {selected?.label ?? emptyOption?.label ?? ''}
+          {selected?.label ?? fallbackLabel ?? emptyOption?.label ?? ''}
         </Text>
         <IconSymbol name="chevron.down" size={14} color={c.sub} />
       </TouchableOpacity>
@@ -134,7 +241,17 @@ export function PickerField({
         <View
           style={[
             st.sheet,
-            { backgroundColor: c.sheet, paddingBottom: insets.bottom + 14 },
+            {
+              backgroundColor: c.sheet,
+              bottom: keyboardHeight,
+              // Домашній індикатор ховається за клавіатурою — його відступ
+              // потрібен лише тоді, коли її немає.
+              paddingBottom: keyboardHeight > 0 ? 14 : insets.bottom + 14,
+              // Висота рахується від ТОГО, ЩО ЛИШИЛОСЬ від екрана. Фіксовані
+              // 76% від повного екрана разом із підйомом на висоту клавіатури
+              // виштовхнули б верх аркуша за межу видимого.
+              maxHeight: Math.max(240, (windowHeight - keyboardHeight) * 0.76),
+            },
             // На планшеті аркуш на всю ширину дав би рядки завдовжки з екран.
             isWide && { maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
           ]}>
@@ -150,6 +267,40 @@ export function PickerField({
               autoCorrect={false}
               style={[st.search, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]}
             />
+          )}
+
+          {/* Рядок дії стоїть ОДРАЗУ під пошуком, а не в кінці списку.
+              Раніше він був останнім елементом прокрутки, а сам аркуш прибитий
+              до низу екрана — тож клавіатура накривала його двічі: і як низ
+              аркуша, і як хвіст прокрутки. Людина набирала назву, якої немає, і
+              не бачила нічого. Тут він поруч із тим, що набирають, і в полі
+              зору завжди.
+
+              Показуємо ЛИШЕ коли є що назвати й такого ще немає: інакше дія
+              поруч зі знайденим записом створювала б дубль. */}
+          {createOption && draftName && (
+            <TouchableOpacity
+              onPress={create}
+              disabled={Boolean(draftError)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: Boolean(draftError) }}
+              accessibilityLabel={createRowText}
+              style={[st.create, {
+                borderColor: draftError ? c.border : c.accent,
+                opacity: draftError ? 0.5 : 1,
+              }]}>
+              <IconSymbol name="plus" size={14} color={draftError ? c.sub : c.accent} />
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '700', color: draftError ? c.sub : c.accent }}>
+                {createRowText}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {draftError && (
+            <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
+              {draftError}
+            </Text>
           )}
 
           <ScrollView keyboardShouldPersistTaps="handled" style={{ marginTop: 10 }}>
@@ -168,6 +319,7 @@ export function PickerField({
                 key={option.id}
                 label={option.label}
                 color={option.color}
+                icon={option.icon}
                 active={option.id === value}
                 colors={c}
                 isDark={isDark}
@@ -180,6 +332,7 @@ export function PickerField({
                 {tr.pickerNothingFound}
               </Text>
             )}
+
           </ScrollView>
         </View>
       </Modal>
@@ -187,9 +340,10 @@ export function PickerField({
   );
 }
 
-function Row({ label, color, active, colors: c, isDark, onPress }: {
+function Row({ label, color, icon, active, colors: c, isDark, onPress }: {
   label: string;
   color?: string;
+  icon?: IconSymbolName;
   active: boolean;
   colors: PickerFieldColors;
   isDark: boolean;
@@ -210,7 +364,9 @@ function Row({ label, color, active, colors: c, isDark, onPress }: {
           borderColor: active ? accent : c.border,
           backgroundColor: active ? accent + '14' : 'transparent',
         }]}>
-        {color ? <View style={[st.dot, { backgroundColor: color }]} /> : null}
+        {icon
+          ? <IconSymbol name={icon} size={15} color={active ? accent : c.sub} />
+          : color ? <View style={[st.dot, { backgroundColor: color }]} /> : null}
         <Text
           numberOfLines={1}
           style={{ flex: 1, fontSize: 14, fontWeight: active ? '700' : '500', color: active ? accent : c.text }}>
@@ -232,8 +388,8 @@ const st = StyleSheet.create({
   backdrop:   { ...StyleSheet.absoluteFillObject },
   sheet: {
     position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    maxHeight: '76%',
+    left: 0, right: 0,
+    // bottom і maxHeight задаються в компоненті: вони залежать від клавіатури.
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 16,
@@ -242,6 +398,8 @@ const st = StyleSheet.create({
   handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   sheetTitle: { fontSize: 17, fontWeight: '700', marginBottom: 12 },
   search:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14 },
+  create:     { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: 12,
+                borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 13, gap: 9, marginBottom: 7 },
   rowWrap:    { marginBottom: 7 },
   row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, gap: 9, overflow: 'hidden' },
 });

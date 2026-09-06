@@ -22,6 +22,7 @@ import {
   type SyncTrigger,
 } from './sync-diagnostics';
 import { assertCompatibleSyncContract } from './sync-contract';
+import { EMPTY_LOCAL_ONLY, findLocalOnly, type LocalOnlyReport } from '@/utils/syncDivergence';
 import {
   SYNC_ARRAY_KEYS,
   SYNC_SINGLETON_KEYS,
@@ -821,6 +822,39 @@ export async function triggerFullSync(): Promise<void> {
  * цього кнопка означала «спробувати відправити все, якщо сервер дозволить», і
  * мовчки лишала частину записів позаду.
  */
+/**
+ * Чи є записи, яких сервер ніколи не бачив.
+ *
+ * Читає сховище, а не мережу: питання не «що на сервері», а «чи все локальне
+ * бодай раз туди доїхало». Відповідь дає мапа ревізій — див. шапку
+ * utils/syncDivergence.ts, там же й привід, чому ця перевірка існує.
+ *
+ * Для гостя й у локальному режимі повертає порожньо: там «лише на пристрої» —
+ * це не аварія, а сам задум, і попередження було б шумом.
+ */
+export async function scanLocalOnlyRecords(): Promise<LocalOnlyReport> {
+  if (!isOnlineMode() || !_isAuthed) return EMPTY_LOCAL_ONLY;
+
+  const revisions = await getRevisionMap();
+  const outbox = await loadOutbox();
+  const known = new Set<string>(Object.keys(revisions));
+  for (const item of outbox) known.add(syncRecordKey(item.collection, item.local_id));
+
+  const entries: { collection: string; keys: string[] }[] = [];
+  for (const collection of SYNC_ARRAY_KEYS) {
+    const stored = await loadData<unknown>(collection, []);
+    if (!Array.isArray(stored)) continue;
+    const keys: string[] = [];
+    for (const record of stored) {
+      const id = normalizeSyncLocalId((record as { id?: unknown })?.id);
+      if (id != null) keys.push(syncRecordKey(collection, id));
+    }
+    if (keys.length) entries.push({ collection, keys });
+  }
+
+  return findLocalOnly(entries, known);
+}
+
 export async function pushAllToServer(): Promise<void> {
   await generateFullOutbox();
   const outbox = await loadOutbox();

@@ -22,6 +22,7 @@ import { TimerDial } from '@/components/time/dials/TimerDial';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { ActiveTimer } from '@/utils/activeTimers';
 import type { DialId } from '@/utils/timerDials';
+import { timerCellSubtaskRows } from '@/utils/timerGrid';
 
 /** Червоний «Стоп» — той самий, що в деталі завдання (TaskTimerTab). */
 const STOP = '#EF4444';
@@ -62,6 +63,13 @@ export interface TimerCellProps {
    * Це не кегль цифр — круглим варіантам потрібен квадрат під фігуру.
    */
   dialSize: number;
+  /**
+   * Плавний хід замість тіку раз на секунду. Рішення ухвалює сітка
+   * (utils/dialSmooth), бо лише вона знає, скільки циферблатів на екрані:
+   * коли їх більше одного, плавність коштувала б 60 Гц × кількість при
+   * ввімкненому дисплеї, а головного серед рівних немає за побудовою.
+   */
+  smooth?: boolean;
   onPress: () => void;
   onStop: () => void;
   /** Відкрити вибір циферблата ДЛЯ ЦЬОГО таймера. */
@@ -82,6 +90,7 @@ export function TimerCell({
   height,
   dial,
   dialSize,
+  smooth,
   onPress,
   onStop,
   onPickDial,
@@ -96,7 +105,11 @@ export function TimerCell({
   // Скільки рядків показати — вирішує ВИСОТА клітинки, а не смак: у сітці 2×2
   // на телефоні місця під список немає взагалі, і три рядки виштовхнули б
   // кнопку «Стоп» за межі картки. Годинник тут головний, список — довідка.
-  const maxRows = height >= 260 ? 3 : height >= 200 ? 2 : height >= 150 ? 1 : 0;
+  //
+  // Сходинка живе в utils/timerGrid разом із розрахунком полотна циферблата:
+  // саме на ці рядки там резервується висота, і якщо їх розвести по двох
+  // файлах, список рано чи пізно поїде на годинник.
+  const maxRows = timerCellSubtaskRows(height);
   // Показуємо НЕзроблені: перелік того, що вже закрито, під час роботи не
   // допомагає — потрібне те, що лишилось.
   const pending = all.filter(s => !s.done).slice(0, maxRows);
@@ -131,6 +144,8 @@ export function TimerCell({
             startedAt={timer.startedAt}
             size={dialSize}
             colors={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent }}
+            isDark={isDark}
+            smooth={smooth}
           />
         </View>
 

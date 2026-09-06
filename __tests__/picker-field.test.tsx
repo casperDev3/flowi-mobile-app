@@ -298,3 +298,19 @@ describe('PickerField: рядок дії не ховається за клаві
     expect(insideScroll(row)).toBe(false);
   });
 });
+
+describe('PickerField: порожній підпис', () => {
+  it('не займає висоти — інакше над полем зайвий проміжок', () => {
+    // Форма задачі малювала свій підпис «Проєкт», а пікер малював ще й свій,
+    // порожній: стрічка з власними відступами лишала дірку рівно своєї висоти.
+    const withLabel = render(2, jest.fn(), { label: 'Проєкт' });
+    const withoutLabel = render(2, jest.fn(), { label: '' });
+
+    const labels = (tree: any) => tree.root.findAll(
+      (n: any) => typeof n.type === 'string' && n.props?.children === 'Проєкт',
+    ).length;
+
+    expect(labels(withLabel)).toBeGreaterThan(0);
+    expect(labels(withoutLabel)).toBe(0);
+  });
+});

@@ -198,10 +198,15 @@ export function PickerField({
 
   return (
     <View style={{ marginTop: 12 }}>
-      <View style={st.labelRow}>
-        {icon ? <IconSymbol name={icon} size={12} color={c.sub} /> : null}
-        <Text style={[st.label, { color: c.sub, marginLeft: icon ? 5 : 0 }]}>{label}</Text>
-      </View>
+      {/* Порожній підпис не малюється взагалі. Порожня стрічка з власними
+          відступами лишала б над полем дірку рівно своєї висоти — а виглядало
+          це як зайвий проміжок між чужим підписом і самим полем. */}
+      {label ? (
+        <View style={st.labelRow}>
+          {icon ? <IconSymbol name={icon} size={12} color={c.sub} /> : null}
+          <Text style={[st.label, { color: c.sub, marginLeft: icon ? 5 : 0 }]}>{label}</Text>
+        </View>
+      ) : null}
 
       {/* 44pt — мінімальний тач-таргет за HIG. Попередній чип на 36pt
           промахувався саме на планшеті, де палець іде через увесь екран. */}

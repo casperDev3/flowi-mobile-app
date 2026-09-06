@@ -110,9 +110,9 @@ export function TaskEditForm({
             один вигляд на всі пікери застосунку. Поле показується ЗАВЖДИ, навіть
             коли живих проєктів немає: інакше задача, чий проєкт заархівували,
             втрачала б і підпис, і спосіб від нього відчепитись. */}
-        <Text style={[st.label, { color: c.sub }]}>{tr.project}</Text>
         <PickerField
-          label=""
+          label={tr.project}
+          icon="folder"
           options={pickableProjects.map(p => ({ id: p.id, label: p.name, color: p.color }))}
           value={editor.draft.projectId ?? null}
           onSelect={id => editor.patch({ projectId: id })}

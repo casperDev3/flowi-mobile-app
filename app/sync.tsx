@@ -22,10 +22,13 @@ import { loadConflicts, SyncConflict } from '@/store/sync-conflicts';
 import {
   formatSyncError,
   loadRejected,
+  pushAllToServer,
   releaseFromQuarantine,
+  scanLocalOnlyRecords,
   SyncRejection,
   useSync,
 } from '@/store/sync-engine';
+import { EMPTY_LOCAL_ONLY, type LocalOnlyReport } from '@/utils/syncDivergence';
 import { markDirty, SYNC_SINGLETON_KEYS } from '@/store/synced-storage';
 import { useContentWidth } from '@/hooks/use-content-width';
 
@@ -59,6 +62,8 @@ export default function SyncScreen() {
 
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [rejected, setRejected] = useState<SyncRejection[]>([]);
+  const [localOnly, setLocalOnly] = useState<LocalOnlyReport>(EMPTY_LOCAL_ONLY);
+  const [pushing, setPushing] = useState(false);
 
   // Палітра — у useMemo: картка конфлікту нижче обгорнута в React.memo і
   // новий об'єкт кольорів щоразу зводив би мемоізацію нанівець.
@@ -78,6 +83,25 @@ export default function SyncScreen() {
   }, []);
 
   useEffect(() => { refreshConflicts(); }, [refreshConflicts, rejectedCount]);
+
+  // Перевіряється при вході й після КОЖНОГО обміну: саме «успішний» обмін і
+  // приспав пильність минулого разу — він відправив нуль записів і відзвітував
+  // про успіх, поки в сховищі лежали транзакції за два дні.
+  useEffect(() => {
+    let cancelled = false;
+    void scanLocalOnlyRecords().then(report => { if (!cancelled) setLocalOnly(report); });
+    return () => { cancelled = true; };
+  }, [syncState, lastSyncAt, pendingCount]);
+
+  const handlePushAll = useCallback(async () => {
+    setPushing(true);
+    try {
+      await pushAllToServer();
+      setLocalOnly(await scanLocalOnlyRecords());
+    } finally {
+      setPushing(false);
+    }
+  }, []);
 
   // «Спробувати ще» — просто випустити з карантину: наступна правка запису
   // покладе його в outbox знову. «Відкинути» робить те саме, але користувач
@@ -254,6 +278,52 @@ export default function SyncScreen() {
                 </Text>
               </TouchableOpacity>
             </BlurView>
+
+            {/* ── ЛИШЕ НА ЦЬОМУ ПРИСТРОЇ ──
+                Стоїть ВИЩЕ за карантин навмисно: карантин каже «сервер
+                відмовив», тобто зв'язок був. Тут гірше — записи до сервера не
+                доїжджали жодного разу, і поки цього не видно, «синхронізовано
+                успішно» читається як «усе на місці». */}
+            {localOnly.total > 0 && (
+              <View style={{ marginTop: 4 }}>
+                <Text style={[st.sectionLabel, { color: c.sub }]}>
+                  {tr.syncLocalOnlyTitle.toUpperCase()} ({localOnly.total})
+                </Text>
+                <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
+                  style={[st.card, { borderColor: c.red + '28', marginTop: 8 }]}>
+                  <Text style={[st.hintText, { color: c.sub, marginBottom: 10 }]}>
+                    {tr.syncLocalOnlyHint}
+                  </Text>
+                  {localOnly.byCollection.map(row => (
+                    <View
+                      key={row.collection}
+                      style={[st.hintRow, { backgroundColor: c.red + '10', borderColor: c.red + '24' }]}>
+                      <Text style={[st.hintText, { color: c.text, flex: 1 }]} numberOfLines={1}>
+                        {row.collection}
+                      </Text>
+                      <Text style={[st.hintText, { color: c.text, fontWeight: '700' }]}>
+                        {row.count}
+                      </Text>
+                    </View>
+                  ))}
+                  <TouchableOpacity
+                    onPress={() => void handlePushAll()}
+                    disabled={pushing || !isOnlineAuthed}
+                    accessibilityRole="button"
+                    style={[st.hintRow, {
+                      backgroundColor: c.accent + '18',
+                      borderColor: c.accent,
+                      opacity: pushing || !isOnlineAuthed ? 0.5 : 1,
+                      justifyContent: 'center',
+                      marginTop: 10,
+                    }]}>
+                    <Text style={[st.hintText, { color: c.accent, fontWeight: '700' }]}>
+                      {tr.syncLocalOnlyAction}
+                    </Text>
+                  </TouchableOpacity>
+                </BlurView>
+              </View>
+            )}
 
             {/* ── КАРАНТИН ── */}
             {rejected.length > 0 && (

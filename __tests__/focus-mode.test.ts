@@ -3,6 +3,7 @@ import path from 'path';
 
 import { SIDEBAR_HIDDEN_ON } from '../constants/nav';
 import {
+  FAB_CLEARANCE,
   TAB_ROUTES,
   focusBadgeLabel,
   focusButtonOffsets,
@@ -10,19 +11,20 @@ import {
   isTabScreen,
 } from '../utils/focusMode';
 
-describe('focusButtonVisible', () => {
-  it('на екранах входу кнопки немає', () => {
+describe('focusButtonVisible на екранах входу', () => {
+  it('гостю кнопки немає на жодній ширині', () => {
     // Гість ще не авторизований — таймерів у нього не буває.
     for (const route of SIDEBAR_HIDDEN_ON) {
-      expect(focusButtonVisible(route)).toBe(false);
+      expect(focusButtonVisible(route, true)).toBe(false);
+      expect(focusButtonVisible(route, false)).toBe(false);
     }
   });
 
-  it('на решті екранів кнопка є завжди', () => {
+  it('на планшеті на решті екранів кнопка є завжди', () => {
     // Правило «показувати лише коли таймер іде» скасовано свідомо: режим
     // мусить відкриватись звідусіль, і порожній стан у ньому вже є.
     for (const route of ['/', '/today', '/explore', '/notes', '/budget', '/meetings']) {
-      expect(focusButtonVisible(route)).toBe(true);
+      expect(focusButtonVisible(route, true)).toBe(true);
     }
   });
 });
@@ -61,36 +63,63 @@ describe('isTabScreen', () => {
 });
 
 describe('focusButtonOffsets', () => {
-  const insets = { bottom: 34, left: 0 };
+  const insets = { bottom: 34, right: 0 };
 
   it('на екрані вкладок кнопка стоїть над панеллю табів', () => {
-    // Панель напівпрозора й накриває контент (position: 'absolute').
+    // Панель напівпрозора й накриває контент (position: 'absolute'),
+    // а зверху ще FAB_CLEARANCE — під кнопкою стоїть власний FAB екрана.
     expect(focusButtonOffsets({ pathname: '/today', isWide: false, insets, tabBarHeight: 88 }).bottom)
-      .toBe(100);
+      .toBe(100 + FAB_CLEARANCE);
   });
 
   it('домашній індикатор не додається двічі', () => {
     // TAB_BAR_HEIGHT уже враховує його — insets.bottom згори дав би 134pt.
     const { bottom } = focusButtonOffsets({ pathname: '/', isWide: false, insets, tabBarHeight: 88 });
-    expect(bottom).toBeLessThan(insets.bottom + 88);
+    expect(bottom).toBeLessThan(insets.bottom + 88 + FAB_CLEARANCE);
   });
 
   it('на Stack-екрані панелі немає — відступ від безпечного поля', () => {
     expect(focusButtonOffsets({ pathname: '/notes', isWide: false, insets, tabBarHeight: 88 }).bottom)
-      .toBe(50);
+      .toBe(50 + FAB_CLEARANCE);
   });
 
   it('на широкому екрані панелі немає навіть на вкладці', () => {
     // Там її роль перебирає сайдбар.
     expect(focusButtonOffsets({ pathname: '/today', isWide: true, insets, tabBarHeight: 88 }).bottom)
-      .toBe(50);
+      .toBe(50 + FAB_CLEARANCE);
   });
 
-  it('виріз у ландшафті з’їдає ліве поле', () => {
-    const { left } = focusButtonOffsets({
-      pathname: '/notes', isWide: false, insets: { bottom: 21, left: 59 }, tabBarHeight: 88,
+  it('кнопка піднята над власним FAB екрана, а не накриває його', () => {
+    // Сім екранів малюють свою дію в тому самому куті: right: 20, 52pt.
+    const { bottom } = focusButtonOffsets({
+      pathname: '/notes', isWide: true, insets, tabBarHeight: 88,
     });
-    expect(left).toBe(75);
+    expect(bottom).toBeGreaterThanOrEqual(insets.bottom + 16 + 52);
+  });
+
+  it('виріз у ландшафті з’їдає праве поле', () => {
+    const { right } = focusButtonOffsets({
+      pathname: '/notes', isWide: false, insets: { bottom: 21, right: 59 }, tabBarHeight: 88,
+    });
+    expect(right).toBe(75);
+  });
+});
+
+describe('focusButtonVisible', () => {
+  it('на телефоні плаваючої кнопки немає — вхід лишається на вкладці «Час»', () => {
+    expect(focusButtonVisible('/today', false)).toBe(false);
+    expect(focusButtonVisible('/notes', false)).toBe(false);
+  });
+
+  it('на широкому екрані кнопка є', () => {
+    expect(focusButtonVisible('/today', true)).toBe(true);
+    expect(focusButtonVisible('/notes', true)).toBe(true);
+  });
+
+  it('на екранах входу її немає навіть на планшеті', () => {
+    for (const route of ['/welcome', '/login', '/register', '/forgot-password']) {
+      expect(focusButtonVisible(route, true)).toBe(false);
+    }
   });
 });
 

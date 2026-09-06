@@ -2,7 +2,16 @@
  * components/time/FocusModeButton.tsx
  *
  * Вхід у режим зосередження — плаваюча кнопка, яка живе в кореневому лейауті
- * й тому доступна з БУДЬ-ЯКОГО екрана.
+ * й тому доступна з будь-якого екрана ШИРОКОГО пристрою. На телефоні її немає:
+ * там вона забирала кут у власної дії екрана, і вхід лишився в шапці вкладки
+ * «Час» (див. focusButtonVisible).
+ *
+ * Іконка — viewfinder, а не стрілки «на весь екран»: стрілки обіцяють
+ * «збільшити те, що бачу», а кнопка відкриває інше — зведення таймерів, що
+ * йдуть просто зараз. Рамка прицілу читається як «зосередитись», тобто як
+ * назва режиму. Іконку таймера взяти не можна: нею в навігації позначений
+ * розділ «Трекер часу», і два різні пункти з однією іконкою читались би як
+ * той самий.
  *
  * Чому не в шапці: Stack-екрани в цьому застосунку мають headerShown: false і
  * малюють власні ScreenHeader. Спільної шапки не існує, тож «увімкнути
@@ -42,7 +51,7 @@ export function FocusModeButton() {
   const { activeTimers } = useTimerContext();
   const [open, setOpen] = useState(false);
 
-  const visible = focusButtonVisible(pathname);
+  const visible = focusButtonVisible(pathname, isWide);
 
   // Пішли на екран входу (вихід з акаунта, редірект гостя) — режим закриваємо.
   // Інакше він лишився б відкритим у стані й вигулькнув би після повернення.
@@ -55,10 +64,10 @@ export function FocusModeButton() {
     () => focusButtonOffsets({
       pathname,
       isWide,
-      insets: { bottom: insets.bottom, left: insets.left },
+      insets: { bottom: insets.bottom, right: insets.right },
       tabBarHeight: TAB_BAR_HEIGHT,
     }),
-    [pathname, isWide, insets.bottom, insets.left],
+    [pathname, isWide, insets.bottom, insets.right],
   );
 
   const badge = focusBadgeLabel(activeTimers.length);
@@ -80,12 +89,12 @@ export function FocusModeButton() {
           s.fab,
           {
             bottom: offsets.bottom,
-            left: offsets.left,
+            right: offsets.right,
             backgroundColor: isDark ? 'rgba(18,21,37,0.92)' : 'rgba(255,255,255,0.94)',
             borderColor: c.accent,
           },
         ]}>
-        <IconSymbol name="arrow.up.left.and.arrow.down.right" size={20} color={c.accent} />
+        <IconSymbol name="viewfinder" size={20} color={c.accent} />
         {badge && (
           <View style={[s.badge, { backgroundColor: c.accent, borderColor: c.bg1 }]}>
             <Text style={s.badgeText} numberOfLines={1}>{badge}</Text>

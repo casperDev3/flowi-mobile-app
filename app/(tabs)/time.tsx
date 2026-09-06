@@ -28,6 +28,7 @@ import { saveSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
 import { useI18n } from '@/store/i18n';
 import { haptic } from '@/utils/haptics';
+import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
@@ -116,6 +117,10 @@ export default function TimeScreen() {
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [showCal, setShowCal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  // Режим зосередження — лише для вузького екрана: на широкому його відкриває
+  // плаваюча кнопка з кореневого лейауту, і другий стан тут дав би два
+  // незалежні «відкрито» на одну модалку.
+  const [fsOpen, setFsOpen] = useState(false);
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
 
@@ -300,19 +305,36 @@ export default function TimeScreen() {
           color={c.text}
           paddingBottom={14}
           actions={
-            /*
-              Входу в режим зосередження тут немає навмисно. Він один на весь
-              застосунок — плаваюча кнопка в app/_layout.tsx, бо «увімкнути
-              звідусіль» не можна зробити з шапки: Stack-екрани малюють власні
-              хедери. Друга кнопка саме тут дала б на цьому екрані два входи в
-              ту саму модалку з двома незалежними станами відкриття.
-            */
-            <HeaderButton
-              onPress={() => setShowMenu(true)}
-              accessibilityLabel={tr.filtersAndSort}
-              style={{ backgroundColor: dateFilter ? c.indigo + '20' : c.dim, borderColor: dateFilter ? c.indigo : c.border }}>
-              <IconSymbol name="slider.horizontal.3" size={17} color={dateFilter ? c.indigo : c.sub} />
-            </HeaderButton>
+            <>
+              {/*
+                Єдиний вхід у режим зосередження НА ТЕЛЕФОНІ. Плаваюча кнопка з
+                app/_layout.tsx показується лише на широкому екрані, бо на
+                вузькому вона забирала кут у власної дії екрана й висіла над
+                кожним списком. Тут її роль перебирає шапка — і саме тут, бо
+                режим показує таймери, а це їхній розділ.
+
+                Умова обов'язкова: без неї на планшеті було б ДВА входи в ту
+                саму модалку з двома незалежними станами відкриття.
+              */}
+              {!isWide && (
+                <HeaderButton
+                  onPress={() => { haptic.light(); setFsOpen(true); }}
+                  accessibilityLabel={
+                    activeTimers.length > 0
+                      ? `${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`
+                      : `${tr.fullscreenTimers}, ${tr.noActiveTimers}`
+                  }
+                  style={{ backgroundColor: c.indigo + '20', borderColor: c.indigo }}>
+                  <IconSymbol name="viewfinder" size={17} color={c.indigo} />
+                </HeaderButton>
+              )}
+              <HeaderButton
+                onPress={() => setShowMenu(true)}
+                accessibilityLabel={tr.filtersAndSort}
+                style={{ backgroundColor: dateFilter ? c.indigo + '20' : c.dim, borderColor: dateFilter ? c.indigo : c.border }}>
+                <IconSymbol name="slider.horizontal.3" size={17} color={dateFilter ? c.indigo : c.sub} />
+              </HeaderButton>
+            </>
           }
         />
 
@@ -818,6 +840,11 @@ export default function TimeScreen() {
           </Pressable>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Монтується лише на вузькому екрані — див. коментар біля fsOpen. */}
+      {!isWide && (
+        <FullscreenTimers visible={fsOpen} onClose={() => setFsOpen(false)} />
+      )}
     </View>
   );
 }

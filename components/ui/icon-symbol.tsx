@@ -68,6 +68,8 @@ const MAPPING: Record<string, MaterialIconName> = {
   'xmark.circle': 'highlight-off',
   // Time & calendar
   'timer': 'timer',
+  // Рамка прицілу — режим зосередження. Іконку 'timer' зайняв розділ «Трекер часу».
+  'viewfinder': 'center-focus-strong',
   'calendar': 'calendar-today',
   'clock': 'access-time-filled',
   'clock.arrow.2.circlepath': 'restore',

@@ -12,6 +12,12 @@
  */
 
 import { loadData, saveData } from './storage';
+import {
+  recordNotify,
+  recordSchedulerInstalled,
+  recordStorageEval,
+  type SchedulerTag,
+} from './sync-diagnostics';
 
 export {
   SYNC_ARRAY_KEYS,
@@ -48,13 +54,36 @@ export function ensureMutationIds(items: OutboxItem[]): OutboxItem[] {
 }
 
 // ─── Scheduler hook (встановлюється sync-engine, щоб уникнути циклічного імпорту) ─
-let _scheduleSync: (() => void) | null = null;
 
-export function setSyncScheduler(fn: () => void): void {
+/**
+ * Відбиток ЦІЄЇ оцінки модуля.
+ *
+ * Модульний стан нижче переживає лише один екземпляр модуля. Якщо збірка
+ * оцінить synced-storage вдруге (Fast Refresh, дубль у графі), екрани
+ * сповіщатимуть один екземпляр, а планувальник стоятиме в іншому — outbox при
+ * цьому спільний, бо він у AsyncStorage, тож симптом виглядає як «кнопка
+ * працює, автоматика ні». Ідентифікатор робить цю підміну видимою.
+ */
+export const SYNCED_STORAGE_INSTANCE_ID = Math.random().toString(36).slice(2, 8);
+recordStorageEval(SYNCED_STORAGE_INSTANCE_ID);
+
+let _scheduleSync: (() => void) | null = null;
+let _schedulerTag: SchedulerTag = 'none';
+
+/**
+ * `tag` не впливає ні на що, крім діагностики: реєстр однаково зберігає
+ * передану функцію. Він потрібен тому, що cleanup рушія ставить сюди порожню
+ * функцію, і ззовні «жива функція» від «заглушки» нічим не відрізняються —
+ * обидві виглядають як встановлений планувальник.
+ */
+export function setSyncScheduler(fn: () => void, tag: 'live' | 'noop' = 'live'): void {
   _scheduleSync = fn;
+  _schedulerTag = tag;
+  recordSchedulerInstalled(tag, SYNCED_STORAGE_INSTANCE_ID);
 }
 
 function notifySyncScheduler(): void {
+  recordNotify(_scheduleSync ? _schedulerTag : 'none');
   _scheduleSync?.();
 }
 

@@ -69,6 +69,30 @@ function loadEngine(): Engine {
   return engine;
 }
 
+/**
+ * Рушій І діагностика з ОДНОГО ізоляту.
+ *
+ * jest.isolateModules віддає рушію свіжий екземпляр графа модулів. Звичайний
+ * require('@/store/sync-diagnostics') поза цим ізолятом дає ІНШИЙ екземпляр із
+ * власними лічильниками, і тест читав би нулі, хоч рушій справно рахує. Це та
+ * сама підміна модуля, заради виявлення якої діагностику й писали.
+ */
+function loadEngineWithDiagnostics(): {
+  engine: Engine;
+  diag: typeof import('@/store/sync-diagnostics');
+} {
+  let engine!: Engine;
+  let diag!: typeof import('@/store/sync-diagnostics');
+  jest.isolateModules(() => {
+    /* eslint-disable @typescript-eslint/no-require-imports -- isolateModules працює лише з require */
+    engine = require('@/store/sync-engine');
+    diag = require('@/store/sync-diagnostics');
+    /* eslint-enable @typescript-eslint/no-require-imports */
+  });
+  engine.setIsAuthed(true);
+  return { engine, diag };
+}
+
 function seed(key: string, value: unknown): void {
   mockStore.set(key, JSON.stringify(value));
 }
@@ -1020,5 +1044,62 @@ describe('doSync — перший синк (cursor = 0)', () => {
     await loadEngine().syncNow();
 
     expect(mockLoadCalls.filter(k => k === 'tasks').length).toBeLessThanOrEqual(2);
+  });
+
+  // ─── Тригер не має згорати ────────────────────────────────────────────────
+  //
+  // Ці два тести описують збій, через який записи лишались на пристрої: у
+  // користувача на планшеті були транзакції за два дні, яких не бачив ні веб,
+  // ні телефон. Обмін ішов, кнопка працювала — а свіжий запис не виїжджав.
+
+  test('синк, відбитий на гейті «вже йде», переозброює дебаунс', async () => {
+    // scheduleSync гасить свій таймер ДО виклику doSync, тож вихід на гейті
+    // раніше не лишав жодного запланованого тригера: запис чекав поллінгу
+    // через п'ять хвилин, повернення з фону або кнопки.
+    seed('server_change_cursor_v2', 0);
+    // Відкладена обіцянка створюється ЗАЗДАЛЕГІДЬ, а не всередині mock: перший
+    // синк може завершитись, не дійшовши до мережі (порожній outbox), і тоді
+    // мок не викликається — release лишався б невизначеним, а прибирання
+    // падало б уже після успішних перевірок.
+    let release!: () => void;
+    const held = new Promise(resolve => { release = () => resolve(v2()); });
+    mockApiFetch.mockImplementation(() => held);
+
+    const { engine, diag } = loadEngineWithDiagnostics();
+
+    const first = engine.syncNow();      // тримає _syncing = true
+    await Promise.resolve();
+    const before = diag.getSyncDiagnostics().debounce.byCaller.retryGate;
+    await engine.syncNow();              // цей мусить упертись у 'busy'
+
+    const after = diag.getSyncDiagnostics().debounce.byCaller.retryGate;
+    expect(after).toBe(before + 1);
+    expect(diag.getSyncDiagnostics().attempts.blocked.busy).toBeGreaterThan(0);
+
+    release();
+    await first;
+  });
+
+  test('запис, зроблений ПІД ЧАС обміну, планує ще один прохід', async () => {
+    // Outbox читається один раз на початку. Без цього те, що людина записала,
+    // поки обмін ішов, лежало б до наступної випадкової причини синхронізації.
+    seed('server_change_cursor_v2', 5);
+    seed('sync_outbox', []);
+
+    mockApiFetch.mockImplementation(async () => {
+      // Імітуємо запис, що ліг в outbox уже після старту обміну.
+      seed('sync_outbox', [{
+        mutation_id: 'm-late', collection: 'transactions', local_id: 'tx-late',
+        deleted: false, queued_at: Date.now() + 1000,
+      }]);
+      return v2();
+    });
+
+    const { engine, diag } = loadEngineWithDiagnostics();
+    const before = diag.getSyncDiagnostics().debounce.byCaller.drain;
+
+    await engine.syncNow();
+
+    expect(diag.getSyncDiagnostics().debounce.byCaller.drain).toBe(before + 1);
   });
 });

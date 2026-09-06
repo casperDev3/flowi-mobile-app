@@ -8,6 +8,19 @@ import { WS_BASE } from './api-config';
 import { isOnlineMode } from './app-mode';
 import { loadData, saveData } from './storage';
 import { appendConflicts, loadConflicts } from './sync-conflicts';
+import {
+  recordAppState,
+  recordDebounceArmed,
+  recordDebounceCancelled,
+  recordDebounceFired,
+  recordRetryArmed,
+  recordSyncAttempt,
+  recordSyncOutcome,
+  recordWs,
+  type GateReason,
+  type ScheduleCaller,
+  type SyncTrigger,
+} from './sync-diagnostics';
 import { assertCompatibleSyncContract } from './sync-contract';
 import {
   SYNC_ARRAY_KEYS,
@@ -188,8 +201,9 @@ function scheduleRetry(): void {
   _retryAttempt++;
   _retryTimer = setTimeout(() => {
     _retryTimer = null;
-    void doSync();
+    void doSync('retry');
   }, delay);
+  recordRetryArmed(delay, _retryAttempt);
   if (__DEV__) console.log(`[sync-engine] retry in ${delay / 1000}s (attempt ${_retryAttempt})`);
 }
 
@@ -218,11 +232,20 @@ export function describeSyncError(error: unknown): unknown {
 
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-function scheduleSync(debounceMs = 5000): void {
+/**
+ * `caller` — тільки для журналу. Слот `_debounceTimer` один на всі джерела
+ * (запис в outbox, сигнал сокета, повний синк, відкат курсора), і кожен новий
+ * виклик гасить попередній таймер незалежно від того, хто його ставив; без
+ * імені викликача в журналі не видно, чий саме тік з'їли.
+ */
+function scheduleSync(debounceMs = 5000, caller: ScheduleCaller = 'outbox'): void {
+  const replacedArmed = _debounceTimer != null;
   if (_debounceTimer) clearTimeout(_debounceTimer);
+  recordDebounceArmed(debounceMs, caller, replacedArmed);
   _debounceTimer = setTimeout(() => {
     _debounceTimer = null;
-    void doSync();
+    recordDebounceFired();
+    void doSync('debounce');
   }, debounceMs);
 }
 
@@ -584,10 +607,41 @@ async function exchangeV2(
 }
 
 let _syncing = false;
+/** Початок поточного обміну — потрібен лише журналу тривалості. */
+let _syncStartedAt = 0;
 
-async function doSync(): Promise<void> {
-  if (!isOnlineMode() || !_isAuthed || _syncing) return;
+/**
+ * Гейт не змінено: ті самі три перевірки в тому самому порядку. Різниця лише в
+ * тому, що тепер він має ім'я — інакше кожен мовчазний вихід звідси
+ * невідрізненний від «синк узагалі не викликали», а це рівно та розвилка, яку
+ * доводиться розплутувати, коли автоматика не їде, а кнопка їде.
+ */
+function currentGate(): GateReason | null {
+  if (!isOnlineMode()) return 'offline';
+  if (!_isAuthed) return 'notAuthed';
+  if (_syncing) return 'busy';
+  return null;
+}
+
+async function doSync(trigger: SyncTrigger): Promise<void> {
+  const gate = currentGate();
+  recordSyncAttempt(gate, trigger);
+  if (gate) {
+    // Закритий гейт СПАЛЮВАВ тригер, а не відкладав його. scheduleSync гасить
+    // свій таймер ще до виклику (див. вище), тож вихід звідси нічого не
+    // переозброював: мутація лишалась в outbox до наступної випадкової
+    // причини синхронізуватись — поллінгу через 5 хв, повернення з фону або
+    // кнопки. Найгірший випадок 'busy': інший обмін уже йде, тобто мережа й
+    // токен справні, а свіжий запис усе одно нікуди не їде.
+    //
+    // Переозброюємо тільки на 'busy'. Для 'offline' і 'notAuthed' крутити
+    // таймер марно — там стан міняється ззовні, і на зміну вже підписані свої
+    // шляхи (ефект авторизації, повернення з фону, перемикач режиму).
+    if (gate === 'busy') scheduleSync(1500, 'retryGate');
+    return;
+  }
   _syncing = true;
+  _syncStartedAt = Date.now();
   updateSyncState('syncing');
 
   try {
@@ -627,7 +681,7 @@ async function doSync(): Promise<void> {
         await generateFullOutbox();
         updatePendingFrom(await loadOutbox());
         updateSyncState('idle');
-        scheduleSync(500);
+        scheduleSync(500, 'rollback');
         return;
       }
 
@@ -694,10 +748,23 @@ async function doSync(): Promise<void> {
     clearRetryTimer();
     _retryAttempt = 0;
     updateSyncState('idle');
+    recordSyncOutcome('ok', Date.now() - _syncStartedAt);
+
+    // Outbox читається ОДИН раз на початку обміну. Усе, що користувач записав,
+    // поки обмін ішов, у цю відправку не потрапило, а власний scheduleSync
+    // такого запису застав _syncing = true й до цієї правки згорав на гейті.
+    // Умова саме «queued_at пізніший за початок обміну», а не «outbox не
+    // порожній»: інакше запис, який сервер стабільно відхиляє, крутив би
+    // цикл вічно.
+    const afterExchange = await loadOutbox();
+    if (afterExchange.some(item => item.queued_at > _syncStartedAt)) {
+      scheduleSync(1500, 'drain');
+    }
   } catch (error) {
     if (error instanceof OfflineError) {
       clearRetryTimer();
       updateSyncState('idle');
+      recordSyncOutcome('offline', Date.now() - _syncStartedAt);
     } else {
       const description = describeSyncError(error);
       if (__DEV__) console.warn('[sync-engine] syncNow error:', description);
@@ -705,6 +772,7 @@ async function doSync(): Promise<void> {
       await saveData(LAST_SYNC_ERROR_KEY, info);
       updateLastError(info);
       updateSyncState('error');
+      recordSyncOutcome('error', Date.now() - _syncStartedAt);
       if (isRetryableSyncError(error)) scheduleRetry();
       else clearRetryTimer();
     }
@@ -723,25 +791,27 @@ export async function flushPendingSync(): Promise<void> {
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
+    recordDebounceCancelled('flush');
   }
-  await doSync();
+  await doSync('flush');
 }
 
 export async function syncNow(): Promise<void> {
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
+    recordDebounceCancelled('syncNow');
   }
   clearRetryTimer();
   _retryAttempt = 0;
-  await doSync();
+  await doSync('button');
 }
 
 /** Повний синк із нуля: викликається після логіну/реєстрації (store/auth.tsx). */
 export async function triggerFullSync(): Promise<void> {
   await setServerCursor(0);
   await setRevisionMap({});
-  scheduleSync(500);
+  scheduleSync(500, 'fullSync');
 }
 
 /**
@@ -793,6 +863,9 @@ async function pruneRecordsMissingOnServer(seenKeys: Set<string>): Promise<void>
 export async function pullAllFromServer(): Promise<void> {
   if (!isOnlineMode() || !_isAuthed || _syncing) return;
   _syncing = true;
+  // Той самий штамп, що й у doSync: інакше панель показувала б тривалість
+  // попереднього обміну, поки триває цей.
+  _syncStartedAt = Date.now();
   updateSyncState('syncing');
   try {
     await saveOutbox([]);
@@ -847,23 +920,26 @@ function useUserSyncSocket(isAuthed: boolean): void {
       if (cancelled || !token) return;
 
       try {
+        recordWs('connecting');
         socket = new WebSocket(`${WS_BASE}/user/`, ['flowi-jwt', token]);
       } catch (error) {
         if (__DEV__) console.warn('[sync-engine] ws open failed:', error);
+        recordWs('failed');
         scheduleReconnect();
         return;
       }
 
-      socket.onopen = () => { attempt = 0; };
+      socket.onopen = () => { attempt = 0; recordWs('open'); };
       socket.onmessage = () => {
         // Дебаунс, а не миттєвий синк: сервер може прислати кілька сигналів
         // поспіль (наприклад, клієнт запушив батч), і кожен піднімав би
         // окремий обмін.
-        scheduleSync(800);
+        scheduleSync(800, 'ws');
       };
       socket.onerror = () => { /* onclose однаково спрацює */ };
       socket.onclose = () => {
         socket = null;
+        recordWs('closed');
         scheduleReconnect();
       };
     };
@@ -925,12 +1001,12 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
     setIsAuthed(isAuthed);
     // A cold app launch starts in the active AppState, so the foreground
     // listener below does not fire. Sync immediately once auth is restored.
-    if (isAuthed) void doSync();
+    if (isAuthed) void doSync('coldStart');
   }, [isAuthed]);
   useEffect(() => () => clearRetryTimer(), []);
   useEffect(() => {
     setSyncScheduler(scheduleSync);
-    return () => setSyncScheduler(() => {});
+    return () => setSyncScheduler(() => {}, 'noop');
   }, []);
   useEffect(() => {
     async function init() {
@@ -959,8 +1035,9 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
       const previous = appStateRef.current;
       appStateRef.current = next;
+      recordAppState(previous, next);
       if (previous !== 'active' && next === 'active') {
-        void doSync();
+        void doSync('foreground');
         return;
       }
       // Згортання: scheduleSync — це setTimeout на 5 с, а iOS призупиняє JS-
@@ -971,7 +1048,7 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
     return () => subscription.remove();
   }, []);
   useEffect(() => {
-    const id = setInterval(() => void doSync(), 5 * 60 * 1000);
+    const id = setInterval(() => void doSync('poll'), 5 * 60 * 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -984,6 +1061,36 @@ export function SyncProvider({ children, isAuthed }: { children: React.ReactNode
       {children}
     </Ctx.Provider>
   );
+}
+
+/**
+ * Живі значення гейта — саме модульні, не їхні React-двійники.
+ *
+ * Екран синхронізації досі судив про них за `online` з контексту, `authStatus`
+ * і `state`, а doSync питає геть інші змінні. Розбіжність між парами і є
+ * відповіддю на «кнопка ж активна, чому не їде».
+ */
+export interface SyncEngineFlags {
+  online: boolean;
+  isAuthed: boolean;
+  syncing: boolean;
+  /** Скільки триває поточний обмін; 0 — обміну немає. */
+  syncingForMs: number;
+  debounceArmed: boolean;
+  retryArmed: boolean;
+  retryAttempt: number;
+}
+
+export function getSyncEngineFlags(): SyncEngineFlags {
+  return {
+    online: isOnlineMode(),
+    isAuthed: _isAuthed,
+    syncing: _syncing,
+    syncingForMs: _syncing && _syncStartedAt > 0 ? Date.now() - _syncStartedAt : 0,
+    debounceArmed: _debounceTimer != null,
+    retryArmed: _retryTimer != null,
+    retryAttempt: _retryAttempt,
+  };
 }
 
 export function useSync(): SyncCtx {

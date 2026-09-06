@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SyncDiagnosticsPanel } from '@/components/shared/SyncDiagnosticsPanel';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppMode } from '@/store/app-mode';
@@ -254,6 +255,17 @@ export default function SyncScreen() {
                 </Text>
               </TouchableOpacity>
             </BlurView>
+
+            {/* ── ЧОМУ НЕ ПОЇХАЛО САМЕ ──
+                Картка вище відповідає за останній обмін, а це — про тригер:
+                чи взагалі хтось збирався синхронізувати без натискання кнопки.
+                Поки ланцюг цілий, панель згорнута в один рядок. */}
+            <SyncDiagnosticsPanel
+              c={c}
+              uiOnline={online}
+              uiAuthStatus={authStatus}
+              uiSyncState={syncState}
+            />
 
             {/* ── КАРАНТИН ── */}
             {rejected.length > 0 && (

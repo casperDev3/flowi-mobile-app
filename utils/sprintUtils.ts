@@ -245,6 +245,174 @@ export function projectBacklogTasks<T extends SprintTaskLike>(
   );
 }
 
+/**
+ * Відкриті спринти проєкту — у порядку sortSprints. Без проєкту — порожньо.
+ * Дзеркало веб-версії (lib/sprints.ts openSprintsForProject).
+ */
+export function openSprintsForProject<T extends Sprint>(
+  sprints: readonly T[],
+  projectId: string | undefined | null,
+): T[] {
+  if (!projectId) return [];
+  return sprintsForProject(sprints, projectId).filter(sprint => !isSprintClosed(sprint));
+}
+
+/** Варіант поля «Спринт» у формі задачі. */
+export interface SprintOption {
+  id: string;
+  name: string;
+  closed: boolean;
+  /** Спринт іншого проєкту або невідомий id (правка з іншого пристрою). */
+  foreign: boolean;
+}
+
+/**
+ * Варіанти поля «Спринт»: відкриті спринти проєкту ПЛЮС поточний спринт
+ * задачі, якщо він закритий, чужий чи невідомий.
+ *
+ * Без доповнення поле не мало б чим показати поточне значення й мовчки
+ * показувало б «Беклог», а перше ж збереження перенесло б задачу. «Беклог»
+ * (відсутність спринта) сюди НЕ входить — це окремий варіант UI.
+ * Дзеркало веб-версії (lib/sprints.ts sprintOptionsForTask).
+ */
+export function sprintOptionsForTask(
+  sprints: readonly Sprint[],
+  projectId: string | undefined | null,
+  currentSprintId: string | undefined | null,
+): SprintOption[] {
+  const options: SprintOption[] = openSprintsForProject(sprints, projectId).map(sprint => ({
+    id: sprint.id,
+    name: sprint.name,
+    closed: false,
+    foreign: false,
+  }));
+  if (currentSprintId && !options.some(option => option.id === currentSprintId)) {
+    const current = sprints.find(sprint => sprint.id === currentSprintId);
+    options.push({
+      id: currentSprintId,
+      name: current?.name ?? '',
+      closed: current ? isSprintClosed(current) : false,
+      foreign: !current || current.projectId !== projectId,
+    });
+  }
+  return options;
+}
+
+/**
+ * Підпис варіанта. Рядки приходять ззовні (tr): утиліта мовно-нейтральна.
+ * «Назва (закритий)» / «Інший проєкт» — як на вебі.
+ */
+export function sprintOptionLabel(
+  option: SprintOption,
+  labels: { closedSuffix: string; foreign: string },
+): string {
+  if (option.foreign) return labels.foreign;
+  return option.closed ? `${option.name} ${labels.closedSuffix}` : option.name;
+}
+
+/** Поле «Спринт» видно, лише коли проєкт обрано і є з чого вибирати. */
+export function sprintFieldVisible(
+  sprints: readonly Sprint[],
+  projectId: string | undefined | null,
+  currentSprintId?: string | null,
+): boolean {
+  return Boolean(projectId) && sprintOptionsForTask(sprints, projectId, currentSprintId).length > 0;
+}
+
+/**
+ * Спринт задачі при збереженні форми (створення й правка).
+ *
+ * `base` — задача, до якої вже застосовано retargetTaskProject: якщо проєкт
+ * мінявся, sprintId у ній уже знято; якщо ні — лежить справжній.
+ *   - Беклог (null/порожньо) → ключ sprintId ВИДАЛЕНО (clearTaskSprint).
+ *   - Вибір збігся з поточним sprintId → задача як є, навіть якщо спринт
+ *     закритий, чужий чи невідомий: правка назви не переносить задачу.
+ *   - Інакше — assignTaskToSprint (projectId зі спринта). Невідомий id
+ *     (спринт видалили, поки форма була відкрита) → беклог.
+ * Дзеркало веб-версії (lib/sprints.ts applyFormSprint).
+ */
+export function applyFormSprint<T extends Omit<SprintTaskLike, 'id' | 'status'>>(
+  base: T,
+  sprints: readonly Sprint[],
+  chosenSprintId: string | null | undefined,
+): T {
+  if (!chosenSprintId) {
+    if (!('sprintId' in base)) return base;
+    const { sprintId: _removed, ...rest } = base;
+    void _removed;
+    return rest as T;
+  }
+  if (chosenSprintId === base.sprintId) return base;
+  const sprint = sprints.find(item => item.id === chosenSprintId);
+  if (!sprint) {
+    const { sprintId: _removed, ...rest } = base;
+    void _removed;
+    return rest as T;
+  }
+  return { ...base, projectId: sprint.projectId, sprintId: sprint.id };
+}
+
+/** Група попапа проєкту. `sprint: null` — «Беклог». */
+export interface ProjectTaskGroup<T> {
+  sprint: Sprint | null;
+  tasks: T[];
+  closed: boolean;
+}
+
+/**
+ * Групи попапа проєкту: по групі на кожен спринт проєкту (порядок
+ * sortSprints — відкриті, потім закриті) і «Беклог» ОСТАННІМ, завжди.
+ *
+ * Задачі — задачі проєкту ПЛЮС ті, що лежать у його спринтах (навіть якщо
+ * projectId задачі розійшовся — див. коментар до selectedTasks у
+ * app/projects.tsx). Посилання на невідомий чи чужий спринт у задачі цього
+ * проєкту рахується беклогом — те саме правило, що projectBacklogTasks.
+ * Порядок задач усередині групи — порядок вхідного масиву.
+ *
+ * Дзеркало веб-версії (lib/sprints.ts projectTaskGroups): однакові дані мусять
+ * давати однакові групи на обох клієнтах.
+ */
+export function projectTaskGroups<T extends SprintTaskLike>(
+  tasks: readonly T[],
+  sprints: readonly Sprint[],
+  projectId: string,
+): ProjectTaskGroup<T>[] {
+  const own = sprintsForProject(sprints, projectId);
+  const known = new Set(own.map(sprint => sprint.id));
+  const bySprint = new Map<string, T[]>(own.map(sprint => [sprint.id, []]));
+  const backlog: T[] = [];
+  for (const task of tasks) {
+    if (task.sprintId && known.has(task.sprintId)) {
+      bySprint.get(task.sprintId)!.push(task);
+    } else if (task.projectId === projectId) {
+      backlog.push(task);
+    }
+  }
+  return [
+    ...own.map(sprint => ({
+      sprint,
+      tasks: bySprint.get(sprint.id) ?? [],
+      closed: isSprintClosed(sprint),
+    })),
+    { sprint: null, tasks: backlog, closed: false },
+  ];
+}
+
+/** Ключ групи «Беклог» у стані згортання — id спринта таким бути не може. */
+export const BACKLOG_GROUP_KEY = '__backlog';
+
+/**
+ * Чи розгорнута група: явне перемикання людини, інакше — відкриті спринти
+ * (і беклог) розгорнуті, закриті згорнуті.
+ */
+export function isTaskGroupExpanded(
+  expanded: Readonly<Record<string, boolean>>,
+  key: string,
+  closed: boolean,
+): boolean {
+  return expanded[key] ?? !closed;
+}
+
 export interface SprintProgress {
   total: number;
   done: number;

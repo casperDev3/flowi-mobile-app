@@ -8,6 +8,11 @@
 
 import {
   SPRINT_BADGE_SEPARATOR,
+  applyFormSprint,
+  openSprintsForProject,
+  sprintFieldVisible,
+  sprintOptionLabel,
+  sprintOptionsForTask,
   assignTaskToSprint,
   clearTaskSprint,
   createSprint,
@@ -15,7 +20,10 @@ import {
   isSprintClosed,
   moveOpenSprintTasks,
   newSprintId,
+  BACKLOG_GROUP_KEY,
+  isTaskGroupExpanded,
   projectBacklogTasks,
+  projectTaskGroups,
   removeProjectSprints,
   renameSprint,
   retargetTaskProject,
@@ -283,5 +291,103 @@ describe('висяче посилання на спринт', () => {
     ] as never[];
     expect(projectBacklogTasks(list, 'p1', known).map((t: { id: string }) => t.id)).toEqual(['b', 'c']);
     expect(sprintTasks(list, 's1').map((t: { id: string }) => t.id)).toEqual(['a']);
+  });
+});
+
+describe('projectTaskGroups — групи попапа проєкту', () => {
+  const closedWeek: Sprint = { ...week1, id: 's0', name: 'Минулий', closedAt: '2026-01-05T00:00:00.000Z' };
+  const tasks: SprintTaskLike[] = [
+    { id: 'a', projectId: 'p1', sprintId: 's1', status: 'active' },
+    { id: 'b', projectId: 'p1', status: 'active' },
+    { id: 'c', projectId: 'p1', sprintId: 'ghost', status: 'active' },
+    { id: 'd', projectId: 'p2', sprintId: 's2', status: 'done' },   // розійшовся projectId — лишається у спринті
+    { id: 'e', projectId: 'p2', status: 'active' },                 // чужий проєкт — ніде
+    { id: 'f', projectId: 'p1', sprintId: 's3', status: 'active' }, // спринт іншого проєкту — беклог
+    { id: 'g', projectId: 'p1', sprintId: 's0', status: 'done' },
+  ];
+
+  it('спринти у порядку sortSprints (закриті в кінці), беклог — останнім', () => {
+    const groups = projectTaskGroups(tasks, [closedWeek, week2, otherProject, week1], 'p1');
+    expect(groups.map(g => g.sprint?.id ?? null)).toEqual(['s1', 's2', 's0', null]);
+    expect(groups.map(g => g.closed)).toEqual([false, false, true, false]);
+    expect(groups.map(g => g.tasks.map(t => t.id))).toEqual([['a'], ['d'], ['g'], ['b', 'c', 'f']]);
+  });
+
+  it('без спринтів — лише беклог (навіть порожній)', () => {
+    expect(projectTaskGroups([], [], 'p1')).toEqual([{ sprint: null, tasks: [], closed: false }]);
+  });
+
+  it('кожна задача потрапляє не більше ніж в одну групу', () => {
+    const groups = projectTaskGroups(tasks, [week1, week2, closedWeek], 'p1');
+    const ids = groups.flatMap(g => g.tasks.map(t => t.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe('isTaskGroupExpanded', () => {
+  it('за замовчуванням відкриті розгорнуті, закриті згорнуті', () => {
+    expect(isTaskGroupExpanded({}, 's1', false)).toBe(true);
+    expect(isTaskGroupExpanded({}, 's0', true)).toBe(false);
+    expect(isTaskGroupExpanded({}, BACKLOG_GROUP_KEY, false)).toBe(true);
+  });
+
+  it('явне перемикання перемагає замовчування', () => {
+    expect(isTaskGroupExpanded({ s0: true }, 's0', true)).toBe(true);
+    expect(isTaskGroupExpanded({ s1: false }, 's1', false)).toBe(false);
+  });
+});
+
+describe('поле «Спринт» у формі задачі', () => {
+  const closed: Sprint = { ...week1, id: 'sc', name: 'Старий', closedAt: '2026-01-05T00:00:00.000Z' };
+  const foreign: Sprint = { ...week1, id: 'x', projectId: 'p2', name: 'Чужий' };
+  const all = [week2, closed, foreign, week1];
+  const labels = { closedSuffix: '(закритий)', foreign: 'Інший проєкт' };
+
+  it('openSprintsForProject — лише відкриті свого проєкту, у порядку показу', () => {
+    expect(openSprintsForProject(all, 'p1').map(s => s.id)).toEqual(['s1', 's2']);
+    expect(openSprintsForProject(all, undefined)).toEqual([]);
+    expect(openSprintsForProject(all, null)).toEqual([]);
+  });
+
+  it('sprintOptionsForTask — відкриті + поточний закритий/чужий/невідомий, без дублів', () => {
+    expect(sprintOptionsForTask(all, 'p1', undefined).map(o => o.id)).toEqual(['s1', 's2']);
+    expect(sprintOptionsForTask(all, 'p1', 's1').map(o => o.id)).toEqual(['s1', 's2']);
+    const withClosed = sprintOptionsForTask(all, 'p1', 'sc');
+    expect(withClosed[2]).toEqual({ id: 'sc', name: 'Старий', closed: true, foreign: false });
+    expect(sprintOptionLabel(withClosed[2], labels)).toBe('Старий (закритий)');
+    const withForeign = sprintOptionsForTask(all, 'p1', 'x');
+    expect(withForeign[2].foreign).toBe(true);
+    expect(sprintOptionLabel(withForeign[2], labels)).toBe('Інший проєкт');
+    expect(sprintOptionsForTask(all, 'p1', 'ghost')[2]).toEqual({ id: 'ghost', name: '', closed: false, foreign: true });
+    expect(sprintOptionLabel(sprintOptionsForTask(all, 'p1', null)[0], labels)).toBe('Тиждень 1');
+  });
+
+  it('sprintFieldVisible — потрібні проєкт і хоча б один варіант', () => {
+    const list = [week1, { ...closed, projectId: 'p3' }];
+    expect(sprintFieldVisible(list, 'p1')).toBe(true);
+    expect(sprintFieldVisible(list, 'p2')).toBe(false);
+    expect(sprintFieldVisible(list, 'p3')).toBe(false);
+    expect(sprintFieldVisible(list, 'p3', 'sc')).toBe(true);
+    expect(sprintFieldVisible(list, undefined, 's1')).toBe(false);
+  });
+
+  it('applyFormSprint — беклог видаляє ключ, збіг із поточним лишає задачу як є', () => {
+    const inSprint = { id: 't', status: 'active', projectId: 'p1', sprintId: 's1' };
+    const detached = applyFormSprint(inSprint, all, null);
+    expect('sprintId' in detached).toBe(false);
+    expect('sprintId' in applyFormSprint(inSprint, all, '')).toBe(false);
+    const inClosed = { id: 't', status: 'active', projectId: 'p1', sprintId: 'sc' };
+    expect(applyFormSprint(inClosed, all, 'sc')).toBe(inClosed);
+    const inGhost = { id: 't', status: 'active', projectId: 'p1', sprintId: 'ghost' };
+    expect(applyFormSprint(inGhost, all, 'ghost')).toBe(inGhost);
+    const plain = { id: 't', status: 'active', projectId: 'p1' };
+    expect(applyFormSprint(plain, all, null)).toBe(plain);
+  });
+
+  it('applyFormSprint — новий вибір кладе у спринт (projectId зі спринта), невідомий → беклог', () => {
+    expect(applyFormSprint({ projectId: 'p1' }, all, 's2')).toEqual({ projectId: 'p1', sprintId: 's2' });
+    expect(applyFormSprint({ projectId: 'p1' }, all, 'x')).toEqual({ projectId: 'p2', sprintId: 'x' });
+    const vanished = applyFormSprint({ projectId: 'p1', sprintId: 's1' }, all, 'gone');
+    expect('sprintId' in vanished).toBe(false);
   });
 });

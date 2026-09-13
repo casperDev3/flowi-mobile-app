@@ -59,6 +59,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { route: '/projects',    icon: 'folder',          labelKey: 'projects' },
       { route: '/meetings',    icon: 'calendar',        labelKey: 'meetings' },
       { route: '/budget',      icon: 'chart.pie.fill',  labelKey: 'navBudget' },
+      { route: '/subscriptions', icon: 'repeat',        labelKey: 'navSubscriptions' },
       { route: '/containers',  icon: 'shippingbox.fill',labelKey: 'containers' },
       { route: '/(tabs)/shared', icon: 'person.2.fill', labelKey: 'sharedTitle' },
     ],
@@ -133,6 +134,34 @@ export function isRouteActive(route: string, pathname: string): boolean {
  * На широкому екрані панелі немає — див. useTabBarInset().
  */
 export const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 88 : 68;
+
+/**
+ * Висота глобальної панелі активних таймерів (components/time/ActiveTimersBar),
+ * що на телефоні стоїть просто над панеллю табів — як міні-плеєр.
+ *
+ * Живе поруч із TAB_BAR_HEIGHT з тієї ж причини: її мусять знати і сама
+ * панель, і кожен екран вкладок, щоб останній рядок і FAB не ховались під нею.
+ */
+export const ACTIVE_TIMERS_BAR_HEIGHT = 52;
+
+/**
+ * Чи видно панель активних таймерів над табами.
+ *
+ * Лише на вузькому екрані: на широкому табів немає, і ту саму роль грає
+ * картка внизу сайдбара (components/time/ActiveTimersSidebarCard).
+ */
+export function activeTimersBarVisible(isWide: boolean, timersCount: number): boolean {
+  return !isWide && Number.isFinite(timersCount) && timersCount > 0;
+}
+
+/**
+ * Скільки місця знизу з'їдають таб-бар і (коли видно) панель таймерів.
+ * Чиста арифметика для useTabBarInset — окремо, щоб перевірити без рендера.
+ */
+export function tabBarInsetFor(isWide: boolean, timersCount: number): number {
+  if (isWide) return 0;
+  return TAB_BAR_HEIGHT + (activeTimersBarVisible(isWide, timersCount) ? ACTIVE_TIMERS_BAR_HEIGHT : 0);
+}
 
 // ─── Ширина, доступна екрану ──────────────────────────────────────────────────
 

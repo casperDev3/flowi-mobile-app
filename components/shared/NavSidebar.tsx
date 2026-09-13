@@ -24,6 +24,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ActiveTimersSidebarCard } from '@/components/time/ActiveTimersSidebarCard';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   DEFAULT_COLLAPSED_GROUP_IDS,
@@ -82,7 +83,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
       accessibilityRole="menu">
       <Text style={[st.brand, { color: c.accent }]}>Flowi</Text>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
         {NAV_GROUPS.map((group, gi) => {
           const hidden = isGroupCollapsed(group, collapsed, pathname);
           // Заголовок групи, яку можна згорнути, — кнопка; решта лишається
@@ -143,6 +144,13 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
           );
         })}
       </ScrollView>
+
+      {/* Активні таймери — ПОЗА скролом, притиснуті до низу: зупинити таймер
+          мусить бути можна з будь-якого розділу без прокрутки сайдбара.
+          Картка сама ховається, коли таймерів немає. */}
+      <View style={{ paddingBottom: insets.bottom + 10 }}>
+        <ActiveTimersSidebarCard colors={c} />
+      </View>
     </View>
   );
 }

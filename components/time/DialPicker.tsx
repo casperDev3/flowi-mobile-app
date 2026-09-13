@@ -41,12 +41,23 @@ export interface DialPickerProps {
   timerLabel: string;
   onSelect: (id: DialId) => void;
   onClose: () => void;
+  /**
+   * Глобальний типовий циферблат (синхронізований, timer_dial_prefs). Разом із
+   * onMakeDefault вмикає «Зробити типовим»: кнопку для циферблата цього
+   * таймера і довге натискання на будь-якій клітинці.
+   */
+  defaultDial?: DialId;
+  onMakeDefault?: (id: DialId) => void;
   colors: DialPickerColors;
   isDark: boolean;
   tr: Translations;
 }
 
-export function DialPicker({ visible, dial, timerLabel, onSelect, onClose, colors: c, isDark, tr }: DialPickerProps) {
+export function DialPicker({
+  visible, dial, timerLabel, onSelect, onClose, defaultDial, onMakeDefault, colors: c, isDark, tr,
+}: DialPickerProps) {
+  const canMakeDefault = Boolean(onMakeDefault);
+  const dialIsDefault = defaultDial !== undefined && dial === defaultDial;
   const insets = useSafeAreaInsets();
   const { isWide } = useResponsive();
 
@@ -101,8 +112,10 @@ export function DialPicker({ visible, dial, timerLabel, onSelect, onClose, color
               <Pressable
                 key={meta.id}
                 onPress={() => { onSelect(meta.id); onClose(); }}
+                onLongPress={canMakeDefault ? () => onMakeDefault?.(meta.id) : undefined}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
+                accessibilityHint={canMakeDefault ? tr.dialMakeDefaultHint : undefined}
                 style={{ width: cellWidth }}>
                 <BlurView
                   intensity={isDark ? 20 : 40}
@@ -131,11 +144,41 @@ export function DialPicker({ visible, dial, timerLabel, onSelect, onClose, color
                     style={[st.name, { color: active ? c.accent : c.sub, fontWeight: active ? '700' : '600' }]}>
                     {String(tr[meta.labelKey])}
                   </Text>
+                  {canMakeDefault && meta.id === defaultDial && (
+                    <View style={[st.defaultTag, { borderColor: c.accent }]}>
+                      <IconSymbol name="star.fill" size={9} color={c.accent} />
+                      <Text style={[st.defaultTagText, { color: c.accent }]}>{tr.dialIsDefault}</Text>
+                    </View>
+                  )}
                 </BlurView>
               </Pressable>
             );
           })}
         </ScrollView>
+
+        {canMakeDefault && (
+          // Дія над циферблатом ЦЬОГО таймера: обрати вигляд тапом по клітинці,
+          // а тоді зробити його типовим для всіх таймерів без власного вибору.
+          <Pressable
+            onPress={() => { if (!dialIsDefault) onMakeDefault?.(dial); }}
+            disabled={dialIsDefault}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: dialIsDefault }}
+            style={({ pressed }) => [
+              st.makeDefault,
+              {
+                borderColor: dialIsDefault ? c.border : c.accent,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}>
+            <IconSymbol name="star.fill" size={13} color={dialIsDefault ? c.sub : c.accent} />
+            <Text numberOfLines={1} style={[st.makeDefaultText, { color: dialIsDefault ? c.sub : c.accent }]}>
+              {dialIsDefault
+                ? `${tr.dialIsDefault}: ${String(tr[DIALS.find(d => d.id === dial)?.labelKey ?? 'dialDigits'])}`
+                : `${tr.dialMakeDefault}: ${String(tr[DIALS.find(d => d.id === dial)?.labelKey ?? 'dialDigits'])}`}
+            </Text>
+          </Pressable>
+        )}
       </View>
     </Modal>
   );
@@ -166,4 +209,14 @@ const st = StyleSheet.create({
   },
   preview: { height: PREVIEW_SIZE + 24, alignItems: 'center', justifyContent: 'center' },
   name:    { fontSize: 12 },
+  defaultTag: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1,
+  },
+  defaultTagText: { fontSize: 10, fontWeight: '700' },
+  makeDefault: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    minHeight: 44, borderRadius: 14, borderWidth: 1, marginTop: 8, paddingHorizontal: 12,
+  },
+  makeDefaultText: { fontSize: 14, fontWeight: '600' },
 });

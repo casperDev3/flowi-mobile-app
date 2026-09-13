@@ -38,6 +38,20 @@ export interface MeetingFormData {
   notes?: string;
   color: string;
   recurrence?: RecurrenceRule;
+  /**
+   * Проєкт зустрічі (CONTRACT §C.1): один на всю серію повторів. Відсутній —
+   * без проєкту. Невідомий id форма НЕ викидає: показує «Без проєкту», але
+   * повертає id як був, поки людина сама не обере інше.
+   */
+  projectId?: string;
+}
+
+/** Мінімум проєкту для вибору в формі зустрічі. */
+export interface MeetingFormProject {
+  id: string;
+  name: string;
+  color: string;
+  archivedAt?: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -135,11 +149,17 @@ interface Props {
   lang: string;
   tr: any;
   markedDays?: Set<string>;
+  /** Проєкти для поля «Проєкт». Без пропа (чи порожній список) поля немає. */
+  projects?: readonly MeetingFormProject[];
+  /** Проєкт, обраний наперед для НОВОЇ зустрічі (створення з деталі проєкту). */
+  presetProjectId?: string;
 }
+
+const NO_PROJECTS: readonly MeetingFormProject[] = [];
 
 export function MeetingFormSheet({
   visible, initial, presetDate, onClose, onSave, onDelete,
-  isDark, lang, tr, markedDays = new Set(),
+  isDark, lang, tr, markedDays = new Set(), projects = NO_PROJECTS, presetProjectId,
 }: Props) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const isUk = lang === 'uk';
@@ -162,6 +182,7 @@ export function MeetingFormSheet({
   const [fLink, setFLink] = useState('');
   const [fNotes, setFNotes] = useState('');
   const [fColor, setFColor] = useState(MEETING_COLORS[0]);
+  const [fProjectId, setFProjectId] = useState<string | undefined>(undefined);
   const [showCal, setShowCal] = useState(false);
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
@@ -186,6 +207,7 @@ export function MeetingFormSheet({
       setFDuration(m.durationMinutes); setFDurationText(String(m.durationMinutes));
       setFLocation(m.location ?? ''); setFLink(m.link ?? '');
       setFNotes(m.notes ?? ''); setFColor(m.color); setShowCal(false);
+      setFProjectId(m.projectId || undefined);
       const d = new Date(m.date + 'T00:00');
       setCalYear(d.getFullYear()); setCalMonth(d.getMonth());
       const rule = m.recurrence;
@@ -204,13 +226,14 @@ export function MeetingFormSheet({
       setFDuration(60); setFDurationText('60');
       setFLocation(''); setFLink(''); setFNotes('');
       setFColor(MEETING_COLORS[0]); setShowCal(false);
+      setFProjectId(presetProjectId || undefined);
       const d = presetDate ? new Date(presetDate + 'T00:00') : today;
       setCalYear(d.getFullYear()); setCalMonth(d.getMonth());
       setFRepeat(false); setFRepeatFreq('weekly'); setFRepeatInterval(1); setFRepeatDays([]);
       setFRepeatEndType('never'); setFRepeatUntil(''); setShowRepeatUntilCal(false);
       setRepeatUntilCalYear(today.getFullYear()); setRepeatUntilCalMonth(today.getMonth());
     }
-  }, [visible, initial, presetDate]);
+  }, [visible, initial, presetDate, presetProjectId]);
 
   const handleSave = () => {
     if (!fTitle.trim() || !fDate) return;
@@ -228,6 +251,7 @@ export function MeetingFormSheet({
       link: fLink.trim() || undefined,
       notes: fNotes.trim() || undefined,
       color: fColor, recurrence,
+      projectId: fProjectId,
     });
   };
 
@@ -244,6 +268,12 @@ export function MeetingFormSheet({
   };
 
   const wdShort = isUk ? WD_SHORT_UK : WD_SHORT_EN;
+  // Живі проєкти + поточний, навіть якщо його заархівували: інакше підпис
+  // уже призначеного проєкту зник би з форми.
+  const projectOptions = projects.filter(p => !p.archivedAt || p.id === fProjectId);
+  const knownProject = fProjectId ? projects.some(p => p.id === fProjectId) : false;
+  const projectLabel: string = tr?.project ?? (isUk ? 'Проєкт' : 'Project');
+  const noProjectLabel: string = tr?.noProject ?? (isUk ? 'Без проєкту' : 'No project');
   const canSave = fTitle.trim().length > 0 && fDate.length > 0;
 
   return (
@@ -401,6 +431,35 @@ export function MeetingFormSheet({
                   </View>
                 </View>
 
+                {/* Project — чипи, а не PickerField: форма сама є модалкою, і
+                    друга модалка поверх неї на iOS не показується надійно. */}
+                {projectOptions.length > 0 && (
+                  <View style={{ marginBottom: 10 }}>
+                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                      {projectLabel}
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {[{ id: undefined as string | undefined, name: noProjectLabel, color: c.sub }, ...projectOptions].map(p => {
+                          const on = p.id ? p.id === fProjectId : !knownProject;
+                          return (
+                            <TouchableOpacity
+                              key={p.id ?? '__none'}
+                              onPress={() => setFProjectId(p.id)}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: on }}
+                              accessibilityLabel={`${projectLabel}: ${p.name}`}
+                              style={[s.chip, { borderColor: on ? (p.id ? p.color : fColor) : c.border, backgroundColor: on ? (p.id ? p.color : fColor) + '18' : c.dim }]}>
+                              {p.id ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.color }} /> : null}
+                              <Text numberOfLines={1} style={{ color: on ? c.text : c.sub, fontSize: 12, fontWeight: '600', maxWidth: 160 }}>{p.name}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </ScrollView>
+                  </View>
+                )}
+
                 {/* Recurrence toggle */}
                 <TouchableOpacity onPress={() => setFRepeat(v => !v)}
                   style={[s.pill, { borderColor: fRepeat ? fColor + '55' : c.border, backgroundColor: fRepeat ? fColor + '10' : c.dim, marginBottom: 10 }]}>
@@ -541,5 +600,6 @@ const s = StyleSheet.create({
   sheet:   { borderRadius: 22, borderWidth: 1, padding: 16, overflow: 'hidden', maxHeight: '92%' },
   inp:     { borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontWeight: '600', borderWidth: 1.5 },
   pill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 9 },
+  chip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
   btn:     { paddingVertical: 11, borderRadius: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

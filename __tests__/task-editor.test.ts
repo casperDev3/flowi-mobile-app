@@ -1,4 +1,5 @@
 import {
+  draftCurrentSprintId,
   draftEstimatedMinutes,
   draftRecurrence,
   taskToDraft,
@@ -56,6 +57,31 @@ describe('taskToDraft', () => {
   });
 });
 
+describe('taskToDraft — спринт', () => {
+  it('без спринта — беклог (null)', () => {
+    expect(taskToDraft(base, 'col').sprintId).toBeNull();
+  });
+
+  it('поточний спринт переноситься дослівно', () => {
+    const d = taskToDraft({ ...base, projectId: 'p1', sprintId: 's-closed' }, 'col');
+    expect(d.projectId).toBe('p1');
+    expect(d.sprintId).toBe('s-closed');
+  });
+});
+
+describe('draftCurrentSprintId', () => {
+  test('обраний у чернетці спринт — він', () => {
+    expect(draftCurrentSprintId({ projectId: 'p1', sprintId: 's1' }, { projectId: 'p1', sprintId: 's0' })).toBe('s1');
+  });
+  test('«Беклог» при тому ж проєкті — вихідний спринт', () => {
+    expect(draftCurrentSprintId({ projectId: 'p1', sprintId: null }, { projectId: 'p1', sprintId: 's0' })).toBe('s0');
+  });
+  test('інший проєкт або створення — null', () => {
+    expect(draftCurrentSprintId({ projectId: 'p2', sprintId: null }, { projectId: 'p1', sprintId: 's0' })).toBeNull();
+    expect(draftCurrentSprintId({ projectId: 'p1', sprintId: null }, null)).toBeNull();
+  });
+});
+
 describe('draftEstimatedMinutes', () => {
   const d = (estHours: string, estMins: string) => ({ ...taskToDraft(base, 'c'), estHours, estMins });
 
@@ -108,9 +134,26 @@ describe('обіг завдання через чернетку', () => {
 
     expect(d.title).toBe(task.title);
     expect(d.desc).toBe(task.description);
-    expect(d.priority).toBe(task.priority);
+    expect(d.priorityLevel).toBe(1); // легасі 'high' → P1
     expect(d.deadline).toBe(task.deadline);
     expect(draftEstimatedMinutes(d)).toBe(task.estimatedMinutes);
     expect(draftRecurrence(d)).toEqual(task.recurrence);
+  });
+});
+
+describe('завдання без пріоритету (старі записи з деталі проєкту)', () => {
+  it('чернетка показує «без пріоритету», а не падає', () => {
+    const legacy = { title: 'З попапа' } as EditableTask;
+    expect(taskToDraft(legacy, 'col').priorityLevel).toBeNull();
+    const broken = { title: 'Биті дані', priority: 'urgent' } as unknown as EditableTask;
+    expect(taskToDraft(broken, 'col').priorityLevel).toBeNull();
+  });
+});
+
+describe('пріоритет P0–P5 у чернетці (CONTRACT §B.5)', () => {
+  it('новий рівень читається як є, розбіжність з легасі — перемагає легасі', () => {
+    expect(taskToDraft({ title: 'a', priority: 'high', priorityLevel: 0 }, 'c').priorityLevel).toBe(0);
+    expect(taskToDraft({ title: 'a', priority: 'low', priorityLevel: 0 }, 'c').priorityLevel).toBe(4);
+    expect(taskToDraft({ title: 'a', priority: 'low', priorityLevel: null }, 'c').priorityLevel).toBeNull();
   });
 });

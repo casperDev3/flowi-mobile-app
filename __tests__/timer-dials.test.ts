@@ -8,7 +8,24 @@
  */
 
 import { allTranslations } from '../store/translations';
-import { DEFAULT_DIAL, DIALS, dialForTimer, parseDialId, pruneDialMap } from '../utils/timerDials';
+import {
+  DEFAULT_DIAL,
+  DIALS,
+  TIMER_DIAL_PREFS_KEY,
+  dialForTimer,
+  emptyDialPrefs,
+  mergeLocalDials,
+  parseDialId,
+  preserveDialPrefs,
+  pruneAdhocDials,
+  pruneDialMap,
+  resolveDial,
+  sanitizeDialPrefs,
+  withDefaultDial,
+  withTimerDial,
+  type TimerDialPrefs,
+} from '../utils/timerDials';
+import { SYNC_ARRAY_KEYS, SYNC_SINGLETON_KEYS } from '../store/sync-contract';
 import { timerDialSize } from '../utils/timerGrid';
 
 describe('маніфест циферблатів', () => {
@@ -114,5 +131,231 @@ describe('pruneDialMap', () => {
 
   it('порожній список живих очищає мапу повністю', () => {
     expect(pruneDialMap({ 'task:1': 'arc' } as never, [])).toEqual({});
+  });
+});
+
+// ─── Синхронізований вибір (CONTRACT.md §F.2) ─────────────────────────────────
+
+describe('timer_dial_prefs — контракт ключа', () => {
+  it('singleton, а не масив, і назва відрізняється від локального timer_dials', () => {
+    expect(TIMER_DIAL_PREFS_KEY).toBe('timer_dial_prefs');
+    expect(SYNC_SINGLETON_KEYS).toContain('timer_dial_prefs');
+    expect(SYNC_ARRAY_KEYS as readonly string[]).not.toContain('timer_dial_prefs');
+    // Локальний ключ ніколи не синхронізується: рушій затер би його форму.
+    expect([...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS] as string[]).not.toContain('timer_dials');
+  });
+});
+
+describe('sanitizeDialPrefs', () => {
+  it('сміття → порожні налаштування з цифрами', () => {
+    for (const junk of [null, undefined, 42, 'rings', [], true]) {
+      expect(sanitizeDialPrefs(junk)).toEqual({ version: 1, defaultDial: 'digits', timers: {} });
+    }
+  });
+
+  it('відкидає невідомі циферблати, лишає чинні', () => {
+    const out = sanitizeDialPrefs({
+      version: 1,
+      defaultDial: 'pulse',
+      timers: { 'task:1': 'rings', 'task:2': 'pulse', 'adhoc:x': 42 },
+    });
+    expect(out.defaultDial).toBe('digits');
+    expect(out.timers).toEqual({ 'task:1': 'rings' });
+  });
+
+  it('невідомі поля верхнього рівня переживають нормалізацію (їх міг писати новіший клієнт)', () => {
+    const out = sanitizeDialPrefs({ version: 1, defaultDial: 'arc', timers: {}, futureField: { a: 1 }, updatedAt: '2026-01-01T00:00:00.000Z' });
+    expect(out.futureField).toEqual({ a: 1 });
+    expect(out.updatedAt).toBe('2026-01-01T00:00:00.000Z');
+    expect(out.defaultDial).toBe('arc');
+  });
+
+  it('timers не об’єкт → порожня мапа', () => {
+    expect(sanitizeDialPrefs({ defaultDial: 'arc', timers: ['rings'] }).timers).toEqual({});
+  });
+});
+
+describe('resolveDial — порядок: синхронізований → локальний → типовий → цифри', () => {
+  const prefs: TimerDialPrefs = { version: 1, defaultDial: 'orbit', timers: { 'task:1': 'rings' } };
+
+  it('синхронізований персональний вибір виграє в локального', () => {
+    expect(resolveDial(prefs, 'task:1', { 'task:1': 'tape' })).toBe('rings');
+  });
+
+  it('старий локальний вибір виграє в типового', () => {
+    expect(resolveDial(prefs, 'task:2', { 'task:2': 'tape' })).toBe('tape');
+  });
+
+  it('без жодного вибору — типовий', () => {
+    expect(resolveDial(prefs, 'task:3', {})).toBe('orbit');
+    expect(resolveDial(prefs, 'task:3')).toBe('orbit');
+  });
+
+  it('без налаштувань узагалі — цифри', () => {
+    expect(resolveDial(null, 'task:1')).toBe('digits');
+    expect(resolveDial(undefined, 'task:1', null)).toBe('digits');
+  });
+
+  it('биті значення пропускаються, а не показуються', () => {
+    const broken = { version: 1, defaultDial: 'pulse', timers: { 'task:1': 'pulse' } } as unknown as TimerDialPrefs;
+    expect(resolveDial(broken, 'task:1', { 'task:1': 'nope' } as never)).toBe('digits');
+  });
+});
+
+describe('pruneAdhocDials', () => {
+  it('прибирає ЛИШЕ вільні таймери, яких немає серед живих', () => {
+    const map = { 'task:1': 'rings', 'meeting:m': 'arc', 'adhoc:gone': 'orbit', 'adhoc:live': 'tape' } as const;
+    expect(pruneAdhocDials(map, ['adhoc:live'])).toEqual({
+      'task:1': 'rings',
+      'meeting:m': 'arc',
+      'adhoc:live': 'tape',
+    });
+  });
+
+  it('task:/meeting: не чистяться навіть без живих таймерів — наступна сесія отримає той самий вибір', () => {
+    const map = { 'task:1': 'rings', 'meeting:m': 'arc' } as const;
+    expect(pruneAdhocDials(map, [])).toBe(map);
+  });
+
+  it('повертає ТОЙ САМИЙ об’єкт, коли чистити нема чого', () => {
+    const map = { 'adhoc:a': 'rings' } as const;
+    expect(pruneAdhocDials(map, ['adhoc:a'])).toBe(map);
+  });
+});
+
+describe('withTimerDial / withDefaultDial', () => {
+  const now = new Date('2026-09-13T10:00:00.000Z');
+
+  it('пише персональний вибір явно, навіть якщо він дорівнює типовому', () => {
+    const next = withTimerDial(emptyDialPrefs(), 'task:1', 'digits', [], now);
+    expect(next.timers).toEqual({ 'task:1': 'digits' });
+    expect(next.updatedAt).toBe(now.toISOString());
+    expect(next.version).toBe(1);
+  });
+
+  it('чистить зупинені вільні таймери лише коли список живих відомий', () => {
+    const prefs: TimerDialPrefs = { version: 1, defaultDial: 'digits', timers: { 'adhoc:old': 'rings', 'task:1': 'arc' } };
+    expect(withTimerDial(prefs, 'task:2', 'tape', ['task:2'], now).timers).toEqual({ 'task:1': 'arc', 'task:2': 'tape' });
+    // null = реєстр ще не прочитаний → нічого не чистимо.
+    expect(withTimerDial(prefs, 'task:2', 'tape', null, now).timers).toEqual({ 'adhoc:old': 'rings', 'task:1': 'arc', 'task:2': 'tape' });
+  });
+
+  it('вибір для щойно запущеного вільного таймера не зникає, навіть якщо його ще немає серед живих', () => {
+    const next = withTimerDial(emptyDialPrefs(), 'adhoc:new', 'orbit', [], now);
+    expect(next.timers['adhoc:new']).toBe('orbit');
+  });
+
+  it('не мутує вхід і зберігає невідомі поля', () => {
+    const prefs = { version: 1, defaultDial: 'digits', timers: { 'task:1': 'arc' }, extra: 'keep' } as TimerDialPrefs;
+    const snapshot = JSON.parse(JSON.stringify(prefs));
+    const next = withTimerDial(prefs, 'task:1', 'rings', [], now);
+    expect(prefs).toEqual(snapshot);
+    expect(next.extra).toBe('keep');
+  });
+
+  it('типовий міняється без зачіпання персональних виборів', () => {
+    const prefs: TimerDialPrefs = { version: 1, defaultDial: 'digits', timers: { 'task:1': 'arc', 'adhoc:x': 'tape' } };
+    const next = withDefaultDial(prefs, 'chrono', now);
+    expect(next.defaultDial).toBe('chrono');
+    expect(next.timers).toEqual(prefs.timers);
+    expect(next.updatedAt).toBe(now.toISOString());
+  });
+
+  it('невідомий циферблат не потрапляє в дані', () => {
+    expect(withDefaultDial(emptyDialPrefs(), 'pulse' as never, now).defaultDial).toBe('digits');
+    expect(withTimerDial(emptyDialPrefs(), 'task:1', 'pulse' as never, [], now).timers['task:1']).toBe('digits');
+  });
+});
+
+// ─── Сумісність із новішими клієнтами (невідомий циферблат) ───────────────────
+
+describe('невідомий циферблат від новішого клієнта не стирається записом', () => {
+  const now = new Date('2026-09-13T10:00:00.000Z');
+  // Так виглядають налаштування, коли новіша збірка додала одинадцятий
+  // циферблат 'pulse' і людина обрала його типовим і для одного таймера.
+  const fromNewer = {
+    version: 1,
+    defaultDial: 'pulse',
+    timers: { 'task:1': 'pulse', 'task:2': 'arc', 'adhoc:gone': 'pulse', 'task:bad': 42, 'task:empty': '' },
+    futureField: true,
+  };
+
+  it('preserveDialPrefs лишає рядкові значення як є, відкидає лише не-рядки', () => {
+    const out = preserveDialPrefs(fromNewer);
+    expect(out.defaultDial).toBe('pulse');
+    expect(out.timers).toEqual({ 'task:1': 'pulse', 'task:2': 'arc', 'adhoc:gone': 'pulse' });
+    expect(out.futureField).toBe(true);
+    for (const junk of [null, undefined, 42, 'rings', [], true]) {
+      expect(preserveDialPrefs(junk)).toEqual({ version: 1, defaultDial: 'digits', timers: {} });
+    }
+    expect(preserveDialPrefs({ defaultDial: '', timers: [] })).toMatchObject({ defaultDial: 'digits', timers: {} });
+  });
+
+  it('withTimerDial міняє лише свій ключ: чужий типовий і чужі вибори лишаються', () => {
+    const next = withTimerDial(preserveDialPrefs(fromNewer), 'task:3', 'rings', null, now);
+    expect(next.defaultDial).toBe('pulse');
+    expect(next.timers).toEqual({ 'task:1': 'pulse', 'task:2': 'arc', 'adhoc:gone': 'pulse', 'task:3': 'rings' });
+    expect(next.futureField).toBe(true);
+  });
+
+  it('withTimerDial чистить лише мертві adhoc:, навіть із невідомим циферблатом', () => {
+    const next = withTimerDial(preserveDialPrefs(fromNewer), 'task:3', 'rings', [], now);
+    expect(next.timers).toEqual({ 'task:1': 'pulse', 'task:2': 'arc', 'task:3': 'rings' });
+  });
+
+  it('withDefaultDial не чіпає невідомі персональні вибори', () => {
+    const next = withDefaultDial(preserveDialPrefs(fromNewer), 'chrono', now);
+    expect(next.defaultDial).toBe('chrono');
+    expect(next.timers).toEqual({ 'task:1': 'pulse', 'task:2': 'arc', 'adhoc:gone': 'pulse' });
+  });
+
+  it('withTimerDial/withDefaultDial не губить невідоме навіть якщо на вхід дали сире значення', () => {
+    const raw = fromNewer as unknown as TimerDialPrefs;
+    expect(withTimerDial(raw, 'task:3', 'rings', null, now).timers['task:1']).toBe('pulse');
+    expect(withDefaultDial(raw, 'chrono', now).timers['task:1']).toBe('pulse');
+  });
+
+  it('показ пропускає невідоме: персональний → локальний → типовий → цифри', () => {
+    const stored = preserveDialPrefs(fromNewer);
+    expect(resolveDial(stored, 'task:1', { 'task:1': 'tape' })).toBe('tape');
+    expect(resolveDial(stored, 'task:1')).toBe('digits');
+    expect(resolveDial(stored, 'task:2')).toBe('arc');
+    expect(resolveDial({ ...stored, defaultDial: 'orbit' }, 'task:1')).toBe('orbit');
+  });
+});
+
+describe('mergeLocalDials — перенесення старого локального вибору в синк', () => {
+  const base = { version: 1 as const, defaultDial: 'digits', timers: { 'task:1': 'arc', 'task:x': 'pulse' } };
+
+  it('дописує лише відсутні task:/meeting: і живі adhoc:, наявне не переписує', () => {
+    const local = {
+      'task:1': 'rings',        // синхронізований уже є → не чіпаємо
+      'task:x': 'tape',         // синхронізований невідомий → теж не чіпаємо
+      'task:2': 'rings',
+      'meeting:m': 'orbit',
+      'adhoc:live': 'dots',
+      'adhoc:dead': 'flip',
+      'other:z': 'arc',
+      'task:bad': 'pulse',      // локальне невідоме — сміття, не переносимо
+    };
+    const out = mergeLocalDials(base, local, ['adhoc:live']);
+    expect(out.timers).toEqual({
+      'task:1': 'arc',
+      'task:x': 'pulse',
+      'task:2': 'rings',
+      'meeting:m': 'orbit',
+      'adhoc:live': 'dots',
+    });
+    expect(base.timers).toEqual({ 'task:1': 'arc', 'task:x': 'pulse' });
+  });
+
+  it('реєстр не прочитаний (null) → вільні таймери не переносяться', () => {
+    const out = mergeLocalDials(base, { 'adhoc:a': 'dots', 'task:2': 'rings' }, null);
+    expect(out.timers).toEqual({ 'task:1': 'arc', 'task:x': 'pulse', 'task:2': 'rings' });
+  });
+
+  it('нічого дописувати → той самий об\u2019єкт; сміття замість мапи не ламає', () => {
+    expect(mergeLocalDials(base, { 'task:1': 'rings' }, [])).toBe(base);
+    for (const junk of [null, undefined, 42, 'x', []]) expect(mergeLocalDials(base, junk, [])).toBe(base);
   });
 });

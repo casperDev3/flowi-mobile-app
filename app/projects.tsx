@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -19,26 +19,35 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { PROJECT_COLORS } from '@/utils/projectColors';
+import {
+  DEFAULT_PRIORITY_LEVEL,
+  normalizePriority,
+  priorityFields,
+  type LegacyPriority,
+  type TaskPriority,
+} from '@/utils/taskUtils';
 import { setProjectArchived } from '@/utils/projectUtils';
 import {
   assignTaskToSprint,
   clearTaskSprint,
   createSprint,
+  BACKLOG_GROUP_KEY,
   isSprintClosed,
+  isTaskGroupExpanded,
   moveOpenSprintTasks,
-  projectBacklogTasks,
+  projectTaskGroups,
   removeProjectSprints,
   renameSprint,
   setSprintClosed,
   sprintMoveTargets,
   sprintProgress,
-  sprintTasks,
   sprintsForProject,
   type Sprint,
 } from '@/utils/sprintUtils';
@@ -57,8 +66,29 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { useTimerContext } from '@/store/timer-context';
 import { formatDuration } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
-import { mergeTaskStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
+import { mergeTaskStatusColumns, taskStatusColumn, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useStorageRefresh } from '@/hooks/use-storage-refresh';
+import { localDateKey } from '@/utils/dateUtils';
+import { BUILTIN_CURRENCIES, type Currency } from '@/utils/financeUtils';
+import {
+  formatSubscriptionMoney,
+  formatTotalsLine,
+  normalizeSubscriptions,
+  subscriptionStatus,
+  subscriptionsForProject,
+  totalsByCurrency,
+  type Subscription,
+} from '@/utils/subscriptions';
+import {
+  findTimerForMeeting,
+  meetingProject,
+  projectMeetingSections,
+  withMeetingProject,
+  type Meeting,
+} from '@/utils/meetings';
+import { MeetingDetailBody, MeetingDetailHeader } from '@/components/meetings/MeetingDetail';
+import { MeetingFormSheet, type MeetingFormData } from '@/components/shared/MeetingFormSheet';
 
 export interface Project {
   id: string;
@@ -95,6 +125,9 @@ interface Task {
    */
   sprintId?: string;
   status: string;
+  /** Легасі-пріоритет ('high'|'medium'|'low') і новий рівень P0–P5 (див. CONTRACT §B). */
+  priority?: LegacyPriority;
+  priorityLevel?: TaskPriority;
   /** Колонка дошки. Графік «Де стоять задачі» питає її через taskColumnId. */
   kanbanColumnId?: string;
   deadline?: string;
@@ -123,6 +156,20 @@ function shortDate(iso: string, locale: string): string {
   const sameYear = d.getFullYear() === new Date().getFullYear();
   return d.toLocaleDateString(locale, sameYear
     ? { day: 'numeric', month: 'short' }
+    : { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Дата зустрічі 'YYYY-MM-DD' (локальна): «Сьогодні»/«Завтра» або коротка дата. */
+function meetingDate(dateKey: string, locale: string, labels: { today: string; tomorrow: string }): string {
+  const now = new Date();
+  if (dateKey === localDateKey(now)) return labels.today;
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  if (dateKey === localDateKey(tomorrow)) return labels.tomorrow;
+  const d = new Date(`${dateKey}T00:00`);
+  if (Number.isNaN(d.getTime())) return dateKey;
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString(locale, sameYear
+    ? { weekday: 'short', day: 'numeric', month: 'short' }
     : { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -276,20 +323,64 @@ export default function ProjectsScreen() {
   const { isExpanded, height } = useResponsive();
   // Активні таймери потрібні, щоб «Відпрацьовано» включало сесію, яка триває
   // просто зараз, а не лише закриті.
-  const { activeTimers } = useTimerContext();
+  const { activeTimers, tasksRevision, meetingsRevision, startMeetingTimer, stopTimer, stopTimerForTask } = useTimerContext();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   // Спринти живуть тут, а не на окремому екрані: спринт існує лише всередині
   // проєкту, і власного розділу навігації в нього немає.
   const [sprints, setSprints] = useState<Sprint[]>([]);
-  /** Відкрита форма спринта: створення або перейменування наявного. */
+  // Зустрічі — для секції «Зустрічі» деталі. Пише їх цей екран лише з форми
+  // зустрічі (створення з проєкту / правка з перегляду) — read-modify-write.
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [showPastMeetings, setShowPastMeetings] = useState(false);
+  // Підписки — лише для секції «Підписки» деталі (читання; пише екран підписок).
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subCurrencies, setSubCurrencies] = useState<Currency[]>(BUILTIN_CURRENCIES);
+  /**
+   * Перегляд зустрічі проєкту: ОРИГІНАЛ + дата натиснутого екземпляра.
+   * Показується в ТІЙ САМІЙ панелі деталі замість проєкту (телефон — та сама
+   * модалка, планшет — та сама колонка): другої модалки поверх першої iOS
+   * надійно не покаже. ✕ перегляду повертає до проєкту.
+   */
+  const [viewedMeeting, setViewedMeeting] = useState<{ origId: string; date: string } | null>(null);
+  /** Відкрита форма зустрічі: правка (initial) або створення з проєктом. */
+  const [meetingForm, setMeetingForm] = useState<{ initial: MeetingFormData | null; projectId?: string } | null>(null);
+  /** Телефон: що повернути після форми зустрічі (деталь закривали заради неї). */
+  const reopenAfterMeetingForm = useRef<{ projectId: string; meeting: { origId: string; date: string } | null } | null>(null);
+  /**
+   * Хвилинна мітка: зустріч, що закінчилась при відкритій деталі, мусить
+   * переїхати в «Минулі» (як веб, що перераховує щохвилини). Не щосекундний
+   * годинник — тоді перемальовувався б увесь екран зі списком і графіками.
+   */
+  const [minuteTick, setMinuteTick] = useState(() => Math.floor(Date.now() / 60000));
+  /**
+   * Група (id спринта), у якій розгорнуто рядок «+ задача». Беклог додає
+   * нижній рядок деталі; «+» мають лише ВІДКРИТІ спринти (CONTRACT §D.3.6).
+   */
+  const [addToSprintId, setAddToSprintId] = useState<string | null>(null);
+  const [sprintTaskTitle, setSprintTaskTitle] = useState('');
+  /**
+   * Відкрита форма спринта: створення або перейменування наявного.
+   *
+   * Форма спринта, діалог закриття і вибір спринта для задачі малюються
+   * ВСЕРЕДИНІ деталі проєкту, а не окремими Modal. На телефоні деталь сама є
+   * модалкою, і iOS не показує другу модалку поверх першої надійно: після
+   * вибору спринта лист лишався порожнім/завислим — і назв задач у спринті
+   * просто не було видно.
+   */
   const [sprintDraft, setSprintDraft] = useState<{ sprint: Sprint | null } | null>(null);
   const [sprintName, setSprintName] = useState('');
-  /** Спринт, для якого відкрито діалог «куди перенести незавершені». */
+  /** Спринт, для якого відкрито питання «куди перенести незавершені». */
   const [closingSprint, setClosingSprint] = useState<Sprint | null>(null);
-  /** Задача, для якої відкрито вибір спринта. */
-  const [movingTask, setMovingTask] = useState<Task | null>(null);
+  /** id задачі, під рядком якої розгорнуто вибір спринта. */
+  const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
+  /**
+   * Згорнуті/розгорнуті групи деталі. Лише ЯВНІ перемикання людини; решту
+   * вирішує isTaskGroupExpanded (відкриті розгорнуті, закриті згорнуті) —
+   * так само, як у веб-SprintPanel.
+   */
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [statusColumns, setStatusColumns] = useState<TaskStatusColumn[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -305,7 +396,7 @@ export default function ProjectsScreen() {
   const detailScrollRef = useRef<ScrollView | null>(null);
 
   const loadAll = useCallback(async () => {
-    const [p, t, columns, s] = await Promise.all([
+    const [p, t, columns, s, m, subs, curs] = await Promise.all([
       loadData<Project[]>('projects', []),
       loadData<Task[]>('tasks', []),
       // Колонки дошки потрібні графіку «Де стоять задачі». Читаємо збережені й
@@ -313,11 +404,17 @@ export default function ProjectsScreen() {
       // копія правила «яка колонка існує» розійшлася б із канбаном.
       loadData<TaskStatusColumn[]>('task_statuses', []),
       loadData<Sprint[]>('sprints', []),
+      loadData<Meeting[]>('meetings', []),
+      loadData<unknown>('subscriptions', []),
+      loadData<Currency[]>('finance_currencies', []),
     ]);
+    setSubscriptions(normalizeSubscriptions(subs));
+    setSubCurrencies([...BUILTIN_CURRENCIES, ...(Array.isArray(curs) ? curs : [])]);
     setProjects(p);
     setTasks(t);
     setStatusColumns(columns);
     setSprints(s);
+    setMeetings(m);
   }, []);
 
   // Архівні ховаються зі списку, але лишаються в даних: стан явний
@@ -402,45 +499,125 @@ export default function ProjectsScreen() {
   }, [tasks, selectedId, projectSprints]);
 
   /**
-   * Задачі проєкту, розкладені по спринтах, і беклог наприкінці.
+   * Задачі проєкту, розкладені по спринтах, і беклог ОСТАННІМ.
    *
-   * Обидва списки рахують спільні хелпери (utils/sprintUtils.ts), а не екран:
-   * склад спринта та беклогу мусить визначатись в одному місці й однаково на всіх
-   * клієнтах — власна копія правила тут і була причиною розбіжності з вебом.
-   *
-   * Спринт бере задачі ЗА sprintId (sprintTasks), беклог — задачі проєкту БЕЗ
-   * спринта (projectBacklogTasks). Тому задача з чужим projectId потрапляє саме в
-   * спринт, а не в беклог — точно як у вебі.
+   * Групи рахує спільний хелпер (utils/sprintUtils.ts projectTaskGroups) —
+   * дзеркало веб-версії: склад спринта й беклогу мусить визначатись в одному
+   * місці й однаково на всіх клієнтах. Спринт бере задачі ЗА sprintId, беклог —
+   * задачі проєкту без (відомого) спринта; задача з чужим projectId потрапляє
+   * саме в спринт, а не в беклог — точно як у вебі.
    */
-  const sprintGroups = useMemo(
-    () => projectSprints.map(sprint => ({ sprint, tasks: sprintTasks(selectedTasks, sprint.id) })),
-    [projectSprints, selectedTasks],
-  );
-  const backlogTasks = useMemo(
-    () => (selectedId ? projectBacklogTasks(selectedTasks, selectedId, projectSprints) : []),
-    [selectedTasks, selectedId, projectSprints],
+  const taskGroups = useMemo(
+    () => (selectedId ? projectTaskGroups(selectedTasks, sprints, selectedId) : []),
+    [selectedTasks, sprints, selectedId],
   );
 
   const selectedStats = selectedId ? statsById.get(selectedId) ?? null : null;
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const sync = () => setMinuteTick(Math.floor(Date.now() / 60000));
+    sync();
+    const id = setInterval(sync, 15000);
+    return () => clearInterval(id);
+  }, [selectedId]);
+
+  /** Зустрічі проєкту: найближчі (зокрема повтори), минулі — окремо. */
+  const meetingSections = useMemo(
+    () => (selectedId
+      ? projectMeetingSections(meetings, selectedId, new Date(minuteTick * 60000))
+      : { upcoming: [], past: [] }),
+    [meetings, selectedId, minuteTick],
+  );
+
+  /** Підписки проєкту: живі (без архівних) + сума за місяць по кожній валюті. */
+  const projectSubscriptions = useMemo(() => {
+    if (!selectedId) return { live: [] as Subscription[], monthlyLine: '', today: '' };
+    const today = localDateKey(new Date(minuteTick * 60000));
+    const all = subscriptionsForProject(subscriptions, selectedId);
+    const live = all.filter(sub => subscriptionStatus(sub, today) !== 'archived');
+    const monthlyLine = formatTotalsLine(totalsByCurrency(live, today), 'monthly', tr.subPerMonth, subCurrencies, locale);
+    return { live, monthlyLine, today };
+  }, [subscriptions, selectedId, minuteTick, subCurrencies, locale, tr]);
+
+  // Інлайн-панелі деталі (вибір спринта, форма спринта, закриття) належать
+  // конкретному проєкту — при перемиканні проєкту вони не мусять «переїхати».
+  useEffect(() => {
+    setMovingTaskId(null);
+    setSprintDraft(null);
+    setClosingSprint(null);
+    setExpandedGroups({});
+    setShowPastMeetings(false);
+    setAddToSprintId(null);
+    setSprintTaskTitle('');
+  }, [selectedId]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadAll().finally(() => setRefreshing(false));
   }, [loadAll]);
 
-  useEffect(() => {
-    loadAll().then(() => setInitialized(true));
-  }, []);
+  /**
+   * Свіжі дані — щоразу, коли вони могли змінитися повз цей екран.
+   *
+   * Раніше loadAll ішов ОДИН раз на монтуванні. Спринт чи проєкт, змінений на
+   * екрані Завдань, стором таймерів або синком з іншого пристрою, лишався
+   * невидимим, поки екран не перемонтують: деталь проєкту показувала старе
+   * розкладання, і задача, щойно покладена у спринт, у ньому «не існувала».
+   *   - useFocusEffect      — повернення на екран (напр. із деталі задачі);
+   *   - useStorageRefresh   — записи в ключі, поки екран відкритий (синк, сусідні екрани);
+   *   - tasksRevision/meetingsRevision — записи стору таймерів.
+   */
+  useFocusEffect(useCallback(() => {
+    loadAll()
+      .then(() => setInitialized(true))
+      .catch(e => { if (__DEV__) console.warn('[projects] завантаження не вдалося:', e); });
+  }, [loadAll]));
+
+  const trackWrite = useStorageRefresh(['tasks', 'sprints', 'projects', 'meetings', 'task_statuses', 'subscriptions', 'finance_currencies'], loadAll);
 
   useEffect(() => {
-    if (initialized) void saveSynced('projects', projects);
-  }, [projects, initialized]);
+    if (!initialized || (tasksRevision === 0 && meetingsRevision === 0)) return;
+    loadAll().catch(e => { if (__DEV__) console.warn('[projects] перечитування після запису стору не вдалося:', e); });
+  }, [tasksRevision, meetingsRevision, initialized, loadAll]);
+
+  /**
+   * Проєкти й спринти пишуться READ-MODIFY-WRITE, а не ефектом «зберегти стан».
+   *
+   * saveSynced ДИФАЄ масив зі сховищем: запис, якого в масиві немає, їде на
+   * сервер як видалення. Ефект, що зберігав застарілий стан екрана, після
+   * створення спринта деінде видаляв той спринт — і його задачі падали в беклог.
+   * Тепер мутація застосовується до свіжого читання, а стан — до результату.
+   */
+  const mutateProjects = useCallback(async (mutate: (list: Project[]) => Project[]) => {
+    try {
+      await trackWrite(async () => {
+        const fresh = await loadData<Project[]>('projects', []);
+        const next = mutate(fresh);
+        if (next === fresh) return;
+        await saveSynced('projects', next);
+        setProjects(next);
+      });
+    } catch (e) {
+      if (__DEV__) console.warn('[projects] запис проєктів не вдався:', e);
+    }
+  }, [trackWrite]);
 
   // Спринти пишуться ТІЛЬКИ через saveSynced, як і решта колекцій: запис повз
   // нього не потрапив би в outbox і не доїхав би на інші пристрої.
-  useEffect(() => {
-    if (initialized) void saveSynced('sprints', sprints);
-  }, [sprints, initialized]);
+  const mutateSprints = useCallback(async (mutate: (list: Sprint[]) => Sprint[]) => {
+    try {
+      await trackWrite(async () => {
+        const fresh = await loadData<Sprint[]>('sprints', []);
+        const next = mutate(fresh);
+        if (next === fresh) return;
+        await saveSynced('sprints', next);
+        setSprints(next);
+      });
+    } catch (e) {
+      if (__DEV__) console.warn('[projects] запис спринтів не вдався:', e);
+    }
+  }, [trackWrite]);
 
   const openAdd = useCallback(() => {
     setEditing(null);
@@ -460,7 +637,15 @@ export default function ProjectsScreen() {
     setShowModal(true);
   }, []);
 
-  const closeModal = useCallback(() => setShowModal(false), []);
+  const closeModal = useCallback(() => {
+    setShowModal(false);
+    // Деталь закривали лише заради форми (телефон) — повертаємо її.
+    const reopenId = reopenAfterEdit.current;
+    if (reopenId) {
+      reopenAfterEdit.current = null;
+      setTimeout(() => setSelectedId(prev => prev ?? reopenId), 300);
+    }
+  }, []);
 
   const save = () => {
     if (!name.trim()) return;
@@ -471,9 +656,10 @@ export default function ProjectsScreen() {
     const descr = description.trim() || undefined;
 
     if (editing) {
-      setProjects(prev => prev.map(p =>
+      const trimmed = name.trim();
+      void mutateProjects(prev => prev.map(p =>
         p.id === editing.id
-          ? { ...p, name: name.trim(), color, deadline: deadlineIso, description: descr }
+          ? { ...p, name: trimmed, color, deadline: deadlineIso, description: descr }
           : p));
     } else {
       const created: Project = {
@@ -484,7 +670,7 @@ export default function ProjectsScreen() {
         deadline: deadlineIso,
         description: descr,
       };
-      setProjects(prev => [...prev, created]);
+      void mutateProjects(prev => [...prev, created]);
       setSelectedId(created.id);
     }
     closeModal();
@@ -492,8 +678,8 @@ export default function ProjectsScreen() {
 
   const toggleArchive = (project: Project) => {
     const archiving = !project.archivedAt;
-    const apply = () => setProjects(prev =>
-      prev.map(p => (p.id === project.id ? setProjectArchived(p, archiving) : p)));
+    const apply = () => { void mutateProjects(prev =>
+      prev.map(p => (p.id === project.id ? setProjectArchived(p, archiving) : p))); };
 
     const activeLeft = tasks.filter(t => t.projectId === project.id && t.status !== 'done').length;
     if (archiving && activeLeft > 0) {
@@ -514,7 +700,9 @@ export default function ProjectsScreen() {
         text: 'Видалити',
         style: 'destructive',
         onPress: () => {
-          setProjects(prev => prev.filter(p => p.id !== id));
+          // Явна дія користувача «Видалити» (з підтвердженням) — фільтр тут
+          // легітимний; застосовується до свіжого читання, а не до стану.
+          void mutateProjects(prev => prev.filter(p => p.id !== id));
           setSelectedId(prev => (prev === id ? null : prev));
           // Діалог обіцяє «без прив'язки» — і код мусить це зробити. Доти
           // projectId лишався вказувати на проєкт, якого вже немає: фільтр за
@@ -525,16 +713,21 @@ export default function ProjectsScreen() {
           // екрана, але він і далі їздив би в синку.
           void (async () => {
             try {
-              const [freshTasks, freshSprints] = await Promise.all([
-                loadData<Task[]>('tasks', []),
-                loadData<Sprint[]>('sprints', []),
-              ]);
-              const freed = removeProjectSprints(freshSprints, freshTasks, id);
-              if (freed.tasks.some((task, i) => task !== freshTasks[i])) {
-                await saveSynced('tasks', freed.tasks);
-                setTasks(freed.tasks);
-              }
-              if (freed.sprints.length !== freshSprints.length) setSprints(freed.sprints);
+              await trackWrite(async () => {
+                const [freshTasks, freshSprints] = await Promise.all([
+                  loadData<Task[]>('tasks', []),
+                  loadData<Sprint[]>('sprints', []),
+                ]);
+                const freed = removeProjectSprints(freshSprints, freshTasks, id);
+                if (freed.tasks.some((task, i) => task !== freshTasks[i])) {
+                  await saveSynced('tasks', freed.tasks);
+                  setTasks(freed.tasks);
+                }
+                if (freed.sprints.length !== freshSprints.length) {
+                  await saveSynced('sprints', freed.sprints);
+                  setSprints(freed.sprints);
+                }
+              });
             } catch (e) {
               if (__DEV__) console.warn('[projects] відвʼязка задач не вдалася:', e);
             }
@@ -542,7 +735,7 @@ export default function ProjectsScreen() {
         },
       },
     ]);
-  }, []);
+  }, [mutateProjects, trackWrite]);
 
   // Палітра стабільна між рендерами — інакше React.memo на картці не спрацює.
   const c = useMemo(() => ({
@@ -566,6 +759,7 @@ export default function ProjectsScreen() {
 
   const selectProject = useCallback((project: Project) => {
     haptic.light();
+    setViewedMeeting(null);
     setSelectedId(prev => (prev === project.id ? null : project.id));
   }, []);
 
@@ -578,40 +772,138 @@ export default function ProjectsScreen() {
    */
   const toggleTask = useCallback(async (id: string) => {
     try {
-      const fresh = await loadData<Task[]>('tasks', []);
-      const updated = fresh.map(t =>
-        t.id === id ? { ...t, status: t.status === 'done' ? 'active' : 'done' } : t);
-      await saveSynced('tasks', updated);
-      setTasks(updated);
+      let becameDone = false;
+      await trackWrite(async () => {
+        const fresh = await loadData<Task[]>('tasks', []);
+        const updated = fresh.map(t => {
+          if (t.id !== id) return t;
+          becameDone = t.status !== 'done';
+          return { ...t, status: t.status === 'done' ? 'active' : 'done' };
+        });
+        await saveSynced('tasks', updated);
+        setTasks(updated);
+      });
       haptic.light();
+      // «Готово» зупиняє таймер задачі — як на екрані Завдань і у вебі. Лише
+      // ПІСЛЯ нашого запису 'tasks' (стор дописує сесію тим самим RMW); без
+      // таймера — no-op. Запис стору піднімає tasksRevision → loadAll.
+      if (becameDone) await stopTimerForTask(id);
     } catch (e) {
       if (__DEV__) console.warn('[projects] відмітка задачі не вдалася:', e);
     }
-  }, []);
+  }, [trackWrite, stopTimerForTask]);
 
   /** Нова задача одразу в цьому проєкті — заради цього поле й стоїть тут. */
-  const addTask = useCallback(async (projectId: string) => {
-    const title = newTaskTitle.trim();
+  const addTask = useCallback(async (projectId: string, sprint: Sprint | null = null) => {
+    const title = (sprint ? sprintTaskTitle : newTaskTitle).trim();
     if (!title) return;
     try {
-      const fresh = await loadData<Task[]>('tasks', []);
-      const task: Task = {
-        id: Date.now().toString(),
-        title,
-        projectId,
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        subtasks: [],
-      };
-      const updated = [task, ...fresh];
-      await saveSynced('tasks', updated);
-      setTasks(updated);
-      setNewTaskTitle('');
+      await trackWrite(async () => {
+        const fresh = await loadData<Task[]>('tasks', []);
+        const base: Task = {
+          id: Date.now().toString(),
+          title,
+          projectId,
+          status: 'active',
+          // Без пріоритету екран Завдань падав на PRIORITY[task.priority].
+          // Типовий P3 у подвійному записі контракту: 'medium' для старих клієнтів.
+          ...priorityFields(DEFAULT_PRIORITY_LEVEL),
+          createdAt: new Date().toISOString(),
+          subtasks: [],
+        };
+        // Створення з групи спринта — одразу в цей спринт (projectId зі спринта).
+        const task = sprint ? assignTaskToSprint(base, sprint) : base;
+        const updated = [task, ...fresh];
+        await saveSynced('tasks', updated);
+        setTasks(updated);
+      });
+      if (sprint) setSprintTaskTitle(''); else setNewTaskTitle('');
       haptic.success();
     } catch (e) {
       if (__DEV__) console.warn('[projects] створення задачі не вдалося:', e);
     }
-  }, [newTaskTitle]);
+  }, [newTaskTitle, sprintTaskTitle, trackWrite]);
+
+  /**
+   * Повна форма задачі на екрані Завдань — з уже обраними проєктом і спринтом
+   * (поле «Спринт» у TaskEditForm). Швидкий рядок лишається для самої назви.
+   */
+  /**
+   * Перехід з деталі на інший екран. На телефоні деталь — Modal, і екран
+   * проєктів лишається змонтованим під новим маршрутом: модалка лишилася б
+   * поверх «Завдань», а їхній лист створення мав би відкритись поверх неї
+   * (iOS так надійно не вміє). Тож спершу закриваємо деталь, а через 300 мс
+   * переходимо — патерн openOverDetail з app/meetings.tsx. Колонка планшета
+   * модалкою не є — там одразу.
+   */
+  const navigateFromDetail = useCallback((go: () => void) => {
+    if (isExpanded) { go(); return; }
+    setSelectedId(null);
+    setViewedMeeting(null);
+    setTimeout(go, 300);
+  }, [isExpanded]);
+
+  const openFullTaskForm = useCallback((projectId: string, sprintId: string | null) => {
+    navigateFromDetail(() => router.push({
+      pathname: '/(tabs)',
+      params: { create: '1', projectId, ...(sprintId ? { sprintId } : {}) },
+    }));
+  }, [router, navigateFromDetail]);
+
+  // ─── Зустрічі проєкту ──────────────────────────────────────────────────────
+
+  const openProjectMeeting = useCallback((meeting: Meeting, date: string) => {
+    setViewedMeeting({ origId: meeting.id, date });
+    detailScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
+
+  const closeProjectMeeting = useCallback(() => setViewedMeeting(null), []);
+
+  /** Форма зустрічі: на телефоні спершу закриваємо деталь, потім — форма. */
+  const openMeetingForm = useCallback((form: { initial: MeetingFormData | null; projectId?: string }) => {
+    if (isExpanded) { setMeetingForm(form); return; }
+    reopenAfterMeetingForm.current = selectedId ? { projectId: selectedId, meeting: viewedMeeting } : null;
+    setSelectedId(null);
+    setViewedMeeting(null);
+    setTimeout(() => setMeetingForm(form), 300);
+  }, [isExpanded, selectedId, viewedMeeting]);
+
+  const closeMeetingForm = useCallback(() => {
+    setMeetingForm(null);
+    const reopen = reopenAfterMeetingForm.current;
+    if (!reopen) return;
+    reopenAfterMeetingForm.current = null;
+    setTimeout(() => {
+      setSelectedId(prev => prev ?? reopen.projectId);
+      setViewedMeeting(reopen.meeting);
+    }, 300);
+  }, []);
+
+  /**
+   * Збереження форми зустрічі — READ-MODIFY-WRITE 'meetings': saveSynced
+   * дифає масив, і будь-яка зустріч, якої бракує в застарілому стані, поїхала
+   * б на сервер як видалена. Проєкт — рівень серії: лише на оригіналі.
+   */
+  const saveProjectMeeting = useCallback(async (data: MeetingFormData) => {
+    closeMeetingForm();
+    try {
+      await trackWrite(async () => {
+        const fresh = await loadData<Meeting[]>('meetings', []);
+        const fields = {
+          title: data.title, date: data.date, time: data.time, durationMinutes: data.durationMinutes,
+          location: data.location, link: data.link, notes: data.notes, color: data.color, recurrence: data.recurrence,
+        };
+        const id = data.id;
+        const next = id
+          ? fresh.map(m => (m.id !== id ? m : withMeetingProject({ ...m, ...fields }, data.projectId)))
+          : [...fresh, withMeetingProject<Meeting>({ id: Date.now().toString(), ...fields }, data.projectId)];
+        await saveSynced('meetings', next);
+        setMeetings(next);
+      });
+    } catch (e) {
+      if (__DEV__) console.warn('[projects] запис зустрічі не вдався:', e);
+    }
+  }, [trackWrite, closeMeetingForm]);
 
   // ─── Спринти ───────────────────────────────────────────────────────────────
 
@@ -630,15 +922,16 @@ export default function ProjectsScreen() {
     if (!name || !sprintDraft) return;
     const target = sprintDraft.sprint;
     if (target) {
-      setSprints(prev => prev.map(s => (s.id === target.id ? renameSprint(s, name) : s)));
+      void mutateSprints(prev => prev.map(s => (s.id === target.id ? renameSprint(s, name) : s)));
     } else if (selectedId) {
       // projectId береться з обраного проєкту: спринт без нього не існує.
-      setSprints(prev => [...prev, createSprint(selectedId, name)]);
+      const created = createSprint(selectedId, name);
+      void mutateSprints(prev => [...prev, created]);
     }
     setSprintDraft(null);
     setSprintName('');
     haptic.success();
-  }, [sprintName, sprintDraft, selectedId]);
+  }, [sprintName, sprintDraft, selectedId, mutateSprints]);
 
   /**
    * Закриття спринта: спершу переносимо незавершені задачі, потім ставимо
@@ -653,41 +946,45 @@ export default function ProjectsScreen() {
    */
   const closeSprint = useCallback(async (sprint: Sprint, target: Sprint | null) => {
     try {
-      const fresh = await loadData<Task[]>('tasks', []);
-      const updated = moveOpenSprintTasks(fresh, sprint.id, target);
-      if (updated.some((task, i) => task !== fresh[i])) {
-        await saveSynced('tasks', updated);
-        setTasks(updated);
-      }
+      await trackWrite(async () => {
+        const fresh = await loadData<Task[]>('tasks', []);
+        const updated = moveOpenSprintTasks(fresh, sprint.id, target);
+        if (updated.some((task, i) => task !== fresh[i])) {
+          await saveSynced('tasks', updated);
+          setTasks(updated);
+        }
+      });
     } catch (e) {
       if (__DEV__) console.warn('[projects] перенесення задач спринта не вдалося:', e);
       return;
     }
-    setSprints(prev => prev.map(s => (s.id === sprint.id ? setSprintClosed(s, true) : s)));
+    await mutateSprints(prev => prev.map(s => (s.id === sprint.id ? setSprintClosed(s, true) : s)));
     setClosingSprint(null);
     haptic.success();
-  }, []);
+  }, [trackWrite, mutateSprints]);
 
   /** Відкрити назад — просто зняти closedAt; задачі при цьому не рухаються. */
   const reopenSprint = useCallback((sprint: Sprint) => {
-    setSprints(prev => prev.map(s => (s.id === sprint.id ? setSprintClosed(s, false) : s)));
+    void mutateSprints(prev => prev.map(s => (s.id === sprint.id ? setSprintClosed(s, false) : s)));
     haptic.light();
-  }, []);
+  }, [mutateSprints]);
 
   /** Покласти задачу у спринт або повернути в беклог. */
   const setTaskSprint = useCallback(async (taskId: string, sprint: Sprint | null) => {
     try {
-      const fresh = await loadData<Task[]>('tasks', []);
-      const updated = fresh.map(t =>
-        t.id !== taskId ? t : (sprint ? assignTaskToSprint(t, sprint) : clearTaskSprint(t)));
-      await saveSynced('tasks', updated);
-      setTasks(updated);
+      await trackWrite(async () => {
+        const fresh = await loadData<Task[]>('tasks', []);
+        const updated = fresh.map(t =>
+          t.id !== taskId ? t : (sprint ? assignTaskToSprint(t, sprint) : clearTaskSprint(t)));
+        await saveSynced('tasks', updated);
+        setTasks(updated);
+      });
       haptic.light();
     } catch (e) {
       if (__DEV__) console.warn('[projects] зміна спринта задачі не вдалася:', e);
     }
-    setMovingTask(null);
-  }, []);
+    setMovingTaskId(null);
+  }, [trackWrite]);
 
   /**
    * Рядок задачі в деталі проєкту. Винесений з renderDetail, бо тепер його
@@ -695,8 +992,10 @@ export default function ProjectsScreen() {
    */
   const renderTaskRow = useCallback((task: Task, project: Project) => {
     const done = task.status === 'done';
+    const picking = movingTaskId === task.id;
     return (
-      <View key={task.id} style={[st.taskRow, { borderColor: c.border }]}>
+      <View key={task.id}>
+      <View style={[st.taskRow, { borderColor: c.border }]}>
         <TouchableOpacity
           onPress={() => { void toggleTask(task.id); }}
           accessibilityRole="checkbox"
@@ -710,30 +1009,165 @@ export default function ProjectsScreen() {
             нагадування живуть там, і другої копії тієї деталі тут не буде. */}
         <TouchableOpacity
           style={{ flex: 1 }}
-          onPress={() => router.push({ pathname: '/(tabs)', params: { open: task.id } })}>
-          <Text
-            numberOfLines={1}
-            style={{ color: done ? c.sub : c.text, fontSize: 14, textDecorationLine: done ? 'line-through' : 'none' }}>
-            {task.title}
-          </Text>
+          onPress={() => navigateFromDetail(() => router.push({ pathname: '/(tabs)', params: { open: task.id } }))}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <PriorityBadge level={normalizePriority(task)} />
+            <Text
+              numberOfLines={1}
+              style={{ flex: 1, color: done ? c.sub : c.text, fontSize: 14, textDecorationLine: done ? 'line-through' : 'none' }}>
+              {task.title}
+            </Text>
+          </View>
           {task.deadline ? (
             <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{shortDate(task.deadline, locale)}</Text>
           ) : null}
         </TouchableOpacity>
+        {/* Статус — як на вебі: колонка дошки з кольоровою крапкою. */}
+        {(() => {
+          // status тут — рядок; правилу колонки потрібна лише ознака «виконано».
+          const column = taskStatusColumn(
+            { status: task.status === 'done' ? 'done' : 'active', kanbanColumnId: task.kanbanColumnId },
+            columns,
+          );
+          return (
+            <View
+              style={[st.statusChip, { borderColor: c.border }]}
+              accessibilityLabel={`${tr.status}: ${column.name}`}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: column.color }} />
+              <Text numberOfLines={1} style={{ color: c.sub, fontSize: 10, fontWeight: '600', flexShrink: 1 }}>{column.name}</Text>
+            </View>
+          );
+        })()}
         {/* Розкладання по спринтах живе на самому рядку: перетягування в
             вертикальному списку конфліктувало б із прокруткою, а окремий
             режим «перемістити» довелося б спершу знайти. */}
         <TouchableOpacity
-          onPress={() => setMovingTask(task)}
+          onPress={() => setMovingTaskId(prev => (prev === task.id ? null : task.id))}
           accessibilityRole="button"
           accessibilityLabel={tr.sprintPick}
+          accessibilityState={{ expanded: picking }}
           hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
-          <IconSymbol name="arrow.left.arrow.right" size={13} color={c.sub} />
+          <IconSymbol name="arrow.left.arrow.right" size={13} color={picking ? c.accent : c.sub} />
         </TouchableOpacity>
         <IconSymbol name="chevron.right" size={13} color={c.sub} />
       </View>
+      {/* Вибір спринта — розгортається ПІД рядком, усередині деталі, а не
+          окремою модалкою поверх модалки (див. коментар до sprintDraft). */}
+      {picking ? (
+        <View style={[st.inlinePanel, { borderColor: c.border, backgroundColor: c.dim }]}>
+          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>{tr.sprintPick}</Text>
+          {/* Закриті спринти як ціль не пропонуються: покласти живу
+              роботу в заморожену пачку означає сховати її від себе. */}
+          {projectSprints.filter(sprint => !isSprintClosed(sprint)).map(sprint => {
+            const current = task.sprintId === sprint.id;
+            return (
+              <TouchableOpacity
+                key={sprint.id}
+                onPress={() => { void setTaskSprint(task.id, sprint); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: current }}
+                style={[st.pickRow, { borderColor: current ? c.accent : c.border }]}>
+                <IconSymbol name="flag" size={14} color={current ? c.accent : c.sub} />
+                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{sprint.name}</Text>
+                {current ? <IconSymbol name="checkmark" size={13} color={c.accent} /> : null}
+              </TouchableOpacity>
+            );
+          })}
+          <TouchableOpacity
+            onPress={() => { void setTaskSprint(task.id, null); }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: !task.sprintId }}
+            style={[st.pickRow, { borderColor: task.sprintId ? c.border : c.accent }]}>
+            <IconSymbol name="tray" size={14} color={task.sprintId ? c.sub : c.accent} />
+            <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{tr.sprintBacklog}</Text>
+            {task.sprintId ? null : <IconSymbol name="checkmark" size={13} color={c.accent} />}
+          </TouchableOpacity>
+          {projectSprints.length === 0 ? (
+            <Text style={{ color: c.sub, fontSize: 12, paddingVertical: 6 }}>{tr.sprintNoSprints}</Text>
+          ) : null}
+          <TouchableOpacity onPress={() => setMovingTaskId(null)} style={[st.btn, { paddingVertical: 9, backgroundColor: c.dim }]}>
+            <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      </View>
     );
-  }, [c, locale, toggleTask, router, tr]);
+  }, [c, locale, toggleTask, router, tr, movingTaskId, projectSprints, setTaskSprint, columns, navigateFromDetail]);
+
+  /** Форма назви спринта (створення / перейменування) — інлайн у деталі. */
+  const renderSprintForm = useCallback(() => (
+    <View style={[st.inlinePanel, { borderColor: c.border, backgroundColor: c.dim }]}>
+      <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginBottom: 8 }}>
+        {sprintDraft?.sprint ? tr.sprintRename : tr.sprintNew}
+      </Text>
+      <TextInput
+        placeholder={tr.sprintNamePlaceholder}
+        placeholderTextColor={c.sub}
+        value={sprintName}
+        onChangeText={setSprintName}
+        onSubmitEditing={saveSprint}
+        returnKeyType="done"
+        autoFocus
+        style={[st.input, { backgroundColor: c.dim, color: c.text }]}
+      />
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+        <TouchableOpacity onPress={() => setSprintDraft(null)} style={[st.btn, { flex: 1, paddingVertical: 10, backgroundColor: c.dim }]}>
+          <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={saveSprint}
+          disabled={!sprintName.trim()}
+          style={[st.btn, { flex: 2, paddingVertical: 10, backgroundColor: sprintName.trim() ? c.accent : c.dim }]}>
+          <Text style={{ color: sprintName.trim() ? '#fff' : c.sub, fontWeight: '700' }}>
+            {sprintDraft?.sprint ? tr.save : tr.create}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  ), [c, tr, sprintDraft, sprintName, saveSprint]);
+
+  /**
+   * Закриття спринта: куди перенести незавершені — інлайн під заголовком
+   * спринта. Список, а не Alert: цілей може бути скільки завгодно, а Alert на
+   * iOS більше трьох кнопок не показує.
+   */
+  const renderCloseSprint = useCallback((sprint: Sprint) => (
+    <View style={[st.inlinePanel, { borderColor: c.border, backgroundColor: c.dim }]}>
+      <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginBottom: 4 }}>{tr.sprintMoveTitle}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, marginBottom: 10 }}>{tr.sprintMoveHint}</Text>
+      {sprintMoveTargets(sprints, sprint).map(target => (
+        <TouchableOpacity
+          key={target.id}
+          onPress={() => { void closeSprint(sprint, target); }}
+          style={[st.pickRow, { borderColor: c.border }]}>
+          <IconSymbol name="flag" size={14} color={c.accent} />
+          <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{target.name}</Text>
+        </TouchableOpacity>
+      ))}
+      <TouchableOpacity
+        onPress={() => { void closeSprint(sprint, null); }}
+        style={[st.pickRow, { borderColor: c.border }]}>
+        <IconSymbol name="tray" size={14} color={c.sub} />
+        <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{tr.sprintMoveToBacklog}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setClosingSprint(null)} style={[st.btn, { paddingVertical: 9, backgroundColor: c.dim }]}>
+        <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+      </TouchableOpacity>
+    </View>
+  ), [c, tr, sprints, closeSprint]);
+
+  /**
+   * Редагування проєкту з його деталі. На телефоні деталь — модалка, а форма
+   * проєкту — друга модалка: iOS не покаже її поверх першої, тож спершу
+   * закриваємо деталь, а після форми відкриваємо її знову.
+   */
+  const reopenAfterEdit = useRef<string | null>(null);
+  const openEditOverDetail = useCallback((project: Project) => {
+    if (isExpanded) { openEdit(project); return; }
+    reopenAfterEdit.current = project.id;
+    setSelectedId(null);
+    setTimeout(() => openEdit(project), 300);
+  }, [isExpanded, openEdit]);
 
   const renderDetail = useCallback((stat: ProjectStats) => {
     const project = stat.project;
@@ -743,7 +1177,9 @@ export default function ProjectsScreen() {
           <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: project.color }} />
           <Text style={[st.detailTitle, { color: c.text, flex: 1 }]}>{project.name}</Text>
           <TouchableOpacity
-            onPress={() => openEdit(project)}
+            onPress={() => openEditOverDetail(project)}
+            accessibilityRole="button"
+            accessibilityLabel={tr.edit}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <IconSymbol name="pencil" size={17} color={c.sub} />
           </TouchableOpacity>
@@ -795,7 +1231,7 @@ export default function ProjectsScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text style={[st.detailLabel, { color: c.sub, flex: 1 }]}>{tr.sprints}</Text>
           <TouchableOpacity
-            onPress={openSprintCreate}
+            onPress={() => (sprintDraft && !sprintDraft.sprint ? setSprintDraft(null) : openSprintCreate())}
             accessibilityRole="button"
             accessibilityLabel={tr.sprintNew}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -804,7 +1240,9 @@ export default function ProjectsScreen() {
           </TouchableOpacity>
         </View>
 
-        {projectSprints.length === 0 ? (
+        {sprintDraft && !sprintDraft.sprint ? renderSprintForm() : null}
+
+        {projectSprints.length === 0 && !sprintDraft ? (
           <Text style={{ color: c.sub, fontSize: 12, opacity: 0.8, lineHeight: 17 }}>
             {tr.sprintNoSprintsHint}
           </Text>
@@ -819,63 +1257,134 @@ export default function ProjectsScreen() {
           </View>
         ) : null}
 
-        {/* Спочатку спринти (відкриті, далі закриті), потім беклог. Порядок
-            задає sprintsForProject — той самий, що у вебі. */}
-        {sprintGroups.map(({ sprint, tasks: groupTasks }) => {
-          const closed = isSprintClosed(sprint);
-          const progress = sprintProgress(groupTasks, sprint.id);
-          return (
-            <View key={sprint.id} style={{ marginTop: 6 }}>
-              <View style={st.sprintHeader}>
-                <IconSymbol name={closed ? 'checkmark.circle' : 'flag'} size={13} color={closed ? c.sub : project.color} />
-                <Text
-                  numberOfLines={1}
-                  style={{ flex: 1, color: closed ? c.sub : c.text, fontSize: 13, fontWeight: '700' }}>
-                  {sprint.name}
-                  {closed ? <Text style={{ fontWeight: '400' }}> · {tr.sprintClosedLabel}</Text> : null}
-                </Text>
-                <Text style={{ color: c.sub, fontSize: 11, fontVariant: ['tabular-nums'] }}>
-                  {progress.done}/{progress.total}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => openSprintRename(sprint)}
-                  accessibilityRole="button"
-                  accessibilityLabel={tr.sprintRename}
-                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
-                  <IconSymbol name="pencil" size={14} color={c.sub} />
-                </TouchableOpacity>
-                {/* Закриття — завжди через діалог перенесення, навіть коли
-                    незавершених немає: інакше та сама кнопка поводилась би
-                    по-різному залежно від невидимого стану. */}
-                <TouchableOpacity
-                  onPress={() => (closed ? reopenSprint(sprint) : setClosingSprint(sprint))}
-                  accessibilityRole="button"
-                  accessibilityLabel={closed ? tr.sprintReopen : tr.sprintClose}
-                  hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
-                  <IconSymbol name={closed ? 'arrow.uturn.backward' : 'flag.fill'} size={14} color={c.sub} />
-                </TouchableOpacity>
+        {/* Спочатку спринти (відкриті, далі закриті), потім беклог — порядок
+            задає projectTaskGroups, той самий, що у вебі. Групи згортаються;
+            закриті спринти згорнуті за замовчуванням. */}
+        {taskGroups.map(group => {
+          const sprint = group.sprint;
+          // Проєкт без спринтів: беклог — це просто всі задачі, і заголовок
+          // «Беклог» над ними нічого б не ділив.
+          if (!sprint && projectSprints.length === 0) {
+            return group.tasks.length > 0 ? (
+              <View key={BACKLOG_GROUP_KEY} style={{ marginTop: 6 }}>
+                {group.tasks.map(task => renderTaskRow(task, project))}
               </View>
-              {groupTasks.length === 0 ? (
-                <Text style={{ color: c.sub, fontSize: 12, opacity: 0.7, paddingVertical: 8 }}>{tr.sprintEmpty}</Text>
-              ) : groupTasks.map(task => renderTaskRow(task, project))}
+            ) : null;
+          }
+          const key = sprint?.id ?? BACKLOG_GROUP_KEY;
+          const closed = group.closed;
+          const open = isTaskGroupExpanded(expandedGroups, key, closed);
+          const doneCount = sprint
+            ? sprintProgress(group.tasks, sprint.id).done
+            : group.tasks.filter(task => task.status === 'done').length;
+          const groupName = sprint ? sprint.name : tr.sprintBacklog;
+          return (
+            <View key={key} style={{ marginTop: 6 }}>
+              <View style={st.sprintHeader}>
+                <TouchableOpacity
+                  onPress={() => setExpandedGroups(prev => ({ ...prev, [key]: !isTaskGroupExpanded(prev, key, closed) }))}
+                  accessibilityRole="button"
+                  accessibilityLabel={groupName}
+                  accessibilityState={{ expanded: open }}
+                  hitSlop={{ top: 8, bottom: 8 }}
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <IconSymbol name={open ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
+                  <IconSymbol
+                    name={!sprint ? 'tray' : closed ? 'checkmark.circle' : 'flag'}
+                    size={13}
+                    color={!sprint || closed ? c.sub : project.color}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={{ flex: 1, color: !sprint || closed ? c.sub : c.text, fontSize: 13, fontWeight: '700' }}>
+                    {groupName}
+                    {closed ? <Text style={{ fontWeight: '400' }}> · {tr.sprintClosedLabel}</Text> : null}
+                  </Text>
+                  <Text style={{ color: c.sub, fontSize: 11, fontVariant: ['tabular-nums'] }}>
+                    {doneCount}/{group.tasks.length}
+                  </Text>
+                </TouchableOpacity>
+                {sprint ? (
+                  <>
+                    {!closed ? (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setAddToSprintId(prev => (prev === sprint.id ? null : sprint.id));
+                          setSprintTaskTitle('');
+                          setExpandedGroups(prev => ({ ...prev, [key]: true }));
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${tr.sprintAddTaskA11y}: ${sprint.name}`}
+                        accessibilityState={{ expanded: addToSprintId === sprint.id }}
+                        hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+                        <IconSymbol name="plus" size={14} color={addToSprintId === sprint.id ? c.accent : c.sub} />
+                      </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity
+                      onPress={() => (sprintDraft?.sprint?.id === sprint.id ? setSprintDraft(null) : openSprintRename(sprint))}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.sprintRename}
+                      hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+                      <IconSymbol name="pencil" size={14} color={c.sub} />
+                    </TouchableOpacity>
+                    {/* Закриття — завжди через діалог перенесення, навіть коли
+                        незавершених немає: інакше та сама кнопка поводилась би
+                        по-різному залежно від невидимого стану. */}
+                    <TouchableOpacity
+                      onPress={() => (closed
+                        ? reopenSprint(sprint)
+                        : setClosingSprint(prev => (prev?.id === sprint.id ? null : sprint)))}
+                      accessibilityRole="button"
+                      accessibilityLabel={closed ? tr.sprintReopen : tr.sprintClose}
+                      hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+                      <IconSymbol name={closed ? 'arrow.uturn.backward' : 'flag.fill'} size={14} color={c.sub} />
+                    </TouchableOpacity>
+                  </>
+                ) : null}
+              </View>
+              {sprint && sprintDraft?.sprint?.id === sprint.id ? renderSprintForm() : null}
+              {sprint && closingSprint?.id === sprint.id ? renderCloseSprint(closingSprint) : null}
+              {open ? (
+                group.tasks.length === 0 ? (
+                  addToSprintId === sprint?.id ? null : (
+                    <Text style={{ color: c.sub, fontSize: 12, opacity: 0.7, paddingVertical: 8 }}>{tr.sprintEmpty}</Text>
+                  )
+                ) : group.tasks.map(task => renderTaskRow(task, project))
+              ) : null}
+              {/* Рядок «+ задача» саме в цей спринт — інлайн, без другої модалки. */}
+              {sprint && !closed && addToSprintId === sprint.id ? (
+                <View style={[st.addRow, { borderColor: c.accent + '60', backgroundColor: c.dim, marginTop: 8 }]}>
+                  <IconSymbol name="flag" size={13} color={project.color} />
+                  <TextInput
+                    placeholder={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
+                    placeholderTextColor={c.sub}
+                    value={sprintTaskTitle}
+                    onChangeText={setSprintTaskTitle}
+                    onSubmitEditing={() => { void addTask(project.id, sprint); }}
+                    returnKeyType="done"
+                    autoFocus
+                    style={{ flex: 1, color: c.text, fontSize: 14, paddingVertical: 10 }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => openFullTaskForm(project.id, sprint.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.openFullTaskForm}
+                    hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
+                    <IconSymbol name="arrow.up.right" size={16} color={c.sub} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => { void addTask(project.id, sprint); }}
+                    disabled={!sprintTaskTitle.trim()}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.sprintAddTaskA11y}
+                    hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}>
+                    <IconSymbol name="plus" size={17} color={sprintTaskTitle.trim() ? project.color : c.sub} />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           );
         })}
-
-        {backlogTasks.length > 0 ? (
-          <View style={{ marginTop: 6 }}>
-            {/* Заголовок беклогу з'являється лише коли є що ділити: у проєкті
-                без спринтів це був би підпис над усіма задачами підряд. */}
-            {projectSprints.length > 0 ? (
-              <View style={st.sprintHeader}>
-                <IconSymbol name="tray" size={13} color={c.sub} />
-                <Text style={{ flex: 1, color: c.sub, fontSize: 13, fontWeight: '700' }}>{tr.sprintBacklog}</Text>
-                <Text style={{ color: c.sub, fontSize: 11, fontVariant: ['tabular-nums'] }}>{backlogTasks.length}</Text>
-              </View>
-            ) : null}
-            {backlogTasks.map(task => renderTaskRow(task, project))}
-          </View>
-        ) : null}
 
         <View style={[st.addRow, { borderColor: c.border, backgroundColor: c.dim }]}>
           <TextInput
@@ -888,17 +1397,194 @@ export default function ProjectsScreen() {
             style={{ flex: 1, color: c.text, fontSize: 14, paddingVertical: 10 }}
           />
           <TouchableOpacity
+            onPress={() => openFullTaskForm(project.id, null)}
+            accessibilityRole="button"
+            accessibilityLabel={tr.openFullTaskForm}
+            hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
+            <IconSymbol name="arrow.up.right" size={16} color={c.sub} />
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => { void addTask(project.id); }}
             disabled={!newTaskTitle.trim()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            accessibilityRole="button"
+            accessibilityLabel={tr.projectAddTask}
+            hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}>
             <IconSymbol name="plus" size={17} color={newTaskTitle.trim() ? project.color : c.sub} />
           </TouchableOpacity>
         </View>
+
+        {/* Зустрічі проєкту: найближчі зверху (повтори — найближчим
+            екземпляром), минулі — згорнуті під «Минулі (N)». Секція є завжди
+            (як вкладка на вебі): інакше створити першу зустріч проєкту звідси
+            не було б як. Тап по рядку — перегляд у цій же панелі. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 8 }}>
+          <Text style={[st.detailLabel, { color: c.sub, flex: 1, marginTop: 0, marginBottom: 0 }]}>{tr.meetings}</Text>
+          <TouchableOpacity
+            onPress={() => openMeetingForm({ initial: null, projectId: project.id })}
+            accessibilityRole="button"
+            accessibilityLabel={tr.addMeeting}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <IconSymbol name="plus" size={17} color={project.color} />
+          </TouchableOpacity>
+        </View>
+        {meetingSections.upcoming.length === 0 && meetingSections.past.length === 0 ? (
+          <Text style={{ color: c.sub, fontSize: 12, opacity: 0.8, paddingVertical: 4 }}>{tr.projectMeetingsEmpty}</Text>
+        ) : (
+          <>
+            {meetingSections.upcoming.length === 0 ? (
+              <Text style={{ color: c.sub, fontSize: 12, opacity: 0.8, paddingVertical: 4 }}>{tr.projectMeetingsNoUpcoming}</Text>
+            ) : meetingSections.upcoming.map(({ meeting, date, time }) => (
+              <TouchableOpacity
+                key={`${meeting.id}_${date}`}
+                onPress={() => openProjectMeeting(meeting, date)}
+                accessibilityRole="button"
+                accessibilityLabel={meeting.title}
+                activeOpacity={0.75}
+                style={[st.meetingRow, { borderColor: c.border }]}>
+                <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: meeting.color }} />
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{meeting.title}</Text>
+                    {meeting.recurrence ? <IconSymbol name="repeat" size={11} color={c.sub} /> : null}
+                  </View>
+                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                    {meetingDate(date, locale, { today: tr.today, tomorrow: tr.tomorrow })}{time ? ` · ${time}` : ''}
+                  </Text>
+                </View>
+                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              </TouchableOpacity>
+            ))}
+            {meetingSections.past.length > 0 ? (
+              <>
+                <TouchableOpacity
+                  onPress={() => setShowPastMeetings(v => !v)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showPastMeetings }}
+                  hitSlop={{ top: 8, bottom: 8 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10 }}>
+                  <IconSymbol name={showPastMeetings ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
+                  <Text style={{ color: c.sub, fontSize: 13, fontWeight: '700' }}>
+                    {tr.projectMeetingsPast.replace('{count}', String(meetingSections.past.length))}
+                  </Text>
+                </TouchableOpacity>
+                {showPastMeetings ? meetingSections.past.map(meeting => (
+                  <TouchableOpacity
+                    key={meeting.id}
+                    onPress={() => openProjectMeeting(meeting, meeting.date)}
+                    accessibilityRole="button"
+                    accessibilityLabel={meeting.title}
+                    activeOpacity={0.75}
+                    style={[st.meetingRow, { borderColor: c.border, opacity: 0.6 }]}>
+                    <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: meeting.color }} />
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{meeting.title}</Text>
+                      <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                        {meetingDate(meeting.date, locale, { today: tr.today, tomorrow: tr.tomorrow })}{meeting.time ? ` · ${meeting.time}` : ''}
+                      </Text>
+                    </View>
+                    <IconSymbol name="chevron.right" size={13} color={c.sub} />
+                  </TouchableOpacity>
+                )) : null}
+              </>
+            ) : null}
+          </>
+        )}
+
+        {/* Підписки проєкту: сума за місяць по кожній валюті (без конвертації),
+            далі живі підписки за датою оплати. Тап / «+» — на екран підписок
+            (на телефоні спершу закриваємо модалку деталі). */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 20, marginBottom: 8 }}>
+          <Text style={[st.detailLabel, { color: c.sub, flex: 1, marginTop: 0, marginBottom: 0 }]}>{tr.navSubscriptions}</Text>
+          <TouchableOpacity
+            onPress={() => navigateFromDetail(() => router.push({ pathname: '/subscriptions', params: { create: '1', projectId: project.id } }))}
+            accessibilityRole="button"
+            accessibilityLabel={tr.subNew}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <IconSymbol name="plus" size={17} color={project.color} />
+          </TouchableOpacity>
+        </View>
+        {projectSubscriptions.live.length === 0 ? (
+          <Text style={{ color: c.sub, fontSize: 12, opacity: 0.8, paddingVertical: 4 }}>{tr.subProjectEmpty}</Text>
+        ) : (
+          <>
+            <Text style={{ color: c.text, fontSize: 15, fontWeight: '800', marginBottom: 4 }}>{projectSubscriptions.monthlyLine}</Text>
+            {projectSubscriptions.live.map(sub => {
+              const overdue = subscriptionStatus(sub, projectSubscriptions.today) === 'overdue';
+              return (
+                <TouchableOpacity
+                  key={sub.id}
+                  onPress={() => navigateFromDetail(() => router.push({ pathname: '/subscriptions', params: { open: sub.id } }))}
+                  accessibilityRole="button"
+                  accessibilityLabel={sub.name}
+                  activeOpacity={0.75}
+                  style={[st.meetingRow, { borderColor: c.border }]}>
+                  <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: sub.color || project.color }} />
+                  <View style={{ flex: 1 }}>
+                    <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{sub.name}</Text>
+                    <Text numberOfLines={1} style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 11, marginTop: 2, fontWeight: overdue ? '700' : '400' }}>
+                      {overdue ? `${tr.subOverdue} · ` : ''}{meetingDate(sub.nextPaymentDate, locale, { today: tr.today, tomorrow: tr.tomorrow })}
+                    </Text>
+                  </View>
+                  <Text style={{ color: overdue ? '#EF4444' : c.text, fontSize: 13, fontWeight: '700' }}>
+                    {formatSubscriptionMoney(sub.amount, sub.currency, subCurrencies, locale)}
+                  </Text>
+                  <IconSymbol name="chevron.right" size={13} color={c.sub} />
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        )}
       </View>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [c, locale, tr, selectedTasks, newTaskTitle, toggleTask, addTask, router,
-      projectSprints, sprintGroups, backlogTasks, renderTaskRow, openSprintCreate, openSprintRename, reopenSprint]);
+  }, [c, locale, tr, selectedTasks, newTaskTitle, toggleTask, addTask, router, projectSubscriptions, subCurrencies, navigateFromDetail,
+      projectSprints, taskGroups, expandedGroups, renderTaskRow, openSprintCreate, openSprintRename, reopenSprint,
+      sprintDraft, closingSprint, renderSprintForm, renderCloseSprint, openEditOverDetail,
+      addToSprintId, sprintTaskTitle, openFullTaskForm, meetingSections, showPastMeetings,
+      openMeetingForm, openProjectMeeting]);
+
+  // ─── Перегляд зустрічі в панелі деталі ─────────────────────────────────────
+  // Оригінал — лише зі свіжого масиву: видалена деінде зустріч просто повертає
+  // панель до проєкту. Для серії показуємо дату натиснутого екземпляра.
+  const viewedMeetingOrig = viewedMeeting ? meetings.find(m => m.id === viewedMeeting.origId) ?? null : null;
+  const viewedMeetingShown: Meeting | null = viewedMeetingOrig && viewedMeeting
+    ? (!viewedMeetingOrig.recurrence || viewedMeeting.date === viewedMeetingOrig.date
+        ? viewedMeetingOrig
+        : { ...viewedMeetingOrig, id: `${viewedMeetingOrig.id}_${viewedMeeting.date}`, date: viewedMeeting.date, _origId: viewedMeetingOrig.id })
+    : null;
+  const viewedMeetingTimer = viewedMeetingOrig ? findTimerForMeeting(activeTimers, viewedMeetingOrig.id) : undefined;
+  const meetingDetailColors = { text: c.text, sub: c.sub, border: c.border, dim: c.dim };
+
+  const editViewedMeeting = useCallback(() => {
+    if (!viewedMeetingOrig) return;
+    const m = viewedMeetingOrig;
+    openMeetingForm({
+      initial: {
+        id: m.id, title: m.title, date: m.date, time: m.time, durationMinutes: m.durationMinutes,
+        location: m.location, link: m.link, notes: m.notes, color: m.color, recurrence: m.recurrence,
+        projectId: m.projectId,
+      },
+    });
+  }, [viewedMeetingOrig, openMeetingForm]);
+
+  const toggleViewedMeetingTimer = useCallback(() => {
+    if (!viewedMeetingOrig) return;
+    // Таймер завжди адресує ОРИГІНАЛ (meeting:<origId>).
+    if (viewedMeetingTimer) void stopTimer(viewedMeetingTimer.id);
+    else void startMeetingTimer({ id: viewedMeetingOrig.id, title: viewedMeetingOrig.title });
+  }, [viewedMeetingOrig, viewedMeetingTimer, stopTimer, startMeetingTimer]);
+
+  const meetingViewHeader = viewedMeetingShown && viewedMeetingOrig ? (
+    <MeetingDetailHeader
+      meeting={viewedMeetingShown}
+      original={viewedMeetingOrig}
+      onEdit={editViewedMeeting}
+      onClose={closeProjectMeeting}
+      isExpanded={isExpanded}
+      colors={meetingDetailColors}
+      tr={tr}
+    />
+  ) : undefined;
 
   // Шапка їде разом зі списком, як і раніше, — тому вона ListHeaderComponent,
   // а не окремий фіксований блок над FlatList.
@@ -1023,19 +1709,44 @@ export default function ProjectsScreen() {
         <DetailPane
           open={!!selectedStats}
           wide={isExpanded}
-          onClose={() => setSelectedId(null)}
+          onClose={() => { setSelectedId(null); setViewedMeeting(null); }}
           isDark={isDark}
           sheetColor={c.sheet}
           borderColor={c.border}
           maxHeight={height * 0.86}
           scrollRef={detailScrollRef}
+          header={meetingViewHeader}
           empty={
             <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 }}>
               {tr.projectPickHint}
             </Text>
           }>
-          {selectedStats ? renderDetail(selectedStats) : null}
+          {viewedMeetingShown && viewedMeetingOrig ? (
+            <MeetingDetailBody
+                meeting={viewedMeetingShown}
+                original={viewedMeetingOrig}
+                project={meetingProject(viewedMeetingOrig, projects)}
+                timer={viewedMeetingTimer}
+                onToggleTimer={toggleViewedMeetingTimer}
+                onEdit={editViewedMeeting}
+                colors={meetingDetailColors}
+                tr={tr}
+                locale={locale}
+              />
+          ) : selectedStats ? renderDetail(selectedStats) : null}
         </DetailPane>
+
+        <MeetingFormSheet
+          visible={!!meetingForm}
+          initial={meetingForm?.initial ?? null}
+          presetProjectId={meetingForm?.projectId}
+          onClose={closeMeetingForm}
+          onSave={data => { void saveProjectMeeting(data); }}
+          isDark={isDark}
+          lang={lang}
+          tr={tr}
+          projects={projects}
+        />
         </View>
       </SafeAreaView>
 
@@ -1141,143 +1852,6 @@ export default function ProjectsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ─── Спринт: створення / перейменування ─── */}
-      <Modal
-        visible={!!sprintDraft}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setSprintDraft(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={() => setSprintDraft(null)}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-              <BlurView
-                intensity={isDark ? 50 : 70}
-                tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-                <Text style={[st.sheetTitle, { color: c.text }]}>
-                  {sprintDraft?.sprint ? tr.sprintRename : tr.sprintNew}
-                </Text>
-                <TextInput
-                  placeholder={tr.sprintNamePlaceholder}
-                  placeholderTextColor={c.sub}
-                  value={sprintName}
-                  onChangeText={setSprintName}
-                  onSubmitEditing={saveSprint}
-                  returnKeyType="done"
-                  autoFocus
-                  style={[st.input, { backgroundColor: c.dim, color: c.text }]}
-                />
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 22 }}>
-                  <TouchableOpacity onPress={() => setSprintDraft(null)} style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={saveSprint}
-                    disabled={!sprintName.trim()}
-                    style={[st.btn, { flex: 2, backgroundColor: sprintName.trim() ? c.accent : c.dim }]}>
-                    <Text style={{ color: sprintName.trim() ? '#fff' : c.sub, fontWeight: '700' }}>
-                      {sprintDraft?.sprint ? tr.save : tr.create}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </BlurView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* ─── Закриття спринта: куди перенести незавершені ───
-          Список, а не Alert: цілей може бути скільки завгодно, а Alert на iOS
-          більше трьох кнопок не показує. */}
-      <Modal
-        visible={!!closingSprint}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setClosingSprint(null)}>
-        <Pressable style={st.overlay} onPress={() => setClosingSprint(null)}>
-          <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-            <BlurView
-              intensity={isDark ? 50 : 70}
-              tint={isDark ? 'dark' : 'light'}
-              style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-              <Text style={[st.sheetTitle, { color: c.text, marginBottom: 6 }]}>{tr.sprintMoveTitle}</Text>
-              <Text style={{ color: c.sub, fontSize: 12, marginBottom: 16 }}>{tr.sprintMoveHint}</Text>
-              <ScrollView style={{ maxHeight: height * 0.4 }} showsVerticalScrollIndicator={false}>
-                {closingSprint ? sprintMoveTargets(sprints, closingSprint).map(target => (
-                  <TouchableOpacity
-                    key={target.id}
-                    onPress={() => { void closeSprint(closingSprint, target); }}
-                    style={[st.pickRow, { borderColor: c.border }]}>
-                    <IconSymbol name="flag" size={14} color={c.accent} />
-                    <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{target.name}</Text>
-                  </TouchableOpacity>
-                )) : null}
-                <TouchableOpacity
-                  onPress={() => { if (closingSprint) void closeSprint(closingSprint, null); }}
-                  style={[st.pickRow, { borderColor: c.border }]}>
-                  <IconSymbol name="tray" size={14} color={c.sub} />
-                  <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{tr.sprintMoveToBacklog}</Text>
-                </TouchableOpacity>
-              </ScrollView>
-              <TouchableOpacity onPress={() => setClosingSprint(null)} style={[st.btn, { marginTop: 16, backgroundColor: c.dim }]}>
-                <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-              </TouchableOpacity>
-            </BlurView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* ─── Задача → спринт ─── */}
-      <Modal
-        visible={!!movingTask}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setMovingTask(null)}>
-        <Pressable style={st.overlay} onPress={() => setMovingTask(null)}>
-          <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-            <BlurView
-              intensity={isDark ? 50 : 70}
-              tint={isDark ? 'dark' : 'light'}
-              style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-              <Text style={[st.sheetTitle, { color: c.text, marginBottom: 6 }]}>{tr.sprintPick}</Text>
-              <Text numberOfLines={2} style={{ color: c.sub, fontSize: 12, marginBottom: 16 }}>{movingTask?.title}</Text>
-              <ScrollView style={{ maxHeight: height * 0.4 }} showsVerticalScrollIndicator={false}>
-                {/* Закриті спринти як ціль не пропонуються: покласти живу
-                    роботу в заморожену пачку означає сховати її від себе. */}
-                {projectSprints.filter(sprint => !isSprintClosed(sprint)).map(sprint => {
-                  const current = movingTask?.sprintId === sprint.id;
-                  return (
-                    <TouchableOpacity
-                      key={sprint.id}
-                      onPress={() => { if (movingTask) void setTaskSprint(movingTask.id, sprint); }}
-                      style={[st.pickRow, { borderColor: current ? c.accent : c.border }]}>
-                      <IconSymbol name="flag" size={14} color={current ? c.accent : c.sub} />
-                      <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{sprint.name}</Text>
-                      {current ? <IconSymbol name="checkmark" size={13} color={c.accent} /> : null}
-                    </TouchableOpacity>
-                  );
-                })}
-                <TouchableOpacity
-                  onPress={() => { if (movingTask) void setTaskSprint(movingTask.id, null); }}
-                  style={[st.pickRow, { borderColor: movingTask?.sprintId ? c.border : c.accent }]}>
-                  <IconSymbol name="tray" size={14} color={movingTask?.sprintId ? c.sub : c.accent} />
-                  <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{tr.sprintBacklog}</Text>
-                  {movingTask?.sprintId ? null : <IconSymbol name="checkmark" size={13} color={c.accent} />}
-                </TouchableOpacity>
-                {projectSprints.length === 0 ? (
-                  <Text style={{ color: c.sub, fontSize: 12, paddingVertical: 10 }}>{tr.sprintNoSprints}</Text>
-                ) : null}
-              </ScrollView>
-              <TouchableOpacity onPress={() => setMovingTask(null)} style={[st.btn, { marginTop: 16, backgroundColor: c.dim }]}>
-                <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-              </TouchableOpacity>
-            </BlurView>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -1293,6 +1867,9 @@ const st = StyleSheet.create({
   metaChip:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
   sprintHeader:{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, paddingBottom: 4 },
   pickRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, marginBottom: 8 },
+  inlinePanel: { borderWidth: 1, borderRadius: 14, padding: 12, marginVertical: 8 },
+  meetingRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 9 },
+  statusChip:  { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 96, borderWidth: 1, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 },
 
   pageTitle:   { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
   headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

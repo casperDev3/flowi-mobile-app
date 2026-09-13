@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { UpcomingPaymentsCard, useUpcomingPayments } from '@/components/finance/UpcomingPaymentsCard';
+import { MeetingProjectChip } from '@/components/meetings/MeetingProjectChip';
 import { RingCell } from '@/components/health/RingCell';
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { PressableScale } from '@/components/shared/PressableScale';
@@ -25,6 +27,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useMotion } from '@/hooks/use-motion';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { loadData } from '@/store/storage';
+import { useTimerContext } from '@/store/timer-context';
+import { meetingProject, meetingsOnDate, orderTodayMeetings, type Meeting } from '@/utils/meetings';
 import { mergeTaskStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { groupTodayTasks } from '@/utils/todayGroups';
 import { saveSynced } from '@/store/synced-storage';
@@ -48,11 +52,9 @@ import { useResponsive } from '@/hooks/use-responsive';
 
 interface TimeEntry { id: string; duration: number; date: string; }
 
-interface TodayMeeting {
+interface TodayProject {
   id: string;
-  title: string;
-  date: string;   // "YYYY-MM-DD"
-  time: string;
+  name: string;
   color: string;
 }
 
@@ -110,6 +112,8 @@ export default function TodayScreen() {
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const c = getHealthColors(isDark);
   useScreenView('today');
+  // Найближчі й прострочені оплати підписок — окремий блок, власне читання сховища.
+  const upcomingPayments = useUpcomingPayments();
 
   const [tasks,    setTasks]    = useState<Task[]>([]);
   const [txs,      setTxs]      = useState<Transaction[]>([]);
@@ -123,7 +127,8 @@ export default function TodayScreen() {
   const [time,     setTime]     = useState<TimeEntry[]>([]);
   const [health,   setHealth]   = useState<HealthEntry[]>([]);
   const [profile,  setProfile]  = useState<HealthProfile | null>(null);
-  const [meetings, setMeetings] = useState<TodayMeeting[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [projects, setProjects] = useState<TodayProject[]>([]);
   const [habits,   setHabits]   = useState<Habit[]>([]);
   const [statusColumns, setStatusColumns] = useState<TaskStatusColumn[]>([]);
   const [notesCount, setNotesCount] = useState(0);
@@ -132,22 +137,24 @@ export default function TodayScreen() {
   const firstLoadDone = useRef(false);
 
   const load = useCallback(async () => {
-    const [t, cols, x, tm, h, p, m, hb, notes, curs, primary, accs] = await Promise.all([
+    const [t, cols, x, tm, h, p, m, hb, notes, curs, primary, accs, prj] = await Promise.all([
       loadData<Task[]>('tasks', []),
       loadData<TaskStatusColumn[]>('task_statuses', []),
       loadData<Transaction[]>('transactions', []),
       loadData<TimeEntry[]>('time_entries', []),
       loadData<HealthEntry[]>('health_entries_v2', []),
       loadData<HealthProfile | null>('health_profile', null),
-      loadData<TodayMeeting[]>('meetings', []),
+      loadData<Meeting[]>('meetings', []),
       loadData<Habit[]>('health_habits', []),
       loadData<{ updatedAt?: string; createdAt?: string }[]>('notes', []),
       loadData<Currency[]>('finance_currencies', []),
       loadData<string>('finance_primary_currency', 'UAH'),
       loadData<Account[]>('accounts', []),
+      loadData<TodayProject[]>('projects', []),
     ]);
     setTasks(t); setStatusColumns(cols); setTxs(x); setTime(tm); setHealth(h); setProfile(p);
-    setMeetings(m); setHabits(hb);
+    setMeetings(Array.isArray(m) ? m : []); setHabits(hb);
+    setProjects(Array.isArray(prj) ? prj.filter(x => x && typeof x.id === 'string') : []);
     setNotesCount(Array.isArray(notes) ? notes.length : 0);
     setCurrencies(Array.isArray(curs) ? curs : []);
     setPrimaryCode(typeof primary === 'string' && primary ? primary : 'UAH');
@@ -246,25 +253,43 @@ export default function TodayScreen() {
     .filter(e => isSameDay(new Date(e.date), today))
     .reduce((s, e) => s + (e.duration || 0), 0);
 
-  // Today's meetings
+  // Today's meetings — разом із екземплярами повторюваних (як секція на
+  // екрані Завдань і веб-дашборд): поточні/майбутні за часом, минулі в кінці.
   const todayMeetings = useMemo(
-    () => meetings.filter(m => isSameDay(new Date(m.date + 'T00:00'), today)),
+    () => orderTodayMeetings(meetingsOnDate(meetings, today), today),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [meetings],
   );
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
+  const { stopTimerForTask } = useTimerContext();
+
   const handleToggleTask = useCallback(async (id: string) => {
     const fresh = await loadData<Task[]>('tasks', []);
+    let becameDone = false;
     const updated = fresh.map(t => {
       if (t.id !== id) return t;
+      becameDone = t.status !== 'done';
       return { ...t, status: t.status === 'done' ? 'active' : 'done' } as Task;
     });
     await saveSynced('tasks', updated);
     setTasks(updated);
     haptic.light();
-  }, []);
+    // Як на екрані Завдань (pendingTimerStops) і у вебі: «готово» зупиняє
+    // таймер задачі — ПІСЛЯ того, як наш запис 'tasks' ліг у сховище, бо стор
+    // дописує сесію тим самим read-modify-write. Без таймера — no-op (стор
+    // звіряється зі свіжим реєстром і нічого не пише).
+    if (becameDone) {
+      await stopTimerForTask(id);
+      setTasks(await loadData<Task[]>('tasks', []));
+    }
+  }, [stopTimerForTask]);
+
+  /** Перегляд зустрічі — на екрані Завдань (там живе MeetingDetail), екземпляр за датою. */
+  const openMeeting = useCallback((m: Meeting) => {
+    router.push({ pathname: '/', params: { meeting: m._origId ?? m.id, meetingDate: m.date } });
+  }, [router]);
 
   const handleAddWater = useCallback(async () => {
     const newEntry: HealthEntry = {
@@ -408,11 +433,13 @@ export default function TodayScreen() {
             <Section index={1} wide={isWide} motion={motion}>
               <View style={{ marginBottom: 12 }}>
                 <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayMeetings}</Text>
-                {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(m => (
+                {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(({ meeting: m, phase }) => (
                   <PressableScale
                     key={m.id}
-                    onPress={() => router.push('/meetings')}
-                    style={{ marginBottom: 6 }}>
+                    onPress={() => openMeeting(m)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${m.time} ${m.title}`}
+                    style={{ marginBottom: 6, opacity: phase === 'past' ? 0.5 : 1 }}>
                     <BlurView
                       intensity={isDark ? 18 : 36}
                       tint={isDark ? 'dark' : 'light'}
@@ -420,6 +447,7 @@ export default function TodayScreen() {
                       <View style={[s.meetingBar, { backgroundColor: m.color || ACCENT_TASK }]} />
                       <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
                       <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
+                      <MeetingProjectChip project={meetingProject(m, projects)} textColor={c.sub} maxWidth={110} />
                     </BlurView>
                   </PressableScale>
                 ))}
@@ -432,6 +460,13 @@ export default function TodayScreen() {
                   />
                 )}
               </View>
+            </Section>
+          )}
+
+          {/* 2б. Найближчі оплати / прострочені підписки */}
+          {upcomingPayments.items.length > 0 && (
+            <Section index={1} wide={isWide} motion={motion}>
+              <UpcomingPaymentsCard data={upcomingPayments} isDark={isDark} c={c} tr={tr} lang={lang} />
             </Section>
           )}
 

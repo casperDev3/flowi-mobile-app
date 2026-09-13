@@ -13,12 +13,18 @@ import React from 'react';
 import { Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { CalendarGrid } from '@/components/tasks/CalendarGrid';
+import { PriorityPicker } from '@/components/tasks/PriorityPicker';
 import { PickerField, type PickerCreateOption } from '@/components/shared/PickerField';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import type { useTaskEditor } from '@/hooks/use-task-editor';
+import { draftCurrentSprintId, type useTaskEditor } from '@/hooks/use-task-editor';
 import type { Translations } from '@/store/translations';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
-import type { Priority } from '@/utils/taskUtils';
+import {
+  sprintFieldVisible,
+  sprintOptionLabel,
+  sprintOptionsForTask,
+  type Sprint,
+} from '@/utils/sprintUtils';
 
 export interface EditFormProject {
   id: string;
@@ -27,8 +33,8 @@ export interface EditFormProject {
 }
 
 export interface TaskEditFormProps {
-  /** Заголовок форми: «Нове завдання» або «Редагувати». */
-  title: string;
+  /** Заголовок форми: «Нове завдання» або «Редагувати». Порожній — не малюється (його показує шапка деталі). */
+  title?: string;
   /** Підпис кнопки підтвердження. */
   submitLabel: string;
   editor: ReturnType<typeof useTaskEditor>;
@@ -44,9 +50,13 @@ export interface TaskEditFormProps {
    * Без пропа поле лишається просто вибором зі списку.
    */
   projectCreateOption?: PickerCreateOption;
+  /**
+   * Усі спринти. Поле «Спринт» з'являється лише тоді, коли в обраного проєкту
+   * є з чого вибирати (sprintFieldVisible). Без пропа поля немає.
+   */
+  sprints?: readonly Sprint[];
   /** Сітка місяця для вибору дедлайну. */
   deadlineWeeks: (number | null)[][];
-  priorityMeta: Record<Priority, { label: string; color: string }>;
   months: string[];
   weekdays: string[];
   /** Пресети дедлайну: «сьогодні», «завтра», «+3», «+7». */
@@ -60,15 +70,25 @@ export interface TaskEditFormProps {
   locale: string;
 }
 
+const NO_SPRINTS: readonly Sprint[] = [];
+
 export function TaskEditForm({
-  title, submitLabel, editor, taskStatuses, pickableProjects, projects, projectCreateOption, deadlineWeeks,
-  priorityMeta: PRIORITY, months: MONTHS_UA, weekdays: WEEKDAYS_SHORT,
+  title, submitLabel, editor, taskStatuses, pickableProjects, projects, projectCreateOption, sprints = NO_SPRINTS, deadlineWeeks,
+  months: MONTHS_UA, weekdays: WEEKDAYS_SHORT,
   deadlinePresets: DEADLINE_PRESETS,
   today, onSave, onCancel, colors: c, isDark, tr, locale,
 }: TaskEditFormProps) {
+  const { projectId, sprintId } = editor.draft;
+  // Варіанти — від поточного АБО вихідного спринта (як веб): «Беклог» не
+  // мусить ховати закритий/чужий спринт задачі, до якого ще можна повернутись.
+  const currentSprintId = draftCurrentSprintId(editor.draft, editor.original);
+  const showSprint = sprintFieldVisible(sprints, projectId, currentSprintId);
+  const sprintOptions = showSprint ? sprintOptionsForTask(sprints, projectId, currentSprintId) : [];
+  const sprintLabels = { closedSuffix: tr.sprintClosedSuffix, foreign: tr.sprintForeignProject };
   return (
     <>
-        <Text style={[st.sheetTitle, { color: c.text }]}>{title}</Text>
+        {/* Без title заголовок малює власна шапка (липка шапка деталі). */}
+        {title ? <Text style={[st.sheetTitle, { color: c.text }]}>{title}</Text> : null}
 
         <TextInput
           placeholder={tr.taskNamePlaceholder}
@@ -86,13 +106,11 @@ export function TaskEditForm({
         />
 
         <Text style={[st.label, { color: c.sub }]}>{tr.priority}</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {(['high', 'medium', 'low'] as Priority[]).map(p => (
-            <TouchableOpacity key={p} onPress={() => editor.patch({ priority: p })} style={[st.priorityBtn, { borderColor: PRIORITY[p].color, backgroundColor: editor.draft.priority === p ? PRIORITY[p].color : 'transparent' }]}>
-              <Text style={{ color: editor.draft.priority === p ? '#fff' : PRIORITY[p].color, fontSize: 12, fontWeight: '600' }}>{PRIORITY[p].label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <PriorityPicker
+          value={editor.draft.priorityLevel}
+          onChange={level => editor.patch({ priorityLevel: level })}
+          colors={c}
+        />
 
         <Text style={[st.label, { color: c.sub }]}>{tr.statusLabel}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -115,7 +133,8 @@ export function TaskEditForm({
           icon="folder"
           options={pickableProjects.map(p => ({ id: p.id, label: p.name, color: p.color }))}
           value={editor.draft.projectId ?? null}
-          onSelect={id => editor.patch({ projectId: id })}
+          // Зміна проєкту скидає спринт у «Беклог»: спринт належить проєкту.
+          onSelect={id => editor.patch(id === projectId ? { projectId: id } : { projectId: id, sprintId: null })}
           emptyOption={{ label: tr.noProject }}
           selectedLabel={projects.find(p => p.id === editor.draft.projectId)?.name ?? null}
           alwaysSearch
@@ -124,6 +143,42 @@ export function TaskEditForm({
           isDark={isDark}
           tr={tr}
         />
+
+        {/* Спринт — лише коли в проєкту є відкриті спринти (або задача вже
+            лежить у закритому/чужому — тоді він теж варіант, щоб правка назви
+            не переносила задачу). «Беклог» — завжди перший. */}
+        {showSprint ? (
+          <>
+            <Text style={[st.label, { color: c.sub }]}>{tr.sprintField}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <View style={{ flexDirection: 'row', gap: 7 }}>
+                {[{ id: null as string | null, label: tr.sprintBacklog, icon: 'tray' as const },
+                  ...sprintOptions.map(option => ({
+                    id: option.id as string | null,
+                    label: sprintOptionLabel(option, sprintLabels),
+                    icon: 'flag' as const,
+                  })),
+                ].map(option => {
+                  const on = (sprintId ?? null) === option.id;
+                  return (
+                    <TouchableOpacity
+                      key={option.id ?? '__backlog'}
+                      onPress={() => editor.patch({ sprintId: option.id })}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      accessibilityLabel={`${tr.sprintField}: ${option.label}`}
+                      style={[st.sortChip, { backgroundColor: on ? c.accent : c.dim, borderColor: on ? c.accent : c.border }]}>
+                      <IconSymbol name={option.icon} size={12} color={on ? '#fff' : c.sub} />
+                      <Text numberOfLines={1} style={{ color: on ? '#fff' : c.text, fontSize: 12, fontWeight: '600', marginLeft: 5, maxWidth: 180 }}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </>
+        ) : null}
 
         <Text style={[st.label, { color: c.sub }]}>{tr.timeEstimate}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -312,7 +367,6 @@ const st = StyleSheet.create({
   sheetTitle:     { fontSize: 20, fontWeight: '800', marginBottom: 18 },
   label:          { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
   input:          { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
-  priorityBtn:    { flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, alignItems: 'center' },
   badge:          { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
   btn:            { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },

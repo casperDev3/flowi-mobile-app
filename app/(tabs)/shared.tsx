@@ -28,7 +28,18 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { OfflineOverlay } from '@/components/shared/OfflineOverlay';
+import { PriorityBadge } from '@/components/tasks/PriorityBadge';
+import { PriorityPicker } from '@/components/tasks/PriorityPicker';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import {
+  DEFAULT_PRIORITY_LEVEL,
+  comparePriority,
+  isPriorityLevel,
+  normalizePriority,
+  sharedPriorityFields,
+  type LegacyPriority,
+  type TaskPriority,
+} from '@/utils/taskUtils';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiFetch } from '@/store/api';
 import { isOnlineMode, useAppMode } from '@/store/app-mode';
@@ -82,7 +93,6 @@ async function api(path: string, method = 'GET', body?: object): Promise<any> {
 const GROUPS_COLUMN_WIDTH = 340;
 
 type SectionType = 'shopping' | 'tasks' | 'notes';
-type Priority    = 'high' | 'medium' | 'low';
 type SortMode    = 'newest' | 'oldest' | 'alpha' | 'priority';
 type FilterMode  = 'all' | 'active' | 'done';
 
@@ -95,7 +105,10 @@ interface LocalItem {
   // type-specific extras
   qty?:      string;
   unit?:     string;
-  priority?: Priority;
+  /** Легасі-пріоритет. Для «без пріоритету» ключа немає (sharedPriorityFields). */
+  priority?: LegacyPriority;
+  /** P0…P5 / null — CONTRACT §B.7. Старі збірки його гублять; читати через normalizePriority. */
+  priorityLevel?: TaskPriority;
   note?:     string;
 }
 
@@ -119,10 +132,6 @@ const SECTION_ICON: Record<SectionType, string> = {
 const TAB_ORDER: SectionType[] = ['shopping', 'tasks', 'notes'];
 
 const UNITS = ['шт', 'кг', 'г', 'л', 'мл', 'упак', 'пачк'];
-
-const PRIORITY_COLOR: Record<Priority, string> = {
-  high: '#EF4444', medium: '#F59E0B', low: '#10B981',
-};
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 
@@ -264,7 +273,7 @@ export default function SharedScreen() {
   const [addText, setAddText]         = useState('');
   const [addQty, setAddQty]           = useState('1');
   const [addUnit, setAddUnit]         = useState('шт');
-  const [addPriority, setAddPriority] = useState<Priority>('medium');
+  const [addPriority, setAddPriority] = useState<TaskPriority>(DEFAULT_PRIORITY_LEVEL);
   const [addNote, setAddNote]         = useState('');
 
   // ─── Edit item state ──────────────────────────────────────────────────────
@@ -273,7 +282,7 @@ export default function SharedScreen() {
   const [editText, setEditText]           = useState('');
   const [editQty, setEditQty]             = useState('1');
   const [editUnit, setEditUnit]           = useState('шт');
-  const [editPriority, setEditPriority]   = useState<Priority>('medium');
+  const [editPriority, setEditPriority]   = useState<TaskPriority>(DEFAULT_PRIORITY_LEVEL);
   const [editNote, setEditNote]           = useState('');
 
   // ─── Section management ───────────────────────────────────────────────────
@@ -565,6 +574,9 @@ export default function SharedScreen() {
       qty:        remote.data?.qty,
       unit:       remote.data?.unit,
       priority:   remote.data?.priority,
+      // Лише валідне значення або явний null; сміття (і відсутність) — без ключа.
+      ...((remote.data?.priorityLevel === null || isPriorityLevel(remote.data?.priorityLevel))
+        && { priorityLevel: remote.data.priorityLevel as TaskPriority }),
       note:       remote.data?.note,
     };
   }
@@ -619,6 +631,7 @@ export default function SharedScreen() {
         ...(item.qty      !== undefined && { qty: item.qty }),
         ...(item.unit     !== undefined && { unit: item.unit }),
         ...(item.priority !== undefined && { priority: item.priority }),
+        ...(item.priorityLevel !== undefined && { priorityLevel: item.priorityLevel }),
         ...(item.note     !== undefined && { note: item.note }),
       },
       deleted: item.deleted,
@@ -699,7 +712,7 @@ export default function SharedScreen() {
       deleted:    false,
       updated_at: new Date().toISOString(),
       ...(type === 'shopping' && { qty: addQty || '1', unit: addUnit }),
-      ...(type === 'tasks'    && { priority: addPriority }),
+      ...(type === 'tasks'    && sharedPriorityFields(addPriority)),
       ...(type === 'notes'    && addNote.trim() && { note: addNote.trim() }),
     };
     setAddText('');
@@ -725,19 +738,22 @@ export default function SharedScreen() {
     setEditText(item.text);
     setEditQty(item.qty ?? '1');
     setEditUnit(item.unit ?? 'шт');
-    setEditPriority(item.priority ?? 'medium');
+    setEditPriority(normalizePriority(item));
     setEditNote(item.note ?? '');
   }
 
   async function saveEditItem() {
     if (!editItem || !sidebarSection || !editText.trim()) return;
     const type = sidebarSection.type;
+    // «Без пріоритету» у спільних елементах — БЕЗ ключа priority (старий UI
+    // тоді не малює бейдж), тож старе легасі-значення треба прибрати явно.
+    const { priority: _oldPriority, ...editBase } = editItem;
     const updated: LocalItem = {
-      ...editItem,
+      ...(type === 'tasks' ? editBase : editItem),
       text: editText.trim(),
       updated_at: new Date().toISOString(),
       ...(type === 'shopping' && { qty: editQty || '1', unit: editUnit }),
-      ...(type === 'tasks'    && { priority: editPriority }),
+      ...(type === 'tasks'    && sharedPriorityFields(editPriority)),
       note: editNote.trim() || undefined,
     };
     setEditItem(null);
@@ -1006,10 +1022,7 @@ export default function SharedScreen() {
       if (sbSort === 'newest')   return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
       if (sbSort === 'oldest')   return new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
       if (sbSort === 'alpha')    return a.text.localeCompare(b.text, 'uk');
-      if (sbSort === 'priority') {
-        const ord: Record<string, number> = { high: 0, medium: 1, low: 2 };
-        return (ord[a.priority ?? 'low'] ?? 2) - (ord[b.priority ?? 'low'] ?? 2);
-      }
+      if (sbSort === 'priority') return comparePriority(a, b); // P0→P5, без пріоритету — в кінці
       return 0;
     };
 
@@ -1665,23 +1678,13 @@ export default function SharedScreen() {
 
                 {/* Tasks: priority selector */}
                 {sidebarSection.type === 'tasks' && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <View style={{ marginBottom: 8, gap: 6 }}>
                     <Text style={{ fontSize: 12, color: c.sub, fontWeight: '500' }}>{tr.priorityLabel}</Text>
-                    {(['high', 'medium', 'low'] as Priority[]).map(p => (
-                      <TouchableOpacity key={p} onPress={() => setAddPriority(p)}
-                        style={{
-                          flexDirection: 'row', alignItems: 'center', gap: 4,
-                          paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1,
-                          backgroundColor: addPriority === p ? PRIORITY_COLOR[p] + '20' : 'transparent',
-                          borderColor: addPriority === p ? PRIORITY_COLOR[p] : c.border,
-                        }}>
-                        <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: PRIORITY_COLOR[p] }} />
-                        <Text style={{ fontSize: 12, fontWeight: '600',
-                          color: addPriority === p ? PRIORITY_COLOR[p] : c.sub }}>
-                          {tr.priorities[p]}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                    <PriorityPicker
+                      value={addPriority}
+                      onChange={setAddPriority}
+                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
+                    />
                   </View>
                 )}
 
@@ -1804,22 +1807,12 @@ export default function SharedScreen() {
                 )}
 
                 {sidebarSection?.type === 'tasks' && (
-                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                    {(['high', 'medium', 'low'] as Priority[]).map(p => (
-                      <TouchableOpacity key={p} onPress={() => setEditPriority(p)}
-                        style={{
-                          flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
-                          paddingVertical: 10, borderRadius: 12, borderWidth: 1,
-                          backgroundColor: editPriority === p ? PRIORITY_COLOR[p] + '20' : 'transparent',
-                          borderColor: editPriority === p ? PRIORITY_COLOR[p] : c.border,
-                        }}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: PRIORITY_COLOR[p] }} />
-                        <Text style={{ fontSize: 13, fontWeight: '600',
-                          color: editPriority === p ? PRIORITY_COLOR[p] : c.sub }}>
-                          {tr.priorities[p]}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                  <View style={{ marginBottom: 12 }}>
+                    <PriorityPicker
+                      value={editPriority}
+                      onChange={setEditPriority}
+                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
+                    />
                   </View>
                 )}
 
@@ -2153,10 +2146,6 @@ const ItemRow = React.memo(function ItemRow({ item, isLast, type, c, onToggle, o
     <TouchableOpacity activeOpacity={0.7} onPress={handleEdit} style={[
       st.itemRow,
       !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
-      type === 'tasks' && item.priority && !item.checked && {
-        borderLeftWidth: 3,
-        borderLeftColor: PRIORITY_COLOR[item.priority] + '70',
-      },
     ]}>
       {/* Checkbox */}
       <TouchableOpacity onPress={handleToggle} style={st.checkbox}
@@ -2196,12 +2185,8 @@ const ItemRow = React.memo(function ItemRow({ item, isLast, type, c, onToggle, o
             </Text>
           </View>
         )}
-        {type === 'tasks' && item.priority && !item.checked && (
-          <View style={{ paddingHorizontal: 6, paddingVertical: 3, borderRadius: 7,
-            backgroundColor: PRIORITY_COLOR[item.priority] + '15' }}>
-            <Text style={{ fontSize: 10, fontWeight: '700',
-              color: PRIORITY_COLOR[item.priority] }}>{item.priority.charAt(0).toUpperCase()}</Text>
-          </View>
+        {type === 'tasks' && !item.checked && (
+          <PriorityBadge level={normalizePriority(item)} />
         )}
         <TouchableOpacity onPress={handleDelete} hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
           <IconSymbol name="xmark" size={13} color={c.sub + '80'} />

@@ -13,20 +13,22 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
 import { subtaskToggleTransition } from '@/utils/taskStatuses';
+import { normalizePriority, type LegacyPriority, type TaskPriority } from '@/utils/taskUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
 
-type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
 interface SubTask { id: string; title: string; done: boolean; }
 interface Task {
   id: string; title: string; description: string;
-  priority: Priority; status: Status; subtasks: SubTask[];
+  /** Легасі + P0–P5 (CONTRACT §B). У підзавдань власного пріоритету немає — показуємо батьківський. */
+  priority?: LegacyPriority; priorityLevel?: TaskPriority; status: Status; subtasks: SubTask[];
   /** Колонка дошки: відмітка останньої підзадачі веде завдання «На перевірку». */
   kanbanColumnId?: string;
   createdAt: string; estimatedMinutes?: number; deadline?: string; projectId?: string;
@@ -161,9 +163,12 @@ export default function SubtasksScreen() {
             <IconSymbol name="chevron.left" size={18} color={c.accent} />
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={1}>
-              {task?.title ?? 'Підзавдання'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ flexShrink: 1, color: c.text, fontSize: 18, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={1}>
+                {task?.title ?? 'Підзавдання'}
+              </Text>
+              {task ? <PriorityBadge level={normalizePriority(task)} size="md" /> : null}
+            </View>
             <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{doneCount}/{total} виконано</Text>
           </View>
         </View>

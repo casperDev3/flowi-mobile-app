@@ -1,6 +1,13 @@
 import { isSameMonth } from './dateUtils';
 
-export type Priority = 'high' | 'medium' | 'low';
+/** Легасі-пріоритет: досі пишеться КОЖНИМ збереженням (dual-write, CONTRACT §B). */
+export type LegacyPriority = 'high' | 'medium' | 'low';
+/** P0 (найвищий) … P5 (найнижчий). */
+export type PriorityLevel = 0 | 1 | 2 | 3 | 4 | 5;
+/** null = явно «без пріоритету». */
+export type TaskPriority = PriorityLevel | null;
+/** @deprecated аліас для наявних імпортів — використовуйте LegacyPriority. */
+export type Priority = LegacyPriority;
 export type Status = 'active' | 'done';
 export type SortBy = 'status' | 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
 export type Filter = 'all' | 'active' | 'done';
@@ -39,7 +46,10 @@ export interface Task {
   /** Опційний: веб-клієнт пише undefined замість порожнього рядка, тож
    *  вважати поле обовʼязковим означало б падати на його даних. */
   description?: string;
-  priority: Priority;
+  /** Легасі-поле. Може бути відсутнім (задачі з деталі проєкту старих збірок). */
+  priority?: LegacyPriority;
+  /** P0…P5 або null («без пріоритету»). Відсутнє = запис ще не зберігав новий клієнт. */
+  priorityLevel?: TaskPriority;
   status: Status;
   kanbanColumnId?: string;
   subtasks: SubTask[];
@@ -60,9 +70,123 @@ export interface Task {
   history?: TaskHistoryEvent[];
 }
 
-export const PRIORITY_ORDER: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+// ─── Пріоритет P0–P5 (CONTRACT §B) ────────────────────────────────────────────
+//
+// Правила однакові з вебом (lib/priority.ts) — дані синхронізуються між
+// клієнтами, тож будь-яка розбіжність тут означала б різний порядок і різні
+// бейджі для того самого завдання на телефоні й у браузері.
 
-export const PRIORITY_COLORS: Record<Priority, string> = {
+export const PRIORITY_LEVELS: readonly PriorityLevel[] = [0, 1, 2, 3, 4, 5];
+/** Нові завдання — P3 (→ 'medium', тобто старий типовий для старих клієнтів). */
+export const DEFAULT_PRIORITY_LEVEL: PriorityLevel = 3;
+export const PRIORITY_LEVEL_COLORS: Record<PriorityLevel, string> = {
+  0: '#EF4444',
+  1: '#F97316',
+  2: '#F59E0B',
+  3: '#3B82F6',
+  4: '#64748B',
+  5: '#94A3B8',
+};
+export const LEGACY_TO_LEVEL: Record<LegacyPriority, PriorityLevel> = { high: 1, medium: 3, low: 4 };
+/** ≈15% альфа-суфікс для #RRGGBB. */
+export const PRIORITY_BADGE_BG_ALPHA_HEX = '26';
+
+export function isPriorityLevel(v: unknown): v is PriorityLevel {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 5;
+}
+
+export function isLegacyPriority(v: unknown): v is LegacyPriority {
+  return v === 'high' || v === 'medium' || v === 'low';
+}
+
+/** P0,P1 → high; P2,P3 → medium; P4,P5,null → low. */
+export function toLegacyPriority(level: TaskPriority): LegacyPriority {
+  if (level === 0 || level === 1) return 'high';
+  if (level === 2 || level === 3) return 'medium';
+  return 'low';
+}
+
+/**
+ * Єдиний пріоритет запису з двох полів.
+ *
+ * Старі клієнти переписують `priority`, але зберігають (tasks) або гублять
+ * (спільні елементи — сервер замінює data) `priorityLevel`. Тому розбіжність
+ * між полями означає «старий клієнт змінив пріоритет після нас» — і перемагає
+ * легасі-значення.
+ */
+export function normalizePriority(item: { priority?: unknown; priorityLevel?: unknown }): TaskPriority {
+  const lvl = isPriorityLevel(item?.priorityLevel) ? item.priorityLevel : undefined;
+  const isNull = item?.priorityLevel === null;
+  const legacy = isLegacyPriority(item?.priority) ? item.priority : undefined;
+  if (lvl !== undefined) {
+    if (legacy !== undefined && toLegacyPriority(lvl) !== legacy) return LEGACY_TO_LEVEL[legacy];
+    return lvl;
+  }
+  if (isNull) {
+    if (legacy !== undefined && legacy !== toLegacyPriority(null)) return LEGACY_TO_LEVEL[legacy];
+    return null;
+  }
+  if (legacy !== undefined) return LEGACY_TO_LEVEL[legacy];
+  return null;
+}
+
+/** Dual-write патч для колекції `tasks`. ЗАВЖДИ розгортається в збережене завдання. */
+export function priorityFields(level: TaskPriority): { priorityLevel: TaskPriority; priority: LegacyPriority } {
+  return { priorityLevel: level, priority: toLegacyPriority(level) };
+}
+
+/**
+ * Для спільних елементів групи: null → `{ priorityLevel: null }` БЕЗ ключа
+ * `priority` (старий UI спільних списків не показує бейдж, коли priority нема).
+ */
+export function sharedPriorityFields(level: TaskPriority): { priorityLevel: TaskPriority; priority?: LegacyPriority } {
+  if (level === null) return { priorityLevel: null };
+  return { priorityLevel: level, priority: toLegacyPriority(level) };
+}
+
+export function priorityColor(level: TaskPriority): string | null {
+  return isPriorityLevel(level) ? PRIORITY_LEVEL_COLORS[level] : null;
+}
+
+export function priorityBadgeBg(level: TaskPriority): string | null {
+  const color = priorityColor(level);
+  return color ? color + PRIORITY_BADGE_BG_ALPHA_HEX : null;
+}
+
+/** 'P0'..'P5', '' для «без пріоритету» (мовно-нейтральне). */
+export function priorityLabel(level: TaskPriority): string {
+  return isPriorityLevel(level) ? `P${level}` : '';
+}
+
+/** P0 першим … P5, без пріоритету — В КІНЦІ; рівні — 0. */
+export function comparePriorityLevel(a: TaskPriority, b: TaskPriority): number {
+  const ra = isPriorityLevel(a) ? a : 6;
+  const rb = isPriorityLevel(b) ? b : 6;
+  return ra - rb;
+}
+
+export function comparePriority(
+  a: { priority?: unknown; priorityLevel?: unknown },
+  b: { priority?: unknown; priorityLevel?: unknown },
+): number {
+  return comparePriorityLevel(normalizePriority(a), normalizePriority(b));
+}
+
+/** Порожній вибір = без фільтра; завдання без пріоритету не проходять непорожній вибір. */
+export function matchesPriorityFilter(
+  item: { priority?: unknown; priorityLevel?: unknown },
+  selected: readonly PriorityLevel[],
+): boolean {
+  if (!selected.length) return true;
+  const level = normalizePriority(item);
+  return level !== null && selected.includes(level);
+}
+
+/** @deprecated легасі-ранг; нове сортування — comparePriority. */
+export const PRIORITY_ORDER: Record<LegacyPriority, number> = { high: 0, medium: 1, low: 2 };
+
+/** @deprecated легасі-кольори; нові бейджі — PRIORITY_LEVEL_COLORS / priorityColor. */
+export const PRIORITY_COLORS: Record<LegacyPriority, string> = {
   high:   '#EF4444',
   medium: '#F59E0B',
   low:    '#10B981',
@@ -117,7 +241,7 @@ export function sortTasks(tasks: Task[], by: SortBy): Task[] {
       // винесений у заголовок групи й сортувати за ним удруге нема сенсу.
       case 'status':
       case 'priority':
-        return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+        return comparePriority(a, b);
       case 'newest':
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       case 'oldest':
@@ -159,12 +283,16 @@ export function applyTaskFilters(
     search,
     projectId,
     priority,
+    priorities,
     dateFilter,
   }: {
     filter: Filter;
     search: string;
     projectId?: string;
-    priority?: Priority;
+    /** @deprecated одиночний легасі-фільтр: збігається з рівнями, що мапляться в це легасі-значення. */
+    priority?: LegacyPriority;
+    /** Мультивибір P0…P5; порожній = без фільтра. */
+    priorities?: readonly PriorityLevel[];
     dateFilter?: string | null;
   },
 ): Task[] {
@@ -172,7 +300,12 @@ export function applyTaskFilters(
     if (filter !== 'all' && t.status !== filter) return false;
     if (!taskMatchesSearch(t, search)) return false;
     if (projectId && t.projectId !== projectId) return false;
-    if (priority && t.priority !== priority) return false;
+    if (priority && isLegacyPriority(priority)) {
+      // Легасі-фільтр означає всю легасі-групу: 'high' = P0 і P1 (а не лише P1).
+      const level = normalizePriority(t);
+      if (level === null || toLegacyPriority(level) !== priority) return false;
+    }
+    if (priorities && !matchesPriorityFilter(t, priorities)) return false;
     if (dateFilter) {
       const tDate = new Date(t.createdAt).toDateString();
       if (tDate !== dateFilter) return false;

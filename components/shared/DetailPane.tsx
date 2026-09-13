@@ -36,11 +36,17 @@ export interface DetailPaneProps {
   scrollRef: React.RefObject<ScrollView | null>;
   /** Що показати в колонці, коли нічого не вибрано. У модалці не потрібне. */
   empty?: React.ReactNode;
+  /**
+   * Липка шапка: стоїть НАД прокруткою, тож кнопки закриття/редагування й
+   * вкладки лишаються на місці, поки гортається лише тіло. Необовʼязкова —
+   * екрани без неї виглядають і поводяться як раніше.
+   */
+  header?: React.ReactNode;
   children: React.ReactNode;
 }
 
 export function DetailPane({
-  open, wide, onClose, isDark, sheetColor, borderColor, maxHeight, scrollRef, empty, children,
+  open, wide, onClose, isDark, sheetColor, borderColor, maxHeight, scrollRef, empty, header, children,
 }: DetailPaneProps) {
   // Колонка не має власного верхнього відступу (він лишився на хедері
   // списку зліва), тож верхній виріз доводиться враховувати самій.
@@ -50,13 +56,19 @@ export function DetailPane({
     return (
       <View style={[st.column, { width: DETAIL_COLUMN_WIDTH, backgroundColor: sheetColor, borderLeftColor: borderColor }]}>
         {open ? (
-          <ScrollView
-            ref={scrollRef}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[st.columnContent, { paddingTop: insets.top + 20 }]}>
-            {children}
-          </ScrollView>
+          <>
+            {header ? (
+              <View style={[st.columnHeader, { paddingTop: insets.top + 20 }]}>{header}</View>
+            ) : null}
+            <ScrollView
+              ref={scrollRef}
+              style={st.scroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={[st.columnContent, { paddingTop: header ? 4 : insets.top + 20 }]}>
+              {children}
+            </ScrollView>
+          </>
         ) : (
           // Порожня колонка без пояснення читається як помилка рендеру.
           <View style={[st.emptyBox, { paddingTop: insets.top + 28 }]}>{empty}</View>
@@ -75,7 +87,10 @@ export function DetailPane({
                 intensity={isDark ? 50 : 70}
                 tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, { maxHeight, borderColor, backgroundColor: sheetColor }]}>
-                <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                {/* Шапка поза ScrollView: лист обмежений maxHeight, і
+                    flexShrink у прокрутки віддає місце саме їй, а не шапці. */}
+                {header}
+                <ScrollView ref={scrollRef} style={st.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   {children}
                 </ScrollView>
               </BlurView>
@@ -89,7 +104,9 @@ export function DetailPane({
 
 const st = StyleSheet.create({
   column:        { borderLeftWidth: StyleSheet.hairlineWidth },
+  columnHeader:  { paddingHorizontal: 20, paddingBottom: 4 },
   columnContent: { padding: 20, paddingBottom: 40 },
+  scroll:        { flexShrink: 1 },
   emptyBox:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:  { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },

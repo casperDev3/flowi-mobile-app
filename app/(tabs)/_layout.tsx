@@ -1,9 +1,10 @@
 import {BlurView} from 'expo-blur';
 import {Tabs} from 'expo-router';
 import React from 'react';
-import {Platform, StyleSheet} from 'react-native';
+import {Platform, StyleSheet, View} from 'react-native';
 
 import {HapticTab} from '@/components/haptic-tab';
+import {ActiveTimersBar} from '@/components/time/ActiveTimersBar';
 import {IconSymbol} from '@/components/ui/icon-symbol';
 import {useColorScheme} from '@/hooks/use-color-scheme';
 import {useI18n} from '@/store/i18n';
@@ -18,6 +19,10 @@ export default function TabLayout() {
     const {isWide} = useResponsive();
 
     return (
+        // Обгортка — заради глобальної панелі активних таймерів: вона стоїть
+        // абсолютним шаром просто над панеллю табів (лише на вузькому екрані,
+        // див. ActiveTimersBar) і зникає разом із табами під Stack-екранами.
+        <View style={{flex: 1}}>
         <Tabs
             screenOptions={{
                 headerShown: false,
@@ -99,6 +104,8 @@ export default function TabLayout() {
                 options={{ href: null }}
             />
         </Tabs>
+        <ActiveTimersBar/>
+        </View>
     );
 }
 

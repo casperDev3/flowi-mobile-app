@@ -3,12 +3,11 @@ import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } fro
 import { Redirect, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import 'react-native-reanimated';
 
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { NavSidebar } from '@/components/shared/NavSidebar';
-import { FocusModeButton } from '@/components/time/FocusModeButton';
 import { SIDEBAR_HIDDEN_ON, sidebarVisible } from '@/constants/nav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useOrientationLock } from '@/hooks/use-orientation-lock';
@@ -19,7 +18,9 @@ import { AuthProvider, useAuth } from '@/store/auth';
 import { AutoBackupProvider } from '@/store/auto-backup';
 import { ensureStorageMigrations } from '@/store/migrations';
 import { SyncProvider } from '@/store/sync-engine';
-import { I18nProvider } from '@/store/i18n';
+import { I18nProvider, useI18n } from '@/store/i18n';
+import { rescheduleSubscriptionRemindersFromStorage } from '@/store/notifications';
+import { subscribeToStorage } from '@/store/storage';
 import { ThemeProvider } from '@/store/theme-context';
 import { TimerProvider } from '@/store/timer-context';
 
@@ -71,6 +72,58 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Нагадування про оплату підписок (локальні ОС-нотифікації).
+ *
+ * Живе на рівні кореня, а не на екрані підписок: нагадування мусять
+ * переплануватись і тоді, коли підписку продовжили на іншому пристрої (запис
+ * синку), і після довгої паузи (прострочена стає «щоденною»), навіть якщо
+ * екран підписок сьогодні не відкривали. Лише ЧИТАЄ сховище; дозвіл тут не
+ * запитується — фоновий запит дозволу посеред іншого екрана збивав би з толку.
+ */
+function SubscriptionReminders() {
+  const { tr, lang } = useI18n();
+  const trRef = React.useRef(tr);
+  trRef.current = tr;
+  const langRef = React.useRef(lang);
+  langRef.current = lang;
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const run = async () => {
+      if (cancelled) return;
+      try {
+        await rescheduleSubscriptionRemindersFromStorage(trRef.current, langRef.current);
+      } catch (e) {
+        if (__DEV__) console.warn('[subscriptions] планування нагадувань не вдалося:', e);
+      }
+    };
+    // Дебаунс: синк пише ключ пачками, а мова/валюти теж можуть змінитися разом.
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { void run(); }, 800);
+    };
+
+    schedule();
+    const unsubscribe = subscribeToStorage(key => {
+      if (key === 'subscriptions' || key === 'finance_currencies' || key === 'notificationsEnabled') schedule();
+    });
+    const appState = AppState.addEventListener('change', state => {
+      if (state === 'active') schedule();
+    });
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+      appState.remove();
+    };
+  }, [lang]);
+
+  return null;
+}
+
+/**
  * Екрани входу — самодостатні: користувач ще не всередині додатку, і
  * навігація по розділах йому нікуди не веде.
  */
@@ -116,6 +169,7 @@ function RootLayoutContent() {
           <Stack.Screen name="containers" options={{ headerShown: false }} />
           <Stack.Screen name="meetings" options={{ headerShown: false }} />
           <Stack.Screen name="budget" options={{ headerShown: false }} />
+          <Stack.Screen name="subscriptions" options={{ headerShown: false }} />
           <Stack.Screen name="apple-health" options={{ headerShown: false }} />
           <Stack.Screen name="workouts" options={{ headerShown: false }} />
           <Stack.Screen name="health-profile" options={{ headerShown: false }} />
@@ -133,17 +187,10 @@ function RootLayoutContent() {
           <Stack.Screen name="notifications" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
-        {/*
-          Кнопка режиму зосередження — сестра Stack, всередині цієї колонки, а
-          не поверх усього рядка. Так вона автоматично стоїть ПРАВОРУЧ від
-          сайдбара на планшеті: колонка вже посунута, і жодного left:
-          SIDEBAR_WIDTH рахувати не треба — друга копія знання про ширину
-          розійшлася б із першою.
-        */}
-        <FocusModeButton />
         </View>
         </View>
         <StatusBar style={isDark ? 'light' : 'dark'} />
+        <SubscriptionReminders />
       </AuthGate>
     </NavigationThemeProvider>
   );

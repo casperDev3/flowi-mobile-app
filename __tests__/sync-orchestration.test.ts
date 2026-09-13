@@ -54,6 +54,8 @@ const { ApiError } = mockActualApi as {
   ApiError: new (status: number, code: string, message: string, details?: unknown) => Error;
 };
 
+import { SYNC_ARRAY_KEYS, SYNC_SINGLETON_KEYS } from '@/store/sync-contract';
+
 // ─── Хелпери ─────────────────────────────────────────────────────────────────
 
 type Engine = typeof import('@/store/sync-engine');
@@ -156,6 +158,10 @@ beforeEach(() => {
   mockApiFetch.mockReset();
   // Курсор != 0, щоб doSync не запускав generateFullOutbox там, де це не мета тесту.
   seed('server_change_cursor_v2', 5);
+  // Пристрій уже синхронізувала поточна збірка: одноразове довантаження нових
+  // колекцій (catchUpAddedCollections) тут не мета тесту й додавало б запити.
+  // Покрито окремо в __tests__/sync-upgrade-catchup.test.ts.
+  seed('sync_known_collections_v2', [...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS]);
 });
 
 afterEach(() => {

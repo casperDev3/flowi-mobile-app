@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -13,28 +13,33 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
+import { PriorityBadge } from '@/components/tasks/PriorityBadge';
+import { PriorityFilterChips } from '@/components/tasks/PriorityFilterChips';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
+import {
+  comparePriority,
+  matchesPriorityFilter,
+  normalizePriority,
+  type LegacyPriority,
+  type PriorityLevel,
+  type TaskPriority,
+} from '@/utils/taskUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
 
-type Priority = 'high' | 'medium' | 'low';
 type Status = 'active' | 'done';
 
 interface SubTask { id: string; title: string; done: boolean; }
 interface Task {
-  id: string; title: string; description: string; priority: Priority; status: Status;
+  // priority може бути відсутнім: задачі, створені з деталі проєкту старими
+  // збірками, його не мали (CONTRACT §D.4.4) — і такі записи вже є в даних.
+  id: string; title: string; description: string; priority?: LegacyPriority; priorityLevel?: TaskPriority; status: Status;
   subtasks: SubTask[]; createdAt: string; estimatedMinutes?: number; deadline?: string; projectId?: string;
 }
-
-const PRIORITY: Record<Priority, { label: string; color: string }> = {
-  high:   { label: 'Високий', color: '#EF4444' },
-  medium: { label: 'Середній', color: '#F59E0B' },
-  low:    { label: 'Низький',  color: '#10B981' },
-};
 
 function deadlineLabel(iso: string): string {
   const d = new Date(iso);
@@ -48,7 +53,6 @@ function deadlineLabel(iso: string): string {
 
 type SortBy = 'newest' | 'oldest' | 'priority' | 'name';
 
-const PRIORITY_ORDER: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 
 interface Palette {
   border: string;
@@ -75,7 +79,8 @@ interface ArchiveCardProps {
 const ArchiveCard = React.memo(function ArchiveCard({
   task, isDark, c, restoreLabel, deleteLabel, onRestore, onDelete,
 }: ArchiveCardProps) {
-  const prioColor = PRIORITY[task.priority].color;
+  // Задача без (валідного) пріоритету — без бейджа, а не TypeError.
+  const prioLevel = normalizePriority(task);
   return (
     <BlurView
       intensity={isDark ? 18 : 35}
@@ -103,12 +108,7 @@ const ArchiveCard = React.memo(function ArchiveCard({
 
         {/* Badge row */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 27 }}>
-          <View style={[ar.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: prioColor }} />
-            <Text style={{ color: prioColor, fontSize: 10, fontWeight: '700', marginLeft: 4 }}>
-              {PRIORITY[task.priority].label}
-            </Text>
-          </View>
+          <PriorityBadge level={prioLevel} />
           {task.subtasks.length > 0 && (
             <View style={[ar.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
               <IconSymbol name="list.bullet" size={10} color={c.sub} />
@@ -157,7 +157,8 @@ export default function ArchiveScreen() {
   const router = useRouter();
   const { tr } = useI18n();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [filterPriority, setFilterPriority] = useState<Priority | null>(null);
+  // Мультивибір P0…P5; порожній = усі.
+  const [filterPriorities, setFilterPriorities] = useState<PriorityLevel[]>([]);
   const [sort, setSort] = useState<SortBy>('newest');
 
   useFocusEffect(useCallback(() => {
@@ -165,21 +166,40 @@ export default function ArchiveScreen() {
   }, []));
 
   const done = useMemo(() => tasks
-    .filter(t => t.status === 'done' && (filterPriority === null || t.priority === filterPriority))
+    .filter(t => t.status === 'done' && matchesPriorityFilter(t, filterPriorities))
     .sort((a, b) => {
       if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       if (sort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      if (sort === 'priority') return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+      // P0→P5, без пріоритету — у кінці.
+      if (sort === 'priority') return comparePriority(a, b);
       return a.title.localeCompare(b.title, 'uk');
-    }), [tasks, filterPriority, sort]);
+    }), [tasks, filterPriorities, sort]);
+
+  // Мутації архіву — завжди read-modify-write по СВІЖОМУ стану сховища.
+  // saveSynced диффить масив: будь-який id, якого в ньому немає, іде на
+  // сервер як DELETE. Стан екрана (`tasks`) — знімок на момент фокусу, тож
+  // задачі, що підтягнулись синхронізацією поки екран відкритий, у ньому
+  // відсутні — зберігати його цілком не можна. Мутації йдуть по черзі, щоб
+  // два швидкі тапи не перезаписали результат одне одного.
+  const mutationQueue = useRef<Promise<void>>(Promise.resolve());
+  const mutateTasks = useCallback((fn: (fresh: Task[]) => Task[]) => {
+    const run = async () => {
+      const fresh = await loadData<Task[]>('tasks', []);
+      const updated = fn(fresh);
+      await saveSynced('tasks', updated);
+      setTasks(updated);
+    };
+    const next = mutationQueue.current.then(run, run);
+    mutationQueue.current = next.catch(err => {
+      if (__DEV__) console.warn('[archive] tasks mutation failed', err);
+    });
+    return next;
+  }, []);
 
   const restore = useCallback((id: string) => {
-    setTasks(prev => {
-      const updated = prev.map(t => (t.id === id ? { ...t, status: 'active' as Status } : t));
-      void saveSynced('tasks', updated);
-      return updated;
-    });
-  }, []);
+    void mutateTasks(fresh => fresh.map(t => (t.id === id ? { ...t, status: 'active' as Status } : t)))
+      .catch(() => {});
+  }, [mutateTasks]);
 
   const deleteForever = useCallback((id: string) => {
     Alert.alert(
@@ -188,33 +208,36 @@ export default function ArchiveScreen() {
       [
         { text: 'Скасувати', style: 'cancel' },
         { text: 'Видалити', style: 'destructive', onPress: () => {
-          setTasks(prev => {
-            const updated = prev.filter(t => t.id !== id);
-            void saveSynced('tasks', updated);
-            return updated;
-          });
+          void mutateTasks(fresh => fresh.filter(t => t.id !== id)).catch(() => {});
         }},
       ]
     );
-  }, []);
+  }, [mutateTasks]);
+
+  const filtersApplied = filterPriorities.length > 0;
 
   const clearAll = useCallback(() => {
     if (done.length === 0) return;
+    // Видаляємо рівно те, що показано в діалозі (після фільтрів), а не
+    // «усі виконані». Id фіксуємо в момент відкриття діалогу.
+    const ids = new Set(done.map(t => t.id));
+    const count = ids.size;
     Alert.alert(
       'Очистити архів?',
-      `Видалити ${done.length} завдань назавжди?`,
+      filtersApplied
+        ? `Видалити ${count} завдань назавжди? Буде видалено лише те, що зараз видно після фільтрів.`
+        : `Видалити ${count} завдань назавжди?`,
       [
         { text: 'Скасувати', style: 'cancel' },
         { text: 'Очистити', style: 'destructive', onPress: () => {
-          setTasks(prev => {
-            const updated = prev.filter(t => t.status !== 'done');
-            void saveSynced('tasks', updated);
-            return updated;
-          });
+          // Задачу, яку тим часом повернули в роботу на іншому пристрої,
+          // не чіпаємо — видаляємо лише ті, що досі виконані.
+          void mutateTasks(fresh => fresh.filter(t => !(ids.has(t.id) && t.status === 'done')))
+            .catch(() => {});
         }},
       ]
     );
-  }, [done.length]);
+  }, [done, filtersApplied, mutateTasks]);
 
   // Палітра стабільна між рендерами — інакше React.memo на картці
   // не спрацює: новий об'єкт кольорів щоразу рахувався б як зміна пропа.
@@ -271,24 +294,12 @@ export default function ArchiveScreen() {
         </View>
 
         {/* Filter by priority */}
-        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 8 }}>
-          {([null, 'high', 'medium', 'low'] as (Priority | null)[]).map(p => {
-            const isActive = filterPriority === p;
-            const color = p ? PRIORITY[p].color : c.accent;
-            const label = p ? PRIORITY[p].label : 'Всі';
-            return (
-              <TouchableOpacity
-                key={String(p)}
-                onPress={() => setFilterPriority(p)}
-                style={[ar.chip, {
-                  backgroundColor: isActive ? color + '20' : c.dim,
-                  borderColor: isActive ? color : c.border,
-                }]}>
-                {p && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color, marginRight: 5 }} />}
-                <Text style={{ color: isActive ? color : c.sub, fontSize: 11, fontWeight: '600' }}>{label}</Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
+          <PriorityFilterChips
+            value={filterPriorities}
+            onChange={setFilterPriorities}
+            colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
+          />
         </View>
 
         {/* Sort */}

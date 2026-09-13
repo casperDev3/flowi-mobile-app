@@ -453,6 +453,17 @@ export default function SettingsScreen() {
                   last={false}
                 />
                 <SettingRow
+                  icon="repeat"
+                  iconColor="#8B5CF6"
+                  label={tr.navSubscriptions}
+                  route="/subscriptions"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+                <SettingRow
                   icon="shippingbox.fill"
                   iconColor="#F97316"
                   label={tr.containers}

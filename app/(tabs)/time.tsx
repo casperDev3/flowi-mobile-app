@@ -117,9 +117,7 @@ export default function TimeScreen() {
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [showCal, setShowCal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  // Режим зосередження — лише для вузького екрана: на широкому його відкриває
-  // плаваюча кнопка з кореневого лейауту, і другий стан тут дав би два
-  // незалежні «відкрито» на одну модалку.
+  // Режим зосередження відкривається лише звідси — з шапки вкладки «Час».
   const [fsOpen, setFsOpen] = useState(false);
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
@@ -307,20 +305,15 @@ export default function TimeScreen() {
           actions={
             <>
               {/*
-                Єдиний вхід у режим зосередження НА ТЕЛЕФОНІ. Плаваюча кнопка з
-                app/_layout.tsx показується лише на широкому екрані, бо на
-                вузькому вона забирала кут у власної дії екрана й висіла над
-                кожним списком. Тут її роль перебирає шапка — і саме тут, бо
-                режим показує таймери, а це їхній розділ.
+                Єдиний вхід у режим зосередження — і на телефоні, і на планшеті.
+                Плаваючої кнопки в кореневому лейауті більше немає: вона висіла
+                над кожним екраном, а режим показує таймери, тож його місце —
+                у їхньому розділі.
 
-                Умова на ширину обов'язкова: без неї на планшеті було б ДВА
-                входи в ту саму модалку з двома незалежними станами відкриття.
-
-                Умова на активні таймери — те саме правило, що й у плаваючої
-                кнопки: режим показує те, що йде просто зараз, і вхід у порожню
-                сітку обіцяв би, що там щось є.
+                Умова на активні таймери: режим показує те, що йде просто зараз,
+                і вхід у порожню сітку обіцяв би, що там щось є.
               */}
-              {!isWide && activeTimers.length > 0 && (
+              {activeTimers.length > 0 && (
                 <HeaderButton
                   onPress={() => { haptic.light(); setFsOpen(true); }}
                   accessibilityLabel={
@@ -845,10 +838,7 @@ export default function TimeScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Монтується лише на вузькому екрані — див. коментар біля fsOpen. */}
-      {!isWide && (
-        <FullscreenTimers visible={fsOpen} onClose={() => setFsOpen(false)} />
-      )}
+      <FullscreenTimers visible={fsOpen} onClose={() => setFsOpen(false)} />
     </View>
   );
 }

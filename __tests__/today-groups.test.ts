@@ -166,6 +166,18 @@ describe('groupTodayTasks — порядок і межі', () => {
     expect(groups[0].tasks.map(t => t.id)).toEqual(['high', 'low']);
   });
 
+  it('P0–P5: P0 першим, без пріоритету — в кінці', () => {
+    const { groups } = groupTodayTasks(
+      [
+        task({ id: 'none', priority: undefined, deadline: iso('2026-08-29') }),
+        task({ id: 'p5', priority: 'low', priorityLevel: 5, deadline: iso('2026-08-29') }),
+        task({ id: 'p0', priority: 'high', priorityLevel: 0, deadline: iso('2026-08-29') }),
+      ],
+      COLUMNS, TODAY, 5,
+    );
+    expect(groups[0].tasks.map(t => t.id)).toEqual(['p0', 'p5', 'none']);
+  });
+
   it('порожніх груп немає', () => {
     const { groups } = groupTodayTasks(
       [task({ id: 'a', deadline: iso('2026-08-29') })],

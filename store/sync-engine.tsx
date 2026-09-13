@@ -109,6 +109,16 @@ const SERVER_REVISIONS_KEY = 'server_record_revisions_v2';
 const LAST_SYNC_AT_KEY = 'last_server_sync_completed_at';
 const LAST_SYNC_ERROR_KEY = 'last_server_sync_error_v2';
 const REJECTED_KEY = 'sync_rejected_v2';
+/**
+ * Колекції контракту, які знала збірка, що востаннє успішно синхронізувалась.
+ * Локальний службовий ключ (не синхронізується, не бекапиться).
+ */
+const KNOWN_COLLECTIONS_KEY = 'sync_known_collections_v2';
+/**
+ * Чого НЕ знала 1.0.1 — остання збірка, що синхронізувалась без маркера вище.
+ * Якщо маркера немає, а курсор > 0, вважаємо, що курсор рухала саме вона.
+ */
+const COLLECTIONS_UNKNOWN_TO_1_0_1: readonly string[] = ['subscriptions', 'timer_dial_prefs'];
 
 export async function loadRejected(): Promise<SyncRejection[]> {
   return loadData<SyncRejection[]>(REJECTED_KEY, []);
@@ -157,6 +167,53 @@ export function applyRevisionUpdates(
     next[syncRecordKey(item.collection, item.local_id)] = item.revision;
   }
   return next;
+}
+
+/** Усі колекції поточного контракту (масиви + singleton). */
+export function currentSyncCollections(): string[] {
+  return [...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS];
+}
+
+/**
+ * Колекції, яких не знала збірка, що рухала курсор востаннє.
+ *
+ * Стара збірка отримує рядки невідомих їй колекцій, записує їхні ревізії
+ * (applyRevisionUpdates не фільтрує колекції), але самі дані відкидає
+ * (applyPullResponse їх пропускає) — і курсор іде далі. Після оновлення
+ * новий клієнт цих рядків уже ніколи не отримає, а записана ревізія дозволяє
+ * «сліпий» запис поверх серверного значення без жодного конфлікту.
+ *
+ * `stored` — вміст KNOWN_COLLECTIONS_KEY; немає маркера → збірка 1.0.1.
+ */
+export function collectionsAddedSince(stored: unknown): string[] {
+  const current = currentSyncCollections();
+  const known = Array.isArray(stored) && stored.every(item => typeof item === 'string')
+    ? (stored as string[])
+    : current.filter(collection => !COLLECTIONS_UNKNOWN_TO_1_0_1.includes(collection));
+  return current.filter(collection => !known.includes(collection));
+}
+
+/**
+ * Прибирає з мапи ревізій УСІ записи вказаних колекцій. Ревізії туди поклала
+ * збірка, яка даних цих колекцій не зберігала, тож вони не підтверджують
+ * жодної локальної копії. Без ревізії запис іде з base_revision null і
+ * сервер відповідає конфліктом замість мовчазного перезапису.
+ */
+export function dropRevisionsForCollections(
+  revisions: SyncRevisionMap,
+  collections: readonly string[],
+): SyncRevisionMap {
+  const prefixes = collections.map(collection => `${collection}:`);
+  const next: SyncRevisionMap = {};
+  for (const key of Object.keys(revisions)) {
+    if (prefixes.some(prefix => key.startsWith(prefix))) continue;
+    next[key] = revisions[key];
+  }
+  return next;
+}
+
+async function saveKnownCollections(): Promise<void> {
+  await saveData(KNOWN_COLLECTIONS_KEY, currentSyncCollections());
 }
 
 async function getServerCursor(): Promise<number> {
@@ -607,6 +664,71 @@ async function exchangeV2(
   throw new Error('Sync page limit exceeded');
 }
 
+/**
+ * Одноразове довантаження колекцій, доданих після збірки, що рухала курсор.
+ *
+ * Сторінкує /sync/user/v2/ з курсора 0 БЕЗ мутацій і застосовує лише рядки
+ * доданих колекцій (dirty-wins, як звичайний pull). Головний курсор не
+ * рухається, рядки відомих колекцій не чіпаються — повторне застосування
+ * старих версій туди не потрапляє. Нічого не видаляє: applyPullItems лише
+ * доливає серверний стан у записи без локальних незапушених правок.
+ *
+ * Ревізії доданих колекцій спершу прибираються повністю, а назад
+ * записуються тільки для рядків, чиї дані реально лягли в сховище (не dirty).
+ * Для локально зміненого запису ревізія лишається порожньою: його мутація
+ * отримає OCC-конфлікт і пройде звичайне LWW-вирішення замість перезапису.
+ *
+ * Маркер зберігається лише після повного проходу; обірваний обмін
+ * повториться на наступному синку (операція ідемпотентна).
+ */
+async function catchUpAddedCollections(
+  mainCursor: number,
+  revisions: SyncRevisionMap,
+): Promise<SyncRevisionMap> {
+  const added = collectionsAddedSince(await loadData<unknown>(KNOWN_COLLECTIONS_KEY, null));
+  if (!added.length) return revisions;
+  const addedSet = new Set(added);
+  let next = dropRevisionsForCollections(revisions, added);
+  let pageCursor = 0;
+
+  for (let page = 0; page < 200; page++) {
+    const response = await apiFetch<SyncResponse>('/sync/user/v2/', {
+      method: 'POST',
+      body: { cursor: pageCursor, mutations: [] },
+    });
+    assertCompatibleSyncContract(response.contract_version);
+    if (response.protocol_version !== 2) {
+      throw new Error(`Unsupported sync protocol ${String(response.protocol_version)}`);
+    }
+    // Курсор сервера нижчий за наш — сервер обнулили. Нічого не застосовуємо:
+    // головний обмін нижче помітить відкат і запустить повний перезалив.
+    if (page === 0 && response.cursor < mainCursor) return revisions;
+
+    const relevant = response.changes.filter(change => addedSet.has(change.collection));
+    if (relevant.length) {
+      const currentOutbox = await loadOutbox();
+      const dirty = new Set(currentOutbox.map(item => syncRecordKey(item.collection, item.local_id)));
+      await applyPullResponse(relevant, currentOutbox);
+      next = applyRevisionUpdates(
+        next,
+        relevant.filter(change => !dirty.has(syncRecordKey(change.collection, change.local_id))),
+      );
+    }
+
+    if (response.next_cursor == null) {
+      await setRevisionMap(next);
+      await saveKnownCollections();
+      if (__DEV__) console.log('[sync-engine] довантажено нові колекції:', added);
+      return next;
+    }
+    if (response.next_cursor <= pageCursor) {
+      throw new Error('Server returned a non-advancing sync cursor');
+    }
+    pageCursor = response.next_cursor;
+  }
+  throw new Error('Sync page limit exceeded');
+}
+
 let _syncing = false;
 /** Початок поточного обміну — потрібен лише журналу тривалості. */
 let _syncStartedAt = 0;
@@ -650,6 +772,8 @@ async function doSync(trigger: SyncTrigger): Promise<void> {
     let revisions = await getRevisionMap();
 
     if (cursor === 0) await generateFullOutbox();
+    // До buildMutation: мутації мають іти вже з очищеними ревізіями.
+    else revisions = await catchUpAddedCollections(cursor, revisions);
 
     const outbox = await loadOutbox();
     updatePendingFrom(outbox);
@@ -740,6 +864,8 @@ async function doSync(trigger: SyncTrigger): Promise<void> {
       }
     }
 
+    // Обмін пройшов повністю — ця збірка бачила всі свої колекції.
+    await saveKnownCollections();
     const completedAt = Date.now();
     await saveData(LAST_SYNC_AT_KEY, completedAt);
     await saveData(LAST_SYNC_ERROR_KEY, null);
@@ -912,6 +1038,7 @@ export async function pullAllFromServer(): Promise<void> {
     await pruneRecordsMissingOnServer(seenKeys);
     await setRevisionMap(result.revisions);
     await setServerCursor(result.cursor);
+    await saveKnownCollections();
     const completedAt = Date.now();
     await saveData(LAST_SYNC_AT_KEY, completedAt);
     updateLastSyncAt(completedAt);

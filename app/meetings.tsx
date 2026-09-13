@@ -32,12 +32,18 @@ import { isOnlineMode } from '@/store/app-mode';
 import { cancelMeetingNotification, scheduleMeetingNotification } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
+import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useTimerContext } from '@/store/timer-context';
 import { useContentWidth } from '@/hooks/use-content-width';
-import { ElapsedClock } from '@/components/tasks/ElapsedClock';
-import { formatClock, formatDuration } from '@/utils/durationFormat';
-import { elapsedSince } from '@/utils/taskTimer';
-import { findTimerForMeeting, meetingTrackedSeconds, type Meeting } from '@/utils/meetings';
+import { MeetingDetailBody, MeetingDetailHeader } from '@/components/meetings/MeetingDetail';
+import { MeetingProjectChip, type MeetingChipProject } from '@/components/meetings/MeetingProjectChip';
+import { formatDuration } from '@/utils/durationFormat';
+import {
+  expandMeetings, findTimerForMeeting, meetingProject, resolveOriginalMeeting, withMeetingProject, withMeetingRecording, type Meeting,
+} from '@/utils/meetings';
+
+/** Мінімум проєкту для чипа й поля «Проєкт» форми. */
+interface MeetingsProject extends MeetingChipProject { archivedAt?: string }
 
 // ─── expo-av conditional (install with: npx expo install expo-av) ────────────
 let AVAudio: any = null;
@@ -136,51 +142,6 @@ function addDays(d: Date, n: number): Date {
   return r;
 }
 
-function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date): Meeting[] {
-  if (!meeting.recurrence) return [meeting];
-  const { freq, interval, daysOfWeek, until } = meeting.recurrence;
-  const instances: Meeting[] = [];
-  const start = new Date(meeting.date + 'T00:00');
-  const limitTs = until
-    ? Math.min(new Date(until + 'T00:00').getTime(), toDate.getTime())
-    : toDate.getTime();
-  const limit = new Date(limitTs);
-
-  if (freq === 'weekly' && daysOfWeek && daysOfWeek.length > 0) {
-    // align cursor to Monday of the week containing `start`
-    const dow0 = start.getDay();
-    const daysBack = dow0 === 0 ? 6 : dow0 - 1;
-    let weekCursor = addDays(start, -daysBack);
-    let safety = 0;
-    while (weekCursor <= limit && safety < 300) {
-      for (const dayIdx of [...daysOfWeek].sort((a, b) => a - b)) {
-        const candidate = addDays(weekCursor, dayIdx);
-        if (candidate >= start && candidate <= limit) {
-          const dateStr = toDateStr(candidate);
-          instances.push({ ...meeting, id: `${meeting.id}_${dateStr}`, date: dateStr, _origId: meeting.id });
-        }
-      }
-      weekCursor = addDays(weekCursor, interval * 7);
-      safety++;
-    }
-  } else {
-    let current = new Date(start);
-    let safety = 0;
-    while (current <= limit && safety < 500) {
-      const dateStr = toDateStr(current);
-      instances.push({ ...meeting, id: `${meeting.id}_${dateStr}`, date: dateStr, _origId: meeting.id });
-      switch (freq) {
-        case 'daily':   current = addDays(current, interval); break;
-        case 'weekly':  current = addDays(current, interval * 7); break;
-        case 'monthly': { const n = new Date(current); n.setMonth(n.getMonth() + interval); current = n; break; }
-        case 'yearly':  { const n = new Date(current); n.setFullYear(n.getFullYear() + interval); current = n; break; }
-      }
-      safety++;
-    }
-  }
-  return instances;
-}
-
 // Одиниці вшиті українською, як і решта рядків цього екрана (див. звіт);
 // сама форма береться зі спільної утиліти, щоб екран не розходився з
 // рештою застосунку через власну копію тих самих трьох гілок.
@@ -227,11 +188,13 @@ function useColors(isDark: boolean) {
 // Мемоізована: у місячному й квартальному зрізі карток бувають сотні, і без
 // цього кожен рендер екрана перемальовував би їх усі. Колбеки приймають саму
 // зустріч аргументом — інлайн-стрілка на кожну картку ламала б порівняння.
-const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = false, isRecurring = false, selected = false, tracking = false }: {
+const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, onRecord, isDark, c, showDate = false, isRecurring = false, selected = false, tracking = false, project = null }: {
   mtg: Meeting; onPress: (m: Meeting) => void; onDelete: (m: Meeting) => void; onRecord?: (m: Meeting) => void;
   isDark: boolean; c: ReturnType<typeof useColors>; showDate?: boolean; isRecurring?: boolean; selected?: boolean;
   /** Іде таймер цієї наради. Керування — у деталі, тут лише позначка. */
   tracking?: boolean;
+  /** Проєкт серії; null — без чипа (без проєкту або висячий id). */
+  project?: MeetingChipProject | null;
 }) {
   const dur = durLabel(mtg.durationMinutes);
   const mtgDt = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
@@ -277,7 +240,8 @@ const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, on
                   запустили. */}
               {tracking && <IconSymbol name="timer" size={11} color="#10B981" />}
             </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+              <MeetingProjectChip project={project} textColor={c.text} />
               {mtg.location ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                   <IconSymbol name="mappin" size={10} color={c.sub} />
@@ -378,7 +342,8 @@ export default function MeetingsScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const c = useColors(isDark);
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   // Реєстр таймерів — той самий, що у завдань: старт наради має бути видно на
   // вкладці «Час» і в повноекранній сітці, а не лише тут.
   const { activeTimers, startMeetingTimer, stopTimer, meetingsRevision } = useTimerContext();
@@ -389,6 +354,8 @@ export default function MeetingsScreen() {
   // Data
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [initialized, setInitialized] = useState(false);
+  // Проєкти — лише для чипа на картках і поля «Проєкт» форми; цей екран їх не пише.
+  const [projects, setProjects] = useState<MeetingsProject[]>([]);
 
   // View span
   const [span, setSpan] = useState<Span>('week');
@@ -439,6 +406,9 @@ export default function MeetingsScreen() {
 
   useFocusEffect(useCallback(() => {
     loadData<Meeting[]>('meetings', []).then(m => { setMeetings(m); setInitialized(true); });
+    loadData<MeetingsProject[]>('projects', [])
+      .then(setProjects)
+      .catch(e => { if (__DEV__) console.warn('[meetings] проєкти не завантажились:', e); });
     // Load GCal config
     AsyncStorage.getItem(GCAL_CLIENT_KEY).then(id => {
       const cid = id ?? '';
@@ -451,11 +421,35 @@ export default function MeetingsScreen() {
     AsyncStorage.getItem('gcal_last_sync').then(t => setGcalLastSync(t));
   }, []));
 
-  // Save on change
-  const saveMeetings = useCallback((updated: Meeting[]) => {
-    setMeetings(updated);
-    if (initialized) void saveSynced('meetings', updated);
-  }, [initialized]);
+  // Запис повз екран (синк, екран «Задачі», таймер) — перечитуємо, поки
+  // екран відкритий: useFocusEffect спрацьовує лише на вході.
+  const reloadFromStorage = useCallback(async () => {
+    const [freshMeetings, freshProjects] = await Promise.all([
+      loadData<Meeting[]>('meetings', []),
+      loadData<MeetingsProject[]>('projects', []),
+    ]);
+    setMeetings(freshMeetings);
+    setProjects(freshProjects);
+  }, []);
+  const trackWrite = useStorageRefresh(['meetings', 'projects'], reloadFromStorage);
+
+  // Усі записи 'meetings' з цього екрана — READ-MODIFY-WRITE по черзі.
+  // saveSynced дифає масив зі сховищем: будь-який id, якого бракує в масиві,
+  // їде на сервер як DELETE. Стан екрана міг відстати (синк-пул, Tasks-екран
+  // додав зустріч, стоп таймера), тож мутуємо лише свіжу копію зі сховища.
+  // Черга — щоб два записи підряд не прочитали той самий «свіжий» масив.
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const mutateMeetings = useCallback((mutate: (list: Meeting[]) => Meeting[]) => {
+    if (!initialized) return;
+    writeQueueRef.current = writeQueueRef.current
+      .then(() => trackWrite(async () => {
+        const fresh = await loadData<Meeting[]>('meetings', []);
+        const next = mutate(fresh);
+        setMeetings(next);
+        await saveSynced('meetings', next);
+      }))
+      .catch(e => { if (__DEV__) console.warn('[meetings] збереження не вдалося:', e); });
+  }, [initialized, trackWrite]);
 
   // Стоп таймера дописує сесію в 'meetings' повз наш стан. Без перечитування
   // наступне збереження з цього екрана (правка, аудіозапис) віддифилось би від
@@ -472,15 +466,7 @@ export default function MeetingsScreen() {
   const expandedMeetings = useMemo(() => {
     const past = new Date(today); past.setFullYear(past.getFullYear() - 1);
     const future = new Date(today); future.setFullYear(future.getFullYear() + 2);
-    const result: Meeting[] = [];
-    meetings.forEach(m => {
-      if (!m.recurrence) {
-        result.push(m);
-      } else {
-        expandRecurring(m, past, future).forEach(inst => result.push(inst));
-      }
-    });
-    return result;
+    return expandMeetings(meetings, past, future);
   }, [meetings]);
 
   const meetingsByDate = useMemo(() => {
@@ -691,8 +677,10 @@ export default function MeetingsScreen() {
       }
 
       if (toAdd.length > 0) {
-        const updated = [...current, ...toAdd];
-        saveMeetings(updated);
+        mutateMeetings(list => {
+          const known = new Set(list.map(m => m.gcalId).filter(Boolean));
+          return [...list, ...toAdd.filter(m => !known.has(m.gcalId))];
+        });
       }
 
       const syncTime = new Date().toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -705,7 +693,7 @@ export default function MeetingsScreen() {
     } finally {
       setGcalImporting(false);
     }
-  }, [getValidGcalToken, saveMeetings]);
+  }, [getValidGcalToken, mutateMeetings]);
 
   const disconnectGoogleCalendar = useCallback(() => {
     Alert.alert('Відключити Google Calendar?', 'Вже імпортовані зустрічі залишаться.', [
@@ -756,18 +744,17 @@ export default function MeetingsScreen() {
       setIsRecording(false);
 
       if (uri && recordingMtgId) {
-        const origId = recordingMtgId.includes('_') ? recordingMtgId.split('_')[0] : recordingMtgId;
-        saveMeetings(meetings.map(m => m.id === origId
-          ? { ...m, recordings: [...(m.recordings ?? []), uri] }
-          : m
-        ));
+        // recordingMtgId — завжди id ОРИГІНАЛУ (handleCardRecord / onRecord
+        // передають resolveOrig(m).id). Не розбирати: `gcal_<eventId>`.
+        const origId = recordingMtgId;
+        mutateMeetings(fresh => withMeetingRecording(fresh, origId, uri));
       }
       setRecordingMtgId(null);
       setRecordingSeconds(0);
     } catch (e: any) {
       if (__DEV__) console.warn('[record] stop error:', e);
     }
-  }, [recordingMtgId, meetings, saveMeetings]);
+  }, [recordingMtgId, mutateMeetings]);
 
   const playRecording = useCallback(async (uri: string) => {
     if (!AVAudio) return;
@@ -790,13 +777,13 @@ export default function MeetingsScreen() {
     Alert.alert('Видалити запис?', '', [
       { text: 'Скасувати', style: 'cancel' },
       { text: 'Видалити', style: 'destructive', onPress: () => {
-        saveMeetings(meetings.map(m => m.id === mtgId
+        mutateMeetings(fresh => fresh.map(m => m.id === mtgId
           ? { ...m, recordings: (m.recordings ?? []).filter(r => r !== uri) }
           : m
         ));
       }},
     ]);
-  }, [meetings, saveMeetings]);
+  }, [mutateMeetings]);
 
   // Cleanup on unmount
   useEffect(() => () => {
@@ -815,43 +802,51 @@ export default function MeetingsScreen() {
 
   const openEdit = useCallback((m: Meeting) => {
     setFormInitial({ id: m.id, title: m.title, date: m.date, time: m.time, durationMinutes: m.durationMinutes,
-      location: m.location, link: m.link, notes: m.notes, color: m.color, recurrence: m.recurrence });
+      location: m.location, link: m.link, notes: m.notes, color: m.color, recurrence: m.recurrence,
+      projectId: m.projectId });
     setFormPresetDate(undefined);
     setShowForm(true);
   }, []);
 
   const handleFormSave = useCallback((data: MeetingFormData) => {
     let savedId: string;
+    // Read-modify-write: saveSynced дифає масив зі сховищем, і стан екрана міг
+    // відстати (синк, стоп таймера) — тоді зустріч, додана деінде, поїхала б
+    // на сервер як видалена. Проєкт — рівень серії: лише на оригіналі.
+    const apply = mutateMeetings;
     if (data.id) {
       // Cancel old notification before re-scheduling
       cancelMeetingNotification(data.id);
-      saveMeetings(meetings.map(m => m.id !== data.id ? m : {
+      const id = data.id;
+      apply(list => list.map(m => m.id !== id ? m : withMeetingProject({
         ...m, title: data.title, date: data.date, time: data.time, durationMinutes: data.durationMinutes,
         location: data.location, link: data.link, notes: data.notes, color: data.color, recurrence: data.recurrence,
-      }));
+      }, data.projectId)));
       savedId = data.id;
     } else {
       savedId = Date.now().toString();
-      saveMeetings([...meetings, { id: savedId, title: data.title, date: data.date, time: data.time,
+      const created = withMeetingProject<Meeting>({ id: savedId, title: data.title, date: data.date, time: data.time,
         durationMinutes: data.durationMinutes, location: data.location, link: data.link,
-        notes: data.notes, color: data.color, recurrence: data.recurrence }]);
+        notes: data.notes, color: data.color, recurrence: data.recurrence }, data.projectId);
+      apply(list => [...list, created]);
     }
     // Schedule notification 15 min before (non-recurring meetings with a specific time only)
     if (!data.recurrence && data.time) {
       scheduleMeetingNotification(savedId, data.title, data.date, data.time);
     }
     setShowForm(false);
-  }, [meetings, saveMeetings]);
+  }, [mutateMeetings]);
 
   const deleteMeeting = useCallback((id: string) => {
     Alert.alert('Видалити зустріч?', 'Цю дію не можна скасувати.', [
       { text: 'Скасувати', style: 'cancel' },
       { text: 'Видалити', style: 'destructive', onPress: () => {
         cancelMeetingNotification(id);
-        saveMeetings(meetings.filter(m => m.id !== id));
+        // Явне видалення користувачем — фільтруємо СВІЖИЙ масив, не стан.
+        mutateMeetings(fresh => fresh.filter(m => m.id !== id));
       }},
     ]);
-  }, [meetings, saveMeetings]);
+  }, [mutateMeetings]);
 
   // ─── Span label ───────────────────────────────────────────────────────────
 
@@ -919,7 +914,7 @@ export default function MeetingsScreen() {
   // Повторювані зустрічі розгортаються в тимчасові копії; редагування,
   // видалення й запис мають потрапити в оригінал, а не в копію.
   const resolveOrig = useCallback(
-    (m: Meeting) => (m._origId ? (meetings.find(x => x.id === m._origId) ?? m) : m),
+    (m: Meeting) => resolveOriginalMeeting(m, meetings),
     [meetings],
   );
 
@@ -985,13 +980,14 @@ export default function MeetingsScreen() {
         <MeetingCard mtg={item.mtg} isDark={isDark} c={c}
           isRecurring={!!item.mtg._origId}
           tracking={runningMeetingIds.has(item.mtg._origId ?? item.mtg.id)}
+          project={meetingProject(item.mtg, projects)}
           selected={item.mtg.id === selectedKey}
           onPress={handleCardPress}
           onDelete={handleCardDelete}
           onRecord={handleCardRecord} />
       </View>
     );
-  }, [c, isDark, selectedKey, runningMeetingIds, handleCardPress, handleCardDelete, handleCardRecord]);
+  }, [c, isDark, selectedKey, runningMeetingIds, handleCardPress, handleCardDelete, handleCardRecord, projects]);
 
   const isDaySpan = span === 'day' || span === 'week';
 
@@ -1017,181 +1013,49 @@ export default function MeetingsScreen() {
 
   // ─── Деталь зустрічі ──────────────────────────────────────────────────────
 
-  // Приймає РОЗГОРНУТИЙ екземпляр: дата й позначка повтору мусять збігатися з
-  // тим, що людина натиснула в списку. Дії натомість адресують оригінал —
-  // саме він лежить у сховищі, копії повторів існують лише в памʼяті.
-  const renderDetail = useCallback((mtg: Meeting) => {
-    const orig = resolveOrig(mtg);
-    const recordings = mtg.recordings ?? [];
-    // Таймер і час — властивість ОРИГІНАЛУ: копії повторів існують лише в
-    // памʼяті, і показувати на них окремий лічильник означало б обіцяти те,
-    // чого в даних немає.
-    const timer = findTimerForMeeting(activeTimers, orig.id);
-    const tracked = meetingTrackedSeconds(orig);
+  // На вузькому екрані деталь — модальний лист, і iOS не покаже другу
+  // модалку, доки перша не зникла; звідси закриття й пауза. У колонці
+  // деталь нікуди не дівається, тож пауза лише гальмувала б дію.
+  const openOverDetail = useCallback((run: () => void) => {
+    if (isExpanded) { run(); return; }
+    setSelectedKey(null);
+    setTimeout(run, 300);
+  }, [isExpanded]);
 
-    // На вузькому екрані деталь — модальний лист, і iOS не покаже другу
-    // модалку, доки перша не зникла; звідси закриття й пауза. У колонці
-    // деталь нікуди не дівається, тож пауза лише гальмувала б дію.
-    const openOverDetail = (run: () => void) => {
-      if (isExpanded) { run(); return; }
-      setSelectedKey(null);
-      setTimeout(run, 300);
-    };
-
-    return (
-      <View>
-        {/* Смужка-«ручка» має сенс лише там, де лист тягнуть пальцем. */}
-        {!isExpanded && (
-          <View style={{ alignItems: 'center', marginBottom: 16 }}>
-            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
-          </View>
-        )}
-
-        {/* Color bar + title */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-          <View style={{ width: 4, height: 44, borderRadius: 2, backgroundColor: mtg.color }} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, letterSpacing: -0.4 }}>
-              {mtg.title}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: mtg.color }}>
-                {mtg.time || '--:--'}
-              </Text>
-              <Text style={{ fontSize: 13, color: c.sub }}>·</Text>
-              <Text style={{ fontSize: 13, color: c.sub }}>{durLabel(mtg.durationMinutes)}</Text>
-              {mtg._origId && (
-                <IconSymbol name="repeat" size={12} color={mtg.color + 'BB'} />
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Date */}
-        <View style={[s.detailRow, { backgroundColor: c.dim, borderRadius: 12, marginBottom: 8 }]}>
-          <IconSymbol name="calendar" size={15} color={c.sub} />
-          <Text style={{ fontSize: 14, color: c.text, marginLeft: 10 }}>{dayLabel(mtg.date)}</Text>
-        </View>
-
-        {/* Location */}
-        {mtg.location ? (
-          <View style={[s.detailRow, { backgroundColor: c.dim, borderRadius: 12, marginBottom: 8 }]}>
-            <IconSymbol name="mappin" size={15} color={c.sub} />
-            <Text style={{ fontSize: 14, color: c.text, marginLeft: 10, flex: 1 }}>{mtg.location}</Text>
-          </View>
-        ) : null}
-
-        {/* Link */}
-        {mtg.link ? (
-          <View style={[s.detailRow, { backgroundColor: ACCENT + '12', borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: ACCENT + '30' }]}>
-            <IconSymbol name="link" size={15} color={ACCENT} />
-            <Text style={{ fontSize: 14, color: ACCENT, marginLeft: 10, flex: 1, fontWeight: '600' }} numberOfLines={1}>
-              {mtg.link}
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Notes */}
-        {mtg.notes ? (
-          <View style={[s.detailRow, { backgroundColor: c.dim, borderRadius: 12, marginBottom: 8, alignItems: 'flex-start', paddingTop: 12, paddingBottom: 12 }]}>
-            <IconSymbol name="note.text" size={15} color={c.sub} />
-            <Text style={{ fontSize: 13, color: c.sub, marginLeft: 10, flex: 1, lineHeight: 19 }}>
-              {mtg.notes}
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Recordings */}
-        {recordings.length > 0 && (
-          <View style={{ marginBottom: 8 }}>
-            <Text style={{ fontSize: 11, color: c.sub, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-              ЗАПИСИ ({recordings.length})
-            </Text>
-            {recordings.map((uri, idx) => (
-              <View key={uri} style={[s.detailRow, { backgroundColor: ACCENT + '10', borderRadius: 12, marginBottom: 6, borderWidth: 1, borderColor: ACCENT + '25' }]}>
-                <IconSymbol name="waveform" size={15} color={ACCENT} />
-                <Text style={{ fontSize: 13, color: c.text, marginLeft: 10, flex: 1 }}>
-                  Запис {idx + 1}
-                </Text>
-                <TouchableOpacity onPress={() => playRecording(uri)}
-                  style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name={playingUri === uri ? 'pause.fill' : 'play.fill'} size={12} color={ACCENT} />
-                </TouchableOpacity>
-                {/* Запис живе в оригіналі — видаляємо звідти, а не з копії. */}
-                <TouchableOpacity onPress={() => deleteRecording(orig.id, uri)}
-                  style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#EF444415', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
-                  <IconSymbol name="trash" size={12} color="#EF4444" />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Таймер наради. Реєстр той самий, що у завдань (active_timers), тому
-            запущена звідси нарада видно й на вкладці «Час», і в повноекранній
-            сітці. Завершена сесія лягає в timeEntries самої наради. */}
-        <View style={[s.detailRow, {
-          backgroundColor: timer ? '#10B98112' : c.dim, borderRadius: 12, marginBottom: 8,
-          borderWidth: timer ? 1 : 0, borderColor: '#10B98140',
-        }]}>
-          <IconSymbol name="timer" size={15} color={timer ? '#10B981' : c.sub} />
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            {timer ? (
-              <ElapsedClock
-                running
-                seconds={now => elapsedSince(timer.startedAt, now)}
-                format={formatClock}
-                style={{ fontSize: 15, fontWeight: '800', color: '#10B981' }}
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: c.text }}>
-                {tracked > 0 ? formatDuration(tracked, DURATION_UNITS) : 'Час не трекався'}
-              </Text>
-            )}
-            {timer && tracked > 0 ? (
-              <Text style={{ fontSize: 11, color: c.sub, marginTop: 2 }}>
-                Разом до цього: {formatDuration(tracked, DURATION_UNITS)}
-              </Text>
-            ) : null}
-          </View>
-          <TouchableOpacity
-            onPress={() => { void toggleMeetingTimer(orig); }}
-            accessibilityRole="button"
-            accessibilityLabel={timer ? 'Зупинити таймер наради' : 'Почати таймер наради'}
-            style={[s.btn, {
-              paddingHorizontal: 14, gap: 6,
-              backgroundColor: (timer ? '#EF4444' : '#10B981') + '18',
-              borderWidth: 1, borderColor: (timer ? '#EF4444' : '#10B981') + '40',
-            }]}>
-            <IconSymbol name={timer ? 'stop.fill' : 'play.fill'} size={13} color={timer ? '#EF4444' : '#10B981'} />
-            <Text style={{ color: timer ? '#EF4444' : '#10B981', fontSize: 13, fontWeight: '700' }}>
-              {timer ? 'Стоп' : 'Старт'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Action buttons */}
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-          {/* Record */}
-          <TouchableOpacity
-            onPress={() => openOverDetail(() => setRecordingMtgId(orig.id))}
-            style={[s.btn, { flex: 1, backgroundColor: ACCENT + '18', borderWidth: 1, borderColor: ACCENT + '40' }]}>
-            <IconSymbol name="mic.fill" size={16} color={ACCENT} />
-            <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '700' }}>Записати</Text>
-          </TouchableOpacity>
-
-          {/* Edit */}
-          <TouchableOpacity
-            onPress={() => openOverDetail(() => openEdit(orig))}
-            style={[s.btn, { flex: 1, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
-            <IconSymbol name="pencil" size={16} color={c.text} />
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>Редагувати</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }, [c, isExpanded, playingUri, playRecording, deleteRecording, openEdit, resolveOrig,
-      activeTimers, toggleMeetingTimer]);
+  // Сама деталь — спільний компонент (components/meetings/MeetingDetail.tsx):
+  // той самий перегляд відкриває й екран Завдань. Приймає РОЗГОРНУТИЙ
+  // екземпляр; дії адресують оригінал — саме він лежить у сховищі.
+  const selectedOrig = selectedMtg ? resolveOrig(selectedMtg) : null;
+  const selectedTimer = selectedOrig ? findTimerForMeeting(activeTimers, selectedOrig.id) : undefined;
+  const detailHeader = selectedMtg && selectedOrig ? (
+    <MeetingDetailHeader
+      meeting={selectedMtg}
+      original={selectedOrig}
+      onEdit={() => openOverDetail(() => openEdit(selectedOrig))}
+      onClose={() => setSelectedKey(null)}
+      isExpanded={isExpanded}
+      colors={c}
+      tr={tr}
+    />
+  ) : null;
+  const detailBody = selectedMtg && selectedOrig ? (
+    <MeetingDetailBody
+      meeting={selectedMtg}
+      original={selectedOrig}
+      project={meetingProject(selectedOrig, projects)}
+      timer={selectedTimer}
+      onToggleTimer={() => { void toggleMeetingTimer(selectedOrig); }}
+      onEdit={() => openOverDetail(() => openEdit(selectedOrig))}
+      onRecord={() => openOverDetail(() => setRecordingMtgId(selectedOrig.id))}
+      onPlayRecording={uri => { void playRecording(uri); }}
+      // Запис живе в оригіналі — видаляємо звідти, а не з копії.
+      onDeleteRecording={uri => deleteRecording(selectedOrig.id, uri)}
+      playingUri={playingUri}
+      colors={c}
+      tr={tr}
+      locale={locale}
+    />
+  ) : null;
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -1320,8 +1184,9 @@ export default function MeetingsScreen() {
               {tr.meetingPickHint}
             </Text>
           </>
-        }>
-        {selectedMtg ? renderDetail(selectedMtg) : null}
+        }
+        header={detailHeader}>
+        {detailBody}
       </DetailPane>
       </View>
 
@@ -1334,8 +1199,9 @@ export default function MeetingsScreen() {
         onDelete={formInitial?.id ? () => { deleteMeeting(formInitial!.id!); setShowForm(false); } : undefined}
         isDark={isDark}
         lang="uk"
-        tr={{}}
+        tr={tr}
         markedDays={markedDays}
+        projects={projects}
       />
 
       {/* ── Google Calendar Sheet ── */}

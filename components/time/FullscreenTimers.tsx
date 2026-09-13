@@ -83,7 +83,7 @@ function makeHistoryEvent(type: HistoryEventType, note?: string): TaskHistoryEve
 }
 
 export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { activeTimers, stopTimer, tasksRevision } = useTimerContext();
+  const { activeTimers, stopTimer, tasksRevision, timersReady } = useTimerContext();
   const { tr, lang } = useI18n();
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
@@ -91,9 +91,13 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
   const { reduced } = useMotion();
   const [pickerFor, setPickerFor] = useState<string | null>(null);
 
-  // Список id — для чистки мапи циферблатів від зупинених таймерів.
-  const liveIds = useMemo(() => activeTimers.map(t => t.id), [activeTimers]);
-  const { dialFor, setDialFor } = useTimerDials(liveIds);
+  // Список id — для чистки вибору зупинених ВІЛЬНИХ таймерів. null, доки
+  // реєстр не прочитаний: «немає живих» до читання стерло б чинний вибір.
+  const liveIds = useMemo(
+    () => (timersReady ? activeTimers.map(t => t.id) : null),
+    [activeTimers, timersReady],
+  );
+  const { dialFor, setDialFor, defaultDial, setDefaultDial } = useTimerDials(liveIds);
 
   const c = useMemo(() => getScreenColors('time', isDark), [isDark]);
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
@@ -412,6 +416,8 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
             timerLabel={activeTimers.find(t => t.id === pickerFor)?.label ?? ''}
             onSelect={id => { if (pickerFor) setDialFor(pickerFor, id); }}
             onClose={() => setPickerFor(null)}
+            defaultDial={defaultDial}
+            onMakeDefault={setDefaultDial}
             colors={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent, sheet: c.bg2 }}
             isDark={isDark}
             tr={tr}

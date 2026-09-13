@@ -18,7 +18,7 @@ import {
   type TaskStatusColumn,
 } from './taskStatuses';
 import { isTodayTask } from './taskToday';
-import { type Task } from './taskUtils';
+import { comparePriority, type Task } from './taskUtils';
 
 export { completedAt } from './taskUtils';
 
@@ -37,11 +37,9 @@ export interface TodayGroups {
   hidden: number;
 }
 
-const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
-
-
+/** P0→P5, без пріоритету — в кінці (CONTRACT §B.4). */
 function byPriority(a: Task, b: Task): number {
-  return (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);
+  return comparePriority(a, b);
 }
 
 /**

@@ -13,16 +13,24 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
+import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { CalSpan, useCalendarNav } from '@/hooks/use-calendar-nav';
 import type { Translations } from '@/store/translations';
 import { monthGrid } from '@/utils/dateUtils';
+import { normalizePriority, type LegacyPriority, type TaskPriority } from '@/utils/taskUtils';
 
 export interface CalendarTask {
   id: string;
   title: string;
   status: 'active' | 'done';
-  priority: 'high' | 'medium' | 'low';
+  /**
+   * Може бути відсутнім: задачі, створені з деталі проєкту старими збірками,
+   * пріоритету не мають (CONTRACT §D.4.4) — рендер мусить це пережити.
+   */
+  priority?: LegacyPriority;
+  /** P0…P5 / null (CONTRACT §B); показ — через normalizePriority. */
+  priorityLevel?: TaskPriority;
   deadline?: string;
   projectId?: string;
   subtasks: { done: boolean }[];
@@ -40,7 +48,6 @@ export interface TaskCalendarViewProps<T extends CalendarTask> {
   today: Date;
   weekdays: string[];
   months: string[];
-  priorityMeta: Record<'high' | 'medium' | 'low', { label: string; color: string }>;
   /** Прогрес завдання у відсотках — рахує екран, бо це його правило. */
   getProgress: (task: T) => number;
   isOverdue: (task: T) => boolean;
@@ -56,7 +63,7 @@ export interface TaskCalendarViewProps<T extends CalendarTask> {
 
 export function TaskCalendarView<T extends CalendarTask>({
   nav, tasksByDate, tasks, meetingsByDate, projects, today, weekdays: WEEKDAYS_SHORT,
-  months: MONTHS_UA, priorityMeta: PRIORITY, getProgress, isOverdue,
+  months: MONTHS_UA, getProgress, isOverdue,
   onSelectTask, onToggleTask, onOpenDay, colors: c, isDark, tr, locale,
 }: TaskCalendarViewProps<T>) {
   return (
@@ -178,7 +185,8 @@ export function TaskCalendarView<T extends CalendarTask>({
                         const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
                         const prog = getProgress(task);
                         const overdue = isOverdue(task);
-                        const prioColor = PRIORITY[task.priority].color;
+                        // Без (валідного) пріоритету — без бейджа, а не TypeError.
+                        const prioLevel = normalizePriority(task);
                         return (
                           <TouchableOpacity
                             key={task.id}
@@ -192,8 +200,10 @@ export function TaskCalendarView<T extends CalendarTask>({
                                 borderColor: task.status === 'done' ? c.border : overdue ? '#EF444450' : c.border,
                                 padding: 13, overflow: 'hidden',
                               }}>
-                              {/* Priority stripe */}
-                              <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: task.status === 'done' ? '#10B981' : prioColor, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
+                              {/* Смужка лише для виконаних: пріоритет тепер показує бейдж P0–P5, а не колір. */}
+                              {task.status === 'done' && (
+                                <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: '#10B981', borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }} />
+                              )}
                               <View style={{ marginLeft: 8 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
                                   <AnimatedCheck
@@ -212,10 +222,7 @@ export function TaskCalendarView<T extends CalendarTask>({
                                 </View>
 
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, marginLeft: 32 }}>
-                                  <View style={[st.badge, { backgroundColor: prioColor + '18', borderColor: prioColor + '40' }]}>
-                                    <View style={[st.dot, { backgroundColor: prioColor, width: 6, height: 6 }]} />
-                                    <Text style={{ color: prioColor, fontSize: 10, fontWeight: '700', marginLeft: 3 }}>{PRIORITY[task.priority].label}</Text>
-                                  </View>
+                                  <PriorityBadge level={prioLevel} />
                                   {proj && (
                                     <View style={[st.badge, { backgroundColor: proj.color + '18', borderColor: proj.color + '45' }]}>
                                       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color }} />

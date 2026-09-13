@@ -124,6 +124,9 @@ export interface Translations {
   resetFilter: string;
   newTask: string;
   priority: string;
+  priorityNone: string;         // "Без пріоритету"
+  priorityA11y: string;         // "Пріоритет {level}"
+  priorityFilterReset: string;  // "Скинути"
   noProject: string;
   timeEstimate: string;
   deadline: string;
@@ -882,11 +885,30 @@ export interface Translations {
   noActiveTimers: string;
   noActiveTimersHint: string;
   fullscreenTimers: string;
+  focusMode: string;
   exitFullscreen: string;
   startTimerAction: string;
   stopTimerAction: string;
   timerLabel: string;
   parallelTimers: string;
+  /** Деталь зустрічі (components/meetings/MeetingDetail.tsx). */
+  meetingNotTracked: string;
+  meetingTrackedBefore: string;
+  meetingTimerStart: string;
+  meetingTimerStop: string;
+  meetingTimerStartA11y: string;
+  meetingTimerStopA11y: string;
+  meetingRecordings: string;
+  meetingRecordingItem: string;
+  meetingRecord: string;
+  meetingDaysAgo: string;
+  meetingOpenLink: string;
+  /** Згорнути розгорнутий список («Показати всі (N)» ↔ «Згорнути»). */
+  collapseList: string;
+  /** Підтвердження: тап по зустрічі, поки редагується завдання. */
+  discardTaskEditTitle: string;
+  discardTaskEditMsg: string;
+  discardChanges: string;
 
   /** Витрати, що не потрапили в ліміт через іншу валюту. */
   budgetUncounted: string;
@@ -926,6 +948,18 @@ export interface Translations {
   sprintMoveToBacklog: string;
   sprintPick: string;
   sprintNoProject: string;
+  /** Поле «Спринт» у формі задачі (CONTRACT §D.3). */
+  sprintField: string;
+  sprintClosedSuffix: string;
+  sprintForeignProject: string;
+  /** Плейсхолдер рядка додавання задачі у конкретний спринт; {name} — назва спринта. */
+  sprintAddTaskIn: string;
+  sprintAddTaskA11y: string;
+  openFullTaskForm: string;
+  /** Секція «Зустрічі» деталі проєкту. */
+  projectMeetingsPast: string;      // "Минулі ({count})"
+  projectMeetingsEmpty: string;
+  projectMeetingsNoUpcoming: string;
 
   /**
    * Аналітика проєктів: чотири графіки й Гантт. Числа рахує
@@ -979,6 +1013,18 @@ export interface Translations {
   dialOrbit: string;
   dialSegment: string;
   dialTape: string;
+  /** Синхронізований типовий циферблат (timer_dial_prefs.defaultDial). */
+  dialMakeDefault: string;      // "Зробити типовим"
+  dialIsDefault: string;        // "Типовий"
+  dialMakeDefaultHint: string;  // a11y: довге натискання робить типовим
+  /** Глобальна панель активних таймерів (components/time/ActiveTimersBar). */
+  timersCountOne: string;       // "{n} таймер"
+  timersCountFew: string;       // "{n} таймери"
+  timersCountMany: string;      // "{n} таймерів"
+  activeTimersExpandA11y: string;
+  timerKindTask: string;
+  timerKindMeeting: string;
+  timerKindAdhoc: string;
 
   /** Прикріплення завдання до таймера на вкладці Час. */
   attachTask: string;
@@ -995,6 +1041,67 @@ export interface Translations {
   unitKcal: string;
   unitKg: string;
   unitGram: string;
+
+  /** Підписки (регулярні платежі). Див. utils/subscriptions.ts. */
+  navSubscriptions: string;
+  subNew: string;
+  subEditTitle: string;
+  subName: string;
+  subNamePlaceholder: string;
+  subAmountPerCycle: string;
+  subPeriod: string;
+  subEvery: string;
+  subNextPayment: string;
+  subEndDate: string;
+  subIndefinite: string;
+  subSetEndDate: string;
+  subReminder: string;
+  subReminderDayOf: string;
+  subReminder1: string;
+  subReminder3: string;
+  subReminder7: string;
+  subColor: string;
+  subNoCategory: string;
+  subNoAccount: string;
+  subAccountHint: string;
+  subUrl: string;
+  subRenew: string;
+  subRenewConfirm: string;
+  subRenewHint: string;
+  subRenewAmount: string;
+  subRenewStale: string;
+  subOverdue: string;
+  subArchiveAction: string;
+  subArchivedChip: string;
+  subEnded: string;
+  subArchiveCount: string;
+  subDeleteTitle: string;
+  subDeleteMsg: string;
+  subHistory: string;
+  subHistoryEmpty: string;
+  subPerMonth: string;
+  subPerYear: string;
+  subTotals: string;
+  subEmptyTitle: string;
+  subEmptyHint: string;
+  subSelectHint: string;
+  subInDays: string;
+  subOverdueDays: string;
+  subUpcoming: string;
+  subUpcomingWithin: string;
+  subFormInvalid: string;
+  subEndBeforeNext: string;
+  subProjectEmpty: string;
+  subNoProjectFilter: string;
+  subSaveError: string;
+  subNotifBeforeTitle: string;
+  subNotifBeforeBody: string;
+  subNotifDueTitle: string;
+  subNotifDueBody: string;
+  subNotifOverdueTitle: string;
+  subNotifOverdueBody: string;
+  subNotifEndTitle: string;
+  subNotifEndBody: string;
 }
 
 const uk: Translations = {
@@ -1151,6 +1258,9 @@ const uk: Translations = {
   resetFilter: 'Скинути фільтр',
   newTask: 'Нове завдання',
   priority: 'Пріоритет',
+  priorityNone: 'Без пріоритету',
+  priorityA11y: 'Пріоритет {level}',
+  priorityFilterReset: 'Скинути',
   noProject: 'Без проекту',
   timeEstimate: 'Оцінка часу',
   deadline: 'Дедлайн',
@@ -1818,6 +1928,7 @@ const uk: Translations = {
   noActiveTimers: 'Немає активних таймерів',
   noActiveTimersHint: 'Запустіть таймер із завдання або створіть вільний',
   fullscreenTimers: 'На весь екран',
+  focusMode: 'Зосередження',
   exitFullscreen: 'Вийти',
   startTimerAction: 'Запустити таймер',
   stopTimerAction: 'Зупинити таймер',
@@ -1851,6 +1962,15 @@ const uk: Translations = {
   sprintMoveToBacklog: 'У беклог проєкту',
   sprintPick: 'Спринт',
   sprintNoProject: 'Спочатку оберіть проєкт — задача без проєкту у спринт не потрапляє',
+  sprintField: 'Спринт',
+  sprintClosedSuffix: '(закритий)',
+  sprintForeignProject: 'Інший проєкт',
+  sprintAddTaskIn: 'Нова задача у «{name}»',
+  sprintAddTaskA11y: 'Додати задачу',
+  openFullTaskForm: 'Відкрити повну форму',
+  projectMeetingsPast: 'Минулі ({count})',
+  projectMeetingsEmpty: 'Зустрічей у проєкті немає',
+  projectMeetingsNoUpcoming: 'Найближчих зустрічей немає',
   projectAnalytics: 'Аналітика',
   projectAnalyticsHint: 'Графіки йдуть за вибраним проєктом; «Витрачений час» лишається по всьому списку — одна смуга ні з чим не порівнюється',
   chartColumns: 'Де стоять задачі',
@@ -1891,12 +2011,96 @@ const uk: Translations = {
   dialOrbit: 'Орбіта',
   dialSegment: 'Семисегментний',
   dialTape: 'Лінійка',
+  dialMakeDefault: 'Зробити типовим',
+  dialIsDefault: 'Типовий',
+  dialMakeDefaultHint: 'Довге натискання — зробити типовим',
+  timersCountOne: '{n} таймер',
+  timersCountFew: '{n} таймери',
+  timersCountMany: '{n} таймерів',
+  activeTimersExpandA11y: 'Показати всі активні таймери',
+  timerKindTask: 'Завдання',
+  timerKindMeeting: 'Зустріч',
+  timerKindAdhoc: 'Вільний таймер',
   attachTask: 'Прикріпити завдання',
   detachTask: 'Відкріпити',
   pickTaskTitle: 'Яке завдання відлічуємо?',
   freeTimerHint: 'Без завдання час запишеться лише в історію трекера',
   timerLabel: 'Таймер',
   parallelTimers: 'Паралельно',
+  meetingNotTracked: 'Час не трекався',
+  meetingTrackedBefore: 'Разом до цього: {time}',
+  meetingTimerStart: 'Старт',
+  meetingTimerStop: 'Стоп',
+  meetingTimerStartA11y: 'Почати таймер зустрічі',
+  meetingTimerStopA11y: 'Зупинити таймер зустрічі',
+  meetingRecordings: 'Записи ({n})',
+  meetingRecordingItem: 'Запис {n}',
+  meetingRecord: 'Записати',
+  meetingDaysAgo: '{n} дн тому',
+  meetingOpenLink: 'Відкрити посилання',
+  collapseList: 'Згорнути',
+  discardTaskEditTitle: 'Скасувати редагування?',
+  discardTaskEditMsg: 'Незбережені зміни завдання буде втрачено.',
+  discardChanges: 'Не зберігати',
+  navSubscriptions: 'Підписки',
+  subNew: 'Нова підписка',
+  subEditTitle: 'Редагувати підписку',
+  subName: 'Назва',
+  subNamePlaceholder: 'Напр. Netflix',
+  subAmountPerCycle: 'Сума за період',
+  subPeriod: 'Період',
+  subEvery: 'Кожні',
+  subNextPayment: 'Наступна оплата',
+  subEndDate: 'Дата завершення',
+  subIndefinite: 'Безстроково',
+  subSetEndDate: 'Вказати дату',
+  subReminder: 'Нагадати',
+  subReminderDayOf: 'У день оплати',
+  subReminder1: 'За 1 день',
+  subReminder3: 'За 3 дні',
+  subReminder7: 'За 7 днів',
+  subColor: 'Колір',
+  subNoCategory: 'Без категорії',
+  subNoAccount: 'Без рахунку',
+  subAccountHint: 'Лише для довідки — баланс рахунку не змінюється',
+  subUrl: 'Посилання',
+  subRenew: 'Продовжено',
+  subRenewConfirm: 'Підтвердити',
+  subRenewHint: 'Наступна оплата переїде на {date}. Операцію у фінансах не буде створено.',
+  subRenewAmount: 'Сума за цей період',
+  subRenewStale: 'Цю підписку вже продовжено на іншому пристрої. Перевірте дату наступної оплати.',
+  subOverdue: 'Прострочено',
+  subArchiveAction: 'В архів',
+  subArchivedChip: 'В архіві',
+  subEnded: 'Завершилась {date}',
+  subArchiveCount: 'Архів ({count})',
+  subDeleteTitle: 'Видалити підписку?',
+  subDeleteMsg: '«{name}» і її історію продовжень буде видалено на всіх пристроях.',
+  subHistory: 'Історія продовжень',
+  subHistoryEmpty: 'Ще не продовжували',
+  subPerMonth: '/міс',
+  subPerYear: '/рік',
+  subTotals: 'Разом',
+  subEmptyTitle: 'Підписок ще немає',
+  subEmptyHint: 'Додайте регулярні платежі — нагадаємо перед оплатою',
+  subSelectHint: 'Оберіть підписку, щоб побачити деталі',
+  subInDays: 'через {n} дн.',
+  subOverdueDays: 'прострочено {n} дн.',
+  subUpcoming: 'Найближчі оплати',
+  subUpcomingWithin: 'Найближчі {n} днів',
+  subFormInvalid: 'Вкажіть назву, суму більше 0 і коректну дату оплати.',
+  subEndBeforeNext: 'Дата завершення раніша за наступну оплату.',
+  subProjectEmpty: 'Немає підписок',
+  subNoProjectFilter: 'Без проєкту',
+  subSaveError: 'Не вдалося зберегти підписку. Спробуйте ще раз.',
+  subNotifBeforeTitle: '💳 Скоро оплата підписки',
+  subNotifBeforeBody: '{name}: {amount} — {date}',
+  subNotifDueTitle: '💳 Сьогодні оплата підписки',
+  subNotifDueBody: '{name}: {amount}',
+  subNotifOverdueTitle: '⚠️ Прострочена оплата підписки',
+  subNotifOverdueBody: '{name}: {amount}. Позначте «Продовжено», коли оплатите.',
+  subNotifEndTitle: '📅 Підписка скоро завершиться',
+  subNotifEndBody: '{name} — {date}',
 };
 
 const en: Translations = {
@@ -2053,6 +2257,9 @@ const en: Translations = {
   resetFilter: 'Reset Filter',
   newTask: 'New Task',
   priority: 'Priority',
+  priorityNone: 'No priority',
+  priorityA11y: 'Priority {level}',
+  priorityFilterReset: 'Reset',
   noProject: 'No Project',
   timeEstimate: 'Time Estimate',
   deadline: 'Deadline',
@@ -2720,6 +2927,7 @@ const en: Translations = {
   noActiveTimers: 'No active timers',
   noActiveTimersHint: 'Start a timer from a task or create a free one',
   fullscreenTimers: 'Fullscreen',
+  focusMode: 'Focus',
   exitFullscreen: 'Exit',
   startTimerAction: 'Start timer',
   stopTimerAction: 'Stop timer',
@@ -2753,6 +2961,15 @@ const en: Translations = {
   sprintMoveToBacklog: 'To the project backlog',
   sprintPick: 'Sprint',
   sprintNoProject: 'Pick a project first — a task without one cannot join a sprint',
+  sprintField: 'Sprint',
+  sprintClosedSuffix: '(closed)',
+  sprintForeignProject: 'Other project',
+  sprintAddTaskIn: 'New task in “{name}”',
+  sprintAddTaskA11y: 'Add task',
+  openFullTaskForm: 'Open full form',
+  projectMeetingsPast: 'Past ({count})',
+  projectMeetingsEmpty: 'No meetings in this project',
+  projectMeetingsNoUpcoming: 'No upcoming meetings',
   projectAnalytics: 'Analytics',
   projectAnalyticsHint: 'Charts follow the selected project; “Time spent” stays over the whole list — a single bar compares to nothing',
   chartColumns: 'Where tasks sit',
@@ -2793,12 +3010,96 @@ const en: Translations = {
   dialOrbit: 'Orbit',
   dialSegment: 'Seven-segment',
   dialTape: 'Tape',
+  dialMakeDefault: 'Make default',
+  dialIsDefault: 'Default',
+  dialMakeDefaultHint: 'Long press to make it the default',
+  timersCountOne: '{n} timer',
+  timersCountFew: '{n} timers',
+  timersCountMany: '{n} timers',
+  activeTimersExpandA11y: 'Show all active timers',
+  timerKindTask: 'Task',
+  timerKindMeeting: 'Meeting',
+  timerKindAdhoc: 'Free timer',
   attachTask: 'Attach a task',
   detachTask: 'Detach',
   pickTaskTitle: 'Which task are you timing?',
   freeTimerHint: 'Without a task the time only lands in the tracker history',
   timerLabel: 'Timer',
   parallelTimers: 'In parallel',
+  meetingNotTracked: 'No time tracked',
+  meetingTrackedBefore: 'Total before: {time}',
+  meetingTimerStart: 'Start',
+  meetingTimerStop: 'Stop',
+  meetingTimerStartA11y: 'Start meeting timer',
+  meetingTimerStopA11y: 'Stop meeting timer',
+  meetingRecordings: 'Recordings ({n})',
+  meetingRecordingItem: 'Recording {n}',
+  meetingRecord: 'Record',
+  meetingDaysAgo: '{n} d ago',
+  meetingOpenLink: 'Open link',
+  collapseList: 'Collapse',
+  discardTaskEditTitle: 'Discard edits?',
+  discardTaskEditMsg: 'Unsaved task changes will be lost.',
+  discardChanges: 'Discard',
+  navSubscriptions: 'Subscriptions',
+  subNew: 'New subscription',
+  subEditTitle: 'Edit subscription',
+  subName: 'Name',
+  subNamePlaceholder: 'e.g. Netflix',
+  subAmountPerCycle: 'Amount per period',
+  subPeriod: 'Period',
+  subEvery: 'Every',
+  subNextPayment: 'Next payment',
+  subEndDate: 'End date',
+  subIndefinite: 'No end date',
+  subSetEndDate: 'Set date',
+  subReminder: 'Remind',
+  subReminderDayOf: 'On payment day',
+  subReminder1: '1 day before',
+  subReminder3: '3 days before',
+  subReminder7: '7 days before',
+  subColor: 'Color',
+  subNoCategory: 'No category',
+  subNoAccount: 'No account',
+  subAccountHint: 'Reference only — the account balance is not changed',
+  subUrl: 'Link',
+  subRenew: 'Renewed',
+  subRenewConfirm: 'Confirm',
+  subRenewHint: 'The next payment moves to {date}. No finance transaction is created.',
+  subRenewAmount: 'Amount for this period',
+  subRenewStale: 'This subscription was already renewed on another device. Check the next payment date.',
+  subOverdue: 'Overdue',
+  subArchiveAction: 'Archive',
+  subArchivedChip: 'Archived',
+  subEnded: 'Ended {date}',
+  subArchiveCount: 'Archive ({count})',
+  subDeleteTitle: 'Delete subscription?',
+  subDeleteMsg: '“{name}” and its renewal history will be deleted on all devices.',
+  subHistory: 'Renewal history',
+  subHistoryEmpty: 'Not renewed yet',
+  subPerMonth: '/mo',
+  subPerYear: '/yr',
+  subTotals: 'Total',
+  subEmptyTitle: 'No subscriptions yet',
+  subEmptyHint: 'Add recurring payments — we will remind you before they are due',
+  subSelectHint: 'Select a subscription to see details',
+  subInDays: 'in {n} d',
+  subOverdueDays: '{n} d overdue',
+  subUpcoming: 'Upcoming payments',
+  subUpcomingWithin: 'Next {n} days',
+  subFormInvalid: 'Enter a name, an amount above 0 and a valid payment date.',
+  subEndBeforeNext: 'The end date is earlier than the next payment.',
+  subProjectEmpty: 'No subscriptions',
+  subNoProjectFilter: 'No project',
+  subSaveError: 'Could not save the subscription. Please try again.',
+  subNotifBeforeTitle: '💳 Subscription payment soon',
+  subNotifBeforeBody: '{name}: {amount} — {date}',
+  subNotifDueTitle: '💳 Subscription payment today',
+  subNotifDueBody: '{name}: {amount}',
+  subNotifOverdueTitle: '⚠️ Subscription payment overdue',
+  subNotifOverdueBody: '{name}: {amount}. Mark it “Renewed” once paid.',
+  subNotifEndTitle: '📅 Subscription ends soon',
+  subNotifEndBody: '{name} — {date}',
 };
 
 export const allTranslations: Record<Lang, Translations> = { uk, en };

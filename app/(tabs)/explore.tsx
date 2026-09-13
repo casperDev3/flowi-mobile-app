@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FinanceSummary, KIND_COLOR, KIND_ICON } from '@/components/finance/FinanceSummary';
+import { UpcomingPaymentsCard, useUpcomingPayments } from '@/components/finance/UpcomingPaymentsCard';
 import { TransactionGroup } from '@/components/finance/TransactionGroup';
 import { MonthPicker } from '@/components/shared/MonthPicker';
 import { PickerField, type PickerOption } from '@/components/shared/PickerField';
@@ -126,6 +127,8 @@ export default function FinanceScreen() {
   useScreenView('finance');
   const insets = useSafeAreaInsets();
   const { tr, lang } = useI18n();
+  // Найближчі й прострочені оплати підписок — блок під зведенням рахунків.
+  const upcomingPayments = useUpcomingPayments();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const DEFAULT_CATEGORIES = lang === 'uk' ? DEFAULT_CATEGORIES_UK : DEFAULT_CATEGORIES_EN;
   const MONTHS_UA = tr.months;
@@ -900,6 +903,17 @@ export default function FinanceScreen() {
               showTransfersNote={monthHasTransfers}
             />
 
+            {/* Найближчі оплати / прострочені підписки. Операцій не створюють —
+                лише нагадують; тап веде на екран підписок. */}
+            <UpcomingPaymentsCard
+              data={upcomingPayments}
+              isDark={isDark}
+              c={{ text: c.text, sub: c.sub, border: c.border }}
+              tr={tr}
+              lang={lang}
+              style={{ marginTop: 16, marginBottom: 0 }}
+            />
+
             {/* Filters */}
             <View style={[s.filterRow, { backgroundColor: c.card, borderColor: c.border, marginTop: 16, marginBottom: 22 }]}>
               {(['all', 'income', 'expense'] as const).map(f => (
@@ -1225,6 +1239,20 @@ export default function FinanceScreen() {
                     розійшовся з сайдбаром і Налаштуваннями саме тому, що жив
                     у трьох місцях, а перекладався в одному. */}
                 <Text style={[s.menuLabel, { color: c.text }]}>{tr.navBudget}</Text>
+                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              </TouchableOpacity>
+
+              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+              {/* Підписки — регулярні платежі. Операцій не створюють, тож
+                  живуть окремим екраном поруч із бюджетом. */}
+              <TouchableOpacity
+                onPress={() => { setShowMenu(false); router.push('/subscriptions'); }}
+                style={s.menuItem}>
+                <View style={[s.menuIconBox, { backgroundColor: '#8B5CF625' }]}>
+                  <IconSymbol name="repeat" size={15} color="#8B5CF6" />
+                </View>
+                <Text style={[s.menuLabel, { color: c.text }]}>{tr.navSubscriptions}</Text>
                 <IconSymbol name="chevron.right" size={13} color={c.sub} />
               </TouchableOpacity>
 

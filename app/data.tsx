@@ -50,6 +50,7 @@ const ALL_KEYS = [
   { key: 'health_checkups',   label: 'Медогляди',   icon: 'cross.case.fill',    color: '#EF4444' },
   { key: 'health_vaccines',   label: 'Щеплення',    icon: 'syringe',            color: '#F97316' },
   { key: 'health_habits',     label: 'Звички',      icon: 'checklist',          color: '#A855F7' },
+  { key: 'subscriptions',     label: 'Підписки',    icon: 'repeat',             color: '#8B5CF6' },
 ] as const;
 
 // export key maps storage key → JSON key (snake_case → camelCase where needed)
@@ -62,6 +63,7 @@ const EXPORT_KEY_MAP: Record<string, string> = {
   savings_jars: 'savingsJars', containers: 'containers',
   health_meds: 'healthMeds', health_checkups: 'healthCheckups',
   health_vaccines: 'healthVaccines', health_habits: 'healthHabits',
+  subscriptions: 'subscriptions',
 };
 const IMPORT_KEY_MAP: Record<string, string> = {
   tasks: 'tasks', taskStatuses: 'task_statuses', transactions: 'transactions', accounts: 'accounts', timeEntries: 'time_entries',
@@ -72,6 +74,7 @@ const IMPORT_KEY_MAP: Record<string, string> = {
   savingsJars: 'savings_jars', containers: 'containers',
   healthMeds: 'health_meds', healthCheckups: 'health_checkups',
   healthVaccines: 'health_vaccines', healthHabits: 'health_habits',
+  subscriptions: 'subscriptions',
   // categories is an object — handled separately
   categories: 'categories',
 };

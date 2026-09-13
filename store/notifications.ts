@@ -2,7 +2,20 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { BUILTIN_CURRENCIES, type Currency } from '@/utils/financeUtils';
+import {
+  SUBSCRIPTION_NOTIFICATION_PREFIX,
+  formatDateKey,
+  formatSubscriptionMoney,
+  limitSubscriptionReminders,
+  normalizeSubscriptions,
+  subscriptionReminderBudget,
+  subscriptionReminderPlan,
+  type Subscription,
+} from '@/utils/subscriptions';
+
 import { loadData } from './storage';
+import type { Translations } from './translations';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -302,4 +315,193 @@ export async function scheduleMeetingNotification(
 export async function cancelMeetingNotification(meetingId: string): Promise<void> {
   const id = meetingNotifId(meetingId);
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+}
+
+// ─── Підписки: нагадування про оплату ────────────────────────────────────────
+
+/**
+ * Тексти нагадувань підписок. Приходять ззовні (з tr), бо цей модуль поза
+ * React і не знає мови інтерфейсу. Плейсхолдери: {name} {amount} {date}.
+ */
+export interface SubscriptionReminderTexts {
+  beforeTitle: string;
+  beforeBody: string;
+  dueTitle: string;
+  dueBody: string;
+  overdueTitle: string;
+  overdueBody: string;
+  endTitle: string;
+  endBody: string;
+}
+
+export interface SyncSubscriptionRemindersOptions {
+  texts: SubscriptionReminderTexts;
+  /** Сума підписки, уже відформатована з валютою. */
+  formatAmount: (sub: Subscription) => string;
+  /** Дата 'YYYY-MM-DD' у людському вигляді. */
+  formatDate: (dateKey: string) => string;
+  /**
+   * Чи можна ПОПРОСИТИ дозвіл. Фонова синхронізація (старт, повернення в
+   * застосунок, запис синку) не має права раптом показувати системний запит —
+   * лише явна дія користувача на екрані підписок.
+   */
+  requestPermission?: boolean;
+  now?: Date;
+}
+
+function fillTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
+}
+
+async function hasNotificationPermission(request: boolean): Promise<boolean> {
+  if (request) return requestNotificationPermissions();
+  if (!Device.isDevice) return true;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+let subscriptionRemindersQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Приводить заплановані ОС-нагадування підписок у відповідність до даних.
+ *
+ * Планує все з subscriptionReminderPlan і скасовує будь-який запланований
+ * ідентифікатор `sub_…`, якого в плані немає (підписку продовжили, архівували,
+ * видалили). Скасовуються ЛИШЕ локальні нотифікації — самі дані не чіпаються.
+ * Виклики серіалізуються: старт, синк і повернення в застосунок можуть збігтися.
+ */
+export function syncSubscriptionReminders(
+  subs: Subscription[],
+  options: SyncSubscriptionRemindersOptions,
+): Promise<void> {
+  const run = async () => {
+    const now = options.now ?? new Date();
+    let scheduledIds: string[] = [];
+    /** Заплановані НЕ підписками (задачі, зустрічі, здоровʼя…); null — невідомо. */
+    let othersPending: number | null = null;
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      scheduledIds = scheduled
+        .map(n => n.identifier)
+        .filter(id => typeof id === 'string' && id.startsWith(SUBSCRIPTION_NOTIFICATION_PREFIX));
+      othersPending = scheduled.length - scheduledIds.length;
+    } catch {
+      scheduledIds = [];
+    }
+
+    const enabled = await isNotificationsEnabled();
+    if (!enabled) {
+      // Нотифікації вимкнено глобально — прибираємо вже заплановані нагадування підписок.
+      await Promise.all(scheduledIds.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+      return;
+    }
+    const granted = await hasNotificationPermission(!!options.requestPermission);
+    if (!granted) return;
+
+    // Обʼєднаний план усіх підписок, обмежений вікном і бюджетом: iOS тримає лише
+    // 64 найближчі локальні нотифікації, і підписки не мають витісняти
+    // нагадування задач/зустрічей/здоровʼя — бюджет рахується від уже
+    // запланованих чужих (subscriptionReminderBudget). Дальші доплануються пізніше.
+    type Entry = ReturnType<typeof subscriptionReminderPlan>[number] & { sub: Subscription };
+    const all: Entry[] = [];
+    for (const sub of subs) {
+      for (const spec of subscriptionReminderPlan(sub, now)) all.push({ ...spec, sub });
+    }
+    const limited = limitSubscriptionReminders(all, now, {
+      max: subscriptionReminderBudget(Platform.OS, othersPending),
+    });
+
+    const planned = new Set<string>();
+    for (const spec of limited) {
+      const sub = spec.sub;
+      const values = {
+        name: sub.name,
+        amount: options.formatAmount(sub),
+        date: options.formatDate(sub.nextPaymentDate),
+      };
+      planned.add(spec.id);
+      const t = options.texts;
+      const [title, body] = spec.kind === 'before'
+        ? [t.beforeTitle, t.beforeBody]
+        : spec.kind === 'due'
+          ? [t.dueTitle, t.dueBody]
+          : spec.kind === 'overdue'
+            ? [t.overdueTitle, t.overdueBody]
+            : [t.endTitle, t.endBody];
+      const content = {
+        title,
+        body: fillTemplate(body, spec.kind === 'end'
+          ? { ...values, date: sub.endDate ? options.formatDate(sub.endDate) : values.date }
+          : values),
+        sound: true,
+        data: { subscriptionId: sub.id, kind: spec.kind },
+      };
+      try {
+        await Notifications.cancelScheduledNotificationAsync(spec.id).catch(() => {});
+        if (spec.daily) {
+          await Notifications.scheduleNotificationAsync({
+            identifier: spec.id,
+            content,
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              hour: spec.daily.hour,
+              minute: spec.daily.minute,
+            },
+          });
+        } else if (spec.fireAt && spec.fireAt.getTime() > Date.now()) {
+          await Notifications.scheduleNotificationAsync({
+            identifier: spec.id,
+            content,
+            trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: spec.fireAt },
+          });
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('[notifications] subscription reminder failed:', spec.id, e);
+      }
+    }
+
+    const stale = scheduledIds.filter(id => !planned.has(id));
+    await Promise.all(stale.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+  };
+  subscriptionRemindersQueue = subscriptionRemindersQueue.then(run, run);
+  return subscriptionRemindersQueue;
+}
+
+/**
+ * Перепланувати нагадування підписок зі свіжого сховища. Спільна точка для
+ * кореневого ефекту (без запиту дозволу) і екрана підписок (після явної дії
+ * користувача — із запитом дозволу).
+ */
+export async function rescheduleSubscriptionRemindersFromStorage(
+  tr: Pick<Translations,
+    'subNotifBeforeTitle' | 'subNotifBeforeBody' | 'subNotifDueTitle' | 'subNotifDueBody'
+    | 'subNotifOverdueTitle' | 'subNotifOverdueBody' | 'subNotifEndTitle' | 'subNotifEndBody'>,
+  lang: string,
+  opts: { requestPermission?: boolean } = {},
+): Promise<void> {
+  const [raw, custom] = await Promise.all([
+    loadData<unknown>('subscriptions', []),
+    loadData<Currency[]>('finance_currencies', []),
+  ]);
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+  const currencies = [...BUILTIN_CURRENCIES, ...(Array.isArray(custom) ? custom : [])];
+  await syncSubscriptionReminders(normalizeSubscriptions(raw), {
+    texts: {
+      beforeTitle: tr.subNotifBeforeTitle,
+      beforeBody: tr.subNotifBeforeBody,
+      dueTitle: tr.subNotifDueTitle,
+      dueBody: tr.subNotifDueBody,
+      overdueTitle: tr.subNotifOverdueTitle,
+      overdueBody: tr.subNotifOverdueBody,
+      endTitle: tr.subNotifEndTitle,
+      endBody: tr.subNotifEndBody,
+    },
+    formatAmount: sub => formatSubscriptionMoney(sub.amount, sub.currency, currencies, locale),
+    formatDate: key => formatDateKey(key, locale),
+    requestPermission: opts.requestPermission,
+  });
 }

@@ -15,7 +15,12 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import type { RecurrenceRule } from '@/components/shared/MeetingFormSheet';
-import type { Priority } from '@/utils/taskUtils';
+import {
+  DEFAULT_PRIORITY_LEVEL,
+  normalizePriority,
+  type LegacyPriority,
+  type TaskPriority,
+} from '@/utils/taskUtils';
 
 /**
  * Мінімум, потрібний формі. Навмисно не повний Task: редактор не має
@@ -25,17 +30,23 @@ import type { Priority } from '@/utils/taskUtils';
 export interface EditableTask {
   title: string;
   description?: string;
-  priority: Priority;
+  /** Може бути відсутнім у старих даних (задачі з деталі проєкту, CONTRACT §D.4.4). */
+  priority?: LegacyPriority;
+  /** P0…P5 / null; відсутнє — запис ще не зберігав новий клієнт (CONTRACT §B). */
+  priorityLevel?: TaskPriority;
   estimatedMinutes?: number;
   deadline?: string;
   projectId?: string;
+  /** Спринт проєкту (utils/sprintUtils.ts); відсутній = беклог. */
+  sprintId?: string;
   recurrence?: RecurrenceRule;
 }
 
 export interface TaskDraft {
   title: string;
   desc: string;
-  priority: Priority;
+  /** Рівень пріоритету; збереження пише priorityFields(priorityLevel) (dual-write). */
+  priorityLevel: TaskPriority;
   statusId: string;
   /**
    * Проєкт — частина чернетки, а не окреме поле завдання.
@@ -45,6 +56,12 @@ export interface TaskDraft {
    * проєкт — половина скасування, яку користувач не просив.
    */
   projectId: string | null;
+  /**
+   * Спринт (CONTRACT §D.3). null = «Беклог». При правці — task.sprintId
+   * ДОСЛІВНО (навіть закритий/чужий), щоб збереження без змін нікуди задачу не
+   * переносило. Зміна проєкту у формі скидає його в null.
+   */
+  sprintId: string | null;
   /** Години й хвилини — окремі рядки, бо це два поля вводу. */
   estHours: string;
   estMins: string;
@@ -59,7 +76,7 @@ export interface TaskDraft {
 
 function emptyDraft(statusId: string): TaskDraft {
   return {
-    title: '', desc: '', priority: 'medium', statusId, projectId: null,
+    title: '', desc: '', priorityLevel: DEFAULT_PRIORITY_LEVEL, statusId, projectId: null, sprintId: null,
     estHours: '', estMins: '', deadline: null,
     repeat: false, repeatFreq: 'weekly', repeatInterval: 1,
     repeatDays: [], repeatEndType: 'never', repeatUntil: '',
@@ -75,9 +92,13 @@ export function taskToDraft(task: EditableTask, statusId: string): TaskDraft {
   return {
     title: task.title,
     desc: task.description ?? '',
-    priority: task.priority,
+    // Єдине правило читання двох полів (CONTRACT §B.3). Задача без валідного
+    // пріоритету показується «без пріоритету» — форма тепер має цей варіант,
+    // а збереження пише валідне легасі-значення для старих клієнтів.
+    priorityLevel: normalizePriority(task),
     statusId,
     projectId: task.projectId ?? null,
+    sprintId: task.sprintId ?? null,
     // Порожній рядок, а не '0': нуль у полі вводу читається як введене
     // значення, хоча користувач нічого не вводив.
     estHours: h > 0 ? String(h) : '',
@@ -90,6 +111,28 @@ export function taskToDraft(task: EditableTask, statusId: string): TaskDraft {
     repeatEndType: rec?.until ? 'until' : 'never',
     repeatUntil: rec?.until ?? '',
   };
+}
+
+/** Проєкт і спринт завдання на момент відкриття правки (null — створення). */
+export interface TaskDraftOriginal {
+  projectId: string | null;
+  sprintId: string | null;
+}
+
+/**
+ * Спринт, від якого будуються варіанти поля «Спринт» (дзеркало веб
+ * task-form.tsx currentSprintId): обраний у чернетці, а якщо обрано «Беклог»
+ * і проєкт не мінявся — вихідний спринт задачі. Інакше закритий/чужий спринт
+ * зникав би зі списку від одного тапу по «Беклогу», і повернутись до нього
+ * можна було б лише скасувавши всю правку.
+ */
+export function draftCurrentSprintId(
+  draft: Pick<TaskDraft, 'projectId' | 'sprintId'>,
+  original: TaskDraftOriginal | null,
+): string | null {
+  if (draft.sprintId) return draft.sprintId;
+  if (original && original.projectId === draft.projectId) return original.sprintId || null;
+  return null;
 }
 
 /** Оцінка часу з чернетки у хвилинах. undefined, якщо не вказано. */
@@ -115,6 +158,8 @@ export function draftRecurrence(draft: TaskDraft): RecurrenceRule | undefined {
 export function useTaskEditor(defaultStatusId: string, today: Date) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<TaskDraft>(() => emptyDraft(defaultStatusId));
+  /** Проєкт/спринт задачі до правки — див. draftCurrentSprintId. */
+  const [original, setOriginal] = useState<TaskDraftOriginal | null>(null);
 
   // Стан спливних елементів форми — не частина чернетки: він не
   // зберігається й мусить скидатися при кожному відкритті.
@@ -127,9 +172,13 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
     setDraft(prev => ({ ...prev, ...part }));
   }, []);
 
-  /** Почати з чистої форми — для створення нового завдання. */
-  const reset = useCallback((statusId: string) => {
-    setDraft(emptyDraft(statusId));
+  /**
+   * Почати з чистої форми — для створення нового завдання.
+   * `preset` — наперед обраний проєкт/спринт (створення зі спринта в деталі проєкту).
+   */
+  const reset = useCallback((statusId: string, preset?: Partial<Pick<TaskDraft, 'projectId' | 'sprintId'>>) => {
+    setDraft({ ...emptyDraft(statusId), ...preset });
+    setOriginal(null);
     setCalYear(today.getFullYear());
     setCalMonth(today.getMonth());
     setShowDeadlineCal(false);
@@ -139,6 +188,7 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
 
   const begin = useCallback((task: EditableTask, statusId: string) => {
     setDraft(taskToDraft(task, statusId));
+    setOriginal({ projectId: task.projectId ?? null, sprintId: task.sprintId ?? null });
     setCalYear(today.getFullYear());
     setCalMonth(today.getMonth());
     setShowDeadlineCal(false);
@@ -157,9 +207,9 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
   // посилання, і будь-який useCallback/useMemo, що залежить від редактора,
   // перераховувався б завжди — тобто був би мемоізацією лише на вигляд.
   return useMemo(() => ({
-    editing, draft, patch, begin, reset, finish,
+    editing, draft, original, patch, begin, reset, finish,
     showDeadlineCal, setShowDeadlineCal,
     showProjectDropdown, setShowProjectDropdown,
     calYear, setCalYear, calMonth, setCalMonth,
-  }), [editing, draft, patch, begin, reset, finish, showDeadlineCal, showProjectDropdown, calYear, calMonth]);
+  }), [editing, draft, original, patch, begin, reset, finish, showDeadlineCal, showProjectDropdown, calYear, calMonth]);
 }

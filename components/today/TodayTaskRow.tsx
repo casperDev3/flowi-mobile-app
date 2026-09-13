@@ -5,10 +5,11 @@ import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } fr
 
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { PressableScale } from '@/components/shared/PressableScale';
+import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { Motion } from '@/constants/motion';
 import { useMotion } from '@/hooks/use-motion';
 import type { Translations } from '@/store/translations';
-import { PRIORITY_COLORS, Task, isOverdue } from '@/utils/taskUtils';
+import { Task, isOverdue, normalizePriority } from '@/utils/taskUtils';
 
 interface Props {
   tasks: Task[];
@@ -64,7 +65,6 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen }: RowProps) {
         intensity={isDark ? 18 : 36}
         tint={isDark ? 'dark' : 'light'}
         style={[s.row, { borderColor: c.border }]}>
-        <View style={[s.priorityBar, { backgroundColor: PRIORITY_COLORS[task.priority] }]} />
         <AnimatedCheck
           checked={localChecked}
           size={20}
@@ -90,6 +90,8 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen }: RowProps) {
           numberOfLines={1}>
           {task.title}
         </Animated.Text>
+        {/* Пріоритет — бейдж P0–P5 біля назви (замість кольорової смужки зліва). */}
+        <PriorityBadge level={normalizePriority(task)} />
         {!done && isOverdue(task) && (
           <View style={s.overdueBadge}>
             <Text style={s.overdueText}>!</Text>
@@ -146,14 +148,6 @@ const s = StyleSheet.create({
     paddingRight: 12,
     gap: 10,
     overflow: 'hidden',
-  },
-  priorityBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    borderRadius: 2,
   },
   title: { flex: 1, fontSize: 14, fontWeight: '500' },
   overdueBadge: {

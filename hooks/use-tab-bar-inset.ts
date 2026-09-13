@@ -7,11 +7,17 @@
  * рядок не ховався під панеллю. На широкому екрані панель прихована
  * (її роль перебирає сайдбар), і той самий відступ перетворився б на
  * смугу порожнечі під списком.
+ *
+ * Коли йде хоч один таймер, над табами стоїть ще й панель активних таймерів
+ * (components/time/ActiveTimersBar) — її висота теж додається, інакше FAB і
+ * останній рядок сховались би під нею.
  */
-import { TAB_BAR_HEIGHT } from '@/constants/nav';
+import { tabBarInsetFor } from '@/constants/nav';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useTimerContext } from '@/store/timer-context';
 
 export function useTabBarInset(): number {
   const { isWide } = useResponsive();
-  return isWide ? 0 : TAB_BAR_HEIGHT;
+  const { activeTimers } = useTimerContext();
+  return tabBarInsetFor(isWide, activeTimers.length);
 }

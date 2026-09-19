@@ -21,8 +21,10 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: jest.fn(), push: mockPush, setParams: jest.fn() }),
-  useLocalSearchParams: () => ({}),
+  useRouter: () => ({ back: jest.fn(), push: mockPush, replace: jest.fn(), setParams: jest.fn() }),
+  // Простір проєкту завжди мокається на p1 — те саме id, що PROJECT нижче.
+  useLocalSearchParams: () => ({ id: 'p1' }),
+  usePathname: () => '/today',
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
 }));
 jest.mock('@/utils/haptics', () => ({
@@ -58,7 +60,7 @@ jest.mock('@/store/timer-context', () => {
 import React from 'react';
 
 import TodayScreen from '@/app/(tabs)/today';
-import ProjectsScreen from '@/app/projects';
+import ProjectTasksScreen from '@/app/project/[id]/tasks';
 import { localDateKey } from '@/utils/dateUtils';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -85,23 +87,21 @@ afterEach(async () => {
   mockPush.mockReset();
 });
 
-async function openProjectDetail() {
+async function openProjectTasks() {
   mockStore.clear();
   mockStore.set('projects', JSON.stringify([PROJECT]));
   mockStore.set('tasks', JSON.stringify([TASK]));
   let tree: any;
-  await act(async () => { tree = create(<ProjectsScreen />); });
+  await act(async () => { tree = create(<ProjectTasksScreen />); });
   mounted = tree;
-  await flush();
-  await pressByLabel(tree, PROJECT.name);
   await flush();
   return tree;
 }
 
 const checkbox = (nodes: any[]) => nodes.find(n => n.props.accessibilityRole === 'checkbox') ?? nodes[0];
 
-test('деталь проєкту: active → done зупиняє таймер після запису статусу', async () => {
-  const tree = await openProjectDetail();
+test('простір проєкту → Завдання: active → done зупиняє таймер після запису статусу', async () => {
+  const tree = await openProjectTasks();
   await pressByLabel(tree, TASK.title, checkbox);
   await flush();
 
@@ -110,8 +110,8 @@ test('деталь проєкту: active → done зупиняє таймер �
   expect(mockStatusAtStop).toEqual(['done']);
 });
 
-test('деталь проєкту: done → active таймер не чіпає', async () => {
-  const tree = await openProjectDetail();
+test('простір проєкту → Завдання: done → active таймер не чіпає', async () => {
+  const tree = await openProjectTasks();
   await pressByLabel(tree, TASK.title, checkbox);
   await flush();
   mockStopTimerForTask.mockClear();

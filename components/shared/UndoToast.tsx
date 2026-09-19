@@ -7,6 +7,7 @@
  * API:
  *   const { show: showUndo, element: undoElement } = useUndoToast(isTab);
  *   showUndo('Завдання виконано', () => { ... });
+ *   showUndo('Скопійовано');   // без onUndo — коротке підтвердження без кнопки
  *   // У JSX: <View style={{ flex: 1 }}>{undoElement}</View>
  */
 
@@ -19,15 +20,18 @@ import { useI18n } from '@/store/i18n';
 
 // ─── Тривалість показу ───────────────────────────────────────────────────────
 const TOAST_DURATION_MS = 4000;
+/** Тост без «Скасувати» (напр. «Скопійовано») — лише підтвердження, довше не треба. */
+const INFO_TOAST_DURATION_MS = 1800;
 const ANIM_DURATION_MS = 200;
 
 interface ToastData {
   message: string;
-  onUndo: () => void;
+  /** Без onUndo тост лише підтверджує дію — кнопки «Скасувати» немає. */
+  onUndo?: () => void;
 }
 
 interface UndoToastApi {
-  show: (message: string, onUndo: () => void) => void;
+  show: (message: string, onUndo?: () => void) => void;
   element: React.ReactElement;
 }
 
@@ -61,11 +65,11 @@ export function useUndoToast(isTab = true): UndoToastApi {
     });
   }, [opacity, translateY]);
 
-  const show = useCallback((message: string, onUndo: () => void) => {
+  const show = useCallback((message: string, onUndo?: () => void) => {
     // Скидаємо попередній таймер
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    onUndoRef.current = onUndo;
+    onUndoRef.current = onUndo ?? null;
 
     // Оновлюємо дані та показуємо анімацію
     setToastData({ message, onUndo });
@@ -77,7 +81,7 @@ export function useUndoToast(isTab = true): UndoToastApi {
       Animated.timing(translateY, { toValue: 0, duration: ANIM_DURATION_MS, useNativeDriver: true }),
     ]).start();
 
-    timerRef.current = setTimeout(hide, TOAST_DURATION_MS);
+    timerRef.current = setTimeout(hide, onUndo ? TOAST_DURATION_MS : INFO_TOAST_DURATION_MS);
   }, [opacity, translateY, hide]);
 
   const handleUndo = useCallback(() => {
@@ -110,6 +114,7 @@ export function useUndoToast(isTab = true): UndoToastApi {
         <Text style={[st.message, { color: c.text }]} numberOfLines={1}>
           {toastData.message}
         </Text>
+        {toastData.onUndo ? (
         <TouchableOpacity
           onPress={handleUndo}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -118,6 +123,7 @@ export function useUndoToast(isTab = true): UndoToastApi {
         >
           <Text style={[st.undoBtn, { color: c.accent }]}>{tr.undo}</Text>
         </TouchableOpacity>
+        ) : null}
       </BlurView>
     </Animated.View>
   ) : <></>;

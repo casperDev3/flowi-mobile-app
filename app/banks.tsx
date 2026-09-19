@@ -41,7 +41,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { updateSynced } from '@/store/synced-storage';
 import {
   accountBalance,
   activeAccounts,
@@ -190,9 +190,9 @@ export default function BanksScreen() {
    * applyDeposit.
    */
   const persistAccounts = useCallback(async (next: Account[]) => {
-    const stored = await loadData<Account[]>('accounts', []);
-    const merged = mergeAccountsForSave(Array.isArray(stored) ? stored : [], next);
-    await saveSynced('accounts', merged);
+    // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+    // ними інакше пішов би на сервер як DELETE.
+    const merged = await updateSynced<Account>('accounts', stored => mergeAccountsForSave(stored, next));
     if (merged.length !== next.length) setAccounts(merged);
   }, []);
 
@@ -370,12 +370,8 @@ export default function BanksScreen() {
     // Список перечитуємо просто перед записом, а не беремо зі стану: поки
     // екран відкритий, синхронізація могла долити транзакції зі сервера, і
     // запис застарілого масиву позначив би їх видаленими.
-    loadData<Transaction[]>('transactions', [])
-      .then(existing => {
-        const next = [tx, ...(Array.isArray(existing) ? existing : [])];
-        setTransactions(next);
-        return saveSynced('transactions', next);
-      })
+    updateSynced<Transaction>('transactions', existing => [tx, ...existing])
+      .then(setTransactions)
       .catch(e => warn('save transaction', e));
 
     if (sourceAccount) {

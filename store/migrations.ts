@@ -9,10 +9,13 @@
  * старті й має бути no-op, якщо дані вже в новій формі.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { loadData, saveData } from './storage';
 import { saveSynced } from './synced-storage';
 import { sortTimers, taskTimerId, shiftForDate, type ActiveTimer } from '@/utils/activeTimers';
 import type { Account } from '@/utils/accounts';
+import { deriveStatusType, type TaskStatusColumn } from '@/utils/taskStatuses';
 // Правило id живе в utils/recordIds: його читає ще й форма категорій, а
 // імпортувати цей файл із чистої логіки не можна — він тягне сховище.
 import { categoryRowId, isUsableId } from '@/utils/recordIds';
@@ -459,6 +462,127 @@ async function migrateAccounts(): Promise<boolean> {
   return true;
 }
 
+// ─── Явний `type` в особистих статусах (§3.3 контракту, мінор з ревʼю) ────────
+
+/**
+ * `mergeTaskStatusColumns` рахує `type` ПРИ ПОКАЗІ (в памʼяті, `resolvedStatusType`),
+ * але сам запис у сховищі — а отже і те, що синкається на інші пристрої/web —
+ * досі лежить без явного поля, якщо особисту колонку створено чи відредаговано
+ * до появи `type`. Контракт §3.3 дослівно: «особисті статуси теж отримують
+ * type» — без цієї міграції кожен клієнт мусив би сам вивести те саме правило
+ * (isDone→done, status-in-progress→in_progress, інше→todo) з тих самих даних,
+ * і будь-яка майбутня розбіжність у цьому виведенні між клієнтами тихо
+ * розійшлася б. Лише ОСОБИСТІ колонки (без `projectId`) — проєктні й так
+ * завжди отримують явний `type` при створенні (`seedProjectStatusColumns`).
+ * Ідемпотентно: другий прохід нічого не змінює (return false).
+ */
+async function migratePersonalStatusTypes(): Promise<boolean> {
+  const stored = await loadData<TaskStatusColumn[] | null>('task_statuses', null);
+  if (!Array.isArray(stored) || !stored.length) return false;
+  let changed = false;
+  const next = stored.map(column => {
+    if (!column || column.projectId || column.type !== undefined) return column;
+    changed = true;
+    return { ...column, type: deriveStatusType(column) };
+  });
+  if (!changed) return false;
+  // saveSynced, а не saveData: явний `type` — реальна зміна даних, яку мають
+  // побачити й інші пристрої/web (contract §3.3), а не лише форма запису.
+  await saveSynced('task_statuses', next as unknown as { id: string }[]);
+  return true;
+}
+
+// ─── Бекфіл `createdBy` для проєктних задач без автора (major, review §3.7) ───
+
+const WORKSPACE_PROJECTS_KEY = 'workspace_projects';
+const PROJECT_SYNC_STATE_KEY = 'project_sync_state_v1';
+const AUTH_USER_KEY = 'auth_user';
+
+interface ProjectRoleSummaryRow { id: string; role?: string }
+interface ProjectSyncStateEntryRow { role?: string }
+interface CreatedByTaskRow { id: string; projectId?: string | null; createdBy?: string }
+
+/**
+ * Задачі без `assigneeId` і без `createdBy` контракт §3.7 не рахує «моїми»
+ * (`isMyTask` — дослівна рівність, без фолбеку — див. попередній прохід
+ * ревʼю нижче в цьому файлі). Такий стан лишають (a) соло-проєктні задачі,
+ * створені ДО появи `createdBy` в клієнті, і (b) записи, перенесені в проєкт
+ * міграцією сервера §3.6 (`POST /projects/migrate/` копіює дані як є, без
+ * додавання поля) — власник тоді втрачає власні задачі з «Сьогодні» й
+ * «Завдання» одразу після входу. Бекфілимо лише для проєктів, де я owner:
+ * для member/viewer чужа задача без автора лишається як є — приписати собі
+ * авторство ЧУЖОЇ команди тут не можна.
+ *
+ * Ідемпотентно: другий прохід не знаходить задач без `createdBy` і виходить
+ * без запису.
+ */
+async function backfillProjectTaskCreatedBy(): Promise<boolean> {
+  const user = await loadData<{ id?: string } | null>(AUTH_USER_KEY, null);
+  const myUserId = user?.id;
+  if (!myUserId) return false; // без сесії бекфілити нема від чийого імені
+
+  const tasks = await loadData<CreatedByTaskRow[] | null>('tasks', null);
+  if (!Array.isArray(tasks) || !tasks.length) return false;
+  if (!tasks.some(t => t?.projectId && !t.createdBy)) return false;
+
+  const [summaries, state] = await Promise.all([
+    loadData<ProjectRoleSummaryRow[]>(WORKSPACE_PROJECTS_KEY, []),
+    loadData<Record<string, ProjectSyncStateEntryRow>>(PROJECT_SYNC_STATE_KEY, {}),
+  ]);
+  const roles: Record<string, string> = {};
+  for (const s of summaries ?? []) {
+    if (s?.id && s.role) roles[s.id] = s.role;
+  }
+  // project_sync_state_v1 точніше й свіжіше за кеш GET /projects/ (той самий
+  // порядок злиття, що й hooks/use-project-roles.ts readRoleMap).
+  for (const [id, entry] of Object.entries(state ?? {})) {
+    if (entry?.role) roles[id] = entry.role;
+  }
+  // Той самий фолбек, що й use-project-roles.ts/canEditProjectItem: невідома
+  // роль = owner (соло-проєкт, якого сервер ще не бачив, належить тому, хто
+  // його створив).
+  const isOwnedByMe = (projectId: string) => (roles[projectId] ?? 'owner') === 'owner';
+
+  let changed = false;
+  const next = tasks.map(t => {
+    if (!t || !t.projectId || t.createdBy || !isOwnedByMe(t.projectId)) return t;
+    changed = true;
+    return { ...t, createdBy: myUserId };
+  });
+  if (!changed) return false;
+  // saveSynced, а не saveData: авторство — реальна зміна даних (contract
+  // §3.7), яку мають побачити й інші пристрої/web, а не лише форма запису.
+  await saveSynced('tasks', next as unknown as { id: string }[]);
+  return true;
+}
+
+// ─── «Спільне» → прибрано (§4 плану, §6.3 контракту) ──────────────────────────
+
+/** Точні ключі легасі-функції «Спільне» — без динамічного `shared_items_<sid>`. */
+const SHARED_FEATURE_KEYS = ['shared_device_id', 'shared_groups_list', 'shared_group', 'shared_section_counts'];
+
+/**
+ * Прибирає сховище екрана «Спільне» — той жорсткий перехід контракту §6.3:
+ * групи стали проєктами, а старі локальні ключі (пристрій, кеш груп/секцій,
+ * лічильники) більше нічого не читає й не пише. `shared_items_<sid>` —
+ * динамічний за id секції, тож шукаємо його префіксом серед усіх ключів, а
+ * не окремим `loadData`.
+ */
+async function removeSharedFeatureKeys(): Promise<boolean> {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const toRemove = allKeys.filter(
+      key => SHARED_FEATURE_KEYS.includes(key) || key.startsWith('shared_items_'),
+    );
+    if (!toRemove.length) return false;
+    await AsyncStorage.multiRemove(toRemove);
+    return true;
+  } catch (e) {
+    if (__DEV__) console.warn('[migrations] очищення ключів «Спільне» не вдалося:', e);
+    return false;
+  }
+}
+
 /**
  * Нормалізація фінансових singleton-блобів у масиви (фаза 7 плану синку).
  *
@@ -477,6 +601,9 @@ export async function runStorageMigrations(): Promise<string[]> {
   if (await migrateOpenTaskTimers()) done.push('active_timers:from_open_entries');
   // Після нормалізації adjustments: міграція рахунків читає їх уже рядками.
   if (await migrateAccounts()) done.push('accounts:from_currencies');
+  if (await removeSharedFeatureKeys()) done.push('shared:removed');
+  if (await migratePersonalStatusTypes()) done.push('task_statuses:explicit_type');
+  if (await backfillProjectTaskCreatedBy()) done.push('tasks:createdBy_backfill');
 
   if (done.length) {
     await saveData(MIGRATIONS_KEY, [...applied, ...done]);

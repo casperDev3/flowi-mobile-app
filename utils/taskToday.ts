@@ -22,9 +22,9 @@
  */
 import { isSameDay } from './dateUtils';
 import {
-  IN_PROGRESS_COLUMN_ID,
   REVIEW_COLUMN_ID,
-  taskColumnId,
+  resolvedStatusType,
+  scopedTaskStatusColumn,
   type TaskStatusColumn,
 } from './taskStatuses';
 import { completedAt, isOverdue, type Task } from './taskUtils';
@@ -33,10 +33,15 @@ import { completedAt, isOverdue, type Task } from './taskUtils';
  * Мінімум полів, потрібних для рішення: екрани мають власні звужені типи
  * завдання, і вимагати від них повний Task означало б тягнути сюди підзадачі,
  * записи таймера й нагадування, до яких правило не має жодного стосунку.
+ *
+ * `projectId` — щоб «У процесі» рахувалось і для задачі ПРОЄКТУ: її власна
+ * in_progress-колонка має інший (`st-<uuid4>`) id, і без скоупу за
+ * projectId її взагалі не було б серед `columns` (плоский особистий список
+ * відфільтровує все з чужим projectId).
  */
 export type TodayScopeTask = Pick<
   Task,
-  'status' | 'kanbanColumnId' | 'deadline' | 'history' | 'updatedAt'
+  'status' | 'kanbanColumnId' | 'deadline' | 'history' | 'updatedAt' | 'projectId'
 >;
 
 export function isTodayTask(
@@ -49,8 +54,12 @@ export function isTodayTask(
     return at !== null && isSameDay(at, now);
   }
 
-  const column = taskColumnId(task, columns);
-  if (column === IN_PROGRESS_COLUMN_ID || column === REVIEW_COLUMN_ID) return true;
+  // Скоуп за ВЛАСНИМ projectId завдання (§3.7) — інакше проєктна копія «У
+  // процесі» (свій id, не IN_PROGRESS_COLUMN_ID) ніколи не впізнавалась би
+  // нижче, і задача проєкту в роботі показувала б «сьогодні» лише за
+  // дедлайном, як звичайний беклог.
+  const column = scopedTaskStatusColumn(task, columns);
+  if (resolvedStatusType(column) === 'in_progress' || column.id === REVIEW_COLUMN_ID) return true;
 
   if (isOverdue(task)) return true;
 

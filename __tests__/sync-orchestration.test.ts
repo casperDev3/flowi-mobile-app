@@ -162,6 +162,12 @@ beforeEach(() => {
   // колекцій (catchUpAddedCollections) тут не мета тесту й додавало б запити.
   // Покрито окремо в __tests__/sync-upgrade-catchup.test.ts.
   seed('sync_known_collections_v2', [...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS]);
+  // Власника локальних даних уже визначено (§9.2, store/data-ownership.ts) —
+  // інакше doSync() з курсором 0 свідомо НЕ генерує full outbox (retry_later
+  // gate), і тести нижче, де це саме мета (перший синк / застаріла форма
+  // колекції), лишались би без жодної мутації в запиті. Дефолт тут імітує
+  // звичайний уже-залогінений акаунт; сам гейт покрито в data-ownership.test.ts.
+  seed('data_owner', { workspaceId: 'w-test', userId: 'u-test' });
 });
 
 afterEach(() => {
@@ -885,6 +891,49 @@ describe('pullAllFromServer — сервер стає істиною', () => {
   });
 });
 
+// ─── WORKSPACE_PROJECTS_CONTRACT §3.5 — «мої проєкти» для pull-guard ──────────
+
+describe('applyPullResponse — loadMyProjectIdsForPull виключає project_id_conflicts_v1 (мінор з ревʼю)', () => {
+  test('запис легасі-проєкту з колізією id оновлюється з сервера, а не застрягає як «проєктний»', async () => {
+    // p-clash лежить локально в 'projects' (легасі id зіткнувся з чужим на
+    // сервері — store/project-sync.ts markProjectIdConflicted), і тому
+    // виключений з "моїх проєктів". getMyProjectIds() (project-sync.ts) уже
+    // виключає його; loadMyProjectIdsForPull() (тут) мусить робити те саме —
+    // інакше особистий pull вважав би t1 "проєктним" (resolveOutboxStream
+    // повертав би 'project:p-clash' ≠ PERSONAL_STREAM) і НАЗАВЖДИ пропускав
+    // би для нього серверні оновлення (§3.5 dirty-wins guard).
+    seed('projects', [{ id: 'p-clash', name: 'Clash', color: '#000' }]);
+    seed('project_id_conflicts_v1', ['p-clash']);
+    seed('tasks', [{ id: 't1', projectId: 'p-clash', title: 'застаріле' }]);
+    mockApiFetch.mockResolvedValue(
+      v2({ changes: [serverItem({ data: { id: 't1', projectId: 'p-clash', title: 'з сервера' } })] }),
+    );
+
+    await loadEngine().pullAllFromServer();
+
+    expect(read('tasks', [])).toEqual([{ id: 't1', projectId: 'p-clash', title: 'з сервера' }]);
+  });
+});
+
+describe('applyPullResponse — переміщення Проєкт→Personal не губиться (major з ревʼю §3.5)', () => {
+  test('upsert без projectId застосовується, навіть коли локальна копія ще проєктна', async () => {
+    // Мірна ситуація до project-sync.test: пристрій A перемістив t1 назад в
+    // Особисте (delete@project:p1 + upsert@personal без projectId). Тут —
+    // пристрій B, де особистий pull приходить ПЕРШИМ: локальна копія t1 ще
+    // належить p1. Старий guard блокував цей upsert як "чужий потік" — запис
+    // губився, коли згодом приходив тумбстоун проєкту p1.
+    seed('projects', [{ id: 'p1', name: 'P1', color: '#000' }]);
+    seed('tasks', [{ id: 't1', projectId: 'p1', title: 'старе' }]);
+    mockApiFetch.mockResolvedValue(
+      v2({ changes: [serverItem({ data: { id: 't1', title: 'вже особисте' } })] }),
+    );
+
+    await loadEngine().pullAllFromServer();
+
+    expect(read('tasks', [])).toEqual([{ id: 't1', title: 'вже особисте' }]);
+  });
+});
+
 describe('pushAllToServer — локальний стан стає істиною', () => {
   test('надсилає всі мутації з force, щоб сервер не відхилив за OCC', async () => {
     seed('server_change_cursor_v2', 9);
@@ -1038,6 +1087,29 @@ describe('doSync — перший синк (cursor = 0)', () => {
     ]);
   });
 
+  test('без визначеного власника локальних даних (retry_later) НЕ штовхає full outbox', async () => {
+    // Контракт §9.2: reconcileDataOwnership() повертає 'retry_later', коли
+    // мережа не дала звірити стан акаунта при вході, і свідомо лишає
+    // data_owner == null. completeSession() (store/auth.tsx) усе одно кличе
+    // triggerFullSync() незалежно від результату — без цього гейта
+    // generateFullOutbox() штовхнула б УСЕ локальне в акаунт без жодного
+    // діалогу злиття (саме те, що знайдено в ревʼю).
+    seed('server_change_cursor_v2', 0);
+    seed('data_owner', null);
+    seed('tasks', [{ id: 't1' }, { id: 't2' }]);
+    seed('notes', [{ id: 'n1' }]);
+    mockApiFetch.mockResolvedValue(v2());
+
+    await loadEngine().syncNow();
+
+    // Обмін усе одно стається (звичайний пул того самого протоколу), але
+    // жодна локальна мутація в ньому не йде — generateFullOutbox() не
+    // спрацювала, і outbox лишається порожнім.
+    const sent = mockApiFetch.mock.calls[0][1].body.mutations as unknown[];
+    expect(sent).toEqual([]);
+    expect(outbox()).toEqual([]);
+  });
+
   test('читає кожну колекцію не більше двох разів за синк', async () => {
     // Регресія на фазу 2 плану: buildMutation бере записи з кешу, а не робить
     // loadData(collection) на кожен рядок outbox (це давало O(n²)).
@@ -1107,5 +1179,113 @@ describe('doSync — перший синк (cursor = 0)', () => {
     await engine.syncNow();
 
     expect(diag.getSyncDiagnostics().debounce.byCaller.drain).toBe(before + 1);
+  });
+});
+
+// ─── Дебаунс: найраніший дедлайн ─────────────────────────────────────────────
+//
+// Слот дебаунсу один. Доти кожен виклик гасив попередній таймер, тож сигнал
+// сокета «на вебі змінили» (800 мс) з'їдався локальним записом в outbox (5 с) —
+// і зміни з вебу доїжджали лише після pull-to-refresh.
+
+describe('scheduleSync — найраніший дедлайн перемагає', () => {
+  test('локальний запис після сигналу сокета не відсуває пул', async () => {
+    mockApiFetch.mockResolvedValue(v2());
+    const engine = loadEngine();
+
+    engine.scheduleSync(800, 'ws');
+    engine.scheduleSync(5000, 'outbox');
+
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('сигнал сокета після локального запису пулить за ~1 с, а не за 5', async () => {
+    mockApiFetch.mockResolvedValue(v2());
+    const engine = loadEngine();
+
+    engine.scheduleSync(5000, 'outbox');
+    await jest.advanceTimersByTimeAsync(2000);
+    engine.scheduleSync(800, 'ws');
+
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('серія локальних записів не відсуває синк без кінця', async () => {
+    mockApiFetch.mockResolvedValue(v2());
+    const engine = loadEngine();
+
+    engine.scheduleSync(5000, 'outbox');
+    for (let i = 0; i < 4; i++) {
+      await jest.advanceTimersByTimeAsync(1000);
+      engine.scheduleSync(5000, 'outbox');
+    }
+    await jest.advanceTimersByTimeAsync(1100);
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── Пул не затирає правку, що лягла під час обміну ─────────────────────────
+
+describe('applyPullResponse перечитує outbox під блокуванням', () => {
+  test('локальна правка, поставлена в outbox уже після старту обміну, лишається', async () => {
+    seed('tasks', [{ id: 't1', title: 'локальне' }]);
+    seed('sync_outbox', []);
+    mockApiFetch.mockImplementation(async () => {
+      // Поки йшов запит, екран записав правку і поставив її в outbox.
+      seed('tasks', [{ id: 't1', title: 'щойно правлене' }]);
+      seed('sync_outbox', [{
+        mutation_id: 'm-late', collection: 'tasks', local_id: 't1', deleted: false, queued_at: Date.now(),
+      }]);
+      return v2({ changes: [serverItem({ data: { id: 't1', title: 'з сервера' } })] });
+    });
+
+    await loadEngine().syncNow();
+
+    expect(read<{ id: string; title: string }[]>('tasks', [])[0].title).toBe('щойно правлене');
+  });
+});
+
+// ─── Пропущений через dirty рядок не рухає ревізію ──────────────────────────
+//
+// Якщо пул не застосував серверний рядок (запис став «брудним» під час обміну),
+// ревізія мусить лишитись старою. Інакше наступний push поїде з base_revision,
+// якої клієнт не бачив, сервер прийме його без OCC-конфлікту, і правка з вебу
+// тихо затреться цілим локальним записом.
+
+describe('пропущений dirty-рядок не рухає ревізію', () => {
+  test('правка під час обміну: ревізія стара, наступний push несе старий base_revision', async () => {
+    seed('tasks', [{ id: 't1', title: 'локальне' }]);
+    seed('sync_outbox', []);
+    seed('server_record_revisions_v2', { 'tasks:t1': 3 });
+    mockApiFetch.mockImplementationOnce(async () => {
+      seed('tasks', [{ id: 't1', title: 'щойно правлене' }]);
+      seed('sync_outbox', [{
+        mutation_id: 'm-late', collection: 'tasks', local_id: 't1', deleted: false, queued_at: Date.now(),
+      }]);
+      return v2({ changes: [serverItem({ revision: 4, data: { id: 't1', title: 'з вебу' } })] });
+    });
+    mockApiFetch.mockResolvedValue(v2({ cursor: 10 }));
+
+    const engine = loadEngine();
+    await engine.syncNow();
+
+    expect(read<Record<string, number>>('server_record_revisions_v2', {})['tasks:t1']).toBe(3);
+
+    await engine.syncNow();
+    const push = mockApiFetch.mock.calls[1][1].body.mutations;
+    expect(push).toHaveLength(1);
+    expect(push[0]).toMatchObject({ mutation_id: 'm-late', base_revision: 3 });
+  });
+
+  test('чистий рядок ревізію отримує', async () => {
+    seed('tasks', []);
+    seed('sync_outbox', []);
+    mockApiFetch.mockResolvedValue(v2({ changes: [serverItem({ revision: 4 })] }));
+
+    await loadEngine().syncNow();
+
+    expect(read<Record<string, number>>('server_record_revisions_v2', {})['tasks:t1']).toBe(4);
   });
 });

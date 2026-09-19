@@ -3,6 +3,7 @@ import {
   DONE_COLUMN_ID,
   IN_PROGRESS_COLUMN_ID,
   REVIEW_COLUMN_ID,
+  applyColumnDoneChangeToTasks,
   mergeTaskStatusColumns,
   orderColumnsForList,
   subtaskToggleTransition,
@@ -10,6 +11,7 @@ import {
   taskStatusColumn,
   taskVisibleInList,
 } from '../utils/taskStatuses';
+import type { Task } from '../utils/taskUtils';
 
 describe('task statuses', () => {
   it('merges synced custom statuses with the default workflow', () => {
@@ -226,5 +228,43 @@ describe('taskVisibleInList', () => {
     const ids = orderColumnsForList(mergeTaskStatusColumns([])).map(c => c.id);
     expect(ids[ids.length - 1]).toBe(DONE_COLUMN_ID);
     expect(ids.indexOf(REVIEW_COLUMN_ID)).toBeLessThan(ids.indexOf(DONE_COLUMN_ID));
+  });
+});
+
+describe('applyColumnDoneChangeToTasks (мінор з ревʼю: cycleType у app/project/[id]/settings.tsx)', () => {
+  const task = (over: Partial<Task> & { id: string }): Task => ({
+    title: over.id, status: 'active', subtasks: [], createdAt: new Date().toISOString(), ...over,
+  });
+
+  it('переносить у "done" лише задачі цієї колонки, лишаючи решту без змін', () => {
+    const tasks = [
+      task({ id: 't1', kanbanColumnId: 'col-a', status: 'active' }),
+      task({ id: 't2', kanbanColumnId: 'col-b', status: 'active' }),
+      task({ id: 't3', status: 'active' }), // без kanbanColumnId — теж не чіпаємо
+    ];
+    const { tasks: next, becameDoneIds } = applyColumnDoneChangeToTasks(tasks, 'col-a', true);
+    expect(next.find(t => t.id === 't1')?.status).toBe('done');
+    expect(next.find(t => t.id === 't2')?.status).toBe('active');
+    expect(next.find(t => t.id === 't3')?.status).toBe('active');
+    expect(becameDoneIds).toEqual(['t1']);
+  });
+
+  it('повертає колонку в "active", коли тип змінили назад із "done"', () => {
+    const tasks = [task({ id: 't1', kanbanColumnId: 'col-a', status: 'done' })];
+    const { tasks: next, becameDoneIds } = applyColumnDoneChangeToTasks(tasks, 'col-a', false);
+    expect(next[0].status).toBe('active');
+    expect(becameDoneIds).toEqual([]); // це не перехід У "done" — таймер зупиняти нема сенсу
+  });
+
+  it('задача, вже позначена "done" раніше, не потрапляє в becameDoneIds повторно', () => {
+    const tasks = [task({ id: 't1', kanbanColumnId: 'col-a', status: 'done' })];
+    const { becameDoneIds } = applyColumnDoneChangeToTasks(tasks, 'col-a', true);
+    expect(becameDoneIds).toEqual([]);
+  });
+
+  it('не створює нових обʼєктів для задач, яких не торкнулось (референційна стабільність)', () => {
+    const untouched = task({ id: 't2', kanbanColumnId: 'col-b', status: 'active' });
+    const { tasks: next } = applyColumnDoneChangeToTasks([untouched], 'col-a', true);
+    expect(next[0]).toBe(untouched);
   });
 });

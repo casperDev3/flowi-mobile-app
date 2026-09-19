@@ -3,10 +3,11 @@
 import { AppState, AppStateStatus } from 'react-native';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import { apiFetch, ApiError, getAccessToken, OfflineError } from './api';
-import { WS_BASE } from './api-config';
-import { isOnlineMode } from './app-mode';
+import { apiFetch, ApiError, getFreshAccessToken, OfflineError, refreshSession } from './api';
+import { getWsBase, getWorkspaceIncompatibility, subscribeWorkspaceIncompatibility } from './api-config';
+import { isOnlineMode, subscribeOnlineMode } from './app-mode';
 import { loadData, saveData } from './storage';
+import { withStorageLock } from './storage-lock';
 import { appendConflicts, loadConflicts } from './sync-conflicts';
 import {
   recordAppState,
@@ -26,6 +27,7 @@ import { EMPTY_LOCAL_ONLY, findLocalOnly, type LocalOnlyReport } from '@/utils/s
 import {
   SYNC_ARRAY_KEYS,
   SYNC_SINGLETON_KEYS,
+  OUTBOX_KEY,
   OutboxItem,
   applyPullItems,
   createMutationId,
@@ -33,9 +35,66 @@ import {
   loadOutbox,
   markDirty,
   removeMutationsFromOutbox,
+  resolveOutboxStreamForRecord,
   saveOutbox,
   setSyncScheduler,
 } from './synced-storage';
+import {
+  computeMyProjectIds,
+  isProjectCollection,
+  isProjectStream,
+  PERSONAL_STREAM,
+  PROJECT_ID_CONFLICTS_KEY,
+  resolveOutboxStream,
+} from '@/utils/projectStream';
+
+/** Особистий обмін бере лише 'personal' (undefined) рядки — проєктні пуше `store/project-sync.ts`. */
+function isPersonalOutboxItem(item: OutboxItem): boolean {
+  return !isProjectStream(item.stream);
+}
+
+/**
+ * Викликається на WS `ws/user/` `{"type":"projects_changed"}` (контракт §5.2:
+ * я доданий/видалений/роль/проєкт видалено/створено на іншому пристрої).
+ * Реєструється `store/project-sync.ts` (`ProjectSyncProvider`), а не
+ * викликається звідси напряму — той самий цикл-імпорт, через який
+ * `loadMyProjectIdsForPull` продубльований вище, замість імпорту. Без цього
+ * major з ревʼю лишався б наполовину виправленим: `syncAllMyProjects()` тепер
+ * і сам робить `GET /projects/` щоцикл (5 хв / 60 с поллінг), але сигнал
+ * призначений саме для того, щоб не чекати цей такт.
+ */
+let _projectsChangedHandler: (() => void) | null = null;
+export function setProjectsChangedHandler(handler: (() => void) | null): void {
+  _projectsChangedHandler = handler;
+}
+
+/**
+ * «Мої проєкти» для перевірки §3.5 нижче (`foreignStreamIds`) — той самий
+ * розрахунок, що й `getMyProjectIds()` у `store/project-sync.ts`, продубльований
+ * тут напряму через `loadData`, а не імпортом того модуля: `project-sync.ts`
+ * імпортує звідси (`applyRevisionUpdates`, `resolveConflictSide`, …), і
+ * зустрічний імпорт замкнув би цикл.
+ *
+ * Виключає `project_id_conflicts_v1` так само, як `getMyProjectIds()` —
+ * інакше легасі-проєкт із колізією id (маршрутизується в 'personal',
+ * `resolveOutboxStream`) тут і далі вважався б проєктним, і особистий pull
+ * пропускав би серверні оновлення його записів назавжди (мінор із ревʼю).
+ */
+async function loadMyProjectIdsForPull(): Promise<ReadonlySet<string>> {
+  const [workspaceProjects, localProjects, conflictedIds] = await Promise.all([
+    loadData<{ id: string }[]>('workspace_projects', []),
+    loadData<{ id: string }[]>('projects', []),
+    loadData<string[]>(PROJECT_ID_CONFLICTS_KEY, []),
+  ]);
+  const conflicted = new Set(Array.isArray(conflictedIds) ? conflictedIds : []);
+  const localIds = Array.isArray(localProjects)
+    ? localProjects.map(p => p.id).filter(id => !conflicted.has(id))
+    : [];
+  return computeMyProjectIds(
+    Array.isArray(workspaceProjects) ? workspaceProjects.map(p => p.id) : [],
+    localIds,
+  );
+}
 
 interface SyncMutation {
   mutation_id: string;
@@ -220,6 +279,21 @@ async function getServerCursor(): Promise<number> {
   return loadData<number>(SERVER_CURSOR_KEY, 0);
 }
 
+/**
+ * Чи вже тягнув цей пристрій особистий синк цього акаунта хоч раз (курсор > 0).
+ *
+ * Використовується `store/auth.tsx` (refreshProfile): легасі-сесія, кешована
+ * ДО появи `resolveDataOwnership` (чи з переходу на цей реліз), уже отримала
+ * СВОЇ дані з акаунта звичайним синком — `data_owner` в неї просто ніколи не
+ * виставлявся. Без цієї перевірки reconcileDataOwnership бачить «дані нічиї» +
+ * «локальні дані є» + «в акаунті є дані» (це ж її власні дані) і показує
+ * діалог «об'єднати/використати дані акаунта» на порожньому місці — вибір
+ * «використати дані акаунта» там стирає непровштовхнутий outbox мовчки.
+ */
+export async function hasSyncedBefore(): Promise<boolean> {
+  return (await getServerCursor()) > 0;
+}
+
 async function setServerCursor(cursor: number): Promise<void> {
   await saveData(SERVER_CURSOR_KEY, cursor);
 }
@@ -230,6 +304,38 @@ async function getRevisionMap(): Promise<SyncRevisionMap> {
 
 async function setRevisionMap(revisions: SyncRevisionMap): Promise<void> {
   await saveData(SERVER_REVISIONS_KEY, revisions);
+}
+
+/**
+ * Скидає курсор і мапу ревізій персонального синку до «ще нічого не тягнули».
+ *
+ * Використовується і власним `triggerFullSync()`, і `store/data-ownership.ts`
+ * при стиранні даних попереднього акаунта на цьому пристрої (контракт §9.2/
+ * §9.3): без цього наступний pull пішов би з курсора чужого акаунта, а
+ * конфлікти рахувались би від його ревізій.
+ */
+export async function resetPersonalSyncState(): Promise<void> {
+  await setServerCursor(0);
+  await setRevisionMap({});
+}
+
+/**
+ * Чи визначено власника локальних синхронізованих даних (`store/data-ownership.ts`,
+ * ключ `'data_owner'`) — читаємо ключ напряму, а не імпортуємо той модуль:
+ * він сам імпортує `generateFullOutbox`/`resetPersonalSyncState` звідси, і
+ * зустрічний імпорт замкнув би цикл.
+ *
+ * Використовується лише щоб НЕ штовхати автоматичний full-outbox у першому
+ * (курсор 0) обміні, коли власника ще не визначено (`reconcileDataOwnership()`
+ * повернула `'retry_later'` — мережа не дала звірити стан акаунта при вході,
+ * і `data_owner` свідомо лишили `null`, щоб нічого не вивантажувати без
+ * діалогу злиття). Explicit-виклики (`pushAllToServer()`, сама
+ * `uploadLocalDataToAccount()`) цю перевірку не проходять — вони й не мають:
+ * там або явна дія користувача, або власник щойно встановлюється поруч.
+ */
+async function isDataOwnershipResolved(): Promise<boolean> {
+  const owner = await loadData<{ workspaceId: string; userId: string } | null>('data_owner', null);
+  return owner !== null;
 }
 
 let _isAuthed = false;
@@ -289,19 +395,43 @@ export function describeSyncError(error: unknown): unknown {
 }
 
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+/** Коли спрацює взведений таймер (Date.now()-мілісекунди); null — не взведено. */
+let _debounceDeadline: number | null = null;
+
+function clearDebounce(): boolean {
+  if (!_debounceTimer) return false;
+  clearTimeout(_debounceTimer);
+  _debounceTimer = null;
+  _debounceDeadline = null;
+  return true;
+}
 
 /**
- * `caller` — тільки для журналу. Слот `_debounceTimer` один на всі джерела
- * (запис в outbox, сигнал сокета, повний синк, відкат курсора), і кожен новий
- * виклик гасить попередній таймер незалежно від того, хто його ставив; без
- * імені викликача в журналі не видно, чий саме тік з'їли.
+ * Слот `_debounceTimer` один на всі джерела (запис в outbox, сигнал сокета,
+ * повний синк, відкат курсора). Тримається НАЙРАНІШИЙ дедлайн: якщо вже
+ * взведений таймер спрацює не пізніше за новий, новий виклик його не чіпає.
+ *
+ * Доти кожен виклик гасив попередній таймер: сигнал сокета «на вебі щось
+ * змінили» (800 мс) з'їдався наступним локальним записом (5 с), а серія
+ * записів відсувала синк без кінця. Тепер пул за сигналом сокета стартує
+ * вчасно незалежно від того, що локально пишеться в outbox, — один обмін
+ * однаково і відправляє outbox, і тягне зміни.
+ *
+ * `caller` — тільки для журналу.
  */
-function scheduleSync(debounceMs = 5000, caller: ScheduleCaller = 'outbox'): void {
-  const replacedArmed = _debounceTimer != null;
-  if (_debounceTimer) clearTimeout(_debounceTimer);
+export function scheduleSync(debounceMs = 5000, caller: ScheduleCaller = 'outbox'): void {
+  const deadline = Date.now() + debounceMs;
+  if (_debounceTimer && _debounceDeadline != null && _debounceDeadline <= deadline) {
+    // Уже взведений таймер спрацює раніше — він і забере цей тригер.
+    recordDebounceArmed(debounceMs, caller, false);
+    return;
+  }
+  const replacedArmed = clearDebounce();
   recordDebounceArmed(debounceMs, caller, replacedArmed);
+  _debounceDeadline = deadline;
   _debounceTimer = setTimeout(() => {
     _debounceTimer = null;
+    _debounceDeadline = null;
     recordDebounceFired();
     void doSync('debounce');
   }, debounceMs);
@@ -497,7 +627,16 @@ async function buildMutation(
   };
 }
 
-async function generateFullOutbox(): Promise<void> {
+/**
+ * Ставить в outbox ЦІЛКОМ увесь локальний стан синхронізованих колекцій — не
+ * лише те, що вже позначено «брудним».
+ *
+ * Використовується `pushAllToServer()` (кнопка «Відправити все») і, з
+ * `store/data-ownership.ts`, міграцією офлайн-даних в акаунт (контракт §9.2):
+ * легасі-записи, створені до появи outbox, чи записи, покладені напряму через
+ * `saveData` в обхід `saveSynced`, інакше ніколи туди не потрапили б.
+ */
+export async function generateFullOutbox(): Promise<void> {
   const now = Date.now();
   const generated: OutboxItem[] = [];
 
@@ -518,7 +657,13 @@ async function generateFullOutbox(): Promise<void> {
     for (const item of items) {
       const localId = normalizeSyncLocalId(item.id);
       if (localId) {
-        generated.push({ collection: key, local_id: localId, deleted: false, queued_at: now });
+        // Запис із projectId, що належить проєкту в workspace_projects, іде в
+        // проєктний потік — інакше повний перезалив штовхнув би його на
+        // особистий ендпоінт (контракт §3.5). До міграції/appearance
+        // workspace_projects резолвер повертає undefined ('personal') — той
+        // самий результат, що й раніше.
+        const stream = await resolveOutboxStreamForRecord(key, localId, item as unknown as Record<string, unknown>);
+        generated.push({ collection: key, local_id: localId, deleted: false, queued_at: now, stream });
       }
     }
   }
@@ -529,16 +674,45 @@ async function generateFullOutbox(): Promise<void> {
     }
   }
 
-  const existing = await loadOutbox();
-  await saveOutbox(deduplicateOutbox([...existing, ...generated]));
+  await withStorageLock(OUTBOX_KEY, async () => {
+    const existing = await loadOutbox();
+    await saveOutbox(deduplicateOutbox([...existing, ...generated]));
+  });
 }
 
+/**
+ * Застосовує серверні рядки до сховища, пропускаючи «брудні» (dirty-wins).
+ *
+ * `pinnedKeys` — ключі, що тримаються локальними штучно (OCC-конфлікт у цьому
+ * ж обміні: локальна версія лишається видимою до вирішення), хоча в outbox
+ * їх уже немає.
+ *
+ * Повертає ключі, пропущені через РЕАЛЬНИЙ outbox — включно з тим, що встиг
+ * лягти в outbox під час обміну (див. перечитування під блокуванням нижче).
+ * Ревізію таких записів рухати не можна: дані сервера не застосовано, і
+ * локальна правка поїхала б із base_revision, якої клієнт ніколи не бачив, —
+ * сервер прийняв би її без OCC-конфлікту й затер би чужі поля цілим записом.
+ * Зі старою ревізією наступний push отримує конфлікт і проходить звичайне
+ * LWW-вирішення.
+ */
 async function applyPullResponse(
   serverItems: SyncResponseItem[],
   currentOutbox: OutboxItem[],
-): Promise<void> {
-  if (!serverItems.length) return;
+  pinnedKeys: ReadonlySet<string> = new Set(),
+): Promise<Set<string>> {
+  const skipped = new Set<string>();
+  if (!serverItems.length) return skipped;
   const dirtySet = new Set(currentOutbox.map(item => syncRecordKey(item.collection, item.local_id)));
+  // §3.5: цей pull несе особистий (`personal`) потік — лише для колекцій, що
+  // взагалі можуть належати проєкту, обчислюємо myProjectIds один раз.
+  const needsForeignCheck = serverItems.some(item => isProjectCollection(item.collection));
+  const myProjectIds = needsForeignCheck ? await loadMyProjectIdsForPull() : null;
+  const markSkipped = (collection: string, items: SyncResponseItem[], dirty: ReadonlySet<string>) => {
+    for (const item of items) {
+      const key = syncRecordKey(collection, item.local_id);
+      if (dirty.has(key)) skipped.add(key);
+    }
+  };
 
   // Групування у звичайний об'єкт із окремим списком порядку — з тієї ж
   // причини, що й у buildCollectionCache: цикл нижче async, і ітерація по
@@ -557,7 +731,12 @@ async function applyPullResponse(
     const items = byCollection[collection];
     const isSingleton = (SYNC_SINGLETON_KEYS as readonly string[]).includes(collection);
     if (isSingleton) {
-      if (dirtySet.has(syncRecordKey(collection, collection))) continue;
+      const singletonKey = syncRecordKey(collection, collection);
+      if (dirtySet.has(singletonKey)) {
+        skipped.add(singletonKey);
+        continue;
+      }
+      if (pinnedKeys.has(singletonKey)) continue;
       const serverItem = items[items.length - 1];
       await saveData(
         collection,
@@ -566,10 +745,57 @@ async function applyPullResponse(
       continue;
     }
     if (!(SYNC_ARRAY_KEYS as readonly string[]).includes(collection)) continue;
-    const storedLocal = await loadData<unknown>(collection, []);
-    const local = Array.isArray(storedLocal) ? (storedLocal as { id: string }[]) : [];
-    await saveData(collection, applyPullItems(local, items, dirtySet, collection));
+    // Під блокуванням ключа: екран (saveSynced/saveSyncedChanges) пише той
+    // самий масив read-modify-write, і без черги пізніший запис затирав би
+    // ранній — або серверні зміни, або щойно зроблену локальну правку.
+    //
+    // Outbox перечитується вже ПІД блокуванням: екран ставить свої записи в
+    // outbox, не відпускаючи блокування колекції, тож правка, що встигла лягти
+    // в сховище після початку обміну, тут уже видна як dirty і не затирається.
+    await withStorageLock(collection, async () => {
+      const dirty = new Set(dirtySet);
+      for (const item of await loadOutbox()) dirty.add(syncRecordKey(item.collection, item.local_id));
+      const storedLocal = await loadData<unknown>(collection, []);
+      const local = Array.isArray(storedLocal) ? (storedLocal as Record<string, unknown>[]) : [];
+      // §3.5 «застосування pull: зміна з потоку S не видаляє/не перезаписує
+      // локальний запис, який зараз належить іншому потоку» — тут S =
+      // 'personal'. Рядок пропускаємо (як dirty), якщо ЛОКАЛЬНИЙ запис із тим
+      // самим id зараз маршрутизується (за власним routing-правилом
+      // `resolveOutboxStream`) у проєктний потік: інший, паралельний
+      // особистому, обмін (`store/project-sync.ts`) міг щойно вставити його
+      // туди з `projectId`, і тумбстоун/застаріла версія особистого рядка не
+      // мають його стирати чи затирати назад у 'personal'.
+      // review finding (major, симетрично до `store/project-sync.ts`
+      // `applyProjectPull`): порівняння лише проти ІСНУЮЧОГО локального рядка
+      // блокувало й ЛЕГІТИМНЕ переміщення НАЗАД в особисте (P→Personal) —
+      // §3.5 «переміщення = delete у старому потоці + upsert у новому»: доки
+      // цей upsert (без projectId) не приїхав, local-рядок ще маршрутизувався
+      // на проєкт, і guard блокував саме той upsert, що мав завершити
+      // переміщення сюди. Якщо особистий pull прийшов ПЕРШИМ (порядок
+      // WS/дебаунсу двох потоків недетермінований), а потім проєктний pull
+      // приносить тумбстоун (delete) — запис губився назавжди. Тепер:
+      // upsert, чиї ВЛАСНІ дані маршрутизуються саме в 'personal', завжди
+      // застосовується — він і є завершенням переміщення.
+      if (myProjectIds && isProjectCollection(collection)) {
+        const localById = new Map(local.map(row => [String(row.id), row]));
+        for (const item of items) {
+          const existing = localById.get(item.local_id);
+          if (!existing) continue;
+          const currentStream = resolveOutboxStream(collection, item.local_id, existing, myProjectIds);
+          if (currentStream === PERSONAL_STREAM) continue;
+          if (!item.deleted) {
+            const incomingStream = resolveOutboxStream(collection, item.local_id, item.data, myProjectIds);
+            if (incomingStream === PERSONAL_STREAM) continue; // завершує переміщення назад в особисте — не блокувати
+          }
+          dirty.add(syncRecordKey(collection, item.local_id));
+        }
+      }
+      markSkipped(collection, items, dirty);
+      for (const key of pinnedKeys) dirty.add(key);
+      await saveData(collection, applyPullItems(local as { id: string }[], items, dirty, collection));
+    });
   }
+  return skipped;
 }
 
 interface ExchangeResult {
@@ -634,19 +860,17 @@ async function exchangeV2(
     // Keep the local candidate visible until the user resolves the conflict.
     // The synthetic dirty rows only affect local application; the real outbox
     // mutation has already been removed by mutation_id above.
-    const conflictDirtyRows: OutboxItem[] = response.conflicts.map(item => ({
-      collection: item.collection,
-      local_id: item.local_id,
-      deleted: item.client.deleted,
-      queued_at: Date.now(),
-    }));
-    await applyPullResponse(
-      [...response.changes, ...conflictRows],
-      [...currentOutbox, ...conflictDirtyRows],
+    const conflictKeys = new Set(
+      response.conflicts.map(item => syncRecordKey(item.collection, item.local_id)),
     );
+    const pulled = [...response.changes, ...conflictRows];
+    const skippedDirty = await applyPullResponse(pulled, currentOutbox, conflictKeys);
+    // Рядок, пропущений через локальну незапушену правку, лишає стару ревізію
+    // (див. applyPullResponse). Конфліктні рядки ревізію отримують: їх вирішує
+    // гілка конфліктів нижче за потоком. Підтвердження — завжди: це наш запис.
     revisions = applyRevisionUpdates(
       revisions,
-      [...response.changes, ...conflictRows],
+      pulled.filter(change => !skippedDirty.has(syncRecordKey(change.collection, change.local_id))),
       response.acknowledged,
     );
     conflicts.push(...response.conflicts);
@@ -707,11 +931,10 @@ async function catchUpAddedCollections(
     const relevant = response.changes.filter(change => addedSet.has(change.collection));
     if (relevant.length) {
       const currentOutbox = await loadOutbox();
-      const dirty = new Set(currentOutbox.map(item => syncRecordKey(item.collection, item.local_id)));
-      await applyPullResponse(relevant, currentOutbox);
+      const skippedDirty = await applyPullResponse(relevant, currentOutbox);
       next = applyRevisionUpdates(
         next,
-        relevant.filter(change => !dirty.has(syncRecordKey(change.collection, change.local_id))),
+        relevant.filter(change => !skippedDirty.has(syncRecordKey(change.collection, change.local_id))),
       );
     }
 
@@ -732,6 +955,29 @@ async function catchUpAddedCollections(
 let _syncing = false;
 /** Початок поточного обміну — потрібен лише журналу тривалості. */
 let _syncStartedAt = 0;
+const _syncIdleWaiters = new Set<() => void>();
+
+/**
+ * Дочекатись завершення обміну, що вже йде (якщо йде) — major з ревʼю:
+ * `logout()`/`switchWorkspace()` (store/auth.tsx) ставлять `setIsAuthed(false)`
+ * ПЕРЕД витиранням локальних даних, але сам гейт (`currentGate`) захищає лише
+ * СТАРТ нового обміну — обмін, що вже стартував ДО цього виклику (наприклад,
+ * від WS `sync_changed`, 5-хвилинного поллінгу чи повернення з фону), про
+ * прапорець не знає і продовжує йти зі старими токенами. Без очікування він
+ * дописав би курсор/ревізії/пул-записи ЦЬОГО (уже покинутого) акаунта в
+ * щойно витерте сховище — рівно те, що контракт §2.3 забороняє.
+ */
+export function waitForSyncIdle(): Promise<void> {
+  if (!_syncing) return Promise.resolve();
+  return new Promise(resolve => { _syncIdleWaiters.add(resolve); });
+}
+
+/** Спільний `finally` для `doSync`/`pullAllFromServer` — обидві ділять `_syncing`. */
+function markSyncIdle(): void {
+  _syncing = false;
+  for (const resolve of [..._syncIdleWaiters]) resolve();
+  _syncIdleWaiters.clear();
+}
 
 /**
  * Гейт не змінено: ті самі три перевірки в тому самому порядку. Різниця лише в
@@ -742,6 +988,15 @@ let _syncStartedAt = 0;
 function currentGate(): GateReason | null {
   if (!isOnlineMode()) return 'offline';
   if (!_isAuthed) return 'notAuthed';
+  // Мінор із ревʼю: `workspace_changed`/несумісна версія лишень
+  // ПЕРЕНАПРАВЛЯЛИ UI на /workspace — сам обмін (і WS, окремо в
+  // useUserSyncSocket) продовжував іти зі старими токенами проти того самого
+  // origin. Сценарій: self-host сервер переінстальовано з тим самим
+  // SECRET_KEY, але свіжою БД — старий JWT лишається валідним для випадково
+  // того самого user id вже ІНШОГО акаунта, і без цього гейта outbox
+  // продовжував би штовхатись (а pull — приходити) у чужий акаунт, поки
+  // користувач не дійде до екрана /workspace вручну.
+  if (getWorkspaceIncompatibility()) return 'incompatible';
   if (_syncing) return 'busy';
   return null;
 }
@@ -771,12 +1026,49 @@ async function doSync(trigger: SyncTrigger): Promise<void> {
     let cursor = await getServerCursor();
     let revisions = await getRevisionMap();
 
-    if (cursor === 0) await generateFullOutbox();
-    // До buildMutation: мутації мають іти вже з очищеними ревізіями.
-    else revisions = await catchUpAddedCollections(cursor, revisions);
+    // Власника ще не визначено (retry_later — обидві мережеві спроби звірити
+    // стан акаунта при вході не вдались, і `reconcileDataOwnership()` свідомо
+    // лишила `data_owner == null`) — фіксуємо це ДО обміну: нижче курсор і
+    // мапу ревізій, які поверне exchangeV2, свідомо НЕ персистимо (major з
+    // ревʼю). Якщо персистити — курсор стає >0 без жодного вивантаження
+    // (generateFullOutbox нижче теж не спрацював), і `hasSyncedBefore()`
+    // (store/auth.tsx, refreshProfile) на наступному холодному старті
+    // помилково читає це як «легасі-сесія вже синхронізувалась із цим
+    // акаунтом» — виставляє власника МОВЧКИ, без діалогу злиття, а
+    // невивантажені легасі-дані назавжди лишаються без власника і без шансу
+    // піти в акаунт. Лишаючи курсор на 0, ми змушуємо КОЖЕН наступний обмін
+    // (і, головне, `refreshProfile` на наступному вході) знову побачити
+    // «ще не звіряли» й повторити `resolveDataOwnership`.
+    const ownerUnresolvedAtStart = cursor === 0 && !(await isDataOwnershipResolved());
 
-    const outbox = await loadOutbox();
-    updatePendingFrom(outbox);
+    if (cursor === 0) {
+      // §9.2: доки власника локальних даних не визначено — НЕ штовхаємо тут
+      // геть усе локальне в акаунт автоматично. Без цієї перевірки будь-який
+      // наступний фоновий обмін (coldStart, WS-сигнал, повернення з фону) з
+      // курсором 0 однаково зробив би це мовчки — саме те, що знайдено в
+      // ревʼю: completeSession() усе одно кличе triggerFullSync() незалежно
+      // від результату reconcile. Пул (нижче, тим самим обміном) лишаємо як
+      // є — це вже наявна dirty-wins модель синку, а не нова поведінка.
+      if (!ownerUnresolvedAtStart) await generateFullOutbox();
+    } else {
+      // До buildMutation: мутації мають іти вже з очищеними ревізіями.
+      revisions = await catchUpAddedCollections(cursor, revisions);
+    }
+
+    const fullOutbox = await loadOutbox();
+    // Лічильник — по ВСІХ потоках (особистий + кожен проєкт): користувачу
+    // важливо «скільки взагалі не відправлено», а не лише особисте. Сам обмін
+    // нижче бере тільки 'personal' — проєктні рядки пуше store/project-sync.ts
+    // власним обміном на /projects/{id}/sync/.
+    updatePendingFrom(fullOutbox);
+    // minor з ревʼю: `ownerUnresolvedAtStart` вище вимикав лише `generateFullOutbox`
+    // (повний дамп), але ЛЕГАСІ-рядки, що вже лежали в outbox ДО цього обміну
+    // (наприклад, непровштовхнуті правки до-релізного офлайн-користувача),
+    // усе одно потрапляли б у `mutations` нижче й ішли на сервер раніше, ніж
+    // §9.2-діалог «злити/використати акаунт» узагалі показаний — точнісінько
+    // той рейс, від якого захищає `ownerUnresolvedAtStart` в іншому місці.
+    // Доки власника не визначено, обмін лишається чистим пулом (mutations=[]).
+    const outbox = ownerUnresolvedAtStart ? [] : fullOutbox.filter(isPersonalOutboxItem);
     const cache = await buildCollectionCache(outbox);
     const allConflicts: SyncConflictServer[] = [];
     const chunkCount = Math.max(1, Math.ceil(outbox.length / 500));
@@ -813,8 +1105,15 @@ async function doSync(trigger: SyncTrigger): Promise<void> {
       cursor = result.cursor;
       revisions = result.revisions;
       allConflicts.push(...result.conflicts);
-      await setRevisionMap(revisions);
-      await setServerCursor(cursor);
+      // Локальні змінні `cursor`/`revisions` оновлюємо завжди (потрібні для
+      // коректності протоколу всередині ЦЬОГО обміну, якщо чанків кілька) —
+      // а ось персистимо в сховище, лише коли власника вже було визначено на
+      // старті. Інакше цей обмін лишає слід, який наступний холодний старт
+      // прочитає як «вже синхронізувались» (див. коментар вище).
+      if (!ownerUnresolvedAtStart) {
+        await setRevisionMap(revisions);
+        await setServerCursor(cursor);
+      }
       updatePendingFrom(await loadOutbox());
     }
 
@@ -904,7 +1203,7 @@ async function doSync(trigger: SyncTrigger): Promise<void> {
       else clearRetryTimer();
     }
   } finally {
-    _syncing = false;
+    markSyncIdle();
   }
 }
 
@@ -915,20 +1214,12 @@ async function doSync(trigger: SyncTrigger): Promise<void> {
  * того, що попередня помилка минула.
  */
 export async function flushPendingSync(): Promise<void> {
-  if (_debounceTimer) {
-    clearTimeout(_debounceTimer);
-    _debounceTimer = null;
-    recordDebounceCancelled('flush');
-  }
+  if (clearDebounce()) recordDebounceCancelled('flush');
   await doSync('flush');
 }
 
 export async function syncNow(): Promise<void> {
-  if (_debounceTimer) {
-    clearTimeout(_debounceTimer);
-    _debounceTimer = null;
-    recordDebounceCancelled('syncNow');
-  }
+  if (clearDebounce()) recordDebounceCancelled('syncNow');
   clearRetryTimer();
   _retryAttempt = 0;
   await doSync('button');
@@ -936,8 +1227,7 @@ export async function syncNow(): Promise<void> {
 
 /** Повний синк із нуля: викликається після логіну/реєстрації (store/auth.tsx). */
 export async function triggerFullSync(): Promise<void> {
-  await setServerCursor(0);
-  await setRevisionMap({});
+  await resetPersonalSyncState();
   scheduleSync(500, 'fullSync');
 }
 
@@ -1052,7 +1342,7 @@ export async function pullAllFromServer(): Promise<void> {
       updateSyncState('error');
     }
   } finally {
-    _syncing = false;
+    markSyncIdle();
   }
 }
 
@@ -1074,33 +1364,92 @@ function useUserSyncSocket(isAuthed: boolean): void {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
     let cancelled = false;
+    /** open() уже чекає токен — другий паралельний виклик не потрібен. */
+    let opening = false;
+
+    const clearReconnect = () => {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+    };
 
     const open = async () => {
-      if (cancelled || !isOnlineMode()) return;
-      const token = await getAccessToken();
-      if (cancelled || !token) return;
+      // Мінор із ревʼю: той самий гейт, що й у doSync()/currentGate() — сокет
+      // не має права піднятись зі старими токенами проти origin, чий
+      // workspace_id вже розійшовся з тим, на який ці токени видані (self-host
+      // сервер переінстальовано з тим самим SECRET_KEY, свіжою БД).
+      if (cancelled || socket || opening || !isOnlineMode() || getWorkspaceIncompatibility()) return;
+      opening = true;
+      let token: string | null;
+      try {
+        // Не кешований токен як є: протухлий дав би 4401 на кожній спробі.
+        token = await getFreshAccessToken();
+      } finally {
+        opening = false;
+      }
+      if (cancelled || socket || !token || !isOnlineMode()) return;
 
+      let ws: WebSocket;
       try {
         recordWs('connecting');
-        socket = new WebSocket(`${WS_BASE}/user/`, ['flowi-jwt', token]);
+        ws = new WebSocket(`${getWsBase()}/user/`, ['flowi-jwt', token]);
       } catch (error) {
         if (__DEV__) console.warn('[sync-engine] ws open failed:', error);
         recordWs('failed');
         scheduleReconnect();
         return;
       }
+      socket = ws;
 
-      socket.onopen = () => { attempt = 0; recordWs('open'); };
-      socket.onmessage = () => {
-        // Дебаунс, а не миттєвий синк: сервер може прислати кілька сигналів
-        // поспіль (наприклад, клієнт запушив батч), і кожен піднімав би
-        // окремий обмін.
+      ws.onopen = () => {
+        attempt = 0;
+        recordWs('open');
+        // Поки сокета не було, сигнали про чужі зміни губились — підтягуємо.
         scheduleSync(800, 'ws');
       };
-      socket.onerror = () => { /* onclose однаково спрацює */ };
-      socket.onclose = () => {
-        socket = null;
+      ws.onmessage = (event: { data?: unknown }) => {
+        // Дебаунс, а не миттєвий синк: сервер може прислати кілька сигналів
+        // поспіль (наприклад, клієнт запушив батч), і кожен піднімав би
+        // окремий обмін. scheduleSync тримає найраніший дедлайн, тож локальний
+        // запис в outbox цей тригер уже не відсуває. §5.2: старий сервер чи
+        // повідомлення без розпізнаного `type` (у т.ч. наявний `sync_changed`
+        // — форма НЕ змінюється) так само штовхає особистий синк, як і зараз.
+        scheduleSync(800, 'ws');
+        // §5.2 (адитивно): `projects_changed` — я доданий/видалений з
+        // проєкту, роль змінилась, проєкт видалено чи створено деінде.
+        // Особистий синк вище цього не покриває — проєкти йдуть окремим
+        // потоком (`store/project-sync.ts`).
+        if (typeof event?.data === 'string') {
+          try {
+            const msg: unknown = JSON.parse(event.data);
+            if (msg && typeof msg === 'object' && (msg as { type?: unknown }).type === 'projects_changed') {
+              _projectsChangedHandler?.();
+            }
+          } catch {
+            // не JSON / не той формат — ігноруємо, особистий синк вище й так запланований
+          }
+        }
+      };
+      ws.onerror = () => { /* onclose однаково спрацює */ };
+      ws.onclose = (event: { code?: number }) => {
+        if (socket === ws) socket = null;
         recordWs('closed');
+        if (cancelled) return;
+        // 4401 — сервер відхилив саме токен (як на вебі, lib/data-context.tsx).
+        // Оновлюємо його ПЕРЕД наступною спробою, інакше повторюватимемо ту
+        // саму відмову з кешованим токеном.
+        if (event?.code === 4401) {
+          void refreshSession().then(outcome => {
+            if (cancelled) return;
+            // `invalid` — сесії справді немає: session-expired уже надіслано,
+            // застосунок іде на екран входу. Стукати далі нема з чим.
+            if (outcome === 'invalid') return;
+            if (outcome === 'ok') attempt = 0;
+            scheduleReconnect();
+          });
+          return;
+        }
         scheduleReconnect();
       };
     };
@@ -1117,15 +1466,57 @@ function useUserSyncSocket(isAuthed: boolean): void {
       }, delay);
     };
 
+    /** Підключитись негайно, без очікування backoff, — якщо сокета немає. */
+    const reconnectNow = () => {
+      if (cancelled || socket) return;
+      clearReconnect();
+      attempt = 0;
+      void open();
+    };
+
+    const closeSocket = () => {
+      clearReconnect();
+      if (socket) {
+        const ws = socket;
+        socket = null;
+        ws.onclose = null;
+        ws.close();
+        recordWs('closed');
+      }
+    };
+
     void open();
+
+    // Онлайн-режим увімкнули пізніше — доти open() мовчки виходив і більше
+    // ніхто його не кликав. Вимкнули — сокет закриваємо.
+    const unsubscribeMode = subscribeOnlineMode(online => {
+      if (online) reconnectNow();
+      else closeSocket();
+    });
+
+    // Несумісність workspace виявили ПОКИ сокет уже відкритий (мінор із
+    // ревʼю) — закриваємо негайно, не чекаючи природного onclose/backoff:
+    // інакше сесія продовжила б приймати `sync_changed`-сигнали зі старого
+    // origin і тягнути звідти дані ще секунди чи хвилини, поки TCP сам не
+    // порветься. Знята несумісність (користувач пройшов /workspace і
+    // підтвердив/перепідʼєднав workspace) — пробуємо піднятись знову.
+    const unsubscribeIncompatible = subscribeWorkspaceIncompatibility(v => {
+      if (v) closeSocket();
+      else reconnectNow();
+    });
+
+    // iOS/Android рвуть сокет у фоні, а backoff міг відкласти спробу до 30 с.
+    // Повернення в застосунок — саме той момент, коли людина чекає свіжих даних.
+    const appStateSub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') reconnectNow();
+    });
 
     return () => {
       cancelled = true;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (socket) {
-        socket.onclose = null;
-        socket.close();
-      }
+      unsubscribeMode();
+      unsubscribeIncompatible();
+      appStateSub.remove();
+      closeSocket();
     };
   }, [isAuthed]);
 }

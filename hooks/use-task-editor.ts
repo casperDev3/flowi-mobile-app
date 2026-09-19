@@ -40,6 +40,8 @@ export interface EditableTask {
   /** Спринт проєкту (utils/sprintUtils.ts); відсутній = беклог. */
   sprintId?: string;
   recurrence?: RecurrenceRule;
+  /** Виконавець (контракт §4.5) — рядковий `user.id`, як і скрізь у синку. */
+  assigneeId?: string | null;
 }
 
 export interface TaskDraft {
@@ -72,6 +74,13 @@ export interface TaskDraft {
   repeatDays: number[];
   repeatEndType: 'never' | 'until';
   repeatUntil: string;
+  /**
+   * Виконавець (контракт §4.5). Поле форми, а не самого завдання: як і
+   * проєкт/спринт, застосовується лише при збереженні — «Скасувати» не має
+   * лишати нового виконавця, обраного, а потім відкинутого разом з рештою
+   * правки.
+   */
+  assigneeId: string | null;
 }
 
 function emptyDraft(statusId: string): TaskDraft {
@@ -80,6 +89,7 @@ function emptyDraft(statusId: string): TaskDraft {
     estHours: '', estMins: '', deadline: null,
     repeat: false, repeatFreq: 'weekly', repeatInterval: 1,
     repeatDays: [], repeatEndType: 'never', repeatUntil: '',
+    assigneeId: null,
   };
 }
 
@@ -110,6 +120,7 @@ export function taskToDraft(task: EditableTask, statusId: string): TaskDraft {
     repeatDays: rec?.daysOfWeek ?? [],
     repeatEndType: rec?.until ? 'until' : 'never',
     repeatUntil: rec?.until ?? '',
+    assigneeId: task.assigneeId ?? null,
   };
 }
 
@@ -155,11 +166,50 @@ export function draftRecurrence(draft: TaskDraft): RecurrenceRule | undefined {
   };
 }
 
+/** Групи полів форми — одиниці «користувач це змінив». */
+export type DraftFieldGroup =
+  | 'title' | 'desc' | 'priority' | 'status' | 'project' | 'sprint'
+  | 'estimate' | 'deadline' | 'recurrence' | 'assignee';
+
+/**
+ * Які поля форми користувач реально змінив від моменту відкриття.
+ *
+ * Поки форма відкрита, завдання може змінитись деінде (веб, інший пристрій), і
+ * список на екрані оновлюється наживо. Форма — ні: чернетка лишається тією, яку
+ * людина бачить. Тому при збереженні пишуться ЛИШЕ змінені тут поля — інакше
+ * незмінена в формі назва перезаписала б нову назву з вебу старою
+ * (last write wins по полю, а не по запису).
+ *
+ * `initial` null — створення: «змінено» все.
+ */
+export function editedDraftFields(initial: TaskDraft | null, draft: TaskDraft): Set<DraftFieldGroup> {
+  const all: DraftFieldGroup[] = [
+    'title', 'desc', 'priority', 'status', 'project', 'sprint', 'estimate', 'deadline', 'recurrence', 'assignee',
+  ];
+  if (!initial) return new Set(all);
+  const changed = new Set<DraftFieldGroup>();
+  if (initial.title.trim() !== draft.title.trim()) changed.add('title');
+  if (initial.desc.trim() !== draft.desc.trim()) changed.add('desc');
+  if (initial.priorityLevel !== draft.priorityLevel) changed.add('priority');
+  if (initial.statusId !== draft.statusId) changed.add('status');
+  if (initial.projectId !== draft.projectId) changed.add('project');
+  if (initial.sprintId !== draft.sprintId) changed.add('sprint');
+  if ((initial.assigneeId ?? null) !== (draft.assigneeId ?? null)) changed.add('assignee');
+  if (draftEstimatedMinutes(initial) !== draftEstimatedMinutes(draft)) changed.add('estimate');
+  if (initial.deadline !== draft.deadline) changed.add('deadline');
+  if (JSON.stringify(draftRecurrence(initial) ?? null) !== JSON.stringify(draftRecurrence(draft) ?? null)) {
+    changed.add('recurrence');
+  }
+  return changed;
+}
+
 export function useTaskEditor(defaultStatusId: string, today: Date) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<TaskDraft>(() => emptyDraft(defaultStatusId));
   /** Проєкт/спринт задачі до правки — див. draftCurrentSprintId. */
   const [original, setOriginal] = useState<TaskDraftOriginal | null>(null);
+  /** Чернетка на момент відкриття правки — див. editedDraftFields. null — створення. */
+  const [initial, setInitial] = useState<TaskDraft | null>(null);
 
   // Стан спливних елементів форми — не частина чернетки: він не
   // зберігається й мусить скидатися при кожному відкритті.
@@ -179,6 +229,7 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
   const reset = useCallback((statusId: string, preset?: Partial<Pick<TaskDraft, 'projectId' | 'sprintId'>>) => {
     setDraft({ ...emptyDraft(statusId), ...preset });
     setOriginal(null);
+    setInitial(null);
     setCalYear(today.getFullYear());
     setCalMonth(today.getMonth());
     setShowDeadlineCal(false);
@@ -187,7 +238,9 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
   }, [today]);
 
   const begin = useCallback((task: EditableTask, statusId: string) => {
-    setDraft(taskToDraft(task, statusId));
+    const start = taskToDraft(task, statusId);
+    setDraft(start);
+    setInitial(start);
     setOriginal({ projectId: task.projectId ?? null, sprintId: task.sprintId ?? null });
     setCalYear(today.getFullYear());
     setCalMonth(today.getMonth());
@@ -207,9 +260,9 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
   // посилання, і будь-який useCallback/useMemo, що залежить від редактора,
   // перераховувався б завжди — тобто був би мемоізацією лише на вигляд.
   return useMemo(() => ({
-    editing, draft, original, patch, begin, reset, finish,
+    editing, draft, original, initial, patch, begin, reset, finish,
     showDeadlineCal, setShowDeadlineCal,
     showProjectDropdown, setShowProjectDropdown,
     calYear, setCalYear, calMonth, setCalMonth,
-  }), [editing, draft, original, patch, begin, reset, finish, showDeadlineCal, showProjectDropdown, calYear, calMonth]);
+  }), [editing, draft, original, initial, patch, begin, reset, finish, showDeadlineCal, showProjectDropdown, calYear, calMonth]);
 }

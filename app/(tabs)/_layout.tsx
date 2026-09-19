@@ -92,10 +92,6 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="shared"
-                options={{ href: null }}
-            />
-            <Tabs.Screen
                 name="agent"
                 options={{ href: null }}
             />

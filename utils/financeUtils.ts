@@ -54,6 +54,12 @@ export interface Transaction {
    */
   currency?: string;
   history?: TxHistoryEvent[];
+  /**
+   * Належність проєкту (WORKSPACE_PROJECTS_CONTRACT §3.3, §4.1). Транзакції й
+   * підписки з `projectId` бачить лише власник проєкту — фільтрація на
+   * сервері (§3.4 «бюджетна фільтрація»), тут поле лише розмічає запис.
+   */
+  projectId?: string;
 }
 
 /** Append chronologically; detail screens may reverse a copy for newest-first UI. */

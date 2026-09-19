@@ -15,7 +15,7 @@ import {
 } from '../utils/taskStatuses';
 import { isTodayTask } from '../utils/taskToday';
 import { groupTodayTasks } from '../utils/todayGroups';
-import type { Task } from '../utils/taskUtils';
+import { isMyTask, type Task } from '../utils/taskUtils';
 
 const COLUMNS = mergeTaskStatusColumns([]);
 /** 3 вересня 2026, четвер. Локальний полудень — щоб зсув зони нічого не з'їв. */
@@ -149,5 +149,77 @@ describe('узгодженість з екраном «Сьогодні»', () =
     const today = groupTodayTasks([t], COLUMNS, TODAY, 99);
     expect(today.total).toBe(0);
     expect(isTodayTask(t, COLUMNS, TODAY)).toBe(false);
+  });
+});
+
+describe('§3.7 «Особисте агрегує» — задача проєкту зі своєю колонкою «У процесі»', () => {
+  // allColumns — ВЕСЬ task_statuses (усі потоки), не звужений до особистого:
+  // саме це раніше губило проєктні задачі (review finding «Today ... resolves
+  // columns with mergeTaskStatusColumns(personal)»).
+  const allColumns = [
+    ...COLUMNS,
+    { id: 'st-p1-doing', name: 'В роботі', color: '#111', position: 0, isDone: false, projectId: 'p-1', type: 'in_progress' as const },
+    { id: 'st-p1-done', name: 'Зроблено', color: '#222', position: 1, isDone: true, projectId: 'p-1', type: 'done' as const },
+  ];
+
+  it('задача проєкту у власній in_progress-колонці — «сьогодні», навіть без дедлайну', () => {
+    const t = task({ id: 'proj-doing', projectId: 'p-1', kanbanColumnId: 'st-p1-doing' });
+    expect(isTodayTask(t, allColumns, TODAY)).toBe(true);
+  });
+
+  it('та сама задача групується окремою секцією («В роботі»), а не «До роботи»', () => {
+    const t = task({ id: 'proj-doing', projectId: 'p-1', kanbanColumnId: 'st-p1-doing' });
+    const { groups } = groupTodayTasks([t], allColumns, TODAY, 5);
+    expect(groups.map(g => g.id)).toEqual(['st-p1-doing']);
+    expect(groups[0].name).toBe('В роботі');
+  });
+
+  it('колонка іншого проєкту не протікає в задачу без dead/projectId, що збігся id', () => {
+    // Задача БЕЗ projectId ніколи не бачить 'st-p1-doing' — інакше довільний
+    // збіг id проєктної колонки міг би підмінити особистий статус.
+    const t = task({ id: 'personal', kanbanColumnId: 'st-p1-doing' });
+    expect(isTodayTask(t, allColumns, TODAY)).toBe(false);
+  });
+});
+
+describe('isMyTask — §3.7 "моє" (особистий потік / assigneeId / createdBy)', () => {
+  it('особистий потік (немає projectId) — завжди моє, байдуже до createdBy/assigneeId', () => {
+    expect(isMyTask({ projectId: undefined, assigneeId: null, createdBy: 'someone-else' }, 'me')).toBe(true);
+  });
+
+  it('є assigneeId — рахує ТІЛЬКИ його, ігноруючи createdBy', () => {
+    expect(isMyTask({ projectId: 'p-1', assigneeId: 'me', createdBy: 'someone-else' }, 'me')).toBe(true);
+    expect(isMyTask({ projectId: 'p-1', assigneeId: 'someone-else', createdBy: 'me' }, 'me')).toBe(false);
+  });
+
+  it('assigneeId порожній — рахує createdBy', () => {
+    expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: 'me' }, 'me')).toBe(true);
+    expect(isMyTask({ projectId: 'p-1', assigneeId: undefined, createdBy: 'someone-else' }, 'me')).toBe(false);
+  });
+
+  it('без createdBy (легасі-запис до поля) і без assigneeId — НЕ моє, дослівно за контрактом (регресія з ревʼю)', () => {
+    // review finding (minor): раніше `!task.createdBy || ...` рахував будь-яку
+    // непризначену задачу без createdBy "моєю" для КОЖНОГО учасника команди —
+    // легасі/мігровані задачі з'являлись би в «Сьогодні» всіх одночасно.
+    // Контракт §3.7 вимагає дослівну рівність `createdBy == me`, без фолбеку.
+    expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: undefined }, 'me')).toBe(false);
+  });
+
+  it('myUserId невідомий (ще не завантажено useAuth) — ховає задачі проєкту (без відомого "я" рівність неможлива)', () => {
+    expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: 'anyone' }, null)).toBe(false);
+  });
+
+  it('groupTodayTasks: без myUserId (undefined) фільтр §3.7 не застосовується — сумісність із викликами без користувача', () => {
+    const mine = task({ id: 'mine', projectId: 'p-1', deadline: TODAY_ISO, createdBy: 'me' });
+    const other = task({ id: 'other', projectId: 'p-1', deadline: TODAY_ISO, createdBy: 'someone-else' });
+    expect(groupTodayTasks([mine, other], COLUMNS, TODAY, 99).total).toBe(2);
+  });
+
+  it('groupTodayTasks: із myUserId ховає задачі проєкту, створені й не призначені іншим', () => {
+    const mine = task({ id: 'mine', projectId: 'p-1', deadline: TODAY_ISO, createdBy: 'me' });
+    const other = task({ id: 'other', projectId: 'p-1', deadline: TODAY_ISO, createdBy: 'someone-else' });
+    const { total, groups } = groupTodayTasks([mine, other], COLUMNS, TODAY, 99, 'me');
+    expect(total).toBe(1);
+    expect(groups.flatMap(g => g.tasks.map(t => t.id))).toEqual(['mine']);
   });
 });

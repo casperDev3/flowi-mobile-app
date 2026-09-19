@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,10 +21,9 @@ import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
-import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
-import { syncNow } from '@/store/sync-engine';
+import { previewInvite, type InvitePreview } from '@/store/project-team';
 import { haptic } from '@/utils/haptics';
 
 // ─── Простий валідатор формату email ─────────────────────────────────────────
@@ -36,10 +35,35 @@ export default function RegisterScreen() {
   const router = useRouter();
   const { tr } = useI18n();
   const { register } = useAuth();
-  const { online, setOnline } = useAppMode();
+  const { inviteToken } = useLocalSearchParams<{ inviteToken?: string }>();
   // Та сама колонка сталої ширини, що й на вході: форма з чотирьох полів,
   // розтягнута на планшет, читається як таблиця, а не як послідовність кроків.
   const contentWidth = useContentWidth();
+
+  // Банер «запрошені в проєкт X» (контракт §4.3(d)) — превʼю публічне, тому
+  // читається без входу, лише щоб показати НАЗВУ проєкту й хто запросив;
+  // саме приєднання все одно робить сервер під час /auth/register/ (§2.4).
+  const [invitePreview, setInvitePreview] = useState<InvitePreview | null>(null);
+  useEffect(() => {
+    if (!inviteToken?.trim()) return;
+    let cancelled = false;
+    void previewInvite(inviteToken.trim()).then(p => { if (!cancelled) setInvitePreview(p); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [inviteToken]);
+
+  /**
+   * Контракт §2.4: `400 invite_invalid` / `410 invite_expired` на
+   * `POST /auth/register/` — сервер НЕ створив акаунт узагалі (не лише
+   * «інвайт не додався»), бо валідність токена перевіряється ДО створення
+   * користувача. Клієнт пропонує продовжити без інвайту (мінор із ревʼю,
+   * раніше обидві помилки провалювались у загальне `tr.authInvalidCreds`,
+   * і форма з правильними email/паролем виглядала так, ніби дані невірні).
+   * Стан, а не локальна змінна: щойно підтверджено «зламано» — БУДЬ-який
+   * наступний тап «Зареєструватися» (не лише той, що з діалогу) має мовчки
+   * пропускати той самий мертвий токен, а не повторювати ту саму помилку.
+   */
+  const [skipInvite, setSkipInvite] = useState(false);
+  const effectiveInviteToken = skipInvite ? undefined : (inviteToken?.trim() || undefined);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -73,6 +97,69 @@ export default function RegisterScreen() {
     setPasswordError('');
   };
 
+  /**
+   * `useInviteToken` — явний параметр, а не читання `effectiveInviteToken`
+   * зсередини: гілка `invite_invalid`/`invite_expired` нижче мусить
+   * повторити запит БЕЗ токена одразу з callback'а `Alert`, де замикання ще
+   * бачило б старий `skipInvite === false` (стан оновлюється асинхронно) —
+   * без явного аргументу другий виклик надіслав би той самий мертвий токен.
+   */
+  const submitRegister = async (useInviteToken: string | undefined) => {
+    setLoading(true);
+    try {
+      const trimEmail = email.trim().toLowerCase();
+      const result = await register(trimEmail, password, name.trim() || undefined, useInviteToken);
+      if (result.status === 'pending') {
+        router.replace({ pathname: '/register-pending', params: { requestId: result.requestId } });
+        return;
+      }
+      // §2 плану: успішна реєстрація (акаунт активний одразу) так само
+      // примусово вмикає онлайн-режим (store/auth.tsx completeSession) —
+      // питати «увімкнути онлайн?» після цього вже нема сенсу.
+      router.replace('/(tabs)');
+    } catch (e: unknown) {
+      haptic.error();
+      if (e instanceof OfflineError) {
+        setGeneralError(tr.authOfflineError);
+      } else if (e instanceof ApiError) {
+        if (useInviteToken && (e.code === 'invite_invalid' || e.code === 'invite_expired')) {
+          // Контракт §2.4: акаунт НЕ створено (перевірка інвайту йде ДО
+          // створення користувача) — без цієї гілки помилка провалювалась
+          // у generalError('authInvalidCreds') нижче, і форма з коректними
+          // email/паролем виглядала так, ніби дані невірні, хоча причина —
+          // мертве запрошення. Позначаємо `skipInvite` одразу: наступний
+          // тап «Зареєструватися» (якщо людина закриє діалог) уже не
+          // повторить ту саму помилку тим самим токеном.
+          setSkipInvite(true);
+          Alert.alert(
+            tr.registerInviteBrokenTitle,
+            e.code === 'invite_expired' ? tr.registerInviteExpiredMsg : tr.registerInviteInvalidMsg,
+            [
+              { text: tr.cancel, style: 'cancel' },
+              { text: tr.registerContinueWithoutInvite, onPress: () => void submitRegister(undefined) },
+            ],
+          );
+        } else if (e.status === 409 && e.code === 'request_pending') {
+          setEmailError(tr.authRegistrationPending);
+        } else if (e.status === 409 || e.code === 'email_taken') {
+          setEmailError(tr.authEmailTaken);
+        } else if (e.code === 'password_too_common' || e.code === 'password_too_short') {
+          setPasswordError(tr.authWeakPassword);
+        } else if (e.code === 'timeout' || e.code === 'network') {
+          setGeneralError(tr.authNetworkError);
+        } else if (e.status >= 500) {
+          setGeneralError(tr.authServerError);
+        } else {
+          setGeneralError(tr.authInvalidCreds);
+        }
+      } else {
+        setGeneralError(tr.authNetworkError);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRegister = async () => {
     clearErrors();
 
@@ -99,39 +186,7 @@ export default function RegisterScreen() {
       return;
     }
 
-    setLoading(true);
-    try {
-      await register(trimEmail, password, name.trim() || undefined);
-      router.replace('/(tabs)');
-      // З офлайну зареєструвались заради онлайн-функцій — пропонуємо увімкнути
-      if (!online) {
-        Alert.alert(tr.enableOnline, tr.enableOnlineAfterLoginMsg, [
-          { text: tr.yes, onPress: () => { setOnline(true); void syncNow(); } },
-          { text: tr.later, style: 'cancel' },
-        ]);
-      }
-    } catch (e: unknown) {
-      haptic.error();
-      if (e instanceof OfflineError) {
-        setGeneralError(tr.authOfflineError);
-      } else if (e instanceof ApiError) {
-        if (e.status === 409 || e.code === 'email_taken') {
-          setEmailError(tr.authEmailTaken);
-        } else if (e.code === 'password_too_common' || e.code === 'password_too_short') {
-          setPasswordError(tr.authWeakPassword);
-        } else if (e.code === 'timeout' || e.code === 'network') {
-          setGeneralError(tr.authNetworkError);
-        } else if (e.status >= 500) {
-          setGeneralError(tr.authServerError);
-        } else {
-          setGeneralError(tr.authInvalidCreds);
-        }
-      } else {
-        setGeneralError(tr.authNetworkError);
-      }
-    } finally {
-      setLoading(false);
-    }
+    await submitRegister(effectiveInviteToken);
   };
 
   return (
@@ -156,6 +211,17 @@ export default function RegisterScreen() {
             showsVerticalScrollIndicator={false}
           >
             <Text style={[st.title, { color: c.text }]}>{tr.authRegister}</Text>
+
+            {invitePreview && !skipInvite && (
+              <View style={[st.inviteBanner, { borderColor: c.accent, backgroundColor: c.accent + '14' }]}>
+                <IconSymbol name="person.2.fill" size={16} color={c.accent} />
+                <Text style={{ color: c.text, fontSize: 13, flex: 1, marginLeft: 8 }}>
+                  {tr.registerInvitedMsg
+                    .replace('{project}', invitePreview.project.name)
+                    .replace('{role}', invitePreview.role === 'member' ? tr.roleMember : tr.roleViewer)}
+                </Text>
+              </View>
+            )}
 
             <BlurView
               intensity={isDark ? 20 : 40}
@@ -310,6 +376,15 @@ const st = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.4,
     marginBottom: 24,
+  },
+  inviteBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
   },
   card: {
     borderRadius: 18,

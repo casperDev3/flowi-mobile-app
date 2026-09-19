@@ -68,6 +68,15 @@ export interface Task {
   reminderAt?: string;
   timeEntries?: TaskTimeEntry[];
   history?: TaskHistoryEvent[];
+  /**
+   * Хто створив завдання в межах проєкту (WORKSPACE_PROJECTS_CONTRACT §3.3,
+   * §3.7 — «моє» = особистий потік АБО assigneeId==me АБО (assigneeId
+   * порожній і createdBy==me)). `user.id` — рядок, як і скрізь у синку.
+   * Відсутнє для особистих завдань і легасі-записів до цього поля.
+   */
+  createdBy?: string;
+  /** Виконавець (§4.5, командна фаза) — адитивне поле, тут лише для форми. */
+  assigneeId?: string | null;
 }
 
 // ─── Пріоритет P0–P5 (CONTRACT §B) ────────────────────────────────────────────
@@ -199,6 +208,74 @@ export function getProgress(t: Task): number {
 }
 
 /**
+ * §3.7 «моє» завдання — WORKSPACE_PROJECTS_CONTRACT: особистий потік (немає
+ * `projectId`) АБО `assigneeId == me` АБО (`assigneeId` порожній і
+ * `createdBy == me`). `myUserId` — рядок (`user.id` з `useAuth()`), як і
+ * скрізь у синку.
+ *
+ * review finding (minor): фолбек раніше рахував БУДЬ-ЯКЕ завдання без
+ * `assigneeId`/`createdBy` «моїм» (`!task.createdBy || ...`) — у команді
+ * (§4 уже реалізовано, `app/project/[id]/members.tsx`) легасі/мігровані
+ * непризначені задачі, або задачі від клієнта, що не проставляє `createdBy`,
+ * з'являлись би в «Сьогодні»/«Завдання» КОЖНОГО учасника проєкту одночасно.
+ * Контракт дослівно вимагає рівність `createdBy == me`, без фолбеку на
+ * відсутність поля — саме так тепер і зроблено.
+ */
+export function isMyTask(
+  task: Pick<Task, 'projectId' | 'assigneeId' | 'createdBy'>,
+  myUserId: string | null | undefined,
+): boolean {
+  if (!task.projectId) return true; // особистий потік
+  if (!myUserId) return false;
+  if (task.assigneeId) return task.assigneeId === myUserId;
+  return task.createdBy === myUserId;
+}
+
+/**
+ * `createdBy` після зміни проєкту в редакторі (review finding, §3.7):
+ * особиста задача (і соло-проєктна, мігрована §3.6 без автора) не має
+ * `createdBy`, і `isMyTask` (дослівна рівність, без фолбеку на відсутнє
+ * поле) одразу ховає її з «Сьогодні»/«Завдання» власника, щойно вона
+ * потрапляє в проєкт — переносити її мав саме він. Наявний `createdBy` НЕ
+ * чіпаємо: авторство не змінюється переносом чи повторним збереженням форми.
+ */
+export function createdByAfterProjectChange(
+  task: Pick<Task, 'projectId' | 'createdBy'>,
+  myUserId: string | null | undefined,
+): string | undefined {
+  if (!task.projectId || task.createdBy) return task.createdBy;
+  return myUserId ?? undefined;
+}
+
+/** Мінімальна форма учасника проєкту, якої досить для підпису виконавця
+ *  (уникає прямого імпорту `MemberOut` зі `store/project-team` в утиліту —
+ *  структурна типізація TS сама перевірить сумісність на виклику). */
+export interface AssigneeLookupMember {
+  user: { id: string | number; name: string; email: string };
+}
+
+/**
+ * Підпис виконавця для картки завдання (§4.5): «Я», коли `assigneeId`
+ * збігається з поточним користувачем (той самий фолбек, що вже показує
+ * пікер у `TaskEditForm`), інакше ім'я/пошта учасника з кешу
+ * `project_members_v1`. `null` — коли виконавця нема або кеш ще не знає
+ * такого учасника (проєкт без командного кешу, учасника прибрали) —
+ * картка тоді просто не показує бейдж, а не «невідомий».
+ */
+export function assigneeDisplayName(
+  assigneeId: string | null | undefined,
+  members: readonly AssigneeLookupMember[],
+  myUserId: string | null | undefined,
+  meLabel: string,
+): string | null {
+  if (!assigneeId) return null;
+  if (myUserId && assigneeId === myUserId) return meLabel;
+  const member = members.find(m => String(m.user.id) === assigneeId);
+  if (!member) return null;
+  return member.user.name || member.user.email || null;
+}
+
+/**
  * Приймає структурний зріз, а не весь `Task`: екрани оголошують власні
  * інтерфейси завдання (з recurrence, recordings тощо), і номінально
  * несумісний тип змушував би або кастити, або тримати локальну копію правила.
@@ -224,7 +301,10 @@ export function deadlineColor(task: Task, fallback: string): string {
   return fallback;
 }
 
-export function filterTasksByMonth(tasks: Task[], month: Date): Task[] {
+export function filterTasksByMonth<T extends Pick<Task, 'createdAt' | 'deadline' | 'status'>>(
+  tasks: readonly T[],
+  month: Date,
+): T[] {
   return tasks.filter(t => {
     const created = isSameMonth(new Date(t.createdAt), month);
     const deadline = t.deadline ? isSameMonth(new Date(t.deadline), month) : false;

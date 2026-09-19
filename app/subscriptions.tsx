@@ -42,6 +42,7 @@ import { DetailPane } from '@/components/shared/DetailPane';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useTopInset } from '@/hooks/use-top-inset';
@@ -49,7 +50,7 @@ import { useI18n } from '@/store/i18n';
 import type { CategoryRow } from '@/store/migrations';
 import { rescheduleSubscriptionRemindersFromStorage } from '@/store/notifications';
 import { loadData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { updateSynced } from '@/store/synced-storage';
 import { activeAccounts, type Account } from '@/utils/accounts';
 import { expenseCategoryPresets } from '@/utils/financeCategories';
 import { BUILTIN_CURRENCIES, type Currency } from '@/utils/financeUtils';
@@ -116,6 +117,12 @@ export default function SubscriptionsScreen() {
   const router = useRouter();
   const topInset = useTopInset();
   const contentWidth = useContentWidth();
+  // Contract §4.1: Бюджет (і всі колекції, що його читають — тут `subscriptions`)
+  // доступний ЛИШЕ власнику проєкту. Раніше пікер пропонував УСІ проєкти
+  // (review finding): учасник чи глядач могли прив'язати підписку до проєкту,
+  // де сервер однаково відхилить запис `forbidden`, і локальна копія лишалась
+  // би висіти, ніколи не долетівши.
+  const projectRoles = useProjectRoles();
   const { isExpanded, height } = useResponsive();
   const c = useMemo(() => makeColors(isDark), [isDark]);
   const uiColors: SubscriptionUiColors = useMemo(
@@ -205,14 +212,10 @@ export default function SubscriptionsScreen() {
    */
   const mutateSubscriptions = useCallback(async (mutate: (raw: RawItem[]) => RawItem[]) => {
     await trackWrite(async () => {
-      const stored = await loadData<unknown>('subscriptions', []);
-      if (!Array.isArray(stored)) {
-        // Не масив — не наша форма; перезапис стер би те, що там лежить.
-        throw new Error('subscriptions: unexpected storage shape');
-      }
-      const next = mutate(stored as RawItem[]);
-      if (next === stored) return;
-      await saveSynced('subscriptions', next);
+      // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+      // ними інакше пішов би на сервер як DELETE. Не-масив у сховищі
+      // updateSynced відхиляє сам: перезапис стер би те, що там лежить.
+      await updateSynced<RawItem>('subscriptions', mutate);
     });
     await load();
   }, [trackWrite, load]);
@@ -479,8 +482,10 @@ export default function SubscriptionsScreen() {
   }, [projectFilter, filterOptions]);
 
   const projectOptions: SubscriptionFormOption[] = useMemo(
-    () => projects.filter(p => !isProjectArchived(p)).map(p => ({ id: p.id, label: p.name, color: p.color })),
-    [projects],
+    () => projects
+      .filter(p => !isProjectArchived(p) && (projectRoles[p.id] ?? 'owner') === 'owner')
+      .map(p => ({ id: p.id, label: p.name, color: p.color })),
+    [projects, projectRoles],
   );
   const categoryOptions: SubscriptionFormOption[] = useMemo(
     () => expenseCategoryPresets(categoryRows, lang).map(cat => ({ id: cat.name, label: cat.name, icon: cat.icon })),

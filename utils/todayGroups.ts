@@ -12,13 +12,13 @@
  * всі». Кожна перевірена тестом.
  */
 import {
-  IN_PROGRESS_COLUMN_ID,
   orderColumnsForList,
-  taskColumnId,
+  resolvedStatusType,
+  scopedTaskStatusColumn,
   type TaskStatusColumn,
 } from './taskStatuses';
 import { isTodayTask } from './taskToday';
-import { comparePriority, type Task } from './taskUtils';
+import { comparePriority, isMyTask, type Task } from './taskUtils';
 
 export { completedAt } from './taskUtils';
 
@@ -54,32 +54,46 @@ export function groupTodayTasks(
   columns: TaskStatusColumn[],
   today: Date,
   limit: number,
+  /**
+   * §3.7 «моє» (contract) — `undefined`, доки викликач не знає користувача
+   * (тести, ранній рендер до `useAuth()`): тоді фільтр пропускає все, як і
+   * до цього поля. У соло-фазі це й так завжди `true` — див. `isMyTask`.
+   */
+  myUserId?: string | null,
 ): TodayGroups {
   // Кого взагалі беремо — питає спільне правило: те саме, що вирішує склад
   // статусних груп у списку завдань. Копія цієї умови жила тут і одного разу
   // вже розійшлася з копією в taskListSections.ts.
-  const relevant = tasks.filter(task => isTodayTask(task, columns, today));
+  const relevant = tasks.filter(task =>
+    isTodayTask(task, columns, today) && (myUserId === undefined || isMyTask(task, myUserId)));
 
+  // `columns` — увесь `task_statuses` (усі проєкти разом); колонка кожного
+  // завдання шукається у ВЛАСНОМУ скоупі (§3.7 «Особисте агрегує» — інакше
+  // задача проєкту з kanbanColumnId='st-…' не знаходилась у плоскому
+  // особистому списку й завжди падала на дефолтну «До роботи»/«Готово»).
   const buckets = new Map<string, Task[]>();
+  const bucketColumns = new Map<string, TaskStatusColumn>();
   for (const task of relevant) {
-    const id = taskColumnId(task, columns);
-    const bucket = buckets.get(id);
+    const column = scopedTaskStatusColumn(task, columns);
+    const bucket = buckets.get(column.id);
     if (bucket) bucket.push(task);
-    else buckets.set(id, [task]);
+    else buckets.set(column.id, [task]);
+    if (!bucketColumns.has(column.id)) bucketColumns.set(column.id, column);
   }
 
   // Порядок груп — спільне правило списків: «У процесі» попереду решти.
-  const ordered = orderColumnsForList(columns).filter(column => buckets.has(column.id));
+  const ordered = orderColumnsForList([...bucketColumns.values()]);
 
   let budget = limit;
   const groups: TodayGroup[] = [];
   let shown = 0;
 
   for (const column of ordered) {
+    const inProgress = resolvedStatusType(column) === 'in_progress';
     const all = (buckets.get(column.id) ?? []).sort(byPriority);
-    const take = column.id === IN_PROGRESS_COLUMN_ID ? all.length : Math.max(0, budget);
+    const take = inProgress ? all.length : Math.max(0, budget);
     const visible = all.slice(0, take);
-    if (column.id !== IN_PROGRESS_COLUMN_ID) budget -= visible.length;
+    if (!inProgress) budget -= visible.length;
     if (visible.length === 0) continue;
     groups.push({ id: column.id, name: column.name, color: column.color, tasks: visible });
     shown += visible.length;

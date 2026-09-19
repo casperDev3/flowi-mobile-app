@@ -21,7 +21,7 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useAppMode } from '@/store/app-mode';
-import { useAuth } from '@/store/auth';
+import { UnsyncedOutboxError, useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { pullAllFromServer, pushAllToServer, useSync } from '@/store/sync-engine';
 import { getAllScheduledNotifications } from '@/store/notifications';
@@ -51,7 +51,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { lang, setLang, tr } = useI18n();
-  const { online, setOnline } = useAppMode();
+  const { online } = useAppMode();
   const { user, status, logout } = useAuth();
   const { syncNow, state: syncState, lastSyncAt, pendingCount } = useSync();
 
@@ -72,16 +72,43 @@ export default function SettingsScreen() {
     saveData('pref_task_reminders', val);
   }, []);
 
+  // Контракт §9.3: logout() сама пробує досинхронізувати непорожній outbox,
+  // а якщо після спроби (чи взагалі без мережі) щось лишилось непровштовхнуте
+  // — кидає UnsyncedOutboxError замість мовчки стерти. Той самий патерн
+  // «попередити → на «Продовжити» повторити з force», що й у зміні workspace
+  // (app/account.tsx, app/workspace.tsx).
+  const runLogout = useCallback((force: boolean) => {
+    logout(force).catch(e => {
+      if (e instanceof UnsyncedOutboxError) {
+        Alert.alert(tr.workspaceSwitchSyncFailedTitle, tr.workspaceSwitchSyncFailedMsg, [
+          { text: tr.cancel, style: 'cancel' },
+          // Замикання того самого `runLogout`: до моменту натискання кнопки
+          // ця const уже присвоєна (виклик асинхронний, синхронне
+          // оголошення завершилось раніше).
+          { text: tr.workspaceSwitchProceedAnyway, style: 'destructive', onPress: () => runLogout(true) },
+        ]);
+        return;
+      }
+      if (__DEV__) console.warn('[settings] logout failed:', e);
+    });
+  }, [logout, tr]);
+
   const handleLogout = useCallback(() => {
+    // pendingCount — той самий лічильник, що й рядок «Синхронізація» нижче:
+    // попереджаємо про непровштовхнуті зміни ДО підтвердження, а не лише
+    // постфактум у діалозі помилки синку.
+    const message = pendingCount > 0
+      ? `${tr.workspaceSwitchOutboxWarning}\n\n${tr.logoutConfirm}`
+      : tr.logoutConfirm;
     Alert.alert(
       tr.authLogout,
-      tr.logoutConfirm,
+      message,
       [
         { text: tr.cancel, style: 'cancel' },
-        { text: tr.authLogout, style: 'destructive', onPress: () => void logout() },
+        { text: tr.authLogout, style: 'destructive', onPress: () => runLogout(false) },
       ],
     );
-  }, [tr, logout]);
+  }, [tr, runLogout, pendingCount]);
 
   // Гейт для ручних синк-дій: потрібні онлайн-режим і акаунт.
   const guardSync = useCallback((fn: () => void | Promise<void>) => {
@@ -91,32 +118,6 @@ export default function SettingsScreen() {
     }
     void fn();
   }, [online, status, tr]);
-
-  const handleOnlineToggle = useCallback((v: boolean) => {
-    if (v && status !== 'authed') {
-      Alert.alert(
-        tr.onlineNeedsAccount,
-        tr.onlineNeedsAccountMsg,
-        [
-          { text: tr.authLogin, onPress: () => router.push('/login') },
-          { text: tr.authRegister, onPress: () => router.push('/register') },
-          { text: tr.cancel, style: 'cancel' },
-        ],
-      );
-      return;
-    }
-    setOnline(v);
-    if (v && status === 'authed') {
-      Alert.alert(
-        tr.syncNowTitle,
-        tr.syncNowMsg,
-        [
-          { text: tr.yes, onPress: () => void syncNow() },
-          { text: tr.later, style: 'cancel' },
-        ],
-      );
-    }
-  }, [status, tr, router, setOnline, syncNow]);
 
   // ── Стабільні дії рядків ───────────────────────────────────────────────────
   const go = useCallback<RowPress>(route => {
@@ -238,6 +239,19 @@ export default function SettingsScreen() {
                       border={c.border}
                       last={false}
                     />
+                    {user.isAdmin && (
+                      <SettingRow
+                        icon="person.badge.key.fill"
+                        iconColor="#0EA5E9"
+                        label={tr.settingsAdminWorkspace}
+                        route="/admin-workspace"
+                        onPress={go}
+                        text={c.text}
+                        sub={c.sub}
+                        border={c.border}
+                        last={false}
+                      />
+                    )}
                     <TouchableOpacity
                       onPress={handleLogout}
                       style={st.row}>
@@ -276,16 +290,16 @@ export default function SettingsScreen() {
               </BlurView>
             </View>
 
-            {/* Режим роботи */}
+            {/* Режим роботи — §2 плану: «офлайн» тепер лише тимчасова
+                відсутність мережі, не ручний вибір користувача, тож
+                перемикача тут більше немає — лише поточний стан. */}
             <View style={colStyle}>
               <SectionLabel label={tr.workMode} color={c.sub} />
               <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <ToggleRow
+                <StatusRow
                   icon={online ? 'wifi' : 'icloud.slash'}
                   iconColor="#0EA5E9"
                   label={online ? tr.modeOnline : tr.modeOffline}
-                  value={online}
-                  onChange={handleOnlineToggle}
                   text={c.text}
                   border={c.border}
                   last
@@ -468,17 +482,6 @@ export default function SettingsScreen() {
                   iconColor="#F97316"
                   label={tr.containers}
                   route="/containers"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="person.2.fill"
-                  iconColor="#7C3AED"
-                  label={tr.sharedTitle}
-                  route="/(tabs)/shared"
                   onPress={go}
                   text={c.text}
                   sub={c.sub}
@@ -762,6 +765,33 @@ const ToggleRow = React.memo(function ToggleRow(
         thumbColor="#fff"
         ios_backgroundColor="rgba(128,128,128,0.3)"
       />
+    </View>
+  );
+});
+
+interface StatusRowProps {
+  icon: IconSymbolName;
+  iconColor: string;
+  label: string;
+  text: string;
+  border: string;
+  last?: boolean;
+}
+
+/**
+ * Рядок стану без перемикача — §2 плану: «онлайн/офлайн» більше не ручний
+ * вибір користувача (той сам вибирав собі персистентний офлайн-режим), а
+ * лише поточний факт мережі, тож тут нема чого перемикати.
+ */
+const StatusRow = React.memo(function StatusRow(
+  { icon, iconColor, label, text, border, last }: StatusRowProps,
+) {
+  return (
+    <View style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+      <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
+        <IconSymbol name={icon} size={17} color={iconColor} />
+      </View>
+      <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
     </View>
   );
 });

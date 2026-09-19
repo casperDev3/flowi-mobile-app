@@ -38,7 +38,7 @@ import {
   categoryMapToRows,
   categoryRowsToMap,
 } from '@/store/migrations';
-import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
+import { saveSynced, saveSyncedValue, updateSynced } from '@/store/synced-storage';
 import {
   filterByMonth, groupTransactions, mergeTransactionsForSave, resolveAccountFilter,
   calcTotalsByCurrency, formatCurrency,
@@ -296,15 +296,13 @@ export default function FinanceScreen() {
    */
   const persistTxs = useCallback(async (next: Transaction[]) => {
     const merged = await trackWrite(async () => {
-      const stored = await loadData<Transaction[]>('transactions', []);
-      const result = mergeTransactionsForSave(
-        Array.isArray(stored) ? stored : [],
-        next,
-        seenTxIds.current,
-      );
-      seenTxIds.current = new Set(result.map(t => t.id));
-      await saveSynced('transactions', result);
-      return result;
+      // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+      // ними інакше пішов би на сервер як DELETE.
+      return updateSynced<Transaction>('transactions', stored => {
+        const result = mergeTransactionsForSave(stored, next, seenTxIds.current);
+        seenTxIds.current = new Set(result.map(t => t.id));
+        return result;
+      });
     });
     // Долите має стати видимим — повторний прохід ефекту вже нічого не долиє,
     // тож циклу немає.
@@ -359,10 +357,7 @@ export default function FinanceScreen() {
    */
   const persistAccounts = useCallback(async (next: Account[]) => {
     const merged = await trackWrite(async () => {
-      const stored = await loadData<Account[]>('accounts', []);
-      const result = mergeAccountsForSave(Array.isArray(stored) ? stored : [], next);
-      await saveSynced('accounts', result);
-      return result;
+      return updateSynced<Account>('accounts', stored => mergeAccountsForSave(stored, next));
     });
     // Долиті рахунки мають стати видимими — і повторний прохід ефекту вже
     // нічого не долиє, тож циклу немає.

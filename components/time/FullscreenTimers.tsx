@@ -39,7 +39,7 @@ import { useTimerDials } from '@/hooks/use-timer-dial';
 import { useMotion } from '@/hooks/use-motion';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { updateSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
 import type { ActiveTimer } from '@/utils/activeTimers';
 import { isOverdue, type HistoryEventType, type Task, type TaskHistoryEvent } from '@/utils/taskUtils';
@@ -155,19 +155,22 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
    */
   const toggleSubtask = useCallback(async (taskId: string, subId: string) => {
     try {
-      const stored = await loadData<Task[]>('tasks', []);
-      const index = stored.findIndex(t => t.id === taskId);
-      if (index < 0) return;
-      const target = stored[index];
-      const sub = (target.subtasks ?? []).find(s => s.id === subId);
-      const type: HistoryEventType = sub?.done ? 'subtask_undone' : 'subtask_done';
-      const next = [...stored];
-      next[index] = {
-        ...target,
-        subtasks: (target.subtasks ?? []).map(s => (s.id === subId ? { ...s, done: !s.done } : s)),
-        history: [...(target.history ?? []), makeHistoryEvent(type, sub?.title)],
-      };
-      await saveSynced('tasks', next);
+      // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+      // ними інакше пішов би на сервер як DELETE.
+      const next = await updateSynced<Task>('tasks', stored => {
+        const index = stored.findIndex(t => t.id === taskId);
+        if (index < 0) return stored;
+        const target = stored[index];
+        const sub = (target.subtasks ?? []).find(s => s.id === subId);
+        const type: HistoryEventType = sub?.done ? 'subtask_undone' : 'subtask_done';
+        const patched = [...stored];
+        patched[index] = {
+          ...target,
+          subtasks: (target.subtasks ?? []).map(s => (s.id === subId ? { ...s, done: !s.done } : s)),
+          history: [...(target.history ?? []), makeHistoryEvent(type, sub?.title)],
+        };
+        return patched;
+      });
       setTasks(next);
     } catch (e) {
       if (__DEV__) console.warn('[fullscreen-timers] запис підзавдання не вдався:', e);

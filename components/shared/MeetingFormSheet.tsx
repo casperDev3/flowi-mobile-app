@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { CommentsSection } from '@/components/shared/CommentsSection';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 // ─── Exported types ────────────────────────────────────────────────────────────
@@ -153,6 +154,15 @@ interface Props {
   projects?: readonly MeetingFormProject[];
   /** Проєкт, обраний наперед для НОВОЇ зустрічі (створення з деталі проєкту). */
   presetProjectId?: string;
+  /**
+   * Коментарі (contract §4.4) — лише для НАРАДИ, що вже збережена і належить
+   * проєкту (`initial.id` і `initial.projectId` обидва є): нову, ще не
+   * створену нараду коментувати нічим, а особиста нарада (без проєкту)
+   * коментарів не має — колекція `comments` існує лише в потоці проєкту.
+   */
+  currentUserId?: string | null;
+  /** Моя роль у проєкті наради — контракт §4.1: власник видаляє чужі коментарі. */
+  isProjectOwner?: boolean;
 }
 
 const NO_PROJECTS: readonly MeetingFormProject[] = [];
@@ -160,6 +170,7 @@ const NO_PROJECTS: readonly MeetingFormProject[] = [];
 export function MeetingFormSheet({
   visible, initial, presetDate, onClose, onSave, onDelete,
   isDark, lang, tr, markedDays = new Set(), projects = NO_PROJECTS, presetProjectId,
+  currentUserId = null, isProjectOwner = false,
 }: Props) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const isUk = lang === 'uk';
@@ -564,6 +575,26 @@ export function MeetingFormSheet({
                     )}
                   </View>
                 )}
+
+                {/* Коментарі (contract §4.4) — лише збережена нарада проєкту. */}
+                {initial?.id && initial.projectId && currentUserId ? (
+                  <View style={{ marginBottom: 14 }}>
+                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                      {tr?.commentsTitle ?? (isUk ? 'Коментарі' : 'Comments')}
+                    </Text>
+                    <CommentsSection
+                      projectId={initial.projectId}
+                      targetType="meeting"
+                      targetId={initial.id}
+                      isOwner={isProjectOwner}
+                      currentUserId={currentUserId}
+                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: fColor }}
+                      isDark={isDark}
+                      locale={isUk ? 'uk-UA' : 'en-US'}
+                      tr={tr}
+                    />
+                  </View>
+                ) : null}
 
                 {/* Buttons */}
                 <View style={{ flexDirection: 'row', gap: 7 }}>

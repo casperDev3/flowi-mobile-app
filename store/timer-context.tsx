@@ -25,7 +25,7 @@ import { AppState } from 'react-native';
 
 import { ensureStorageMigrations } from './migrations';
 import { loadData, subscribeToStorage } from './storage';
-import { saveSynced } from './synced-storage';
+import { updateSynced } from './synced-storage';
 import {
   adHocTimerId,
   findTimerForTask,
@@ -57,6 +57,8 @@ interface MirroredTimeEntry {
   shift: Shift;
   duration: number;
   date: string;
+  /** Проєкт сесії (WORKSPACE_PROJECTS_PLAN §3 «години за тиждень» на Огляді). */
+  projectId?: string;
 }
 
 /** Мінімум, потрібний сторy для старту: решту полів завдання він не читає. */
@@ -65,6 +67,7 @@ export interface TimerTaskInput {
   title: string;
   kanbanColumnId?: string;
   status: 'active' | 'done';
+  projectId?: string;
 }
 
 /**
@@ -184,15 +187,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     async (mutate: (current: ActiveTimer[]) => ActiveTimer[]) => {
       writesInFlight.current += 1;
       try {
-        const current = await readStoredTimers();
-        const mutated = mutate(current);
-        const next = sortTimers(mutated);
-        timersRef.current = next;
-        setActiveTimers(next);
-        // mutate повернув той самий масив — робити нічого, але свіжий стан зі
-        // сховища ми вже підхопили.
-        if (mutated === current) return;
-        await saveSynced(TIMERS_KEY, next);
+        // Читання й запис — одна операція під блокуванням ключа, інакше pull,
+        // що ліг між ними, пішов би на сервер як DELETE.
+        await updateSynced<ActiveTimer>(TIMERS_KEY, raw => {
+          const current = sortTimers(raw.filter(t => t?.id && t.startedAt));
+          const mutated = mutate(current);
+          const next = sortTimers(mutated);
+          timersRef.current = next;
+          setActiveTimers(next);
+          // mutate повернув той самий масив — робити нічого, але свіжий стан зі
+          // сховища ми вже підхопили.
+          return mutated === current ? raw : next;
+        });
       } catch (e) {
         // Мовчки ковтати не можна: таймер лишиться на екрані, але не переживе
         // перезапуск, і причина має бути видимою.
@@ -279,13 +285,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const patchTask = useCallback(
     async (taskId: string, patch: (task: Task) => Task) => {
       try {
-        const tasks = await loadData<Task[]>(TASKS_KEY, []);
-        const index = tasks.findIndex(t => t.id === taskId);
-        if (index < 0) return;
-        const next = [...tasks];
-        next[index] = patch(tasks[index]);
-        await saveSynced(TASKS_KEY, next);
-        setTasksRevision(n => n + 1);
+        // Читання, патч і запис — одна операція під блокуванням ключа: pull,
+        // що встиг би лягти між loadData і saveSynced, пішов би на сервер як DELETE.
+        let found = false;
+        await updateSynced<Task>(TASKS_KEY, tasks => {
+          const index = tasks.findIndex(t => t.id === taskId);
+          if (index < 0) return tasks;
+          found = true;
+          const next = [...tasks];
+          next[index] = patch(tasks[index]);
+          return next;
+        });
+        if (found) setTasksRevision(n => n + 1);
       } catch (e) {
         if (__DEV__) console.warn(`[timers] запис 'tasks' не вдався (${taskId}):`, e);
       }
@@ -303,15 +314,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const patchMeeting = useCallback(
     async (meetingId: string, patch: (meeting: Meeting) => Meeting) => {
       try {
-        const meetings = await loadData<Meeting[]>(MEETINGS_KEY, []);
-        const index = meetings.findIndex(m => m.id === meetingId);
-        // Нараду могли видалити, поки таймер ішов. Сесії немає куди класти —
-        // але в 'time_entries' вона все одно потрапить, тож час не зникне.
-        if (index < 0) return;
-        const next = [...meetings];
-        next[index] = patch(meetings[index]);
-        await saveSynced(MEETINGS_KEY, next);
-        setMeetingsRevision(n => n + 1);
+        let found = false;
+        await updateSynced<Meeting>(MEETINGS_KEY, meetings => {
+          const index = meetings.findIndex(m => m.id === meetingId);
+          // Нараду могли видалити, поки таймер ішов. Сесії немає куди класти —
+          // але в 'time_entries' вона все одно потрапить, тож час не зникне.
+          if (index < 0) return meetings;
+          found = true;
+          const next = [...meetings];
+          next[index] = patch(meetings[index]);
+          return next;
+        });
+        if (found) setMeetingsRevision(n => n + 1);
       } catch (e) {
         if (__DEV__) console.warn(`[timers] запис 'meetings' не вдався (${meetingId}):`, e);
       }
@@ -324,15 +338,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     async (timer: ActiveTimer, duration: number, endedAt: Date) => {
       if (duration <= 0) return;
       try {
-        const existing = await loadData<MirroredTimeEntry[]>(TIME_ENTRIES_KEY, []);
         const entry: MirroredTimeEntry = {
           id: `timer_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
           task: timer.label,
           shift: timer.shift,
           duration,
           date: endedAt.toISOString(),
+          projectId: timer.projectId,
         };
-        await saveSynced(TIME_ENTRIES_KEY, [entry, ...existing]);
+        await updateSynced<MirroredTimeEntry>(TIME_ENTRIES_KEY, existing => [entry, ...existing]);
         setTimeEntriesRevision(n => n + 1);
       } catch (e) {
         if (__DEV__) console.warn('[timers] дзеркало у time_entries не вдалося:', e);
@@ -355,6 +369,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         label: task.title,
         startedAt: now.toISOString(),
         shift: shiftForDate(now),
+        projectId: task.projectId,
       };
 
       let created = false;

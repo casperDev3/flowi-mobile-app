@@ -53,3 +53,12 @@ function split(seconds: number) {
     seconds: total % 60,
   };
 }
+
+/**
+ * Годинник ХХ:СС (хвилини не обрізаються на 60) — таймер аудіозапису.
+ * Той самий вигляд, що й до винесення годинника з екранів.
+ */
+export function formatMinutesClock(seconds: number): string {
+  const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}

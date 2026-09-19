@@ -683,3 +683,43 @@ export function buildGantt(
     ticks: monthTicks(new Date(fromAt), new Date(toAt), span, months),
   };
 }
+
+// ─── Тягнення краю смуги (contract §3 «тягнення країв змінює дати») ──────────
+
+export interface GanttEdgeDragTask {
+  startDate?: string;
+  deadline?: string;
+  createdAt: string;
+}
+
+/**
+ * Нова дата початку/кінця задачі після тягнення ручки на `deltaDays`
+ * (додатне — вправо/пізніше). Чиста функція окремо від `ProjectGantt.tsx`,
+ * щоб клампінг «початок не може перескочити кінець» і навпаки перевірявся
+ * тестом без рендера жестового компонента.
+ *
+ * Повертає `null`, коли рух нічого не змінює: `deltaDays === 0`, зіпсована
+ * базова дата, або рух зробив би тривалість від'ємною/нульовою.
+ */
+export function shiftGanttEdge(
+  task: GanttEdgeDragTask,
+  edge: 'start' | 'end',
+  deltaDays: number,
+): { startDate: string } | { deadline: string } | null {
+  if (!deltaDays) return null;
+  const baseIso = edge === 'start' ? (task.startDate ?? task.createdAt) : (task.deadline ?? task.startDate ?? task.createdAt);
+  const base = new Date(baseIso);
+  if (Number.isNaN(base.getTime())) return null;
+  base.setDate(base.getDate() + deltaDays);
+
+  const otherIso = edge === 'start' ? task.deadline : (task.startDate ?? task.createdAt);
+  if (otherIso) {
+    const other = new Date(otherIso);
+    if (!Number.isNaN(other.getTime())) {
+      if (edge === 'start' && base >= other) return null;
+      if (edge === 'end' && base <= other) return null;
+    }
+  }
+
+  return edge === 'start' ? { startDate: base.toISOString() } : { deadline: base.toISOString() };
+}

@@ -28,7 +28,7 @@
  * списку, і прострочені приходять сюди вже відсіяними. Якщо шапки немає,
  * прострочене просто лишається у своїй статусній групі — воно «сьогоднішнє».
  */
-import { orderColumnsForList, taskColumnId, type TaskStatusColumn } from './taskStatuses';
+import { orderColumnsForList, scopedTaskStatusColumn, type TaskStatusColumn } from './taskStatuses';
 import { isTodayTask, type TodayScopeTask } from './taskToday';
 
 /** Мінімум полів, потрібних для розбиття: екрани мають власні типи завдання. */
@@ -51,6 +51,7 @@ export function buildStatusListSections<T extends ListTask>(
   scope: TaskListScope = 'today',
 ): TaskListSection<T>[] {
   const statusBuckets = new Map<string, T[]>();
+  const bucketColumns = new Map<string, TaskStatusColumn>();
 
   for (const task of tasks) {
     // Завершене лишається в статусах ЗАВЖДИ — це підсумок дня, а не робота на
@@ -59,7 +60,12 @@ export function buildStatusListSections<T extends ListTask>(
     // сюди взагалі доходить, вирішує фільтр видимості вище по потоку
     // (taskVisibleInList): у режимі «сьогодні» він лишає тільки закрите сьогодні.
     if (scope === 'all' || task.status === 'done' || isTodayTask(task, columns, today)) {
-      push(statusBuckets, taskColumnId(task, columns), task);
+      // Скоуп за ВЛАСНИМ projectId завдання (§3.7 «Особисте агрегує»):
+      // плоский `columns` містить усі потоки, і без цього задача проєкту зі
+      // своєю (`st-<uuid4>`) колонкою не знаходила б її серед особистих.
+      const column = scopedTaskStatusColumn(task, columns);
+      push(statusBuckets, column.id, task);
+      if (!bucketColumns.has(column.id)) bucketColumns.set(column.id, column);
     }
   }
 
@@ -67,8 +73,7 @@ export function buildStatusListSections<T extends ListTask>(
   // Порядок завдань усередині секцій навмисно не чіпаємо: вхід уже
   // відсортований за пріоритетом, і пересортувати його тут означало б тихо
   // перебити вибір користувача.
-  return orderColumnsForList(columns)
-    .filter(column => statusBuckets.has(column.id))
+  return orderColumnsForList([...bucketColumns.values()])
     .map(column => ({
       key: column.id,
       label: column.name,

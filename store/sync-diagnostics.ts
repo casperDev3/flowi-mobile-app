@@ -29,7 +29,7 @@ export type ScheduleCaller = 'outbox' | 'ws' | 'fullSync' | 'rollback' | 'retryG
 export type DebounceCancel = 'rearm' | 'flush' | 'syncNow';
 
 /** Назва гейта, на якому doSync мовчки вийшов. */
-export type GateReason = 'offline' | 'notAuthed' | 'busy';
+export type GateReason = 'offline' | 'notAuthed' | 'busy' | 'incompatible';
 
 /**
  * Хто покликав doSync.
@@ -154,8 +154,8 @@ const state: SyncDiagnostics = {
   },
   attempts: {
     total: 0, entered: 0,
-    blocked: { offline: 0, notAuthed: 0, busy: 0 },
-    lastBlockedAt: { offline: null, notAuthed: null, busy: null },
+    blocked: { offline: 0, notAuthed: 0, busy: 0, incompatible: 0 },
+    lastBlockedAt: { offline: null, notAuthed: null, busy: null, incompatible: null },
     lastAttemptAt: null, lastEnteredAt: null,
     lastOutcome: null, lastOutcomeAt: null, lastDurationMs: null,
     lastEnteredTrigger: null, lastBlockedTrigger: null, runningTrigger: null,
@@ -289,6 +289,10 @@ const GATE_LABELS: Record<GateReason, string> = {
   offline: 'офлайн',
   notAuthed: 'не авторизований',
   busy: 'вже йде',
+  // Мінор із ревʼю: `getWorkspaceIncompatibility()` (workspace_changed чи
+  // несумісна версія) — обмін навмисно НЕ йде, доки користувач не пройде
+  // /workspace (AuthGate) і не підтвердить/скине workspace.
+  incompatible: 'workspace несумісний',
 };
 
 const OUTCOME_LABELS: Record<SyncOutcome, string> = {

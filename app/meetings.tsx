@@ -24,14 +24,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MeetingFormSheet, MeetingFormData } from '@/components/shared/MeetingFormSheet';
 
 import { DetailPane } from '@/components/shared/DetailPane';
+import { RecordingClock } from '@/components/shared/RecordingClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useProjectRole } from '@/hooks/use-project-role';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { isOnlineMode } from '@/store/app-mode';
 import { cancelMeetingNotification, scheduleMeetingNotification } from '@/store/notifications';
 import { loadData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { updateSynced } from '@/store/synced-storage';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useTimerContext } from '@/store/timer-context';
 import { useContentWidth } from '@/hooks/use-content-width';
@@ -384,6 +387,9 @@ export default function MeetingsScreen() {
   const [showForm, setShowForm]           = useState(false);
   const [formInitial, setFormInitial]     = useState<MeetingFormData | null>(null);
   const [formPresetDate, setFormPresetDate] = useState<string | undefined>(undefined);
+  // Коментарі (contract §4.4) у формі — лише коли форма редагує нараду проєкту.
+  const { user } = useAuth();
+  const formProjectRole = useProjectRole(formInitial?.projectId);
 
   // Google Calendar
   const [gcalClientId, setGcalClientId]   = useState('');
@@ -398,10 +404,11 @@ export default function MeetingsScreen() {
   // Recording
   const [recordingMtgId, setRecordingMtgId] = useState<string | null>(null);
   const [isRecording, setIsRecording]     = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  // Мітка старту запису, а не лічильник секунд: цокає RecordingClock, і
+  // екран не перемальовується щосекунди.
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
   const [playingUri, setPlayingUri]       = useState<string | null>(null);
   const recordingRef = useRef<any>(null);
-  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundRef = useRef<any>(null);
 
   useFocusEffect(useCallback(() => {
@@ -443,10 +450,9 @@ export default function MeetingsScreen() {
     if (!initialized) return;
     writeQueueRef.current = writeQueueRef.current
       .then(() => trackWrite(async () => {
-        const fresh = await loadData<Meeting[]>('meetings', []);
-        const next = mutate(fresh);
-        setMeetings(next);
-        await saveSynced('meetings', next);
+        // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+        // ними інакше пішов би на сервер як DELETE.
+        setMeetings(await updateSynced<Meeting>('meetings', mutate));
       }))
       .catch(e => { if (__DEV__) console.warn('[meetings] збереження не вдалося:', e); });
   }, [initialized, trackWrite]);
@@ -725,8 +731,7 @@ export default function MeetingsScreen() {
       recordingRef.current = recording;
       setRecordingMtgId(mtgId);
       setIsRecording(true);
-      setRecordingSeconds(0);
-      recordTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+      setRecordingStartedAt(Date.now());
     } catch (e: any) {
       if (__DEV__) console.warn('[record] start error:', e);
       Alert.alert('Помилка запису', e?.message);
@@ -735,13 +740,13 @@ export default function MeetingsScreen() {
 
   const stopRecording = useCallback(async () => {
     if (!recordingRef.current) return;
-    if (recordTimerRef.current) { clearInterval(recordTimerRef.current); recordTimerRef.current = null; }
     try {
       await recordingRef.current.stopAndUnloadAsync();
       await AVAudio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
       setIsRecording(false);
+      setRecordingStartedAt(null);
 
       if (uri && recordingMtgId) {
         // recordingMtgId — завжди id ОРИГІНАЛУ (handleCardRecord / onRecord
@@ -750,8 +755,8 @@ export default function MeetingsScreen() {
         mutateMeetings(fresh => withMeetingRecording(fresh, origId, uri));
       }
       setRecordingMtgId(null);
-      setRecordingSeconds(0);
     } catch (e: any) {
+      setRecordingStartedAt(null);
       if (__DEV__) console.warn('[record] stop error:', e);
     }
   }, [recordingMtgId, mutateMeetings]);
@@ -787,7 +792,6 @@ export default function MeetingsScreen() {
 
   // Cleanup on unmount
   useEffect(() => () => {
-    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     recordingRef.current?.stopAndUnloadAsync().catch(() => {});
     soundRef.current?.unloadAsync().catch(() => {});
   }, []);
@@ -1202,6 +1206,8 @@ export default function MeetingsScreen() {
         tr={tr}
         markedDays={markedDays}
         projects={projects}
+        currentUserId={user?.id ? String(user.id) : null}
+        isProjectOwner={formProjectRole === 'owner'}
       />
 
       {/* ── Google Calendar Sheet ── */}
@@ -1381,10 +1387,11 @@ export default function MeetingsScreen() {
             <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#fff' : '#000', marginBottom: 6 }}>
               {isRecording ? 'Запис...' : 'Аудіозапис'}
             </Text>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: isRecording ? '#EF4444' : ACCENT,
-              letterSpacing: 2, marginBottom: 24, fontVariant: ['tabular-nums'] }}>
-              {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}
-            </Text>
+            <RecordingClock
+              startedAt={recordingStartedAt}
+              style={{ fontSize: 28, fontWeight: '800', color: isRecording ? '#EF4444' : ACCENT,
+                letterSpacing: 2, marginBottom: 24, fontVariant: ['tabular-nums'] }}
+            />
 
             {isRecording ? (
               <TouchableOpacity onPress={stopRecording}

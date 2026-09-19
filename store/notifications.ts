@@ -16,15 +16,31 @@ import {
 
 import { loadData } from './storage';
 import type { Translations } from './translations';
+import { ensurePushTokenRegistered, isForCurrentWorkspace, type PushPayloadData } from './push';
+
+const SUPPRESSED = {
+  shouldShowAlert: false,
+  shouldPlaySound: false,
+  shouldSetBadge: false,
+  shouldShowBanner: false,
+  shouldShowList: false,
+} as const;
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async notification => {
+    // Контракт §7: push для ІНШОГО workspace, ніж активний зараз, ігноруємо —
+    // токен на сервері старого workspace знімається лише при виході/зміні
+    // workspace (§2.3/§2.8), тож пуш звідти теоретично ще може долетіти.
+    const data = (notification.request.content.data ?? {}) as PushPayloadData;
+    if (!isForCurrentWorkspace(data)) return SUPPRESSED;
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
 });
 
 export async function requestNotificationPermissions(): Promise<boolean> {
@@ -47,6 +63,10 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       lightColor: '#7C3AED',
     });
   }
+  // Контракт §2.8: дозвіл міг щойно з'явитись не при вході, а тут-таки —
+  // наприклад, користувач вмикає нагадування в Налаштуваннях. Без цього
+  // токен реєструвався б лише на наступному холодному старті/вході.
+  void ensurePushTokenRegistered();
   return true;
 }
 

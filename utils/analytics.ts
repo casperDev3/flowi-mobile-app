@@ -19,7 +19,5 @@ export const Events = {
   HealthEntryAdded: 'health_entry_added',
   PreventionReminderSet: 'prevention_reminder_set',
   ReportExported: 'report_exported',
-  SharedGroupCreated: 'shared_group_created',
-  SharedSecretShared: 'shared_secret_shared',
   UpsellShown: 'upsell_shown',
 } as const;

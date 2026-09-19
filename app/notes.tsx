@@ -36,6 +36,8 @@ interface Note {
   body: string;
   createdAt: string;
   updatedAt: string;
+  /** Належність проєкту (WORKSPACE_PROJECTS_CONTRACT §3.3) — опційна, як у Task/Meeting. */
+  projectId?: string;
 }
 
 function relativeDate(iso: string): string {

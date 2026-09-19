@@ -51,7 +51,7 @@ jest.mock('@/components/shared/SheetModal', () => ({
 import React from 'react';
 import { Alert } from 'react-native';
 
-import ProjectsScreen from '@/app/projects';
+import ProjectBudgetScreen from '@/app/project/[id]/budget';
 import SubscriptionsScreen from '@/app/subscriptions';
 import { UpcomingPaymentsCard } from '@/components/finance/UpcomingPaymentsCard';
 import { BUILTIN_CURRENCIES } from '@/utils/financeUtils';
@@ -226,7 +226,7 @@ test('правка: синк під час відкритої форми не в
   expect(stored[0].history).toEqual(renewed.history);
 });
 
-test('деталь проєкту: секція «Підписки» з місячною сумою; архівні не показуються', async () => {
+test('простір проєкту → Бюджет: секція «Підписки» з місячною сумою; архівні не показуються', async () => {
   const PROJECT = { id: 'p1', name: 'Сайт', color: '#EF4444', createdAt: NOW };
   seed({
     projects: [PROJECT],
@@ -237,11 +237,10 @@ test('деталь проєкту: секція «Підписки» з міся
       { ...NETFLIX, id: 'sub-other', name: 'Чужий', projectId: 'p2' },
     ],
   });
+  mockParams = { id: 'p1' };
   let tree: any;
-  await act(async () => { tree = create(<ProjectsScreen />); });
+  await act(async () => { tree = create(<ProjectBudgetScreen />); });
   mounted = tree;
-  await flush();
-  await pressByLabel(tree, PROJECT.name);
   await flush();
 
   const text = allText(tree);

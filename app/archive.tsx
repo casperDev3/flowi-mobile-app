@@ -17,9 +17,10 @@ import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { PriorityFilterChips } from '@/components/tasks/PriorityFilterChips';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { updateSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
 import {
   comparePriority,
@@ -161,9 +162,15 @@ export default function ArchiveScreen() {
   const [filterPriorities, setFilterPriorities] = useState<PriorityLevel[]>([]);
   const [sort, setSort] = useState<SortBy>('newest');
 
+  const reloadTasks = useCallback(async () => {
+    setTasks(await loadData<Task[]>('tasks', []));
+  }, []);
   useFocusEffect(useCallback(() => {
-    loadData<Task[]>('tasks', []).then(setTasks);
-  }, []));
+    void reloadTasks();
+  }, [reloadTasks]));
+  // Задачу могли завершити чи повернути деінде (веб, інший пристрій), поки
+  // архів відкритий, — пул синку пише 'tasks', і список оновлюється одразу.
+  useStorageRefresh(['tasks'], reloadTasks);
 
   const done = useMemo(() => tasks
     .filter(t => t.status === 'done' && matchesPriorityFilter(t, filterPriorities))
@@ -184,9 +191,9 @@ export default function ArchiveScreen() {
   const mutationQueue = useRef<Promise<void>>(Promise.resolve());
   const mutateTasks = useCallback((fn: (fresh: Task[]) => Task[]) => {
     const run = async () => {
-      const fresh = await loadData<Task[]>('tasks', []);
-      const updated = fn(fresh);
-      await saveSynced('tasks', updated);
+      // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+      // ними інакше пішов би на сервер як DELETE.
+      const updated = await updateSynced<Task>('tasks', fn);
       setTasks(updated);
     };
     const next = mutationQueue.current.then(run, run);

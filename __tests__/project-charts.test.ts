@@ -19,6 +19,7 @@ import {
   deadlineLoad,
   doneByWeek,
   GANTT_FALLBACK_COLOR,
+  shiftGanttEdge,
   tasksForProjects,
   timeByProject,
   trackedSeconds,
@@ -451,5 +452,47 @@ describe('відхилення мобільного від веб-дзеркал
     const uk = buildGantt(tasks, [project()], { now: NOW });
     const en = buildGantt(tasks, [project()], { now: NOW, months: ['Jan'] });
     expect({ ...uk, ticks: [] }).toEqual({ ...en, ticks: [] });
+  });
+});
+
+describe('shiftGanttEdge — тягнення краю смуги на Таймлайні (contract §3)', () => {
+  const startDate = day(-10);
+  const deadline = day(10);
+
+  it('тягнення лівого краю вправо на N днів зсуває startDate', () => {
+    const result = shiftGanttEdge({ startDate, deadline, createdAt: day(-10) }, 'start', 3);
+    expect(result).toEqual({ startDate: day(-7) });
+  });
+
+  it('тягнення правого краю вліво на N днів зсуває deadline', () => {
+    const result = shiftGanttEdge({ startDate, deadline, createdAt: day(-10) }, 'end', -4);
+    expect(result).toEqual({ deadline: day(6) });
+  });
+
+  it('0 днів — нічого не змінює', () => {
+    expect(shiftGanttEdge({ startDate, deadline, createdAt: day(-10) }, 'start', 0)).toBeNull();
+  });
+
+  it('початок не може перескочити за кінець', () => {
+    // Кінець за 10 днів; тягнення старту на +25 поставило б його ПІСЛЯ кінця.
+    expect(shiftGanttEdge({ startDate, deadline, createdAt: day(-10) }, 'start', 25)).toBeNull();
+  });
+
+  it('кінець не може стати раніше за початок', () => {
+    expect(shiftGanttEdge({ startDate, deadline, createdAt: day(-10) }, 'end', -25)).toBeNull();
+  });
+
+  it('без startDate — база дедлайна відлічується від createdAt (вигаданий початок)', () => {
+    const result = shiftGanttEdge({ deadline, createdAt: day(-10) }, 'start', 2);
+    expect(result).toEqual({ startDate: day(-8) });
+  });
+
+  it('без deadline — редагування кінця відлічується від startDate', () => {
+    const result = shiftGanttEdge({ startDate, createdAt: day(-10) }, 'end', 5);
+    expect(result).toEqual({ deadline: day(-5) });
+  });
+
+  it('зіпсована базова дата — null, а не Invalid Date у сховищі', () => {
+    expect(shiftGanttEdge({ startDate: 'not-a-date', createdAt: day(-10) }, 'start', 1)).toBeNull();
   });
 });

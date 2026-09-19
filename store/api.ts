@@ -14,7 +14,7 @@
 
 import * as SecureStore from 'expo-secure-store';
 
-import { API_BASE } from './api-config';
+import { CLIENT_HEADER_VALUE, getApiBase, reportClientOutdated } from './api-config';
 import { isOnlineMode } from './app-mode';
 
 // ─── Ключі SecureStore ────────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15_000);
   try {
-    return await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal });
+    return await fetch(`${getApiBase()}${path}`, { ...init, signal: controller.signal });
   } catch (e) {
     // Нормалізуємо мережеві помилки в ApiError з розпізнаваним кодом
     if (e instanceof DOMException && e.name === 'AbortError') {
@@ -101,7 +101,12 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
 }
 
 async function buildHeaders(auth: boolean): Promise<Record<string, string>> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // Контракт §0.4: на КОЖЕН запит — сервер порівнює з min_client_version і
+  // відповідає 426, коли клієнт застарів (крім /workspace/, /health/, /auth/*).
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Flowi-Client': CLIENT_HEADER_VALUE,
+  };
   if (auth) {
     const token = await getAccessToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -129,44 +134,42 @@ async function parseErrorBody(res: Response): Promise<ApiError> {
   return new ApiError(res.status, code, message, details);
 }
 
-/** Спроба оновити access-токен через /auth/refresh/. Повертає true якщо успішно. */
-async function performRefresh(): Promise<boolean> {
+/**
+ * Результат оновлення токена.
+ * `invalid` — сервер відхилив сам refresh (або його немає): сесія мертва.
+ * `retry`   — тимчасова перешкода (мережа, 429, 5xx); токени чіпати НЕ можна.
+ */
+export type RefreshOutcome = 'ok' | 'invalid' | 'retry';
+
+/** Спроба оновити access-токен через /auth/refresh/. */
+async function performRefresh(): Promise<RefreshOutcome> {
   try {
     const refresh = await SecureStore.getItemAsync(REFRESH_SECURE_KEY);
-    if (!refresh) return false;
+    if (!refresh) return 'invalid';
 
-    const res = await doFetch('/auth/refresh/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh }),
-    });
-    if (!res.ok) return false;
+    let res: Response;
+    try {
+      res = await doFetch('/auth/refresh/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Flowi-Client': CLIENT_HEADER_VALUE },
+        body: JSON.stringify({ refresh }),
+      });
+    } catch {
+      return 'retry';
+    }
+    if (!res.ok) return res.status === 401 || res.status === 400 ? 'invalid' : 'retry';
 
     const data = (await res.json()) as { access: string; refresh: string };
     await setTokens(data.access, data.refresh);
-    return true;
+    return 'ok';
   } catch {
-    return false;
+    return 'retry';
   }
 }
 
-/**
- * Оновлення токена, дедупліковане на час польоту (як на вебі, lib/api.ts).
- *
- * Синк шле запити пачками, тож коли access протухає, кілька з них ловлять 401
- * майже одночасно. Доти кожен стріляв своїм /auth/refresh/ з ОДНИМ І ТИМ САМИМ
- * refresh-токеном, а на сервері ROTATE_REFRESH_TOKENS + BLACKLIST_AFTER_ROTATION:
- * перший запит ротував пару і клав стару в блокліст, другий отримував на неї 401
- * і йшов шляхом «сесія мертва» — clearTokens() стирав щойно видану валідну пару.
- * Саме це виглядало як випадкові вилогінювання посеред роботи.
- *
- * Тепер у мережу йде рівно один запит, решта чекають на його результат. Ті, хто
- * чекав, ОБОВʼЯЗКОВО мусять перечитати токен після await (getAccessToken нижче):
- * значення, прочитане до входу в чергу, вже застаріле — саме воно й дало 401.
- */
-let _refreshInFlight: Promise<boolean> | null = null;
+let _refreshInFlight: Promise<RefreshOutcome> | null = null;
 
-function tryRefresh(): Promise<boolean> {
+function tryRefresh(): Promise<RefreshOutcome> {
   if (_refreshInFlight) return _refreshInFlight;
   const run = performRefresh().finally(() => {
     // Порівняння з run, а не безумовне обнулення: інакше запізніла відповідь
@@ -175,6 +178,55 @@ function tryRefresh(): Promise<boolean> {
   });
   _refreshInFlight = run;
   return run;
+}
+
+/**
+ * Оновити токен ззовні — для WebSocket, який отримав відмову 4401 (як на вебі,
+ * lib/api.ts refreshSession). Мертва сесія прибирається так само, як в apiFetch.
+ */
+export async function refreshSession(): Promise<RefreshOutcome> {
+  const outcome = await tryRefresh();
+  if (outcome === 'invalid') {
+    await clearTokens();
+    emitSessionExpired();
+  }
+  return outcome;
+}
+
+/** Мілісекунди claim'а `exp` JWT без перевірки підпису (це робить сервер). */
+export function jwtExpiresAtMs(token: string): number | null {
+  try {
+    const segment = token.split('.')[1];
+    if (!segment) return null;
+    const base64 = segment.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const payload = JSON.parse(atob(padded)) as Record<string, unknown>;
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Скільки лишається до `exp`, коли вже варто оновити токен наперед. */
+const RENEW_FLOOR_MS = 60_000;
+
+/**
+ * Свіжий access-токен для з'єднань, які НЕ йдуть через apiFetch (WebSocket).
+ *
+ * apiFetch сам переживає 401 (оновлює й повторює), а сокет — ні: сервер
+ * закриває його з кодом 4401, і перепідключення з тим самим кешованим токеном
+ * крутилось би по колу. Тому перед відкриттям перевіряємо `exp` і за потреби
+ * оновлюємо; якщо не вдалось — віддаємо що є (відмова 4401 обробиться окремо).
+ */
+export async function getFreshAccessToken(): Promise<string | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const expiresAt = jwtExpiresAtMs(token);
+  if (expiresAt !== null && expiresAt - Date.now() < RENEW_FLOOR_MS) {
+    await tryRefresh();
+    return getAccessToken();
+  }
+  return token;
 }
 
 // ─── Публічний apiFetch ──────────────────────────────────────────────────────
@@ -200,7 +252,7 @@ export async function apiFetch<T>(
 
   // 401 + auth → одна спроба refresh (спільна на всі паралельні запити) → повтор
   if (res.status === 401 && auth) {
-    const refreshed = await tryRefresh();
+    const refreshed = (await tryRefresh()) === 'ok';
     if (refreshed) {
       // Читаємо токен саме ТУТ, після await: якщо оновлення робив хтось інший,
       // у headers лежить уже мертвий токен, з яким повтор дасть 401 і вихід.
@@ -217,7 +269,17 @@ export async function apiFetch<T>(
     throw new ApiError(401, 'session_expired', 'Session expired');
   }
 
-  if (!res.ok) throw await parseErrorBody(res);
+  if (!res.ok) {
+    const err = await parseErrorBody(res);
+    // Контракт §0.4: 426 на будь-якому ендпоінті (крім /workspace/, /health/,
+    // /auth/*, куди й так не ставимо заголовок клієнта) означає, що збірка
+    // застаріла для активного workspace — блокуємо UI екраном оновлення,
+    // а не просто показуємо помилку на конкретному екрані.
+    if (res.status === 426) {
+      reportClientOutdated(typeof err.details?.min_version === 'string' ? err.details.min_version : undefined);
+    }
+    throw err;
+  }
 
   // 204 No Content / 205 Reset Content — повертаємо undefined
   if (res.status === 204 || res.status === 205) return undefined as unknown as T;

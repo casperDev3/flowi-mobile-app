@@ -39,7 +39,15 @@ import type { ActiveTimer, Shift } from '@/utils/activeTimers';
 
 interface ShiftCfg { label: string; icon: IconSymbolName; color: string; hours: string; }
 
-interface TimeEntry { id: string; task: string; shift: Shift; duration: number; date: string; }
+interface TimeEntry {
+  id: string;
+  task: string;
+  shift: Shift;
+  duration: number;
+  date: string;
+  /** Належність проєкту (WORKSPACE_PROJECTS_CONTRACT §3.3) — опційна. */
+  projectId?: string;
+}
 
 /** Рівно те, що рядок активного таймера показує про підзавдання. */
 interface RowSubtask { id: string; title: string; done: boolean }
@@ -55,6 +63,7 @@ interface PickableTask {
   status: 'active' | 'done';
   kanbanColumnId?: string;
   subtasks?: RowSubtask[];
+  projectId?: string;
 }
 
 const today = new Date();
@@ -198,6 +207,7 @@ export default function TimeScreen() {
         title: linkedTask.title,
         kanbanColumnId: linkedTask.kanbanColumnId,
         status: linkedTask.status,
+        projectId: linkedTask.projectId,
       });
     } else {
       await startAdHocTimer(taskName.trim() || tr.untitled, activeShift);

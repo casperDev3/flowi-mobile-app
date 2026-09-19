@@ -56,3 +56,22 @@ export async function saveData(key: string, data: unknown): Promise<void> {
   }
   notifyStorageChanged(key);
 }
+
+/**
+ * Прибирає ключ ЦІЛКОМ (а не `saveData(key, null)`): останній пише рядок
+ * `"null"`, і `loadData` — бо вважає «нема даних» лише порожній рядок від
+ * AsyncStorage — повертав би СПРАВЖНІЙ `null` замість fallback усім читачам,
+ * а не «значення відсутнє». Для singleton-ключів (`SYNC_SINGLETON_KEYS`)
+ * читачі саме на `undefined` перевіряють «є локальні дані» (`hasAnyLocalData`,
+ * `generateFullOutbox` у `store/sync-engine.tsx`) — `saveData(key, null)` там
+ * лишав би щойно стертий singleton «локальними даними» назавжди.
+ */
+export async function removeData(key: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(key);
+  } catch (e) {
+    if (__DEV__) console.warn(`[storage] removeData(${key}) failed:`, e);
+    return;
+  }
+  notifyStorageChanged(key);
+}

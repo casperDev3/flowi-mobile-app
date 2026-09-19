@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -21,10 +20,9 @@ import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
-import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
-import { syncNow } from '@/store/sync-engine';
+import { getPendingRegistration } from '@/store/registration';
 import { haptic } from '@/utils/haptics';
 
 // ─── Простий валідатор формату email ─────────────────────────────────────────
@@ -36,7 +34,6 @@ export default function LoginScreen() {
   const router = useRouter();
   const { tr } = useI18n();
   const { login } = useAuth();
-  const { online, setOnline } = useAppMode();
   // Форма входу лишається колонкою сталої ширини: на планшеті поле на всю
   // ширину вікна змушує око бігати від мітки до курсора через пів екрана.
   const contentWidth = useContentWidth();
@@ -86,21 +83,33 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
+      // §2 плану: вхід завжди примусово вмикає онлайн-режим (store/auth.tsx
+      // completeSession) — «увімкнути онлайн?» після входу більше нема сенсу
+      // питати, застосунок уже онлайн.
       await login(trimEmail, password);
       router.replace('/(tabs)');
-      // З офлайну увійшли заради онлайн-функцій — пропонуємо увімкнути
-      if (!online) {
-        Alert.alert(tr.enableOnline, tr.enableOnlineAfterLoginMsg, [
-          { text: tr.yes, onPress: () => { setOnline(true); void syncNow(); } },
-          { text: tr.later, style: 'cancel' },
-        ]);
-      }
     } catch (e: unknown) {
       haptic.error();
       if (e instanceof OfflineError) {
         setGeneralError(tr.authOfflineError);
       } else if (e instanceof ApiError) {
-        if (e.status === 401 || e.code === 'no_active_account') {
+        if (e.status === 403 && e.code === 'registration_pending') {
+          // Контракт §2.6: `/auth/login/` для email із pending-заявкою не
+          // повертає requestId — ведемо на екран очікування лише якщо ЦЕЙ
+          // пристрій сам подавав заявку (той самий request_token лежить у
+          // SecureStore) і email збігається; інакше `register-pending.tsx`
+          // опитував би сервер токеном, якого просто нема.
+          const pending = await getPendingRegistration();
+          if (pending && pending.email === trimEmail) {
+            router.replace({ pathname: '/register-pending', params: { requestId: pending.requestId } });
+            return;
+          }
+          setGeneralError(tr.authRegistrationPending);
+        } else if (e.status === 403 && e.code === 'registration_rejected') {
+          // Контракт §2.6: `{"code":"registration_rejected","reject_reason":"…"}`.
+          const reason = typeof e.details?.reject_reason === 'string' ? e.details.reject_reason.trim() : '';
+          setGeneralError(reason ? `${tr.authRegistrationRejected}: ${reason}` : tr.authRegistrationRejected);
+        } else if (e.status === 401 || e.code === 'no_active_account') {
           setPasswordError(tr.authInvalidCreds);
         } else if (e.code === 'timeout' || e.code === 'network') {
           setGeneralError(tr.authNetworkError);

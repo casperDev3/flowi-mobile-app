@@ -1,0 +1,14 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn: "Back"
+- waitForAnimationToEnd
+- swipe:
+    start: "50%,80%"
+    end: "50%,30%"
+- swipe:
+    start: "50%,80%"
+    end: "50%,30%"
+- waitForAnimationToEnd
+- longPressOn: ".*Звички.*"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/36-tile-longpress

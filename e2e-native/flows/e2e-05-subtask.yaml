@@ -1,0 +1,12 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "37%,77%"
+- inputText: "Підзавдання один"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/05-subtask-typing
+- pressKey: Enter
+- waitForAnimationToEnd
+- hideKeyboard
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/05-subtask-added

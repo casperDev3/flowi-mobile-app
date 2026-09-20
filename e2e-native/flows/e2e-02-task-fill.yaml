@@ -1,0 +1,13 @@
+appId: com.casper3.f-tracking-app
+---
+# доказ: всередині SheetModal Maestro не бачить окремих контролів
+- runFlow:
+    when:
+      visible: "Назва"
+    commands:
+      - takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/02-nazva-visible
+- tapOn:
+    point: "50%,30%"
+- inputText: "Аудит A1 задача"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/02-typed

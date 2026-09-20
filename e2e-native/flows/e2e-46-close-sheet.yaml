@@ -1,0 +1,10 @@
+appId: com.casper3.f-tracking-app
+---
+- swipe:
+    start: "201,155"
+    end: "201,800"
+    duration: 400
+- waitForAnimationToEnd
+- longPressOn: ".*Харчування.*"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/46-nutrition

@@ -1,0 +1,12 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "48%,28%"
+- inputText: "Seed alpha"
+- tapOn:
+    point: "37%,50%"
+- tapOn:
+    point: "18%,75%"
+- tapOn:
+    point: "62%,90%"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lang/04-seeded

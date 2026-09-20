@@ -1,0 +1,12 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "70%,94%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/01-health-hub-top
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/02-health-hub-mid
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/03-health-hub-bot

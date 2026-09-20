@@ -1,0 +1,14 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn: "Назва проєкту"
+- inputText: "Аудит L2"
+- hideKeyboard
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Створити"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/P16-form
+- tapOn: "Створити"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/P17-created

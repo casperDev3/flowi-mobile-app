@@ -1,0 +1,7 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    text: "Опції"
+    index: 0
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/P04-menu

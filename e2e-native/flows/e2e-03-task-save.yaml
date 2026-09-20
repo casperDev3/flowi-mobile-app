@@ -1,0 +1,20 @@
+appId: com.casper3.f-tracking-app
+---
+- hideKeyboard
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/03-before-save
+# пріоритет P1
+- tapOn:
+    point: "37%,44%"
+# дедлайн «Сьогодні»
+- tapOn:
+    point: "18%,77%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/03-filled
+# ПОДВІЙНЕ натискання «Додати»
+- tapOn:
+    point: "64%,90%"
+    repeat: 2
+    delay: 60
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/03-after-double-save

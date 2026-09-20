@@ -1,0 +1,110 @@
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Бюджет"
+    direction: DOWN
+    visibilityPercentage: 60
+- tapOn: "Бюджет"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T01-budget
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Контейнери"
+    direction: DOWN
+    visibilityPercentage: 60
+- tapOn: "Контейнери"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T03-containers
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Синхронізація"
+    direction: DOWN
+    visibilityPercentage: 60
+- tapOn: "Синхронізація"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T04-sync
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Управління даними"
+    direction: DOWN
+    visibilityPercentage: 60
+- tapOn: "Управління даними"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T05-data
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Ідеї"
+    direction: DOWN
+    visibilityPercentage: 60
+- tapOn: "Ідеї"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T06-ideas
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Список багів"
+    direction: DOWN
+    visibilityPercentage: 60
+- tapOn: "Список багів"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T07-bugs
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Керування акаунтом"
+    direction: DOWN
+    visibilityPercentage: 60
+- tapOn: "Керування акаунтом"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T08-account
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Розробник"
+    direction: DOWN
+    visibilityPercentage: 60
+- tapOn: "Розробник"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T09-developer
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Задонатити"
+    direction: DOWN
+    visibilityPercentage: 60
+- tapOn: "Задонатити"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T10-donate

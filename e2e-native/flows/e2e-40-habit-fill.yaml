@@ -1,0 +1,15 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "201,505"
+- inputText: "Аудит звичка"
+- tapOn:
+    point: "20%,55%"
+- waitForAnimationToEnd
+- tapOn:
+    point: "201,732"
+- inputText: "09:30"
+- tapOn:
+    point: "20%,55%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/40-habit-filled

@@ -1,0 +1,12 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "201,600"
+- waitForAnimationToEnd
+- tapOn:
+    point: "33,178"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/45-hub
+- longPressOn: ".*Харчування.*"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/45-nutrition

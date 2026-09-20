@@ -1,0 +1,82 @@
+appId: com.casper3.f-tracking-app
+---
+- scrollUntilVisible:
+    element: "Бюджет"
+    direction: DOWN
+- tapOn: "Бюджет"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T01-budget
+- swipe:
+    start: "1%,50%"
+    end: "95%,50%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Підписки"
+    direction: DOWN
+- tapOn: "Підписки"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T02-subscriptions
+- swipe:
+    start: "1%,50%"
+    end: "95%,50%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Контейнери"
+    direction: DOWN
+- tapOn: "Контейнери"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T03-containers
+- swipe:
+    start: "1%,50%"
+    end: "95%,50%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Синхронізація"
+    direction: DOWN
+- tapOn: "Синхронізація"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T04-sync
+- swipe:
+    start: "1%,50%"
+    end: "95%,50%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Управління даними"
+    direction: DOWN
+- tapOn: "Управління даними"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T05-data
+- swipe:
+    start: "1%,50%"
+    end: "95%,50%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Ідеї"
+    direction: UP
+- tapOn: "Ідеї"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T06-ideas
+- swipe:
+    start: "1%,50%"
+    end: "95%,50%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Список багів"
+    direction: UP
+- tapOn: "Список багів"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T07-bugs
+- swipe:
+    start: "1%,50%"
+    end: "95%,50%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Керування акаунтом"
+    direction: UP
+- tapOn: "Керування акаунтом"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/T08-account
+- swipe:
+    start: "1%,50%"
+    end: "95%,50%"
+- waitForAnimationToEnd

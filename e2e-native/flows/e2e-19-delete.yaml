@@ -1,0 +1,13 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "9%,11%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/19-back-to-tasks
+- tapOn: ".*Аудит A1 задача.*"
+- waitForAnimationToEnd
+# Видалити
+- tapOn:
+    point: "22%,91%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/19-delete-confirm

@@ -1,0 +1,8 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn: "Режим списку"
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,82%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/a11y/03-add-sheet

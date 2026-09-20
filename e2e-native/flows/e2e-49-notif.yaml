@@ -1,0 +1,11 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "361,818"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      text: ".*Нагадування.*"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/49-settings-notif

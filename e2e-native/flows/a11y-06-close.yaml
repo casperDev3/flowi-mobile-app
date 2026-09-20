@@ -1,0 +1,5 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "50%,10%"
+- waitForAnimationToEnd

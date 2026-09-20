@@ -1,0 +1,7 @@
+appId: com.casper3.f-tracking-app
+---
+- setOrientation: PORTRAIT
+- waitForAnimationToEnd
+- tapOn: "Новий проект"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/P15-newproj

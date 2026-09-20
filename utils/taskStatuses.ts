@@ -254,6 +254,37 @@ export function scopedTaskStatusColumn(
   return taskStatusColumn(task, mergeTaskStatusColumns([...allColumns]));
 }
 
+/**
+ * Особиста колонка, під якою завдання показується в ОСОБИСТИХ списках
+ * («Завдання», групування за статусом).
+ *
+ * Кожен проєкт має власні колонки з власними id, і групування за id давало
+ * на особистому екрані по окремій «До роботи»/«Готово» на кожен проєкт.
+ * Тут колонка проєкту зводиться до «тієї самої за змістом» особистої:
+ * спершу копія, з якої її засіяно (sourceStatusId), далі — однакова назва,
+ * далі — той самий тип (todo/in_progress/done).
+ */
+export function personalDisplayColumn(
+  task: Pick<Task, 'status' | 'kanbanColumnId' | 'projectId'>,
+  allColumns: readonly TaskStatusColumn[],
+): TaskStatusColumn {
+  const personal = mergeTaskStatusColumns([...allColumns]);
+  if (!task.projectId) return taskStatusColumn(task, personal);
+  const own = scopedTaskStatusColumn(task, allColumns);
+  if (!own.projectId) return own;
+  const bySource = own.sourceStatusId ? personal.find(column => column.id === own.sourceStatusId) : undefined;
+  if (bySource) return bySource;
+  const name = own.name.trim().toLowerCase();
+  const byName = personal.find(column => column.name.trim().toLowerCase() === name);
+  if (byName) return byName;
+  const type = resolvedStatusType(own);
+  const preferredId = type === 'done' ? DONE_COLUMN_ID : type === 'in_progress' ? IN_PROGRESS_COLUMN_ID : ACTIVE_COLUMN_ID;
+  return personal.find(column => column.id === preferredId)
+    ?? personal.find(column => resolvedStatusType(column) === type)
+    ?? personal[0]
+    ?? own;
+}
+
 export function boardColumnForTask(
   task: Pick<Task, 'status' | 'kanbanColumnId'>,
   boardColumns: readonly TaskStatusColumn[],
@@ -427,15 +458,18 @@ export function taskVisibleInList(
   scope: 'today' | 'all' = 'all',
 ): boolean {
   if (task.status !== 'done') {
-    return filter === 'all' || task.status === filter;
+    // Будь-який незавершений статус — активний. Веб колись писав
+    // 'todo'/'in_progress'; дослівне `task.status === filter` ховало такі
+    // задачі на мобільному, і «Усі» тут було вдвічі менше, ніж на вебі.
+    return filter === 'all' || filter === 'active';
   }
 
   // Завершене видно, лише поки воно свіже. Список завдань — про роботу, а не
   // про історію: сотня закритих справ ховає те, заради чого екран відкривають.
-  // Старіше живе в Архіві, і саме туди по нього й ідуть.
-  const visible = filter === 'all' || filter === 'done'
-    || (filter === 'active' && sort === 'status');
-  if (!visible) return false;
+  // Старіше живе в Архіві, і саме туди по нього й ідуть. Вирішує САМЕ вікно
+  // свіжості, при будь-якому групуванні — так само, як includeRecentlyDone у
+  // вебі; раніше свіже завершене потрапляло в «Активні» лише при групуванні
+  // за статусом, і лічильник «Усі» двох клієнтів розходився.
 
   // Фільтр «Виконані» — це свідома вимога показати зроблене; звужувати його до
   // одного дня означало б зламати єдиний спосіб переглянути закрите за тиждень.

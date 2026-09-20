@@ -203,6 +203,13 @@ describe('isMyTask — §3.7 "моє" (особистий потік / assigneeI
     // легасі/мігровані задачі з'являлись би в «Сьогодні» всіх одночасно.
     // Контракт §3.7 вимагає дослівну рівність `createdBy == me`, без фолбеку.
     expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: undefined }, 'me')).toBe(false);
+    expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: undefined }, 'me', { 'p-1': 'member' })).toBe(false);
+  });
+
+  it('без createdBy і assigneeId — моє ВЛАСНИКУ проєкту (легасі-дані власника після міграції §3.6)', () => {
+    // Регресія: у соло-проєктах зникали всі старі задачі (передусім «Готово»),
+    // бо міграція перенесла їх без автора.
+    expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: undefined }, 'me', { 'p-1': 'owner' })).toBe(true);
   });
 
   it('myUserId невідомий (ще не завантажено useAuth) — ховає задачі проєкту (без відомого "я" рівність неможлива)', () => {
@@ -221,5 +228,45 @@ describe('isMyTask — §3.7 "моє" (особистий потік / assigneeI
     const { total, groups } = groupTodayTasks([mine, other], COLUMNS, TODAY, 99, 'me');
     expect(total).toBe(1);
     expect(groups.flatMap(g => g.tasks.map(t => t.id))).toEqual(['mine']);
+  });
+});
+
+describe('«Готово» на сьогодні — строго за подією done', () => {
+  it('виконана без події done, але з сьогоднішнім updatedAt — НЕ сьогоднішня', () => {
+    // Перезапис (синк, міграція, правка) зсуває updatedAt — це не завершення.
+    const stale = { status: 'done', updatedAt: TODAY_ISO, history: [] } as unknown as Task;
+    expect(isTodayTask(stale, COLUMNS, TODAY)).toBe(false);
+  });
+
+  it('подія done сьогодні — сьогоднішня; учора — ні', () => {
+    const today = { status: 'done', history: [{ id: '1', type: 'done', at: TODAY_ISO }] } as unknown as Task;
+    const yesterday = { status: 'done', history: [{ id: '1', type: 'done', at: YESTERDAY }] } as unknown as Task;
+    expect(isTodayTask(today, COLUMNS, TODAY)).toBe(true);
+    expect(isTodayTask(yesterday, COLUMNS, TODAY)).toBe(false);
+  });
+});
+
+describe('withCompletionEvent — шар запису гарантує подію done', () => {
+  const { withCompletionEvent } = jest.requireActual('../utils/taskUtils');
+  const AT = TODAY_ISO;
+
+  it('перехід у done без події — дописує done', () => {
+    const next = withCompletionEvent({ status: 'active', history: [] }, { status: 'done', history: [] }, AT);
+    expect(next.history.map((e: { type: string }) => e.type)).toEqual(['done']);
+    expect(next.history[0].at).toBe(AT);
+  });
+
+  it('шлях сам записав done — не дублює', () => {
+    const next = withCompletionEvent(
+      { status: 'active', history: [] },
+      { status: 'done', history: [{ id: 'x', type: 'done', at: AT }] },
+      AT,
+    );
+    expect(next.history).toHaveLength(1);
+  });
+
+  it('уже була виконана (правка назви) — нічого не додає', () => {
+    const prev = { status: 'done', history: [{ id: 'x', type: 'done', at: YESTERDAY }] };
+    expect(withCompletionEvent(prev, { ...prev }, AT).history).toHaveLength(1);
   });
 });

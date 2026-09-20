@@ -224,10 +224,22 @@ export function getProgress(t: Task): number {
 export function isMyTask(
   task: Pick<Task, 'projectId' | 'assigneeId' | 'createdBy'>,
   myUserId: string | null | undefined,
+  /**
+   * Ролі в проєктах (useProjectRoles). Задача БЕЗ автора й виконавця
+   * прийшла зі старих особистих даних власника (міграція §3.6 переносить
+   * саме їх; нові клієнти `createdBy` ставлять завжди) — тож вона «моя»
+   * лише власнику. Без цього фолбеку в соло-проєктах зникали всі старі
+   * задачі, передусім виконані; без перевірки ролі вони б з'являлись у
+   * кожного учасника команди (finding вище).
+   */
+  roles?: Readonly<Record<string, string>>,
 ): boolean {
   if (!task.projectId) return true; // особистий потік
   if (!myUserId) return false;
   if (task.assigneeId) return task.assigneeId === myUserId;
+  // Роль невідома — проєкт ще не приєднано (міграція §3.6 не відпрацювала):
+  // запис фізично в особистому потоці, тобто мій, як і на вебі.
+  if (!task.createdBy) return roles ? (roles[task.projectId] ?? 'owner') === 'owner' : false;
   return task.createdBy === myUserId;
 }
 
@@ -301,14 +313,19 @@ export function deadlineColor(task: Task, fallback: string): string {
   return fallback;
 }
 
-export function filterTasksByMonth<T extends Pick<Task, 'createdAt' | 'deadline' | 'status'>>(
+export function filterTasksByMonth<T extends Pick<Task, 'createdAt' | 'deadline' | 'status' | 'history' | 'updatedAt'>>(
   tasks: readonly T[],
   month: Date,
 ): T[] {
   return tasks.filter(t => {
     const created = isSameMonth(new Date(t.createdAt), month);
     const deadline = t.deadline ? isSameMonth(new Date(t.deadline), month) : false;
-    const isActive = t.status === 'active';
+    // Незавершене в будь-якому статусі (веб писав і 'todo'/'in_progress').
+    const isActive = t.status !== 'done';
+    // Свіже завершене місяць не ховає: інакше на початку місяця задача,
+    // закрита вчора, зникала з «Усі» на мобільному, але лишалась у вебі,
+    // де місячного фільтра немає взагалі.
+    if (!isActive && completedWithinDays(t, DONE_VISIBLE_DAYS)) return true;
     // Show active tasks from any month so nothing gets lost
     return created || deadline || isActive;
   });
@@ -395,6 +412,41 @@ export function applyTaskFilters(
 }
 
 /**
+ * Коли завдання завершили — СТРОГО, лише за подією 'done' в історії.
+ *
+ * Для погляду «сьогодні»: відкат `completedAt()` до `updatedAt` там бреше —
+ * будь-який перезапис задачі (синк, міграція, правка назви) зсуває updatedAt
+ * на сьогодні, і давно закрита справа вилазила в «Готово» дня. Подію 'done'
+ * тепер гарантує шар запису (withCompletionEvent у store/synced-storage.ts).
+ */
+export function completedEventAt(task: Pick<Task, 'history'>): Date | null {
+  const history = task.history ?? [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const event = history[i];
+    if (event?.type === 'done' && event.at) return new Date(event.at);
+  }
+  return null;
+}
+
+/**
+ * Дописує подію 'done', коли задача щойно стала виконаною, а шлях, що її
+ * закрив (галочка на «Сьогодні», дошка проєкту, колонка з isDone…), подію не
+ * записав. Одна точка в шарі запису замість правки кожного з цих шляхів.
+ */
+export function withCompletionEvent<T extends Pick<Task, 'status' | 'history'>>(
+  prev: Pick<Task, 'status' | 'history'> | undefined,
+  next: T,
+  at: string,
+): T {
+  if (next.status !== 'done' || prev?.status === 'done') return next;
+  const history = next.history ?? [];
+  const fresh = history.slice(prev?.history?.length ?? 0);
+  if (fresh.some(event => event?.type === 'done')) return next;
+  const event = { id: `${Date.parse(at)}${Math.random().toString(36).slice(2)}`, at, type: 'done' as const };
+  return { ...next, history: [...history, event] };
+}
+
+/**
  * Коли завдання завершили.
  *
  * Окремого поля під це немає, тож ідемо ланцюжком від найточнішого до
@@ -403,7 +455,7 @@ export function applyTaskFilters(
  * просто не існує, і вигадувати її (наприклад, беручи createdAt) означало б
  * витягувати на екран дня випадкові старі завдання.
  */
-export function completedAt(task: Task): Date | null {
+export function completedAt(task: Pick<Task, 'history' | 'updatedAt'>): Date | null {
   const events = (task.history ?? []).filter(event => event.type === 'done');
   const last = events[events.length - 1];
   if (last?.at) return new Date(last.at);
@@ -427,7 +479,7 @@ export const DONE_VISIBLE_DAYS = 2;
  * верху списку.
  */
 export function completedWithinDays(
-  task: Task,
+  task: Pick<Task, 'history' | 'updatedAt'>,
   days: number = DONE_VISIBLE_DAYS,
   now: Date = new Date(),
 ): boolean {

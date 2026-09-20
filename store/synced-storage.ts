@@ -13,6 +13,7 @@
 
 import { loadData, saveData } from './storage';
 import { withStorageLock } from './storage-lock';
+import { withCompletionEvent } from '@/utils/taskUtils';
 import {
   recordNotify,
   recordSchedulerInstalled,
@@ -407,10 +408,17 @@ export function stampUpdatedAt<T extends Timestamped>(
   next: T[],
   changedIds: Set<string>,
   now: string,
+  collection?: string,
 ): T[] {
   const prevById = new Map(prev.map(item => [item.id, item]));
   return next.map(item => {
-    if (changedIds.has(item.id)) return { ...item, updatedAt: now };
+    if (changedIds.has(item.id)) {
+      const stamped = { ...item, updatedAt: now };
+      // Лише задачі: у ідей теж є status, але подій виконання вони не мають.
+      return collection === 'tasks'
+        ? withCompletionEvent(prevById.get(item.id) as Parameters<typeof withCompletionEvent>[0], stamped as never, now)
+        : stamped;
+    }
     const existing = prevById.get(item.id)?.updatedAt ?? item.updatedAt;
     return { ...item, updatedAt: existing ?? item.createdAt ?? now };
   });
@@ -498,6 +506,7 @@ export async function updateSynced<T extends { id: string }>(
       items as unknown as Timestamped[],
       new Set(diff.changed),
       new Date().toISOString(),
+      key,
     ) as unknown as T[];
     await saveData(key, stamped);
     // В outbox — ще під блокуванням колекції: рушій синку перечитує outbox під
@@ -764,6 +773,7 @@ export async function saveSyncedChanges<T extends { id: string }>(
       applied.next as unknown as Timestamped[],
       new Set(applied.changed),
       new Date().toISOString(),
+      key,
     ) as unknown as T[];
     await saveData(key, stamped);
     // changed → новий стан (stamped), deleted → те, що лежало в stored до

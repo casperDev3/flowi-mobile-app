@@ -28,7 +28,7 @@
  * списку, і прострочені приходять сюди вже відсіяними. Якщо шапки немає,
  * прострочене просто лишається у своїй статусній групі — воно «сьогоднішнє».
  */
-import { orderColumnsForList, scopedTaskStatusColumn, type TaskStatusColumn } from './taskStatuses';
+import { orderColumnsForList, personalDisplayColumn, scopedTaskStatusColumn, type TaskStatusColumn } from './taskStatuses';
 import { isTodayTask, type TodayScopeTask } from './taskToday';
 
 /** Мінімум полів, потрібних для розбиття: екрани мають власні типи завдання. */
@@ -49,6 +49,12 @@ export function buildStatusListSections<T extends ListTask>(
   columns: TaskStatusColumn[],
   today: Date,
   scope: TaskListScope = 'today',
+  /**
+   * Особистий список («Завдання») зводить колонки проєктів до особистих —
+   * інакше кожен проєкт давав би власну групу «До роботи». Список ВСЕРЕДИНІ
+   * проєкту передає false: там колонки проєкту і є робочим процесом.
+   */
+  mergeIntoPersonal = false,
 ): TaskListSection<T>[] {
   const statusBuckets = new Map<string, T[]>();
   const bucketColumns = new Map<string, TaskStatusColumn>();
@@ -63,7 +69,9 @@ export function buildStatusListSections<T extends ListTask>(
       // Скоуп за ВЛАСНИМ projectId завдання (§3.7 «Особисте агрегує»):
       // плоский `columns` містить усі потоки, і без цього задача проєкту зі
       // своєю (`st-<uuid4>`) колонкою не знаходила б її серед особистих.
-      const column = scopedTaskStatusColumn(task, columns);
+      const column = mergeIntoPersonal
+        ? personalDisplayColumn(task, columns)
+        : scopedTaskStatusColumn(task, columns);
       push(statusBuckets, column.id, task);
       if (!bucketColumns.has(column.id)) bucketColumns.set(column.id, column);
     }

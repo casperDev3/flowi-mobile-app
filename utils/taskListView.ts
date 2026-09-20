@@ -59,6 +59,8 @@ export interface TaskListQuery {
    * `isMyTask`.
    */
   myUserId?: string | null;
+  /** Ролі в проєктах — для задач без автора (див. isMyTask). */
+  projectRoles?: Readonly<Record<string, string>>;
 }
 
 export interface TaskListGroup<T> {
@@ -130,7 +132,7 @@ export function filterTasksForList<T extends ListViewTask>(sorted: readonly T[],
     // проєктів, а не все, до чого клієнт має доступ (мінор із ревʼю —
     // «Завдання», на відміну від «Сьогодні», цього правила не застосовували).
     // Немає значення нема — той самий бай-пас, що й у `groupTodayTasks`.
-    if (q.myUserId !== undefined && !isMyTask(t, q.myUserId)) return false;
+    if (q.myUserId !== undefined && !isMyTask(t, q.myUserId, q.projectRoles)) return false;
     // Правило видимості — в утиліті: у режимі групування за статусом
     // завершені лишаються, щоб група «Готово» взагалі мала з чого зʼявитись.
     if (!taskVisibleInList(t, q.filter, q.sort)) return false;
@@ -181,7 +183,7 @@ export function buildTaskGroups<T extends ListViewTask>(
   // Статусні групи — це погляд на СЬОГОДНІ: правило, кого туди пускати,
   // живе в утиліті поруч із правилом екрана дня, щоб копії не розходились.
   if (q.sort === 'status') {
-    return buildStatusListSections(groupsSource, columns, today, q.scope)
+    return buildStatusListSections(groupsSource, columns, today, q.scope, true)
       .map(section => ({ key: section.key, label: section.label, tasks: section.tasks }));
   }
   const map: Record<string, { label: string; tasks: T[] }> = {};

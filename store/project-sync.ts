@@ -909,6 +909,9 @@ export async function syncAllMyProjects(): Promise<void> {
   await flushPendingProjectDeletes();
 
   const summaries = await fetchWorkspaceProjects();
+  // 426 на GET /projects/ уже підняв несумісність (reportClientOutdated) —
+  // далі кожен POST/sync однаково впав би тим самим 426.
+  if (getWorkspaceIncompatibility()) return;
   const summaryIds = new Set(summaries.map(s => s.id));
 
   // §9.4 / major з ревʼю: проєкт, видалений або з відкликаним доступом деінде,
@@ -939,6 +942,7 @@ export async function syncAllMyProjects(): Promise<void> {
   const due = new Set(projectsNeedingSync(knownSummaries, freshState, dirtyStreams));
   for (const id of myProjectIds) {
     if (summaryIds.has(id)) continue;
+    if (getWorkspaceIncompatibility()) return;
     // Сервер ще не знає про цей проєкт (щойно створений локально, або
     // офлайн-створення) — контракт §3.2: створюємо ЯВНО, перш ніж пробувати
     // `/projects/{id}/sync/`. Без цього перший обмін ловив би 404, а §9.4

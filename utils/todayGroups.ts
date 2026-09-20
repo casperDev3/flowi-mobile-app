@@ -60,12 +60,14 @@ export function groupTodayTasks(
    * до цього поля. У соло-фазі це й так завжди `true` — див. `isMyTask`.
    */
   myUserId?: string | null,
+  /** Ролі в проєктах — для задач без автора (див. isMyTask). */
+  projectRoles?: Readonly<Record<string, string>>,
 ): TodayGroups {
   // Кого взагалі беремо — питає спільне правило: те саме, що вирішує склад
   // статусних груп у списку завдань. Копія цієї умови жила тут і одного разу
   // вже розійшлася з копією в taskListSections.ts.
   const relevant = tasks.filter(task =>
-    isTodayTask(task, columns, today) && (myUserId === undefined || isMyTask(task, myUserId)));
+    isTodayTask(task, columns, today) && (myUserId === undefined || isMyTask(task, myUserId, projectRoles)));
 
   // `columns` — увесь `task_statuses` (усі проєкти разом); колонка кожного
   // завдання шукається у ВЛАСНОМУ скоупі (§3.7 «Особисте агрегує» — інакше

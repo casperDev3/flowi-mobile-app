@@ -172,11 +172,14 @@ describe('taskVisibleInList', () => {
     expect(taskVisibleInList(active, 'active', 'status', NOW)).toBe(true);
   });
 
-  it('сортування за датою лишається без завершених', () => {
-    // Там поділ по днях, і завершені засмічували б кожен день.
-    expect(taskVisibleInList(done, 'active', 'deadline', NOW)).toBe(false);
-    expect(taskVisibleInList(done, 'active', 'newest', NOW)).toBe(false);
-    expect(taskVisibleInList(done, 'active', 'priority', NOW)).toBe(false);
+  it('свіже завершене видно при БУДЬ-ЯКОМУ сортуванні — як includeRecentlyDone у вебі', () => {
+    // Раніше завершені лишались лише в групуванні за статусом, і лічильник
+    // «Усі» на мобільному був менший, ніж у вебі на тих самих даних.
+    expect(taskVisibleInList(done, 'active', 'deadline', NOW)).toBe(true);
+    expect(taskVisibleInList(done, 'active', 'newest', NOW)).toBe(true);
+    expect(taskVisibleInList(done, 'active', 'priority', NOW)).toBe(true);
+    // Вирішує вікно свіжості: старіше за нього — лише в Архіві.
+    expect(taskVisibleInList(doneDaysAgo(5), 'active', 'deadline', NOW)).toBe(false);
   });
 
   it('фільтр «Готово» показує лише завершені навіть у статусному режимі', () => {

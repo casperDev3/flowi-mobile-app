@@ -27,7 +27,7 @@ import {
   scopedTaskStatusColumn,
   type TaskStatusColumn,
 } from './taskStatuses';
-import { completedAt, isOverdue, type Task } from './taskUtils';
+import { completedEventAt, isOverdue, type Task } from './taskUtils';
 
 /**
  * Мінімум полів, потрібних для рішення: екрани мають власні звужені типи
@@ -50,7 +50,9 @@ export function isTodayTask(
   now: Date,
 ): boolean {
   if (task.status === 'done') {
-    const at = completedAt(task as Task);
+    // Строго за подією 'done' — див. completedEventAt: updatedAt зсувається
+    // від будь-якого перезапису і тягнув у «Готово» дня старі задачі.
+    const at = completedEventAt(task);
     return at !== null && isSameDay(at, now);
   }
 

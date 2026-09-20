@@ -272,10 +272,11 @@ export default function TodayScreen() {
   // а groupTodayTasks сам звужує колонки до ВЛАСНОГО проєкту кожної задачі
   // (§3.7 «Особисте агрегує»); з попереднім особистим-only списком задача
   // проєкту в «У процесі» завжди показувалась як звичайне «До роботи».
+  const projectRoles = useProjectRoles();
   const todayGroups = useMemo(
-    () => groupTodayTasks(tasks, statusColumns, today, TODAY_PREVIEW_LIMIT, user?.id),
+    () => groupTodayTasks(tasks, statusColumns, today, TODAY_PREVIEW_LIMIT, user?.id, projectRoles),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, statusColumns, dayKey, user?.id],
+    [tasks, statusColumns, dayKey, user?.id, projectRoles],
   );
 
   // Health
@@ -333,7 +334,6 @@ export default function TodayScreen() {
   // глядач бачить їх тут так само, як на екрані Завдань, і без цієї
   // перевірки міг відмічати чужі проєктні задачі готовими просто зі списку
   // дня (review finding, той самий гандикап, що й у `(tabs)/index.tsx`).
-  const projectRoles = useProjectRoles();
 
   const handleToggleTask = useCallback(async (id: string) => {
     if (!canEditProjectItem(tasks.find(t => t.id === id)?.projectId, projectRoles)) return;

@@ -617,7 +617,8 @@ export default function TasksScreen() {
     // задачі з усіх проєктів, щойно в проєкті зʼявиться другий учасник
     // (мінор із ревʼю).
     myUserId: user?.id,
-  }), [filter, sort, scope, search, filterProject, filterPriorities, dateFilter, activeMonth, user?.id]);
+    projectRoles,
+  }), [filter, sort, scope, search, filterProject, filterPriorities, dateFilter, activeMonth, user?.id, projectRoles]);
 
   /**
    * Набір без урахування денного скоупу — тобто те, що людина побачила б,

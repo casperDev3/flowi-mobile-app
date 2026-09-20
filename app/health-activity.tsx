@@ -19,6 +19,7 @@ import { useI18n } from '@/store/i18n';
 import { ACCENT, ACCENT_CAL, ACCENT_STEPS, ModalKey, getHealthColors } from '@/utils/healthTheme';
 import { stepsToKm } from '@/utils/healthUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { HealthKitStatus, LoadErrorNotice } from '@/components/health/HealthNotices';
 
 export default function ActivityScreen() {
   const contentWidth = useContentWidth();
@@ -54,6 +55,9 @@ export default function ActivityScreen() {
 
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+          {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+          {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
 
           {/* Кроки */}
           <SectionHeader title={tr.steps} icon="figure.walk" color={ACCENT_STEPS} textColor={c.text} top={8} />
@@ -99,10 +103,32 @@ export default function ActivityScreen() {
               <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{today.calOut}</Text>
               <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>кк {tr.burned.toLowerCase()}</Text>
             </View>
-            <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>
-              {h.hk.available ? 'Синхронізується з HealthKit' : 'Додавайте активність вручну або через тренування'}
-            </Text>
+            {/* ERR-14: перевіряємо ДОСТУП, а не наявність модуля у збірці.
+                При відмовленому доступі «Кроки 0» і «Синхронізується з
+                HealthKit» разом стверджували неправду. */}
+            <HealthKitStatus
+              lang={lang}
+              c={c}
+              hk={{ available: h.hk.available, access: h.hk.access, failed: h.hk.failed }}
+              onGrant={() => { void h.hk.requestAccess(); }}
+              onRetry={() => { void h.hk.sync(); }} />
           </BlurView>
+
+          {/* NAT-24: маршрут /apple-health був зареєстрований у _layout.tsx,
+              але жоден router.push на нього не вів — екран був недосяжний з
+              інтерфейсу. Вхід саме звідси: це єдиний екран, який показує ті
+              самі дані HealthKit. */}
+          {h.hk.available && (
+            <TouchableOpacity
+              onPress={() => router.push('/apple-health')}
+              accessibilityRole="button"
+              accessibilityLabel="Apple Health"
+              style={[s.card, { borderColor: c.border, marginTop: 14, flexDirection: 'row', alignItems: 'center' }]}>
+              <IconSymbol name="heart.fill" size={16} color={ACCENT} />
+              <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', flex: 1, marginLeft: 10 }}>Apple Health</Text>
+              <IconSymbol name="chevron.right" size={13} color={c.sub} />
+            </TouchableOpacity>
+          )}
 
         </ScrollView>
       </SafeAreaView>

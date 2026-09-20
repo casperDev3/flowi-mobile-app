@@ -23,7 +23,7 @@ import { ensureStorageMigrations } from '@/store/migrations';
 import { SyncProvider } from '@/store/sync-engine';
 import { ProjectSyncProvider } from '@/store/project-sync';
 import { I18nProvider, useI18n } from '@/store/i18n';
-import { rescheduleSubscriptionRemindersFromStorage } from '@/store/notifications';
+import { rescheduleHealthRemindersFromStorage, rescheduleSubscriptionRemindersFromStorage } from '@/store/notifications';
 import { setupPushInteractionHandlers } from '@/store/push';
 import { getPendingRegistration, type PendingRegistration } from '@/store/registration';
 import { clearPendingInvite, getPendingInvite } from '@/store/invite-link';
@@ -181,6 +181,15 @@ function SubscriptionReminders() {
       } catch (e) {
         if (__DEV__) console.warn('[subscriptions] планування нагадувань не вдалося:', e);
       }
+      if (cancelled) return;
+      // DI-05: ліки й звички, що приїхали синком з іншого пристрою, приходять
+      // БЕЗ notifIds — єдине джерело правди про заплановане тепер список в ОС.
+      // Без цього виклику звірка, написана в store/notifications.ts, мертва.
+      try {
+        await rescheduleHealthRemindersFromStorage(trRef.current);
+      } catch (e) {
+        if (__DEV__) console.warn('[health] планування нагадувань не вдалося:', e);
+      }
     };
     // Дебаунс: синк пише ключ пачками, а мова/валюти теж можуть змінитися разом.
     const schedule = () => {
@@ -190,7 +199,8 @@ function SubscriptionReminders() {
 
     schedule();
     const unsubscribe = subscribeToStorage(key => {
-      if (key === 'subscriptions' || key === 'finance_currencies' || key === 'notificationsEnabled') schedule();
+      if (key === 'subscriptions' || key === 'finance_currencies' || key === 'notificationsEnabled'
+        || key === 'health_meds' || key === 'health_habits') schedule();
     });
     const appState = AppState.addEventListener('change', state => {
       if (state === 'active') schedule();

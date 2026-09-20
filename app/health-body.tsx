@@ -2,7 +2,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BodyEntrySheet, BodyRecord } from '@/components/health/BodyEntrySheet';
@@ -21,6 +21,7 @@ import {
   estimateBodyFatNavy, latestValue, leanMass, waistToHeightRatio, waistToHipRatio, whrHealthy, whtrCategory,
 } from '@/utils/healthUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { LoadErrorNotice, ReminderBlockedNotice } from '@/components/health/HealthNotices';
 
 const labelKey = {
   waist: 'mWaist', hips: 'mHips', chest: 'mChest', thigh: 'mThigh',
@@ -31,13 +32,15 @@ export default function BodyScreen() {
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const c = getHealthColors(isDark);
   useScreenView('health_body');
 
   const h = useHealthEntries();
   const [refreshing, setRefreshing] = useState(false);
   const [sheet, setSheet] = useState(false);
+  // ERR-10: відмова планувальника перестала бути невидимою.
+  const [reminderBlocked, setReminderBlocked] = useState(false);
 
   const onRefresh = async () => { setRefreshing(true); await h.reload(); setRefreshing(false); };
 
@@ -81,6 +84,9 @@ export default function BodyScreen() {
 
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT_WEIGHT} />}>
+
+          {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+          {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
 
           {/* Зведення */}
           <SectionHeader title={tr.summary} icon="ruler.fill" color={ACCENT_WEIGHT} textColor={c.text} top={8} />
@@ -143,15 +149,30 @@ export default function BodyScreen() {
             <View style={s.remRow}>
               <IconSymbol name="scalemass.fill" size={16} color={ACCENT_WEIGHT} />
               <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 10 }}>{tr.weightReminder}</Text>
-              <Switch value={h.reminders.weight} disabled={!h.remindersLoaded}
-                onValueChange={v => h.setReminder('weight', v, tr.weight, tr.weightReminderBody)} trackColor={{ true: ACCENT_WEIGHT }} />
+              <Switch
+                value={h.reminders.weight}
+                disabled={!h.remindersLoaded || h.reminderBusy !== null}
+                accessibilityLabel={tr.weightReminder}
+                accessibilityState={{ checked: h.reminders.weight, disabled: !h.remindersLoaded || h.reminderBusy !== null }}
+                onValueChange={v => { void h.setReminder('weight', v, tr.weight, tr.weightReminderBody).then(ok => setReminderBlocked(v && !ok)); }}
+                trackColor={{ true: ACCENT_WEIGHT }} />
             </View>
             <View style={[s.remRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
               <IconSymbol name="ruler.fill" size={16} color={ACCENT_WEIGHT} />
               <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 10 }}>{tr.measurementsReminder}</Text>
-              <Switch value={h.reminders.measurements} disabled={!h.remindersLoaded}
-                onValueChange={v => h.setReminder('measurements', v, tr.bodyMeasurements, tr.measurementsReminderBody)} trackColor={{ true: ACCENT_WEIGHT }} />
+              <Switch
+                value={h.reminders.measurements}
+                disabled={!h.remindersLoaded || h.reminderBusy !== null}
+                accessibilityLabel={tr.measurementsReminder}
+                accessibilityState={{ checked: h.reminders.measurements, disabled: !h.remindersLoaded || h.reminderBusy !== null }}
+                onValueChange={v => { void h.setReminder('measurements', v, tr.bodyMeasurements, tr.measurementsReminderBody).then(ok => setReminderBlocked(v && !ok)); }}
+                trackColor={{ true: ACCENT_WEIGHT }} />
             </View>
+            {reminderBlocked && (
+              <ReminderBlockedNotice lang={lang} c={c} isDark={isDark}
+                onOpenSettings={() => { void Linking.openSettings(); }}
+                onDismiss={() => setReminderBlocked(false)} />
+            )}
           </BlurView>
 
         </ScrollView>

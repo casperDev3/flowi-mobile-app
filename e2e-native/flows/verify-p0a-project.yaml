@@ -1,0 +1,25 @@
+# P0 (а) NAT-01 — ПРОЄКТ створюється до кінця, кнопка «Створити» натискається.
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "30%,94%"
+- waitForAnimationToEnd
+- tapOn:
+    point: "90%,11%"
+- waitForAnimationToEnd
+- tapOn:
+    point: "59%,31%"        # «Проєкти»
+- waitForAnimationToEnd
+- tapOn:
+    point: "90%,11%"        # «+»
+- waitForAnimationToEnd
+- inputText: "P0 Project"
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn:
+    point: "65%,91%"        # «Створити»
+- waitForAnimationToEnd
+- assertVisible: "P0 Project"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/p0a-04-project-created

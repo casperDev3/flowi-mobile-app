@@ -22,6 +22,7 @@ import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
+import { throttleMessage } from '@/store/auth-throttle';
 import { getPendingRegistration } from '@/store/registration';
 import { haptic } from '@/utils/haptics';
 
@@ -111,6 +112,11 @@ export default function LoginScreen() {
           setGeneralError(reason ? `${tr.authRegistrationRejected}: ${reason}` : tr.authRegistrationRejected);
         } else if (e.status === 401 || e.code === 'no_active_account') {
           setPasswordError(tr.authInvalidCreds);
+        } else if (e.status === 429) {
+          // ERR-03: відро throttle `auth` — 20/год на IP. Досі 429 падав у
+          // else нижче й казав «Невірний email або пароль» навіть на
+          // ПРАВИЛЬНИЙ пароль, а скидання пароля сидить на тому ж відрі.
+          setGeneralError(throttleMessage(tr, e));
         } else if (e.code === 'timeout' || e.code === 'network') {
           setGeneralError(tr.authNetworkError);
         } else if (e.status >= 500) {
@@ -133,7 +139,11 @@ export default function LoginScreen() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={st.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel={tr.back}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <IconSymbol name="chevron.left" size={22} color={c.accent} />
           </TouchableOpacity>
         </View>
@@ -196,7 +206,7 @@ export default function LoginScreen() {
                     onPress={() => setShowPassword(v => !v)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     accessibilityRole="button"
-                    accessibilityLabel={showPassword ? 'Сховати пароль' : 'Показати пароль'}
+                    accessibilityLabel={showPassword ? tr.authHidePassword : tr.authShowPassword}
                   >
                     <IconSymbol
                       name={showPassword ? 'eye.slash' : 'eye'}

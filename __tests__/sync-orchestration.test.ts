@@ -14,6 +14,8 @@
 // ─── In-memory сховище ───────────────────────────────────────────────────────
 const mockStore = new Map<string, string>();
 const mockLoadCalls: string[] = [];
+/** Ключі, запис у які заблоковано (ERR-01: читання ключа провалилось). */
+const mockBlockedKeys = new Set<string>();
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -28,6 +30,13 @@ jest.mock('@/store/storage', () => ({
     return raw === undefined ? fallback : JSON.parse(raw);
   }),
   saveData: jest.fn(async (key: string, data: unknown) => {
+    if (mockBlockedKeys.has(key)) {
+      // Точна форма справжньої помилки store/storage.ts: рушій розрізняє її
+      // за `name`, бо класу в мокнутому модулі немає.
+      const blocked = new Error(`[storage] запис у '${key}' заблоковано`);
+      blocked.name = 'StorageWriteBlockedError';
+      throw blocked;
+    }
     mockStore.set(key, JSON.stringify(data));
   }),
 }));
@@ -154,6 +163,7 @@ beforeEach(() => {
   // тримає jest живим після завершення тестів.
   jest.useFakeTimers();
   mockStore.clear();
+  mockBlockedKeys.clear();
   mockLoadCalls.length = 0;
   mockApiFetch.mockReset();
   // Курсор != 0, щоб doSync не запускав generateFullOutbox там, де це не мета тесту.
@@ -1287,5 +1297,99 @@ describe('пропущений dirty-рядок не рухає ревізію',
     await loadEngine().syncNow();
 
     expect(read<Record<string, number>>('server_record_revisions_v2', {})['tasks:t1']).toBe(4);
+  });
+});
+
+// ─── DI-05: id локальних нотифікацій не їздять синком ────────────────────────
+
+describe('DI-05 — notifIds лишаються на пристрої', () => {
+  test('мутація ліків іде на сервер БЕЗ notifIds', async () => {
+    seed('health_meds', [
+      { id: 'm1', name: 'Вітамін D', active: true, notifIds: ['med_m1_0', 'med_m1_1'] },
+    ]);
+    seed('sync_outbox', [
+      { mutation_id: 'mm1', collection: 'health_meds', local_id: 'm1', deleted: false, queued_at: 1 },
+    ]);
+    mockApiFetch.mockResolvedValue(v2());
+
+    await loadEngine().syncNow();
+
+    const [, init] = mockApiFetch.mock.calls[0];
+    const sent = init.body.mutations[0].data;
+    expect(sent).toMatchObject({ id: 'm1', name: 'Вітамін D', active: true });
+    expect(sent).not.toHaveProperty('notifIds');
+    // Локально id нотифікацій лишились — скасувати нагадування є чим.
+    expect(read<{ notifIds?: string[] }[]>('health_meds', [])[0].notifIds)
+      .toEqual(['med_m1_0', 'med_m1_1']);
+  });
+
+  test('ліки з іншого пристрою приїжджають без чужих notifIds', async () => {
+    seed('health_meds', []);
+    seed('sync_outbox', []);
+    mockApiFetch.mockResolvedValue(v2({
+      changes: [serverItem({
+        collection: 'health_meds',
+        local_id: 'm2',
+        data: { id: 'm2', name: 'Магній', active: true, notifIds: ['med_m2_0'] },
+      })],
+    }));
+
+    await loadEngine().syncNow();
+
+    const stored = read<Record<string, unknown>[]>('health_meds', []);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ id: 'm2', name: 'Магній' });
+    // Нагадування тут ніхто не планував — поля бути не повинно взагалі.
+    expect(stored[0]).not.toHaveProperty('notifIds');
+  });
+
+  test('чужа правка запису не стирає власні notifIds', async () => {
+    seed('health_meds', [{ id: 'm1', name: 'Вітамін D', active: true, notifIds: ['med_m1_0'] }]);
+    seed('sync_outbox', []);
+    mockApiFetch.mockResolvedValue(v2({
+      changes: [serverItem({
+        collection: 'health_meds',
+        local_id: 'm1',
+        data: { id: 'm1', name: 'Вітамін D3', active: true },
+      })],
+    }));
+
+    await loadEngine().syncNow();
+
+    expect(read<Record<string, unknown>[]>('health_meds', [])[0])
+      .toMatchObject({ name: 'Вітамін D3', notifIds: ['med_m1_0'] });
+  });
+});
+
+// ─── ERR-01: зіпсований ключ не зупиняє весь обмін ───────────────────────────
+
+describe('ERR-01 — колекція з проваленим читанням пропускається, решта застосовується', () => {
+  test('pull у заблокований ключ не валить синк і не рухає ревізію', async () => {
+    seed('tasks', []);
+    seed('health_meds', []);
+    seed('sync_outbox', []);
+    // health_meds не прочитався → store/storage.ts блокує запис у цей ключ.
+    mockBlockedKeys.add('health_meds');
+    mockApiFetch.mockResolvedValue(v2({
+      changes: [
+        serverItem({
+          collection: 'health_meds',
+          local_id: 'm1',
+          data: { id: 'm1', name: 'Магній' },
+          revision: 4,
+        }),
+        serverItem({ revision: 7 }),
+      ],
+    }));
+
+    await loadEngine().syncNow();
+
+    // Обмін завершився чисто, задачі застосовані.
+    expect(lastError()).toBeNull();
+    expect(read<{ id: string }[]>('tasks', []).map(t => t.id)).toEqual(['t1']);
+    // Ревізія пропущеного рядка не зрушила — наступний обмін принесе його знову.
+    const revisions = read<Record<string, number>>('server_record_revisions_v2', {});
+    expect(revisions['tasks:t1']).toBe(7);
+    expect(revisions['health_meds:m1']).toBeUndefined();
   });
 });

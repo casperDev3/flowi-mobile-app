@@ -93,12 +93,19 @@ export default function ProjectTimeScreen() {
 
   return (
     <ProjectScreenShell project={project} isDark={isDark} title={tr.navTime}>
-      <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
+        showsVerticalScrollIndicator={false}
+        // L3: дефолтний keyboardShouldPersistTaps='never' означає, що перший
+        // тап по кнопці поруч із полем лише ховає клавіатуру — кнопка
+        // виглядає мертвою.
+        keyboardShouldPersistTaps="handled">
 
         {canEdit && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 8, marginBottom: 16 }}>
             <TextInput
               placeholder={tr.timeManualTask}
+              accessibilityLabel={tr.timeManualTask}
               placeholderTextColor={c.sub}
               value={taskName}
               onChangeText={setTaskName}
@@ -106,13 +113,19 @@ export default function ProjectTimeScreen() {
             />
             <TextInput
               placeholder={tr.timeManualMinutes}
+              accessibilityLabel={tr.timeManualMinutes}
               placeholderTextColor={c.sub}
               value={minutes}
               onChangeText={setMinutes}
               keyboardType="number-pad"
               style={{ width: 64, color: c.text, fontSize: 14, paddingVertical: 8, textAlign: 'center' }}
             />
-            <TouchableOpacity onPress={addEntry} disabled={!taskName.trim() || !minutes.trim()} hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}>
+            <TouchableOpacity
+              onPress={addEntry}
+              disabled={!taskName.trim() || !minutes.trim()}
+              accessibilityRole="button"
+              accessibilityLabel={tr.add}
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}>
               <IconSymbol name="plus" size={19} color={taskName.trim() && minutes.trim() ? c.accent : c.sub} />
             </TouchableOpacity>
           </View>

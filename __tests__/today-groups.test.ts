@@ -6,7 +6,7 @@
  */
 
 import { mergeTaskStatusColumns } from '../utils/taskStatuses';
-import { completedAt, groupTodayTasks } from '../utils/todayGroups';
+import { completedAt, groupTodayTasks, TODAY_IN_PROGRESS_LIMIT } from '../utils/todayGroups';
 import type { Task } from '../utils/taskUtils';
 
 const COLUMNS = mergeTaskStatusColumns([]);
@@ -63,6 +63,26 @@ describe('groupTodayTasks', () => {
     expect(groups[1].tasks).toHaveLength(2);
     expect(total).toBe(10);
     expect(hidden).toBe(3);
+  });
+
+  it('«У процесі» має власну СКІНЧЕННУ стелю, решта йде під «показати всі» (PERF-7)', () => {
+    // Екран дня малює групи через .map() у звичайному ScrollView — без
+    // віртуалізації. Поки стелі не було, 300 задач «у процесі» монтувались
+    // усі одразу (нативний прогін: 17 екранів вмісту, 96–106 % CPU).
+    const running = Array.from({ length: 300 }, (_, i) =>
+      task({ id: `run${i}`, kanbanColumnId: 'status-in-progress' }));
+
+    const { groups, hidden, total } = groupTodayTasks(running, COLUMNS, TODAY, 3);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].tasks.length).toBe(TODAY_IN_PROGRESS_LIMIT);
+    expect(total).toBe(300);
+    // Решта не зникає — вона під кнопкою «показати всі».
+    expect(hidden).toBe(300 - TODAY_IN_PROGRESS_LIMIT);
+  });
+
+  it('стеля «У процесі» більша за ліміт решти груп', () => {
+    // Інакше те, над чим людина працює просто зараз, ховалося б першим.
+    expect(TODAY_IN_PROGRESS_LIMIT).toBeGreaterThan(3);
   });
 
   it('прострочене потрапляє в день, навіть якщо дедлайн був учора', () => {

@@ -33,7 +33,6 @@ import { PressableScale } from '@/components/shared/PressableScale';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { SkeletonRow } from '@/components/shared/Skeleton';
 import { useUndoToast } from '@/components/shared/UndoToast';
-import { RecordingClock } from '@/components/shared/RecordingClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
@@ -130,10 +129,6 @@ import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { formatClock, formatDuration, formatDurationShort } from '@/utils/durationFormat';
 
-// ─── expo-av conditional (install with: npx expo install expo-av) ────────────
-let AVAudio: any = null;
-try { AVAudio = require('expo-av').Audio; } catch {}
-
 type ViewMode = 'list' | 'calendar';
 
 /**
@@ -148,6 +143,15 @@ interface Task extends BaseTask {
 }
 
 
+/**
+ * Локальний `YYYY-MM-DD` — той самий ключ, яким живе `meeting.date`
+ * (`utils/meetings.ts` будує його з getFullYear/getMonth/getDate).
+ *
+ * Свідомо НЕ `toISOString().slice(0, 10)`: на схід від UTC локальна північ у
+ * ISO дає ПОПЕРЕДНЮ добу, тож попап дня шукав зустрічі за вчорашнім ключем
+ * (крапка «є зустріч» на дні раніше, «нічого не заплановано» на правильному
+ * числі), а створена з календаря зустріч зберігалась учорашнім числом.
+ */
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -399,16 +403,6 @@ export default function TasksScreen() {
   const [reminderMins, setReminderMins] = useState('');
   const [reminderDate, setReminderDate] = useState<string | null>(null);
 
-  // Recording
-  const [recordingTaskId, setRecordingTaskId] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  // Мітка старту запису, а не лічильник секунд: цокає RecordingClock, і
-  // екран не перемальовується щосекунди.
-  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
-  const [playingUri, setPlayingUri] = useState<string | null>(null);
-  const recordingRef = useRef<any>(null);
-  const soundRef = useRef<any>(null);
-
   // Detail tab + timer display
   const [detailTab, setDetailTab] = useState<'info' | 'timer' | 'history' | 'comments'>('info');
 
@@ -468,18 +462,22 @@ export default function TasksScreen() {
    */
   const [returnToProject, setReturnToProject] = useState<string | null>(null);
 
+  // Окремою змінною, а не `composer` цілком: `reset` стабільний (useCallback
+  // на [today], а today тут — `useToday()`), тоді як сам composer міняє
+  // ідентичність на кожну зміну чернетки — ефект нижче бігав би на кожну
+  // натиснуту клавішу й скидав би форму. Раніше це вирішував eslint-disable,
+  // від якого React Compiler переставав оптимізувати ВЕСЬ екран (PERF-2).
+  const composerReset = composer.reset;
   useEffect(() => {
     if (createParam === '1') {
       if (projectParam) {
-        composer.reset(ACTIVE_COLUMN_ID, { projectId: projectParam, sprintId: sprintParam || null });
+        composerReset(ACTIVE_COLUMN_ID, { projectId: projectParam, sprintId: sprintParam || null });
         setReturnToProject(projectParam);
       }
       setShowAdd(true);
       router.setParams({ create: '', projectId: '', sprintId: '' });
     }
-    // composer навмисно поза deps: реагуємо лише на прихід параметра.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createParam, projectParam, sprintParam, router]);
+  }, [createParam, projectParam, sprintParam, router, composerReset]);
 
   // Open task details when navigated with ?open=<taskId> (e.g. from Today rows)
   useEffect(() => {
@@ -490,9 +488,11 @@ export default function TasksScreen() {
       if (t.projectId) setReturnToProject(t.projectId);
     }
     router.setParams({ open: '' });
-    // tasks навмисно поза deps: реагуємо лише на прихід параметра після ініціалізації
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openParam, initialized, router]);
+    // `tasks` у deps чесно: ефект усе одно виконується один раз — перший же
+    // прохід гасить `openParam` через router.setParams, а далі спрацьовує
+    // ранній вихід. Було в eslint-disable, який вимикав React Compiler на
+    // всьому екрані (PERF-2).
+  }, [openParam, initialized, router, tasks]);
 
   // Сам перехід назад — щойно ОБИДВІ модалки, які могли прийти з проєкту,
   // знову закриті. `router.back()`, коли можна: цей екран стоїть у стеку
@@ -554,13 +554,17 @@ export default function TasksScreen() {
   const { show: showUndo, element: undoElement } = useUndoToast(true);
 
   // Reset detail tab when opening a different task
+  // Ключ — саме id, а не об'єкт: інакше будь-яке оновлення задачі (синк,
+  // цокання таймера) викидало б людину з відкритої вкладки «Коментарі» на
+  // «Інфо». Окрема змінна замість `selected?.id` у тілі — щоб deps були
+  // чесні без eslint-disable, який глушив React Compiler (PERF-2).
+  const selectedId = selected?.id;
   useEffect(() => {
     setDetailTab('info');
     setShowReminderPicker(false);
     // Панель деталі одна на задачу й зустріч: відкрита задача витісняє зустріч.
-    if (selected) setSelectedMeeting(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id]);
+    if (selectedId) setSelectedMeeting(null);
+  }, [selectedId]);
 
   // Джерело правди про «йде» — реєстр активних таймерів у сторі. Читання
   // синхронне, але реактивне: стор оновлює стан разом із ref, тож цей рендер
@@ -756,82 +760,6 @@ export default function TasksScreen() {
       ],
     );
   }, [selected, tr, showUndo, getTimerForTask, setTasks, projectRoles]);
-
-  // ─── Recording ──────────────────────────────────────────────────────────────
-  const startRecording = useCallback(async (taskId: string) => {
-    if (!AVAudio) { Alert.alert('Потрібен пакет', 'Встановіть: npx expo install expo-av'); return; }
-    try {
-      const { granted } = await AVAudio.requestPermissionsAsync();
-      if (!granted) { Alert.alert('Немає дозволу', 'Дозвольте доступ до мікрофону в налаштуваннях.'); return; }
-      await AVAudio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await AVAudio.Recording.createAsync(AVAudio.RecordingOptionsPresets.HIGH_QUALITY);
-      recordingRef.current = recording;
-      setRecordingTaskId(taskId);
-      setIsRecording(true);
-      setRecordingStartedAt(Date.now());
-    } catch (e: any) {
-      if (__DEV__) console.warn('[record] start error:', e);
-      Alert.alert('Помилка запису', e?.message);
-    }
-  }, []);
-
-  const stopRecording = useCallback(async () => {
-    if (!recordingRef.current) return;
-    try {
-      await recordingRef.current.stopAndUnloadAsync();
-      await AVAudio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = recordingRef.current.getURI();
-      recordingRef.current = null;
-      setIsRecording(false);
-      setRecordingStartedAt(null);
-      if (uri && recordingTaskId) {
-        setTasks(prev => prev.map(t => t.id === recordingTaskId
-          ? { ...t, recordings: [...(t.recordings ?? []), uri] }
-          : t
-        ));
-      }
-      setRecordingTaskId(null);
-    } catch (e: any) {
-      setRecordingStartedAt(null);
-      if (__DEV__) console.warn('[record] stop error:', e);
-    }
-  }, [recordingTaskId, setTasks]);
-
-  const playRecording = useCallback(async (uri: string) => {
-    if (!AVAudio) return;
-    try {
-      if (soundRef.current) { await soundRef.current.unloadAsync(); soundRef.current = null; setPlayingUri(null); }
-      if (playingUri === uri) return;
-      const { sound } = await AVAudio.Sound.createAsync({ uri });
-      soundRef.current = sound;
-      setPlayingUri(uri);
-      await sound.playAsync();
-      sound.setOnPlaybackStatusUpdate((status: any) => {
-        if (status.didJustFinish) { setPlayingUri(null); sound.unloadAsync(); soundRef.current = null; }
-      });
-    } catch (e: any) {
-      if (__DEV__) console.warn('[record] play error:', e);
-    }
-  }, [playingUri]);
-
-  const deleteRecording = useCallback((taskId: string, uri: string) => {
-    Alert.alert('Видалити запис?', '', [
-      { text: 'Скасувати', style: 'cancel' },
-      { text: 'Видалити', style: 'destructive', onPress: () => {
-        setTasks(prev => prev.map(t => t.id === taskId
-          ? { ...t, recordings: (t.recordings ?? []).filter(r => r !== uri) }
-          : t
-        ));
-      }},
-    ]);
-  }, [setTasks]);
-
-  // Cleanup recording on unmount
-  useEffect(() => () => {
-    recordingRef.current?.stopAndUnloadAsync().catch(() => {});
-    soundRef.current?.unloadAsync().catch(() => {});
-  }, []);
-  // ────────────────────────────────────────────────────────────────────────────
 
   /**
    * Переносить завдання в іншу колонку статусу.
@@ -1753,6 +1681,32 @@ export default function TasksScreen() {
 
   // Липка шапка деталі: ✎, назва з пріоритетом, ✕ і вкладки стоять поза
   // прокруткою DetailPane — гортається лише тіло.
+  /**
+   * Закриття деталі завдання (× у шапці, бекдроп, свайп).
+   *
+   * Форма правки живе ВСЕРЕДИНІ деталі, тож закриття деталі мовчки викидало
+   * все введене — без жодного попередження, навіть якщо людина переписала
+   * назву. Питаємо лише коли є що втрачати: `editedDraftFields` порівнює
+   * чернетку з тією, з якої почали, тож відкрив-подивився-закрив проходить
+   * без діалогу.
+   */
+  const closeTaskDetail = useCallback((alsoMeeting: boolean) => {
+    const close = () => {
+      setSelected(null);
+      if (alsoMeeting) setSelectedMeeting(null);
+      editor.finish();
+    };
+    // Без відкритої задачі `editing` — лише залишок закритої панелі
+    // (та сама умова, що й у openMeetingView), і питати нема про що.
+    const dirty = editor.editing && !!selected
+      && editedDraftFields(editor.initial, editor.draft).size > 0;
+    if (!dirty) { close(); return; }
+    Alert.alert(tr.discardTaskEditTitle, tr.discardTaskEditMsg, [
+      { text: tr.cancel, style: 'cancel' },
+      { text: tr.discardChanges, style: 'destructive', onPress: close },
+    ]);
+  }, [editor, selected, tr]);
+
   const taskDetailHeader = selectedTask ? (
     <TaskDetailHeader
       title={selectedTask.title}
@@ -1773,7 +1727,7 @@ export default function TasksScreen() {
       onTabChange={setDetailTab}
       timerRunning={isTimerRunning}
       onEdit={canEditSelectedTask ? () => editor.begin(selectedTask, taskColumnId(selectedTask, taskStatuses)) : undefined}
-      onClose={() => { setSelected(null); editor.finish(); }}
+      onClose={() => closeTaskDetail(false)}
       onCopy={() => copyTask(selectedTask)}
       showHandle={!showDetailColumn}
       showComments={!!selectedTask.projectId}
@@ -1826,6 +1780,19 @@ export default function TasksScreen() {
 
   const closeMeetingView = useCallback(() => setSelectedMeeting(null), []);
 
+  /**
+   * Останній `openMeetingView` — у ref, бо сам колбек міняє ідентичність на
+   * кожну зміну чернетки редактора (він залежить від `editor`).
+   *
+   * У deps ефекту нижче його ставити не можна: `openMeetingView` викликає
+   * `setSelected(null)`, від чого змінюється `selected`, від чого змінюється
+   * сам колбек — і поки параметр маршруту ще не згас, ефект зациклився б.
+   * Раніше це вирішував eslint-disable, від якого React Compiler переставав
+   * оптимізувати весь екран (PERF-2).
+   */
+  const openMeetingViewRef = useRef(openMeetingView);
+  useEffect(() => { openMeetingViewRef.current = openMeetingView; }, [openMeetingView]);
+
   // ?meeting=<origId>&meetingDate= — перегляд зустрічі з вкладки «Сьогодні»
   // (екземпляр повтору адресується датою; редагування/таймер — оригінал).
   useEffect(() => {
@@ -1833,12 +1800,10 @@ export default function TasksScreen() {
     const orig = meetings.find(m => m.id === meetingParam);
     if (orig) {
       const date = typeof meetingDateParam === 'string' && meetingDateParam ? meetingDateParam : orig.date;
-      openMeetingView({ ...orig, date, _origId: orig.id });
+      openMeetingViewRef.current({ ...orig, date, _origId: orig.id });
     }
     router.setParams({ meeting: '', meetingDate: '' });
-    // meetings/openMeetingView навмисно поза deps: реагуємо лише на прихід параметра.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meetingParam, meetingDateParam, meetingsInit, router]);
+  }, [meetingParam, meetingDateParam, meetingsInit, router, meetings]);
 
   const editViewedMeeting = useCallback(() => {
     if (!viewedMeetingOrig) return;
@@ -1950,7 +1915,10 @@ export default function TasksScreen() {
                 returnKeyType="search"
               />
               {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <TouchableOpacity onPress={() => setSearch('')}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.clear}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
                 </TouchableOpacity>
               )}
@@ -1959,10 +1927,15 @@ export default function TasksScreen() {
             {/* Скоуп: денна робота чи весь список. Окремо від чипів фільтрів
                 і завжди на очах — це головний перемикач вкладки, а не одна з
                 прихованих у шторці опцій. У календарі його немає: там місяць,
-                і «сьогодні проти всього» нічого не означає. */}
+                і «сьогодні проти всього» нічого не означає.
+
+                flexWrap + flexShrink нижче: при найбільшому Dynamic Type (AX5)
+                чип «Сьогодні N» виїжджав за правий край екрана, а «Всі N»
+                обрізало рамкою — ряд не мав ні куди перенестись, ні як
+                стиснутись (NAT-06). */}
             {viewMode === 'list' && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                <View style={{ flexDirection: 'row', gap: 6, backgroundColor: c.dim, borderRadius: 12, padding: 3, borderWidth: 1, borderColor: c.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1, backgroundColor: c.dim, borderRadius: 12, padding: 3, borderWidth: 1, borderColor: c.border }}>
                   {([
                     { key: 'today' as const, label: tr.today, count: todayCount },
                     { key: 'all' as const, label: tr.allTasks, count: filteredAll.length },
@@ -1976,7 +1949,7 @@ export default function TasksScreen() {
                         accessibilityState={{ selected: active }}
                         accessibilityLabel={`${option.label}, ${option.count}`}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: active ? c.accent : 'transparent' }}>
-                        <Text style={{ color: active ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }}>{option.label}</Text>
+                        <Text numberOfLines={1} style={{ color: active ? '#fff' : c.sub, fontSize: 13, fontWeight: '700', flexShrink: 1 }}>{option.label}</Text>
                         <Text style={{ color: active ? 'rgba(255,255,255,0.75)' : c.sub, fontSize: 11, fontWeight: '600' }}>{option.count}</Text>
                       </TouchableOpacity>
                     );
@@ -2010,13 +1983,17 @@ export default function TasksScreen() {
               </View>
             )}
 
-            {/* Active filter chips */}
+            {/* Active filter chips.
+                keyboardShouldPersistTaps: ряд стоїть просто під полем пошуку,
+                і з відкритою клавіатурою перший тап по чипу витрачався на її
+                ховання — фільтр не скидався (CLAUDE.md, L3). */}
             {hasActiveFilters && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 4 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginTop: 10, marginBottom: 4 }}>
                 <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center' }}>
                   {filter !== 'active' && (
                     <TouchableOpacity
                       onPress={() => setFilter('active')}
+                      accessibilityRole="button"
                       style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
                       <Text style={[s.activeChipText, { color: c.accent }]}>
                         {filter === 'all' ? tr.allTasks : tr.allCompleted}
@@ -2027,6 +2004,7 @@ export default function TasksScreen() {
                   {sort !== 'status' && (
                     <TouchableOpacity
                       onPress={() => setSort('status')}
+                      accessibilityRole="button"
                       style={[s.activeChip, { backgroundColor: c.accent + '15', borderColor: c.accent + '40' }]}>
                       <IconSymbol name="arrow.up.arrow.down" size={10} color={c.accent} />
                       <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
@@ -2040,6 +2018,7 @@ export default function TasksScreen() {
                     return proj ? (
                       <TouchableOpacity
                         onPress={() => setFilterProject(null)}
+                        accessibilityRole="button"
                         style={[s.activeChip, { backgroundColor: proj.color + '20', borderColor: proj.color + '50' }]}>
                         <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color }} />
                         <Text style={[s.activeChipText, { color: proj.color, marginLeft: 4 }]}>{proj.name}</Text>
@@ -2060,6 +2039,7 @@ export default function TasksScreen() {
                   {dateFilter && (
                     <TouchableOpacity
                       onPress={() => setDateFilter(null)}
+                      accessibilityRole="button"
                       style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
                       <IconSymbol name="calendar" size={10} color={c.accent} />
                       <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
@@ -2070,6 +2050,8 @@ export default function TasksScreen() {
                   )}
                   <TouchableOpacity
                     onPress={clearAllFilters}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.resetAllFilters}
                     style={[s.activeChip, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
                     <Text style={[s.activeChipText, { color: '#EF4444' }]}>{tr.resetAll}</Text>
                   </TouchableOpacity>
@@ -2134,6 +2116,11 @@ export default function TasksScreen() {
                   )}
                   <TouchableOpacity
                     onPress={() => openAddMeeting()}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.addMeeting}
+                    // 30×30 намальовано, 44×44 натискається (Apple HIG 2.5.5):
+                    // +7 з кожного боку. Зміряно на пристрої — тут hitSlop не було.
+                    hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }}
                     style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#6366F118', borderWidth: 1, borderColor: '#6366F130', alignItems: 'center', justifyContent: 'center' }}>
                     <IconSymbol name="plus" size={14} color="#6366F1" />
                   </TouchableOpacity>
@@ -2441,7 +2428,7 @@ export default function TasksScreen() {
         <DetailPane
           open={!!selectedTask || !!viewedMeeting}
           wide={showDetailColumn}
-          onClose={() => { setSelected(null); setSelectedMeeting(null); }}
+          onClose={() => closeTaskDetail(true)}
           header={selectedTask ? taskDetailHeader : meetingDetailHeader}
           isDark={isDark}
           sheetColor={c.sheet}
@@ -2482,10 +2469,10 @@ export default function TasksScreen() {
         animationType="slide"
         statusBarTranslucent
         onRequestClose={() => setCalPopupDate(null)}>
-        <Pressable
+        <Pressable accessible={false}
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'flex-end' }}
           onPress={() => setCalPopupDate(null)}>
-          <Pressable onPress={e => e.stopPropagation()}>
+          <Pressable onPress={e => e.stopPropagation()} accessible={false}>
             <BlurView
               intensity={isDark ? 60 : 80}
               tint={isDark ? 'dark' : 'light'}
@@ -2511,7 +2498,7 @@ export default function TasksScreen() {
                   </Text>
                   {calPopupDate && (() => {
                     const tCnt = (tasksByDate[calPopupDate.toDateString()] ?? []).length;
-                    const mCnt = (meetingsByDate[calPopupDate.toISOString().slice(0, 10)] ?? []).length;
+                    const mCnt = (meetingsByDate[localDateStr(calPopupDate)] ?? []).length;
                     const parts = [];
                     if (tCnt > 0) parts.push(`${tCnt} завдань`);
                     if (mCnt > 0) parts.push(`${mCnt} зустрічей`);
@@ -2520,6 +2507,8 @@ export default function TasksScreen() {
                 </View>
                 <TouchableOpacity
                   onPress={() => setCalPopupDate(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.close}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <IconSymbol name="xmark.circle.fill" size={24} color={c.sub} />
                 </TouchableOpacity>
@@ -2532,7 +2521,7 @@ export default function TasksScreen() {
 
                 {/* Meetings in popup */}
                 {calPopupDate && (() => {
-                  const dayMeetings = (meetingsByDate[calPopupDate.toISOString().slice(0, 10)] ?? [])
+                  const dayMeetings = (meetingsByDate[localDateStr(calPopupDate)] ?? [])
                     .sort((a, b) => a.time.localeCompare(b.time));
                   if (!dayMeetings.length) return null;
                   return (
@@ -2570,7 +2559,7 @@ export default function TasksScreen() {
                         );
                       })}
                       <TouchableOpacity
-                        onPress={() => { setCalPopupDate(null); openAddMeeting(calPopupDate.toISOString().slice(0, 10)); }}
+                        onPress={() => { setCalPopupDate(null); openAddMeeting(localDateStr(calPopupDate)); }}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 4 }}>
                         <IconSymbol name="plus.circle" size={14} color="#6366F1" />
                         <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '600' }}>{tr.addMeetingForDay}</Text>
@@ -2583,7 +2572,7 @@ export default function TasksScreen() {
                 })()}
 
                 {calPopupDate && (tasksByDate[calPopupDate.toDateString()] ?? []).length === 0
-                  && (meetingsByDate[calPopupDate.toISOString().slice(0, 10)] ?? []).length === 0 && (
+                  && (meetingsByDate[localDateStr(calPopupDate)] ?? []).length === 0 && (
                   <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                     <IconSymbol name="calendar.badge.checkmark" size={32} color={c.sub} />
                     <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600', marginTop: 10 }}>{tr.noTasksAndMeetings}</Text>
@@ -2606,6 +2595,14 @@ export default function TasksScreen() {
                       style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                       <TouchableOpacity
                         onPress={e => { e.stopPropagation(); toggleTask(task.id); }}
+                        accessibilityRole="checkbox"
+                        accessibilityLabel={task.title}
+                        accessibilityState={{ checked: task.status === 'done' }}
+                        // Єдина ціль дотику застосунку, що падала під WCAG 2.2
+                        // AA 2.5.8 (24×24): 22×22 всередині картки, яка
+                        // ВІДКРИВАЄ завдання, тобто промах дає протилежну дію.
+                        // 22 + 11×2 = рівно 44 (як у TaskCompactCard: 18 + 13).
+                        hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
                         style={{ width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', borderColor: task.status === 'done' ? '#10B981' : c.border, backgroundColor: task.status === 'done' ? '#10B981' : 'transparent', flexShrink: 0 }}>
                         {task.status === 'done' && <IconSymbol name="checkmark" size={11} color="#fff" />}
                       </TouchableOpacity>
@@ -2632,7 +2629,7 @@ export default function TasksScreen() {
 
       {/* ─── Options Dropdown ─── */}
       <Modal visible={showOptionsMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowOptionsMenu(false)}>
-        <Pressable
+        <Pressable accessible={false}
           style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
           onPress={() => setShowOptionsMenu(false)}>
           <BlurView
@@ -2744,15 +2741,17 @@ export default function TasksScreen() {
 
       {/* ─── Filter & Sort Bottom Sheet ─── */}
       <Modal visible={showFilterSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
-        <Pressable style={s.overlay} onPress={() => setShowFilterSheet(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+        <Pressable accessible={false} style={s.overlay} onPress={() => setShowFilterSheet(false)}>
+          <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[s.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={() => setShowFilterSheet(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity onPress={() => setShowFilterSheet(false)}
+                      accessibilityRole="button" accessibilityLabel={tr.close}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <IconSymbol name="xmark" size={17} color={c.sub} />
                     </TouchableOpacity>
                   </View>
@@ -2801,6 +2800,9 @@ export default function TasksScreen() {
                     <TouchableOpacity
                       key={f}
                       onPress={() => setFilter(f)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: filter === f, checked: filter === f }}
+                      accessibilityLabel={f === 'all' ? tr.allTasks : f === 'active' ? tr.allActive : tr.allCompleted}
                       style={[s.filterSegBtn, { flex: 1, backgroundColor: filter === f ? c.accent : c.dim, borderColor: filter === f ? c.accent : c.border }]}>
                       <IconSymbol
                         name={f === 'all' ? 'tray.full' : f === 'active' ? 'circle.dotted' : 'checkmark.circle.fill'}
@@ -2892,14 +2894,16 @@ export default function TasksScreen() {
       {/* ─── Calendar filter Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setShowCal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[s.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={() => setShowCal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity onPress={() => setShowCal(false)}
+                      accessibilityRole="button" accessibilityLabel={tr.close}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <IconSymbol name="xmark" size={17} color={c.sub} />
                     </TouchableOpacity>
                   </View>
@@ -2960,74 +2964,6 @@ export default function TasksScreen() {
         </BlurView>
       </SheetModal>
 
-
-      {/* ─── Recording Modal ─── */}
-      <Modal visible={!!recordingTaskId} transparent animationType="fade" statusBarTranslucent
-        onRequestClose={() => { if (isRecording) stopRecording(); else setRecordingTaskId(null); }}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' }}
-          onPress={() => { if (!isRecording) setRecordingTaskId(null); }}>
-          <Pressable onPress={e => e.stopPropagation()}
-            style={{ backgroundColor: isDark ? '#12121E' : '#FFFFFF', borderRadius: 24, padding: 28,
-              alignItems: 'center', width: 280, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20 }}>
-            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: isRecording ? '#EF4444' + '20' : c.dim,
-              alignItems: 'center', justifyContent: 'center', marginBottom: 20,
-              borderWidth: 2, borderColor: isRecording ? '#EF4444' : c.border }}>
-              <IconSymbol name={isRecording ? 'stop.fill' : 'mic.fill'} size={32} color={isRecording ? '#EF4444' : c.sub} />
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#fff' : '#000', marginBottom: 6 }}>
-              {isRecording ? 'Запис...' : 'Аудіозапис'}
-            </Text>
-            <RecordingClock
-              startedAt={recordingStartedAt}
-              style={{ fontSize: 28, fontWeight: '800', color: isRecording ? '#EF4444' : c.accent,
-                letterSpacing: 2, marginBottom: 24, fontVariant: ['tabular-nums'] }}
-            />
-            {isRecording ? (
-              <TouchableOpacity onPress={stopRecording}
-                style={{ backgroundColor: '#EF4444', borderRadius: 16, paddingVertical: 14,
-                  paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <IconSymbol name="stop.fill" size={16} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Зупинити</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity onPress={() => recordingTaskId && startRecording(recordingTaskId)}
-                style={{ backgroundColor: c.accent, borderRadius: 16, paddingVertical: 14,
-                  paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <IconSymbol name="mic.fill" size={16} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Почати запис</Text>
-              </TouchableOpacity>
-            )}
-            {/* Recordings list */}
-            {(() => {
-              const task = tasks.find(t => t.id === recordingTaskId);
-              if (!task?.recordings?.length) return null;
-              return (
-                <View style={{ width: '100%', marginTop: 20, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 14 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: c.sub, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                    ЗАПИСИ ({task.recordings.length})
-                  </Text>
-                  {task.recordings.map((uri, idx) => (
-                    <View key={uri} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6,
-                      backgroundColor: c.accent + '10', borderRadius: 10, padding: 8,
-                      borderWidth: 1, borderColor: c.accent + '25' }}>
-                      <IconSymbol name="waveform" size={14} color={c.accent} />
-                      <Text style={{ flex: 1, fontSize: 13, color: isDark ? '#fff' : '#000', marginLeft: 8 }}>Запис {idx + 1}</Text>
-                      <TouchableOpacity onPress={() => playRecording(uri)}
-                        style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.accent + '20', alignItems: 'center', justifyContent: 'center' }}>
-                        <IconSymbol name={playingUri === uri ? 'pause.fill' : 'play.fill'} size={11} color={c.accent} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => { deleteRecording(recordingTaskId!, uri); }}
-                        style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#EF444415', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
-                        <IconSymbol name="trash" size={11} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              );
-            })()}
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       {/* Undo-тост */}
       {undoElement}
@@ -3129,11 +3065,28 @@ const GroupShowAllButton = React.memo(function GroupShowAllButton({
 });
 
 // ─── Stat Cell ───────────────────────────────────────────────────────────────
+/**
+ * Стеля масштабування чисел і підписів картки статистики.
+ *
+ * Чотири комірки ділять ширину екрана порівну, тож при AX5 (×3) підпис
+ * «ефективність» ламався на три рядки («ефек/ти/сть») і вилазив за нижню
+ * межу картки, яка має `overflow: 'hidden'` (NAT-06). 1.6 — той самий
+ * прийом, що вже вжито для заголовка (`TITLE_MAX_FONT_SCALE`) і підписів
+ * табів, але трохи вільніший: тут є куди рости у два рядки.
+ */
+const STAT_MAX_FONT_SCALE = 1.6;
+
 function StatCell({ value, label, color, sub }: any) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}>
-      <Text style={{ color, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{value}</Text>
-      <Text style={{ color: sub, fontSize: 10, fontWeight: '500', marginTop: 3 }}>{label}</Text>
+    <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14, minWidth: 0 }}>
+      <Text
+        numberOfLines={1}
+        maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
+        style={{ color, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{value}</Text>
+      <Text
+        numberOfLines={2}
+        maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
+        style={{ color: sub, fontSize: 10, fontWeight: '500', marginTop: 3, textAlign: 'center' }}>{label}</Text>
     </View>
   );
 }

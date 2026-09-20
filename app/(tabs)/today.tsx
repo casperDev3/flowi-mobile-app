@@ -27,6 +27,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useMotion } from '@/hooks/use-motion';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
+import { useToday } from '@/hooks/use-today';
 import { useAuth } from '@/store/auth';
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { loadData } from '@/store/storage';
@@ -36,7 +37,7 @@ import { type TaskStatusColumn } from '@/utils/taskStatuses';
 import { groupTodayTasks } from '@/utils/todayGroups';
 import { updateSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
-import { isSameDay, localDateKey } from '@/utils/dateUtils';
+import { isSameDay } from '@/utils/dateUtils';
 import { Transaction, calcTotals, filterByMonth } from '@/utils/financeUtils';
 import { resolveTxCurrency, type Account } from '@/utils/accounts';
 import {
@@ -206,14 +207,8 @@ export default function TodayScreen() {
   }, [loaders]);
   useStorageRefresh(refreshKeys, onKeyChanged, loaded);
 
-  // Дата «сьогодні» для мемоізованих зрізів (завдання, зустрічі, фінанси
-  // місяця). Без неї екран, відкритий учора, після півночі показував би
-  // вчорашні задачі — дані ж не змінились і нічого не перерахувалось.
-  const [dayKey, setDayKey] = useState(() => localDateKey(new Date()));
-
   useFocusEffect(useCallback(() => {
     focusedRef.current = true;
-    setDayKey(localDateKey(new Date()));
     if (!firstLoadDone.current) {
       firstLoadDone.current = true;
       dirtyKeys.current.clear();
@@ -242,8 +237,22 @@ export default function TodayScreen() {
 
   // ─── Derived data ──────────────────────────────────────────────────────────
 
-  const today = new Date();
-  const hour  = today.getHours();
+  /**
+   * «Сьогодні» для мемоізованих зрізів — СТАБІЛЬНЕ посилання в межах доби
+   * (`hooks/use-today.ts`: нове значення лише коли доба справді змінилась,
+   * на фокусі екрана й на поверненні з фону).
+   *
+   * Було `const today = new Date()` на кожен рендер, і тому кожен мемо, що
+   * від нього залежить, мусив брехати в deps (локальний `dayKey` замість
+   * `today`) під eslint-disable — а від disable React Compiler переставав
+   * оптимізувати ВЕСЬ екран (PERF-2). `useToday()` — той самий хук, яким це
+   * вже вирішено на екрані Завдань і в «Усі (N)», з тією ж семантикою
+   * оновлення, що й колишній `dayKey`.
+   */
+  const today = useToday();
+  // Година — окремо й на кожен рендер: привітання залежить від ЧАСУ доби, а
+  // не від дати, і не має застигати на момент, коли доба почалась.
+  const hour  = new Date().getHours();
   const greet = hour < 6
     ? tr.todayGreetNight
     : hour < 12
@@ -275,8 +284,7 @@ export default function TodayScreen() {
   const projectRoles = useProjectRoles();
   const todayGroups = useMemo(
     () => groupTodayTasks(tasks, statusColumns, today, TODAY_PREVIEW_LIMIT, user?.id, projectRoles),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, statusColumns, dayKey, user?.id, projectRoles],
+    [tasks, statusColumns, today, user?.id, projectRoles],
   );
 
   // Health
@@ -311,8 +319,7 @@ export default function TodayScreen() {
       today,
     );
     return calcTotals(month);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txs, accounts, primaryCode, dayKey]);
+  }, [txs, accounts, primaryCode, today]);
 
   // Time today
   const trackedSec = time
@@ -323,8 +330,7 @@ export default function TodayScreen() {
   // екрані Завдань і веб-дашборд): поточні/майбутні за часом, минулі в кінці.
   const todayMeetings = useMemo(
     () => orderTodayMeetings(meetingsOnDate(meetings, today), today),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [meetings, dayKey],
+    [meetings, today],
   );
 
   // ─── Handlers ──────────────────────────────────────────────────────────────

@@ -427,25 +427,42 @@ export default function SubscriptionsScreen() {
     ]);
   }, [selected, tr, mutateSubscriptions, closeDetail, reportError]);
 
+  /**
+   * Свіжі значення для ефекту переходу нижче.
+   *
+   * Ефект мусить спрацьовувати САМЕ на зміну параметрів маршруту: додати в
+   * його залежності `subs` означало б знову відкрити підписку (а то й форму
+   * продовження) при кожному прильоті синхронізації. Раніше це глушили
+   * `eslint-disable`, і ціна була непропорційна — React Compiler відмовляється
+   * оптимізувати компонент, у якому вимкнено правило хуків (PERF-2), тобто
+   * весь екран підписок лишався без мемоізації. Ref дає ту саму свіжість без
+   * бейлаута; оновлює його ефект, бо запис у ref під час рендера компілятор
+   * так само не пропускає.
+   */
+  const deepLinkRef = useRef({ subs, quickRenew, openCreate, router, projectId: params.projectId });
+  useEffect(() => {
+    deepLinkRef.current = { subs, quickRenew, openCreate, router, projectId: params.projectId };
+  });
+
   // Параметри переходу: ?open=<id>[&renew=1] (з блоку «Найближчі оплати»), ?create=1&projectId= (з проєкту).
   useEffect(() => {
     if (!initialized) return;
     const open = typeof params.open === 'string' ? params.open : '';
     const create = params.create === '1';
     if (!open && !create) return;
-    if (open && subs.some(s => s.id === open)) {
-      const target = subs.find(s => s.id === open);
+    const live = deepLinkRef.current;
+    if (open && live.subs.some(s => s.id === open)) {
+      const target = live.subs.find(s => s.id === open);
       // «Продовжено» з блоку: одразу підтвердження суми; архівну не продовжуємо.
       if (params.renew === '1' && target && subscriptionStatus(target, dateKeyOf(new Date())) !== 'archived') {
-        quickRenew(open);
+        live.quickRenew(open);
       } else {
         setSelectedId(open);
         setRenewOpen(false);
       }
     }
-    if (create) openCreate(typeof params.projectId === 'string' && params.projectId ? params.projectId : null);
-    router.setParams({ open: '', renew: '', create: '', projectId: '' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (create) live.openCreate(typeof live.projectId === 'string' && live.projectId ? live.projectId : null);
+    live.router.setParams({ open: '', renew: '', create: '', projectId: '' });
   }, [initialized, params.open, params.renew, params.create]);
 
   // ─── Похідне ───────────────────────────────────────────────────────────────

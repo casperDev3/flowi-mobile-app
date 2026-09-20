@@ -43,11 +43,27 @@ function byPriority(a: Task, b: Task): number {
 }
 
 /**
+ * Стеля для групи «У процесі».
+ *
+ * Свій ліміт, більший за `limit` решти груп, але СКІНЧЕННИЙ. До цього група
+ * не обрізалась узагалі, і на 300 задачах «у процесі» екран дня малював їх
+ * усі через `.map()` у звичайному (невіртуалізованому) `ScrollView`: 15 050 pt
+ * вмісту = 17 екранів, сотні одночасно змонтованих `BlurView` з власними
+ * `useSharedValue`/`useAnimatedStyle` (нативний прогін: 96–106 % CPU при
+ * прокрутці, RSS 267→290 МБ).
+ *
+ * 12, а не 3: те, над чим людина працює просто зараз, — єдина причина, з якої
+ * воно на екрані дня, тож ховати його одразу під «показати всі» не можна.
+ * Але й нескінченний список тут не потрібен: залишок доступний тією самою
+ * кнопкою «показати всі», яку рахує `hidden`.
+ */
+export const TODAY_IN_PROGRESS_LIMIT = 12;
+
+/**
  * Групи завдань для екрана дня.
  *
- * @param limit скільки показати ПОЗА групою «У процесі». Сама вона не
- *   обрізається ніколи: ховати те, над чим людина працює просто зараз, під
- *   «показати всі» означало б викинути єдину причину, з якої воно тут.
+ * @param limit скільки показати ПОЗА групою «У процесі». Вона має власну,
+ *   більшу стелю — `TODAY_IN_PROGRESS_LIMIT`.
  */
 export function groupTodayTasks(
   tasks: Task[],
@@ -93,7 +109,7 @@ export function groupTodayTasks(
   for (const column of ordered) {
     const inProgress = resolvedStatusType(column) === 'in_progress';
     const all = (buckets.get(column.id) ?? []).sort(byPriority);
-    const take = inProgress ? all.length : Math.max(0, budget);
+    const take = inProgress ? Math.min(all.length, TODAY_IN_PROGRESS_LIMIT) : Math.max(0, budget);
     const visible = all.slice(0, take);
     if (!inProgress) budget -= visible.length;
     if (visible.length === 0) continue;

@@ -400,7 +400,10 @@ export default function ProjectTasksScreen() {
       }>
       <ScrollView
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        // L3: перший тап по «+» поруч із полем назви інакше лише ховає
+        // клавіатуру, і завдання не створюється.
+        keyboardShouldPersistTaps="handled">
 
         {/* Швидке створення — повна форма (проєкт/спринт/пріоритет/дедлайн)
             лишається на екрані Завдань, тут лише назва. Глядач (contract §4.1)
@@ -409,6 +412,7 @@ export default function ProjectTasksScreen() {
           <View style={[st.addRow, { borderColor: c.border, backgroundColor: c.dim, marginBottom: 14 }]}>
             <TextInput
               placeholder={tr.projectAddTask}
+              accessibilityLabel={tr.projectAddTask}
               placeholderTextColor={c.sub}
               value={newTitle}
               onChangeText={setNewTitle}
@@ -416,10 +420,19 @@ export default function ProjectTasksScreen() {
               returnKeyType="done"
               style={{ flex: 1, color: c.text, fontSize: 14, paddingVertical: 10 }}
             />
-            <TouchableOpacity onPress={openFullForm} hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
+            <TouchableOpacity
+              onPress={openFullForm}
+              accessibilityRole="button"
+              accessibilityLabel={tr.openFullTaskForm}
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
               <IconSymbol name="arrow.up.right" size={16} color={c.sub} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={addTask} disabled={!newTitle.trim()} hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}>
+            <TouchableOpacity
+              onPress={addTask}
+              disabled={!newTitle.trim()}
+              accessibilityRole="button"
+              accessibilityLabel={tr.projectAddTask}
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}>
               <IconSymbol name="plus" size={17} color={newTitle.trim() ? c.accent : c.sub} />
             </TouchableOpacity>
           </View>
@@ -430,7 +443,7 @@ export default function ProjectTasksScreen() {
             {/* contract §3 «Список — групування за статусом/пріоритетом/
                 спринтом»: ряд-перемикач над списком, 'none' — як і було,
                 плаский список без заголовків. */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }} contentContainerStyle={{ alignItems: 'center', gap: 6 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }} contentContainerStyle={{ alignItems: 'center', gap: 6 }} keyboardShouldPersistTaps="handled">
               <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', marginRight: 2 }}>{tr.projectGroupByLabel}</Text>
               {GROUP_BY_OPTIONS.map(opt => (
                 <TouchableOpacity
@@ -504,7 +517,7 @@ export default function ProjectTasksScreen() {
         )}
 
         {view === 'board' && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }} keyboardShouldPersistTaps="handled">
             {boardColumns.map(col => {
               // За isDone, а не завжди boardColumns[0] — інакше легасі-задача
               // з висячим/відсутнім kanbanColumnId (статус видалили в

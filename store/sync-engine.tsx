@@ -38,6 +38,7 @@ import {
   resolveOutboxStreamForRecord,
   saveOutbox,
   setSyncScheduler,
+  stripLocalOnlyFields,
 } from './synced-storage';
 import {
   computeMyProjectIds,
@@ -194,6 +195,10 @@ export async function quarantineRejections(items: SyncRejection[]): Promise<Sync
   }
   const next = Array.from(byRecord.values());
   await saveData(REJECTED_KEY, next);
+  // ERR-06: проєктний потік (store/project-sync.ts) кладе відхилення сюди ж,
+  // але лічильник оновлювався тільки на особистому шляху — бейдж «відхилено»
+  // з'являвся аж на наступному особистому синку чи холодному старті.
+  updateRejectedCount(next.length);
   return next;
 }
 
@@ -608,7 +613,10 @@ async function buildMutation(
   } else {
     const item = cache.get(collection)?.get(normalizedLocalId);
     if (!item) return null;
-    data = item;
+    // DI-05: id локальних нотифікацій — стан цього пристрою, а не запису.
+    // На сервер вони не їдуть, інакше інший пристрій отримає «нагадування
+    // стоїть» для нотифікації, якої в його ОС немає.
+    data = stripLocalOnlyFields(collection, item);
   }
 
   const clientUpdatedAt = typeof data.updatedAt === 'string' ? data.updatedAt : null;
@@ -714,6 +722,24 @@ async function applyPullResponse(
     }
   };
 
+  /**
+   * Ключ, читання якого провалилось (ERR-01), заблоковано на запис: масив,
+   * порахований із fallback, затер би байти, які ще можна врятувати. Тоді ця
+   * колекція просто не застосовується — решта обміну має пройти (зіпсовані
+   * `health_meds` не мають зупиняти синхронізацію задач), а всі її рядки
+   * позначаються пропущеними, щоб ревізії не зрушили: наступний обмін
+   * принесе їх знову.
+   *
+   * Перевірка за `name`, а не `instanceof`: тести рушія мокають
+   * `@/store/storage` цілком, і класу там немає — `instanceof undefined`
+   * кидав би TypeError замість того, щоб просто не збігтися.
+   */
+  const isWriteBlocked = (error: unknown): boolean =>
+    (error as { name?: string } | null)?.name === 'StorageWriteBlockedError';
+  const skipWholeCollection = (collection: string, items: SyncResponseItem[]) => {
+    for (const item of items) skipped.add(syncRecordKey(collection, item.local_id));
+  };
+
   // Групування у звичайний об'єкт із окремим списком порядку — з тієї ж
   // причини, що й у buildCollectionCache: цикл нижче async, і ітерація по
   // Map у ньому залежить від способу транспіляції.
@@ -738,10 +764,16 @@ async function applyPullResponse(
       }
       if (pinnedKeys.has(singletonKey)) continue;
       const serverItem = items[items.length - 1];
-      await saveData(
-        collection,
-        serverItem.deleted ? null : (serverItem.data?.value ?? serverItem.data),
-      );
+      try {
+        await saveData(
+          collection,
+          serverItem.deleted ? null : (serverItem.data?.value ?? serverItem.data),
+        );
+      } catch (e) {
+        if (!isWriteBlocked(e)) throw e;
+        if (__DEV__) console.warn(`[sync-engine] '${collection}' не прочитався — pull пропущено`);
+        skipped.add(singletonKey);
+      }
       continue;
     }
     if (!(SYNC_ARRAY_KEYS as readonly string[]).includes(collection)) continue;
@@ -752,48 +784,54 @@ async function applyPullResponse(
     // Outbox перечитується вже ПІД блокуванням: екран ставить свої записи в
     // outbox, не відпускаючи блокування колекції, тож правка, що встигла лягти
     // в сховище після початку обміну, тут уже видна як dirty і не затирається.
-    await withStorageLock(collection, async () => {
-      const dirty = new Set(dirtySet);
-      for (const item of await loadOutbox()) dirty.add(syncRecordKey(item.collection, item.local_id));
-      const storedLocal = await loadData<unknown>(collection, []);
-      const local = Array.isArray(storedLocal) ? (storedLocal as Record<string, unknown>[]) : [];
-      // §3.5 «застосування pull: зміна з потоку S не видаляє/не перезаписує
-      // локальний запис, який зараз належить іншому потоку» — тут S =
-      // 'personal'. Рядок пропускаємо (як dirty), якщо ЛОКАЛЬНИЙ запис із тим
-      // самим id зараз маршрутизується (за власним routing-правилом
-      // `resolveOutboxStream`) у проєктний потік: інший, паралельний
-      // особистому, обмін (`store/project-sync.ts`) міг щойно вставити його
-      // туди з `projectId`, і тумбстоун/застаріла версія особистого рядка не
-      // мають його стирати чи затирати назад у 'personal'.
-      // review finding (major, симетрично до `store/project-sync.ts`
-      // `applyProjectPull`): порівняння лише проти ІСНУЮЧОГО локального рядка
-      // блокувало й ЛЕГІТИМНЕ переміщення НАЗАД в особисте (P→Personal) —
-      // §3.5 «переміщення = delete у старому потоці + upsert у новому»: доки
-      // цей upsert (без projectId) не приїхав, local-рядок ще маршрутизувався
-      // на проєкт, і guard блокував саме той upsert, що мав завершити
-      // переміщення сюди. Якщо особистий pull прийшов ПЕРШИМ (порядок
-      // WS/дебаунсу двох потоків недетермінований), а потім проєктний pull
-      // приносить тумбстоун (delete) — запис губився назавжди. Тепер:
-      // upsert, чиї ВЛАСНІ дані маршрутизуються саме в 'personal', завжди
-      // застосовується — він і є завершенням переміщення.
-      if (myProjectIds && isProjectCollection(collection)) {
-        const localById = new Map(local.map(row => [String(row.id), row]));
-        for (const item of items) {
-          const existing = localById.get(item.local_id);
-          if (!existing) continue;
-          const currentStream = resolveOutboxStream(collection, item.local_id, existing, myProjectIds);
-          if (currentStream === PERSONAL_STREAM) continue;
-          if (!item.deleted) {
-            const incomingStream = resolveOutboxStream(collection, item.local_id, item.data, myProjectIds);
-            if (incomingStream === PERSONAL_STREAM) continue; // завершує переміщення назад в особисте — не блокувати
+    try {
+      await withStorageLock(collection, async () => {
+        const dirty = new Set(dirtySet);
+        for (const item of await loadOutbox()) dirty.add(syncRecordKey(item.collection, item.local_id));
+        const storedLocal = await loadData<unknown>(collection, []);
+        const local = Array.isArray(storedLocal) ? (storedLocal as Record<string, unknown>[]) : [];
+        // §3.5 «застосування pull: зміна з потоку S не видаляє/не перезаписує
+        // локальний запис, який зараз належить іншому потоку» — тут S =
+        // 'personal'. Рядок пропускаємо (як dirty), якщо ЛОКАЛЬНИЙ запис із тим
+        // самим id зараз маршрутизується (за власним routing-правилом
+        // `resolveOutboxStream`) у проєктний потік: інший, паралельний
+        // особистому, обмін (`store/project-sync.ts`) міг щойно вставити його
+        // туди з `projectId`, і тумбстоун/застаріла версія особистого рядка не
+        // мають його стирати чи затирати назад у 'personal'.
+        // review finding (major, симетрично до `store/project-sync.ts`
+        // `applyProjectPull`): порівняння лише проти ІСНУЮЧОГО локального рядка
+        // блокувало й ЛЕГІТИМНЕ переміщення НАЗАД в особисте (P→Personal) —
+        // §3.5 «переміщення = delete у старому потоці + upsert у новому»: доки
+        // цей upsert (без projectId) не приїхав, local-рядок ще маршрутизувався
+        // на проєкт, і guard блокував саме той upsert, що мав завершити
+        // переміщення сюди. Якщо особистий pull прийшов ПЕРШИМ (порядок
+        // WS/дебаунсу двох потоків недетермінований), а потім проєктний pull
+        // приносить тумбстоун (delete) — запис губився назавжди. Тепер:
+        // upsert, чиї ВЛАСНІ дані маршрутизуються саме в 'personal', завжди
+        // застосовується — він і є завершенням переміщення.
+        if (myProjectIds && isProjectCollection(collection)) {
+          const localById = new Map(local.map(row => [String(row.id), row]));
+          for (const item of items) {
+            const existing = localById.get(item.local_id);
+            if (!existing) continue;
+            const currentStream = resolveOutboxStream(collection, item.local_id, existing, myProjectIds);
+            if (currentStream === PERSONAL_STREAM) continue;
+            if (!item.deleted) {
+              const incomingStream = resolveOutboxStream(collection, item.local_id, item.data, myProjectIds);
+              if (incomingStream === PERSONAL_STREAM) continue; // завершує переміщення назад в особисте — не блокувати
+            }
+            dirty.add(syncRecordKey(collection, item.local_id));
           }
-          dirty.add(syncRecordKey(collection, item.local_id));
         }
-      }
-      markSkipped(collection, items, dirty);
-      for (const key of pinnedKeys) dirty.add(key);
-      await saveData(collection, applyPullItems(local as { id: string }[], items, dirty, collection));
-    });
+        markSkipped(collection, items, dirty);
+        for (const key of pinnedKeys) dirty.add(key);
+        await saveData(collection, applyPullItems(local as { id: string }[], items, dirty, collection));
+      });
+    } catch (e) {
+      if (!isWriteBlocked(e)) throw e;
+      if (__DEV__) console.warn(`[sync-engine] '${collection}' не прочитався — pull пропущено`);
+      skipWholeCollection(collection, items);
+    }
   }
   return skipped;
 }

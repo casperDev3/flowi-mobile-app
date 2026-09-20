@@ -429,8 +429,8 @@ export default function BugsScreen() {
       {/* Add Bug Modal */}
       <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={() => setShowAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+          <Pressable accessible={false} style={st.overlay} onPress={() => setShowAdd(false)}>
+            <Pressable accessible={false} onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={st.handleRow}>
@@ -509,8 +509,8 @@ export default function BugsScreen() {
       {/* Edit Bug Modal */}
       <Modal visible={showEdit} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowEdit(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={() => setShowEdit(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+          <Pressable accessible={false} style={st.overlay} onPress={() => setShowEdit(false)}>
+            <Pressable accessible={false} onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={st.handleRow}>

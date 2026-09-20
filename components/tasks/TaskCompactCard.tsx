@@ -77,8 +77,11 @@ function TaskCompactCardInner<T extends Task>({
   const titleOpacity = useSharedValue(isDone ? 0.45 : 1);
   useEffect(() => {
     titleOpacity.value = withTiming(isDone ? 0.45 : 1, { duration: 250 });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDone]);
+    // titleOpacity у deps — це об'єкт із useSharedValue, стабільний на весь
+    // час життя компонента, тож ефект від цього не починає бігати частіше.
+    // Раніше тут стояв eslint-disable, а від нього React Compiler мовчки
+    // припиняв оптимізувати ВСЮ картку (PERF-2).
+  }, [isDone, titleOpacity]);
   const titleAnimStyle = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
 
   // Опис рядка для VoiceOver: інакше озвучувалась лише назва, а статус,
@@ -100,13 +103,22 @@ function TaskCompactCardInner<T extends Task>({
     <PressableScale
       onPress={() => onPress(task)}
       onLongPress={onLongPress ? () => onLongPress(task) : undefined}
-      delayLongPress={350}>
+      delayLongPress={350}
+      /*
+       * accessible={false} — інакше картка стає ОДНИМ елементом доступності
+       * і поглинає правильно розмічений чекбокс усередині: на пристрої вся
+       * картка була одним вузлом 362×55 з назвою «A11Y тест, До роботи,
+       * Пріоритет P3», а окремого вузла чекбокса в дереві не існувало —
+       * тобто відмітити завдання виконаним з VoiceOver було нічим.
+       * Сам onPress/onLongPress від цього не страждає (це лише прапорець
+       * дерева доступності), а роль і назву картки бере на себе блок тексту
+       * нижче, у якого є onAccessibilityTap.
+       */
+      accessible={false}>
       <BlurView
         intensity={isDark ? 18 : 35}
         tint={isDark ? 'dark' : 'light'}
-        style={st.card}
-        accessibilityRole="button"
-        accessibilityLabel={a11ySummary}>
+        style={st.card}>
         <AnimatedCheck
           checked={isDone}
           color="#10B981"
@@ -125,7 +137,12 @@ function TaskCompactCardInner<T extends Task>({
             В один рядок назва змагалася за місце з рештою і обрізалась першою,
             хоча вона тут найважливіша. Дату свідомо не показуємо — компактний
             вигляд для швидкого перегляду списку, дедлайн видно в повному. */}
-        <View style={{ flex: 1, marginHorizontal: 10, gap: 4 }}>
+        <View
+          style={{ flex: 1, marginHorizontal: 10, gap: 4 }}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={a11ySummary}
+          onAccessibilityTap={() => onPress(task)}>
           <AnimatedText
             style={[{ color: c.text, fontSize: 14, fontWeight: '600', textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
             numberOfLines={2}>

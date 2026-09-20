@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View,
+  Linking, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,12 +20,13 @@ import {
   ACCENT, ACCENT_CAL, ACCENT_PROT, ACCENT_PULSE, ACCENT_STEPS, ModalKey, getHealthColors,
 } from '@/utils/healthTheme';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { LoadErrorNotice, ReminderBlockedNotice } from '@/components/health/HealthNotices';
 
 export default function NutritionScreen() {
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const c = getHealthColors(isDark);
   useScreenView('health_nutrition');
 
@@ -33,6 +34,9 @@ export default function NutritionScreen() {
   const { today, goals, cal } = h;
   const [refreshing, setRefreshing] = useState(false);
   const [modal, setModal] = useState<ModalKey | null>(null);
+  // ERR-10: планувальник відмовив — перемикач лишається вимкненим, а причину
+  // показуємо, замість того щоб малювати «увімкнено» і мовчати.
+  const [reminderBlocked, setReminderBlocked] = useState(false);
 
   const onRefresh = async () => { setRefreshing(true); await h.reload(); setRefreshing(false); };
   const onSubmit = (e: NewEntryPayload) => { h.addEntry(e); setModal(null); };
@@ -55,6 +59,9 @@ export default function NutritionScreen() {
 
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+          {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+          {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
 
           {/* Калорії */}
           <SectionHeader title={tr.calories} icon="flame.fill" color={ACCENT_CAL} textColor={c.text} top={8} />
@@ -149,9 +156,19 @@ export default function NutritionScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
               <IconSymbol name="drop.fill" size={16} color={ACCENT} />
               <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 10 }}>{tr.waterReminder}</Text>
-              <Switch value={h.reminders.water} disabled={!h.remindersLoaded}
-                onValueChange={v => h.setReminder('water', v, tr.water, tr.waterReminder)} trackColor={{ true: ACCENT }} />
+              <Switch
+                value={h.reminders.water}
+                disabled={!h.remindersLoaded || h.reminderBusy !== null}
+                accessibilityLabel={tr.waterReminder}
+                accessibilityState={{ checked: h.reminders.water, disabled: !h.remindersLoaded || h.reminderBusy !== null }}
+                onValueChange={v => { void h.setReminder('water', v, tr.water, tr.waterReminder).then(ok => setReminderBlocked(v && !ok)); }}
+                trackColor={{ true: ACCENT }} />
             </View>
+            {reminderBlocked && (
+              <ReminderBlockedNotice lang={lang} c={c} isDark={isDark}
+                onOpenSettings={() => { void Linking.openSettings(); }}
+                onDismiss={() => setReminderBlocked(false)} />
+            )}
           </BlurView>
 
           {/* Журнал їжі */}

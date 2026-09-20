@@ -1,0 +1,13 @@
+# I18N-05 — заголовок нотифікації мусить іти мовою інтерфейсу.
+# Мова вже перемкнена на English попереднім кроком.
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "30%,94%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/i18n-03-tasks-en
+- tapOn: ".*Add task.*"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/i18n-04-sheet-en

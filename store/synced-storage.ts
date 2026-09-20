@@ -424,6 +424,68 @@ export function stampUpdatedAt<T extends Timestamped>(
   });
 }
 
+// ─── Локальні поля запису (DI-05) ────────────────────────────────────────────
+
+/**
+ * Поля, що описують стан ЦЬОГО пристрою, а не сам запис, і тому не мають
+ * ані їхати на сервер, ані прилітати з нього.
+ *
+ * Це ідентифікатори локальних нотифікацій: `med_<id>_<i>` для ліків,
+ * `habit_<id>` для звичок, разовий id для щеплень і медоглядів. Вони видані
+ * ОС конкретного пристрою — на іншому пристрої такої запланованої
+ * нотифікації просто немає. Коли вони їхали разом із записом, виходило дві
+ * брехні одразу: ліки, заведені на планшеті, приїжджали на телефон із
+ * заповненим `notifIds` (тобто «нагадування стоїть»), хоча телефон нічого не
+ * планував; а ліки, вимкнені на планшеті (`notifIds: []`), стирали id на
+ * телефоні, і скасувати там реальне нагадування вже не було чим.
+ *
+ * Планування/скасування — справа `store/notifications.ts` і екранів: шар
+ * даних лише перестає видавати чуже за своє.
+ */
+export const LOCAL_ONLY_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  health_meds: ['notifIds'],
+  health_habits: ['notifId'],
+  health_vaccines: ['notifId'],
+  health_checkups: ['notifId'],
+};
+
+/** Копія запису без локальних полів — рівно те, що можна віддати серверу. */
+export function stripLocalOnlyFields<T extends Record<string, unknown>>(
+  collection: string,
+  data: T,
+): T {
+  const fields = LOCAL_ONLY_FIELDS[collection];
+  if (!fields) return data;
+  let copy: Record<string, unknown> | null = null;
+  for (const field of fields) {
+    if (!(field in data)) continue;
+    if (!copy) copy = { ...data };
+    delete copy[field];
+  }
+  return (copy ?? data) as T;
+}
+
+/**
+ * Запис із сервера + локальні поля ЦЬОГО пристрою: у наявного запису вони
+ * зберігаються як були, у новому (заведеному на іншому пристрої) їх немає
+ * зовсім — нагадування тут ще ніхто не планував.
+ */
+export function withLocalOnlyFields<T extends { id: string }>(
+  collection: string,
+  incoming: T,
+  existing: T | undefined,
+): T {
+  const fields = LOCAL_ONLY_FIELDS[collection];
+  if (!fields) return incoming;
+  const next = { ...(incoming as unknown as Record<string, unknown>) };
+  const prev = existing as unknown as Record<string, unknown> | undefined;
+  for (const field of fields) {
+    if (prev && field in prev) next[field] = prev[field];
+    else delete next[field];
+  }
+  return next as unknown as T;
+}
+
 // ─── applyPullItems (чиста функція, тестабельна) ──────────────────────────────
 
 /**
@@ -454,7 +516,13 @@ export function applyPullItems<T extends { id: string }>(
     if (si.deleted) {
       map.delete(si.local_id);
     } else {
-      map.set(si.local_id, { id: si.local_id, ...(si.data ?? {}) } as T);
+      // Локальні поля (id нотифікацій цього пристрою) не заміщаються
+      // серверними — див. LOCAL_ONLY_FIELDS.
+      map.set(si.local_id, withLocalOnlyFields(
+        collection,
+        { id: si.local_id, ...(si.data ?? {}) } as T,
+        map.get(si.local_id),
+      ));
     }
   }
 
@@ -463,11 +531,65 @@ export function applyPullItems<T extends { id: string }>(
 
 // ─── saveSynced / updateSynced ────────────────────────────────────────────────
 
+/**
+ * Ідентифікатори, які викликач `saveSynced` для цього ключа вже колись
+ * ПОКАЗУВАВ — тобто ті, про які він знає (DI-01).
+ *
+ * Навіщо: `saveSynced(key, items)` не несе в собі різниці «користувач видалив
+ * запис» і «викликач ніколи цього запису не бачив». Екран тримає весь масив у
+ * React-стані, читає ключ раз на монтуванні й не підписаний на зміни, тож
+ * запис, який приїхав синком у живу вкладку, у його стані відсутній — і
+ * наступне збереження оголошувало його видаленим (тумбстоун в outbox → запис
+ * зникав із сервера й з усіх пристроїв).
+ *
+ * Правило: `saveSynced` має право поставити тумбстоун ЛИШЕ на запис, який цей
+ * ключ уже отримував у попередньому `items` (або який лежав у сховищі на
+ * момент ПЕРШОГО запису в цьому запуску — там масив викликача і є повною
+ * правдою: відновлення з копії, міграція, перший ефект-дзеркало після
+ * читання). Усе інше — чуже й невідоме — зберігається як є.
+ *
+ * Набір лише росте: ключ до нього — id, а не вміст, тож пам'ять — рядки id
+ * колекції. Скидається `resetSyncedKnownIds` (зміна власника даних, «очистити
+ * всі дані», тести).
+ */
+const knownIdsByKey = new Map<string, Set<string>>();
+
+/** Скидає пам'ять «що викликач уже показував» — для одного ключа або всіх. */
+export function resetSyncedKnownIds(key?: string): void {
+  if (key === undefined) knownIdsByKey.clear();
+  else knownIdsByKey.delete(key);
+}
+
+/**
+ * Масив для запису: `items` викликача плюс записи сховища, яких він ніколи не
+ * бачив. `known === undefined` (перший запис у ключ за цей запуск) — поведінка
+ * як була: масив викликача заміщає вміст ключа цілком.
+ *
+ * Чужі записи дописуються в КІНЕЦЬ: порядок `items` — це порядок, який
+ * намалював екран, і зсувати його не можна.
+ */
+export function mergeUnknownRecords<T extends { id: string }>(
+  existing: readonly T[],
+  items: T[],
+  known: ReadonlySet<string> | undefined,
+): T[] {
+  if (!known) return items;
+  const itemIds = new Set(items.map(item => item.id));
+  const unknown = existing.filter(record => !itemIds.has(record.id) && !known.has(record.id));
+  return unknown.length ? [...items, ...unknown] : items;
+}
+
 export async function saveSynced<T extends { id: string }>(
   key: string,
   items: T[],
 ): Promise<void> {
-  await updateSynced<T>(key, () => items);
+  const known = knownIdsByKey.get(key);
+  await updateSynced<T>(key, existing => mergeUnknownRecords(existing, items, known));
+  // Після успішного запису все, що викликач показав, стає «відомим» — і з
+  // наступного разу він має право це видаляти.
+  const next = known ?? new Set<string>();
+  for (const item of items) next.add(item.id);
+  knownIdsByKey.set(key, next);
 }
 
 /**

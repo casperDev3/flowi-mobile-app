@@ -22,6 +22,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError, apiFetch } from '@/store/api';
 import { useI18n } from '@/store/i18n';
+import { throttleMessage } from '@/store/auth-throttle';
 import { haptic } from '@/utils/haptics';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -72,6 +73,10 @@ export default function ForgotPasswordScreen() {
       haptic.error();
       if (e instanceof OfflineError) {
         setError(tr.authOfflineError);
+      } else if (e instanceof ApiError && e.status === 429) {
+        // ERR-03: `/auth/forgot/` сидить на тому самому відрі `auth`, що й
+        // вхід, — саме сюди людина йде після «Невірний email або пароль».
+        setError(throttleMessage(tr, e));
       } else if (e instanceof ApiError && (e.code === 'timeout' || e.code === 'network')) {
         setError(tr.authNetworkError);
       } else if (e instanceof ApiError && e.status >= 500) {
@@ -126,8 +131,8 @@ export default function ForgotPasswordScreen() {
           setError(tr.authCodeInvalid);
         } else if (e.code === 'code_expired') {
           setError(tr.authCodeExpired);
-        } else if (e.code === 'too_many_attempts') {
-          setError(tr.authTooManyAttempts);
+        } else if (e.code === 'too_many_attempts' || e.status === 429) {
+          setError(throttleMessage(tr, e));
         } else if (e.code === 'weak_password') {
           setError(tr.authWeakPassword);
         } else if (e.code === 'timeout' || e.code === 'network') {
@@ -151,7 +156,11 @@ export default function ForgotPasswordScreen() {
 
       <SafeAreaView style={{ flex: 1 }}>
         <View style={st.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel={tr.back}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <IconSymbol name="chevron.left" size={22} color={c.accent} />
           </TouchableOpacity>
         </View>
@@ -200,6 +209,9 @@ export default function ForgotPasswordScreen() {
                   activeOpacity={0.82}
                   onPress={handleSendCode}
                   disabled={loading}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.authSendCode}
+                  accessibilityState={{ disabled: loading, busy: loading }}
                 >
                   {loading ? (
                     <ActivityIndicator color="#fff" />
@@ -249,6 +261,8 @@ export default function ForgotPasswordScreen() {
                       />
                       <TouchableOpacity
                         onPress={() => setShowNewPwd(v => !v)}
+                        accessibilityRole="button"
+                        accessibilityLabel={showNewPwd ? tr.authHidePassword : tr.authShowPassword}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
                         <IconSymbol name={showNewPwd ? 'eye.slash' : 'eye'} size={18} color={c.sub} />
@@ -273,6 +287,8 @@ export default function ForgotPasswordScreen() {
                       />
                       <TouchableOpacity
                         onPress={() => setShowRepeat(v => !v)}
+                        accessibilityRole="button"
+                        accessibilityLabel={showRepeat ? tr.authHidePassword : tr.authShowPassword}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
                         <IconSymbol name={showRepeat ? 'eye.slash' : 'eye'} size={18} color={c.sub} />
@@ -288,6 +304,9 @@ export default function ForgotPasswordScreen() {
                   activeOpacity={0.82}
                   onPress={handleResetPassword}
                   disabled={loading}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.authChangePasswordBtn}
+                  accessibilityState={{ disabled: loading, busy: loading }}
                 >
                   {loading ? (
                     <ActivityIndicator color="#fff" />
@@ -299,6 +318,8 @@ export default function ForgotPasswordScreen() {
                 <TouchableOpacity
                   style={st.linkBtn}
                   onPress={() => { setStep(1); setCode(''); setNewPassword(''); setRepeatPassword(''); setError(''); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tr.authSendCode} (${tr.authEmail})`}
                 >
                   <Text style={[st.linkText, { color: c.sub }]}>{tr.authSendCode} ({tr.authEmail})</Text>
                 </TouchableOpacity>

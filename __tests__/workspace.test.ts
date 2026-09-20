@@ -19,6 +19,7 @@ jest.mock('@/store/storage', () => ({
 
 import {
   buildWorkspaceConfig,
+  checkWorkspace,
   checkWorkspaceCompatibility,
   clearWorkspaceConfig,
   compareSemver,
@@ -51,10 +52,57 @@ function makeInfo(overrides: Partial<WorkspaceInfo> = {}): WorkspaceInfo {
 }
 
 describe('normalizeWorkspaceOrigin', () => {
-  it('додає https:// без схеми', () => {
+  it('додає https:// без схеми і зізнається, що схему домислив', () => {
     expect(normalizeWorkspaceOrigin('api.flowi.casperdev.site')).toEqual({
       ok: true,
       origin: 'https://api.flowi.casperdev.site',
+      schemeAssumed: true,
+    });
+  });
+
+  it('схему, написану руками, не позначає домисленою', () => {
+    expect(normalizeWorkspaceOrigin('https://api.flowi.casperdev.site')).toEqual({
+      ok: true,
+      origin: 'https://api.flowi.casperdev.site',
+    });
+  });
+
+  // З пристрою: адресі без схеми домислювався https БУДЬ-ЧОМУ, тож локальний
+  // сервер (`127.0.0.1:8000`, `192.168.x`) ставав недосяжним — `https://` там
+  // просто не відповідає, — а екран казав лише «Не вдалося з'єднатися з
+  // workspace», не натякаючи ні на схему, ні на причину.
+  it.each([
+    ['127.0.0.1:8000', 'http://127.0.0.1:8000'],
+    ['localhost:8000', 'http://localhost:8000'],
+    ['192.168.0.106:8000', 'http://192.168.0.106:8000'],
+    ['10.0.0.7:8000', 'http://10.0.0.7:8000'],
+    ['mac-mini.local', 'http://mac-mini.local'],
+  ])('локальній адресі без схеми домислює http: %s', (input, origin) => {
+    expect(normalizeWorkspaceOrigin(input)).toEqual({ ok: true, origin, schemeAssumed: true });
+  });
+
+  it('домислений http не суперечить власній перевірці безпеки', () => {
+    // Те саме LOCAL_HOST_RE, що дозволяє http нижче, вирішує й схему вище —
+    // тож побудоване тут не може впасти в insecure_url двома рядками далі.
+    const r = normalizeWorkspaceOrigin('192.168.1.50:8000');
+    expect(r.ok).toBe(true);
+  });
+
+  it('явний https на локальному хості лишається https', () => {
+    // Префіл екрана ховає `https://`; якби ховання було сліпим, збережений
+    // https-self-host на .local перетворився б на http при першій же
+    // повторній перевірці. Тут — половина інваріанта, друга в app/workspace.tsx.
+    expect(normalizeWorkspaceOrigin('https://mac-mini.local')).toEqual({
+      ok: true,
+      origin: 'https://mac-mini.local',
+    });
+  });
+
+  it('публічному хосту без схеми далі домислюється https', () => {
+    expect(normalizeWorkspaceOrigin('example.com')).toEqual({
+      ok: true,
+      origin: 'https://example.com',
+      schemeAssumed: true,
     });
   });
 
@@ -232,5 +280,68 @@ describe('refreshWorkspaceCompatibility — контракт §2.3 «дані о
     await refreshWorkspaceCompatibility();
 
     expect(isFirstCompatCheckPending()).toBe(false);
+  });
+});
+
+
+// ── ERR-04 + підказка про схему ──────────────────────────────────────────────
+
+describe('checkWorkspace — чому саме не вийшло', () => {
+  const originalFetch = global.fetch;
+  beforeEach(() => { global.fetch = jest.fn() as unknown as typeof fetch; });
+  afterEach(() => { global.fetch = originalFetch; });
+
+  // ERR-04: 502/503 під час деплою, 500 від Django і 429 від throttle читались
+  // як «Це не Flowi workspace або сервер застарів — оновіть сервер». Людина з
+  // ПРАВИЛЬНОЮ адресою бралася її правити або смикати адміна.
+  it.each([500, 502, 503, 429])('не-2xx %s — server_unavailable, а не not_workspace', async (status) => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status, json: async () => ({}) });
+    await expect(checkWorkspace('https://api.example.com')).resolves.toEqual({
+      ok: false,
+      code: 'server_unavailable',
+    });
+  });
+
+  it('404 лишається not_workspace — тут справді нема Flowi', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 404, json: async () => ({}) });
+    await expect(checkWorkspace('https://api.example.com')).resolves.toEqual({
+      ok: false,
+      code: 'not_workspace',
+    });
+  });
+
+  it('відповідь без workspace_protocol — not_workspace', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200, json: async () => ({ hello: 'world' }) });
+    await expect(checkWorkspace('https://api.example.com')).resolves.toEqual({
+      ok: false,
+      code: 'not_workspace',
+    });
+  });
+
+  it('мережевий збій на домисленій схемі несе прапорець для підказки', async () => {
+    (global.fetch as jest.Mock).mockRejectedValue(new TypeError('Network request failed'));
+    await expect(checkWorkspace('api.example.com')).resolves.toEqual({
+      ok: false,
+      code: 'network',
+      schemeAssumed: true,
+    });
+  });
+
+  it('мережевий збій на явній схемі підказки не несе', async () => {
+    (global.fetch as jest.Mock).mockRejectedValue(new TypeError('Network request failed'));
+    await expect(checkWorkspace('https://api.example.com')).resolves.toEqual({
+      ok: false,
+      code: 'network',
+    });
+  });
+
+  it('локальну адресу без схеми стукає по http, а не по https', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true, status: 200,
+      json: async () => makeInfo({ workspace_id: 'ws-local' }),
+    });
+    const r = await checkWorkspace('127.0.0.1:8000');
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('http://127.0.0.1:8000/api/workspace/');
+    expect(r.ok).toBe(true);
   });
 });

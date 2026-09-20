@@ -285,6 +285,39 @@ export function personalDisplayColumn(
     ?? own;
 }
 
+/**
+ * Колонка, в яку стає завдання, ПОВЕРНУТЕ З АРХІВУ.
+ *
+ * Відновлення робило лише `status: 'active'` і лишало `kanbanColumnId`
+ * колонкою «Готово». Далі `boardColumnForTask` знаходить цю колонку напряму —
+ * і активне завдання показувалось із зеленим бейджем «Готово» під
+ * заголовком секції «ДО РОБОТИ», а шапка рахувала одночасно «1 активних»,
+ * «0 виконано» і «100 % ефективність».
+ *
+ * Колонка НЕ-готова (завдання позначили виконаним чекбоксом, не рухаючи по
+ * дошці) зберігається як є — тоді людина повертається рівно туди, звідки
+ * пішла. Інакше — перша колонка типу `todo` у ВЛАСНОМУ скоупі завдання
+ * (§3.7: у проєктної задачі це колонки її проєкту, а не особисті).
+ *
+ * Попередню колонку відновити нізвідки: вона ніде не зберігається (див.
+ * NAT-10 — «У процесі» губиться при відновленні й досі).
+ */
+export function restoredColumnIdForTask(
+  task: Pick<Task, 'status' | 'kanbanColumnId' | 'projectId'>,
+  allColumns: readonly TaskStatusColumn[],
+): string | undefined {
+  const scoped = mergeTaskStatusColumns([...allColumns], task.projectId);
+  const current = task.kanbanColumnId
+    ? scoped.find(column => column.id === task.kanbanColumnId)
+    : undefined;
+  if (current && resolvedStatusType(current) !== 'done') return current.id;
+  const todo = scoped.find(column => resolvedStatusType(column) === 'todo')
+    ?? scoped.find(column => resolvedStatusType(column) !== 'done');
+  // Немає жодної не-готової колонки (набір зіпсовано) — краще лишити
+  // завдання без колонки, ніж повернути його в «Готово».
+  return todo?.id;
+}
+
 export function boardColumnForTask(
   task: Pick<Task, 'status' | 'kanbanColumnId'>,
   boardColumns: readonly TaskStatusColumn[],

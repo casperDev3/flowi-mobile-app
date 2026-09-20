@@ -177,6 +177,7 @@ export default function ProjectSprintsScreen() {
               onChangeText={setDraftName}
               onSubmitEditing={saveDraft}
               placeholder={tr.sprintNamePlaceholder}
+              accessibilityLabel={tr.sprintNamePlaceholder}
               placeholderTextColor={c.sub}
               style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 8, color: c.text }}
             />
@@ -221,6 +222,7 @@ export default function ProjectSprintsScreen() {
                     onChangeText={setAddTitle}
                     onSubmitEditing={() => addTask(sprint)}
                     placeholder={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
+                    accessibilityLabel={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
                     placeholderTextColor={c.sub}
                     style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 7, color: c.text, fontSize: 13 }}
                   />
@@ -274,7 +276,13 @@ export default function ProjectSprintsScreen() {
           <IconSymbol name="plus" size={17} color={c.accent} />
         </TouchableOpacity>
       ) : undefined}>
-      <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
+        showsVerticalScrollIndicator={false}
+        // L3: дефолтний keyboardShouldPersistTaps='never' означає, що перший
+        // тап по кнопці поруч із полем лише ховає клавіатуру — кнопка
+        // виглядає мертвою.
+        keyboardShouldPersistTaps="handled">
         {draft && !draft.sprint && (
           <View style={{ borderRadius: 14, borderWidth: 1, borderColor: c.accent, backgroundColor: c.dim, padding: 12, marginBottom: 12, gap: 8 }}>
             <TextInput
@@ -283,6 +291,7 @@ export default function ProjectSprintsScreen() {
               onChangeText={setDraftName}
               onSubmitEditing={saveDraft}
               placeholder={tr.sprintNamePlaceholder}
+              accessibilityLabel={tr.sprintNamePlaceholder}
               placeholderTextColor={c.sub}
               style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 8, color: c.text }}
             />

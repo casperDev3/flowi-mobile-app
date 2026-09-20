@@ -34,6 +34,7 @@ import { appendConflicts, type SyncConflict } from './sync-conflicts';
 import {
   applyRevisionUpdates,
   normalizeSyncLocalId,
+  quarantineRejections,
   resolveConflictSide,
   setProjectsChangedHandler,
   syncRecordKey,
@@ -600,8 +601,17 @@ async function exchangeProject(
     ]);
     await removeMutationsFromOutbox(finishedIds);
     if (rejections.some(r => r.reason === 'forbidden')) hadForbiddenRejection = true;
-    if (rejections.length && __DEV__) {
-      console.warn(`[project-sync] ${projectId} відхилено:`, rejections.map(r => `${r.collection}:${r.local_id} (${r.reason})`));
+    if (rejections.length) {
+      // ERR-06: відхилену мутацію прибирали з outbox, курсор скидали в 0, і
+      // наступний pull повертав запис до серверної правди — введене зникало
+      // з екрана без жодного слова. Особистий потік для цього давно має
+      // карантин (`sync_rejected_v2` + список на /sync із «спробувати ще» /
+      // «відкинути»); проєктний писав лише в __DEV__ console, тобто в релізі
+      // не писав нікуди. Тепер обидва потоки ведуть ОДИН журнал.
+      await quarantineRejections(rejections.map(r => ({ ...r, status: 'rejected' as const })));
+      if (__DEV__) {
+        console.warn(`[project-sync] ${projectId} відхилено:`, rejections.map(r => `${r.collection}:${r.local_id} (${r.reason})`));
+      }
     }
 
     const conflictRows = response.conflicts.flatMap(c => c.server ? [c.server] : []);

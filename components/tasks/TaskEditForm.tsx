@@ -128,7 +128,11 @@ export function TaskEditForm({
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={{ flexDirection: 'row', gap: 7 }}>
             {taskStatuses.map(column => (
-              <TouchableOpacity key={column.id} onPress={() => editor.patch({ statusId: column.id })} style={[st.sortChip, { backgroundColor: editor.draft.statusId === column.id ? column.color : c.dim, borderColor: editor.draft.statusId === column.id ? column.color : c.border }]}>
+              <TouchableOpacity key={column.id} onPress={() => editor.patch({ statusId: column.id })}
+                accessibilityRole="radio"
+                accessibilityLabel={column.name}
+                accessibilityState={{ selected: editor.draft.statusId === column.id, checked: editor.draft.statusId === column.id }}
+                style={[st.sortChip, { backgroundColor: editor.draft.statusId === column.id ? column.color : c.dim, borderColor: editor.draft.statusId === column.id ? column.color : c.border }]}>
                 <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: editor.draft.statusId === column.id ? '#fff' : column.color, marginRight: 5 }} />
                 <Text style={{ color: editor.draft.statusId === column.id ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{column.name}</Text>
               </TouchableOpacity>
@@ -326,12 +330,19 @@ export function TaskEditForm({
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>Кожні</Text>
+              {/* 28×28 намальовано, 44×44 натискається. hitSlop по 8
+                  ліворуч/праворуч, а не по 8 всюди: сусідні «−» і «+»
+                  розділяє gap 8, і ширші зони почали б перекриватись. */}
               <TouchableOpacity onPress={() => editor.patch({ repeatInterval: Math.max(1, editor.draft.repeatInterval - 1) })}
+                accessibilityRole="button"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
                 style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>−</Text>
               </TouchableOpacity>
               <Text style={{ color: c.accent, fontSize: 16, fontWeight: '800', minWidth: 24, textAlign: 'center' }}>{editor.draft.repeatInterval}</Text>
               <TouchableOpacity onPress={() => editor.patch({ repeatInterval: Math.min(99, editor.draft.repeatInterval + 1) })}
+                accessibilityRole="button"
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                 style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>+</Text>
               </TouchableOpacity>

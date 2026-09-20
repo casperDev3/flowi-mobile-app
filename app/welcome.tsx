@@ -54,6 +54,8 @@ export default function WelcomeScreen() {
               style={[st.primaryBtn, { backgroundColor: c.accent }]}
               activeOpacity={0.82}
               onPress={() => router.push('/login')}
+              accessibilityRole="button"
+              accessibilityLabel={tr.authLogin}
             >
               <Text style={st.primaryBtnText}>{tr.authLogin}</Text>
             </TouchableOpacity>
@@ -62,6 +64,8 @@ export default function WelcomeScreen() {
               style={[st.secondaryBtn, { borderColor: c.accent }]}
               activeOpacity={0.82}
               onPress={() => router.push('/register')}
+              accessibilityRole="button"
+              accessibilityLabel={tr.authRegister}
             >
               <Text style={[st.secondaryBtnText, { color: c.accent }]}>{tr.authRegister}</Text>
             </TouchableOpacity>
@@ -72,6 +76,8 @@ export default function WelcomeScreen() {
               style={st.workspaceRow}
               activeOpacity={0.7}
               onPress={() => router.push({ pathname: '/workspace', params: { change: '1' } })}
+              accessibilityRole="button"
+              accessibilityLabel={`${tr.workspaceCurrentLabel}: ${workspaceName}. ${tr.workspaceChangeLink}`}
             >
               <Text style={[st.workspaceText, { color: c.sub }]}>
                 {tr.workspaceCurrentLabel}: {workspaceName}

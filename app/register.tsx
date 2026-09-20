@@ -23,6 +23,7 @@ import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
+import { throttleMessage } from '@/store/auth-throttle';
 import { previewInvite, type InvitePreview } from '@/store/project-team';
 import { haptic } from '@/utils/haptics';
 
@@ -145,6 +146,10 @@ export default function RegisterScreen() {
           setEmailError(tr.authEmailTaken);
         } else if (e.code === 'password_too_common' || e.code === 'password_too_short') {
           setPasswordError(tr.authWeakPassword);
+        } else if (e.status === 429) {
+          // ERR-03: те саме відро `auth`, що й у входу, — без цієї гілки
+          // «забагато спроб» показувалось як «Невірний email або пароль».
+          setGeneralError(throttleMessage(tr, e));
         } else if (e.code === 'timeout' || e.code === 'network') {
           setGeneralError(tr.authNetworkError);
         } else if (e.status >= 500) {
@@ -284,7 +289,7 @@ export default function RegisterScreen() {
                     onPress={() => setShowPassword(v => !v)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     accessibilityRole="button"
-                    accessibilityLabel={showPassword ? 'Сховати пароль' : 'Показати пароль'}
+                    accessibilityLabel={showPassword ? tr.authHidePassword : tr.authShowPassword}
                   >
                     <IconSymbol
                       name={showPassword ? 'eye.slash' : 'eye'}
@@ -315,7 +320,7 @@ export default function RegisterScreen() {
                     onPress={() => setShowPasswordRepeat(v => !v)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     accessibilityRole="button"
-                    accessibilityLabel={showPasswordRepeat ? 'Сховати пароль' : 'Показати пароль'}
+                    accessibilityLabel={showPasswordRepeat ? tr.authHidePassword : tr.authShowPassword}
                   >
                     <IconSymbol
                       name={showPasswordRepeat ? 'eye.slash' : 'eye'}

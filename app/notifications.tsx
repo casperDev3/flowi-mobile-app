@@ -76,7 +76,7 @@ export default function NotificationsScreen() {
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const [items, setItems] = useState<ScheduledItem[]>([]);
   const [permGranted, setPermGranted] = useState<boolean | null>(null);
   const [globalEnabled, setGlobalEnabled] = useState(true);
@@ -229,11 +229,14 @@ export default function NotificationsScreen() {
     const isToday = d.toDateString() === now.toDateString();
     const tom = new Date(now); tom.setDate(tom.getDate() + 1);
     const isTomorrow = d.toDateString() === tom.toDateString();
-    const timeStr = d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+    // I18N-03: локаль бралася жорстко 'uk-UA' — англійський інтерфейс
+    // показував «12 листопада» поруч із перекладеними «Today»/«Tomorrow».
+    const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+    const timeStr = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     if (isToday) return `${tr.today} · ${timeStr}`;
     if (isTomorrow) return `${tr.tomorrow} · ${timeStr}`;
-    return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' }) + ` · ${timeStr}`;
-  }, [tr]);
+    return d.toLocaleDateString(locale, { day: 'numeric', month: 'long' }) + ` · ${timeStr}`;
+  }, [tr, lang]);
 
   const oneTimeCount = items.filter(i => !i.isRecurring).length;
   const recurringCount = items.filter(i => i.isRecurring).length;
@@ -282,6 +285,7 @@ export default function NotificationsScreen() {
       <View style={{ marginTop: 14, marginBottom: 24, flexDirection: 'row', alignItems: 'center' }}>
         <TouchableOpacity
           onPress={() => router.back()}
+          accessibilityRole="button"
           accessibilityLabel={tr.back}
           style={[ns.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
           <IconSymbol name="chevron.left" size={17} color={c.sub} />
@@ -292,6 +296,7 @@ export default function NotificationsScreen() {
         {items.length > 0 && (
           <TouchableOpacity
             onPress={cancelAll}
+            accessibilityRole="button"
             accessibilityLabel={tr.deleteAllReminders}
             style={[ns.headerBtn, { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.3)' }]}>
             <IconSymbol name="trash" size={16} color="#EF4444" />
@@ -303,6 +308,8 @@ export default function NotificationsScreen() {
       {permGranted === false && (
         <TouchableOpacity
           onPress={requestPerm}
+          accessibilityRole="button"
+          accessibilityLabel={`${tr.notifDisabled}. ${tr.notifDisabledSub}`}
           style={[ns.banner, { backgroundColor: '#EF444415', borderColor: '#EF444440' }]}>
           <View style={[ns.bannerIcon, { backgroundColor: '#EF444420' }]}>
             <IconSymbol name="bell.slash" size={20} color="#EF4444" />
@@ -331,9 +338,13 @@ export default function NotificationsScreen() {
           <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 12 }}>
             {tr.pushNotifications}
           </Text>
+          {/* A11Y-03: глобальний тумблер push — дія з наслідками; без імені
+              VoiceOver читав лише «увімкнено, перемикач». */}
           <Switch
             value={globalEnabled}
             onValueChange={toggleGlobal}
+            accessibilityLabel={tr.pushNotifications}
+            accessibilityState={{ checked: globalEnabled }}
             trackColor={{ false: 'rgba(128,128,128,0.3)', true: '#7C3AED' }}
             thumbColor="#fff"
             ios_backgroundColor="rgba(128,128,128,0.3)"

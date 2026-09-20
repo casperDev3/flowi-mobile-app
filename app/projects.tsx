@@ -46,7 +46,7 @@ import { useTimerContext } from '@/store/timer-context';
 import { mergeTaskStatusColumns, seedProjectStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { hasPendingProjectOutbox, queueProjectDeletion, syncAllMyProjects } from '@/store/project-sync';
 import { uuidV4 } from '@/utils/uuid';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { haptic } from '@/utils/haptics';
 import { useAuth } from '@/store/auth';
@@ -318,6 +318,7 @@ export default function ProjectsScreen() {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { isExpanded } = useResponsive();
+  const sheetSurface = useSheetSurface();
   // Активні таймери потрібні, щоб «Відпрацьовано» включало сесію, яка триває
   // просто зараз, а не лише закриті.
   const { activeTimers, tasksRevision } = useTimerContext();
@@ -712,12 +713,16 @@ export default function ProjectsScreen() {
       <View style={{ marginTop: 14, marginBottom: 28, flexDirection: 'row', alignItems: 'center' }}>
         <TouchableOpacity
           onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel={tr.back}
           style={[st.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
           <IconSymbol name="chevron.left" size={17} color={c.sub} />
         </TouchableOpacity>
-        <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 12 }]}>Проекти</Text>
+        <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 12 }]}>{tr.projects}</Text>
         <TouchableOpacity
           onPress={openAdd}
+          accessibilityRole="button"
+          accessibilityLabel={tr.newProject}
           style={[st.headerBtn, { backgroundColor: c.accent, borderColor: c.accent }]}>
           <IconSymbol name="plus" size={17} color="#fff" />
         </TouchableOpacity>
@@ -728,8 +733,8 @@ export default function ProjectsScreen() {
       {archivedProjects.length > 0 && (
         <View style={{ flexDirection: 'row', gap: 7, marginBottom: 18 }}>
           {([
-            { key: false, label: 'Живі', count: liveProjects.length },
-            { key: true, label: 'Архів', count: archivedProjects.length },
+            { key: false, label: tr.filterActive, count: liveProjects.length },
+            { key: true, label: tr.archive, count: archivedProjects.length },
           ] as const).map(opt => (
             <TouchableOpacity
               key={String(opt.key)}
@@ -825,29 +830,34 @@ export default function ProjectsScreen() {
       {/* Add/Edit Modal */}
       <Modal visible={showModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={closeModal}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+          <Pressable accessible={false} style={st.overlay} onPress={closeModal}>
+            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView
                 intensity={isDark ? 50 : 70}
                 tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={closeModal} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity
+                      onPress={closeModal}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.close}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <IconSymbol name="xmark" size={17} color={c.sub} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 <Text style={[st.sheetTitle, { color: c.text }]}>
-                  {editing ? 'Редагувати проект' : 'Новий проект'}
+                  {editing ? tr.editProject : tr.newProject}
                 </Text>
 
                 <TextInput
-                  placeholder="Назва проекту"
+                  placeholder={tr.projectNamePlaceholder}
+                  accessibilityLabel={tr.projectNamePlaceholder}
                   placeholderTextColor={c.sub}
                   value={name}
                   onChangeText={setName}
@@ -929,18 +939,18 @@ export default function ProjectsScreen() {
                     accessibilityRole="button"
                     style={[st.btn, { marginTop: 18, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
                     <Text style={{ color: c.sub, fontWeight: '600' }}>
-                      {editing.archivedAt ? 'Повернути з архіву' : 'Архівувати'}
+                      {editing.archivedAt ? tr.unarchiveProject : tr.archiveAccount}
                     </Text>
                   </TouchableOpacity>
                 )}
 
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 22, marginBottom: 4 }}>
                   <TouchableOpacity onPress={closeModal} style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>Скасувати</Text>
+                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={save} style={[st.btn, { flex: 2, backgroundColor: c.accent }]}>
                     <Text style={{ color: '#fff', fontWeight: '700' }}>
-                      {editing ? 'Зберегти' : 'Створити'}
+                      {editing ? tr.save : tr.create}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -969,8 +979,11 @@ const st = StyleSheet.create({
   progressBg:  { height: 3, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
   progressFill:{ height: '100%', borderRadius: 2 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: '90%' },
+  sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
+  // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
+  // ScrollView усередині нічого не гортав (NAT-01).
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   sheetTitle:  { fontSize: 20, fontWeight: '800', marginBottom: 16 },

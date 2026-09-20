@@ -153,8 +153,8 @@ export function ProjectSwitcherSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <Pressable style={st.overlay} onPress={onClose}>
-        <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrap}>
+      <Pressable accessible={false} style={st.overlay} onPress={onClose}>
+        <Pressable accessible={false} onPress={e => e.stopPropagation()} style={st.sheetWrap}>
           <BlurView
             intensity={isDark ? 50 : 70}
             tint={isDark ? 'dark' : 'light'}

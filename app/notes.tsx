@@ -320,8 +320,8 @@ export default function NotesScreen() {
         statusBarTranslucent
         onRequestClose={saveNote}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={ns.overlay} onPress={saveNote}>
-            <Pressable onPress={e => e.stopPropagation()} style={ns.sheetWrapper}>
+          <Pressable accessible={false} style={ns.overlay} onPress={saveNote}>
+            <Pressable accessible={false} onPress={e => e.stopPropagation()} style={ns.sheetWrapper}>
               <BlurView
                 intensity={isDark ? 50 : 70}
                 tint={isDark ? 'dark' : 'light'}

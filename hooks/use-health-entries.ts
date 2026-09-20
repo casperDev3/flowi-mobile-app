@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import { HK_AVAILABLE, HKDayData, fetchTodayData, initHealthKit } from '@/store/healthkit';
+import {
+  HK_AVAILABLE, type HKAccess, fetchTodayDataResult, getHealthKitAccess, initHealthKit,
+} from '@/store/healthkit';
 import { cancelDailyReminder, scheduleDailyReminder, scheduleWeeklyReminder } from '@/store/notifications';
-import { loadData, saveData } from '@/store/storage';
+import { loadData, loadDataResult, retryStorageRead } from '@/store/storage';
 import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
 import { Events, track } from '@/utils/analytics';
 import { isSameDay } from '@/utils/dateUtils';
@@ -51,6 +53,7 @@ function genId() {
 // Решта екранів отримують HK-дані через сховище (reload-on-focus), без повторних синків.
 let _hkInited = false;
 let _hkAuthorized = false;
+let _hkAccess: HKAccess = HK_AVAILABLE ? 'unknown' : 'unavailable';
 
 /**
  * Єдине джерело даних здоров'я: записи + профіль + нагадування + HealthKit-синк,
@@ -61,11 +64,23 @@ export function useHealthEntries() {
   const [profile, setProfile] = useState<HealthProfile | null>(null);
   const [reminders, setReminders] = useState<Reminders>(DEFAULT_REMINDERS);
   const [remindersLoaded, setRemindersLoaded] = useState(false);
+  // ERR-10: «зберігається» — стан, якого не було взагалі; перемикач стрибав
+  // у ON миттєво, ще до того, як щось було заплановано.
+  const [reminderBusy, setReminderBusy] = useState<keyof Reminders | null>(null);
   const [initialized, setInitialized] = useState(false);
 
   const [hkAuthorized, setHkAuthorized] = useState(false);
   const [hkSyncing, setHkSyncing] = useState(false);
   const [hkLastSync, setHkLastSync] = useState<Date | null>(null);
+  // ERR-14: стан доступу окремо від «модуль є у збірці» і окремо від
+  // «останнє читання провалилось». Нулі можна малювати лише коли доступ є
+  // і запити вдались; інакше це «немає даних», а не «нуль кроків».
+  const [hkAccess, setHkAccess] = useState<HKAccess>(_hkAccess);
+  const [hkFailed, setHkFailed] = useState(false);
+
+  // ERR-01: читання ключа провалилось. Екран мусить показати помилку з
+  // повтором, а не порожній список; автозапис у такий ключ заборонено.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // Міграція старих HK-калорій (note '__hk__') → 'calories_out'
   const migrate = useCallback((data: HealthEntry[]): HealthEntry[] => {
@@ -78,8 +93,15 @@ export function useHealthEntries() {
   }, []);
 
   const loadEntries = useCallback(async () => {
-    const data = await loadData<HealthEntry[]>(ENTRIES_KEY, []);
-    setEntries(migrate(data));
+    const r = await loadDataResult<HealthEntry[]>(ENTRIES_KEY, []);
+    if (!r.ok) {
+      // Головне: НЕ підставляти порожній масив у стан. Саме він потім їхав
+      // назад у сховище автозаписом і знищував ще читабельні байти.
+      setLoadFailed(true);
+      return false;
+    }
+    setEntries(migrate(r.value));
+    return true;
   }, [migrate]);
 
   const loadProfile = useCallback(async () => {
@@ -87,14 +109,29 @@ export function useHealthEntries() {
   }, []);
 
   const reload = useCallback(async () => {
-    await Promise.all([loadEntries(), loadProfile()]);
+    const [ok] = await Promise.all([loadEntries(), loadProfile()]);
+    return ok;
   }, [loadEntries, loadProfile]);
+
+  /** «Повторити» після збою читання: лише retryStorageRead знімає блокування запису. */
+  const retryLoad = useCallback(async () => {
+    const r = await retryStorageRead<HealthEntry[]>(ENTRIES_KEY, []);
+    if (!r.ok) return false;
+    setEntries(migrate(r.value));
+    setLoadFailed(false);
+    setInitialized(true);
+    return true;
+  }, [migrate]);
 
   const syncHealthKit = useCallback(async () => {
     if (!HK_AVAILABLE) return;
     setHkSyncing(true);
-    const data: HKDayData = await fetchTodayData();
-    setHkLastSync(new Date());
+    const { data, outcome } = await fetchTodayDataResult();
+    setHkFailed(!outcome.ok);
+    // ERR-14: «оновлено щойно» ставимо лише коли справді щось прочитали —
+    // інакше підпис стверджував свіжість нулів, яких ніхто не читав.
+    if (outcome.ok) setHkLastSync(new Date());
+    else { setHkSyncing(false); return; }
     setEntries(prev => {
       const todayDate = new Date();
       const filtered = prev.filter(e => {
@@ -114,14 +151,26 @@ export function useHealthEntries() {
   }, []);
 
   useEffect(() => {
-    Promise.all([loadEntries(), loadProfile()]).then(() => setInitialized(true));
+    // initialized вмикається ЛИШЕ на успішному читанні — це і є заборона
+    // автозапису поверх ключа, який не прочитався (ERR-01).
+    Promise.all([loadEntries(), loadProfile()]).then(([ok]) => { if (ok) setInitialized(true); });
     loadData<Reminders>(REMINDERS_KEY, DEFAULT_REMINDERS).then(r => { setReminders(r); setRemindersLoaded(true); });
     if (HK_AVAILABLE) {
       if (_hkInited) {
         setHkAuthorized(_hkAuthorized); // вже ініціалізовано в цій сесії — не синкаємо повторно
+        setHkAccess(_hkAccess);
       } else {
         _hkInited = true;
-        initHealthKit().then(ok => { _hkAuthorized = ok; setHkAuthorized(ok); if (ok) syncHealthKit(); });
+        initHealthKit().then(async ok => {
+          _hkAuthorized = ok;
+          setHkAuthorized(ok);
+          // requestAuthorization не кидає й не повертає «дозволено» — питаємо
+          // систему окремо, інакше «модуль є» видавалось за «доступ є».
+          const access = await getHealthKitAccess();
+          _hkAccess = access;
+          setHkAccess(access);
+          if (ok && access !== 'denied') syncHealthKit();
+        });
       }
     }
   }, []);
@@ -130,8 +179,13 @@ export function useHealthEntries() {
   // (модулі мають власні екземпляри хука — так зміни синхронізуються через сховище)
   useFocusEffect(useCallback(() => { if (initialized) reload(); }, [initialized, reload]));
 
-  // Зберігати записи після ініціалізації
-  useEffect(() => { if (initialized) void saveSynced(ENTRIES_KEY, entries); }, [entries, initialized]);
+  // Зберігати записи після ініціалізації.
+  // .catch обовʼязковий: saveSynced тепер відхиляється StorageWriteBlockedError,
+  // якщо ключ позначений як «не прочитався».
+  useEffect(() => {
+    if (!initialized) return;
+    void saveSynced(ENTRIES_KEY, entries).catch(e => { if (__DEV__) console.warn('[health] save failed:', e); });
+  }, [entries, initialized]);
 
   // ─── Дії ────────────────────────────────────────────────────────────────
   const addEntry = useCallback((e: NewEntry) => {
@@ -143,12 +197,54 @@ export function useHealthEntries() {
     setEntries(p => [{ id: genId(), type, value, date: new Date().toISOString() }, ...p]);
   }, []);
 
-  const setReminder = useCallback(async (key: keyof Reminders, on: boolean, title: string, body: string) => {
-    setReminders(curr => { const next = { ...curr, [key]: on }; void saveSyncedValue(REMINDERS_KEY, next); return next; });
-    if (!on) { await cancelDailyReminder(key); return; }
-    if (key === 'measurements') await scheduleWeeklyReminder(key, MEASUREMENTS_WEEKDAY, MEASUREMENTS_HOUR, 0, title, body);
-    else await scheduleDailyReminder(key, DAILY_HOURS[key], 0, title, body);
+  /**
+   * ERR-10. Перемикач нагадування більше не бреше.
+   *
+   * Було: `reminders[key]` писався в стан і в сховище ПЕРШИМ, а
+   * `scheduleDailyReminder` викликався після — і його boolean ніхто не читав.
+   * Якщо сповіщення вимкнені глобально або ОС не дала дозволу, перемикач
+   * лишався ON, а в системі не було заплановано нічого.
+   *
+   * Стало: спершу плануємо, і лише успіх вмикає перемикач. Помилка повертає
+   * false — екран показує плашку «нагадування не увімкнено» і сам перемикач
+   * лишається вимкненим, бо стан не змінився.
+   *
+   * Застереження (нативний прогін): `requestNotificationPermissions()` віддає
+   * true без запиту до iOS, коли `!Device.isDevice` — тобто в симуляторі й
+   * дев-білді гілка відмови не виконується НІКОЛИ. Відтворити це можна лише
+   * на живому пристрої або вимкнувши глобальний тумблер сповіщень.
+   */
+  const setReminder = useCallback(async (key: keyof Reminders, on: boolean, title: string, body: string): Promise<boolean> => {
+    setReminderBusy(key);
+    try {
+      if (!on) {
+        await cancelDailyReminder(key);
+        setReminders(curr => { const next = { ...curr, [key]: false }; void saveSyncedValue(REMINDERS_KEY, next); return next; });
+        return true;
+      }
+      const scheduled = key === 'measurements'
+        ? await scheduleWeeklyReminder(key, MEASUREMENTS_WEEKDAY, MEASUREMENTS_HOUR, 0, title, body)
+        : await scheduleDailyReminder(key, DAILY_HOURS[key], 0, title, body);
+      if (!scheduled) return false;
+      setReminders(curr => { const next = { ...curr, [key]: true }; void saveSyncedValue(REMINDERS_KEY, next); return next; });
+      return true;
+    } finally {
+      setReminderBusy(null);
+    }
   }, []);
+
+  /** Повторний запит доступу до HealthKit з екрана (ERR-14). */
+  const requestHkAccess = useCallback(async () => {
+    if (!HK_AVAILABLE) return false;
+    const ok = await initHealthKit();
+    _hkAuthorized = ok;
+    setHkAuthorized(ok);
+    const access = await getHealthKitAccess();
+    _hkAccess = access;
+    setHkAccess(access);
+    if (ok && access !== 'denied') await syncHealthKit();
+    return ok && access !== 'denied';
+  }, [syncHealthKit]);
 
   // ─── Агрегати (сьогодні) ──────────────────────────────────────────────────
   const today = new Date();
@@ -201,6 +297,7 @@ export function useHealthEntries() {
 
   return {
     entries, setEntries, profile, initialized,
+    loadFailed, retryLoad,
     goals, heightCm, latestWeight, bmi, bmiCategory,
     today: {
       water: todayWater, calIn: todayCalIn, calOut: todayCalOut, steps: todaySteps,
@@ -210,8 +307,18 @@ export function useHealthEntries() {
     charts: { cal: calChart, weight: weightChart, steps: stepsChart, sleep: sleepChart },
     last7, prevWeight,
     addEntry, addQuick,
-    reminders, remindersLoaded, setReminder,
-    hk: { available: HK_AVAILABLE, authorized: hkAuthorized, syncing: hkSyncing, lastSync: hkLastSync, sync: syncHealthKit },
+    reminders, remindersLoaded, reminderBusy, setReminder,
+    hk: {
+      available: HK_AVAILABLE,
+      authorized: hkAuthorized,
+      access: hkAccess,
+      /** true — останній синк не зміг прочитати нічого (не плутати з «нуль кроків»). */
+      failed: hkFailed,
+      syncing: hkSyncing,
+      lastSync: hkLastSync,
+      sync: syncHealthKit,
+      requestAccess: requestHkAccess,
+    },
     reload,
   };
 }

@@ -23,6 +23,7 @@ import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
 import { UnsyncedOutboxError, useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
+import { throttleMessage } from '@/store/auth-throttle';
 import { useSync } from '@/store/sync-engine';
 import { haptic } from '@/utils/haptics';
 
@@ -59,6 +60,8 @@ export default function AccountScreen() {
       haptic.error();
       if (e instanceof OfflineError) {
         setNameError(tr.authOfflineError);
+      } else if (e instanceof ApiError && e.status === 429) {
+        setNameError(throttleMessage(tr, e));
       } else if (e instanceof ApiError && e.status >= 500) {
         setNameError(tr.authServerError);
       } else {
@@ -104,6 +107,9 @@ export default function AccountScreen() {
       } else if (e instanceof ApiError) {
         if (e.code === 'weak_password') {
           setPwdError(tr.authWeakPassword);
+        } else if (e.status === 429) {
+          // ERR-03: 429 від throttle — не «невірний пароль».
+          setPwdError(throttleMessage(tr, e));
         } else if (e.status === 400 || e.status === 401) {
           setPwdError(tr.authInvalidCreds);
         } else if (e.status >= 500) {
@@ -201,6 +207,8 @@ export default function AccountScreen() {
         Alert.alert('', tr.accountDeleteOwnsProjectsError);
       } else if (e instanceof ApiError && e.code === 'last_admin') {
         Alert.alert('', tr.accountDeleteLastAdminError);
+      } else if (e instanceof ApiError && e.status === 429) {
+        Alert.alert('', throttleMessage(tr, e));
       } else if (e instanceof ApiError && (e.status === 400 || e.status === 401)) {
         Alert.alert('', tr.authInvalidCreds);
       } else {
@@ -217,7 +225,11 @@ export default function AccountScreen() {
 
       <SafeAreaView style={{ flex: 1 }}>
         <View style={st.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel={tr.back}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <IconSymbol name="chevron.left" size={22} color={c.accent} />
           </TouchableOpacity>
         </View>
@@ -265,6 +277,9 @@ export default function AccountScreen() {
               activeOpacity={0.82}
               onPress={handleSaveName}
               disabled={nameSaving || !name.trim()}
+              accessibilityRole="button"
+              accessibilityLabel={tr.accountSaveName}
+              accessibilityState={{ disabled: nameSaving || !name.trim(), busy: nameSaving }}
             >
               {nameSaving ? (
                 <ActivityIndicator color="#fff" />
@@ -290,7 +305,11 @@ export default function AccountScreen() {
                     autoComplete="current-password"
                     returnKeyType="next"
                   />
-                  <TouchableOpacity onPress={() => setShowOld(v => !v)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowOld(v => !v)}
+                    accessibilityRole="button"
+                    accessibilityLabel={showOld ? tr.authHidePassword : tr.authShowPassword}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <IconSymbol name={showOld ? 'eye.slash' : 'eye'} size={18} color={c.sub} />
                   </TouchableOpacity>
                 </View>
@@ -309,7 +328,11 @@ export default function AccountScreen() {
                     textContentType="newPassword"
                     returnKeyType="next"
                   />
-                  <TouchableOpacity onPress={() => setShowNew(v => !v)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowNew(v => !v)}
+                    accessibilityRole="button"
+                    accessibilityLabel={showNew ? tr.authHidePassword : tr.authShowPassword}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <IconSymbol name={showNew ? 'eye.slash' : 'eye'} size={18} color={c.sub} />
                   </TouchableOpacity>
                 </View>
@@ -329,7 +352,11 @@ export default function AccountScreen() {
                     returnKeyType="done"
                     onSubmitEditing={handleChangePassword}
                   />
-                  <TouchableOpacity onPress={() => setShowRepeat(v => !v)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowRepeat(v => !v)}
+                    accessibilityRole="button"
+                    accessibilityLabel={showRepeat ? tr.authHidePassword : tr.authShowPassword}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <IconSymbol name={showRepeat ? 'eye.slash' : 'eye'} size={18} color={c.sub} />
                   </TouchableOpacity>
                 </View>
@@ -341,6 +368,9 @@ export default function AccountScreen() {
               activeOpacity={0.82}
               onPress={handleChangePassword}
               disabled={pwdSaving}
+              accessibilityRole="button"
+              accessibilityLabel={tr.accountChangePassword}
+              accessibilityState={{ disabled: pwdSaving, busy: pwdSaving }}
             >
               {pwdSaving ? (
                 <ActivityIndicator color="#fff" />
@@ -406,7 +436,11 @@ export default function AccountScreen() {
                       returnKeyType="done"
                       onSubmitEditing={handleDeleteConfirm}
                     />
-                    <TouchableOpacity onPress={() => setShowDeletePwdText(v => !v)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity
+                    onPress={() => setShowDeletePwdText(v => !v)}
+                    accessibilityRole="button"
+                    accessibilityLabel={showDeletePwdText ? tr.authHidePassword : tr.authShowPassword}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <IconSymbol name={showDeletePwdText ? 'eye.slash' : 'eye'} size={18} color={c.sub} />
                     </TouchableOpacity>
                   </View>
@@ -415,6 +449,9 @@ export default function AccountScreen() {
                     activeOpacity={0.82}
                     onPress={handleDeleteConfirm}
                     disabled={deleting || !deletePwd}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.accountDeleteAccount}
+                    accessibilityState={{ disabled: deleting || !deletePwd, busy: deleting }}
                   >
                     {deleting ? (
                       <ActivityIndicator color="#fff" />

@@ -9,14 +9,15 @@
  *   - spring(cfg)    → cfg без змін (використовуй dur окремо)
  *
  * getReducedMotion() — синхронний не-hook аксесор для місць поза React.
- * Значення кешується після першого рендеру компонента, що використовує useMotion().
+ * Значення кешується після першого КОМІТУ компонента, що використовує useMotion().
  * До першого монтування повертає false (анімації ввімкнено) — це безпечно.
  */
+import { useEffect, useMemo } from 'react';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { Motion } from '@/constants/motion';
 
-// Модульний кеш: оновлюється при кожному виклику useMotion().
+// Модульний кеш: оновлюється в ЕФЕКТІ useMotion() (не в тілі рендера).
 let _reducedMotionCached = false;
 
 /**
@@ -31,9 +32,19 @@ export type MotionAPI = ReturnType<typeof useMotion>;
 
 export function useMotion() {
   const reduced = useReducedMotion();
-  _reducedMotionCached = reduced;
 
-  return {
+  // Кеш оновлюється в ефекті, а не в тілі: присвоєння модульної змінної під
+  // час рендера — побічна дія, на якій React Compiler бейлаутить увесь
+  // компонент («Cannot reassign variables declared outside of the
+  // component/hook»), а з ним і все, що цей компонент рендерить.
+  useEffect(() => { _reducedMotionCached = reduced; }, [reduced]);
+
+  // useMemo, бо об'єкт їде пропом у мемоізовані картки списку
+  // (`TaskListItem`, `TodayTaskRow`): новий об'єкт щорендера провалює
+  // shallow-порівняння React.memo і перемальовує ВСІ видимі картки на
+  // кожне натискання клавіші в пошуку. Ключ один — `reduced`; решта полів
+  // від нього ж і залежить.
+  return useMemo(() => ({
     reduced,
     /** Повертає тривалість або 0 якщо reduced motion увімкнено. */
     dur(d: number): number {
@@ -53,7 +64,7 @@ export function useMotion() {
     spring<T extends object>(cfg: T): T {
       return cfg;
     },
-  } as const;
+  } as const), [reduced]);
 }
 
 // Re-export Motion для зручності

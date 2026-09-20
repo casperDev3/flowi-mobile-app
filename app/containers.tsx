@@ -25,7 +25,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
-import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { CONTENT_MAX_WIDTH, useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { DETAIL_COLUMN_WIDTH, DetailPane } from '@/components/shared/DetailPane';
 import { sizeClassFor } from '@/constants/tokens';
 
@@ -240,6 +240,7 @@ const ItemRow = React.memo(function ItemRow({
 export default function ContainersScreen() {
   const contentWidth = useContentWidth();
   const { width, height, isWide, isExpanded } = useResponsive();
+  const sheetSurface = useSheetSurface();
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
   const router = useRouter();
@@ -738,10 +739,10 @@ export default function ContainersScreen() {
       {/* ── Container Form Modal ─────────────────────────────────────────────── */}
       <Modal visible={showForm} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowForm(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowForm(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable accessible={false} style={s.overlay} onPress={() => setShowForm(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-                style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
                   <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, marginRight: 'auto', marginLeft: 'auto' }} />
@@ -798,10 +799,10 @@ export default function ContainersScreen() {
       {/* ── Item Edit Modal ───────────────────────────────────────────────────── */}
       <Modal visible={!!editItem} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditItem(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setEditItem(null)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable accessible={false} style={s.overlay} onPress={() => setEditItem(null)}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-                style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+                style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
                   <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, marginRight: 'auto', marginLeft: 'auto' }} />
@@ -865,8 +866,11 @@ export default function ContainersScreen() {
 
 const s = StyleSheet.create({
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheetOuter: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:      { borderRadius: 24, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
+  sheetOuter: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
+  // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
+  // ScrollView усередині нічого не гортав (NAT-01).
+  sheet:      { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   label:      { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
   input:      { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500', marginBottom: 2 },
   btn:        { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },

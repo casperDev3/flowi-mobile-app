@@ -116,6 +116,32 @@ describe('useMotion — reduced mode (reduced=true)', () => {
   });
 });
 
+describe('useMotion — стабільність посилання (PERF-3)', () => {
+  // Об'єкт motion їде пропом у React.memo-картки списку задач
+  // (index.tsx renderTaskItem → TaskListItem, TodayTaskRow). Новий об'єкт на
+  // кожен рендер екрана провалює shallow-порівняння memo і перемальовує всі
+  // видимі картки на кожне натискання клавіші в пошуку.
+  test('повторний рендер із тим самим reduced віддає ТОЙ САМИЙ об\'єкт', async () => {
+    (useReducedMotion as jest.Mock).mockReturnValue(false);
+    let renderer: any;
+    await act(async () => { renderer = TestRenderer.create(React.createElement(Probe)); });
+    const first = captured;
+    await act(async () => { renderer.update(React.createElement(Probe)); });
+    expect(captured).toBe(first);
+  });
+
+  test('зміна reduced віддає НОВИЙ об\'єкт (інакше dur() лишився б старим)', async () => {
+    (useReducedMotion as jest.Mock).mockReturnValue(false);
+    let renderer: any;
+    await act(async () => { renderer = TestRenderer.create(React.createElement(Probe)); });
+    const first = captured;
+    (useReducedMotion as jest.Mock).mockReturnValue(true);
+    await act(async () => { renderer.update(React.createElement(Probe)); });
+    expect(captured).not.toBe(first);
+    expect(captured.dur(250)).toBe(0);
+  });
+});
+
 describe('getReducedMotion — кеш', () => {
   test('повертає boolean (безпечний дефолт)', () => {
     expect(typeof getReducedMotion()).toBe('boolean');

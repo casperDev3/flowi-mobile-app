@@ -12,7 +12,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import { loadData, saveData } from '@/store/storage';
-import { OutboxItem, saveSynced } from '@/store/synced-storage';
+import { OutboxItem, resetSyncedKnownIds, saveSynced } from '@/store/synced-storage';
 import { categoryRowsToMap } from '@/store/migrations';
 
 function outbox(): OutboxItem[] {
@@ -20,13 +20,13 @@ function outbox(): OutboxItem[] {
   return raw === undefined ? [] : (JSON.parse(raw) as OutboxItem[]);
 }
 
-beforeEach(() => { mockStore.clear(); });
+beforeEach(() => { mockStore.clear(); resetSyncedKnownIds(); });
 
 interface Med { id: string; name: string }
 
-describe('DI-01: saveSynced зі СТАРОГО React-стану', () => {
-  it('ставить тумбстоун на запис, що приїхав синком повз екран', async () => {
-    // 1. екран змонтувався: у сховищі один запис
+describe('DI-01: saveSynced зі СТАРОГО React-стану (ВИПРАВЛЕНО)', () => {
+  it('НЕ ставить тумбстоун на запис, що приїхав синком повз екран', async () => {
+    // 1. екран змонтувався: у сховищі один запис, ефект-дзеркало його зберіг
     await saveSynced<Med>('health_meds', [{ id: 'a', name: 'Аспірин' }]);
     mockStore.set('sync_outbox', '[]');
 
@@ -41,9 +41,35 @@ describe('DI-01: saveSynced зі СТАРОГО React-стану', () => {
     await saveSynced<Med>('health_meds', screenState.map(m => ({ ...m, name: 'Аспірин 2' })));
 
     const afterStorage = await loadData<Med[]>('health_meds', []);
-    const deletes = outbox().filter(i => i.deleted);
-    expect(afterStorage.map(m => m.id)).toEqual(['a']); // b зник зі сховища
-    expect(deletes.map(i => i.local_id)).toEqual(['b']); // і поїхав на сервер як DELETE
+    expect(afterStorage.map(m => m.id)).toEqual(['a', 'b']);        // b на місці
+    expect(afterStorage.find(m => m.id === 'a')!.name).toBe('Аспірин 2'); // правка застосована
+    expect(outbox().filter(i => i.deleted)).toEqual([]);            // тумбстоунів немає
+    expect(outbox().map(i => i.local_id)).toEqual(['a']);           // на сервер їде лише a
+  });
+
+  it('справжнє видалення того, що екран бачив, і далі дає тумбстоун', async () => {
+    await saveSynced<Med>('health_meds', [
+      { id: 'a', name: 'Аспірин' },
+      { id: 'b', name: 'Вітамін D' },
+    ]);
+    mockStore.set('sync_outbox', '[]');
+
+    // користувач видалив b на екрані
+    await saveSynced<Med>('health_meds', [{ id: 'a', name: 'Аспірин' }]);
+
+    expect((await loadData<Med[]>('health_meds', [])).map(m => m.id)).toEqual(['a']);
+    expect(outbox().filter(i => i.deleted).map(i => i.local_id)).toEqual(['b']);
+  });
+
+  it('ПЕРШИЙ запис у ключ (відновлення з копії, міграція) і далі заміщає масив цілком', async () => {
+    // Жодного saveSynced по цьому ключу в цьому запуску ще не було, тож масив
+    // викликача — повна правда: інакше «відновити з копії» лишало б чуже.
+    mockStore.set('notes', JSON.stringify([{ id: 'стара', name: 'з пристрою' }]));
+
+    await saveSynced<Med>('notes', [{ id: 'з-копії', name: 'бекап' }]);
+
+    expect((await loadData<Med[]>('notes', [])).map(m => m.id)).toEqual(['з-копії']);
+    expect(outbox().filter(i => i.deleted).map(i => i.local_id)).toEqual(['стара']);
   });
 });
 

@@ -1,0 +1,18 @@
+# P0 (а) NAT-01 — НАРАДА створюється до кінця (найдовша форма застосунку).
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "30%,94%"
+- waitForAnimationToEnd
+- tapOn: "Додати зустріч"
+- waitForAnimationToEnd
+- inputText: "P0 Meeting"
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn:
+    point: "65%,92%"        # «Додати»
+- waitForAnimationToEnd
+- assertVisible: "P0 Meeting"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/p0a-12-meeting-created

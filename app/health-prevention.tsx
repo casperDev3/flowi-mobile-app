@@ -56,9 +56,25 @@ export default function PreventionScreen() {
   const habitsLeft = habits.filter(hb => !habitDoneToday(hb)).length;
 
   const exportReport = async () => {
+    // I18N-07: підписи звіту беремо зі словника — інакше англомовний
+    // користувач надсилав лікарю документ, якого сам не прочитає.
     const text = buildHealthReport({
       meds, checkups, vaccines,
       latestWeight: h.latestWeight, bmi: h.bmi, todayPulse: h.today.pulse, locale,
+      labels: {
+        title: tr.healthSummary,
+        weight: tr.weight,
+        bmi: tr.bmi,
+        pulse: tr.pulse,
+        unitKg: tr.unitKg,
+        unitBpm: lang === 'uk' ? 'уд/хв' : 'bpm',
+        meds: tr.meds,
+        adherence: tr.adherence.toLowerCase(),
+        checkups: tr.checkups,
+        vaccines: tr.vaccines,
+        dose: lang === 'uk' ? 'доза' : 'dose',
+        generatedBy: lang === 'uk' ? 'Сформовано у Flowi' : 'Generated in Flowi',
+      },
     });
     try { await Share.share({ message: text }); track(Events.ReportExported); } catch {}
   };

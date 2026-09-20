@@ -29,7 +29,7 @@ import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
 import { Lang } from '@/store/translations';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { useResponsive } from '@/hooks/use-responsive';
 
@@ -42,6 +42,9 @@ type RowPress = (route?: Href) => void;
 
 export default function SettingsScreen() {
   const contentWidth = useContentWidth();
+  // NAT-01: стеля аркуша — ЧИСЛО від висоти вікна; відсоток від батька з
+  // height:auto у Yoga не резолвиться і обмеження просто зникає.
+  const sheetSurface = useSheetSurface();
   const topInset = useTopInset();
   const tabBarInset = useTabBarInset();
   const { isWide } = useResponsive();
@@ -173,7 +176,9 @@ export default function SettingsScreen() {
   // ── Динамічне значення рядку Синхронізації ──────────────────────────────────
   const syncValue = useMemo(() => {
     if (!online) return tr.offlineBadge;
-    if (status !== 'authed') return tr.syncGuestHint.slice(0, 18) + '…';
+    // I18N-09: slice(0,18) різав посеред слова в обох мовах і не знав ні
+    // про ширину екрана, ні про розмір шрифту. Ріже RN по ширині — нижче.
+    if (status !== 'authed') return tr.syncGuestHint;
     if (syncState === 'error') return tr.syncError;
     if (pendingCount > 0) return `${pendingCount} ${tr.syncPending}`;
     if (lastSyncAt) {
@@ -305,8 +310,11 @@ export default function SettingsScreen() {
                   last
                 />
               </BlurView>
+              {/* NAT-15: підпис ішов безумовно офлайновий, тобто в режимі
+                  «Онлайн» екран сам собі суперечив — людина читала «дані лише
+                  на пристрої» під рядком «Онлайн». */}
               <Text style={{ color: c.sub, fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 6, marginBottom: 18 }}>
-                {tr.offlineDesc}
+                {online ? tr.onlineDesc : tr.offlineDesc}
               </Text>
             </View>
 
@@ -621,9 +629,13 @@ export default function SettingsScreen() {
       {/* ─── Theme Modal ─── */}
       <Modal visible={showThemeModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeThemeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={closeThemeModal}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <Pressable accessible={false} style={st.overlay} onPress={closeThemeModal}>
+            <Pressable
+              onPress={e => e.stopPropagation()}
+              accessible={false}
+              accessibilityViewIsModal
+              style={st.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
@@ -661,9 +673,13 @@ export default function SettingsScreen() {
       {/* ─── Language Modal ─── */}
       <Modal visible={showLangModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeLangModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={closeLangModal}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <Pressable accessible={false} style={st.overlay} onPress={closeLangModal}>
+            <Pressable
+              onPress={e => e.stopPropagation()}
+              accessible={false}
+              accessibilityViewIsModal
+              style={st.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
@@ -730,8 +746,12 @@ const SettingRow = React.memo(function SettingRow(
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        {value && <Text style={[st.rowValue, { color: sub }]}>{value}</Text>}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
+        {value && (
+          <Text style={[st.rowValue, { color: sub }]} numberOfLines={1} ellipsizeMode="tail">
+            {value}
+          </Text>
+        )}
         <IconSymbol name="chevron.right" size={16} color={sub} />
       </View>
     </TouchableOpacity>
@@ -758,9 +778,15 @@ const ToggleRow = React.memo(function ToggleRow(
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
+      {/* A11Y-03: підпис і Switch — сусідні вузли, тож без імені друга зупинка
+          VoiceOver звучала як «увімкнено, перемикач» без вказівки, ЩО саме.
+          Ім'я вішаємо на сам Switch, а не на обгортку з accessible: обгортка
+          склеїла б рядок в один елемент і сховала керований контрол (NAT-03). */}
       <Switch
         value={value}
         onValueChange={onChange}
+        accessibilityLabel={label}
+        accessibilityState={{ checked: value }}
         trackColor={{ false: 'rgba(128,128,128,0.3)', true: '#7C3AED' }}
         thumbColor="#fff"
         ios_backgroundColor="rgba(128,128,128,0.3)"
@@ -874,8 +900,9 @@ const st = StyleSheet.create({
   footerName:  { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
   footerBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: '90%' },
+  sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти приходить із useSheetSurface() на місці використання.
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   sheetTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 12 },

@@ -258,7 +258,13 @@ export default function ProjectSettingsScreen() {
 
   return (
     <ProjectScreenShell project={project} isDark={isDark} title={tr.tabOptions}>
-      <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
+        showsVerticalScrollIndicator={false}
+        // L3: дефолтний keyboardShouldPersistTaps='never' означає, що перший
+        // тап по кнопці поруч із полем лише ховає клавіатуру — кнопка
+        // виглядає мертвою.
+        keyboardShouldPersistTaps="handled">
 
         {/* Назва/колір/опис/термін */}
         <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>{tr.projectSettingsInfo}</Text>
@@ -267,6 +273,7 @@ export default function ProjectSettingsScreen() {
           onChangeText={v => { setName(v); setDirty(true); }}
           editable={isOwner}
           placeholder={tr.projectNamePlaceholder}
+          accessibilityLabel={tr.projectNamePlaceholder}
           placeholderTextColor={c.sub}
           style={{ borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 10 }}
         />
@@ -285,6 +292,7 @@ export default function ProjectSettingsScreen() {
           onChangeText={v => { setDescription(v); setDirty(true); }}
           editable={isOwner}
           placeholder={tr.projectDescriptionPlaceholder}
+          accessibilityLabel={tr.projectDescriptionPlaceholder}
           placeholderTextColor={c.sub}
           multiline
           style={{ borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 13, minHeight: 60, marginBottom: 10 }}
@@ -344,6 +352,11 @@ export default function ProjectSettingsScreen() {
                   <Switch
                     value={modules[row.key]}
                     onValueChange={() => toggleModule(row.key)}
+                    // A11Y-03: <Text> і <Switch> — сусідні елементи без
+                    // групування, тож друга зупинка VoiceOver звучала як
+                    // «увімкнено, перемикач» без назви розділу. Ім'я беремо
+                    // з того самого джерела, що й видимий підпис.
+                    accessibilityLabel={String(tr[row.labelKey])}
                     trackColor={{ false: 'rgba(128,128,128,0.3)', true: c.accent }}
                     thumbColor="#fff"
                     ios_backgroundColor="rgba(128,128,128,0.3)"
@@ -391,7 +404,12 @@ export default function ProjectSettingsScreen() {
                     <TouchableOpacity onPress={() => cycleType(col)} style={{ borderRadius: 8, borderWidth: 1, borderColor: c.border, paddingHorizontal: 8, paddingVertical: 4 }}>
                       <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700' }}>{typeLabel(col.type ?? 'todo')}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity disabled={scopedColumns.length <= 1} onPress={() => removeStatus(col.id)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                    <TouchableOpacity
+                      disabled={scopedColumns.length <= 1}
+                      onPress={() => removeStatus(col.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.delete}
+                      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
                       <IconSymbol name="trash" size={14} color={scopedColumns.length <= 1 ? c.border : '#EF4444'} />
                     </TouchableOpacity>
                   </View>

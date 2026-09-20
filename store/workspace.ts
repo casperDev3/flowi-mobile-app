@@ -60,6 +60,7 @@ export type WorkspaceCheckErrorCode =
   | 'insecure_url'
   | 'network'
   | 'not_workspace'
+  | 'server_unavailable'
   | 'update_app'
   | 'update_server'
   | 'update_app_to'
@@ -70,6 +71,12 @@ export interface WorkspaceCheckError {
   code: WorkspaceCheckErrorCode;
   /** Лише для 'update_app_to' — версія, до якої треба оновитись. */
   minVersion?: string;
+  /**
+   * Схему ми домислили самі (користувач її не писав). Тоді 'network' може
+   * означати не «сервера немає», а «ми постукали не туди» — екран додає
+   * підказку про схему замість глухого «не вдалося з'єднатися».
+   */
+  schemeAssumed?: boolean;
 }
 
 export interface WorkspaceCheckSuccess {
@@ -82,14 +89,32 @@ export interface WorkspaceCheckSuccess {
 const LOCAL_HOST_RE =
   /^(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|.+\.local)$/i;
 
+/** Хост із адреси БЕЗ схеми: `192.168.0.5:8000/api` → `192.168.0.5`. */
+function bareHost(input: string): string {
+  const authority = input.split('/')[0];
+  const hostAndPort = authority.split('@').pop() ?? authority;
+  return hostAndPort.replace(/:\d+$/, '');
+}
+
 export function normalizeWorkspaceOrigin(
   input: string,
-): { ok: true; origin: string } | { ok: false; code: 'invalid_url' | 'insecure_url' } {
+): { ok: true; origin: string; schemeAssumed?: boolean }
+  | { ok: false; code: 'invalid_url' | 'insecure_url' } {
   let s = (input ?? '').trim();
   if (!s) return { ok: false, code: 'invalid_url' };
 
   s = s.replace(/\/+$/, '').replace(/\/api$/i, '');
-  if (!/^[a-zA-Z]+:\/\//.test(s)) s = `https://${s}`;
+  let schemeAssumed = false;
+  if (!/^[a-zA-Z]+:\/\//.test(s)) {
+    // Домислити https БУДЬ-ЧОМУ означало зробити локальний сервер і сервер
+    // без TLS недосяжним: `https://127.0.0.1:8000` просто не відповідає, а
+    // екран казав лише «не вдалося з'єднатися». Для адрес, яким http дозволено
+    // нижче (LOCAL_HOST_RE), домислюємо саме http — це той самий перелік, тож
+    // друга перевірка вже не відкине те, що ми щойно побудували.
+    const scheme = LOCAL_HOST_RE.test(bareHost(s)) ? 'http' : 'https';
+    s = `${scheme}://${s}`;
+    schemeAssumed = true;
+  }
 
   let url: URL;
   try {
@@ -107,7 +132,7 @@ export function normalizeWorkspaceOrigin(
   const origin = `${url.protocol}//${url.host}${url.pathname}`
     .replace(/\/+$/, '')
     .replace(/\/api$/i, '');
-  return { ok: true, origin };
+  return schemeAssumed ? { ok: true, origin, schemeAssumed: true } : { ok: true, origin };
 }
 
 // ─── Перевірка сумісності (контракт §2.2.3) ──────────────────────────────────
@@ -151,6 +176,10 @@ async function rawFetchWorkspaceInfo(origin: string): Promise<WorkspaceInfo> {
       headers: { Accept: 'application/json' },
       signal: controller.signal,
     });
+    // ERR-04: 502/503 під час деплою, 500 від Django і 429 від throttle — це
+    // «сервер зараз не відповідає», а не «тут не Flowi, оновіть сервер».
+    // `not_workspace` лишається для 404, не-JSON і відповіді без протоколу.
+    if (res.status >= 500 || res.status === 429) throw new Error('server_unavailable');
     if (!res.ok) throw new Error('not_workspace');
     let data: unknown;
     try {
@@ -184,7 +213,12 @@ export async function checkWorkspace(
     if (e instanceof Error && e.message === 'not_workspace') {
       return { ok: false, code: 'not_workspace' };
     }
-    return { ok: false, code: 'network' };
+    if (e instanceof Error && e.message === 'server_unavailable') {
+      return { ok: false, code: 'server_unavailable' };
+    }
+    return normalized.schemeAssumed
+      ? { ok: false, code: 'network', schemeAssumed: true }
+      : { ok: false, code: 'network' };
   }
 
   const compat = checkWorkspaceCompatibility(info);
@@ -287,7 +321,8 @@ export async function refreshWorkspaceCompatibility(): Promise<void> {
     if (result.code === 'update_app' || result.code === 'update_server' || result.code === 'update_app_to') {
       setWorkspaceIncompatibility({ code: result.code, minVersion: result.minVersion });
     }
-    // 'network' / 'not_workspace' / 'invalid_url' / 'insecure_url' — тимчасове
+    // 'network' / 'server_unavailable' / 'not_workspace' / 'invalid_url' /
+    // 'insecure_url' — тимчасове
     // або малоймовірне (адреса вже пройшла перевірку раніше); не блокуємо UI.
   } finally {
     // `finally`, а не хвіст щасливого шляху (мінор із ревʼю): офлайн холодний

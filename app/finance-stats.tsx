@@ -26,6 +26,7 @@ import {
 import { type Account, type AccountKind } from '@/utils/accounts';
 import { useResponsive } from '@/hooks/use-responsive';
 import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { defaultCategories, type CategoryDef } from '@/utils/financeCategories';
 
 /**
  * Категорію мають лише дохід і витрата, тож розріз «за категоріями» знає саме
@@ -37,27 +38,14 @@ import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
  * лише 'income' | 'expense', і компілятор не показав би жодного місця, де
  * переказ не розглянуто.
  */
+/**
+ * I18N-04. Тут лежала ВЛАСНА україномовна копія дефолтних категорій, і саме
+ * вона вживалась при читанні: у «Фінансах» категорії англійські, а в
+ * «Статистиці» — українські, тобто той самий набір операцій розкладався на два
+ * різні списки. Джерело правди одне — `utils/financeCategories`, який знає
+ * обидві мови.
+ */
 type CatType = 'income' | 'expense';
-interface CategoryDef { name: string; icon: IconSymbolName; }
-
-const DEFAULT_CATEGORIES: Record<CatType, CategoryDef[]> = {
-  income: [
-    { name: 'Зарплата',   icon: 'briefcase.fill' },
-    { name: 'Фріланс',    icon: 'laptopcomputer' },
-    { name: 'Інвестиції', icon: 'chart.line.uptrend.xyaxis' },
-    { name: 'Подарунок',  icon: 'gift.fill' },
-    { name: 'Інше',       icon: 'ellipsis.circle.fill' },
-  ],
-  expense: [
-    { name: 'Їжа',        icon: 'fork.knife' },
-    { name: 'Транспорт',  icon: 'car.fill' },
-    { name: 'Розваги',    icon: 'gamecontroller.fill' },
-    { name: "Здоров'я",   icon: 'cross.fill' },
-    { name: 'Комунальні', icon: 'house.fill' },
-    { name: 'Одяг',       icon: 'tag.fill' },
-    { name: 'Інше',       icon: 'ellipsis.circle.fill' },
-  ],
-};
 
 /**
  * Іконка за видом рахунку, а не за полем `icon`: воно довільне й може містити
@@ -74,9 +62,12 @@ const CAT_COLORS = [
   '#EC4899', '#F97316', '#14B8A6', '#6366F1', '#A855F7', '#64748B',
 ];
 
-const MONTHS_UA      = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
-const MONTHS_UA_FULL = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
-const WEEKDAYS_UA    = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+/**
+ * I18N-03. Тут лежали три локальні україномовні масиви (короткі місяці,
+ * повні місяці, дні тижня) — англійський інтерфейс показував «Січ», «Пн» і
+ * «Січень 2026». Ті самі списки вже є у словнику (`tr.monthsShort`,
+ * `tr.months`, `tr.weekdays`), тож беруться звідти.
+ */
 const fmtShort = (n: number) => {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}к`;
   return String(Math.round(n));
@@ -234,11 +225,25 @@ export default function FinanceStatsScreen() {
   const { width, isWide } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
+  // I18N-03: підписи осей і календаря — зі словника, а не з локальних масивів.
+  const monthLabelsShort = tr.monthsShort;
+  const monthLabelsFull = tr.months;
+  const weekdayLabels = tr.weekdays;
   const [txs, setTxs] = useState<Transaction[]>([]);
   // Порожній стан показуємо лише після читання сховища: інакше він блимає
   // на першому кадрі, поки транзакції ще не приїхали.
   const [loaded, setLoaded] = useState(false);
-  const [cats, setCats] = useState<Record<CatType, CategoryDef[]>>(DEFAULT_CATEGORIES);
+  const defaultCats = useMemo(() => defaultCategories(lang), [lang]);
+  /**
+   * Зберігаємо СИРІ рядки категорій, а мапу рахуємо похідною: дефолти
+   * залежать від мови, і при перемиканні мови список мусить перерахуватись,
+   * а не лишитись тим, яким його прочитали на монтуванні (I18N-04).
+   */
+  const [catRows, setCatRows] = useState<CategoryRow[]>([]);
+  const cats = useMemo<Record<CatType, CategoryDef[]>>(
+    () => categoryRowsToMap(catRows, defaultCats),
+    [catRows, defaultCats],
+  );
   // Рахунки потрібні для розрізу витрат по місцях, де лежать гроші, і як
   // довідник валют для їхніх підсумків.
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -303,7 +308,7 @@ export default function FinanceStatsScreen() {
       loadData<Account[]>('accounts', []),
     ]).then(([loadedTxs, rows, primCur, curList, accs]) => {
       setTxs(loadedTxs);
-      setCats(categoryRowsToMap(Array.isArray(rows) ? rows : [], DEFAULT_CATEGORIES));
+      setCatRows(Array.isArray(rows) ? rows : []);
       setPrimaryCurrency(primCur || 'UAH');
       setCustomCurrencies(Array.isArray(curList) ? curList : []);
       setAccounts(Array.isArray(accs) ? accs : []);
@@ -314,9 +319,9 @@ export default function FinanceStatsScreen() {
   const getCatIcon = useCallback(
     (name: string, type: CatType): IconSymbolName =>
       cats[type].find(cat => cat.name === name)?.icon ??
-      DEFAULT_CATEGORIES[type].find(cat => cat.name === name)?.icon ??
+      defaultCats[type].find(cat => cat.name === name)?.icon ??
       'ellipsis.circle.fill',
-    [cats],
+    [cats, defaultCats],
   );
 
   const c = useMemo(() => makeColors(isDark), [isDark]);
@@ -387,7 +392,7 @@ export default function FinanceStatsScreen() {
         const f = periodFlow.filter(t => new Date(t.date).toDateString() === dayKey);
         const dow = d.getDay();
         return {
-          label: WEEKDAYS_UA[dow === 0 ? 6 : dow - 1],
+          label: weekdayLabels[dow === 0 ? 6 : dow - 1],
           income:  f.filter(t => t.type === 'income' ).reduce((s, t) => s + t.amount, 0),
           expense: f.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
         };
@@ -404,12 +409,12 @@ export default function FinanceStatsScreen() {
         return `${td.getFullYear()}-${td.getMonth()}` === key;
       });
       return {
-        label: MONTHS_UA[d.getMonth()],
+        label: monthLabelsShort[d.getMonth()],
         income:  f.filter(t => t.type === 'income' ).reduce((s, t) => s + t.amount, 0),
         expense: f.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
       };
     });
-  }, [flowTxs, periodFlow, period]);
+  }, [flowTxs, periodFlow, period, monthLabelsShort, weekdayLabels]);
 
   const maxBar = Math.max(...chartData.map(m => Math.max(m.income, m.expense)), 1);
 
@@ -457,13 +462,13 @@ export default function FinanceStatsScreen() {
       counts[idx] += 1;
     });
     const maxSum = Math.max(...sums, 1);
-    return WEEKDAYS_UA.map((label, i) => ({
+    return weekdayLabels.map((label, i) => ({
       label,
       total: sums[i],
       count: counts[i],
       pct:   sums[i] / maxSum,
     }));
-  }, [periodFlow]);
+  }, [periodFlow, weekdayLabels]);
 
   // ── Quick stats ──────────────────────────────────────────────────────────
   // Лічильник показує операції обороту: він стоїть поруч із «сер/день», і
@@ -537,12 +542,18 @@ export default function FinanceStatsScreen() {
 
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={[s.backBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel={tr.back}
+            style={[s.backBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
             <IconSymbol name="chevron.left" size={17} color={c.sub} />
           </TouchableOpacity>
           <Text style={[s.title, { color: c.text }]}>Статистика</Text>
           <TouchableOpacity
             onPress={openCal}
+            accessibilityRole="button"
+            accessibilityLabel={tr.calendar}
             style={[s.backBtn, {
               backgroundColor: hasCustomRange ? c.accent + '22' : c.dim,
               borderColor:     hasCustomRange ? c.accent        : c.border,
@@ -562,9 +573,9 @@ export default function FinanceStatsScreen() {
               style={[s.rangeChip, { backgroundColor: c.accent + '18', borderColor: c.accent + '50' }]}>
               <IconSymbol name="calendar" size={12} color={c.accent} />
               <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700', marginHorizontal: 6 }}>
-                {rangeStart!.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                {rangeStart!.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                 {' — '}
-                {rangeEnd!.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {rangeEnd!.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}
               </Text>
               <IconSymbol name="xmark" size={11} color={c.accent} />
             </TouchableOpacity>
@@ -603,6 +614,9 @@ export default function FinanceStatsScreen() {
               <TouchableOpacity
                 key={p.key}
                 onPress={() => setPeriod(p.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: period === p.key }}
+                accessibilityLabel={p.label}
                 style={[s.segBtn, period === p.key && { backgroundColor: c.accent }]}>
                 <Text style={[s.segLabel, { color: period === p.key ? '#fff' : c.sub }]}>{p.label}</Text>
               </TouchableOpacity>
@@ -818,6 +832,9 @@ export default function FinanceStatsScreen() {
               <TouchableOpacity
                 key={t}
                 onPress={() => setCatTab(t)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: catTab === t }}
+                accessibilityLabel={t === 'expense' ? tr.expenses : tr.incomes}
                 style={[s.segBtn, catTab === t && { backgroundColor: t === 'expense' ? c.red : c.green }]}>
                 <Text style={[s.segLabel, { color: catTab === t ? '#fff' : c.sub }]}>
                   {t === 'expense' ? 'Витрати' : 'Доходи'}
@@ -900,8 +917,13 @@ export default function FinanceStatsScreen() {
 
       {/* ─── Calendar Range Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.28)', justifyContent: 'flex-end' }} onPress={() => setShowCal(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={[{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }, contentWidth]}>
+        <Pressable accessible={false} style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.28)', justifyContent: 'flex-end' }} onPress={() => setShowCal(false)}>
+          <Pressable
+            onPress={e => e.stopPropagation()}
+            accessible={false}
+            accessibilityViewIsModal
+            importantForAccessibility="yes"
+            style={[{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }, contentWidth]}>
             <BlurView intensity={isDark ? 55 : 72} tint={isDark ? 'dark' : 'light'} style={[s.calSheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,16,30,0.97)' : 'rgba(245,248,255,0.97)' }]}>
 
               {/* Handle + close */}
@@ -909,7 +931,11 @@ export default function FinanceStatsScreen() {
                 <View style={{ flex: 1 }} />
                 <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, alignSelf: 'center' }} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <TouchableOpacity onPress={() => setShowCal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowCal(false)}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.close}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <IconSymbol name="xmark" size={16} color={c.sub} />
                   </TouchableOpacity>
                 </View>
@@ -939,7 +965,7 @@ export default function FinanceStatsScreen() {
                       <View style={{ marginLeft: 7 }}>
                         <Text style={{ color: isActive ? c.accent : isDone ? c.green : c.sub, fontSize: 10, fontWeight: '600' }}>{label}</Text>
                         <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>
-                          {dateVal ? dateVal.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }) : '—'}
+                          {dateVal ? dateVal.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '—'}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -949,20 +975,31 @@ export default function FinanceStatsScreen() {
 
               {/* Month navigation */}
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <TouchableOpacity onPress={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }} style={s.navBtn}>
+                {/* Ім'я кнопки — місяць, куди вона веде: ключів «попередній/
+                    наступний місяць» у словнику немає, а SF Symbol iOS озвучує
+                    англійським «Back»/«Forward» (A11Y-01, NAT-28). */}
+                <TouchableOpacity
+                  onPress={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={monthLabelsFull[(calMonth + 11) % 12]}
+                  style={s.navBtn}>
                   <IconSymbol name="chevron.left" size={19} color={c.sub} />
                 </TouchableOpacity>
                 <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontWeight: '700' }}>
-                  {MONTHS_UA_FULL[calMonth]} {calYear}
+                  {monthLabelsFull[calMonth]} {calYear}
                 </Text>
-                <TouchableOpacity onPress={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }} style={s.navBtn}>
+                <TouchableOpacity
+                  onPress={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={monthLabelsFull[(calMonth + 1) % 12]}
+                  style={s.navBtn}>
                   <IconSymbol name="chevron.right" size={19} color={c.sub} />
                 </TouchableOpacity>
               </View>
 
               {/* Weekday headers */}
               <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-                {WEEKDAYS_UA.map(d => (
+                {weekdayLabels.map(d => (
                   <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
                 ))}
               </View>
@@ -984,6 +1021,12 @@ export default function FinanceStatsScreen() {
                       <TouchableOpacity
                         key={di}
                         onPress={() => !isFuture && handleDayPress(date)}
+                        accessibilityRole="button"
+                        accessibilityLabel={[
+                          date.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }),
+                          isToday ? tr.today : null,
+                        ].filter(Boolean).join(', ')}
+                        accessibilityState={{ selected: !!(isStart || isEnd), disabled: isFuture }}
                         style={{ flex: 1, alignItems: 'center', paddingVertical: 3 }}
                         activeOpacity={isFuture ? 1 : 0.7}>
                         <View style={[

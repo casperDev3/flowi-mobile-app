@@ -33,7 +33,9 @@ import {
 } from '@/utils/healthTheme';
 import { HealthEntry, getMonthEntries, getWeeklyInsights } from '@/utils/healthUtils';
 import { useResponsive } from '@/hooks/use-responsive';
+import { sheetSurfaceStyle } from '@/hooks/use-content-width';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { LoadErrorNotice } from '@/components/health/HealthNotices';
 
 export default function HealthHubScreen() {
   const { sizeClass } = useResponsive();
@@ -138,8 +140,13 @@ export default function HealthHubScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 
+          {/* ERR-01: якщо читання провалилось, initialized НЕ вмикається —
+              без цієї гілки екран крутив би скелетони нескінченно, а людина
+              думала б, що дані «ще вантажаться». */}
+          {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
+
           {/* Skeleton — перший завантаження */}
-          {!h.initialized && (
+          {!h.initialized && !h.loadFailed && (
             <>
               <SkeletonCard style={{ marginTop: 4 }} />
               <SkeletonCard />
@@ -245,7 +252,10 @@ export default function HealthHubScreen() {
       </View>
 
       {/* FAB → нижній попап швидкого вводу */}
-      <View style={[s.fabContainer, { bottom: Platform.OS === 'ios' ? 108 : 88 }]} pointerEvents="box-none">
+      {/* L5: інсет із useTabBarInset() — він додає висоту ActiveTimersBar,
+          коли йде хоч один таймер. Зашите 108 ховало нижню третину кнопки
+          під панеллю таймерів, і тап потрапляв у панель. */}
+      <View style={[s.fabContainer, { bottom: tabBarInset + 20 }]} pointerEvents="box-none">
         <TouchableOpacity onPress={() => setQuickOpen(true)} activeOpacity={0.85}
           accessibilityRole="button" accessibilityLabel={tr.add}
           style={[s.fab, { shadowColor: ACCENT }]}>
@@ -279,13 +289,14 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, isD
   isDark: boolean; c: any; tr: any; locale: string;
 }) {
   const { height } = useResponsive();
+  const sheetSurface = sheetSurfaceStyle(height);
   const now = new Date();
   const monthEntries = useMemo(() => getMonthEntries(entries, activeMonth), [entries, activeMonth]);
   return (
     <Modal visible={open} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-      <Pressable style={s.overlay} onPress={onClose}>
-        <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
-          <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+      <Pressable accessible={false} style={s.overlay} onPress={onClose}>
+        <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+          <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
             <View style={s.handleRow}>
               <View style={{ flex: 1 }} />
               <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -367,8 +378,10 @@ const s = StyleSheet.create({
   fab:          { width: 58, height: 58, borderRadius: 29, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
   fabGrad:      { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
   overlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
-  sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
+  sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти — числом із sheetSurfaceStyle(); відсоток від батька з
+  // height:auto не рахується і обмеження просто зникає (NAT-01).
+  sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2 },
   sheetTitle:   { fontSize: 20, fontWeight: '800' },

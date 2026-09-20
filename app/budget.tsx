@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
 import { MonthPicker } from '@/components/shared/MonthPicker';
 import { isSameMonth as sameMonth } from '@/utils/dateUtils';
 import { budgetTxCurrency, formatUncounted, uncountedSpendByCategory } from '@/utils/budgetUtils';
@@ -25,13 +26,13 @@ import type { CategoryRow } from '@/store/migrations';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
-import { loadData } from '@/store/storage';
+import { loadDataResult, retryStorageRead } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import {
   BUILTIN_CURRENCIES, formatCurrency, type Currency, type Transaction,
 } from '@/utils/financeUtils';
 import { type Account } from '@/utils/accounts';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,6 +53,39 @@ interface BudgetLimit {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ACCENT = '#0EA5E9';
+/**
+ * A11Y-05. Той самий `#0EA5E9`, узятий КОЛЬОРОМ ТЕКСТУ на світлому тлі
+ * екрана, дає 2.51:1 при нормі 4.5:1 — цифра ліміту й підписи чипів
+ * практично не читаються при яскравому світлі. Тло, заливки й прогрес
+ * лишаються акцентними (там норма інша), а текст і гліфи у світлій темі
+ * беруть темніший відтінок: `#0369A1` на `#EFF5FF` = 5.4:1.
+ * Правильне місце для такої пари — токени теми, але constants/tokens.ts —
+ * чужа зона цього проходу.
+ */
+const ACCENT_TEXT_LIGHT = '#0369A1';
+
+/**
+ * ERR-13. Підтвердження видалення й попередження про дубль були зашиті
+ * українською повз i18n: англомовний користувач підтверджував незворотну дію,
+ * не прочитавши, що саме підтверджує. Ключів під ці рядки в
+ * `store/translations.ts` немає, а сам словник у цьому проході — чужа зона,
+ * тож поки що двомовна табличка тут. Перенести в `Translations` — окремо
+ * (винесено в needsOtherZone).
+ */
+const ALERTS = {
+  uk: {
+    deleteTitle: 'Видалити категорію?',
+    deleteMsg: '«{name}» буде видалено з бюджету.',
+    exists: 'Категорія вже існує',
+    deleteAction: 'Видалити категорію',
+  },
+  en: {
+    deleteTitle: 'Delete category?',
+    deleteMsg: '"{name}" will be removed from the budget.',
+    exists: 'This category already exists',
+    deleteAction: 'Delete category',
+  },
+} as const;
 
 const ICON_OPTIONS: IconSymbolName[] = [
   'fork.knife', 'car.fill', 'gamecontroller.fill', 'cross.fill', 'house.fill',
@@ -94,6 +128,8 @@ function makeColors(isDark: boolean) {
     dim:    isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
     sheet:  isDark ? 'rgba(8,14,24,0.98)' : 'rgba(239,245,255,0.98)',
     input:  isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+    /** Акцент у ролі тексту/гліфа — див. ACCENT_TEXT_LIGHT (A11Y-05). */
+    accentText: isDark ? ACCENT : ACCENT_TEXT_LIGHT,
     green:  '#10B981',
     amber:  '#F59E0B',
     red:    '#EF4444',
@@ -107,6 +143,7 @@ type BudgetColors = ReturnType<typeof makeColors>;
 export default function BudgetScreen() {
   const contentWidth = useContentWidth();
   const { isWide } = useResponsive();
+  const sheetSurface = useSheetSurface();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
 
@@ -136,22 +173,30 @@ export default function BudgetScreen() {
   const [newCatName, setNewCatName]       = useState('');
   const [newCatIcon, setNewCatIcon]       = useState<IconSymbolName>('ellipsis.circle.fill');
   const [newCatLimit, setNewCatLimit]     = useState('');
+  /** ERR-01: «ліміти не прочитались» — окремий стан, а не порожній бюджет. */
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // ─── Load ─────────────────────────────────────────────────────────────────
 
-  useFocusEffect(useCallback(() => {
-    (async () => {
-      const [savedBudgets, txs, primCur, curList, accs, catRows] = await Promise.all([
-        loadData<BudgetLimit[]>('budget_limits', []),
-        loadData<Transaction[]>('transactions', []),
-        loadData<string>('finance_primary_currency', 'UAH'),
-        loadData<Currency[]>('finance_currencies', []),
-        loadData<Account[]>('accounts', []),
-        loadData<CategoryRow[]>('categories', []),
-      ]);
-      setPrimaryCurrency(primCur || 'UAH');
-      setCustomCurrencies(Array.isArray(curList) ? curList : []);
-      setAccounts(Array.isArray(accs) ? accs : []);
+  const load = useCallback(async (retry = false) => {
+    // Аліас із явним типом: union двох generic-функцій втрачає параметр T.
+    const read: typeof loadDataResult = retry ? retryStorageRead : loadDataResult;
+    const [savedBudgets, txs, primCur, curList, accs, catRows] = await Promise.all([
+      read<BudgetLimit[]>('budget_limits', []),
+      read<Transaction[]>('transactions', []),
+      read<string>('finance_primary_currency', 'UAH'),
+      read<Currency[]>('finance_currencies', []),
+      read<Account[]>('accounts', []),
+      read<CategoryRow[]>('categories', []),
+    ]);
+      // ERR-01. 'budget_limits' — єдиний ключ, у який цей екран пише. Якщо він
+      // не прочитався, показувати пресети з нулями не можна: перша ж правка
+      // ліміту записала б цей список поверх справжніх лімітів (а шар сховища
+      // такий запис ще й відхилить StorageWriteBlockedError).
+      if (!savedBudgets.ok) { setLoadFailed(true); return; }
+      setPrimaryCurrency(primCur.ok ? (primCur.value || 'UAH') : 'UAH');
+      setCustomCurrencies(curList.ok && Array.isArray(curList.value) ? curList.value : []);
+      setAccounts(accs.ok && Array.isArray(accs.value) ? accs.value : []);
 
       // Форму даних перевіряємо ДО використання, а не сподіваємось на неї.
       // Екран падав саме тут: `budget_limits` чи `transactions` у вигляді
@@ -159,11 +204,11 @@ export default function BudgetScreen() {
       // «Invalid attempt to spread non-iterable instance» просто на відкритті,
       // без жодного натяку на причину. Порожній список — поганий стан, але
       // видимий; виняток на монтуванні — це чорний екран.
-      const limitRows = Array.isArray(savedBudgets)
-        ? savedBudgets.filter((row): row is BudgetLimit => !!row && typeof row === 'object')
+      const limitRows = Array.isArray(savedBudgets.value)
+        ? savedBudgets.value.filter((row): row is BudgetLimit => !!row && typeof row === 'object')
         : [];
-      const txRows = Array.isArray(txs)
-        ? txs.filter((row): row is Transaction => !!row && typeof row === 'object')
+      const txRows = txs.ok && Array.isArray(txs.value)
+        ? txs.value.filter((row): row is Transaction => !!row && typeof row === 'object')
         : [];
 
       // Пресети беремо з категорій, під якими операції лежать НАСПРАВДІ, а не
@@ -171,7 +216,7 @@ export default function BudgetScreen() {
       // назви: доки список був зашитий українською, англійський інтерфейс
       // давав сім порожніх українських рядків, а ліміт на «Їжа» не зменшувався
       // ніколи — витрата лежала в «Food».
-      const presets = expenseCategoryPresets(Array.isArray(catRows) ? catRows : [], lang);
+      const presets = expenseCategoryPresets(catRows.ok && Array.isArray(catRows.value) ? catRows.value : [], lang);
       const merged = [...limitRows];
       for (const def of presets) {
         if (!merged.find(b => b.category === def.name)) {
@@ -180,14 +225,22 @@ export default function BudgetScreen() {
       }
       setBudgets(merged);
       setTransactions(txRows);
-    })();
-  }, [lang]));
+      setLoadFailed(false);
+  }, [lang]);
+
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  /** «Повторити»: без retryStorageRead ключ лишається заблокованим на запис. */
+  const retryLoad = useCallback(() => { void load(true); }, [load]);
 
   const saveBudgets = useCallback((next: BudgetLimit[]) => {
     setBudgets(next);
     // id похідний від назви категорії: два пристрої, що офлайн додали ліміт на
     // ту саму категорію, мусять зійтись в один запис, а не в два.
-    void saveSynced('budget_limits', next.map(b => ({ ...b, id: b.category })));
+    // Запис у ключ із проваленим читанням шар сховища відхиляє — без .catch
+    // RN лаявся б Possible Unhandled Promise Rejection (ERR-01).
+    void saveSynced('budget_limits', next.map(b => ({ ...b, id: b.category })))
+      .catch(e => { if (__DEV__) console.warn('[budget] запис лімітів не вдався:', e); });
   }, []);
 
   // ─── Computed ─────────────────────────────────────────────────────────────
@@ -305,9 +358,10 @@ export default function BudgetScreen() {
   }
 
   function deleteCategory(cat: string) {
-    Alert.alert('Видалити категорію?', `«${cat}» буде видалено з бюджету.`, [
-      { text: 'Скасувати', style: 'cancel' },
-      { text: 'Видалити', style: 'destructive', onPress: () => saveBudgets(budgets.filter(b => b.category !== cat)) },
+    const a = ALERTS[lang] ?? ALERTS.uk;
+    Alert.alert(a.deleteTitle, a.deleteMsg.replace('{name}', cat), [
+      { text: tr.cancel, style: 'cancel' },
+      { text: tr.delete, style: 'destructive', onPress: () => saveBudgets(budgets.filter(b => b.category !== cat)) },
     ]);
   }
 
@@ -315,7 +369,7 @@ export default function BudgetScreen() {
     const name = newCatName.trim();
     if (!name) return;
     if (budgets.find(b => b.category === name)) {
-      Alert.alert('Категорія вже існує');
+      Alert.alert((ALERTS[lang] ?? ALERTS.uk).exists);
       return;
     }
     const limit = parseFloat(newCatLimit.replace(',', '.')) || 0;
@@ -348,8 +402,10 @@ export default function BudgetScreen() {
           <Text style={[st.title, { color: c.text }]}>Бюджет</Text>
           <TouchableOpacity
             onPress={() => setShowAddModal(true)}
+            accessibilityRole="button"
+            accessibilityLabel={tr.add}
             style={[st.headerBtn, { backgroundColor: ACCENT + '20' }]}>
-            <IconSymbol name="plus" size={18} color={ACCENT} />
+            <IconSymbol name="plus" size={18} color={c.accentText} />
           </TouchableOpacity>
         </View>
 
@@ -378,7 +434,7 @@ export default function BudgetScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
               backgroundColor: ACCENT + '15', borderRadius: 12, marginBottom: 12,
               borderWidth: 1, borderColor: ACCENT + '30' }}>
-              <IconSymbol name="info.circle" size={15} color={ACCENT} />
+              <IconSymbol name="info.circle" size={15} color={c.accentText} />
               <Text style={{ flex: 1, fontSize: 12, color: c.sub, lineHeight: 17 }}>
                 {tr.budgetOtherCurrenciesHint.replace('{n}', String(otherCurrencyCount))}
               </Text>
@@ -398,7 +454,7 @@ export default function BudgetScreen() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={{ fontSize: 12, color: c.sub, fontWeight: '600' }}>БЮДЖЕТ</Text>
-                  <Text style={{ fontSize: 22, fontWeight: '800', color: ACCENT, marginTop: 2, letterSpacing: -0.5 }}>
+                  <Text style={{ fontSize: 22, fontWeight: '800', color: c.accentText, marginTop: 2, letterSpacing: -0.5 }}>
                     {fmt(totals.totalBudget)}
                   </Text>
                 </View>
@@ -440,11 +496,16 @@ export default function BudgetScreen() {
             </BlurView>
           )}
 
+          {/* ERR-01: збій читання лімітів — окремий стан із «Повторити». */}
+          {loadFailed && (
+            <LoadErrorNotice lang={lang} isDark={isDark} text={c.text} sub={c.sub} onRetry={retryLoad} />
+          )}
+
           {/* Empty state */}
-          {displayBudgets.length === 0 && (
+          {displayBudgets.length === 0 && !loadFailed && (
             <View style={{ alignItems: 'center', paddingVertical: 64 }}>
               <View style={[st.emptyIcon, { backgroundColor: ACCENT + '15' }]}>
-                <IconSymbol name="chart.pie.fill" size={36} color={ACCENT} />
+                <IconSymbol name="chart.pie.fill" size={36} color={c.accentText} />
               </View>
               <Text style={{ fontSize: 17, fontWeight: '700', color: c.text, marginTop: 16 }}>
                 Бюджет не налаштовано
@@ -474,10 +535,10 @@ export default function BudgetScreen() {
       <Modal visible={showEditModal} transparent animationType="slide" statusBarTranslucent
         onRequestClose={() => setShowEditModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={() => setShowEditModal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, contentWidth]} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable accessible={false} style={st.overlay} onPress={() => setShowEditModal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, contentWidth]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet, maxHeight: '90%' }]}>
+                style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
                 {/* Handle */}
@@ -488,7 +549,7 @@ export default function BudgetScreen() {
                 {/* Icon + title */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                   <View style={[st.catIconBox, { backgroundColor: ACCENT + '18', width: 44, height: 44, borderRadius: 13 }]}>
-                    {editItem && <IconSymbol name={editItem.icon} size={20} color={ACCENT} />}
+                    {editItem && <IconSymbol name={editItem.icon} size={20} color={c.accentText} />}
                   </View>
                   <View>
                     <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{editItem?.category}</Text>
@@ -524,11 +585,18 @@ export default function BudgetScreen() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
                   contentContainerStyle={{ gap: 8, paddingVertical: 4 }} style={{ marginBottom: 16 }}>
                   {[500, 1000, 1500, 2000, 3000, 5000, 10000].map(v => (
-                    <TouchableOpacity key={v} onPress={() => setEditLimit(String(v))}
+                    <TouchableOpacity
+                      key={v}
+                      onPress={() => setEditLimit(String(v))}
+                      // Вибраний пресет позначався ЛИШЕ кольором (A11Y-04).
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: editLimit === String(v), checked: editLimit === String(v) }}
+                      accessibilityLabel={v.toLocaleString(locale)}
                       style={[st.preset, { borderColor: editLimit === String(v) ? ACCENT : c.border,
                         backgroundColor: editLimit === String(v) ? ACCENT + '15' : c.dim }]}>
+                      {/* I18N-03: число форматувалось жорстко в 'uk-UA'. */}
                       <Text style={{ fontSize: 13, fontWeight: '600',
-                        color: editLimit === String(v) ? ACCENT : c.sub }}>{v.toLocaleString('uk-UA')}</Text>
+                        color: editLimit === String(v) ? c.accentText : c.sub }}>{v.toLocaleString(locale)}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -536,7 +604,7 @@ export default function BudgetScreen() {
                 {/* Buttons */}
                 <TouchableOpacity onPress={saveEdit}
                   style={[st.btn, { backgroundColor: ACCENT }]}>
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Зберегти</Text>
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{tr.save}</Text>
                 </TouchableOpacity>
 
                 {editItem && !!budgets.find(b => b.category === editItem?.category) && (
@@ -544,7 +612,7 @@ export default function BudgetScreen() {
                     onPress={() => { setShowEditModal(false); deleteCategory(editItem.category); }}
                     style={[st.btn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: c.red + '50', marginTop: 8 }]}>
                     <IconSymbol name="trash" size={15} color={c.red} />
-                    <Text style={{ color: c.red, fontSize: 15, fontWeight: '600' }}>Видалити категорію</Text>
+                    <Text style={{ color: c.red, fontSize: 15, fontWeight: '600' }}>{(ALERTS[lang] ?? ALERTS.uk).deleteAction}</Text>
                   </TouchableOpacity>
                 )}
                 </ScrollView>
@@ -558,10 +626,10 @@ export default function BudgetScreen() {
       <Modal visible={showAddModal} transparent animationType="slide" statusBarTranslucent
         onRequestClose={() => setShowAddModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={() => setShowAddModal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, contentWidth]} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable accessible={false} style={st.overlay} onPress={() => setShowAddModal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, contentWidth]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet, maxHeight: '90%' }]}>
+                style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
 
                 <ScrollView keyboardShouldPersistTaps="handled">
                   {/* Handle */}
@@ -609,7 +677,7 @@ export default function BudgetScreen() {
                             backgroundColor: newCatIcon === icon ? ACCENT + '25' : c.dim,
                             borderColor: newCatIcon === icon ? ACCENT : 'transparent',
                           }]}>
-                          <IconSymbol name={icon} size={18} color={newCatIcon === icon ? ACCENT : c.sub} />
+                          <IconSymbol name={icon} size={18} color={newCatIcon === icon ? c.accentText : c.sub} />
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -677,7 +745,7 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
         divider && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
         {/* Icon */}
         <View style={[st.catIconBox, { backgroundColor: isAutoAdded ? c.dim : ACCENT + '18' }]}>
-          <IconSymbol name={item.icon} size={16} color={isAutoAdded ? c.sub : ACCENT} />
+          <IconSymbol name={item.icon} size={16} color={isAutoAdded ? c.sub : c.accentText} />
         </View>
         {/* Info */}
         <View style={{ flex: 1, gap: 4 }}>
@@ -730,7 +798,7 @@ const st = StyleSheet.create({
   emptyIcon:    { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   addBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16 },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheetWrapper: { width: '100%' },
+  sheetWrapper: { width: '100%', flexShrink: 1 },
   sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, padding: 24, paddingBottom: 36 },
   input:        { borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, marginBottom: 8 },
   spentRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16 },

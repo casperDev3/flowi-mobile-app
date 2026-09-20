@@ -19,8 +19,19 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async (k: string) => { mockStore.delete(k); }),
 }));
 
-import { loadData } from '@/store/storage';
-import { saveSynced, updateSynced, type OutboxItem } from '@/store/synced-storage';
+import {
+  hasStorageReadFailure,
+  loadData,
+  loadDataResult,
+  retryStorageRead,
+  StorageWriteBlockedError,
+} from '@/store/storage';
+import {
+  resetSyncedKnownIds,
+  saveSynced,
+  updateSynced,
+  type OutboxItem,
+} from '@/store/synced-storage';
 
 interface Med { id: string; name: string }
 
@@ -29,27 +40,60 @@ function outbox(): OutboxItem[] {
   return raw === undefined ? [] : (JSON.parse(raw) as OutboxItem[]);
 }
 
-beforeEach(() => { mockStore.clear(); mockFailGet = new Set(); mockFailSet = new Set(); });
+beforeEach(() => {
+  mockStore.clear();
+  mockFailGet = new Set();
+  mockFailSet = new Set();
+  resetSyncedKnownIds();
+});
 
-describe('ERR-01: читання впало → ефект-дзеркало затирає ключ', () => {
-  it('зіпсований JSON: екран бачить [], і назад у сховище лягає []', async () => {
+describe('ERR-01: читання впало → запис у ключ заблоковано (ВИПРАВЛЕНО)', () => {
+  it('зіпсований JSON: loadData і далі віддає [], але ключ позначено як непрочитаний', async () => {
     mockStore.set('health_meds', '{{{ не JSON');
     const seen = await loadData<Med[]>('health_meds', []);
-    expect(seen).toEqual([]); // помилку проковтнуто
+    expect(seen).toEqual([]);                          // сумісність збережено
+    expect(hasStorageReadFailure('health_meds')).toBe(true);
 
     // ефект-дзеркало екрана: saveSynced(KEY, meds) зі щойно прочитаним []
-    await saveSynced<Med>('health_meds', seen);
-    expect(mockStore.get('health_meds')).toBe('[]'); // байти знищено
-    expect(outbox()).toEqual([]);                    // сервер про це не знає
+    await expect(saveSynced<Med>('health_meds', seen)).rejects.toBeInstanceOf(StorageWriteBlockedError);
+    expect(mockStore.get('health_meds')).toBe('{{{ не JSON'); // байти цілі
+    expect(outbox()).toEqual([]);                             // тумбстоунів немає
   });
 
-  it('getItem кидає: те саме, ключ перезаписано порожнім масивом', async () => {
+  it('getItem кидає: блокування ТРИМАЄТЬСЯ і після того, як збій минув', async () => {
     mockStore.set('health_meds', JSON.stringify([{ id: 'a', name: 'Аспірин' }]));
     mockFailGet.add('health_meds');
     const seen = await loadData<Med[]>('health_meds', []);
-    mockFailGet.clear();               // збій одноразовий — запис проходить
-    await saveSynced<Med>('health_meds', seen);
-    expect(JSON.parse(mockStore.get('health_meds')!)).toEqual([]);
+    mockFailGet.clear(); // збій одноразовий — саме читання вже проходить
+
+    // Ключове: всередині updateSynced читання ТЕПЕР вдається, але писати
+    // порожній масив, порахований із проваленого читання, однаково не можна.
+    await expect(saveSynced<Med>('health_meds', seen)).rejects.toBeInstanceOf(StorageWriteBlockedError);
+    expect(JSON.parse(mockStore.get('health_meds')!)).toEqual([{ id: 'a', name: 'Аспірин' }]);
+  });
+
+  it('після retryStorageRead ключ знову пишеться', async () => {
+    mockStore.set('health_meds', JSON.stringify([{ id: 'a', name: 'Аспірин' }]));
+    mockFailGet.add('health_meds');
+    await loadData<Med[]>('health_meds', []);
+    mockFailGet.clear();
+
+    const retried = await retryStorageRead<Med[]>('health_meds', []);
+    expect(retried).toEqual({ ok: true, found: true, value: [{ id: 'a', name: 'Аспірин' }] });
+    expect(hasStorageReadFailure('health_meds')).toBe(false);
+
+    await saveSynced<Med>('health_meds', [{ id: 'a', name: 'Аспірин 2' }]);
+    expect(JSON.parse(mockStore.get('health_meds')!)[0].name).toBe('Аспірин 2');
+  });
+
+  it('loadDataResult розрізняє «ключа немає» і «не прочиталось»', async () => {
+    const missing = await loadDataResult<Med[]>('health_meds', []);
+    expect(missing).toEqual({ ok: true, found: false, value: [] });
+
+    mockStore.set('health_meds', '{{{ не JSON');
+    const broken = await loadDataResult<Med[]>('health_meds', []);
+    expect(broken.ok).toBe(false);
+    expect(broken.value).toEqual([]); // fallback віддається, але з ok:false
   });
 });
 

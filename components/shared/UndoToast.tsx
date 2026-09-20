@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useI18n } from '@/store/i18n';
 
 // ─── Тривалість показу ───────────────────────────────────────────────────────
@@ -23,6 +24,12 @@ const TOAST_DURATION_MS = 4000;
 /** Тост без «Скасувати» (напр. «Скопійовано») — лише підтвердження, довше не треба. */
 const INFO_TOAST_DURATION_MS = 1800;
 const ANIM_DURATION_MS = 200;
+/**
+ * Наскільки тост «виїжджає» знизу. Виділено в константу, бо при ввімкненому
+ * «Зменшенні руху» саме цей зсув і прибирається: фейд лишається (Apple сама
+ * рекомендує cross-fade як заміну руху), а переміщення — ні.
+ */
+const TOAST_TRAVEL_PT = 20;
 
 interface ToastData {
   message: string;
@@ -41,11 +48,12 @@ interface UndoToastApi {
 export function useUndoToast(isTab = true): UndoToastApi {
   const { tr } = useI18n();
   const isDark = useColorScheme() === 'dark';
+  const reduced = useReduceMotion();
 
   const [toastData, setToastData] = useState<ToastData | null>(null);
 
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
+  const translateY = useRef(new Animated.Value(TOAST_TRAVEL_PT)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onUndoRef = useRef<(() => void) | null>(null);
 
@@ -57,13 +65,16 @@ export function useUndoToast(isTab = true): UndoToastApi {
   }, []);
 
   const hide = useCallback(() => {
-    Animated.parallel([
+    const anims = [
       Animated.timing(opacity, { toValue: 0, duration: ANIM_DURATION_MS, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 20, duration: ANIM_DURATION_MS, useNativeDriver: true }),
-    ]).start(({ finished }) => {
+    ];
+    if (!reduced) {
+      anims.push(Animated.timing(translateY, { toValue: TOAST_TRAVEL_PT, duration: ANIM_DURATION_MS, useNativeDriver: true }));
+    }
+    Animated.parallel(anims).start(({ finished }) => {
       if (finished) setToastData(null);
     });
-  }, [opacity, translateY]);
+  }, [opacity, translateY, reduced]);
 
   const show = useCallback((message: string, onUndo?: () => void) => {
     // Скидаємо попередній таймер
@@ -74,15 +85,19 @@ export function useUndoToast(isTab = true): UndoToastApi {
     // Оновлюємо дані та показуємо анімацію
     setToastData({ message, onUndo });
     opacity.setValue(0);
-    translateY.setValue(20);
+    // При Reduce Motion тост одразу стоїть на місці — з'являється лише фейдом.
+    translateY.setValue(reduced ? 0 : TOAST_TRAVEL_PT);
 
-    Animated.parallel([
+    const anims = [
       Animated.timing(opacity, { toValue: 1, duration: ANIM_DURATION_MS, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 0, duration: ANIM_DURATION_MS, useNativeDriver: true }),
-    ]).start();
+    ];
+    if (!reduced) {
+      anims.push(Animated.timing(translateY, { toValue: 0, duration: ANIM_DURATION_MS, useNativeDriver: true }));
+    }
+    Animated.parallel(anims).start();
 
     timerRef.current = setTimeout(hide, onUndo ? TOAST_DURATION_MS : INFO_TOAST_DURATION_MS);
-  }, [opacity, translateY, hide]);
+  }, [opacity, translateY, hide, reduced]);
 
   const handleUndo = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);

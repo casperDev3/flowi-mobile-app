@@ -72,7 +72,11 @@ export function TaskReminderRow({
       {open && (
         <View style={[st.box, { borderColor: c.border, backgroundColor: c.dim }]}>
           <Text style={[st.caption, { color: c.sub }]}>{tr.reminderDate}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+          {/* keyboardShouldPersistTaps: поля годин/хвилин цієї ж форми тримають
+              клавіатуру відкритою, а дефолтне 'never' витрачає перший тап по
+              чипу на її ховання — вибір дня не застосовувався (CLAUDE.md,
+              «Horizontal ScrollView with tappable children»). */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginBottom: 10 }}>
             <View style={{ flexDirection: 'row', gap: 7 }}>
               {presets.map(preset => {
                 const day = new Date();

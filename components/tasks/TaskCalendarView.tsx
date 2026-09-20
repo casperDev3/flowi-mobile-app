@@ -17,7 +17,7 @@ import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { CalSpan, useCalendarNav } from '@/hooks/use-calendar-nav';
 import type { Translations } from '@/store/translations';
-import { monthGrid } from '@/utils/dateUtils';
+import { localDateKey, monthGrid } from '@/utils/dateUtils';
 import { normalizePriority, type LegacyPriority, type TaskPriority } from '@/utils/taskUtils';
 
 export interface CalendarTask {
@@ -274,7 +274,12 @@ export function TaskCalendarView<T extends CalendarTask>({
                         if (!day) return <View key={di} style={{ flex: 1 }} />;
                         const d = new Date(yr, mo, day);
                         const dayTasks = tasksByDate[d.toDateString()] ?? [];
-                        const dayMeets = meetingsByDate[d.toISOString().slice(0, 10)] ?? [];
+                        // localDateKey, а не toISOString().slice(0,10): мапа
+                        // побудована з `meeting.date`, який формується з
+                        // ЛОКАЛЬНИХ полів дати. На схід від UTC локальна
+                        // північ у ISO дає попередню добу — крапка «є
+                        // зустріч» ставала на день раніше.
+                        const dayMeets = meetingsByDate[localDateKey(d)] ?? [];
                         const isToday = d.toDateString() === today.toDateString();
                         const cnt = dayTasks.length;
                         const activeCnt = dayTasks.filter(t => t.status === 'active').length;

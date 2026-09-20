@@ -618,6 +618,7 @@ export interface Translations {
   modeOnline: string;
   modeOffline: string;
   offlineDesc: string;
+  onlineDesc: string;
   unavailableOffline: string;
   enableOnline: string;
   offlineBadge: string;
@@ -792,6 +793,10 @@ export interface Translations {
   authOfflineError: string;
   authNetworkError: string;
   authServerError: string;
+  /** 429 від throttle, коли сервер сказав, коли повторити. {n} — хвилини. */
+  authTooManyAttemptsIn: string;
+  authShowPassword: string;
+  authHidePassword: string;
   budgetOtherCurrenciesHint: string;
   welcomeSubtitle: string;
   onlineNeedsAccount: string;
@@ -811,6 +816,8 @@ export interface Translations {
   workspaceErrorInvalidUrl: string;
   workspaceErrorInsecureUrl: string;
   workspaceErrorNetwork: string;
+  workspaceErrorNetworkScheme: string;
+  workspaceErrorServerUnavailable: string;
   workspaceErrorNotWorkspace: string;
   workspaceErrorUpdateApp: string;
   workspaceErrorUpdateServer: string;
@@ -1210,6 +1217,11 @@ export interface Translations {
   subNotifOverdueBody: string;
   subNotifEndTitle: string;
   subNotifEndBody: string;
+  // Локальні нагадування (store/notifications.ts)
+  notifChannelReminders: string;
+  notifTaskTitle: string;
+  notifSubtaskTitle: string;
+  notifMeetingTitle: string;
 
   // Простір проєкту (WORKSPACE_PROJECTS_PLAN.md §3)
   projectNavOverview: string;
@@ -1993,6 +2005,7 @@ const uk: Translations = {
   modeOnline: 'Онлайн',
   modeOffline: 'Офлайн',
   offlineDesc: 'Дані лише на пристрої. Онлайн-функції (синхронізація, команда, AI, інтеграції) вимкнено.',
+  onlineDesc: 'Дані синхронізуються з workspace і доступні на всіх ваших пристроях.',
   unavailableOffline: 'Недоступно в офлайн-режимі',
   enableOnline: 'Увімкнути онлайн',
   offlineBadge: 'Офлайн',
@@ -2152,6 +2165,9 @@ const uk: Translations = {
   authOfflineError: 'Увімкніть онлайн-режим для входу',
   authNetworkError: 'Перевірте підключення до мережі',
   authServerError: 'Помилка сервера. Спробуйте пізніше',
+  authTooManyAttemptsIn: 'Забагато спроб. Спробуйте за {n} хв',
+  authShowPassword: 'Показати пароль',
+  authHidePassword: 'Сховати пароль',
   budgetOtherCurrenciesHint: 'Транзакції в інших валютах ({n}) не враховано',
   welcomeSubtitle: 'Завдання, фінанси, здоров\'я — приватно і офлайн-first',
   onlineNeedsAccount: 'Для онлайн-функцій потрібен акаунт',
@@ -2170,6 +2186,8 @@ const uk: Translations = {
   workspaceErrorInvalidUrl: 'Некоректна адреса',
   workspaceErrorInsecureUrl: 'http:// дозволено лише для локальної мережі',
   workspaceErrorNetwork: 'Не вдалося з\'єднатися з workspace',
+  workspaceErrorNetworkScheme: 'Не вдалося з\'єднатися з workspace. Вкажіть схему явно — https:// або http:// для локального сервера',
+  workspaceErrorServerUnavailable: 'Сервер workspace тимчасово недоступний. Спробуйте ще раз',
   workspaceErrorNotWorkspace: 'Це не Flowi workspace або сервер застарів — оновіть сервер',
   workspaceErrorUpdateApp: 'Оновіть застосунок до останньої версії',
   workspaceErrorUpdateServer: 'Оновіть сервер workspace',
@@ -2461,6 +2479,12 @@ const uk: Translations = {
   subNotifOverdueBody: '{name}: {amount}. Позначте «Продовжено», коли оплатите.',
   subNotifEndTitle: '📅 Підписка скоро завершиться',
   subNotifEndBody: '{name} — {date}',
+
+  // Локальні нагадування (store/notifications.ts)
+  notifChannelReminders: 'Нагадування',
+  notifTaskTitle: '📋 Завдання',
+  notifSubtaskTitle: '✅ Підзавдання',
+  notifMeetingTitle: '📅 Зустріч через 15 хв',
 
   // Простір проєкту (WORKSPACE_PROJECTS_PLAN.md §3)
   projectNavOverview: 'Огляд',
@@ -3229,6 +3253,7 @@ const en: Translations = {
   modeOnline: 'Online',
   modeOffline: 'Offline',
   offlineDesc: 'Data stays on device only. Online features (sync, team, AI, integrations) are off.',
+  onlineDesc: 'Data syncs with your workspace and is available on all your devices.',
   unavailableOffline: 'Unavailable in offline mode',
   enableOnline: 'Go online',
   offlineBadge: 'Offline',
@@ -3388,6 +3413,9 @@ const en: Translations = {
   authOfflineError: 'Enable online mode to sign in',
   authNetworkError: 'Check your network connection',
   authServerError: 'Server error. Please try again later',
+  authTooManyAttemptsIn: 'Too many attempts. Try again in {n} min',
+  authShowPassword: 'Show password',
+  authHidePassword: 'Hide password',
   budgetOtherCurrenciesHint: 'Transactions in other currencies ({n}) not included',
   welcomeSubtitle: 'Tasks, finance, health — private and offline-first',
   onlineNeedsAccount: 'Online features require an account',
@@ -3406,6 +3434,8 @@ const en: Translations = {
   workspaceErrorInvalidUrl: 'Invalid address',
   workspaceErrorInsecureUrl: 'http:// is only allowed for local networks',
   workspaceErrorNetwork: 'Could not connect to the workspace',
+  workspaceErrorNetworkScheme: 'Could not connect to the workspace. Add the scheme explicitly — https://, or http:// for a local server',
+  workspaceErrorServerUnavailable: 'The workspace server is temporarily unavailable. Please try again',
   workspaceErrorNotWorkspace: 'This is not a Flowi workspace, or the server is outdated — please update it',
   workspaceErrorUpdateApp: 'Update the app to the latest version',
   workspaceErrorUpdateServer: 'Update the workspace server',
@@ -3697,6 +3727,12 @@ const en: Translations = {
   subNotifOverdueBody: '{name}: {amount}. Mark it “Renewed” once paid.',
   subNotifEndTitle: '📅 Subscription ends soon',
   subNotifEndBody: '{name} — {date}',
+
+  // Local reminders (store/notifications.ts)
+  notifChannelReminders: 'Reminders',
+  notifTaskTitle: '📋 Task',
+  notifSubtaskTitle: '✅ Subtask',
+  notifMeetingTitle: '📅 Meeting in 15 min',
 
   // Project space (WORKSPACE_PROJECTS_PLAN.md §3)
   projectNavOverview: 'Overview',

@@ -23,9 +23,10 @@ import {
   HKWeekDay,
   HKWorkout,
   fetchHeartRateSamples,
-  fetchTodayData,
+  fetchTodayDataResult,
   fetchWeekData,
   fetchWorkouts,
+  getHealthKitAccess,
   initHealthKit,
 } from '@/store/healthkit';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -136,46 +137,61 @@ export default function AppleHealthScreen() {
   const [workouts, setWorkouts] = useState<HKWorkout[]>([]);
   const [hrSamples, setHrSamples] = useState<HKHeartRateSample[]>([]);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  // ERR-14: читання могло не вдатись зовсім. Тоді нулі на картках — не факт
+  // про здоровʼя людини, а відсутність відповіді, і підпис «Оновлено HH:MM»
+  // поверх них був неправдою.
+  const [readFailed, setReadFailed] = useState(false);
 
   const load = useCallback(async () => {
     setSyncing(true);
     const [t, w, wo, hr] = await Promise.all([
-      fetchTodayData(),
+      fetchTodayDataResult(),
       fetchWeekData(),
       fetchWorkouts(),
       fetchHeartRateSamples(24),
     ]);
-    setToday(t);
-    setWeek(w);
-    setWorkouts(wo);
-    setHrSamples(hr);
-    setLastSync(new Date());
+    setReadFailed(!t.outcome.ok);
+    if (t.outcome.ok) {
+      setToday(t.data);
+      setWeek(w);
+      setWorkouts(wo);
+      setHrSamples(hr);
+      setLastSync(new Date());
+    }
     setSyncing(false);
   }, []);
 
+  /**
+   * ERR-14. `initHealthKit()` каже лише «модуль є і запит не впав» — Apple за
+   * дизайном не повідомляє, що саме дозволено читати. Тому окремо питаємо
+   * getRequestStatusForAuthorization: `shouldRequest` означає, що діалог ще
+   * не показували або на нього не відповіли, тобто доступу НЕМАЄ і екран
+   * мусить пропонувати його надати, а не малювати нулі.
+   */
+  const checkAccess = useCallback(async () => {
+    const ok = await initHealthKit();
+    const access = await getHealthKitAccess();
+    const granted = ok && access !== 'denied' && access !== 'unavailable';
+    setAuthorized(granted);
+    setLoading(false);
+    if (granted) await load();
+  }, [load]);
+
   useEffect(() => {
     if (!HK_AVAILABLE) { setLoading(false); return; }
-    initHealthKit().then(ok => {
-      setAuthorized(ok);
-      setLoading(false);
-      if (ok) load();
-    });
+    void checkAccess();
 
     // When user returns from Apple Health settings — re-check permissions
     const sub = AppState.addEventListener('change', state => {
       if (state === 'active' && waitingForReturn.current) {
         waitingForReturn.current = false;
         setLoading(true);
-        initHealthKit().then(ok => {
-          setAuthorized(ok);
-          setLoading(false);
-          if (ok) load();
-        });
+        void checkAccess();
       }
     });
     return () => sub.remove();
-    // load — стабільний useCallback без залежностей, тож ефект не перезапускається.
-  }, [load]);
+    // checkAccess — стабільний useCallback, тож ефект не перезапускається.
+  }, [checkAccess]);
 
   // Палітра — у useMemo, щоб React.memo на картках метрик і тренувань
   // не збивався новим обʼєктом на кожен ререндер (а їх тут багато: синхронізація
@@ -214,11 +230,15 @@ export default function AppleHealthScreen() {
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 14 }}>
             <Text style={[s.pageTitle, { color: c.text }]}>Apple Health</Text>
-            {lastSync && (
+            {readFailed ? (
+              <Text style={{ color: '#EF4444', fontSize: 11, marginTop: 2, fontWeight: '700' }}>
+                Дані не вдалося прочитати
+              </Text>
+            ) : lastSync ? (
               <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
                 Оновлено {lastSync.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
               </Text>
-            )}
+            ) : null}
           </View>
           {authorized && (
             <TouchableOpacity onPress={load} disabled={syncing}
@@ -263,6 +283,17 @@ export default function AppleHealthScreen() {
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
             <>
+
+            {/* ERR-14: збій читання показуємо явно — інакше нулі нижче
+                неможливо відрізнити від справжніх «сьогодні 0 кроків». */}
+            {readFailed && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#EF444444', backgroundColor: '#EF444412', padding: 14, marginBottom: 12 }}>
+                <IconSymbol name="exclamationmark.triangle.fill" size={16} color="#EF4444" />
+                <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '700', flex: 1 }}>
+                  Запити до HealthKit не вдались. Показані числа — не ваші дані; перевірте доступ у «Здоровʼя → Доступ до даних».
+                </Text>
+              </View>
+            )}
 
             {/* WIP banner */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#F59E0B44', backgroundColor: '#F59E0B12', padding: 14, marginBottom: 18 }}>

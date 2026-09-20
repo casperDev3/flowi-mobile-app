@@ -7,6 +7,7 @@ import {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ACCENT_WEIGHT, getHealthColors } from '@/utils/healthTheme';
 import { EntryType } from '@/utils/healthUtils';
+import { useSheetSurface } from '@/hooks/use-content-width';
 
 export interface BodyRecord { type: EntryType; value: number; }
 
@@ -31,6 +32,7 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
   tr: any;
 }) {
   const c = getHealthColors(isDark);
+  const sheetSurface = useSheetSurface();
   const [vals, setVals] = useState<Record<string, string>>({});
   const canSave = FIELDS.some(field => {
     const value = parseFloat((vals[field.type] ?? '').replace(',', '.'));
@@ -59,14 +61,15 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <Pressable style={s.overlay} onPress={onClose}>
+        <Pressable accessible={false} style={s.overlay} onPress={onClose}>
           <Pressable
             onPress={e => e.stopPropagation()}
             style={s.sheetWrap}
+            accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"
           >
-            <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+            <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -123,8 +126,10 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
 
 const s = StyleSheet.create({
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
-  sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '92%', overflow: 'hidden' },
+  sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти — числом із useSheetSurface(); відсоток від батька з
+  // height:auto не рахується і обмеження просто зникає (NAT-01).
+  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   handle:    { width: 36, height: 4, borderRadius: 2 },
   title:     { fontSize: 20, fontWeight: '800', marginBottom: 12 },

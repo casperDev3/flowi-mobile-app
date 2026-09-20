@@ -148,13 +148,20 @@ export default function ProjectBudgetScreen() {
 
   return (
     <ProjectScreenShell project={project} isDark={isDark} title={tr.navBudget}>
-      <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
+        showsVerticalScrollIndicator={false}
+        // L3: дефолтний keyboardShouldPersistTaps='never' означає, що перший
+        // тап по кнопці поруч із полем лише ховає клавіатуру — кнопка
+        // виглядає мертвою.
+        keyboardShouldPersistTaps="handled">
 
         <View style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 16, marginBottom: 20 }}>
           <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 8 }}>{tr.projectBudgetLimit}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <TextInput
               placeholder={budget ? String(budget.amount) : '0'}
+              accessibilityLabel={tr.projectBudgetLimit}
               placeholderTextColor={c.sub}
               value={amountDraft}
               onChangeText={setAmountDraft}

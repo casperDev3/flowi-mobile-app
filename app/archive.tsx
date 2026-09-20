@@ -22,6 +22,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
+import { restoredColumnIdForTask, type TaskStatusColumn } from '@/utils/taskStatuses';
 import {
   comparePriority,
   matchesPriorityFilter,
@@ -162,15 +163,25 @@ export default function ArchiveScreen() {
   const [filterPriorities, setFilterPriorities] = useState<PriorityLevel[]>([]);
   const [sort, setSort] = useState<SortBy>('newest');
 
+  // Колонки статусів — лише щоб знати, куди повертати завдання з архіву
+  // (`restoredColumnIdForTask`). Ref, а не стан: мутації архіву йдуть чергою
+  // асинхронно, і замикання на значенні зі стану читало б застарілий набір.
+  const statusColumnsRef = useRef<TaskStatusColumn[]>([]);
+
   const reloadTasks = useCallback(async () => {
-    setTasks(await loadData<Task[]>('tasks', []));
+    const [stored, columns] = await Promise.all([
+      loadData<Task[]>('tasks', []),
+      loadData<TaskStatusColumn[]>('task_statuses', []),
+    ]);
+    statusColumnsRef.current = columns;
+    setTasks(stored);
   }, []);
   useFocusEffect(useCallback(() => {
     void reloadTasks();
   }, [reloadTasks]));
   // Задачу могли завершити чи повернути деінде (веб, інший пристрій), поки
   // архів відкритий, — пул синку пише 'tasks', і список оновлюється одразу.
-  useStorageRefresh(['tasks'], reloadTasks);
+  useStorageRefresh(['tasks', 'task_statuses'], reloadTasks);
 
   const done = useMemo(() => tasks
     .filter(t => t.status === 'done' && matchesPriorityFilter(t, filterPriorities))
@@ -204,22 +215,28 @@ export default function ArchiveScreen() {
   }, []);
 
   const restore = useCallback((id: string) => {
-    void mutateTasks(fresh => fresh.map(t => (t.id === id ? { ...t, status: 'active' as Status } : t)))
+    // Разом зі статусом міняється й КОЛОНКА: сам по собі `status: 'active'`
+    // лишав завдання в колонці «Готово», і воно поверталось зі списку зі
+    // зеленим бейджем «Готово» всередині секції «До роботи».
+    void mutateTasks(fresh => fresh.map(t => (t.id === id
+      ? { ...t, status: 'active' as Status, kanbanColumnId: restoredColumnIdForTask(t, statusColumnsRef.current) }
+      : t)))
       .catch(() => {});
   }, [mutateTasks]);
 
   const deleteForever = useCallback((id: string) => {
+    // ERR-13: підтвердження незворотної дії — через словник, не літералами.
     Alert.alert(
-      'Видалити назавжди?',
-      'Завдання буде видалено без можливості відновлення.',
+      tr.deletePermanently,
+      tr.taskWillBeDeleted,
       [
-        { text: 'Скасувати', style: 'cancel' },
-        { text: 'Видалити', style: 'destructive', onPress: () => {
+        { text: tr.cancel, style: 'cancel' },
+        { text: tr.delete, style: 'destructive', onPress: () => {
           void mutateTasks(fresh => fresh.filter(t => t.id !== id)).catch(() => {});
         }},
       ]
     );
-  }, [mutateTasks]);
+  }, [mutateTasks, tr]);
 
   const filtersApplied = filterPriorities.length > 0;
 
@@ -230,13 +247,16 @@ export default function ArchiveScreen() {
     const ids = new Set(done.map(t => t.id));
     const count = ids.size;
     Alert.alert(
-      'Очистити архів?',
+      tr.clearArchive,
+      // ЗАГОЛОВОК і КНОПКИ — зі словника; сам текст із числом лишається
+      // українським: ключа з підстановкою {count} для нього в
+      // `store/translations.ts` немає, а словник — не ця зона (ERR-13).
       filtersApplied
         ? `Видалити ${count} завдань назавжди? Буде видалено лише те, що зараз видно після фільтрів.`
         : `Видалити ${count} завдань назавжди?`,
       [
-        { text: 'Скасувати', style: 'cancel' },
-        { text: 'Очистити', style: 'destructive', onPress: () => {
+        { text: tr.cancel, style: 'cancel' },
+        { text: tr.clear, style: 'destructive', onPress: () => {
           // Задачу, яку тим часом повернули в роботу на іншому пристрої,
           // не чіпаємо — видаляємо лише ті, що досі виконані.
           void mutateTasks(fresh => fresh.filter(t => !(ids.has(t.id) && t.status === 'done')))
@@ -244,7 +264,7 @@ export default function ArchiveScreen() {
         }},
       ]
     );
-  }, [done, filtersApplied, mutateTasks]);
+  }, [done, filtersApplied, mutateTasks, tr]);
 
   // Палітра стабільна між рендерами — інакше React.memo на картці
   // не спрацює: новий об'єкт кольорів щоразу рахувався б як зміна пропа.

@@ -132,8 +132,8 @@ export default function ProjectNotesScreen() {
       </ScrollView>
 
       <Modal visible={!!selected} transparent animationType="fade" statusBarTranslucent onRequestClose={save}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={save}>
-          <Pressable onPress={e => e.stopPropagation()} style={{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }}>
+        <Pressable accessible={false} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={save}>
+          <Pressable accessible={false} onPress={e => e.stopPropagation()} style={{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }}>
             <BlurView
               intensity={isDark ? 50 : 70}
               tint={isDark ? 'dark' : 'light'}

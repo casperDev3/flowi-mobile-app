@@ -16,6 +16,7 @@ import {
 
 import { CommentsSection } from '@/components/shared/CommentsSection';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useSheetSurface } from '@/hooks/use-content-width';
 
 // ─── Exported types ────────────────────────────────────────────────────────────
 
@@ -174,6 +175,7 @@ export function MeetingFormSheet({
 }: Props) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const isUk = lang === 'uk';
+  const sheetSurface = useSheetSurface();
 
   const c = {
     border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)',
@@ -290,11 +292,13 @@ export function MeetingFormSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <Pressable style={s.overlay} onPress={onClose}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.wrapper}>
+        <Pressable accessible={false} style={s.overlay} onPress={onClose}>
+          <Pressable onPress={e => e.stopPropagation()} style={s.wrapper} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
             <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-              style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces={false}>
+              style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              {/* bounces тут був false — на обрізаному аркуші це остаточно
+                  вбивало будь-який натяк на те, що вміст можна прогорнути. */}
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                 {/* Handle + close */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
@@ -627,8 +631,11 @@ export function MeetingFormSheet({
 
 const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  wrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:   { borderRadius: 22, borderWidth: 1, padding: 16, overflow: 'hidden', maxHeight: '92%' },
+  wrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
+  // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
+  // ScrollView усередині нічого не гортав (NAT-01).
+  sheet:   { borderRadius: 22, borderWidth: 1, padding: 16, overflow: 'hidden' },
   inp:     { borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontWeight: '600', borderWidth: 1.5 },
   pill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 9 },
   chip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },

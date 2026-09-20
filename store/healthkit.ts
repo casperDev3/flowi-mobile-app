@@ -43,6 +43,47 @@ export interface HKHeartRateSample {
   startDate: string;
 }
 
+/**
+ * ERR-14. Стан доступу до HealthKit. «Порожньо» і «немає доступу» — різні
+ * речі: нуль кроків означає, що людина сьогодні не ходила, а відмова в
+ * доступі означає, що застосунок не знає нічого. До цього обидва малювались
+ * однаково («Кроки 0», «≈ 0.0 км») під підписом «Синхронізується з HealthKit».
+ *
+ * `denied` тут — точне твердження: iOS каже, що діалог авторизації ще НЕ
+ * показували або на нього не відповіли (`shouldRequest`), тобто не надано
+ * нічого. `unknown` — діалог був, але Apple за дизайном не повідомляє, які
+ * саме типи дозволено на читання; тоді єдина ознака — чи повертають запити
+ * хоч щось і чи не падають вони (див. HKReadOutcome).
+ */
+export type HKAccess = 'unavailable' | 'granted' | 'denied' | 'unknown';
+
+/** Підсумок пачки запитів: скільки зроблено і скільки з них упало. */
+export interface HKReadOutcome {
+  /** false — ЖОДЕН запит не вдався; нулі на екрані малювати не можна. */
+  ok: boolean;
+  queries: number;
+  failures: number;
+}
+
+export interface HKTodayResult {
+  data: HKDayData;
+  outcome: HKReadOutcome;
+}
+
+/** Лічильник провалів для однієї пачки запитів. */
+interface HKStats { queries: number; failures: number }
+
+function newStats(): HKStats { return { queries: 0, failures: 0 }; }
+
+function outcomeOf(stats: HKStats): HKReadOutcome {
+  return {
+    // Усі запити впали — це відмова, а не «даних немає».
+    ok: stats.queries === 0 || stats.failures < stats.queries,
+    queries: stats.queries,
+    failures: stats.failures,
+  };
+}
+
 // ─── Module lazy-load ─────────────────────────────────────────────────────────
 
 let _sdk: typeof import('@kingstinct/react-native-healthkit') | null = null;
@@ -91,6 +132,41 @@ export async function initHealthKit(): Promise<boolean> {
   } catch (e) {
     console.warn('[HealthKit] initHealthKit error:', e);
     return false;
+  }
+}
+
+/**
+ * ERR-14. Стан доступу, на який можна спиратись в інтерфейсі.
+ *
+ * Apple за дизайном НЕ повідомляє, які типи дозволено читати (інакше сам факт
+ * відмови був би медичною інформацією). Єдине, що система каже чесно, —
+ * `getRequestStatusForAuthorization`: `shouldRequest` (1) означає, що діалог
+ * ще не показували або на нього не відповіли, тобто не надано нічого;
+ * `unnecessary` (2) — діалог був, а що саме дозволено, невідомо.
+ *
+ * Тому: 'denied' — тверде «доступу немає, є сенс показати кнопку запиту»,
+ * 'unknown' — «питали, далі судимо за тим, чи працюють запити».
+ */
+export async function getHealthKitAccess(): Promise<HKAccess> {
+  const sdk = getSDK();
+  if (!sdk) return 'unavailable';
+  try {
+    const HealthKit = (sdk as any).default ?? sdk;
+    if (typeof HealthKit.isHealthDataAvailable !== 'function') return 'unavailable';
+    const available = await Promise.resolve(HealthKit.isHealthDataAvailable());
+    if (!available) return 'unavailable';
+    if (typeof HealthKit.getRequestStatusForAuthorization !== 'function') return 'unknown';
+    const status = await HealthKit.getRequestStatusForAuthorization({
+      toShare: [],
+      toRead: [...Object.values(HK_QUANTITY), HK_SLEEP],
+    });
+    // SDK віддає або число HKAuthorizationRequestStatus, або рядок.
+    if (status === 1 || status === 'shouldRequest') return 'denied';
+    if (status === 2 || status === 'unnecessary') return 'unknown';
+    return 'unknown';
+  } catch (e) {
+    console.warn('[HealthKit] getHealthKitAccess error:', e);
+    return 'unknown';
   }
 }
 
@@ -143,7 +219,9 @@ async function querySum(
   from: Date,
   to: Date,
   unit = 'count',
+  stats?: HKStats,
 ): Promise<number> {
+  if (stats) stats.queries++;
   try {
     const HealthKit = sdk.default ?? sdk;
     const result = await HealthKit.queryStatisticsForQuantity(
@@ -152,13 +230,17 @@ async function querySum(
       { ...dateFilter(from, to), unit },
     );
     return Math.round(quantityValue(result?.sumQuantity));
-  } catch {
+  } catch (e) {
+    // ERR-14: нуль лишається заради сумісності викликачів, але сам факт
+    // збою більше не зникає — він їде в stats і далі в HKReadOutcome.
+    if (stats) stats.failures++;
+    if (__DEV__) console.warn('[HealthKit] querySum failed:', identifier, e);
     return 0;
   }
 }
 
-async function queryEnergySum(sdk: any, identifier: string, from: Date, to: Date): Promise<number> {
-  return querySum(sdk, identifier, from, to, 'kcal');
+async function queryEnergySum(sdk: any, identifier: string, from: Date, to: Date, stats?: HKStats): Promise<number> {
+  return querySum(sdk, identifier, from, to, 'kcal', stats);
 }
 
 async function queryQuantitySamples(
@@ -168,13 +250,17 @@ async function queryQuantitySamples(
   to: Date,
   limit = 500,
   unit?: string,
+  stats?: HKStats,
 ): Promise<any[]> {
+  if (stats) stats.queries++;
   try {
     const HealthKit = sdk.default ?? sdk;
     return await HealthKit.queryQuantitySamples(identifier, {
       ...dateFilter(from, to), limit, ascending: false, ...(unit ? { unit } : {}),
     }) ?? [];
-  } catch {
+  } catch (e) {
+    if (stats) stats.failures++;
+    if (__DEV__) console.warn('[HealthKit] queryQuantitySamples failed:', identifier, e);
     return [];
   }
 }
@@ -185,29 +271,36 @@ async function queryCategorySamples(
   from: Date,
   to: Date,
   limit = 500,
+  stats?: HKStats,
 ): Promise<any[]> {
+  if (stats) stats.queries++;
   try {
     const HealthKit = sdk.default ?? sdk;
     return await HealthKit.queryCategorySamples(identifier, {
       ...dateFilter(from, to), limit, ascending: false,
     }) ?? [];
-  } catch {
+  } catch (e) {
+    if (stats) stats.failures++;
+    if (__DEV__) console.warn('[HealthKit] queryCategorySamples failed:', identifier, e);
     return [];
   }
 }
 
-async function queryMostRecent(sdk: any, identifier: string, unit?: string): Promise<any | null> {
+async function queryMostRecent(sdk: any, identifier: string, unit?: string, stats?: HKStats): Promise<any | null> {
+  if (stats) stats.queries++;
   try {
     const HealthKit = sdk.default ?? sdk;
     return await HealthKit.getMostRecentQuantitySample(identifier, unit) ?? null;
-  } catch {
+  } catch (e) {
+    if (stats) stats.failures++;
+    if (__DEV__) console.warn('[HealthKit] getMostRecentQuantitySample failed:', identifier, e);
     return null;
   }
 }
 
-async function queryDistance(sdk: any, from: Date, to: Date): Promise<number | null> {
+async function queryDistance(sdk: any, from: Date, to: Date, stats?: HKStats): Promise<number | null> {
   try {
-    const meters = await querySum(sdk, HK_QUANTITY.distance, from, to, 'm');
+    const meters = await querySum(sdk, HK_QUANTITY.distance, from, to, 'm', stats);
     return meters > 0 ? Math.round(meters / 100) / 10 : null;
   } catch {
     return null;
@@ -216,27 +309,33 @@ async function queryDistance(sdk: any, from: Date, to: Date): Promise<number | n
 
 // ─── Today ────────────────────────────────────────────────────────────────────
 
-export async function fetchTodayData(): Promise<HKDayData> {
+/**
+ * Дані за сьогодні РАЗОМ із підсумком, чи вдалися запити (ERR-14).
+ * Екран мусить малювати нулі лише тоді, коли `outcome.ok` — інакше це не
+ * «нуль кроків», а «ми нічого не знаємо».
+ */
+export async function fetchTodayDataResult(): Promise<HKTodayResult> {
   const empty: HKDayData = {
     steps: 0, activeCalories: 0,
     heartRateAvg: null, heartRateMin: null, heartRateMax: null,
     restingHeartRate: null, weight: null, distanceKm: null, sleepMinutes: null,
   };
   const sdk = getSDK();
-  if (!sdk) return empty;
+  if (!sdk) return { data: empty, outcome: { ok: false, queries: 0, failures: 0 } };
 
   const from = startOfDay();
   const to = new Date();
+  const stats = newStats();
 
   const [steps, cal, hrSamples, restHRSample, weightSample, dist, sleepSamples] =
     await Promise.all([
-      querySum(sdk, HK_QUANTITY.steps, from, to),
-      queryEnergySum(sdk, HK_QUANTITY.activeEnergy, from, to),
-      queryQuantitySamples(sdk, HK_QUANTITY.heartRate, from, to, 500, 'count/min'),
-      queryMostRecent(sdk, HK_QUANTITY.restingHeartRate, 'count/min'),
-      queryMostRecent(sdk, HK_QUANTITY.bodyMass, 'kg'),
-      queryDistance(sdk, from, to),
-      queryCategorySamples(sdk, HK_SLEEP, startOfDay(new Date(Date.now() - 86400000)), to),
+      querySum(sdk, HK_QUANTITY.steps, from, to, 'count', stats),
+      queryEnergySum(sdk, HK_QUANTITY.activeEnergy, from, to, stats),
+      queryQuantitySamples(sdk, HK_QUANTITY.heartRate, from, to, 500, 'count/min', stats),
+      queryMostRecent(sdk, HK_QUANTITY.restingHeartRate, 'count/min', stats),
+      queryMostRecent(sdk, HK_QUANTITY.bodyMass, 'kg', stats),
+      queryDistance(sdk, from, to, stats),
+      queryCategorySamples(sdk, HK_SLEEP, startOfDay(new Date(Date.now() - 86400000)), to, 500, stats),
     ]);
 
   const hrValues = hrSamples
@@ -269,16 +368,24 @@ export async function fetchTodayData(): Promise<HKDayData> {
     }, 0);
 
   return {
-    steps,
-    activeCalories: cal,
-    heartRateAvg: hrAvg,
-    heartRateMin: hrMin,
-    heartRateMax: hrMax,
-    restingHeartRate: restHR,
-    weight,
-    distanceKm: dist,
-    sleepMinutes: sleepMins > 0 ? Math.round(sleepMins) : null,
+    data: {
+      steps,
+      activeCalories: cal,
+      heartRateAvg: hrAvg,
+      heartRateMin: hrMin,
+      heartRateMax: hrMax,
+      restingHeartRate: restHR,
+      weight,
+      distanceKm: dist,
+      sleepMinutes: sleepMins > 0 ? Math.round(sleepMins) : null,
+    },
+    outcome: outcomeOf(stats),
   };
+}
+
+/** Сумісна обгортка для викликачів, яким підсумок не потрібен. */
+export async function fetchTodayData(): Promise<HKDayData> {
+  return (await fetchTodayDataResult()).data;
 }
 
 // ─── Week ─────────────────────────────────────────────────────────────────────

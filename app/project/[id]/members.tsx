@@ -68,7 +68,11 @@ export default function ProjectMembersScreen() {
   const isDark = useColorScheme() === 'dark';
   const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
+  // I18N-03: `toLocaleDateString()` без аргументу бере мову ПРИСТРОЮ, а не
+  // застосунку — українець з англійським телефоном бачив третій варіант
+  // дати. Той самий прийом, що в app/invite.tsx.
+  const dateLocale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { project } = useProject(projectId);
   const { user } = useAuth();
   const role = useProjectRole(projectId);
@@ -78,6 +82,13 @@ export default function ProjectMembersScreen() {
   const [members, setMembers] = useState<MemberOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
+  /**
+   * ERR-09: 500/таймаут/429 раніше лишали екран у стані «у проєкті нікого
+   * немає» — а це завжди неправда, бо сам користувач у ньому є. Збій мусить
+   * бути відмінним від порожнього списку й мати кнопку «Повторити»:
+   * `useFocusEffect` ретраїть лише на повторний вхід на екран.
+   */
+  const [loadError, setLoadError] = useState(false);
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
   // §4.2/§9.4 (review finding): власник раніше не мав ЖОДНОГО способу вийти
   // з власного проєкту — блок нижче з'являється поверх звичайного списку й
@@ -104,12 +115,18 @@ export default function ProjectMembersScreen() {
       const list = await fetchProjectMembers(projectId);
       setMembers(list);
       setOffline(false);
+      setLoadError(false);
     } catch (e) {
       if (e instanceof OfflineError) {
         setMembers(await getCachedMembers(projectId));
         setOffline(true);
-      } else if (__DEV__) {
-        console.warn('[project/members] завантаження не вдалося:', e);
+        setLoadError(false);
+      } else {
+        // Список НЕ замінюється порожнім: якщо попередня спроба щось
+        // принесла, краще показати старе поруч зі смужкою збою, ніж
+        // стверджувати, що в проєкті нікого немає.
+        setLoadError(true);
+        if (__DEV__) console.warn('[project/members] завантаження не вдалося:', e);
       }
     } finally {
       setLoading(false);
@@ -372,7 +389,26 @@ export default function ProjectMembersScreen() {
           <IconSymbol name="chevron.left" size={19} color={c.text} />
         </HeaderButton>
       }>
-      <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
+        showsVerticalScrollIndicator={false}
+        // L3: без цього перший тап по «Надіслати запрошення» лише ховав
+        // клавіатуру, і кнопка виглядала мертвою.
+        keyboardShouldPersistTaps="handled">
+
+        {loadError && (
+          <View style={[st.hint, { borderColor: '#EF4444', backgroundColor: c.dim, marginBottom: 12 }]}>
+            <IconSymbol name="exclamationmark.circle" size={14} color="#EF4444" />
+            <Text style={{ color: c.text, fontSize: 12, marginLeft: 6, flex: 1 }}>{tr.projectMembersError}</Text>
+            <TouchableOpacity
+              onPress={() => { void load(); void loadInvites(); }}
+              accessibilityRole="button"
+              accessibilityLabel={tr.adminRetry}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700' }}>{tr.adminRetry}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {offline && (
           <View style={[st.hint, { borderColor: c.border, backgroundColor: c.dim, marginBottom: 12 }]}>
@@ -409,6 +445,10 @@ export default function ProjectMembersScreen() {
 
         {loading && members.length === 0 ? (
           <ActivityIndicator color={c.accent} style={{ marginTop: 30 }} />
+        ) : loadError && members.length === 0 ? (
+          // Порожній список малюється ЛИШЕ після успішної відповіді:
+          // «нікого немає» і «не вдалося дізнатись» — різні стани.
+          null
         ) : (
           <View style={{ marginBottom: 24 }}>
             {sortedMembers.map(member => {
@@ -438,6 +478,8 @@ export default function ProjectMembersScreen() {
                           { text: tr.cancel, style: 'cancel' },
                         ]);
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel={member.user.name || member.user.email}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       style={{ marginLeft: 8 }}>
                       <IconSymbol name="ellipsis" size={18} color={c.sub} />
@@ -535,10 +577,14 @@ export default function ProjectMembersScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{roleLabel(invite.role)}</Text>
                       <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
-                        {tr.inviteExpiresLabel} {new Date(invite.expires_at).toLocaleDateString()}
+                        {tr.inviteExpiresLabel} {new Date(invite.expires_at).toLocaleDateString(dateLocale)}
                       </Text>
                     </View>
-                    <TouchableOpacity onPress={() => handleRevoke(invite)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => handleRevoke(invite)}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.projectMembersRevokeLink}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <IconSymbol name="trash" size={16} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
@@ -552,6 +598,7 @@ export default function ProjectMembersScreen() {
                 value={email}
                 onChangeText={v => { setEmail(v); if (emailError) setEmailError(''); }}
                 placeholder={tr.projectMembersEmailPlaceholder}
+                accessibilityLabel={tr.projectMembersEmailPlaceholder}
                 placeholderTextColor={c.sub}
                 autoCapitalize="none"
                 autoCorrect={false}

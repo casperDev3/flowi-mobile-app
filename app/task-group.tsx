@@ -144,19 +144,26 @@ export default function TaskGroupScreen() {
   }), [tr]);
 
   // Фільтри з маршруту — ті самі значення, що стояли на екрані-джерелі.
-  // Залежність — лише від рядкових параметрів, а не від обʼєкта params,
-  // який expo-router перестворює щорендера.
-  const queryKey = mode === 'tasks'
-    ? [params.filter, params.sort, params.scope, params.search, params.project, params.priorities, params.date, params.month].join('|')
-    : '';
+  // Залежність — від самих рядкових параметрів, а не від обʼєкта `params`,
+  // який expo-router перестворює щорендера. Раніше це робив штучний
+  // `queryKey` + eslint-disable, а від disable React Compiler переставав
+  // оптимізувати весь екран (PERF-2); тепер deps чесні, а результат той
+  // самий — примітиви міняються рівно тоді, коли змінився маршрут.
+  const { filter: pFilter, sort: pSort, scope: pScope, search: pSearch,
+    project: pProject, priorities: pPriorities, date: pDate, month: pMonth } = params;
   const query = useMemo(
     // §3.7 «моє» — той самий `myUserId`, що тепер несе `listQuery` на екрані
     // завдань (app/(tabs)/index.tsx): інакше «Всі (N)» тут показувало б і
     // задачі, яких сама група на екрані-джерелі вже не рахує (мінор із ревʼю
     // про Tasks-таб, той самий спільний конвеєр `buildTaskListView`).
-    () => ({ ...taskListQueryFromParams(params), myUserId: user?.id }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [queryKey, user?.id],
+    () => ({
+      ...taskListQueryFromParams({
+        filter: pFilter, sort: pSort, scope: pScope, search: pSearch,
+        project: pProject, priorities: pPriorities, date: pDate, month: pMonth,
+      }),
+      myUserId: user?.id,
+    }),
+    [pFilter, pSort, pScope, pSearch, pProject, pPriorities, pDate, pMonth, user?.id],
   );
 
   const group = useMemo((): { title: string; subtitle: string | null; tasks: Task[] } | null => {

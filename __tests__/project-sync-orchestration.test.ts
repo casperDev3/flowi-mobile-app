@@ -344,3 +344,42 @@ describe('syncProject — редундантна мутація projects піс�
     expect(read<{ collection: string; local_id: string }[]>('sync_outbox', [])).toEqual([]);
   });
 });
+
+describe('ERR-06: відхилена сервером мутація проєкту не зникає мовчки', () => {
+  it('кладе rejected у той самий журнал, що й особистий потік (`sync_rejected_v2`)', async () => {
+    // Сценарій знахідки: роль у кеші застаріла, UI дозволив правку, сервер
+    // відповів `forbidden`. Рядок прибирався з outbox, курсор скидався в 0,
+    // наступний pull повертав серверну правду — введене зникало з екрана без
+    // жодного слова, бо єдиною реакцією був `console.warn` у `__DEV__`.
+    // Особистий потік для цього давно має карантин і список на /sync.
+    seed('projects', [{ id: 'p1', name: 'P1', color: '#000', createdAt: new Date().toISOString() }]);
+    seed('project_sync_state_v1', {
+      p1: { cursor: 0, revisions: {}, role: 'member', lastSyncedAt: Date.now() - 60_000 },
+    });
+
+    mockApiFetch.mockImplementation(async (path: string, opts?: { method?: string }) => {
+      if (path === '/projects/p1/sync/' && opts?.method === 'POST') {
+        return {
+          contract_version: 2, protocol_version: 2, project_id: 'p1', role: 'member', cursor: 1,
+          changes: [], acknowledged: [], conflicts: [],
+          rejected: [{
+            status: 'rejected', mutation_id: 'm-1', collection: 'tasks', local_id: 't-9',
+            reason: 'forbidden', detail: 'role changed',
+          }],
+          next_cursor: null,
+        };
+      }
+      throw new Error(`unexpected apiFetch(${path}, ${JSON.stringify(opts)})`);
+    });
+
+    await syncProject('p1');
+
+    const quarantined = read<{ collection: string; local_id: string; reason: string; quarantined_at?: number }[]>('sync_rejected_v2', []);
+    expect(quarantined).toEqual([
+      expect.objectContaining({ collection: 'tasks', local_id: 't-9', reason: 'forbidden' }),
+    ]);
+    // Вік запису проставляє клієнт — без нього список на /sync не може
+    // показати, коли саме правку відкинули.
+    expect(typeof quarantined[0].quarantined_at).toBe('number');
+  });
+});

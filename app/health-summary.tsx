@@ -20,6 +20,7 @@ import {
 import { Agg, Period, buildTrend } from '@/utils/healthPeriods';
 import { EntryType, HealthEntry } from '@/utils/healthUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { LoadErrorNotice } from '@/components/health/HealthNotices';
 
 interface Metric { type: EntryType; label: string; color: string; agg: Agg; unit: string; goal?: number; }
 
@@ -35,7 +36,7 @@ export default function HealthSummaryScreen() {
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   // Палітра й список метрик — у useMemo, бо SummaryCard обгорнутий у
   // React.memo: новий обʼєкт на кожен ререндер зводив би memo нанівець,
   // а кожна картка заново перебирає всі записи через buildTrend.
@@ -76,6 +77,9 @@ export default function HealthSummaryScreen() {
 
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+          {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+          {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
           {metrics.map(m => (
             <SummaryCard key={m.type} m={m} period={period} entries={h.entries} isDark={isDark} c={c} tr={tr} />
           ))}

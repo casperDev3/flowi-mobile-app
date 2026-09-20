@@ -40,6 +40,7 @@ import {
   DEFAULT_WORKSPACE_ORIGIN,
   getWorkspaceIncompatibility,
   loadWorkspaceConfig,
+  normalizeWorkspaceOrigin,
   setWorkspaceConfig,
   type WorkspaceCheckError,
   type WorkspaceCheckSuccess,
@@ -53,7 +54,9 @@ function errorMessage(tr: Translations, err: WorkspaceCheckError): string {
   switch (err.code) {
     case 'invalid_url': return tr.workspaceErrorInvalidUrl;
     case 'insecure_url': return tr.workspaceErrorInsecureUrl;
-    case 'network': return tr.workspaceErrorNetwork;
+    // ERR-04 / схема: «не вдалося з'єднатися» саме по собі не каже, ЧОМУ.
+    case 'network': return err.schemeAssumed ? tr.workspaceErrorNetworkScheme : tr.workspaceErrorNetwork;
+    case 'server_unavailable': return tr.workspaceErrorServerUnavailable;
     case 'not_workspace': return tr.workspaceErrorNotWorkspace;
     case 'update_app': return tr.workspaceErrorUpdateApp;
     case 'update_server': return tr.workspaceErrorUpdateServer;
@@ -101,10 +104,14 @@ export default function WorkspaceScreen() {
       const current = await loadWorkspaceConfig();
       if (cancelled) return;
       const origin = current?.origin ?? DEFAULT_WORKSPACE_ORIGIN;
-      // Ховаємо лише https:// (типовий випадок) — http:// лишаємо видимим:
-      // інакше збережена локальна адреса (192.168.x, self-host без TLS)
-      // перевірялась би вдруге вже як https і провалювалась.
-      setAddress(origin.replace(/^https:\/\//, ''));
+      // Ховаємо https:// лише тоді, коли показана адреса нормалізується
+      // назад у ТОЙ САМИЙ origin. Схему тепер домислює не лише https
+      // (локальним адресам — http), тож сліпе `replace` перетворило б
+      // збережений `https://mac.local` на `http://mac.local` при першій же
+      // повторній перевірці. http:// лишається видимим, як і раніше.
+      const stripped = origin.replace(/^https:\/\//, '');
+      const roundTrip = normalizeWorkspaceOrigin(stripped);
+      setAddress(roundTrip.ok && roundTrip.origin === origin ? stripped : origin);
       setPrefilled(true);
       // Несумісність, виявлена фоновою перевіркою (контракт §2.2.4) —
       // одразу показуємо помилку, не чекаючи натискання «Перевірити».
@@ -216,7 +223,11 @@ export default function WorkspaceScreen() {
       <View style={{ flex: 1, paddingTop: topInset }}>
         {isChange && router.canGoBack() ? (
           <View style={st.header}>
-            <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel={tr.back}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <IconSymbol name="chevron.left" size={22} color={c.accent} />
             </TouchableOpacity>
           </View>
@@ -247,6 +258,7 @@ export default function WorkspaceScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="url"
+                  accessibilityLabel={tr.workspaceAddressLabel}
                   editable={prefilled && !busy}
                   returnKeyType="go"
                   onSubmitEditing={handleCheck}
@@ -255,7 +267,11 @@ export default function WorkspaceScreen() {
             </BlurView>
 
             {state === 'error' && error && (
-              <View style={[st.hintRow, { backgroundColor: '#EF444414', borderColor: '#EF444430' }]}>
+              <View
+                accessible
+                accessibilityRole="alert"
+                accessibilityLabel={errorMessage(tr, error)}
+                style={[st.hintRow, { backgroundColor: '#EF444414', borderColor: '#EF444430' }]}>
                 <IconSymbol name="exclamationmark.circle" size={16} color="#EF4444" />
                 <Text style={[st.hintText, { color: '#EF4444' }]}>{errorMessage(tr, error)}</Text>
               </View>
@@ -281,6 +297,9 @@ export default function WorkspaceScreen() {
                 activeOpacity={0.82}
                 onPress={handleCheck}
                 disabled={busy || !address.trim()}
+                accessibilityRole="button"
+                accessibilityLabel={tr.workspaceCheckButton}
+                accessibilityState={{ disabled: busy || !address.trim(), busy }}
               >
                 {busy ? <ActivityIndicator color="#fff" /> : (
                   <Text style={st.primaryBtnText}>{tr.workspaceCheckButton}</Text>
@@ -294,6 +313,9 @@ export default function WorkspaceScreen() {
                 activeOpacity={0.82}
                 onPress={handleContinue}
                 disabled={switching}
+                accessibilityRole="button"
+                accessibilityLabel={tr.workspaceContinueButton}
+                accessibilityState={{ disabled: switching, busy: switching }}
               >
                 {switching ? <ActivityIndicator color="#fff" /> : (
                   <Text style={st.primaryBtnText}>{tr.workspaceContinueButton}</Text>

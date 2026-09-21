@@ -1,0 +1,44 @@
+# Local audit account only. Launch a Release build and authenticate against the local workspace first.
+# Run sequentially on iPad/iPhone with MAESTRO_DRIVER_STARTUP_TIMEOUT=300000.
+appId: com.casper3.f-tracking-app
+---
+- openLink: ftrackingapp://notes
+- extendedWaitUntil:
+    visible:
+      id: notes-add
+    timeout: 30000
+- tapOn:
+    id: notes-add
+- tapOn:
+    id: notes-title
+- inputText: Notes regression
+- tapOn:
+    id: notes-body
+- inputText: Draft survives save and reopen
+- tapOn:
+    id: notes-save
+- extendedWaitUntil:
+    visible: Notes regression
+    timeout: 10000
+- tapOn:
+    id: notes-search
+- inputText: Notes regression
+- hideKeyboard
+- tapOn: Notes regression
+- assertVisible:
+    id: notes-editor
+- assertVisible: Draft survives save and reopen
+- tapOn:
+    id: notes-close
+- tapOn:
+    id: notes-search
+- eraseText
+- inputText: no-match-982716
+- assertNotVisible: Notes regression
+- eraseText
+- hideKeyboard
+- tapOn: Notes regression
+- tapOn:
+    id: notes-delete
+- tapOn: Видалити
+- assertNotVisible: Notes regression

@@ -11,7 +11,7 @@
  *   outbox item local_id=key, data={value}.
  */
 
-import { loadData, saveData } from './storage';
+import { loadData, loadDataResult, saveData, saveDataChecked } from './storage';
 import { withStorageLock } from './storage-lock';
 import { withCompletionEvent } from '@/utils/taskUtils';
 import {
@@ -232,12 +232,13 @@ export async function saveOutbox(items: OutboxItem[]): Promise<void> {
 }
 
 /** Додає нові записи до outbox, дедупліціруючи з наявними. */
-export async function appendToOutbox(newItems: OutboxItem[]): Promise<void> {
+export async function appendToOutbox(newItems: OutboxItem[], checked = false): Promise<void> {
   if (!newItems.length) return;
   await withStorageLock(OUTBOX_KEY, async () => {
     const existing = await loadOutbox();
     const combined = deduplicateOutbox([...existing, ...ensureMutationIds(newItems)]);
-    await saveOutbox(combined);
+    if (checked) await saveDataChecked(OUTBOX_KEY, ensureMutationIds(combined));
+    else await saveOutbox(combined);
   });
 }
 
@@ -673,6 +674,7 @@ async function enqueueChanges(
   deleted: string[],
   changedRecords: Map<string, Record<string, unknown>>,
   beforeRecords: Map<string, Record<string, unknown>>,
+  checked = false,
 ): Promise<Set<string>> {
   const touchedStreams = new Set<string>();
   // Якщо нема змін — не чіпаємо outbox
@@ -717,7 +719,7 @@ async function enqueueChanges(
     if (stream) touchedStreams.add(stream);
   }
 
-  await appendToOutbox(outboxItems);
+  await appendToOutbox(outboxItems, checked);
   return touchedStreams;
 }
 
@@ -879,15 +881,23 @@ export async function saveSyncedChanges<T extends { id: string }>(
   key: string,
   before: readonly T[],
   after: readonly T[],
+  /** Surface write failures; re-enqueue intent on retry after a partial local save. */
+  options?: { checked?: boolean },
 ): Promise<T[] | null> {
   const changes = diffLocalChanges(before, after);
   if (!hasLocalChanges(changes)) return null;
 
   const result = await withStorageLock(key, async () => {
-    const storedRaw = await loadData<unknown>(key, []);
+    const read = options?.checked
+      ? await loadDataResult<unknown>(key, [])
+      : { ok: true, value: await loadData<unknown>(key, []) };
+    if (options?.checked && (!read.ok || !Array.isArray(read.value))) {
+      throw new Error(`Cannot safely read ${key}`);
+    }
+    const storedRaw = read.value;
     const stored = Array.isArray(storedRaw) ? (storedRaw as T[]) : [];
     const applied = applyLocalChanges(stored, changes);
-    if (!applied.changed.length && !applied.deleted.length) {
+    if (!options?.checked && !applied.changed.length && !applied.deleted.length) {
       return { ...applied, next: stored, touchedStreams: new Set<string>() };
     }
     const stamped = stampUpdatedAt(
@@ -897,18 +907,21 @@ export async function saveSyncedChanges<T extends { id: string }>(
       new Date().toISOString(),
       key,
     ) as unknown as T[];
-    await saveData(key, stamped);
+    await (options?.checked ? saveDataChecked : saveData)(key, stamped);
     // changed → новий стан (stamped), deleted → те, що лежало в stored до
     // видалення — та сама логіка, що й у updateSynced вище.
     const touchedStreams = await enqueueChanges(
-      key, applied.changed, applied.deleted,
+      key,
+      options?.checked ? changes.upserts.map(item => item.id) : applied.changed,
+      options?.checked ? changes.deletes : applied.deleted,
       recordsById(stamped as unknown as { id: string }[]),
-      recordsById(stored as unknown as { id: string }[]),
+      recordsById((options?.checked ? [...before, ...stored] : stored) as unknown as { id: string }[]),
+      options?.checked,
     );
     return { ...applied, next: stamped, touchedStreams };
   });
 
-  if (result.changed.length || result.deleted.length) {
+  if (options?.checked || result.changed.length || result.deleted.length) {
     notifySyncScheduler();
     notifyProjectStreams(result.touchedStreams);
   }

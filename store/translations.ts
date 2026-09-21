@@ -1229,6 +1229,19 @@ export interface Translations {
   overviewHoursThisWeek: string;
   overviewUpcomingMeetings: string;
   overviewBudgetSpent: string;
+  notesSortTitle: string;
+  notesSearch: string;
+  notesPersonal: string;
+  notesSelectHint: string;
+  notesNoResults: string;
+  notesReadOnly: string;
+  notesUnsavedTitle: string;
+  notesUnsavedBody: string;
+  notesEmptyError: string;
+  notesSaveError: string;
+  notesReadError: string;
+  notesRetry: string;
+  notesDeleteConfirm: string;
   noteBodyPlaceholder: string;
   timeManualTask: string;
   timeManualMinutes: string;
@@ -2492,6 +2505,19 @@ const uk: Translations = {
   overviewHoursThisWeek: 'Годин за тиждень',
   overviewUpcomingMeetings: 'Найближчі наради',
   overviewBudgetSpent: 'Витрачено',
+  notesSortTitle: 'За назвою',
+  notesSearch: 'Пошук у нотатках…',
+  notesPersonal: 'Особисті',
+  notesSelectHint: 'Виберіть нотатку або створіть нову',
+  notesNoResults: 'Нічого не знайдено. Змініть запит або фільтр.',
+  notesReadOnly: 'Лише перегляд',
+  notesUnsavedTitle: 'Незбережена нотатка',
+  notesUnsavedBody: 'Залишитися в редакторі чи відкинути зміни?',
+  notesEmptyError: 'Додайте заголовок або текст нотатки.',
+  notesSaveError: 'Не вдалося зберегти. Текст залишився в редакторі — спробуйте ще раз.',
+  notesReadError: 'Не вдалося прочитати нотатки. Повторіть спробу.',
+  notesRetry: 'Повторити',
+  notesDeleteConfirm: 'Видалити цю нотатку з усіх синхронізованих пристроїв?',
   noteBodyPlaceholder: 'Текст нотатки...',
   timeManualTask: 'Над чим працювали',
   timeManualMinutes: 'Хв',
@@ -3740,6 +3766,19 @@ const en: Translations = {
   overviewHoursThisWeek: 'Hours this week',
   overviewUpcomingMeetings: 'Upcoming meetings',
   overviewBudgetSpent: 'Spent',
+  notesSortTitle: 'By title',
+  notesSearch: 'Search notes…',
+  notesPersonal: 'Personal',
+  notesSelectHint: 'Select a note or create a new one',
+  notesNoResults: 'No matches. Change the search or filter.',
+  notesReadOnly: 'Read only',
+  notesUnsavedTitle: 'Unsaved note',
+  notesUnsavedBody: 'Stay in the editor or discard your changes?',
+  notesEmptyError: 'Add a title or note text.',
+  notesSaveError: 'Could not save. Your text remains in the editor. Please retry.',
+  notesReadError: 'Could not read notes. Please retry.',
+  notesRetry: 'Retry',
+  notesDeleteConfirm: 'Delete this note from all synced devices?',
   noteBodyPlaceholder: 'Note text...',
   timeManualTask: 'What did you work on',
   timeManualMinutes: 'Min',

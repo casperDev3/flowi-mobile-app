@@ -21,7 +21,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AppState } from 'react-native';
+import { Alert, AppState } from 'react-native';
+import { useI18n } from './i18n';
 
 import { ensureStorageMigrations } from './migrations';
 import { loadData, subscribeToStorage } from './storage';
@@ -42,7 +43,7 @@ import {
   meetingTimerId,
   type Meeting,
 } from '@/utils/meetings';
-import { IN_PROGRESS_COLUMN_ID, REVIEW_COLUMN_ID } from '@/utils/taskStatuses';
+import { DEFAULT_TASK_STATUS_COLUMNS, IN_PROGRESS_COLUMN_ID, REVIEW_COLUMN_ID, mergeTaskStatusColumns, resolvedStatusType, type TaskStatusColumn } from '@/utils/taskStatuses';
 import type { Task, TaskHistoryEvent, HistoryEventType } from '@/utils/taskUtils';
 
 const TIMERS_KEY = 'active_timers';
@@ -156,6 +157,7 @@ async function readStoredTimers(): Promise<ActiveTimer[]> {
 }
 
 export function TimerProvider({ children }: { children: React.ReactNode }) {
+  const { tr } = useI18n();
   const [pendingTask, setPendingTask] = useState('');
   const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
   const [timersReady, setTimersReady] = useState(false);
@@ -267,14 +269,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [readTimers]);
 
+  // The callback identity must follow React state: consumers/compiler may
+  // memoize lookups. A stable getter over a ref hides start/stop changes.
   const getTimerForTask = useCallback(
-    (taskId: string) => findTimerForTask(timersRef.current, taskId),
-    [],
+    (taskId: string) => findTimerForTask(activeTimers, taskId),
+    [activeTimers],
   );
 
   const getTimerForMeeting = useCallback(
-    (meetingId: string) => findTimerForMeeting(timersRef.current, meetingId),
-    [],
+    (meetingId: string) => findTimerForMeeting(activeTimers, meetingId),
+    [activeTimers],
   );
 
   /**
@@ -355,12 +359,37 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  // Проєктні колонки мають власні id. «Перевірка» має той самий type,
+  // що й «До роботи», тому підбір лише за type повертав би не ту колонку.
+  const resolveTimerColumn = useCallback(async (taskId: string, target: string) => {
+    const tasks = await loadData<Task[]>(TASKS_KEY, []);
+    const task = tasks.find(task => task.id === taskId);
+    if (task?.status === 'done') return task.kanbanColumnId;
+    const projectId = task?.projectId;
+    if (!projectId) return target;
+    const columns = await loadData<TaskStatusColumn[]>('task_statuses', []);
+    const scoped = mergeTaskStatusColumns(columns, projectId);
+    if (!scoped.length) return target;
+    const source = DEFAULT_TASK_STATUS_COLUMNS.find(column => column.id === target)!;
+    const match = scoped.find(column => !column.isDone && column.sourceStatusId === target)
+      ?? scoped.find(column => !column.isDone && column.name === source.name)
+      ?? (target === IN_PROGRESS_COLUMN_ID
+        ? scoped.find(column => !column.isDone && resolvedStatusType(column) === 'in_progress') : undefined);
+    if (match) return match.id;
+    // Workflow changes are owner-only on the server. Never create a local
+    // column that a member cannot synchronize, or silently select Todo.
+    Alert.alert(tr.timerWorkflowMissingTitle, tr.timerWorkflowMissingMessage);
+    return undefined;
+  }, [tr.timerWorkflowMissingTitle, tr.timerWorkflowMissingMessage]);
+
   const startTaskTimer = useCallback(
     async (task: TimerTaskInput) => {
       // Завершене завдання не трекають: сесія на ньому нікуди не веде, а
       // колонку done автоматика чіпати не сміє.
       if (task.status === 'done') return;
 
+      const columnId = await resolveTimerColumn(task.id, IN_PROGRESS_COLUMN_ID);
+      if (!columnId) return;
       const now = new Date();
 
       const timer: ActiveTimer = {
@@ -390,11 +419,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         // прийшло. Робота почалась — і на дошці це має бути видно однаково,
         // незалежно від того, чи лежало завдання в «До роботи», чи у власній
         // колонці користувача.
-        kanbanColumnId: IN_PROGRESS_COLUMN_ID,
+        kanbanColumnId: columnId,
         history: [...(t.history ?? []), makeHistoryEvent('timer_start')],
       }));
     },
-    [mutateTimers, patchTask],
+    [mutateTimers, patchTask, resolveTimerColumn],
   );
 
   const startAdHocTimer = useCallback(
@@ -455,6 +484,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       // 2. Завершена сесія переїжджає в timeEntries завдання. endedAt тут є
       //    ЗАВЖДИ: відкритих записів у timeEntries більше не буває.
       if (timer.taskId) {
+        const columnId = await resolveTimerColumn(timer.taskId, REVIEW_COLUMN_ID);
         await patchTask(timer.taskId, t => ({
           ...t,
           // Зупинка ЗАВЖДИ переводить у «На перевірці»: робота скінчилась, але
@@ -466,7 +496,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           // і цей запис прилітає сюди вже ПІСЛЯ того, як екран переставив
           // завдання в «Готово»; безумовний перенос скасував би щойно
           // завершену роботу й повернув її на дошку.
-          kanbanColumnId: t.status === 'done' ? t.kanbanColumnId : REVIEW_COLUMN_ID,
+          kanbanColumnId: t.status === 'done' ? t.kanbanColumnId : (columnId ?? t.kanbanColumnId),
           timeEntries: [
             ...(t.timeEntries ?? []),
             {
@@ -493,7 +523,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       // 3. Дзеркало для екранів часу.
       await mirrorToTimeEntries(timer, duration, endedAt);
     },
-    [mutateTimers, mirrorToTimeEntries, patchTask, patchMeeting],
+    [mutateTimers, mirrorToTimeEntries, patchTask, patchMeeting, resolveTimerColumn],
   );
 
   const stopTimerForTask = useCallback(

@@ -144,6 +144,8 @@ export interface Translations {
   history: string;
   trackedTime: string;
   currentSession: string;
+  timerWorkflowMissingTitle: string;
+  timerWorkflowMissingMessage: string;
   startTimer: string;
   stopTimer: string;
   nothingFound: string;
@@ -1572,6 +1574,8 @@ const uk: Translations = {
   history: 'Історія',
   trackedTime: 'Відстежений час',
   currentSession: 'Поточна сесія',
+  timerWorkflowMissingTitle: 'Налаштуйте статуси проєкту',
+  timerWorkflowMissingMessage: 'Власник проєкту має додати статуси «У процесі» та «На перевірці». Поточний статус завдання збережено.',
   startTimer: 'Запустити',
   stopTimer: 'Зупинити',
   nothingFound: 'Нічого не знайдено',
@@ -2836,6 +2840,8 @@ const en: Translations = {
   history: 'History',
   trackedTime: 'Tracked Time',
   currentSession: 'Current Session',
+  timerWorkflowMissingTitle: 'Configure project statuses',
+  timerWorkflowMissingMessage: 'The project owner needs to add In progress and In review statuses. The current task status was preserved.',
   startTimer: 'Start',
   stopTimer: 'Stop',
   nothingFound: 'Nothing found',

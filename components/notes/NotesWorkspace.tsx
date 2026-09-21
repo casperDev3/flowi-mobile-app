@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { loadData, loadDataResult, retryStorageRead, subscribeToStorage } from '@/store/storage';
 import { saveSyncedChanges } from '@/store/synced-storage';
@@ -24,6 +25,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
   const { tr, lang } = useI18n();
   const { isExpanded } = useResponsive();
   const insets = useSafeAreaInsets();
+  const tabBarInset = useTabBarInset();
   const navigation = useNavigation();
   const roles = useProjectRoles();
   const [notes, setNotes] = useState<Note[]>([]);
@@ -162,12 +164,12 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={[s.root, { backgroundColor: c.bg, paddingBottom: Math.max(insets.bottom, 12) }]}>
+      style={[s.root, { backgroundColor: c.bg }]}>
       {readError && <View accessibilityRole="alert" style={{ padding: 12 }}>
         <Text style={{ color: c.text }}>{tr.notesReadError}</Text>
         {button(tr.notesRetry, () => { void reload(true); }, 'notes-retry')}
       </View>}
-      <View style={[s.panes, { flexDirection: isExpanded ? 'row' : 'column' }]}>
+      <View style={[s.panes, { flexDirection: isExpanded ? 'row' : 'column', paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
         {(isExpanded || !selected) && <View testID="notes-list" style={isExpanded ? s.listWide : s.list}>
           <View style={s.toolbar}>
             {canEditProjectItem(projectId, roles) && button(tr.addNote, add, 'notes-add', !ready || readError || saving)}

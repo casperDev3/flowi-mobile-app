@@ -1,30 +1,39 @@
+# Supply a unique NOTE_TITLE via -e for each run.
 # Local audit account only. Launch a Release build and authenticate against the local workspace first.
 # Run sequentially on iPad/iPhone with MAESTRO_DRIVER_STARTUP_TIMEOUT=300000.
 appId: com.casper3.f-tracking-app
 ---
+- launchApp
 - openLink: ftrackingapp://notes
+- tapOn:
+    text: Open
+    optional: true
 - extendedWaitUntil:
     visible:
       id: notes-add
     timeout: 30000
 - tapOn:
+    id: notes-search
+- eraseText
+- tapOn:
     id: notes-add
 - tapOn:
     id: notes-title
-- inputText: Notes regression
+- inputText: ${NOTE_TITLE}
 - tapOn:
     id: notes-body
 - inputText: Draft survives save and reopen
 - tapOn:
     id: notes-save
 - extendedWaitUntil:
-    visible: Notes regression
+    visible: ${NOTE_TITLE}
     timeout: 10000
 - tapOn:
     id: notes-search
-- inputText: Notes regression
-- hideKeyboard
-- tapOn: Notes regression
+- eraseText
+- inputText: ${NOTE_TITLE}
+- tapOn:
+    id: "note-.*"
 - assertVisible:
     id: notes-editor
 - assertVisible: Draft survives save and reopen
@@ -34,11 +43,17 @@ appId: com.casper3.f-tracking-app
     id: notes-search
 - eraseText
 - inputText: no-match-982716
-- assertNotVisible: Notes regression
+- assertNotVisible: ${NOTE_TITLE}
 - eraseText
-- hideKeyboard
-- tapOn: Notes regression
+- inputText: ${NOTE_TITLE}
+- tapOn:
+    id: "note-.*"
 - tapOn:
     id: notes-delete
-- tapOn: Видалити
-- assertNotVisible: Notes regression
+- tapOn:
+    text: Видалити
+    below: "Видалити цю нотатку.*"
+- tapOn:
+    id: notes-search
+- eraseText
+- assertNotVisible: ${NOTE_TITLE}

@@ -18,6 +18,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async (key: string) => { mockStore.delete(key); }),
 }));
 jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ dispatch: jest.fn() }), usePreventRemove: jest.fn() }));
+jest.mock('@/hooks/use-tab-bar-inset', () => ({ useTabBarInset: () => 0 }));
 jest.mock('@/hooks/use-responsive', () => ({ useResponsive: () => ({ isExpanded: mockExpanded }) }));
 jest.mock('@/hooks/use-project-roles', () => ({
   useProjectRoles: () => mockRoles,

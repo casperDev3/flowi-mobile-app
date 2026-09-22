@@ -1,0 +1,32 @@
+{
+  "description": "Спільна фікстура web/mobile: головна («Сьогодні») і «Фінанси» мусять показувати ті самі числа з financeOverview(). Дати — локальний час без Z, щоб не залежати від часового поясу.",
+  "now": "2026-09-22T10:00:00",
+  "primary": "UAH",
+  "accounts": [
+    { "id": "card", "name": "Картка", "kind": "card", "currency": "UAH", "openingBalance": 3000, "createdAt": "2026-08-01T09:00:00" },
+    { "id": "cash", "name": "Готівка", "kind": "cash", "currency": "UAH", "openingBalance": 0, "createdAt": "2026-08-01T09:00:00" },
+    { "id": "usd", "name": "Відкладене", "kind": "savings", "currency": "USD", "openingBalance": 100, "createdAt": "2026-08-01T09:00:00" },
+    { "id": "old", "name": "Старий гаманець", "kind": "cash", "currency": "UAH", "openingBalance": 500, "archived": true, "createdAt": "2026-01-01T09:00:00" }
+  ],
+  "transactions": [
+    { "id": "t1", "type": "income", "category": "Зарплата", "amount": 10000, "note": "", "date": "2026-08-05T12:00:00", "accountId": "card" },
+    { "id": "t2", "type": "expense", "category": "Оренда", "amount": 7000, "note": "", "date": "2026-08-10T12:00:00", "accountId": "card" },
+    { "id": "t3", "type": "income", "category": "Зарплата", "amount": 5000, "note": "", "date": "2026-09-05T12:00:00", "accountId": "card" },
+    { "id": "t4", "type": "expense", "category": "Їжа", "amount": 1200, "note": "", "date": "2026-09-06T12:00:00", "accountId": "card" },
+    { "id": "t5", "type": "expense", "category": "Їжа", "amount": -200, "note": "від'ємна сума з легасі-даних", "date": "2026-09-07T12:00:00", "accountId": "card" },
+    { "id": "t6", "type": "transfer", "category": "Переказ", "amount": 1000, "note": "", "date": "2026-09-08T12:00:00", "accountId": "card", "toAccountId": "cash" },
+    { "id": "t7", "type": "expense", "category": "Кава", "amount": 300, "note": "", "date": "2026-09-09T12:00:00", "accountId": "cash" },
+    { "id": "t8", "type": "expense", "category": "Кава", "amount": "150", "note": "рядок замість числа", "date": "2026-09-10T12:00:00", "accountId": "cash" },
+    { "id": "t9", "type": "expense", "category": "Підписка", "amount": 400, "note": "майбутня", "date": "2026-09-30T12:00:00", "accountId": "card" },
+    { "id": "t10", "type": "expense", "category": "Інше", "amount": 50, "note": "без рахунку", "date": "2026-09-11T12:00:00", "accountId": "", "currency": "UAH" },
+    { "id": "t11", "type": "income", "category": "Кешбек", "amount": 20, "note": "", "date": "2026-09-12T12:00:00", "accountId": "usd" }
+  ],
+  "expected": {
+    "balances": { "card": 8600, "cash": 550, "usd": 120, "old": 500 },
+    "totalByCurrency": { "UAH": 9150, "USD": 120 },
+    "month": { "income": 5000, "expense": 2300, "net": 2700 },
+    "unassignedCount": 1,
+    "futureCount": 1,
+    "cardBreakdown": { "opening": 3000, "income": 15000, "expense": 8400, "transfersIn": 0, "transfersOut": 1000, "future": -400, "futureCount": 1, "balance": 8600 }
+  }
+}

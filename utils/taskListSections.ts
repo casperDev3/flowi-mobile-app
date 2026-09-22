@@ -29,13 +29,13 @@
  * прострочене просто лишається у своїй статусній групі — воно «сьогоднішнє».
  */
 import { orderColumnsForList, personalDisplayColumn, scopedTaskStatusColumn, type TaskStatusColumn } from './taskStatuses';
-import { isTodayTask, type TodayScopeTask } from './taskToday';
+import { isTodayTask, type TaskScopeMode, type TodayScopeTask } from './taskToday';
 
 /** Мінімум полів, потрібних для розбиття: екрани мають власні типи завдання. */
 export type ListTask = TodayScopeTask;
 
-/** Що показуємо: лише денну роботу чи весь список. */
-export type TaskListScope = 'today' | 'all';
+/** Що показуємо: денну роботу, тиждень чи весь список (utils/taskToday.ts inTaskScope). */
+export type TaskListScope = TaskScopeMode;
 
 export interface TaskListSection<T> {
   key: string;
@@ -65,7 +65,10 @@ export function buildStatusListSections<T extends ListTask>(
     // спорожнити «Готово» і зробити зроблене невидимим. Скільки завершеного
     // сюди взагалі доходить, вирішує фільтр видимості вище по потоку
     // (taskVisibleInList): у режимі «сьогодні» він лишає тільки закрите сьогодні.
-    if (scope === 'all' || task.status === 'done' || isTodayTask(task, columns, today)) {
+    // Відбір за 'week'/'all' (+ «Без дедлайну») уже зробив applyTaskScope
+    // вище по потоку; тут повторно перевіряється лише 'today' — щоб друга
+    // копія правил тижня/дедлайну не завелась і не розійшлась із першою.
+    if (scope !== 'today' || task.status === 'done' || isTodayTask(task, columns, today)) {
       // Скоуп за ВЛАСНИМ projectId завдання (§3.7 «Особисте агрегує»):
       // плоский `columns` містить усі потоки, і без цього задача проєкту зі
       // своєю (`st-<uuid4>`) колонкою не знаходила б її серед особистих.

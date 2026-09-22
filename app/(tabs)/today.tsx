@@ -38,8 +38,9 @@ import { groupTodayTasks } from '@/utils/todayGroups';
 import { updateSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { isSameDay } from '@/utils/dateUtils';
-import { Transaction, calcTotals, filterByMonth } from '@/utils/financeUtils';
-import { resolveTxCurrency, type Account } from '@/utils/accounts';
+import { Transaction } from '@/utils/financeUtils';
+import { financeOverview } from '@/utils/financeOverview';
+import { type Account } from '@/utils/accounts';
 import {
   ACCENT, ACCENT_CAL, ACCENT_SLEEP, ACCENT_STEPS, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
@@ -309,17 +310,18 @@ export default function TodayScreen() {
   );
 
   /**
-   * Зведення дня рахує лише оборот основної валюти. Перекази сюди не
-   * потрапляють: `calcTotals` бере тільки 'income' і 'expense', тож переїзд
-   * грошей між своїми рахунками не роздуває ні дохід, ні витрату місяця.
+   * Цифри плитки — з ТОГО САМОГО джерела, що й екран «Фінанси»
+   * (utils/financeOverview.ts). Раніше тут був оборот місяця, підписаний як
+   * баланс, а на «Фінансах» — баланс рахунків, і різниця між ними виглядала
+   * як помилка. Тепер головна цифра — «На рахунках» (та сама, що на
+   * «Фінансах»), а оборот місяця — окремим рядком «Сальдо місяця».
    */
-  const fin = useMemo(() => {
-    const month = filterByMonth(
-      txs.filter(t => resolveTxCurrency(t, accounts) === primaryCode),
-      today,
-    );
-    return calcTotals(month);
-  }, [txs, accounts, primaryCode, today]);
+  const overview = useMemo(
+    () => financeOverview({ txs, accounts, primary: primaryCode, now: today }),
+    [txs, accounts, primaryCode, today],
+  );
+  const hasPrimaryAccounts = accounts.some(a => !a.archived && (a.currency || 'UAH') === primaryCode);
+  const headlineValue = hasPrimaryAccounts ? overview.totalByCurrency[primaryCode] ?? 0 : overview.month.net;
 
   // Time today
   const trackedSec = time
@@ -644,15 +646,32 @@ export default function TodayScreen() {
             icon="banknote" color={ACCENT_FIN}
             title={tr.tabFinance}
             onPress={() => router.push('/explore')}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, fontWeight: '600', flexShrink: 1 }}>
+                {hasPrimaryAccounts ? tr.totalOnAccounts : tr.monthNet}
+              </Text>
+              {overview.unassigned.count > 0 && (
+                <View
+                  accessible
+                  accessibilityLabel={tr.unassignedTxWarning.replace('{n}', String(overview.unassigned.count))}>
+                  <IconSymbol name="exclamationmark.triangle.fill" size={11} color="#F59E0B" />
+                </View>
+              )}
+            </View>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
-              style={{ color: fin.balance >= 0 ? '#10B981' : '#EF4444', fontSize: 20, fontWeight: '800', marginTop: 6 }}>
-              {fmtMoney(fin.balance)}
+              style={{ color: headlineValue >= 0 ? '#10B981' : '#EF4444', fontSize: 20, fontWeight: '800', marginTop: 2 }}>
+              {fmtMoney(headlineValue)}
             </Text>
+            {hasPrimaryAccounts && (
+              <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                {tr.monthNet}: {overview.month.net > 0 ? '+' : ''}{fmtMoney(overview.month.net)}
+              </Text>
+            )}
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 2 }}>
-              <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>↑ {fmtMoney(fin.income)}</Text>
-              <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>↓ {fmtMoney(fin.expense)}</Text>
+              <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>↑ {fmtMoney(overview.month.income)}</Text>
+              <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>↓ {fmtMoney(overview.month.expense)}</Text>
             </View>
           </StatTile>
           <StatTile

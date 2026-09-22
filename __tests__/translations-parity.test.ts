@@ -87,7 +87,6 @@ test('нові ключі аналітики проєктів є в обох м�
     'chartOverdueDebt',
     'chartBeyondHorizon',
     'chartNoDeadline',
-    'ganttTitle',
     'ganttLegendReal',
     'ganttLegendEstimated',
     'ganttLegendColor',

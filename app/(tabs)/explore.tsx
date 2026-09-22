@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Modal,
+  Alert,
   Platform,
   Pressable,
   FlatList,
@@ -48,11 +49,12 @@ import {
   type Currency, type Transaction, type TxHistoryEvent,
 } from '@/utils/financeUtils';
 import {
-  accountBalance, accountById, accountIdForLegacyTx, activeAccounts, creditedAmount,
+  accountById, accountIdForLegacyTx, activeAccounts, creditedAmount,
   defaultAccountId, isTransfer, markTransferTargets, mergeAccountsForSave,
-  resolveTxCurrency, transferRate,
+  findTransferPairCandidate, markAsTransferAccounts, reconciledOpeningBalance, resolveTxCurrency, transferRate,
   ACCOUNT_KINDS, type Account, type AccountKind,
 } from '@/utils/accounts';
+import { financeOverview } from '@/utils/financeOverview';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useMotion } from '@/hooks/use-motion';
 import { isSameDay } from '@/utils/dateUtils';
@@ -221,6 +223,8 @@ export default function FinanceScreen() {
   // Форма рахунку живе всередині аркуша рахунків, а не окремим аркушем:
   // два bottom-sheet одночасно на iOS закривають один одного.
   const [accForm, setAccForm] = useState<AccountDraft | null>(null);
+  const [reconcileActual, setReconcileActual] = useState('');
+  const [reconcileNote, setReconcileNote] = useState<string | null>(null);
   /** Транзакція, яку перетворюємо на переказ (старі дані лежать парами). */
   const [markTxId, setMarkTxId] = useState<string | null>(null);
   const [markTargetId, setMarkTargetId] = useState<string | null>(null);
@@ -500,11 +504,23 @@ export default function FinanceScreen() {
     setAccountFilter(prev => resolveAccountFilter(prev, visibleAccounts.map(a => a.id)));
   }, [visibleAccounts]);
 
-  const accountBalances = useMemo(() => {
-    const out: Record<string, number> = {};
-    accounts.forEach(a => { out[a.id] = accountBalance(a, txs); });
-    return out;
-  }, [accounts, txs]);
+  /**
+   * Баланси, «Разом» по валютах і розклад «Звідки ця сума» — з ТОГО САМОГО
+   * financeOverview, що й плитка «Сьогодні»: два екрани більше не рахують
+   * «баланс» кожен по-своєму (utils/financeOverview.ts).
+   */
+  const overview = useMemo(
+    () => financeOverview({ txs, accounts, primary: primaryCurrency, now: new Date() }),
+    [txs, accounts, primaryCurrency],
+  );
+  const accountBalances = overview.balances;
+  /** Фільтр стрічки «лише операції без рахунку» — з попередження над рахунками. */
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
+  const unassignedIds = useMemo(() => new Set(overview.unassigned.ids), [overview.unassigned.ids]);
+  useEffect(() => {
+    if (overview.unassigned.count === 0) setUnassignedOnly(false);
+  }, [overview.unassigned.count]);
+
 
   /** Переказ належить обом рахункам: і тому, з якого пішов, і тому, куди прийшов. */
   const touchesAccount = useCallback(
@@ -522,16 +538,18 @@ export default function FinanceScreen() {
     [txs, accountFilter, touchesAccount],
   );
   const totalsByCurrency = useMemo(
-    () => calcTotalsByCurrency(totalsSource, activeMonth),
-    [totalsSource, activeMonth],
+    // Валюта — за РАХУНКОМ (resolveTxCurrency), як і на плитці «Сьогодні».
+    () => calcTotalsByCurrency(totalsSource, activeMonth, t => resolveTxCurrency(t, accounts)),
+    [totalsSource, activeMonth, accounts],
   );
 
   const filtered = useMemo(() => monthTxs.filter(t => {
     if (filter !== 'all' && t.type !== filter) return false;
+    if (unassignedOnly && !unassignedIds.has(t.id)) return false;
     if (accountFilter && !touchesAccount(t, accountFilter)) return false;
     if (dateFilter && !isSameDay(new Date(t.date), dateFilter)) return false;
     return true;
-  }), [monthTxs, filter, accountFilter, dateFilter, touchesAccount]);
+  }), [monthTxs, filter, accountFilter, dateFilter, touchesAccount, unassignedOnly, unassignedIds]);
 
   /** У віртуалізованому списку елементи монтуються заново при прокрутці. */
   const animatedGroups = useRef<Set<string>>(new Set());
@@ -746,34 +764,54 @@ export default function FinanceScreen() {
   const applyMarkAsTransfer = () => {
     const target = accountById(accounts, markTargetId ?? undefined);
     const tx = txs.find(t => t.id === markTxId);
-    if (!target || !tx || target.id === tx.accountId) return;
+    if (!target || !tx || !tx.accountId || target.id === tx.accountId) return;
     // Валюта призначення мусить збігатися з валютою операції: зарахована сума
     // тут не питається (курс минулого переказу невідомий), тож на рахунок
     // іншої валюти пішло б те саме ЧИСЛО — 100 USD стали б 100 UAH з повітря.
     if (!markTransferTargets(accounts, tx).some(a => a.id === target.id)) return;
+    // Дохід — гроші ПРИЙШЛИ на рахунок операції, тож він стає призначенням.
+    const direction = markAsTransferAccounts(tx, target.id);
+    const pair = findTransferPairCandidate(txs, tx, target.id, accounts);
     setTxs(prev => prev.map(t => (t.id !== tx.id ? t : appendTransactionHistory({
       ...t,
       type: 'transfer',
       category: tr.transfer,
-      toAccountId: target.id,
+      accountId: direction.accountId,
+      toAccountId: direction.toAccountId,
       // Курс минулого переказу невідомий, тож зарахована сума лишається
       // порожньою (= списаній). За різних валют її виправляють редагуванням.
       toAmount: undefined,
     }, {
       id: Date.now().toString() + Math.random().toString(36).slice(2),
       at: new Date().toISOString(),
-      note: `${tr.markAsTransfer}: ${accountName(t.accountId)} → ${target.name}`,
+      note: `${tr.markAsTransfer}: ${accountName(direction.accountId)} → ${accountName(direction.toAccountId)}`,
     }))));
     setSelected(null);
     setMarkTxId(null);
     setMarkTargetId(null);
     haptic.success();
+    // Друга половина старої пари лишилась би витратою/доходом поруч із
+    // переказом — гроші порахувались би двічі. Пропонуємо, не видаляємо самі.
+    if (pair) {
+      Alert.alert(
+        tr.markTransferPairTitle,
+        tr.markTransferPairHint
+          .replace('{account}', target.name)
+          .replace('{date}', new Date(pair.date).toLocaleDateString(locale, { day: 'numeric', month: 'long' })),
+        [
+          { text: tr.markTransferPairKeep, style: 'cancel' },
+          { text: tr.markTransferPairDelete, style: 'destructive', onPress: () => deleteTx(pair.id) },
+        ],
+      );
+    }
   };
 
   // ── Рахунки: створення, перейменування, архівація ──
   /** useCallback з тієї ж причини, що й openAdd: проп мемоізованої шапки. */
   const openAccountForm = useCallback((account: Account | null) => {
     setShowAccounts(true);
+    setReconcileActual('');
+    setReconcileNote(null);
     setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol('');
     setAccForm(account
       ? {
@@ -782,6 +820,58 @@ export default function FinanceScreen() {
         }
       : { id: null, name: '', kind: 'cash', currency: primaryCurrency, opening: '' });
   }, [primaryCurrency]);
+
+  const showBreakdown = useCallback((account: Account) => {
+    const b = overview.breakdowns[account.id];
+    if (!b) return;
+    const cur = curOf(account.currency);
+    const line = (label: string, value: number, sign = '') => `${label}: ${sign}${fmtCur(value, cur)}`;
+    const lines = [
+      line(tr.breakdownOpening, b.opening),
+      line(tr.breakdownIncome, b.income, '+'),
+      line(tr.breakdownExpense, b.expense, '−'),
+      line(tr.breakdownTransfersIn, b.transfersIn, '+'),
+      line(tr.breakdownTransfersOut, b.transfersOut, '−'),
+      `= ${line(tr.breakdownBalance, b.balance)}`,
+    ];
+    if (b.futureCount > 0) {
+      lines.push('', `${tr.breakdownFuture.replace('{n}', String(b.futureCount))} (${b.future > 0 ? '+' : ''}${fmtCur(b.future, cur)})`);
+    }
+    Alert.alert(`${tr.balanceBreakdown} · ${account.name}`, lines.join('\n'), [
+      { text: tr.reconcileBalance, onPress: () => openAccountForm(account) },
+      { text: tr.close, style: 'cancel' },
+    ]);
+  }, [overview.breakdowns, fmtCur, curOf, tr, openAccountForm]);
+
+  /**
+   * «Звірити з реальним залишком»: людина вводить, скільки РЕАЛЬНО лежить на
+   * рахунку зараз, і ми рахуємо, яким мав би бути початковий залишок, щоб
+   * баланс зійшовся (історія операцій лишається як є). Нічого не
+   * застосовується мовчки — нове значення лягає у форму разом із різницею,
+   * і людина сама натискає «Зберегти».
+   */
+  const applyReconcile = () => {
+    if (!accForm?.id) return;
+    const account = accounts.find(a => a.id === accForm.id);
+    const actual = parseFloat(reconcileActual.replace(',', '.').trim());
+    if (!account || !Number.isFinite(actual)) return;
+    const { opening, delta } = reconciledOpeningBalance(account, txs, actual, { asOf: new Date() });
+    const cur = curOf(account.currency);
+    setAccForm(prev => (prev ? { ...prev, opening: String(opening) } : prev));
+    setReconcileNote(tr.reconcileDelta.replace('{delta}', `${delta > 0 ? '+' : ''}${fmtCur(delta, cur)}`));
+    haptic.light();
+  };
+
+  /** Яким стане баланс рахунку з поточним значенням поля «Початковий залишок». */
+  const accFormPreview = (() => {
+    if (!accForm) return null;
+    const raw = accForm.opening.replace(',', '.').trim();
+    const opening = raw === '' ? 0 : parseFloat(raw);
+    if (!Number.isFinite(opening)) return null;
+    const b = accForm.id ? overview.breakdowns[accForm.id] : undefined;
+    const history = b ? b.balance - b.opening : 0;
+    return opening + history;
+  })();
 
   const saveAccount = () => {
     if (!accForm) return;
@@ -1089,6 +1179,15 @@ export default function FinanceScreen() {
               noAccountsHint={tr.noAccountsHint}
               transfersNoteLabel={tr.transfersNotCounted}
               showTransfersNote={monthHasTransfers}
+              accountTotals={overview.totalByCurrency}
+              totalLabel={tr.totalOnAccounts}
+              onLongPressAccount={showBreakdown}
+              breakdownHint={tr.balanceBreakdown}
+              unassignedLabel={overview.unassigned.count > 0
+                ? tr.unassignedTxWarning.replace('{n}', String(overview.unassigned.count))
+                : null}
+              unassignedActive={unassignedOnly}
+              onPressUnassigned={() => { haptic.light(); setUnassignedOnly(v => !v); }}
             />
 
             {/* Найближчі оплати / прострочені підписки. Операцій не створюють —
@@ -1149,6 +1248,7 @@ export default function FinanceScreen() {
     c.green, c.red, c.sub, c.text, dateFilter, filter, fmtCur, groups.length, initialized,
     isDark, kindLabel, lang, loadFailed, locale, monthHasTransfers, openAccountForm, openAdd,
     primaryCurrency, retryLoad, totalsByCurrency, tr, upcomingPayments, visibleAccounts,
+    overview.totalByCurrency, overview.unassigned.count, showBreakdown, unassignedOnly,
   ]);
 
   // Той самий вміст показується модалкою на телефоні й колонкою на
@@ -2181,11 +2281,50 @@ export default function FinanceScreen() {
                   placeholderTextColor={c.sub}
                   value={accForm.opening}
                   accessibilityLabel={tr.openingBalance}
+                  accessibilityHint={tr.openingBalanceHint}
                   // Мінус лишаємо: борг по картці — теж стан рахунку.
-                  onChangeText={t => setAccForm(prev => (prev ? { ...prev, opening: t.replace(/[^0-9.,-]/g, '') } : prev))}
+                  onChangeText={t => { setReconcileNote(null); setAccForm(prev => (prev ? { ...prev, opening: t.replace(/[^0-9.,-]/g, '') } : prev)); }}
                   keyboardType="numbers-and-punctuation"
                   style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text }]}
                 />
+                {/* Пояснення поля + живий підсумок: головна причина розбіжності
+                    «Сьогодні» і «Фінансів» — поточний залишок, введений сюди
+                    поверх уже привʼязаної історії (вона рахується двічі). */}
+                <Text style={{ color: c.sub, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{tr.openingBalanceHint}</Text>
+                {accFormPreview !== null && (
+                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginTop: 6 }}>
+                    {tr.balanceWillBe.replace('{amount}', fmtCur(accFormPreview, curOf(accForm.currency)))}
+                  </Text>
+                )}
+                {!!accForm.id && (
+                  <>
+                    <Text style={[s.label, { color: c.sub }]}>{tr.reconcileActualLabel}</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                      <TextInput
+                        placeholder="0"
+                        placeholderTextColor={c.sub}
+                        value={reconcileActual}
+                        accessibilityLabel={tr.reconcileActualLabel}
+                        onChangeText={t => setReconcileActual(t.replace(/[^0-9.,-]/g, ''))}
+                        keyboardType="numbers-and-punctuation"
+                        style={[s.input, { flexGrow: 1, flexBasis: 120, backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text }]}
+                      />
+                      <TouchableOpacity
+                        onPress={applyReconcile}
+                        disabled={!reconcileActual.trim()}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !reconcileActual.trim() }}
+                        accessibilityLabel={tr.reconcileBalance}
+                        style={[s.btn, { flexGrow: 1, minHeight: 44, paddingHorizontal: 12, backgroundColor: reconcileActual.trim() ? c.accent + '20' : c.dim, borderWidth: 1, borderColor: reconcileActual.trim() ? c.accent + '55' : c.border }]}>
+                        <IconSymbol name="arrow.triangle.2.circlepath" size={14} color={reconcileActual.trim() ? c.accent : c.sub} />
+                        <Text style={{ color: reconcileActual.trim() ? c.accent : c.sub, fontWeight: '700', marginLeft: 6 }}>{tr.reconcileBalance}</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {reconcileNote && (
+                      <Text style={{ color: c.accent, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{reconcileNote}</Text>
+                    )}
+                  </>
+                )}
 
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
                   <TouchableOpacity onPress={() => setAccForm(null)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>

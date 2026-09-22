@@ -41,7 +41,6 @@ import {
 } from '@/utils/projectStats';
 import { ProjectAnalytics } from '@/components/projects/ProjectAnalytics';
 import { ProjectTimeline } from '@/components/projects/ProjectTimeline';
-import { useResponsive } from '@/hooks/use-responsive';
 import { useTimerContext } from '@/store/timer-context';
 import { mergeTaskStatusColumns, seedProjectStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { hasPendingProjectOutbox, queueProjectDeletion, syncAllMyProjects } from '@/store/project-sync';
@@ -104,9 +103,8 @@ interface Task {
   deadline?: string;
   createdAt?: string;
   /**
-   * Справжня дата початку роботи. Заповнена рідко — і саме тому Гантт малює
-   * смуги з нею й без неї по-різному: без startDate початок беруть із
-   * createdAt, і смуга показує вік запису, а не тривалість роботи.
+   * Справжня дата початку роботи. Заповнена рідко — Таймлайн проєкту
+   * (app/project/[id]/tasks.tsx) без неї бере початок із createdAt.
    */
   startDate?: string;
   subtasks?: unknown[];
@@ -317,7 +315,6 @@ export default function ProjectsScreen() {
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const { isExpanded } = useResponsive();
   const sheetSurface = useSheetSurface();
   // Активні таймери потрібні, щоб «Відпрацьовано» включало сесію, яка триває
   // просто зараз, а не лише закриті.
@@ -780,7 +777,6 @@ export default function ProjectsScreen() {
               tasks={tasks}
               columns={columns}
               scopeLabel={showArchived ? tr.archive : tr.projects}
-              wide={isExpanded}
               palette={analyticsPalette}
             />
           }

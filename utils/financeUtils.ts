@@ -250,7 +250,6 @@ export function filterByMonth(txs: Transaction[], month: Date): Transaction[] {
 /**
  * Per-currency totals including a "carryover" line:
  *   carryover = sum(income - expense) of all transactions with date < startOfMonth(activeMonth)
- *                + optional per-currency manual adjustment (from settings)
  *   income/expense = transactions inside activeMonth only
  *   balance = carryover + income - expense
  *
@@ -260,11 +259,17 @@ export function filterByMonth(txs: Transaction[], month: Date): Transaction[] {
  * Перекази пропускаються ЦІЛКОМ — і в місяці, і в перенесеному залишку. Вони
  * не змінюють суму грошей у валюті, лише її розкладку по рахунках, тож
  * баланси окремих рахунків рахує accountBalance, а не ця функція.
+ *
+ * `currencyOf` — валюта операції. Екран передає resolveTxCurrency(tx,
+ * accounts) (валюта РАХУНКУ), як і плитка «Сьогодні»: інакше запис, у якого
+ * легасі-поле currency розходиться з рахунком, рахувався б у різних валютах
+ * на двох екранах. Ручні коригування (`finance_balance_adjustments`)
+ * переїхали в Account.openingBalance — параметра для них більше немає.
  */
 export function calcTotalsByCurrency(
   allTxs: Transaction[],
   activeMonth: Date,
-  adjustments: Record<string, number> = {},
+  currencyOf: (tx: Transaction) => string = txCurrency,
 ): Record<string, CurrencyTotals> {
   const monthStart = startOfMonth(activeMonth);
   const out: Record<string, CurrencyTotals> = {};
@@ -275,22 +280,17 @@ export function calcTotalsByCurrency(
 
   for (const t of allTxs) {
     if (t.type === 'transfer') continue;
-    const code = txCurrency(t);
+    const code = currencyOf(t);
     const d = new Date(t.date);
+    const amount = safeAmount(t.amount);
     if (isSameMonth(d, activeMonth)) {
       const slot = ensure(code);
-      if (t.type === 'income') slot.income += t.amount;
-      else slot.expense += t.amount;
+      if (t.type === 'income') slot.income += amount;
+      else slot.expense += amount;
     } else if (d < monthStart) {
       const slot = ensure(code);
-      slot.carryover += t.type === 'income' ? t.amount : -t.amount;
+      slot.carryover += t.type === 'income' ? amount : -amount;
     }
-  }
-
-  // Apply manual adjustments to carryover, ensuring the currency slot exists.
-  for (const [code, value] of Object.entries(adjustments)) {
-    if (!value) continue;
-    ensure(code).carryover += value;
   }
 
   // Round floats to mitigate fp accumulation error. 8 decimals is enough for
@@ -307,15 +307,24 @@ export function calcTotalsByCurrency(
 }
 
 /**
+ * Сума як невід'ємне число — те саме правило, що txAmount в utils/accounts.ts:
+ * рядок "150" не склеюється, знак не подвоює розбіжність (напрям задає type).
+ */
+function safeAmount(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? Math.abs(n) : 0;
+}
+
+/**
  * Back-compat: totals for one month, no carryover, all currencies summed.
  *
  * Перекази сюди не потрапляють: фільтри беруть лише 'income' і 'expense', і
  * 'transfer' відсіюється сам. Лишаємо це явним, бо саме на цій функції
- * тримається екран дня.
+ * трималась плитка «Сьогодні» (тепер — utils/financeOverview.ts).
  */
 export function calcTotals(txs: Transaction[]) {
-  const income  = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const expense = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const income  = txs.filter(t => t.type === 'income').reduce((s, t) => s + safeAmount(t.amount), 0);
+  const expense = txs.filter(t => t.type === 'expense').reduce((s, t) => s + safeAmount(t.amount), 0);
   const balance = income - expense;
   const savingsPct = income > 0 ? Math.max(0, Math.round((balance / income) * 100)) : 0;
   return { income, expense, balance, savingsPct };

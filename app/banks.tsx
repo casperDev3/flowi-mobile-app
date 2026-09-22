@@ -240,7 +240,9 @@ export default function BanksScreen() {
   /** Накопичене = баланс рахунку, а не збережене поле. */
   const balances = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const a of savings) map[a.id] = accountBalance(a, transactions);
+    // Як «Фінанси» і веб: баланс на сьогодні, без запланованих наперед операцій.
+    const asOf = new Date();
+    for (const a of savings) map[a.id] = accountBalance(a, transactions, { asOf });
     return map;
   }, [savings, transactions]);
 

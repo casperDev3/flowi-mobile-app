@@ -1,6 +1,7 @@
 import { DONE_VISIBLE_DAYS, completedWithinDays } from './taskUtils';
 import type { Filter, SortBy, Status, SubTask, Task } from './taskUtils';
 import { uuidV4 } from './uuid';
+import { displayFallbackPersonal, personalForProjectColumn, projectForPersonalColumn } from './statusLinks';
 
 /**
  * Тип статусу (WORKSPACE_PROJECTS_CONTRACT §3.3): щоб «Сьогодні»/«Завдання»
@@ -41,6 +42,12 @@ export interface TaskStatusColumn {
    * пізніше в налаштуваннях, його не мають.
    */
   sourceStatusId?: string;
+  /**
+   * Лише на ОСОБИСТИХ колонках: явні зв'язки з колонками проєктів, які людина
+   * обрала у відповідь на питання «куди перенести» (utils/statusLinks.ts):
+   * `{ [projectId]: [id колонки проєкту, …] }`. Адитивне поле.
+   */
+  projectLinks?: Record<string, string[]>;
 }
 
 export const ACTIVE_COLUMN_ID = 'status-active';
@@ -218,12 +225,106 @@ export function projectEquivalentColumn(
   const scoped = mergeTaskStatusColumns([...allColumns], projectId);
   if (!scoped.length) return chosen;
   if (chosen) {
+    const strict = projectForPersonalColumn(freshPersonal(chosen, allColumns), scoped, projectId);
+    if (strict) return strict;
+    // Неінтерактивний запасний шлях (як matchProjectColumn вебу): копія → тип.
     const bySource = scoped.find(column => column.sourceStatusId === chosen.id);
     if (bySource) return bySource;
     const byType = scoped.find(column => resolvedStatusType(column) === resolvedStatusType(chosen));
     if (byType) return byType;
   }
   return scoped.find(column => !column.isDone) ?? scoped[0];
+}
+
+/**
+ * Те саме, що projectEquivalentColumn, але БЕЗ запасного варіанту за типом:
+ * null — у проєкті немає статусу з тією ж назвою, копії чи явного зв'язку,
+ * і інтерактивний шлях мусить запитати людину, куди перенести задачу.
+ * Без проєкту чи для легасі-проєкту без власних колонок — `chosen` як є.
+ */
+export function projectEquivalentStrict(
+  chosen: TaskStatusColumn,
+  allColumns: readonly TaskStatusColumn[],
+  projectId: string | undefined,
+): TaskStatusColumn | null {
+  if (!projectId) return chosen;
+  const scoped = mergeTaskStatusColumns([...allColumns], projectId);
+  if (!scoped.length) return chosen;
+  return projectForPersonalColumn(freshPersonal(chosen, allColumns), scoped, projectId);
+}
+
+/**
+ * Особиста колонка з АКТУАЛЬНИМИ зв'язками: викликач міг передати знімок,
+ * зроблений до того, як людина відповіла на питання «куди перенести».
+ */
+function freshPersonal(chosen: TaskStatusColumn, allColumns: readonly TaskStatusColumn[]): TaskStatusColumn {
+  if (chosen.projectId) return chosen;
+  return mergeTaskStatusColumns([...allColumns]).find(column => column.id === chosen.id) ?? chosen;
+}
+
+/**
+ * Особиста колонка для колонки проєкту — назва → копія → явний зв'язок;
+ * null, якщо відповідності немає (питати, куди показувати в особистому).
+ */
+export function personalEquivalentStrict(
+  projectColumn: TaskStatusColumn,
+  allColumns: readonly TaskStatusColumn[],
+): TaskStatusColumn | null {
+  if (!projectColumn.projectId) return projectColumn;
+  return personalForProjectColumn(projectColumn, mergeTaskStatusColumns([...allColumns]));
+}
+
+/**
+ * Колонка задачі серед колонок її проєкту, терпима до «чужих» id.
+ *
+ * Веб (і старі збірки) писав у задачі проєкту ОСОБИСТІ id (`status-in-progress`,
+ * `status-review`, …), яких серед колонок проєкту (`st-<uuid4>`) немає. Раніше
+ * такий промах падав на «першу не-готову колонку», і задача «У процесі» з вебу
+ * показувалась на телефоні/планшеті як «До роботи». Тепер особистий id
+ * зводиться до еквівалента в проєкті (назва → копія → зв'язок → тип). Лише
+ * показ: запис виправиться при наступній зміні на мобільному.
+ */
+export function findScopedColumn(
+  kanbanColumnId: string | undefined,
+  scoped: readonly TaskStatusColumn[],
+  allColumns?: readonly TaskStatusColumn[],
+): TaskStatusColumn | undefined {
+  if (!kanbanColumnId) return undefined;
+  const direct = scoped.find(column => column.id === kanbanColumnId);
+  if (direct) return direct;
+  const projectId = scoped[0]?.projectId;
+  if (!projectId) return undefined;
+  const bySource = scoped.find(column => column.sourceStatusId === kanbanColumnId);
+  if (bySource) return bySource;
+  const personal = mergeTaskStatusColumns(allColumns ? [...allColumns] : [])
+    .find(column => column.id === kanbanColumnId);
+  if (!personal) return undefined;
+  const strict = projectForPersonalColumn(personal, scoped, projectId);
+  if (strict) return strict;
+  const type = resolvedStatusType(personal);
+  // «На перевірці» має тип todo, але в проєкті без такої колонки ближче за
+  // змістом «У процесі», ніж «До роботи»: робота вже зроблена.
+  if (personal.id === REVIEW_COLUMN_ID) {
+    return scoped.find(column => resolvedStatusType(column) === 'in_progress')
+      ?? scoped.find(column => !column.isDone);
+  }
+  return scoped.find(column => resolvedStatusType(column) === type);
+}
+
+/**
+ * Колонка проєкту для ОСОБИСТОГО системного id (автоматика: таймер,
+ * підзавдання пишуть REVIEW/IN_PROGRESS). Без проєкту чи без власних колонок —
+ * сам id.
+ */
+export function projectColumnIdFor(
+  personalId: string,
+  allColumns: readonly TaskStatusColumn[],
+  projectId: string | undefined,
+): string {
+  if (!projectId) return personalId;
+  const scoped = mergeTaskStatusColumns([...allColumns], projectId);
+  if (!scoped.length) return personalId;
+  return findScopedColumn(personalId, scoped, allColumns)?.id ?? personalId;
 }
 
 /**
@@ -248,7 +349,7 @@ export function scopedTaskStatusColumn(
   allColumns: readonly TaskStatusColumn[],
 ): TaskStatusColumn {
   const scoped = mergeTaskStatusColumns([...allColumns], task.projectId);
-  if (scoped.length) return boardColumnForTask(task, scoped) ?? scoped[0];
+  if (scoped.length) return boardColumnForTask(task, scoped, allColumns) ?? scoped[0];
   // Легасі-проєкт без власних колонок (до цієї фази) — падаємо на особисті
   // дефолти, як і решта застосунку без цього поля.
   return taskStatusColumn(task, mergeTaskStatusColumns([...allColumns]));
@@ -261,8 +362,9 @@ export function scopedTaskStatusColumn(
  * Кожен проєкт має власні колонки з власними id, і групування за id давало
  * на особистому екрані по окремій «До роботи»/«Готово» на кожен проєкт.
  * Тут колонка проєкту зводиться до «тієї самої за змістом» особистої:
- * спершу копія, з якої її засіяно (sourceStatusId), далі — однакова назва,
- * далі — той самий тип (todo/in_progress/done).
+ * спершу однакова назва (правило користувача «та сама назва — туди»), далі
+ * явний зв'язок, обраний людиною, далі копія, з якої її засіяно
+ * (sourceStatusId), і лише потім той самий тип (todo/in_progress/done).
  */
 export function personalDisplayColumn(
   task: Pick<Task, 'status' | 'kanbanColumnId' | 'projectId'>,
@@ -272,16 +374,10 @@ export function personalDisplayColumn(
   if (!task.projectId) return taskStatusColumn(task, personal);
   const own = scopedTaskStatusColumn(task, allColumns);
   if (!own.projectId) return own;
-  const bySource = own.sourceStatusId ? personal.find(column => column.id === own.sourceStatusId) : undefined;
-  if (bySource) return bySource;
-  const name = own.name.trim().toLowerCase();
-  const byName = personal.find(column => column.name.trim().toLowerCase() === name);
-  if (byName) return byName;
-  const type = resolvedStatusType(own);
-  const preferredId = type === 'done' ? DONE_COLUMN_ID : type === 'in_progress' ? IN_PROGRESS_COLUMN_ID : ACTIVE_COLUMN_ID;
-  return personal.find(column => column.id === preferredId)
-    ?? personal.find(column => resolvedStatusType(column) === type)
-    ?? personal[0]
+  // Назва → явний зв'язок (utils/statusLinks.ts), далі — копія
+  // (sourceStatusId) і той самий тип.
+  return personalForProjectColumn(own, personal)
+    ?? displayFallbackPersonal(own, personal)
     ?? own;
 }
 
@@ -307,9 +403,9 @@ export function restoredColumnIdForTask(
   allColumns: readonly TaskStatusColumn[],
 ): string | undefined {
   const scoped = mergeTaskStatusColumns([...allColumns], task.projectId);
-  const current = task.kanbanColumnId
-    ? scoped.find(column => column.id === task.kanbanColumnId)
-    : undefined;
+  const current = task.projectId
+    ? findScopedColumn(task.kanbanColumnId, scoped, allColumns)
+    : (task.kanbanColumnId ? scoped.find(column => column.id === task.kanbanColumnId) : undefined);
   if (current && resolvedStatusType(current) !== 'done') return current.id;
   const todo = scoped.find(column => resolvedStatusType(column) === 'todo')
     ?? scoped.find(column => resolvedStatusType(column) !== 'done');
@@ -321,10 +417,13 @@ export function restoredColumnIdForTask(
 export function boardColumnForTask(
   task: Pick<Task, 'status' | 'kanbanColumnId'>,
   boardColumns: readonly TaskStatusColumn[],
+  /** Увесь `task_statuses` — щоб звести кастомний особистий id (див. findScopedColumn). */
+  allColumns?: readonly TaskStatusColumn[],
 ): TaskStatusColumn | undefined {
   if (!boardColumns.length) return undefined;
-  const direct = task.kanbanColumnId ? boardColumns.find(column => column.id === task.kanbanColumnId) : undefined;
-  if (direct) return direct;
+  const direct = findScopedColumn(task.kanbanColumnId, boardColumns, allColumns);
+  // Зведений особистий id не має права суперечити верхньорівневому status.
+  if (direct && (direct.isDone === (task.status === 'done') || direct.id === task.kanbanColumnId)) return direct;
   return boardColumns.find(column => column.isDone === (task.status === 'done')) ?? boardColumns[0];
 }
 
@@ -393,8 +492,12 @@ export function taskStatusType(
   allColumns: readonly TaskStatusColumn[],
 ): StatusType {
   const scoped = mergeTaskStatusColumns([...allColumns], task.projectId);
-  const column = task.kanbanColumnId ? scoped.find(c => c.id === task.kanbanColumnId) : undefined;
-  if (column) return resolvedStatusType(column);
+  const column = task.projectId
+    ? findScopedColumn(task.kanbanColumnId, scoped, allColumns)
+    : (task.kanbanColumnId ? scoped.find(c => c.id === task.kanbanColumnId) : undefined);
+  if (column && (column.id === task.kanbanColumnId || column.isDone === (task.status === 'done'))) {
+    return resolvedStatusType(column);
+  }
   return task.status === 'done' ? 'done' : 'todo';
 }
 
@@ -453,8 +556,13 @@ export function orderColumnsForList(columns: TaskStatusColumn[]): TaskStatusColu
  * @param subtasksAfterToggle підзавдання ПІСЛЯ перемикання, а не до нього.
  */
 export function subtaskToggleTransition(
-  task: Pick<Task, 'status' | 'kanbanColumnId'>,
+  task: Pick<Task, 'status' | 'kanbanColumnId'> & { projectId?: string },
   subtasksAfterToggle: readonly Pick<SubTask, 'done'>[],
+  /**
+   * Увесь `task_statuses`: задача проєкту йде в «На перевірці» СВОГО проєкту
+   * (`st-<uuid4>`), а не в особистий id, якого на дошці проєкту немає.
+   */
+  allColumns: readonly TaskStatusColumn[] = [],
 ): { status: Status; kanbanColumnId: string } | null {
   // Завершене завдання галочка в підзавданні не воскрешає: вихід із «Готово» —
   // окреме свідоме рішення, а не побічний ефект відмітки в списку.
@@ -463,7 +571,7 @@ export function subtaskToggleTransition(
   // де воно було, включно з колонкою, яку користувач виставив руками.
   if (subtasksAfterToggle.length === 0) return null;
   if (!subtasksAfterToggle.every(sub => sub.done)) return null;
-  return { status: 'active', kanbanColumnId: REVIEW_COLUMN_ID };
+  return { status: 'active', kanbanColumnId: projectColumnIdFor(REVIEW_COLUMN_ID, allColumns, task.projectId) };
 }
 
 /**

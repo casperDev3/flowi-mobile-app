@@ -13,7 +13,7 @@
  */
 import { taskVisibleInList, type TaskStatusColumn } from './taskStatuses';
 import { buildStatusListSections, type TaskListScope } from './taskListSections';
-import { isTodayTask } from './taskToday';
+import { inTaskScope, isTodayTask } from './taskToday';
 import {
   comparePriority,
   filterTasksByMonth,
@@ -59,8 +59,13 @@ export interface TaskListQuery {
    * `isMyTask`.
    */
   myUserId?: string | null;
-  /** Ролі в проєктах — для задач без автора (див. isMyTask). */
+  /** Ролі в проєктах — див. isMyTask. */
   projectRoles?: Readonly<Record<string, string>>;
+  /**
+   * Лише в режимі «Всі»: true — показати мої активні БЕЗ дедлайну, інакше
+   * (за замовчуванням) — лише з дедлайном. Див. inTaskScope.
+   */
+  noDeadline?: boolean;
 }
 
 export interface TaskListGroup<T> {
@@ -150,21 +155,37 @@ export function filterTasksForList<T extends ListViewTask>(sorted: readonly T[],
 /** Денний скоуп поверх filterTasksForList. */
 export function applyTaskScope<T extends ListViewTask>(
   filteredAll: readonly T[],
-  q: Pick<TaskListQuery, 'scope' | 'filter' | 'sort'>,
+  q: Pick<TaskListQuery, 'scope' | 'filter' | 'sort' | 'noDeadline'>,
   columns: TaskStatusColumn[],
   today: Date,
   now: Date = new Date(),
 ): T[] {
-  if (q.scope === 'all') return [...filteredAll];
   return filteredAll.filter(t => {
     // У денному режимі «Готово» — це закрите СЬОГОДНІ, а не за вікном у два
     // дні: вчорашня закрита справа серед сьогоднішніх вдає незавершену роботу.
-    if (!taskVisibleInList(t, q.filter, q.sort, now, 'today')) return false;
-    // Денний скоуп відсіює несьогоднішнє тут, а не в побудові секцій, і для
-    // ВСІХ сортувань однаково — інакше порожній «Сьогодні» лишався б без
-    // жодного порожнього стану під ним.
-    return isTodayTask(t, columns, today);
+    if (q.scope === 'today' && !taskVisibleInList(t, q.filter, q.sort, now, 'today')) return false;
+    // Скоуп відсіює тут, а не в побудові секцій, і для ВСІХ сортувань
+    // однаково — інакше порожній режим лишався б без порожнього стану.
+    if (q.scope === 'today') return isTodayTask(t, columns, today);
+    return inTaskScope(t, columns, q.scope, { noDeadline: q.noDeadline }, today);
   });
+}
+
+/** Скільки завдань у кожному режимі перемикача — лічильники на кнопках. */
+export function taskScopeCounts<T extends ListViewTask>(
+  filteredAll: readonly T[],
+  q: Pick<TaskListQuery, 'filter' | 'sort'>,
+  columns: TaskStatusColumn[],
+  today: Date,
+  now: Date = new Date(),
+): { today: number; week: number; all: number; noDeadline: number } {
+  // Лише НЕзавершене — як лічильники вебу (activeScopeVisible у
+  // app/app/tasks/page.tsx): свіжо закриті домішуються в список заради групи
+  // «Готово», але роботою на кнопці перемикача не є.
+  const active = filteredAll.filter(t => t.status !== 'done');
+  const count = (scope: TaskListScope, noDeadline = false) =>
+    applyTaskScope(active, { ...q, scope, noDeadline }, columns, today, now).length;
+  return { today: count('today'), week: count('week'), all: count('all'), noDeadline: count('all', true) };
 }
 
 /** Прострочене окремою секцією — лише у списку і не для фільтра «Виконані». */
@@ -326,6 +347,7 @@ export function taskListQueryToParams(q: TaskListQuery): TaskListRouteParams {
   if (q.projectId) params.project = q.projectId;
   if (q.priorities.length) params.priorities = q.priorities.join(',');
   if (q.dateFilter) params.date = q.dateFilter;
+  if (q.scope === 'all' && q.noDeadline) params.noDeadline = '1';
   return params;
 }
 
@@ -337,7 +359,8 @@ export function taskListQueryFromParams(params: Partial<Record<string, string | 
   };
   const filter = FILTERS.find(f => f === one('filter')) ?? 'active';
   const sort = SORTS.find(s => s === one('sort')) ?? 'status';
-  const scope: TaskListScope = one('scope') === 'all' ? 'all' : 'today';
+  const rawScope = one('scope');
+  const scope: TaskListScope = rawScope === 'all' || rawScope === 'week' ? rawScope : 'today';
   const m = /^(\d{4})-(\d{2})$/.exec(one('month'));
   const month = m
     ? new Date(Number(m[1]), Number(m[2]) - 1, 1)
@@ -356,6 +379,7 @@ export function taskListQueryFromParams(params: Partial<Record<string, string | 
     projectId: one('project') || null,
     priorities,
     dateFilter: one('date') || null,
+    noDeadline: scope === 'all' && one('noDeadline') === '1',
   };
 }
 

@@ -23,6 +23,7 @@
 import { isSameDay } from './dateUtils';
 import {
   REVIEW_COLUMN_ID,
+  personalDisplayColumn,
   resolvedStatusType,
   scopedTaskStatusColumn,
   type TaskStatusColumn,
@@ -61,7 +62,12 @@ export function isTodayTask(
   // нижче, і задача проєкту в роботі показувала б «сьогодні» лише за
   // дедлайном, як звичайний беклог.
   const column = scopedTaskStatusColumn(task, columns);
-  if (resolvedStatusType(column) === 'in_progress' || column.id === REVIEW_COLUMN_ID) return true;
+  // «На перевірці» проєкту — його копія (sourceStatusId) з власним st-id або
+  // колонка, яку людина пов'язала з особистою «На перевірці» (як веб, що
+  // зводить колонку проєкту до особистої через taskColumnId).
+  if (resolvedStatusType(column) === 'in_progress' || column.id === REVIEW_COLUMN_ID
+    || column.sourceStatusId === REVIEW_COLUMN_ID
+    || (!!column.projectId && personalDisplayColumn(task, columns).id === REVIEW_COLUMN_ID)) return true;
 
   if (isOverdue(task)) return true;
 
@@ -75,4 +81,50 @@ export function isTodayTask(
   if (Number.isNaN(deadline.getTime())) return false;
 
   return isSameDay(deadline, now);
+}
+
+/**
+ * «Тиждень»: усе «сьогоднішнє» (у роботі, прострочене, на сьогодні) ПЛЮС
+ * дедлайн у найближчі 7 календарних днів. Дзеркалить веб `taskUrgency 'week'`.
+ */
+export function isWeekTask(task: TodayScopeTask, columns: TaskStatusColumn[], now: Date): boolean {
+  if (isTodayTask(task, columns, now)) return true;
+  if (task.status === 'done' || !task.deadline) return false;
+  const deadline = new Date(task.deadline);
+  if (Number.isNaN(deadline.getTime())) return false;
+  const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round((dayStart(deadline) - dayStart(now)) / 86400000);
+  return diffDays > 0 && diffDays <= 7;
+}
+
+/** Режими перемикача вкладки «Завдання». */
+export type TaskScopeMode = 'today' | 'week' | 'all';
+
+/**
+ * ЄДИНЕ правило перемикача «Сьогодні / Тиждень / Всі» (+ «Без дедлайну» у
+ * режимі «Всі»):
+ *
+ *   today — isTodayTask;
+ *   week  — isWeekTask;
+ *   all   — активні лише З дедлайном; з `noDeadline` — лише БЕЗ дедлайну.
+ *           Особиста дошка показує завдання з дедлайном, а беклог без дати
+ *           відкривається окремою кнопкою (запит користувача 2026-09-22).
+ *
+ * Завершені в 'week' і 'all' лишаються незалежно від дедлайну: скільки їх видно,
+ * вирішує вікно свіжості (taskVisibleInList) вище по потоку.
+ */
+export function inTaskScope(
+  task: TodayScopeTask,
+  columns: TaskStatusColumn[],
+  scope: TaskScopeMode,
+  options: { noDeadline?: boolean } = {},
+  now: Date = new Date(),
+): boolean {
+  if (scope === 'today') return isTodayTask(task, columns, now);
+  // Завершені в «Тиждень»/«Всі» — як inTaskScope вебу: лишаються, а скільки їх
+  // видно, вирішує вікно свіжості (DONE_VISIBLE_DAYS) вище по потоку.
+  if (task.status === 'done') return true;
+  if (scope === 'week') return isWeekTask(task, columns, now);
+  const hasDeadline = !!task.deadline && !Number.isNaN(new Date(task.deadline).getTime());
+  return options.noDeadline ? !hasDeadline : hasDeadline;
 }

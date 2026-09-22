@@ -22,7 +22,7 @@ import { copyTextToClipboard } from '@/utils/clipboard';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
-import { subtaskToggleTransition } from '@/utils/taskStatuses';
+import { subtaskToggleTransition, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { normalizePriority, type LegacyPriority, type TaskPriority } from '@/utils/taskUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
 
@@ -137,7 +137,9 @@ export default function SubtasksScreen() {
     // Те саме правило, що й у списку завдань, і навмисно з тієї самої утиліти:
     // раніше тут стояла власна копія, яка ще й позначала завдання завершеним.
     // null — статус і колонку не чіпаємо взагалі.
-    const transition = subtaskToggleTransition(task, subtasks);
+    // Задача проєкту йде в «На перевірці» ВЛАСНОГО проєкту — див. утиліту.
+    const statusColumns = await loadData<TaskStatusColumn[]>('task_statuses', []);
+    const transition = subtaskToggleTransition(task, subtasks, statusColumns);
     await persistTask({ ...task, subtasks, ...(transition ?? {}) });
     if (!transition) return;
 

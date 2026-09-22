@@ -192,8 +192,8 @@ describe('isMyTask — §3.7 "моє" (особистий потік / assigneeI
     expect(isMyTask({ projectId: 'p-1', assigneeId: 'someone-else', createdBy: 'me' }, 'me')).toBe(false);
   });
 
-  it('assigneeId порожній — рахує createdBy', () => {
-    expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: 'me' }, 'me')).toBe(true);
+  it('assigneeId порожній — НЕ моє, навіть якщо я автор (лише призначене мені, запит 2026-09-22)', () => {
+    expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: 'me' }, 'me')).toBe(false);
     expect(isMyTask({ projectId: 'p-1', assigneeId: undefined, createdBy: 'someone-else' }, 'me')).toBe(false);
   });
 
@@ -206,10 +206,12 @@ describe('isMyTask — §3.7 "моє" (особистий потік / assigneeI
     expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: undefined }, 'me', { 'p-1': 'member' })).toBe(false);
   });
 
-  it('без createdBy і assigneeId — моє ВЛАСНИКУ проєкту (легасі-дані власника після міграції §3.6)', () => {
-    // Регресія: у соло-проєктах зникали всі старі задачі (передусім «Готово»),
-    // бо міграція перенесла їх без автора.
-    expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: undefined }, 'me', { 'p-1': 'owner' })).toBe(true);
+  it('без виконавця — не моє і власнику приєднаного проєкту; моє лише в НЕприєднаному проєкті (як веб joinedProjectIds)', () => {
+    expect(isMyTask({ projectId: 'p-1', assigneeId: null, createdBy: undefined }, 'me', { 'p-1': 'owner' })).toBe(false);
+    // Проєкт ще не на сервері (міграція §3.6 не відпрацювала) — запис лежить
+    // в особистому потоці, тобто мій.
+    expect(isMyTask({ projectId: 'p-9', assigneeId: null, createdBy: undefined }, 'me', { 'p-1': 'owner' })).toBe(true);
+    expect(isMyTask({ projectId: 'p-9', assigneeId: 'other', createdBy: undefined }, 'me', { 'p-1': 'owner' })).toBe(false);
   });
 
   it('myUserId невідомий (ще не завантажено useAuth) — ховає задачі проєкту (без відомого "я" рівність неможлива)', () => {
@@ -222,8 +224,8 @@ describe('isMyTask — §3.7 "моє" (особистий потік / assigneeI
     expect(groupTodayTasks([mine, other], COLUMNS, TODAY, 99).total).toBe(2);
   });
 
-  it('groupTodayTasks: із myUserId ховає задачі проєкту, створені й не призначені іншим', () => {
-    const mine = task({ id: 'mine', projectId: 'p-1', deadline: TODAY_ISO, createdBy: 'me' });
+  it('groupTodayTasks: із myUserId лишає лише задачі проєкту, призначені мені', () => {
+    const mine = task({ id: 'mine', projectId: 'p-1', deadline: TODAY_ISO, createdBy: 'someone-else', assigneeId: 'me' });
     const other = task({ id: 'other', projectId: 'p-1', deadline: TODAY_ISO, createdBy: 'someone-else' });
     const { total, groups } = groupTodayTasks([mine, other], COLUMNS, TODAY, 99, 'me');
     expect(total).toBe(1);

@@ -81,8 +81,19 @@ describe('параметри маршруту', () => {
       priorities: [0, 2],
       dateFilter: new Date(2026, 8, 3).toDateString(),
       month: new Date(2026, 8, 1),
+      noDeadline: false,
     };
     expect(taskListQueryFromParams(taskListQueryToParams(q))).toEqual(q);
+  });
+
+  test('«Тиждень» і «Всі · Без дедлайну» переживають дорогу туди й назад', () => {
+    const week: TaskListQuery = { ...BASE, scope: 'week', noDeadline: false };
+    expect(taskListQueryFromParams(taskListQueryToParams(week))).toEqual(week);
+    const undated: TaskListQuery = { ...BASE, scope: 'all', noDeadline: true };
+    expect(taskListQueryToParams(undated).noDeadline).toBe('1');
+    expect(taskListQueryFromParams(taskListQueryToParams(undated))).toEqual(undated);
+    // «Без дедлайну» має сенс лише в «Всі» — в інших режимах відкидається.
+    expect(taskListQueryFromParams({ scope: 'today', noDeadline: '1' }).noDeadline).toBe(false);
   });
 
   test('зіпсовані значення падають у типові екрана', () => {
@@ -125,18 +136,18 @@ describe('filterTasksForList — §3.7 «Особисте агрегує» (мі
     expect(filterTasksForList(sorted(tasks, q), q).map(t => t.id)).toEqual(['mine']);
   });
 
-  test('без призначеного виконавця — моє, лише якщо я автор; без автора — нічиє (регресія з ревʼю)', () => {
-    // review finding (minor): раніше `isMyTask` рахував запис без `createdBy`
-    // "моїм" для КОЖНОГО учасника — легасі/мігрована непризначена задача
-    // з'являлась би в списку "Моє" у всіх одразу. Контракт §3.7 вимагає
-    // дослівну рівність `createdBy == me`, без фолбеку на відсутність поля.
+  test('задача проєкту в особистому — ЛИШЕ якщо призначена мені (запит 2026-09-22)', () => {
+    // Раніше непризначена задача, створена мною, теж потрапляла в особисте.
+    // Правило користувача: «з проєкту позначаємо в особистому тільки тоді,
+    // коли воно призначене на мене».
     const tasks = [
       task({ id: 'created-by-me', projectId: 'p1', createdBy: 'u1' }),
       task({ id: 'created-by-other', projectId: 'p1', createdBy: 'u2' }),
       task({ id: 'no-author', projectId: 'p1' }),
+      task({ id: 'assigned-me', projectId: 'p1', createdBy: 'u2', assigneeId: 'u1' }),
     ];
-    const q = { ...BASE, myUserId: 'u1' };
-    expect(filterTasksForList(sorted(tasks, q), q).map(t => t.id).sort()).toEqual(['created-by-me']);
+    const q = { ...BASE, myUserId: 'u1', projectRoles: { p1: 'owner' } };
+    expect(filterTasksForList(sorted(tasks, q), q).map(t => t.id).sort()).toEqual(['assigned-me']);
   });
 });
 
@@ -146,7 +157,8 @@ describe('buildTaskListView + findTaskListGroup', () => {
       ...Array.from({ length: 20 }, (_, i) => task({ id: `m${i}`, title: `Звіт ${i}`, kanbanColumnId: ACTIVE_COLUMN_ID })),
       ...Array.from({ length: 5 }, (_, i) => task({ id: `x${i}`, title: `Інше ${i}` })),
     ];
-    const q = { ...BASE, search: 'звіт' };
+    // Задачі без дедлайну — у «Всі · Без дедлайну».
+    const q = { ...BASE, search: 'звіт', noDeadline: true };
     const view = buildTaskListView(tasks, q, COLUMNS, TODAY, LABELS, 'uk-UA');
     const group = view.groups.find(g => g.key === ACTIVE_COLUMN_ID)!;
     expect(group.tasks).toHaveLength(20);
@@ -161,7 +173,8 @@ describe('buildTaskListView + findTaskListGroup', () => {
 
   test('«Прострочені» адресуються окремим ключем', () => {
     const past = new Date(2026, 8, 1, 12).toISOString();
-    const tasks = [task({ id: 'o1', deadline: past }), task({ id: 'a1' })];
+    const later = new Date(2026, 9, 20, 12).toISOString();
+    const tasks = [task({ id: 'o1', deadline: past }), task({ id: 'a1', deadline: later })];
     const view = buildTaskListView(tasks, BASE, COLUMNS, TODAY, LABELS, 'uk-UA');
     expect(view.overdue.map(t => t.id)).toEqual(['o1']);
     const overdue = findTaskListGroup(view, OVERDUE_GROUP_KEY, LABELS)!;

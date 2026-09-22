@@ -208,48 +208,52 @@ export function getProgress(t: Task): number {
 }
 
 /**
- * §3.7 «моє» завдання — WORKSPACE_PROJECTS_CONTRACT: особистий потік (немає
- * `projectId`) АБО `assigneeId == me` АБО (`assigneeId` порожній і
- * `createdBy == me`). `myUserId` — рядок (`user.id` з `useAuth()`), як і
- * скрізь у синку.
+ * «Моє» завдання для ОСОБИСТОГО простору («Сьогодні», «Завдання»):
+ * особистий потік (немає `projectId`) АБО задача проєкту, ПРИЗНАЧЕНА мені
+ * (`assigneeId == me`).
  *
- * review finding (minor): фолбек раніше рахував БУДЬ-ЯКЕ завдання без
- * `assigneeId`/`createdBy` «моїм» (`!task.createdBy || ...`) — у команді
- * (§4 уже реалізовано, `app/project/[id]/members.tsx`) легасі/мігровані
- * непризначені задачі, або задачі від клієнта, що не проставляє `createdBy`,
- * з'являлись би в «Сьогодні»/«Завдання» КОЖНОГО учасника проєкту одночасно.
- * Контракт дослівно вимагає рівність `createdBy == me`, без фолбеку на
- * відсутність поля — саме так тепер і зроблено.
+ * Правило користувача (2026-09-22): «завдання з проєкту позначаємо в
+ * особистому тільки тоді, коли воно призначене на мене». Раніше сюди ще
+ * потрапляли непризначені задачі, створені мною, і безавторські задачі
+ * проєктів, де я власник, — і особистий простір засмічувався беклогом
+ * проєкту. Дзеркалить веб `isTaskAssignedToMe` (lib/task-filters.ts).
+ *
+ * Виняток один: проєкт, якого ще немає серед моїх ролей (`roles` передано, але
+ * проєкту в ньому нема — міграція §3.6 не відпрацювала), — запис фізично
+ * лежить в особистому потоці, тобто мій, як і на вебі (joinedProjectIds).
  */
 export function isMyTask(
   task: Pick<Task, 'projectId' | 'assigneeId' | 'createdBy'>,
   myUserId: string | null | undefined,
-  /**
-   * Ролі в проєктах (useProjectRoles). Задача БЕЗ автора й виконавця
-   * прийшла зі старих особистих даних власника (міграція §3.6 переносить
-   * саме їх; нові клієнти `createdBy` ставлять завжди) — тож вона «моя»
-   * лише власнику. Без цього фолбеку в соло-проєктах зникали всі старі
-   * задачі, передусім виконані; без перевірки ролі вони б з'являлись у
-   * кожного учасника команди (finding вище).
-   */
+  /** Ролі в проєктах (useProjectRoles) — лише для винятку вище. */
   roles?: Readonly<Record<string, string>>,
 ): boolean {
   if (!task.projectId) return true; // особистий потік
   if (!myUserId) return false;
-  if (task.assigneeId) return task.assigneeId === myUserId;
-  // Роль невідома — проєкт ще не приєднано (міграція §3.6 не відпрацювала):
-  // запис фізично в особистому потоці, тобто мій, як і на вебі.
-  if (!task.createdBy) return roles ? (roles[task.projectId] ?? 'owner') === 'owner' : false;
-  return task.createdBy === myUserId;
+  if (roles && !(task.projectId in roles)) return !task.assigneeId || task.assigneeId === myUserId;
+  return task.assigneeId === myUserId;
 }
 
 /**
- * `createdBy` після зміни проєкту в редакторі (review finding, §3.7):
- * особиста задача (і соло-проєктна, мігрована §3.6 без автора) не має
- * `createdBy`, і `isMyTask` (дослівна рівність, без фолбеку на відсутнє
- * поле) одразу ховає її з «Сьогодні»/«Завдання» власника, щойно вона
- * потрапляє в проєкт — переносити її мав саме він. Наявний `createdBy` НЕ
- * чіпаємо: авторство не змінюється переносом чи повторним збереженням форми.
+ * Виконавець задачі, яку щойно перенесли в проєкт (чи створили в проєкті)
+ * з ОСОБИСТОГО простору: не обраний — я. Інакше за правилом isMyTask
+ * («в особистому лише призначене мені») задача зникала б одразу після
+ * збереження.
+ */
+export function assigneeForPersonalProjectTask(
+  task: Pick<Task, 'projectId' | 'assigneeId'>,
+  myUserId: string | null | undefined,
+): string | undefined {
+  if (!task.projectId) return undefined;
+  return task.assigneeId || (myUserId ?? undefined);
+}
+
+/**
+ * `createdBy` після зміни проєкту в редакторі (§3.7): особиста задача не має
+ * `createdBy`, а в проєкті автор потрібен (коментарі, активність). На
+ * видимість в особистому просторі він більше не впливає — див. isMyTask і
+ * assigneeForPersonalProjectTask. Наявний `createdBy` НЕ чіпаємо: авторство не
+ * змінюється переносом чи повторним збереженням форми.
  */
 export function createdByAfterProjectChange(
   task: Pick<Task, 'projectId' | 'createdBy'>,

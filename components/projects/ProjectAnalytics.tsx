@@ -1,11 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { ProjectGantt } from '@/components/projects/ProjectGantt';
 import { useI18n } from '@/store/i18n';
 import { formatDuration } from '@/utils/durationFormat';
 import {
-  buildGantt,
   columnDistribution,
   deadlineLoad,
   doneByWeek,
@@ -45,14 +43,13 @@ export interface AnalyticsPalette {
  * графіків — не видно, котрий бреше.
  */
 export function ProjectAnalytics({
-  projects, tasks, columns, scopeLabel, wide, palette,
+  projects, tasks, columns, scopeLabel, palette,
 }: {
   /** Проєкти видимого списку — живі або архівні, залежно від вкладки. */
   projects: ChartProjectLike[];
   tasks: ChartTaskLike[];
   columns: TaskStatusColumn[];
   scopeLabel: string;
-  wide: boolean;
   palette: AnalyticsPalette;
 }) {
   const { tr } = useI18n();
@@ -87,10 +84,6 @@ export function ProjectAnalytics({
   const done = useMemo(() => doneByWeek(focusTasks), [focusTasks]);
   const load = useMemo(() => deadlineLoad(focusTasks), [focusTasks]);
   const time = useMemo(() => timeByProject(projects, scopeTasks), [projects, scopeTasks]);
-  const gantt = useMemo(
-    () => buildGantt(focusTasks, projects, { months }),
-    [focusTasks, projects, months],
-  );
 
   if (!projects.length) return null;
 
@@ -188,10 +181,6 @@ export function ProjectAnalytics({
           emptyLabel={tr.chartNoSessions}
           palette={palette}
         />
-      </Panel>
-
-      <Panel title={tr.ganttTitle} hint={focusLabel} palette={palette}>
-        <ProjectGantt chart={gantt} wide={wide} palette={palette} />
       </Panel>
     </View>
   );

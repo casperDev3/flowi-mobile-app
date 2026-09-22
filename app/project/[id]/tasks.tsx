@@ -16,8 +16,8 @@
  * розмірах екрана, а не лише на телефоні.
  * Календар (contract §3) — задачі за дедлайном
  * ПЛЮС наради проєкту за датою (розгорнуті по повторах), об'єднані по днях,
- * у межах місяця; Таймлайн — той самий `ProjectGantt`, що на аналітиці списку проєктів
- * (тепер звужений до задач ОДНОГО проєкту), плюс редагування дат під ним:
+ * у межах місяця; Таймлайн — графік `ProjectGantt` задач ЦЬОГО проєкту
+ * (від старту до дедлайну), плюс редагування дат під ним:
  * contract §3 «тягнення країв змінює дати (планшет/веб; телефон — перегляд +
  * редагування дат у картці)» — тягнення країв (drag-to-resize) реалізоване
  * (`onGanttEdgeDrag` нижче, планшет/веб); на телефоні лишається лише
@@ -66,8 +66,10 @@ import {
   type GroupLabels, type ProjectListGroupBy,
 } from '@/utils/taskListView';
 import {
-  boardColumnForTask, mergeTaskStatusColumns, orderColumnsForList, scopedColumnFor, type TaskStatusColumn,
+  boardColumnForTask, mergeTaskStatusColumns, orderColumnsForList, personalEquivalentStrict, scopedColumnFor,
+  type TaskStatusColumn,
 } from '@/utils/taskStatuses';
+import { saveStatusLink } from '@/store/status-links';
 import { useAuth } from '@/store/auth';
 import {
   assigneeDisplayName,
@@ -191,8 +193,8 @@ export default function ProjectTasksScreen() {
       new Date(a.startDate ?? a.createdAt).getTime() - new Date(b.startDate ?? b.createdAt).getTime()),
     [filtered],
   );
-  // Той самий графік, що на аналітиці списку проєктів (ProjectAnalytics) —
-  // тут звужений до задач ЦЬОГО проєкту й пофарбований у ЙОГО колір.
+  // Таймлайн задач ЦЬОГО проєкту, пофарбований у ЙОГО колір. (На екрані
+  // списку проєктів Ганта більше немає — лише тут, у проєкті.)
   const ganttChart = useMemo(
     () => (project ? buildGantt(filtered, [project], { months: tr.monthsShort }) : null),
     [filtered, project, tr.monthsShort],
@@ -239,6 +241,29 @@ export default function ProjectTasksScreen() {
    * status picker)». Без drag-n-drop (велика окрема функція для дошки), але
    * бодай перехід у будь-яку колонку без відкриття повного редактора.
    */
+  /**
+   * Задача, яку щойно перенесли В ПРОЄКТІ, видна і в моєму особистому
+   * просторі (якщо призначена мені). Якщо в особистому немає статусу з тією ж
+   * назвою (і немає копії чи збереженого зв'язку) — питаємо, під яким
+   * статусом показувати такі задачі в особистому, і запам'ятовуємо відповідь.
+   */
+  const askPersonalStatusLink = useCallback((task: Task, column: TaskStatusColumn) => {
+    if (!projectId || !column.projectId || !user?.id || task.assigneeId !== user.id) return;
+    if (personalEquivalentStrict(column, columns)) return;
+    const personal = mergeTaskStatusColumns(columns);
+    Alert.alert(
+      tr.statusLinkAskPersonalTitle,
+      tr.statusLinkAskPersonalBody.replace('{name}', column.name).replace('{project}', project?.name ?? ''),
+      [
+        ...personal.map(target => ({
+          text: target.name,
+          onPress: () => void saveStatusLink(target, projectId, column.id),
+        })),
+        { text: tr.statusLinkKeepAsIs, style: 'cancel' as const },
+      ],
+    );
+  }, [projectId, user?.id, columns, project?.name, tr]);
+
   const moveToColumn = useCallback(async (task: Task, column: TaskStatusColumn) => {
     if (!canEdit || column.id === task.kanbanColumnId) return;
     let becameDone = false;
@@ -253,10 +278,11 @@ export default function ProjectTasksScreen() {
       });
       haptic.light();
       if (becameDone) await stopTimerForTask(task.id);
+      askPersonalStatusLink(task, column);
     } catch (e) {
       if (__DEV__) console.warn('[project/tasks] перенесення в колонку не вдалося:', e);
     }
-  }, [canEdit, trackWrite, stopTimerForTask]);
+  }, [canEdit, trackWrite, stopTimerForTask, askPersonalStatusLink]);
 
   const openColumnPicker = useCallback((task: Task) => {
     Alert.alert(
@@ -468,7 +494,7 @@ export default function ProjectTasksScreen() {
                   <TaskCompactCard
                     key={task.id}
                     task={task}
-                    statusColumn={boardColumnForTask(task, boardColumns) ?? boardColumns[0]}
+                    statusColumn={boardColumnForTask(task, boardColumns, columns) ?? boardColumns[0]}
                     onPress={openTask}
                     onToggle={toggleTask}
                     c={c}
@@ -495,7 +521,7 @@ export default function ProjectTasksScreen() {
                         <TaskCompactCard
                           key={task.id}
                           task={task}
-                          statusColumn={boardColumnForTask(task, boardColumns) ?? boardColumns[0]}
+                          statusColumn={boardColumnForTask(task, boardColumns, columns) ?? boardColumns[0]}
                           onPress={openTask}
                           onToggle={toggleTask}
                           c={c}
@@ -523,7 +549,7 @@ export default function ProjectTasksScreen() {
               // з висячим/відсутнім kanbanColumnId (статус видалили в
               // налаштуваннях проєкту) завжди опинялась у ПЕРШІЙ колонці,
               // навіть якщо вона вже виконана (review finding).
-              const colTasks = filtered.filter(t => boardColumnForTask(t, boardColumns)?.id === col.id);
+              const colTasks = filtered.filter(t => boardColumnForTask(t, boardColumns, columns)?.id === col.id);
               return (
                 <View key={col.id} style={[st.boardColumn, { borderColor: c.border, backgroundColor: c.dim }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -590,7 +616,7 @@ export default function ProjectTasksScreen() {
                   <View key={task.id} style={{ marginBottom: 6 }}>
                     <TaskCompactCard
                       task={task}
-                      statusColumn={boardColumnForTask(task, boardColumns) ?? boardColumns[0]}
+                      statusColumn={boardColumnForTask(task, boardColumns, columns) ?? boardColumns[0]}
                       onPress={openTask}
                       onToggle={toggleTask}
                       c={c}

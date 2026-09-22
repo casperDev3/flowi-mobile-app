@@ -53,10 +53,13 @@ import { TaskDetailHeader } from '@/components/tasks/TaskDetailHeader';
 import { CommentsSection } from '@/components/shared/CommentsSection';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
+import { saveStatusLink } from '@/store/status-links';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import {
   assigneeDisplayName,
+  assigneeForPersonalProjectTask,
   createdByAfterProjectChange,
+  isMyTask,
   isOverdue,
   normalizePriority,
   priorityFields,
@@ -80,6 +83,7 @@ import {
   overdueForList,
   sortTasksForList,
   taskListQueryToParams,
+  taskScopeCounts,
   OVERDUE_GROUP_KEY,
   type GroupLabels,
   type TaskListGroup,
@@ -88,10 +92,11 @@ import {
 import { TaskCompactCard } from '@/components/tasks/TaskCompactCard';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import { taskMarkdownLabels, taskToMarkdown } from '@/utils/taskMarkdown';
-import { isTodayTask } from '@/utils/taskToday';
+import { inTaskScope, isWeekTask } from '@/utils/taskToday';
 import {
-  ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, projectEquivalentColumn,
-  scopedColumnFor, scopedTaskStatusColumn, subtaskToggleTransition, taskColumnId, taskStatusColumn,
+  ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, personalDisplayColumn, projectEquivalentColumn,
+  projectEquivalentStrict,
+  scopedColumnFor, scopedTaskStatusColumn, subtaskToggleTransition,
 } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
@@ -332,6 +337,15 @@ export default function TasksScreen() {
    * мусить назавжди отримати його при кожному відкритті вкладки.
    */
   const [scope, setScope] = useState<TaskListScope>('today');
+  /**
+   * Лише в режимі «Всі»: false (типово) — мої активні З дедлайном, true —
+   * БЕЗ дедлайну (utils/taskToday.ts inTaskScope). Поза «Всі» скидається.
+   */
+  const [noDeadline, setNoDeadline] = useState(false);
+  const selectScope = useCallback((next: TaskListScope, nextNoDeadline = false) => {
+    setScope(next);
+    setNoDeadline(next === 'all' && nextNoDeadline);
+  }, []);
 
   // Search & extra filters
   const [search, setSearch] = useState('');
@@ -549,6 +563,8 @@ export default function TasksScreen() {
   // Ref для синхронного читання поточних tasks (використовується в callbacks без deps)
   const tasksRef = useRef<Task[]>([]);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+  const storedTaskStatusesRef = useRef<TaskStatusColumn[]>([]);
+  useEffect(() => { storedTaskStatusesRef.current = storedTaskStatuses; }, [storedTaskStatuses]);
 
   // Undo-тост (таб — над таб-баром)
   const { show: showUndo, element: undoElement } = useUndoToast(true);
@@ -574,7 +590,10 @@ export default function TasksScreen() {
 
   const todayStr = today.toDateString();
   // Tasks due today (deadline = today) — both done and not done
-  const dueTodayTasks   = tasks.filter(t => t.deadline && new Date(t.deadline).toDateString() === todayStr);
+  // Лише МОЄ (isMyTask): у шапці не має рахуватись робота інших учасників
+  // проєктів, якої немає в самому списку нижче.
+  const dueTodayTasks   = tasks.filter(t => t.deadline && new Date(t.deadline).toDateString() === todayStr
+    && (user?.id === undefined || isMyTask(t, user.id, projectRoles)));
   const doneCount       = dueTodayTasks.filter(t => t.status === 'done').length;
   const activeCount     = dueTodayTasks.filter(t => t.status === 'active').length;
   // Efficiency based on subtasks (if task has subtasks, count subtask progress; otherwise count task status)
@@ -622,7 +641,8 @@ export default function TasksScreen() {
     // (мінор із ревʼю).
     myUserId: user?.id,
     projectRoles,
-  }), [filter, sort, scope, search, filterProject, filterPriorities, dateFilter, activeMonth, user?.id, projectRoles]);
+    noDeadline: scope === 'all' && noDeadline,
+  }), [filter, sort, scope, search, filterProject, filterPriorities, dateFilter, activeMonth, user?.id, projectRoles, noDeadline]);
 
   /**
    * Набір без урахування денного скоупу — тобто те, що людина побачила б,
@@ -701,8 +721,10 @@ export default function TasksScreen() {
       projectId: draft.projectId ?? undefined,
       // §3.3 «createdBy — клієнт ставить при створенні в проєкті».
       createdBy: draft.projectId ? user?.id : undefined,
-      // §4.5 — виконавець; має сенс лише для завдання проєкту.
-      assigneeId: draft.projectId ? draft.assigneeId ?? undefined : undefined,
+      // §4.5 — виконавець; має сенс лише для завдання проєкту. Не обраний —
+      // я: в особистому просторі видно лише призначене мені (isMyTask), і без
+      // цього щойно створена задача проєкту зникала б одразу після «Додати».
+      assigneeId: assigneeForPersonalProjectTask({ projectId: draft.projectId ?? undefined, assigneeId: draft.assigneeId ?? undefined }, user?.id),
       timeEntries: [],
       history: [makeHistoryEvent('created')],
       recurrence: draftRecurrence(draft),
@@ -718,11 +740,14 @@ export default function TasksScreen() {
     // невідрізнити від втрати даних: вона щойно натиснула кнопку й нічого не
     // побачила. Тому створення, що виводить завдання з поточного обсягу, САМЕ
     // розширює обсяг до «Усі» — дія користувача важить більше за фільтр.
-    if (!isTodayTask(created, storedTaskStatuses, today)) setScope('all');
+    if (!inTaskScope(created, storedTaskStatuses, scope, { noDeadline }, today)) {
+      if (isWeekTask(created, storedTaskStatuses, today)) selectScope('week');
+      else selectScope('all', !created.deadline);
+    }
     composer.reset(ACTIVE_COLUMN_ID);
     setShowAdd(false);
     haptic.success();
-  }, [composer, taskStatuses, storedTaskStatuses, today, sprints, setTasks, user]);
+  }, [composer, taskStatuses, storedTaskStatuses, today, sprints, setTasks, user, scope, noDeadline, selectScope]);
 
   const deleteTask = useCallback((id: string, title?: string) => {
     const taskToDelete = tasksRef.current.find(t => t.id === id);
@@ -768,26 +793,15 @@ export default function TasksScreen() {
    * увійшовши в режим редагування. Тобто перевести завдання з «В роботі» в
    * будь-який інший кастомний статус із деталей було неможливо.
    */
-  const setTaskColumn = useCallback((id: string, columnId: string) => {
-    const chosen = taskStatuses.find(item => item.id === columnId);
-    if (!chosen) return;
-    // Contract §4.1: глядач не рухає проєктну задачу по статусах.
-    if (!canEditProjectItem(tasksRef.current.find(t => t.id === id)?.projectId, projectRoles)) return;
-    haptic.light();
+  /** Ставить задачу в УЖЕ зведену до її простору колонку. */
+  const applyTaskColumn = useCallback((id: string, column: TaskStatusColumn) => {
     // Перенесення в колонку «готово» — така сама зупинка таймера, як і
     // чекбокс: інакше відлік лишався б на завершеному завданні, а кнопку
-    // «Стоп» у деталі до нього вже не показують. `chosen.isDone` не залежить
-    // від проєкту (§3.3: копії проєкту зберігають isDone 1-в-1), тож рахувати
-    // це до резолюції по конкретному завданню — безпечно.
-    if (chosen.isDone && getTimerForTask(id)) pendingTimerStops.current.push(id);
+    // «Стоп» у деталі до нього вже не показують.
+    if (column.isDone && getTimerForTask(id)) pendingTimerStops.current.push(id);
     setTasks(prev => prev.map(t => {
       if (t.id !== id) return t;
-      // Пікер пропонує ОСОБИСТІ статуси незалежно від проєкту задачі (§3.7
-      // «Особисте агрегує» — спільна деталь для всіх завдань); еквівалент у
-      // ВЛАСНОМУ проєкті задачі — інакше вибір «У процесі» ставив би
-      // особистий id, якого немає серед колонок дошки цього проєкту.
-      const column = projectEquivalentColumn(chosen, storedTaskStatuses, t.projectId) ?? chosen;
-      if (scopedTaskStatusColumn(t, storedTaskStatuses).id === column.id) return t;
+      if (scopedTaskStatusColumn(t, storedTaskStatusesRef.current).id === column.id && t.kanbanColumnId === column.id) return t;
       const status: Status = column.isDone ? 'done' : 'active';
       return {
         ...t,
@@ -798,7 +812,42 @@ export default function TasksScreen() {
         history: [...(t.history ?? []), makeHistoryEvent(column.isDone ? 'done' : 'active', column.name)],
       };
     }));
-  }, [taskStatuses, storedTaskStatuses, getTimerForTask, setTasks, projectRoles]);
+  }, [getTimerForTask, setTasks]);
+
+  const setTaskColumn = useCallback((id: string, columnId: string) => {
+    const chosen = taskStatuses.find(item => item.id === columnId);
+    if (!chosen) return;
+    const task = tasksRef.current.find(t => t.id === id);
+    if (!task) return;
+    // Contract §4.1: глядач не рухає проєктну задачу по статусах.
+    if (!canEditProjectItem(task.projectId, projectRoles)) return;
+    haptic.light();
+    // Пікер пропонує ОСОБИСТІ статуси незалежно від проєкту задачі (§3.7
+    // «Особисте агрегує»); задачі проєкту пишемо еквівалент у ВЛАСНОМУ
+    // проєкті: та сама назва → копія → явний зв'язок (utils/statusLinks.ts).
+    const strict = projectEquivalentStrict(chosen, storedTaskStatuses, task.projectId);
+    if (strict) { applyTaskColumn(id, strict); return; }
+    // Розбіжність: у проєкті немає такого статусу. Дія зроблена в ОСОБИСТОМУ
+    // просторі — питаємо, куди перенести задачу в проєкті, і запам'ятовуємо
+    // відповідь, щоб наступного разу не питати.
+    const projectId = task.projectId!;
+    const projectColumns = mergeTaskStatusColumns(storedTaskStatuses, projectId);
+    const projectName = projects.find(p => p.id === projectId)?.name ?? '';
+    Alert.alert(
+      tr.statusLinkAskProjectTitle,
+      tr.statusLinkAskProjectBody.replace('{project}', projectName).replace('{name}', chosen.name),
+      [
+        ...projectColumns.map(column => ({
+          text: column.name,
+          onPress: () => {
+            applyTaskColumn(id, column);
+            void saveStatusLink(chosen, projectId, column.id);
+          },
+        })),
+        { text: tr.cancel, style: 'cancel' as const },
+      ],
+    );
+  }, [taskStatuses, storedTaskStatuses, projectRoles, projects, tr, applyTaskColumn]);
 
   const toggleTask = useCallback((id: string) => {
     // Знімок поточного стану задачі для undo
@@ -904,7 +953,7 @@ export default function TasksScreen() {
     // Єдине джерело правила «куди веде відмітка підзавдання» — утиліта.
     // null означає, що ні статус, ні колонку чіпати не можна: відмітка не
     // останньої підзадачі не мусить викидати завдання з «У процесі».
-    const transition = current ? subtaskToggleTransition(current, nextSubs) : null;
+    const transition = current ? subtaskToggleTransition(current, nextSubs, storedTaskStatusesRef.current) : null;
     // Закрита остання підзадача — робота скінчилась, тож таймер зупиняємо так
     // само, як від чекбокса завдання. Зупинка сама переставляє завдання в «На
     // перевірці», тобто пише ТУ САМУ колонку, що й перехід вище: два
@@ -1031,18 +1080,28 @@ export default function TasksScreen() {
    * список, і підрахунок по них показував би на тумблері «Сьогодні» його ж
    * число. Прострочене входить сюди само — воно сьогоднішнє за правилом.
    */
-  const todayCount = useMemo(
-    () => filteredAll.filter(t => isTodayTask(t, storedTaskStatuses, today)).length,
-    [filteredAll, storedTaskStatuses, today],
+  const scopeCounts = useMemo(
+    () => taskScopeCounts(filteredAll, listQuery, storedTaskStatuses, today),
+    [filteredAll, listQuery, storedTaskStatuses, today],
   );
-  /** Скільки роботи лишається поза сьогоднішнім днем — число на тумблері «Усі». */
-  const beyondTodayCount = filteredAll.length - todayCount;
+  const todayCount = scopeCounts.today;
+  /**
+   * Куди вести з порожнього «Сьогодні»: у найближчий непорожній режим —
+   * тиждень, далі «Всі» з дедлайном, далі «Без дедлайну».
+   */
+  const emptyTodayTarget = useMemo(() => (
+    scopeCounts.week > 0
+      ? { scope: 'week' as const, noDeadline: false, count: scopeCounts.week, label: tr.tasksScopeWeek }
+      : scopeCounts.all > 0
+        ? { scope: 'all' as const, noDeadline: false, count: scopeCounts.all, label: tr.allTasks }
+        : { scope: 'all' as const, noDeadline: true, count: scopeCounts.noDeadline, label: tr.withoutDeadline }
+  ), [scopeCounts, tr.tasksScopeWeek, tr.allTasks, tr.withoutDeadline]);
   /**
    * Порожній день при непорожньому списку. Пошук виключено навмисно: у нього
    * власна гілка порожнього стану, і пропонувати «показати всі» людині, яка
    * просто нічого не знайшла за запитом, означало б відповідати не на те питання.
    */
-  const todayEmpty = scope === 'today' && !search.trim() && todayCount === 0 && beyondTodayCount > 0;
+  const todayEmpty = scope === 'today' && !search.trim() && todayCount === 0 && emptyTodayTarget.count > 0;
 
   /**
    * У віртуалізованому списку елементи монтуються заново при поверненні
@@ -1177,14 +1236,30 @@ export default function TasksScreen() {
       // §3.7 review finding — createdByAfterProjectChange (utils/taskUtils.ts).
       if (edited.has('project')) {
         next.createdBy = createdByAfterProjectChange(next, user?.id);
+        // Перенесену в проєкт задачу без виконавця призначаємо мені — інакше
+        // вона зникла б з особистого простору (isMyTask: лише призначене мені).
+        if (!edited.has('assignee') && next.projectId && !next.assigneeId) {
+          next.assigneeId = assigneeForPersonalProjectTask(next, user?.id);
+        }
       }
       if (edited.has('title')) next.title = draft.title.trim();
       if (edited.has('desc')) next.description = draft.desc.trim();
       // Dual-write: priorityLevel + валідне легасі для старих клієнтів.
       if (edited.has('priority')) next = { ...next, ...priorityFields(draft.priorityLevel) };
       if (edited.has('status')) {
-        next.status = column.isDone ? 'done' : 'active';
-        next.kanbanColumnId = draft.statusId;
+        // Пікер форми — ОСОБИСТІ статуси; задачі проєкту пишемо еквівалент
+        // у ВЛАСНОМУ проєкті (інакше особистий id, якого немає на дошці
+        // проєкту, і на інших пристроях задача «падала» в «До роботи»).
+        const target = projectEquivalentColumn(column, storedTaskStatuses, next.projectId) ?? column;
+        next.status = target.isDone ? 'done' : 'active';
+        next.kanbanColumnId = target.id;
+      } else if (edited.has('project') && t.kanbanColumnId) {
+        // Змінився простір — колонку старого зводимо до нового: спершу до
+        // особистої «за змістом», далі до еквівалента в новому проєкті.
+        const personalView = personalDisplayColumn(t, storedTaskStatuses);
+        const target = projectEquivalentColumn(personalView, storedTaskStatuses, next.projectId) ?? personalView;
+        next.kanbanColumnId = target.id;
+        next.status = target.isDone ? 'done' : 'active';
       }
       if (edited.has('estimate')) next.estimatedMinutes = estimatedMinutes;
       if (edited.has('deadline')) next.deadline = draft.deadline ?? undefined;
@@ -1204,7 +1279,7 @@ export default function TasksScreen() {
     setSelected(prev => prev?.id === selected.id ? patch(prev) : prev);
     editor.finish();
     // Чернетка тепер один об'єкт, тож і залежність одна замість тринадцяти.
-  }, [editor, selected, taskStatuses, getTimerForTask, sprints, setTasks, user]);
+  }, [editor, selected, taskStatuses, storedTaskStatuses, getTimerForTask, sprints, setTasks, user]);
 
   const openReminderPicker = useCallback((taskId: string, subtaskId?: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -1301,6 +1376,7 @@ export default function TasksScreen() {
     setFilterPriorities([]);
     setDateFilter(null);
     setSearch('');
+    setNoDeadline(false);
   }, []);
 
   // Мемоізовано: палітра йде пропом у кожну картку списку, і новий об'єкт
@@ -1503,7 +1579,7 @@ export default function TasksScreen() {
                       label={tr.status}
                       icon="rectangle.3.group"
                       options={statusOptions}
-                      value={taskStatusColumn(selectedTask, taskStatuses).id}
+                      value={personalDisplayColumn(selectedTask, storedTaskStatuses).id}
                       onSelect={id => { if (id) setTaskColumn(selectedTask.id, id); }}
                       colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
                       isDark={isDark}
@@ -1726,7 +1802,7 @@ export default function TasksScreen() {
       tab={detailTab}
       onTabChange={setDetailTab}
       timerRunning={isTimerRunning}
-      onEdit={canEditSelectedTask ? () => editor.begin(selectedTask, taskColumnId(selectedTask, taskStatuses)) : undefined}
+      onEdit={canEditSelectedTask ? () => editor.begin(selectedTask, personalDisplayColumn(selectedTask, storedTaskStatuses).id) : undefined}
       onClose={() => closeTaskDetail(false)}
       onCopy={() => copyTask(selectedTask)}
       showHandle={!showDetailColumn}
@@ -1937,14 +2013,15 @@ export default function TasksScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1, backgroundColor: c.dim, borderRadius: 12, padding: 3, borderWidth: 1, borderColor: c.border }}>
                   {([
-                    { key: 'today' as const, label: tr.today, count: todayCount },
-                    { key: 'all' as const, label: tr.allTasks, count: filteredAll.length },
+                    { key: 'today' as const, label: tr.today, count: scopeCounts.today },
+                    { key: 'week' as const, label: tr.tasksScopeWeek, count: scopeCounts.week },
+                    { key: 'all' as const, label: tr.allTasks, count: scopeCounts.all },
                   ]).map(option => {
                     const active = scope === option.key;
                     return (
                       <TouchableOpacity
                         key={option.key}
-                        onPress={() => { haptic.light(); setScope(option.key); }}
+                        onPress={() => { haptic.light(); selectScope(option.key); }}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
                         accessibilityLabel={`${option.label}, ${option.count}`}
@@ -1955,6 +2032,23 @@ export default function TasksScreen() {
                     );
                   })}
                 </View>
+
+                {/* «Без дедлайну» — лише в режимі «Всі»: особиста дошка
+                    типово показує завдання З дедлайном, а беклог без дати
+                    відкривається свідомо, цією кнопкою. */}
+                {scope === 'all' && (
+                  <TouchableOpacity
+                    onPress={() => { haptic.light(); setNoDeadline(v => !v); }}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: noDeadline }}
+                    accessibilityLabel={`${tr.withoutDeadline}, ${scopeCounts.noDeadline}`}
+                    accessibilityHint={tr.tasksNoDeadlineA11y}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: noDeadline ? c.accent : c.border, backgroundColor: noDeadline ? c.accent + '22' : c.dim }}>
+                    <IconSymbol name="calendar" size={13} color={noDeadline ? c.accent : c.sub} />
+                    <Text numberOfLines={1} style={{ color: noDeadline ? c.accent : c.sub, fontSize: 13, fontWeight: '700', flexShrink: 1 }}>{tr.withoutDeadline}</Text>
+                    <Text style={{ color: noDeadline ? c.accent : c.sub, fontSize: 11, fontWeight: '600' }}>{scopeCounts.noDeadline}</Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Фільтри й скидання — поруч із перемикачем, а не в хедері:
                     обидва органи керування звужують ОДИН набір завдань, і
@@ -2224,12 +2318,12 @@ export default function TasksScreen() {
                 <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noTasksToday}</Text>
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7, textAlign: 'center' }}>{tr.noTasksTodayHint}</Text>
                 <TouchableOpacity
-                  onPress={() => setScope('all')}
+                  onPress={() => selectScope(emptyTodayTarget.scope, emptyTodayTarget.noDeadline)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${tr.showAllTasks}, ${beyondTodayCount}`}
+                  accessibilityLabel={`${emptyTodayTarget.label}, ${emptyTodayTarget.count}`}
                   style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <IconSymbol name="list.bullet" size={15} color={c.accent} />
-                  <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.showAllTasks} · {beyondTodayCount}</Text>
+                  <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{emptyTodayTarget.label} · {emptyTodayTarget.count}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -2239,10 +2333,14 @@ export default function TasksScreen() {
               <View style={{ alignItems: 'center', paddingVertical: 56 }}>
                 <IconSymbol name="checklist" size={40} color={c.sub} />
                 <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>
-                  {search.trim() ? tr.nothingFound : hasFiltersBesidesSearch ? tr.noTasksMatchFilters : tr.noTasks}
+                  {search.trim() ? tr.nothingFound : hasFiltersBesidesSearch ? tr.noTasksMatchFilters : scope === 'week' ? tr.noTasksWeekTitle : tr.noTasks}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7, textAlign: 'center' }}>
-                  {search.trim() ? tr.tryAnotherQuery : hasFiltersBesidesSearch ? tr.noTasksMatchFiltersHint : tr.pressToAdd}
+                  {search.trim() ? tr.tryAnotherQuery : hasFiltersBesidesSearch ? tr.noTasksMatchFiltersHint
+                    // «Всі» з дедлайном порожні, а без дедлайну є — сказати, де
+                    // вони, інакше людина вирішить, що задачі зникли.
+                    : scope === 'all' && !noDeadline && scopeCounts.noDeadline > 0 ? tr.noDatedTasksHint
+                    : tr.pressToAdd}
                 </Text>
                 {/* Дія має вести до виходу з глухого кута. Коли список порожній
                     через фільтри, кнопка «додати» безпорадна: нове завдання так

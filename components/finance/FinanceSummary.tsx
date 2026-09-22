@@ -7,9 +7,10 @@
  * переміщення грошей між своїми ж місцями виглядало як витрата.
  *
  * Тепер зверху — стрічка РАХУНКІВ: кожен зі своїм балансом у своїй валюті.
- * Тап по рахунку фільтрує стрічку операцій нижче. Зведеного «≈ усього» немає
- * свідомо: курсів валют у застосунку поки немає, і будь-яка спільна цифра була
- * б вигадкою.
+ * Тап по рахунку фільтрує стрічку операцій нижче, довгий тап показує «Звідки
+ * ця сума». Над стрічкою — «На рахунках» ПО КОЖНІЙ ВАЛЮТІ окремо (курсів
+ * валют немає, тож міжвалютного «≈ усього» немає свідомо). Ця цифра та сама,
+ * що на плитці «Сьогодні» — обидві з utils/financeOverview.ts.
  *
  * Під стрічкою — оборот місяця (доходи/витрати) по валютах. Перекази в нього не
  * входять: гроші не заробили й не витратили, а переклали з місця на місце.
@@ -60,6 +61,16 @@ interface FinanceSummaryProps {
   transfersNoteLabel: string;
   /** Показувати примітку про перекази лише коли вони цього місяця були. */
   showTransfersNote?: boolean;
+  /** Валюта → сума балансів активних рахунків (financeOverview.totalByCurrency). */
+  accountTotals?: Record<string, number>;
+  totalLabel?: string;
+  /** Довгий тап по рахунку — «Звідки ця сума». */
+  onLongPressAccount?: (account: Account) => void;
+  breakdownHint?: string;
+  /** Текст попередження про операції без рахунку; null — попередження немає. */
+  unassignedLabel?: string | null;
+  unassignedActive?: boolean;
+  onPressUnassigned?: () => void;
 }
 
 /** Кольори за видом рахунку — коли користувач не задав власний. */
@@ -82,6 +93,8 @@ export function FinanceSummary({
   incomeLabel, expenseLabel, savingsLabel,
   accountsLabel, newAccountLabel, noAccountsLabel, noAccountsHint,
   transfersNoteLabel, showTransfersNote,
+  accountTotals, totalLabel, onLongPressAccount, breakdownHint,
+  unassignedLabel, unassignedActive, onPressUnassigned,
 }: FinanceSummaryProps) {
   const curOf = (code: string): Currency =>
     currencies.find(cu => cu.code === code) ?? { code, symbol: code, kind: 'fiat', decimals: 2 };
@@ -94,12 +107,47 @@ export function FinanceSummary({
     })
     .sort((a, b) => (a === primaryCode ? -1 : b === primaryCode ? 1 : a.localeCompare(b)));
 
+  const totalCodes = Object.keys(accountTotals ?? {})
+    .sort((a, b) => (a === primaryCode ? -1 : b === primaryCode ? 1 : a.localeCompare(b)));
+
   return (
     <View>
       {/* ─── Стрічка рахунків ─── */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
         <Text style={[s.sectionLabel, { color: c.sub, flex: 1 }]}>{accountsLabel}</Text>
       </View>
+
+      {/* «На рахунках» — та сама цифра, що на плитці «Сьогодні». */}
+      {accounts.length > 0 && totalCodes.length > 0 && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 14, rowGap: 4, marginBottom: 10 }}>
+          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{totalLabel}</Text>
+          {totalCodes.map(code => {
+            const value = accountTotals![code];
+            return (
+              <Text
+                key={code}
+                numberOfLines={1}
+                accessibilityLabel={`${totalLabel ?? ''} ${fmt(value, curOf(code))}`}
+                style={{ color: value < 0 ? c.red : c.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.5, flexShrink: 1 }}>
+                {fmt(value, curOf(code))}
+              </Text>
+            );
+          })}
+        </View>
+      )}
+
+      {unassignedLabel ? (
+        <TouchableOpacity
+          onPress={onPressUnassigned}
+          accessibilityRole="button"
+          accessibilityState={{ selected: !!unassignedActive }}
+          accessibilityLabel={unassignedLabel}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: unassignedActive ? '#F59E0B' : '#F59E0B66', backgroundColor: '#F59E0B' + (unassignedActive ? '26' : '12'), marginBottom: 10 }}>
+          <IconSymbol name="exclamationmark.triangle.fill" size={14} color="#F59E0B" />
+          <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', flex: 1 }}>{unassignedLabel}</Text>
+          <IconSymbol name={unassignedActive ? 'xmark' : 'chevron.right'} size={12} color={c.sub} />
+        </TouchableOpacity>
+      ) : null}
 
       {accounts.length === 0 ? (
         <BlurView
@@ -134,7 +182,11 @@ export function FinanceSummary({
                 key={account.id}
                 activeOpacity={0.8}
                 onPress={() => onSelectAccount(account.id)}
+                onLongPress={onLongPressAccount ? () => onLongPressAccount(account) : undefined}
                 accessibilityRole="button"
+                accessibilityHint={onLongPressAccount ? breakdownHint : undefined}
+                accessibilityActions={onLongPressAccount ? [{ name: 'longpress', label: breakdownHint }] : undefined}
+                onAccessibilityAction={onLongPressAccount ? (e => { if (e.nativeEvent.actionName === 'longpress') onLongPressAccount(account); }) : undefined}
                 accessibilityState={{ selected }}
                 accessibilityLabel={`${account.name}, ${fmt(balance, curOf(account.currency))}`}>
                 <BlurView

@@ -19,6 +19,7 @@
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useProjectRoles } from '@/hooks/use-project-roles';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
@@ -150,7 +151,8 @@ export default function TaskGroupScreen() {
   // оптимізувати весь екран (PERF-2); тепер deps чесні, а результат той
   // самий — примітиви міняються рівно тоді, коли змінився маршрут.
   const { filter: pFilter, sort: pSort, scope: pScope, search: pSearch,
-    project: pProject, priorities: pPriorities, date: pDate, month: pMonth } = params;
+    project: pProject, priorities: pPriorities, date: pDate, month: pMonth, noDeadline: pNoDeadline } = params;
+  const projectRoles = useProjectRoles();
   const query = useMemo(
     // §3.7 «моє» — той самий `myUserId`, що тепер несе `listQuery` на екрані
     // завдань (app/(tabs)/index.tsx): інакше «Всі (N)» тут показувало б і
@@ -159,11 +161,12 @@ export default function TaskGroupScreen() {
     () => ({
       ...taskListQueryFromParams({
         filter: pFilter, sort: pSort, scope: pScope, search: pSearch,
-        project: pProject, priorities: pPriorities, date: pDate, month: pMonth,
+        project: pProject, priorities: pPriorities, date: pDate, month: pMonth, noDeadline: pNoDeadline,
       }),
       myUserId: user?.id,
+      projectRoles,
     }),
-    [pFilter, pSort, pScope, pSearch, pProject, pPriorities, pDate, pMonth, user?.id],
+    [pFilter, pSort, pScope, pSearch, pProject, pPriorities, pDate, pMonth, pNoDeadline, user?.id, projectRoles],
   );
 
   const group = useMemo((): { title: string; subtitle: string | null; tasks: Task[] } | null => {

@@ -252,6 +252,35 @@ export interface Translations {
   accountDefaultName: string;      // назва рахунку, створеного міграцією
   newAccount: string;
   openingBalance: string;
+  tasksScopeWeek: string;
+  tasksNoDeadlineA11y: string;
+  noTasksWeekTitle: string;
+  noDatedTasksHint: string;
+  statusLinkAskPersonalTitle: string;
+  statusLinkAskPersonalBody: string;
+  statusLinkAskProjectTitle: string;
+  statusLinkAskProjectBody: string;
+  statusLinkKeepAsIs: string;
+  monthNet: string;
+  totalOnAccounts: string;
+  balanceBreakdown: string;
+  breakdownOpening: string;
+  breakdownIncome: string;
+  breakdownExpense: string;
+  breakdownTransfersIn: string;
+  breakdownTransfersOut: string;
+  breakdownFuture: string;
+  breakdownBalance: string;
+  openingBalanceHint: string;
+  balanceWillBe: string;
+  reconcileBalance: string;
+  reconcileActualLabel: string;
+  reconcileDelta: string;
+  unassignedTxWarning: string;
+  markTransferPairTitle: string;
+  markTransferPairHint: string;
+  markTransferPairDelete: string;
+  markTransferPairKeep: string;
   selectAccount: string;
   noAccounts: string;
   noAccountsHint: string;
@@ -1103,7 +1132,6 @@ export interface Translations {
   chartOverdueDebt: string;
   chartBeyondHorizon: string;
   chartNoDeadline: string;
-  ganttTitle: string;
   ganttLegendReal: string;
   ganttLegendEstimated: string;
   ganttLegendColor: string;
@@ -1516,7 +1544,7 @@ const uk: Translations = {
   resetAll: 'Скинути все',
   subtasksToday: 'Підзавдання на сьогодні',
   noTasksToday: 'Немає завдань на сьогодні',
-  noTasksTodayHint: 'Решта роботи нікуди не зникла — вона в режимі «Всі».',
+  noTasksTodayHint: 'Решта роботи нікуди не зникла — вона в режимах «Тиждень» і «Всі».',
   showAllTasks: 'Показати всі',
   meetings: 'Зустрічі',
   addMeeting: 'Додати зустріч',
@@ -1675,6 +1703,35 @@ const uk: Translations = {
   accountDefaultName: 'Основний',
   newAccount: 'Новий рахунок',
   openingBalance: 'Початковий залишок',
+  tasksScopeWeek: 'Тиждень',
+  tasksNoDeadlineA11y: 'Показати завдання без дедлайну',
+  noTasksWeekTitle: 'На тиждень завдань немає',
+  noDatedTasksHint: 'Завдання без дедлайну — під кнопкою «Без дедлайну».',
+  statusLinkAskPersonalTitle: 'Статус в особистому',
+  statusLinkAskPersonalBody: 'В особистому просторі немає статусу «{name}» (проєкт «{project}»). Куди переносити такі задачі в особистому?',
+  statusLinkAskProjectTitle: 'Статус у проєкті',
+  statusLinkAskProjectBody: 'У проєкті «{project}» немає статусу «{name}». Куди перенести задачу в проєкті?',
+  statusLinkKeepAsIs: 'Залишити як є',
+  monthNet: 'Сальдо місяця',
+  totalOnAccounts: 'На рахунках',
+  balanceBreakdown: 'Звідки ця сума',
+  breakdownOpening: 'Початковий залишок',
+  breakdownIncome: 'Доходи',
+  breakdownExpense: 'Витрати',
+  breakdownTransfersIn: 'Перекази на рахунок',
+  breakdownTransfersOut: 'Перекази з рахунку',
+  breakdownFuture: 'Майбутні операції (не враховано): {n}',
+  breakdownBalance: 'Баланс',
+  openingBalanceHint: 'Сума ДО першої записаної операції цього рахунку — не поточний залишок. Щоб баланс збігся з реальним, скористайтесь «Звірити з реальним залишком».',
+  balanceWillBe: 'Баланс стане: {amount}',
+  reconcileBalance: 'Звірити з реальним залишком',
+  reconcileActualLabel: 'Реальний залишок зараз',
+  reconcileDelta: 'Початковий залишок зміниться на {delta}. Збережіть рахунок, щоб застосувати.',
+  unassignedTxWarning: 'Операцій без рахунку чи на архівних рахунках: {n} — у баланс не входять',
+  markTransferPairTitle: 'Друга половина переказу?',
+  markTransferPairHint: 'Знайдено операцію на ту саму суму на рахунку «{account}» ({date}). Якщо це друга половина старого переказу, її треба видалити — інакше гроші порахуються двічі.',
+  markTransferPairDelete: 'Видалити другу половину',
+  markTransferPairKeep: 'Залишити',
   selectAccount: 'Оберіть рахунок',
   noAccounts: 'Немає рахунків',
   noAccountsHint: 'Заведіть гаманець, картку чи заощадження — операції мусять звідкись іти',
@@ -2381,7 +2438,6 @@ const uk: Translations = {
   chartOverdueDebt: 'Прострочено — це борг, а не план',
   chartBeyondHorizon: 'З дедлайном далі за горизонт',
   chartNoDeadline: 'Незавершених без дедлайну',
-  ganttTitle: 'Гантт',
   ganttLegendReal: 'Справжня дата початку',
   ganttLegendEstimated: 'Початок узято з дати створення — тривалість завищена',
   ganttLegendColor: 'Колір смуги — колір проєкту',
@@ -2782,7 +2838,7 @@ const en: Translations = {
   resetAll: 'Reset All',
   subtasksToday: 'Subtasks today',
   noTasksToday: 'No tasks today',
-  noTasksTodayHint: 'The rest of your work is still there — under “All”.',
+  noTasksTodayHint: 'The rest of your work is still there — under “Week” and “All”.',
   showAllTasks: 'Show all',
   meetings: 'Meetings',
   addMeeting: 'Add Meeting',
@@ -2941,6 +2997,35 @@ const en: Translations = {
   accountDefaultName: 'Main',
   newAccount: 'New account',
   openingBalance: 'Opening balance',
+  tasksScopeWeek: 'Week',
+  tasksNoDeadlineA11y: 'Show tasks without a deadline',
+  noTasksWeekTitle: 'No tasks this week',
+  noDatedTasksHint: 'Tasks without a deadline are under “No deadline”.',
+  statusLinkAskPersonalTitle: 'Status in personal space',
+  statusLinkAskPersonalBody: 'Your personal space has no “{name}” status (project “{project}”). Where should such tasks go in your personal space?',
+  statusLinkAskProjectTitle: 'Status in project',
+  statusLinkAskProjectBody: 'Project “{project}” has no “{name}” status. Where should the task go in the project?',
+  statusLinkKeepAsIs: 'Keep as is',
+  monthNet: 'Month net',
+  totalOnAccounts: 'On accounts',
+  balanceBreakdown: 'Where this amount comes from',
+  breakdownOpening: 'Opening balance',
+  breakdownIncome: 'Income',
+  breakdownExpense: 'Expenses',
+  breakdownTransfersIn: 'Transfers in',
+  breakdownTransfersOut: 'Transfers out',
+  breakdownFuture: 'Future transactions (not counted): {n}',
+  breakdownBalance: 'Balance',
+  openingBalanceHint: 'The amount BEFORE this account’s first recorded transaction — not the current balance. To match your real balance, use “Reconcile with actual balance”.',
+  balanceWillBe: 'Balance will be: {amount}',
+  reconcileBalance: 'Reconcile with actual balance',
+  reconcileActualLabel: 'Actual balance now',
+  reconcileDelta: 'Opening balance changes by {delta}. Save the account to apply.',
+  unassignedTxWarning: 'Transactions without an account or on archived accounts: {n} — not in the balance',
+  markTransferPairTitle: 'Other half of the transfer?',
+  markTransferPairHint: 'Found a transaction for the same amount on “{account}” ({date}). If it is the other half of an old transfer, delete it — otherwise the money is counted twice.',
+  markTransferPairDelete: 'Delete the other half',
+  markTransferPairKeep: 'Keep',
   selectAccount: 'Select an account',
   noAccounts: 'No accounts',
   noAccountsHint: 'Add a wallet, a card or savings — every operation needs a place to come from',
@@ -3644,7 +3729,6 @@ const en: Translations = {
   chartOverdueDebt: 'Overdue — that is debt, not a plan',
   chartBeyondHorizon: 'Due beyond the horizon',
   chartNoDeadline: 'Unfinished with no deadline',
-  ganttTitle: 'Gantt',
   ganttLegendReal: 'Real start date',
   ganttLegendEstimated: 'Start taken from the creation date — duration overstated',
   ganttLegendColor: 'Bar colour is the project colour',

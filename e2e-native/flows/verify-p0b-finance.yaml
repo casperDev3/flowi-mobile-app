@@ -1,0 +1,35 @@
+# P0 (б) NAT-02 — після «+ Новий рахунок» усередині форми транзакції екран
+# Фінансів МУСИТЬ лишитись живим. До правок він назавжди переставав приймати
+# дотики: ні «Додати», ні FAB, ні «…», ні сегмент «Доходи». Лікував лише перезапуск.
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "50%,94%"        # вкладка «Фінанси»
+- waitForAnimationToEnd
+- assertVisible: "Немає транзакцій"
+
+# ── 1. ТРИГЕР ДЕФЕКТУ ────────────────────────────────────────────────────
+- tapOn:
+    point: "88%,85%"         # FAB → форма транзакції
+- waitForAnimationToEnd
+- assertVisible: ".*СУМА.*"
+- tapOn: ".*Новий рахунок.*"
+- waitForAnimationToEnd
+# До правок аркуш рахунків НЕ з'являвся, а екран замерзав назавжди.
+- assertVisible: "Рахунки"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/p0b-10-accsheet
+
+# ── 2. ЕКРАН ЖИВИЙ ───────────────────────────────────────────────────────
+- tapOn:
+    point: "90%,34%"        # × закрити аркуш рахунків
+- waitForAnimationToEnd
+- tapOn: "Витрати"          # сегмент фільтра — реагує?
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/p0b-12-segment
+- tapOn:
+    point: "90%,11%"        # «…» у шапці — реагує?
+- waitForAnimationToEnd
+- assertVisible: "Статистика"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/p0b-13-menu

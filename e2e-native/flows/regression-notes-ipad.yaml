@@ -1,0 +1,56 @@
+# Local audit fixture: existing project with one note; no saved mutations in this flow.
+# Orientation command: https://docs.maestro.dev/reference/commands-available/setorientation
+appId: com.casper3.f-tracking-app
+env:
+  PROJECT_ID: p-notes-audit
+  PROJECT_NOTE_ID: n-project-audit
+---
+- setOrientation: PORTRAIT
+- openLink: ftrackingapp://project/${PROJECT_ID}/notes
+- tapOn:
+    text: Open
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: note-${PROJECT_NOTE_ID}
+    timeout: 30000
+- tapOn:
+    id: note-${PROJECT_NOTE_ID}
+- assertVisible:
+    id: notes-editor
+- takeScreenshot: ${EVIDENCE_DIR}/project-portrait
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: notes-list
+- assertVisible:
+    id: notes-editor
+- takeScreenshot: ${EVIDENCE_DIR}/project-landscape
+- tapOn:
+    id: notes-body
+- eraseText: 1000
+- inputText: Draft across iPad rotation
+- setOrientation: PORTRAIT
+- assertVisible: Draft across iPad rotation
+- takeScreenshot: ${EVIDENCE_DIR}/portrait-draft
+- tapOn:
+    id: notes-close
+- tapOn: Не зберігати
+- openLink: ftrackingapp://notes
+- tapOn:
+    text: Open
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: note-${PROJECT_NOTE_ID}
+    timeout: 30000
+- setOrientation: LANDSCAPE_LEFT
+- tapOn:
+    id: note-${PROJECT_NOTE_ID}
+- assertVisible:
+    id: notes-editor
+- assertVisible:
+    id: notes-list
+- takeScreenshot: ${EVIDENCE_DIR}/aggregate-landscape
+- tapOn:
+    id: notes-close
+- setOrientation: PORTRAIT

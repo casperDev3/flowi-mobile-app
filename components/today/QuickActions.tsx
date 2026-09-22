@@ -16,6 +16,9 @@ interface Props {
   onTimer: () => void;
 }
 
+/** Стеля Dynamic Type для підписів плиток — див. коментар у розмітці. */
+const QUICK_LABEL_MAX_FONT_SCALE = 1.6;
+
 export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWater, onTimer }: Props) {
   const actions = [
     { label: tr.quickAddTask,    icon: 'plus.circle.fill' as const, color: '#7C3AED', onPress: onAddTask },
@@ -40,7 +43,15 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
             <View style={[s.iconWrap, { backgroundColor: a.color + '22' }]}>
               <IconSymbol name={a.icon} size={16} color={a.color} />
             </View>
-            <Text style={[s.label, { color: c.sub }]} numberOfLines={1}>{a.label}</Text>
+            {/* NAT-06: чотири плитки ділять ширину порівну, і при найбільшому
+                Dynamic Type (AX5) підписи зрізались до «+ З…», «Та…», «Фін…».
+                Стеля масштабування + другий рядок лишають слово читабельним;
+                озвучення не страждає — повний підпис є в accessibilityLabel
+                самої плитки. */}
+            <Text
+              style={[s.label, { color: c.sub }]}
+              numberOfLines={2}
+              maxFontSizeMultiplier={QUICK_LABEL_MAX_FONT_SCALE}>{a.label}</Text>
           </BlurView>
         </PressableScale>
       ))}

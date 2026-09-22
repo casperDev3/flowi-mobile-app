@@ -84,10 +84,10 @@ export function MonthPicker({
         transparent
         animationType="slide"
         onRequestClose={() => setOpen(false)}>
-        <Pressable
+        <Pressable accessible={false}
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
           onPress={() => setOpen(false)}>
-          <Pressable onPress={e => e.stopPropagation()}>
+          <Pressable accessible={false} onPress={e => e.stopPropagation()}>
             <BlurView
               intensity={72}
               tint="dark"

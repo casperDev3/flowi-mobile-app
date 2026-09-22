@@ -1,0 +1,10 @@
+# P0 (в) NAT-03 — аркуш «Нове завдання» більше не один вузол доступності.
+# До правок: увесь аркуш = 1 вузол [0,138][402,874] з підписом на 40+ контролів,
+# 22 вузли в усьому дереві, 5 a11y-листків.
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn: "Додати завдання"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/p0c-01-sheet

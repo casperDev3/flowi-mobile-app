@@ -1,0 +1,19 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn: "Back"
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,85%"
+- waitForAnimationToEnd
+- tapOn:
+    point: "25%,93%"
+- waitForAnimationToEnd
+- tapOn: "Всі, 1"
+- waitForAnimationToEnd
+- tapOn:
+    point: "50%,61%"
+- waitForAnimationToEnd
+- tapOn:
+    point: "22%,91%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/a11y/99-cleanup

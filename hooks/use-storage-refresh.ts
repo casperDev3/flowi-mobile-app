@@ -19,7 +19,8 @@ import { subscribeToStorage } from '@/store/storage';
  */
 export function useStorageRefresh(
   keys: readonly string[],
-  reload: () => void | Promise<unknown>,
+  /** Отримує ключ, що змінився, — можна перечитати лише його. */
+  reload: (key: string) => void | Promise<unknown>,
   enabled = true,
 ): <T>(write: () => Promise<T>) => Promise<T> {
   const writesInFlight = useRef(0);
@@ -41,7 +42,7 @@ export function useStorageRefresh(
       // його назад.
       if (writesInFlight.current > 0) return;
       try {
-        void Promise.resolve(reloadRef.current()).catch(e => {
+        void Promise.resolve(reloadRef.current(key)).catch(e => {
           if (__DEV__) console.warn(`[storage] перечитування ${key} впало:`, e);
         });
       } catch (e) {

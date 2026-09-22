@@ -2,9 +2,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  FlatList,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -15,11 +15,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useUndoToast } from '@/components/shared/UndoToast';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useI18n } from '@/store/i18n';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import { loadData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { updateSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
-import { subtaskToggleTransition } from '@/utils/taskStatuses';
+import { subtaskToggleTransition, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { normalizePriority, type LegacyPriority, type TaskPriority } from '@/utils/taskUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
 
@@ -42,14 +45,20 @@ interface SubRowProps {
   dimColor: string;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  /** Копіювати назву підзавдання в буфер. */
+  onCopy: (sub: SubTask) => void;
+  copyLabel: string;
 }
 
 /**
  * Рядок мемоізований: набір тексту в полі «Додати підзавдання» інакше
  * перемальовує весь список на кожну натиснуту літеру.
  */
+const subKey = (sub: SubTask) => sub.id;
+const SubSeparator = () => <View style={{ height: 8 }} />;
+
 const SubRow = React.memo(function SubRow({
-  sub, textColor, subColor, borderColor, dimColor, onToggle, onDelete,
+  sub, textColor, subColor, borderColor, dimColor, onToggle, onDelete, onCopy, copyLabel,
 }: SubRowProps) {
   return (
     <TouchableOpacity
@@ -67,8 +76,16 @@ const SubRow = React.memo(function SubRow({
         {sub.title}
       </Text>
       <TouchableOpacity
+        onPress={() => onCopy(sub)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel={`${copyLabel}: ${sub.title}`}
+        style={{ marginRight: 18 }}>
+        <IconSymbol name="doc.on.doc" size={14} color={subColor} />
+      </TouchableOpacity>
+      <TouchableOpacity
         onPress={() => onDelete(sub.id)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        hitSlop={{ top: 10, bottom: 10, left: 8, right: 10 }}>
         <IconSymbol name="trash" size={14} color={subColor} />
       </TouchableOpacity>
     </TouchableOpacity>
@@ -81,6 +98,12 @@ export default function SubtasksScreen() {
   const router = useRouter();
   const { taskId } = useLocalSearchParams<{ taskId: string }>();
   const { stopTimerForTask } = useTimerContext();
+  const { tr } = useI18n();
+  const { show: showToast, element: toastElement } = useUndoToast(false);
+
+  const copySubtask = useCallback((sub: SubTask) => {
+    void copyTextToClipboard(sub.title).then(ok => { if (ok) showToast(tr.subtaskCopied); });
+  }, [showToast, tr.subtaskCopied]);
 
   const [task, setTask] = useState<Task | null>(null);
   const [newSubtask, setNewSubtask] = useState('');
@@ -105,8 +128,7 @@ export default function SubtasksScreen() {
 
   const persistTask = useCallback(async (updated: Task) => {
     setTask(updated);
-    const tasks = await loadData<Task[]>('tasks', []);
-    await saveSynced('tasks', tasks.map(t => t.id === updated.id ? updated : t));
+    await updateSynced<Task>('tasks', tasks => tasks.map(t => t.id === updated.id ? updated : t));
   }, []);
 
   const toggleSubtask = useCallback(async (subId: string) => {
@@ -115,7 +137,9 @@ export default function SubtasksScreen() {
     // Те саме правило, що й у списку завдань, і навмисно з тієї самої утиліти:
     // раніше тут стояла власна копія, яка ще й позначала завдання завершеним.
     // null — статус і колонку не чіпаємо взагалі.
-    const transition = subtaskToggleTransition(task, subtasks);
+    // Задача проєкту йде в «На перевірці» ВЛАСНОГО проєкту — див. утиліту.
+    const statusColumns = await loadData<TaskStatusColumn[]>('task_statuses', []);
+    const transition = subtaskToggleTransition(task, subtasks, statusColumns);
     await persistTask({ ...task, subtasks, ...(transition ?? {}) });
     if (!transition) return;
 
@@ -152,6 +176,20 @@ export default function SubtasksScreen() {
   const total = task ? task.subtasks.length : 0;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
+  const renderSub = useCallback(({ item }: { item: SubTask }) => (
+    <SubRow
+      sub={item}
+      textColor={c.text}
+      subColor={c.sub}
+      borderColor={c.border}
+      dimColor={c.dim}
+      onToggle={toggleSubtask}
+      onDelete={deleteSubtask}
+      onCopy={copySubtask}
+      copyLabel={tr.copySubtask}
+    />
+  ), [c, toggleSubtask, deleteSubtask, copySubtask, tr.copySubtask]);
+
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
@@ -174,39 +212,26 @@ export default function SubtasksScreen() {
         </View>
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <ScrollView
+          {/* FlatList, а не ScrollView+map: зазвичай підзавдань одиниці, але
+              імпортований чек-лист на сотні пунктів монтувався б цілком. */}
+          <FlatList
+            data={sortedSubs}
+            keyExtractor={subKey}
+            renderItem={renderSub}
+            ItemSeparatorComponent={SubSeparator}
             contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled">
-
-            {/* Progress bar */}
-            {total > 0 && (
+            keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={total > 0 ? (
               <View style={{ marginBottom: 20 }}>
                 <View style={st.progressBg}>
                   <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: c.accent }]} />
                 </View>
                 <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 5 }}>{pct}% виконано</Text>
               </View>
-            )}
-
-            <View style={{ gap: 8 }}>
-              {/* Підзавдань у межах однієї задачі одиниці — віртуалізація тут
-                  лише додала б накладних витрат, тому звичайний map. */}
-              {sortedSubs.map(sub => (
-                <SubRow
-                  key={sub.id}
-                  sub={sub}
-                  textColor={c.text}
-                  subColor={c.sub}
-                  borderColor={c.border}
-                  dimColor={c.dim}
-                  onToggle={toggleSubtask}
-                  onDelete={deleteSubtask}
-                />
-              ))}
-
-              {/* Add subtask */}
-              <View style={[st.addSubRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+            ) : null}
+            ListFooterComponent={
+              <View style={[st.addSubRow, { borderColor: c.border, backgroundColor: c.dim, marginTop: sortedSubs.length > 0 ? 8 : 0 }]}>
                 <IconSymbol name="plus" size={15} color={c.sub} />
                 <TextInput
                   placeholder="Додати підзавдання..."
@@ -223,10 +248,11 @@ export default function SubtasksScreen() {
                   </TouchableOpacity>
                 ) : null}
               </View>
-            </View>
-          </ScrollView>
+            }
+          />
         </KeyboardAvoidingView>
       </SafeAreaView>
+      {toastElement}
     </View>
   );
 }

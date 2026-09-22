@@ -1,0 +1,14 @@
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      text: "Контейнери"
+    direction: DOWN
+- tapOn: "Контейнери"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/a11y/08-containers

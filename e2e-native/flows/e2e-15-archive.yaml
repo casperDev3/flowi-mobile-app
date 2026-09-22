@@ -1,0 +1,12 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "30%,94%"
+- waitForAnimationToEnd
+- tapOn:
+    point: "90%,11%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/15-options-menu
+- tapOn: "Архів"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/15-archive

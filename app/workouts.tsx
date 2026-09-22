@@ -21,11 +21,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { requestNotificationPermissions } from '@/store/notifications';
-import { loadData } from '@/store/storage';
+import { loadDataResult, retryStorageRead } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
 import { formatDuration } from '@/utils/durationFormat';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useI18n } from '@/store/i18n';
+import { LoadErrorNotice } from '@/components/health/HealthNotices';
+import { getHealthColors } from '@/utils/healthTheme';
 
 const ACCENT = '#0EA5E9';
 const ACCENT2 = '#6366F1';
@@ -103,6 +106,7 @@ function ExerciseModal({
   c: ReturnType<typeof makeColors>;
   isDark: boolean;
 }) {
+  const { tr } = useI18n();
   const [name, setName] = useState('');
   const [muscleGroup, setMuscleGroup] = useState('');
   const [sets, setSets] = useState('3');
@@ -147,7 +151,8 @@ function ExerciseModal({
       <LinearGradient colors={[isDark ? '#0C0C14' : '#F4F2FF', isDark ? '#14121E' : '#EAE6FF']} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}>
-            <TouchableOpacity onPress={onClose} style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}
+              style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <IconSymbol name="xmark" size={18} color={c.sub} />
             </TouchableOpacity>
             <Text style={{ color: c.text, fontSize: 18, fontWeight: '700', flex: 1 }}>
@@ -158,12 +163,12 @@ function ExerciseModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
             <Text style={sectionLabel(c)}>Назва вправи *</Text>
             <TextInput style={inp} value={name} onChangeText={setName} placeholder="Наприклад: Жим лежачи" placeholderTextColor={c.sub} />
 
             <Text style={[sectionLabel(c), { marginTop: 16 }]}>Група м&apos;язів</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
                 {MUSCLE_GROUPS.map(mg => (
                   <TouchableOpacity
@@ -220,6 +225,7 @@ function ProgramModal({
   c: ReturnType<typeof makeColors>;
   isDark: boolean;
 }) {
+  const { tr } = useI18n();
   const [name, setName] = useState('');
   const [color, setColor] = useState(PROGRAM_COLORS[4]);
   const [selectedEx, setSelectedEx] = useState<string[]>([]);
@@ -267,7 +273,8 @@ function ProgramModal({
       <LinearGradient colors={[isDark ? '#0C0C14' : '#F4F2FF', isDark ? '#14121E' : '#EAE6FF']} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}>
-            <TouchableOpacity onPress={onClose} style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}
+              style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <IconSymbol name="xmark" size={18} color={c.sub} />
             </TouchableOpacity>
             <Text style={{ color: c.text, fontSize: 18, fontWeight: '700', flex: 1 }}>
@@ -278,7 +285,7 @@ function ProgramModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
             <Text style={sectionLabel(c)}>Назва програми *</Text>
             <TextInput style={inp} value={name} onChangeText={setName} placeholder="Наприклад: Силовий день А" placeholderTextColor={c.sub} />
 
@@ -396,6 +403,7 @@ function StatsModal({
   c: ReturnType<typeof makeColors>;
   isDark: boolean;
 }) {
+  const { tr } = useI18n();
   const now = new Date();
   const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0, 0, 0, 0);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -429,12 +437,13 @@ function StatsModal({
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}>
             <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', flex: 1, letterSpacing: -0.5 }}>Статистика</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <IconSymbol name="xmark" size={18} color={c.sub} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 60 }}>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
             {/* Key metrics */}
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
               {([
@@ -562,6 +571,7 @@ type Colors = ReturnType<typeof makeColors>;
 const WorkoutRow = React.memo(function WorkoutRow({ w, c, isDark, lastInGroup, onDelete }: {
   w: Workout; c: Colors; isDark: boolean; lastInGroup: boolean; onDelete: (id: string) => void;
 }) {
+  const { tr } = useI18n();
   const cfg = WORKOUT_TYPES.find(t => t.key === w.type) ?? WORKOUT_TYPES[6];
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
@@ -575,7 +585,8 @@ const WorkoutRow = React.memo(function WorkoutRow({ w, c, isDark, lastInGroup, o
           {fmtDuration(w.durationMin)}{w.calories ? ` · ${w.calories} ккал` : ''}
         </Text>
       </View>
-      <TouchableOpacity onPress={() => onDelete(w.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity onPress={() => onDelete(w.id)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${w.title}`}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <IconSymbol name="xmark" size={14} color={c.sub} />
       </TouchableOpacity>
     </BlurView>
@@ -586,6 +597,7 @@ const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onD
   ex: Exercise; c: Colors; isDark: boolean;
   onEdit: (ex: Exercise) => void; onDelete: (id: string) => void;
 }) {
+  const { tr } = useI18n();
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
       style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
@@ -605,10 +617,12 @@ const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onD
       </View>
       <TouchableOpacity
         onPress={() => onEdit(ex)}
+        accessibilityRole="button" accessibilityLabel={`${tr.edit}: ${ex.name}`}
         style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <IconSymbol name="pencil" size={15} color={c.sub} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => onDelete(ex.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity onPress={() => onDelete(ex.id)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${ex.name}`}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <IconSymbol name="trash" size={15} color="#EF4444" />
       </TouchableOpacity>
     </BlurView>
@@ -651,6 +665,7 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
   prog: WorkoutProgram; exercises: Exercise[]; c: Colors; isDark: boolean;
   onEdit: (p: WorkoutProgram) => void; onDelete: (p: WorkoutProgram) => void; onStart: (p: WorkoutProgram) => void;
 }) {
+  const { tr } = useI18n();
   const progExs = exercises.filter(e => prog.exerciseIds.includes(e.id));
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
@@ -671,10 +686,12 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
           </View>
           <TouchableOpacity
             onPress={() => onEdit(prog)}
+            accessibilityRole="button" accessibilityLabel={`${tr.edit}: ${prog.name}`}
             style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <IconSymbol name="pencil" size={15} color={c.sub} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => onDelete(prog)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={() => onDelete(prog)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${prog.name}`}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <IconSymbol name="trash" size={15} color="#EF4444" />
           </TouchableOpacity>
         </View>
@@ -723,11 +740,17 @@ export default function WorkoutsScreen() {
   // Палітра мусить бути стабільним обʼєктом: інакше кожен рендер екрана
   // віддавав би мемоізованим рядкам нове посилання, і React.memo не спрацює.
   const c = useMemo(() => makeColors(isDark), [isDark]);
+  const { tr, lang } = useI18n();
+  // Плашка помилки читання спільна для всіх екранів; їй потрібна палітра
+  // здоровʼя, а не локальна палітра тренувань.
+  const noticeColors = useMemo(() => getHealthColors(isDark), [isDark]);
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [programs, setPrograms] = useState<WorkoutProgram[]>([]);
   const [initialized, setInitialized] = useState(false);
+  // ERR-01: читання провалилось — показуємо це, а не порожній список.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'workouts' | 'exercises' | 'programs'>('workouts');
 
@@ -738,13 +761,33 @@ export default function WorkoutsScreen() {
   const [showProgModal, setShowProgModal] = useState(false);
   const [editingProg, setEditingProg] = useState<WorkoutProgram | null>(null);
 
+  /**
+   * ERR-01. Три колекції читаються разом, тож і невдача спільна: досить
+   * одного провалу, щоб автозапис нижче переписав УСІ ТРИ ключі зі свого
+   * (порожнього) стану — саме це й знищувало дані. Тепер провал не вмикає
+   * initialized і показує плашку з повтором.
+   */
   const load = useCallback(async () => {
     const [w, e, p] = await Promise.all([
-      loadData<Workout[]>('workouts', []),
-      loadData<Exercise[]>('exercises', []),
-      loadData<WorkoutProgram[]>('workout_programs', []),
+      loadDataResult<Workout[]>('workouts', []),
+      loadDataResult<Exercise[]>('exercises', []),
+      loadDataResult<WorkoutProgram[]>('workout_programs', []),
     ]);
-    setWorkouts(w); setExercises(e); setPrograms(p);
+    if (!w.ok || !e.ok || !p.ok) { setLoadFailed(true); return false; }
+    setWorkouts(w.value); setExercises(e.value); setPrograms(p.value);
+    setLoadFailed(false);
+    return true;
+  }, []);
+
+  const retryLoad = useCallback(async () => {
+    const [w, e, p] = await Promise.all([
+      retryStorageRead<Workout[]>('workouts', []),
+      retryStorageRead<Exercise[]>('exercises', []),
+      retryStorageRead<WorkoutProgram[]>('workout_programs', []),
+    ]);
+    if (!w.ok || !e.ok || !p.ok) return;
+    setWorkouts(w.value); setExercises(e.value); setPrograms(p.value);
+    setLoadFailed(false); setInitialized(true);
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -753,13 +796,14 @@ export default function WorkoutsScreen() {
     setRefreshing(false);
   }, [load]);
 
-  useEffect(() => { load().then(() => setInitialized(true)); }, [load]);
+  useEffect(() => { load().then(ok => { if (ok) setInitialized(true); }); }, [load]);
 
   useEffect(() => {
     if (!initialized) return;
-    void saveSynced('workouts', workouts);
-    void saveSynced('exercises', exercises);
-    void saveSynced('workout_programs', programs);
+    const warn = (key: string) => (e: unknown) => { if (__DEV__) console.warn(`[workouts] save ${key} failed:`, e); };
+    void saveSynced('workouts', workouts).catch(warn('workouts'));
+    void saveSynced('exercises', exercises).catch(warn('exercises'));
+    void saveSynced('workout_programs', programs).catch(warn('workout_programs'));
   }, [workouts, exercises, programs, initialized]);
 
   const scheduleNotifs = useCallback(async (prog: WorkoutProgram): Promise<string[]> => {
@@ -1066,8 +1110,16 @@ export default function WorkoutsScreen() {
         <View style={contentWidth}>
           {/* Header */}
           <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            {/* NAT-18: у дереві доступності кнопка була 20×20 (з hitSlop 8 —
+                36×36), найменша ціль у застосунку при нормі Apple 44×44, ще й
+                без імені («Back» англійською). Рамка 36×36 + hitSlop {10,4},
+                як у спільному ScreenHeader, дає рівно 44×44. */}
+            <TouchableOpacity
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel={tr.back}
+              style={{ width: 36, height: 36, marginRight: 8, alignItems: 'center', justifyContent: 'center' }}
+              hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}>
               <IconSymbol name="chevron.left" size={20} color={c.text} />
             </TouchableOpacity>
             <Text style={{ fontSize: 24, fontWeight: '800', color: c.text, letterSpacing: -0.5, flex: 1 }}>
@@ -1075,6 +1127,8 @@ export default function WorkoutsScreen() {
             </Text>
             <TouchableOpacity
               onPress={() => setShowStats(true)}
+              accessibilityRole="button"
+              accessibilityLabel={tr.statistics}
               style={{
                 width: 36, height: 36, borderRadius: 12,
                 backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
@@ -1108,8 +1162,13 @@ export default function WorkoutsScreen() {
           data={rows}
           keyExtractor={rowKey}
           renderItem={renderRow}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={listEmpty}
+          ListHeaderComponent={
+            <>
+              {loadFailed && <LoadErrorNotice lang={lang} c={noticeColors} isDark={isDark} onRetry={() => { void retryLoad(); }} />}
+              {listHeader}
+            </>
+          }
+          ListEmptyComponent={loadFailed ? null : listEmpty}
           contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}

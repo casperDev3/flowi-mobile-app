@@ -1,0 +1,18 @@
+# A11Y-08 — стрілки місяця 36x36 + hitSlop 4 = 44x44 за HIG.
+# Тапаємо на 3pt ЗОВНІ видимої іконки: до правки тут був промах.
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "30%,94%"
+- waitForAnimationToEnd
+- tapOn:
+    point: "79%,11%"        # кнопка календаря в шапці
+- waitForAnimationToEnd
+- assertVisible: ".*Вересень.*"
+- tapOn:
+    point: "4%,75%"         # ← 3pt ЛІВІШЕ видимої стрілки «Back» @(20,640) 36x36
+- waitForAnimationToEnd
+- assertVisible: ".*Серпень.*"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/hs-02-prevmonth

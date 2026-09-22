@@ -15,10 +15,12 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 
-export type TaskDetailTab = 'info' | 'timer' | 'history';
+export type TaskDetailTab = 'info' | 'timer' | 'history' | 'comments';
 
-const TABS: readonly TaskDetailTab[] = ['info', 'timer', 'history'];
+const BASE_TABS: readonly TaskDetailTab[] = ['info', 'timer', 'history'];
 const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
+/** Праворуч від неї одразу ✕ — горизонтальний запас менший, щоб зони не перекривались. */
+const HIT_COPY = { top: 10, bottom: 10, left: 10, right: 6 };
 
 export interface TaskDetailHeaderProps {
   title: string;
@@ -32,17 +34,24 @@ export interface TaskDetailHeaderProps {
   onTabChange: (tab: TaskDetailTab) => void;
   /** Крапка на вкладці «Трекер», коли таймер задачі йде. */
   timerRunning: boolean;
-  onEdit: () => void;
+  /** Відсутній — ✎ не малюється (contract §4.1: глядач не редагує проєктну задачу). */
+  onEdit?: () => void;
   onClose: () => void;
+  /** Копіювати завдання як Markdown. Без нього кнопки немає. */
+  onCopy?: () => void;
   /** Показувати «ручку» листа (лише на вузькому екрані). */
   showHandle: boolean;
+  /** Вкладка «Коментарі» (contract §4.4) — лише для задач проєкту (є `projectId`). */
+  showComments?: boolean;
   colors: { text: string; sub: string; border: string; dim: string; accent: string };
-  tr: Pick<Translations, 'details' | 'tracker' | 'history' | 'edit' | 'close' | 'editTask'>;
+  tr: Pick<Translations, 'details' | 'tracker' | 'history' | 'edit' | 'close' | 'editTask' | 'copyTask' | 'commentsTitle'>;
 }
 
 export function TaskDetailHeader({
-  title, badge, leading, editing, tab, onTabChange, timerRunning, onEdit, onClose, showHandle, colors: c, tr,
+  title, badge, leading, editing, tab, onTabChange, timerRunning, onEdit, onClose, onCopy, showHandle,
+  showComments, colors: c, tr,
 }: TaskDetailHeaderProps) {
+  const TABS: readonly TaskDetailTab[] = showComments ? [...BASE_TABS, 'comments'] : BASE_TABS;
   return (
     <View style={st.wrap}>
       {showHandle ? <View style={[st.handle, { backgroundColor: c.border }]} /> : null}
@@ -51,7 +60,7 @@ export function TaskDetailHeader({
         {/* Місце під ✎ тримається й під час редагування: інакше назва
             стрибала б ліворуч щоразу, коли відкривається форма. */}
         <View style={st.sideBtn}>
-          {!editing ? (
+          {!editing && onEdit ? (
             <TouchableOpacity
               onPress={onEdit}
               hitSlop={HIT}
@@ -73,7 +82,20 @@ export function TaskDetailHeader({
           {!editing && badge ? <View style={st.badge}>{badge}</View> : null}
         </View>
 
-        <View style={[st.sideBtn, { alignItems: 'flex-end' }]}>
+        <View style={st.trailing}>
+          {/* Копіювання — поруч із ✕, а не з ✎: ліва кнопка змінює завдання,
+              права група нічого в ньому не чіпає. Під час редагування
+              ховається — копіювати незбережену форму означало б копіювати
+              не те, що лежить у завданні. */}
+          {onCopy && !editing ? (
+            <TouchableOpacity
+              onPress={onCopy}
+              hitSlop={HIT_COPY}
+              accessibilityRole="button"
+              accessibilityLabel={tr.copyTask}>
+              <IconSymbol name="doc.on.doc" size={16} color={c.sub} />
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             onPress={onClose}
             hitSlop={HIT}
@@ -96,12 +118,17 @@ export function TaskDetailHeader({
                 accessibilityState={{ selected: active }}
                 style={[st.tab, { backgroundColor: active ? c.accent : 'transparent' }]}>
                 <IconSymbol
-                  name={key === 'info' ? 'list.bullet' : key === 'timer' ? 'timer' : 'clock.arrow.circlepath'}
+                  name={
+                    key === 'info' ? 'list.bullet'
+                      : key === 'timer' ? 'timer'
+                      : key === 'comments' ? 'bubble.left.and.bubble.right.fill'
+                      : 'clock.arrow.circlepath'
+                  }
                   size={12}
                   color={active ? '#fff' : c.sub}
                 />
                 <Text style={{ color: active ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }}>
-                  {key === 'info' ? tr.details : key === 'timer' ? tr.tracker : tr.history}
+                  {key === 'info' ? tr.details : key === 'timer' ? tr.tracker : key === 'comments' ? tr.commentsTitle : tr.history}
                 </Text>
                 {key === 'timer' && timerRunning ? (
                   <View style={[st.runDot, { backgroundColor: active ? '#fff' : '#6366F1' }]} />
@@ -120,6 +147,7 @@ const st = StyleSheet.create({
   handle:   { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
   sideBtn:  { width: 28, paddingTop: 3 },
+  trailing: { minWidth: 28, paddingTop: 3, flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
   titleBox: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', marginHorizontal: 6 },
   leading:  { marginRight: 10, marginTop: 1 },
   title:    { flex: 1, fontSize: 18, fontWeight: '700', lineHeight: 24 },

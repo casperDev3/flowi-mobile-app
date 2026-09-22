@@ -1,0 +1,10 @@
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "30%,94%"
+- waitForAnimationToEnd
+- tapOn: "Режим календаря"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/P11-calmode

@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,40 +12,66 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { cancelMedReminders, scheduleMedReminders } from '@/store/notifications';
-import { loadData } from '@/store/storage';
+import { loadDataResult, retryStorageRead } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { Events, track } from '@/utils/analytics';
 import { HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
 import { MEDS_KEY, Medication, genId, medAdherence, medTakenToday, parseTimes } from '@/utils/preventionUtils';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
+import { LoadErrorNotice, ReminderBlockedNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
 
 const ACC = HEALTH_ACCENTS.prevention;
 
 export default function MedsScreen() {
   const contentWidth = useContentWidth();
+  const sheetSurface = useSheetSurface();
+  const sheetScreenMinHeight = useSheetScreenMinHeight();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const c = getHealthColors(isDark);
   useScreenView('health_meds');
 
   const [meds, setMeds] = useState<Medication[]>([]);
   const [initialized, setInitialized] = useState(false);
+  // ERR-01: поки читання провалене, initialized лишається false — автозапис
+  // порожнього масиву поверх нечитаних даних заборонено.
+  const [loadFailed, setLoadFailed] = useState(false);
+  // ERR-10: scheduleMedReminders віддав [] — ліки збережено БЕЗ нагадувань.
+  const [reminderBlocked, setReminderBlocked] = useState(false);
   const [add, setAdd] = useState(false);
   const [name, setName] = useState('');
   const [dose, setDose] = useState('');
   const [times, setTimes] = useState('08:00');
   const canCreate = name.trim().length > 0 && parseTimes(times).length > 0;
 
-  useEffect(() => { loadData<Medication[]>(MEDS_KEY, []).then(d => { setMeds(d); setInitialized(true); }); }, []);
-  useEffect(() => { if (initialized) void saveSynced(MEDS_KEY, meds); }, [meds, initialized]);
+  useEffect(() => {
+    loadDataResult<Medication[]>(MEDS_KEY, []).then(r => {
+      if (r.ok) { setMeds(r.value); setInitialized(true); }
+      else setLoadFailed(true);
+    });
+  }, []);
+
+  const retryLoad = async () => {
+    const r = await retryStorageRead<Medication[]>(MEDS_KEY, []);
+    if (r.ok) { setMeds(r.value); setLoadFailed(false); setInitialized(true); }
+  };
+
+  useEffect(() => {
+    if (!initialized) return;
+    void saveSynced(MEDS_KEY, meds).catch(e => { if (__DEV__) console.warn('[meds] save failed:', e); });
+  }, [meds, initialized]);
 
   const create = async () => {
     const t = parseTimes(times);
     if (!name.trim() || !t.length) return;
     const id = genId();
+    // ERR-10: порожній масив — це відмова планувальника (вимкнені сповіщення
+    // або не дано дозвіл), а не «нагадувань не просили». Раніше він мовчки
+    // лягав у запис, і ліки виглядали як такі, що дзвонитимуть о 08:00.
     const notifIds = await scheduleMedReminders(id, t, `💊 ${name.trim()}`, tr.takeNow);
+    setReminderBlocked(notifIds.length === 0);
     const med: Medication = {
       id, name: name.trim(), dose: dose.trim() || undefined, times: t,
       startDate: new Date().toISOString(), active: true, log: [], notifIds, createdAt: new Date().toISOString(),
@@ -58,20 +84,30 @@ export default function MedsScreen() {
   const take = (id: string) =>
     setMeds(p => p.map(m => m.id === id ? { ...m, log: [...m.log, { date: new Date().toISOString(), takenAt: new Date().toISOString() }] } : m));
 
-  const remove = async (m: Medication) => { await cancelMedReminders(m.notifIds); setMeds(p => p.filter(x => x.id !== m.id)); };
+  // Скасовуємо за ДЕТЕРМІНОВАНИМИ id, а не лише за m.notifIds: поле локальне
+  // для пристрою і після синку з іншого пристрою його може не бути взагалі,
+  // тоді як нотифікація в ОС стоїть і далі дзвонить (DI-05).
+  const medNotifIds = (m: Medication) => (m.notifIds?.length ? m.notifIds : m.times.map((_, i) => `med_${m.id}_${i}`));
+
+  const remove = async (m: Medication) => { await cancelMedReminders(medNotifIds(m)); setMeds(p => p.filter(x => x.id !== m.id)); };
 
   const toggleActive = async (m: Medication) => {
     if (m.active) {
-      await cancelMedReminders(m.notifIds);
+      await cancelMedReminders(medNotifIds(m));
       setMeds(p => p.map(x => x.id === m.id ? { ...x, active: false, notifIds: [] } : x));
     } else {
       const ids = await scheduleMedReminders(m.id, m.times, `💊 ${m.name}`, tr.takeNow);
+      // ERR-10: «активне» без жодного запланованого нагадування — обіцянка,
+      // якої застосунок не виконає; кажемо це вголос.
+      setReminderBlocked(ids.length === 0);
       setMeds(p => p.map(x => x.id === m.id ? { ...x, active: true, notifIds: ids } : x));
     }
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    // NAT-14: formSheet не дає кореню визначеної висоти — без minHeight
+    // `flex: 1` схлопується до висоти вмісту, і низ аркуша лишається прозорим.
+    <View style={{ flex: 1, minHeight: sheetScreenMinHeight }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={s.header}>
@@ -85,7 +121,13 @@ export default function MedsScreen() {
         </View>
 
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
-          {meds.length === 0 ? (
+          {loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={retryLoad} />}
+          {reminderBlocked && (
+            <ReminderBlockedNotice lang={lang} c={c} isDark={isDark}
+              onOpenSettings={() => { void Linking.openSettings(); }}
+              onDismiss={() => setReminderBlocked(false)} />
+          )}
+          {loadFailed ? null : meds.length === 0 ? (
             <Empty c={c} text={tr.medsSub} />
           ) : meds.map(m => {
             const taken = medTakenToday(m); const total = m.times.length; const done = taken >= total;
@@ -124,9 +166,9 @@ export default function MedsScreen() {
 
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessibilityViewIsModal importantForAccessibility="yes">
-              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setAdd(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addMed}</Text>
                 <Field label={tr.medName} value={name} onChange={setName} placeholder="Вітамін D" autoFocus c={c} />
@@ -158,8 +200,10 @@ const s = StyleSheet.create({
   smallBtn:  { borderRadius: 9, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
   takeBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: 9, paddingHorizontal: 12, paddingVertical: 6 },
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
-  sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
+  sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти — числом із useSheetSurface(); відсоток тут не працював
+  // (батько має height:auto), і кнопка «Зберегти» лишалась за краєм вікна.
+  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
   sheetTitle:{ fontSize: 20, fontWeight: '800', marginBottom: 6 },
   btn:       { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 });

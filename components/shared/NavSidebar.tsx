@@ -20,7 +20,7 @@
  * діагоналі.
  */
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,11 +28,12 @@ import { ActiveTimersSidebarCard } from '@/components/time/ActiveTimersSidebarCa
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   DEFAULT_COLLAPSED_GROUP_IDS,
-  NAV_GROUPS,
   SIDEBAR_WIDTH,
   isGroupCollapsed,
   isRouteActive,
+  navGroupsFor,
 } from '@/constants/nav';
+import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
 
@@ -46,6 +47,11 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tr } = useI18n();
+  const { user } = useAuth();
+
+  // «Адміністрування workspace» — лише адміну, у групі «Особисте» (та сама
+  // умова й те саме місце, що на вебі — див. constants/nav.ts).
+  const navGroups = useMemo(() => navGroupsFor(!!user?.isAdmin), [user?.isAdmin]);
 
   const [collapsed, setCollapsed] = useState<readonly string[]>(DEFAULT_COLLAPSED_GROUP_IDS);
 
@@ -84,7 +90,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
       <Text style={[st.brand, { color: c.accent }]}>Flowi</Text>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-        {NAV_GROUPS.map((group, gi) => {
+        {navGroups.map((group, gi) => {
           const hidden = isGroupCollapsed(group, collapsed, pathname);
           // Заголовок групи, яку можна згорнути, — кнопка; решта лишається
           // звичайним підписом, щоб не обіцяти дію, якої немає.

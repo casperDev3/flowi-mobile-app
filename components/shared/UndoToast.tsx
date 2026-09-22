@@ -7,6 +7,7 @@
  * API:
  *   const { show: showUndo, element: undoElement } = useUndoToast(isTab);
  *   showUndo('Завдання виконано', () => { ... });
+ *   showUndo('Скопійовано');   // без onUndo — коротке підтвердження без кнопки
  *   // У JSX: <View style={{ flex: 1 }}>{undoElement}</View>
  */
 
@@ -15,19 +16,29 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useI18n } from '@/store/i18n';
 
 // ─── Тривалість показу ───────────────────────────────────────────────────────
 const TOAST_DURATION_MS = 4000;
+/** Тост без «Скасувати» (напр. «Скопійовано») — лише підтвердження, довше не треба. */
+const INFO_TOAST_DURATION_MS = 1800;
 const ANIM_DURATION_MS = 200;
+/**
+ * Наскільки тост «виїжджає» знизу. Виділено в константу, бо при ввімкненому
+ * «Зменшенні руху» саме цей зсув і прибирається: фейд лишається (Apple сама
+ * рекомендує cross-fade як заміну руху), а переміщення — ні.
+ */
+const TOAST_TRAVEL_PT = 20;
 
 interface ToastData {
   message: string;
-  onUndo: () => void;
+  /** Без onUndo тост лише підтверджує дію — кнопки «Скасувати» немає. */
+  onUndo?: () => void;
 }
 
 interface UndoToastApi {
-  show: (message: string, onUndo: () => void) => void;
+  show: (message: string, onUndo?: () => void) => void;
   element: React.ReactElement;
 }
 
@@ -37,11 +48,12 @@ interface UndoToastApi {
 export function useUndoToast(isTab = true): UndoToastApi {
   const { tr } = useI18n();
   const isDark = useColorScheme() === 'dark';
+  const reduced = useReduceMotion();
 
   const [toastData, setToastData] = useState<ToastData | null>(null);
 
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
+  const translateY = useRef(new Animated.Value(TOAST_TRAVEL_PT)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onUndoRef = useRef<(() => void) | null>(null);
 
@@ -53,32 +65,39 @@ export function useUndoToast(isTab = true): UndoToastApi {
   }, []);
 
   const hide = useCallback(() => {
-    Animated.parallel([
+    const anims = [
       Animated.timing(opacity, { toValue: 0, duration: ANIM_DURATION_MS, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 20, duration: ANIM_DURATION_MS, useNativeDriver: true }),
-    ]).start(({ finished }) => {
+    ];
+    if (!reduced) {
+      anims.push(Animated.timing(translateY, { toValue: TOAST_TRAVEL_PT, duration: ANIM_DURATION_MS, useNativeDriver: true }));
+    }
+    Animated.parallel(anims).start(({ finished }) => {
       if (finished) setToastData(null);
     });
-  }, [opacity, translateY]);
+  }, [opacity, translateY, reduced]);
 
-  const show = useCallback((message: string, onUndo: () => void) => {
+  const show = useCallback((message: string, onUndo?: () => void) => {
     // Скидаємо попередній таймер
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    onUndoRef.current = onUndo;
+    onUndoRef.current = onUndo ?? null;
 
     // Оновлюємо дані та показуємо анімацію
     setToastData({ message, onUndo });
     opacity.setValue(0);
-    translateY.setValue(20);
+    // При Reduce Motion тост одразу стоїть на місці — з'являється лише фейдом.
+    translateY.setValue(reduced ? 0 : TOAST_TRAVEL_PT);
 
-    Animated.parallel([
+    const anims = [
       Animated.timing(opacity, { toValue: 1, duration: ANIM_DURATION_MS, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 0, duration: ANIM_DURATION_MS, useNativeDriver: true }),
-    ]).start();
+    ];
+    if (!reduced) {
+      anims.push(Animated.timing(translateY, { toValue: 0, duration: ANIM_DURATION_MS, useNativeDriver: true }));
+    }
+    Animated.parallel(anims).start();
 
-    timerRef.current = setTimeout(hide, TOAST_DURATION_MS);
-  }, [opacity, translateY, hide]);
+    timerRef.current = setTimeout(hide, onUndo ? TOAST_DURATION_MS : INFO_TOAST_DURATION_MS);
+  }, [opacity, translateY, hide, reduced]);
 
   const handleUndo = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -110,6 +129,7 @@ export function useUndoToast(isTab = true): UndoToastApi {
         <Text style={[st.message, { color: c.text }]} numberOfLines={1}>
           {toastData.message}
         </Text>
+        {toastData.onUndo ? (
         <TouchableOpacity
           onPress={handleUndo}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -118,6 +138,7 @@ export function useUndoToast(isTab = true): UndoToastApi {
         >
           <Text style={[st.undoBtn, { color: c.accent }]}>{tr.undo}</Text>
         </TouchableOpacity>
+        ) : null}
       </BlurView>
     </Animated.View>
   ) : <></>;

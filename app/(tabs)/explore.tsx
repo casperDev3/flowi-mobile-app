@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
   Modal,
+  Alert,
   Platform,
   Pressable,
   FlatList,
@@ -19,6 +20,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FinanceSummary, KIND_COLOR, KIND_ICON } from '@/components/finance/FinanceSummary';
+import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
+import { createSheetHandoff, openAfterModalExit } from '@/components/finance/sheetHandoff';
 import { UpcomingPaymentsCard, useUpcomingPayments } from '@/components/finance/UpcomingPaymentsCard';
 import { TransactionGroup } from '@/components/finance/TransactionGroup';
 import { MonthPicker } from '@/components/shared/MonthPicker';
@@ -32,13 +35,13 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
-import { loadData } from '@/store/storage';
+import { loadDataResult, retryStorageRead } from '@/store/storage';
 import {
   CategoryRow,
   categoryMapToRows,
   categoryRowsToMap,
 } from '@/store/migrations';
-import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
+import { saveSynced, saveSyncedValue, updateSynced } from '@/store/synced-storage';
 import {
   filterByMonth, groupTransactions, mergeTransactionsForSave, resolveAccountFilter,
   calcTotalsByCurrency, formatCurrency,
@@ -46,11 +49,12 @@ import {
   type Currency, type Transaction, type TxHistoryEvent,
 } from '@/utils/financeUtils';
 import {
-  accountBalance, accountById, accountIdForLegacyTx, activeAccounts, creditedAmount,
+  accountById, accountIdForLegacyTx, activeAccounts, creditedAmount,
   defaultAccountId, isTransfer, markTransferTargets, mergeAccountsForSave,
-  resolveTxCurrency, transferRate,
+  findTransferPairCandidate, markAsTransferAccounts, reconciledOpeningBalance, resolveTxCurrency, transferRate,
   ACCOUNT_KINDS, type Account, type AccountKind,
 } from '@/utils/accounts';
+import { financeOverview } from '@/utils/financeOverview';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useMotion } from '@/hooks/use-motion';
 import { isSameDay } from '@/utils/dateUtils';
@@ -133,11 +137,26 @@ export default function FinanceScreen() {
   const DEFAULT_CATEGORIES = lang === 'uk' ? DEFAULT_CATEGORIES_UK : DEFAULT_CATEGORIES_EN;
   const MONTHS_UA = tr.months;
   const WEEKDAYS_SHORT = tr.weekdays;
-  const fmtCur = (n: number, cur: Currency) => formatCurrency(n, cur, locale);
+  /**
+   * PERF-4. Нова функція щорендера — нові пропси в КОЖНІЙ групі стрічки, тож
+   * мемоізація TransactionGroup зносилась на кожну натиснуту клавішу в полі
+   * суми (форма живе в цьому ж компоненті).
+   */
+  const fmtCur = useCallback(
+    (n: number, cur: Currency) => formatCurrency(n, cur, locale),
+    [locale],
+  );
   const motion = useMotion();
   const now = new Date();
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [initialized, setInitialized] = useState(false);
+  /**
+   * ERR-01. Читання провалилось — це НЕ порожній екран. Доки прапорець
+   * піднятий, `initialized` лишається false, тобто ефект-дзеркало не запише
+   * порожній стан поверх цілих даних (а шар сховища такий запис ще й
+   * відхилить StorageWriteBlockedError).
+   */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [filter, setFilter] = useState<'all' | CatType>('all');
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
   const [activeMonth, setActiveMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
@@ -157,6 +176,19 @@ export default function FinanceScreen() {
   const catType: CatType = txType === 'income' ? 'income' : 'expense';
   /** Підставляємо у наступну операцію той рахунок, з якого щойно платили. */
   const lastAccountRef = useRef<string | undefined>(undefined);
+  /**
+   * Черга «закрити цей аркуш → відкрити наступний» (NAT-02). Дві модалки,
+   * перемкнуті в одному тіку, лишали на екрані невидимий модальний шар, після
+   * якого Фінанси переставали приймати дотики до перезапуску застосунку.
+   * Див. components/finance/sheetHandoff.ts.
+   */
+  const sheetHandoff = useRef(createSheetHandoff()).current;
+  /**
+   * Чернетка операції, перервана походом по перший рахунок: аркуш операції
+   * закрився, але поля НЕ скидаємо — повернемось у них, щойно рахунок буде
+   * створено. Саме втрату введеної суми й категорії описує NAT-02.
+   */
+  const txDraftPausedRef = useRef(false);
   const [showMenu, setShowMenu] = useState(false);
   const [compact, setCompact] = useState(false);
 
@@ -191,6 +223,8 @@ export default function FinanceScreen() {
   // Форма рахунку живе всередині аркуша рахунків, а не окремим аркушем:
   // два bottom-sheet одночасно на iOS закривають один одного.
   const [accForm, setAccForm] = useState<AccountDraft | null>(null);
+  const [reconcileActual, setReconcileActual] = useState('');
+  const [reconcileNote, setReconcileNote] = useState<string | null>(null);
   /** Транзакція, яку перетворюємо на переказ (старі дані лежать парами). */
   const [markTxId, setMarkTxId] = useState<string | null>(null);
   const [markTargetId, setMarkTargetId] = useState<string | null>(null);
@@ -221,23 +255,34 @@ export default function FinanceScreen() {
    */
   const seenTxIds = useRef<Set<string>>(new Set());
 
-  const loadTxs = useCallback(async () => {
-    const data = await loadData<Transaction[]>('transactions', []);
-    const list = Array.isArray(data) ? data : [];
+  /** true — прочитали; false — сховище віддало помилку (а не порожнечу). */
+  const loadTxs = useCallback(async (retry = false) => {
+    const r = retry
+      ? await retryStorageRead<Transaction[]>('transactions', [])
+      : await loadDataResult<Transaction[]>('transactions', []);
+    if (!r.ok) return false;
+    const list = Array.isArray(r.value) ? r.value : [];
     seenTxIds.current = new Set(list.map(t => t.id));
     setTxs(list);
+    return true;
   }, []);
 
-  const loadAccounts = useCallback(async () => {
-    const data = await loadData<Account[]>('accounts', []);
-    setAccounts(Array.isArray(data) ? data : []);
+  const loadAccounts = useCallback(async (retry = false) => {
+    const r = retry
+      ? await retryStorageRead<Account[]>('accounts', [])
+      : await loadDataResult<Account[]>('accounts', []);
+    if (!r.ok) return false;
+    setAccounts(Array.isArray(r.value) ? r.value : []);
+    return true;
   }, []);
 
   // Load from storage — useFocusEffect ensures reload after data import or navigation
   const [txsInitialized, setTxsInitialized] = useState(false);
   useFocusEffect(useCallback(() => {
     if (!txsInitialized) {
-      Promise.all([loadTxs(), loadAccounts()]).then(() => {
+      Promise.all([loadTxs(), loadAccounts()]).then(([okTxs, okAccounts]) => {
+        // Автозапис вмикаємо, лише коли ОБИДВА ключі справді прочитані.
+        if (!okTxs || !okAccounts) { setLoadFailed(true); return; }
         setTxsInitialized(true);
         setInitialized(true);
         setAccountsInitialized(true);
@@ -250,6 +295,19 @@ export default function FinanceScreen() {
 
   const reloadFromStorage = useCallback(async () => {
     await Promise.all([loadTxs(), loadAccounts()]);
+  }, [loadTxs, loadAccounts]);
+
+  /**
+   * «Повторити» на плашці збою. Без цього виклику ключ лишається заблокованим
+   * на запис до перезапуску застосунку — позначку знімає лише retryStorageRead.
+   */
+  const retryLoad = useCallback(async () => {
+    const [okTxs, okAccounts] = await Promise.all([loadTxs(true), loadAccounts(true)]);
+    if (!okTxs || !okAccounts) return;
+    setLoadFailed(false);
+    setTxsInitialized(true);
+    setInitialized(true);
+    setAccountsInitialized(true);
   }, [loadTxs, loadAccounts]);
 
   const onRefresh = useCallback(async () => {
@@ -272,17 +330,7 @@ export default function FinanceScreen() {
    */
   const trackWrite = useStorageRefresh(REFRESH_KEYS, reloadFromStorage, txsInitialized);
 
-  // Open add-transaction modal when navigated with ?create=1 (e.g. from Today quick actions)
   const { create: createParam } = useLocalSearchParams<{ create?: string }>();
-  useEffect(() => {
-    if (createParam === '1') {
-      openAdd();
-      router.setParams({ create: '' });
-    }
-    // openAdd навмисно не в залежностях: він перестворюється щорендера, і
-    // форма відкривалася б знову після кожної правки полів.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createParam]);
 
   /**
    * Операції записуємо, доливши те, що з'явилось у сховищі повз екран.
@@ -296,15 +344,13 @@ export default function FinanceScreen() {
    */
   const persistTxs = useCallback(async (next: Transaction[]) => {
     const merged = await trackWrite(async () => {
-      const stored = await loadData<Transaction[]>('transactions', []);
-      const result = mergeTransactionsForSave(
-        Array.isArray(stored) ? stored : [],
-        next,
-        seenTxIds.current,
-      );
-      seenTxIds.current = new Set(result.map(t => t.id));
-      await saveSynced('transactions', result);
-      return result;
+      // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+      // ними інакше пішов би на сервер як DELETE.
+      return updateSynced<Transaction>('transactions', stored => {
+        const result = mergeTransactionsForSave(stored, next, seenTxIds.current);
+        seenTxIds.current = new Set(result.map(t => t.id));
+        return result;
+      });
     });
     // Долите має стати видимим — повторний прохід ефекту вже нічого не долиє,
     // тож циклу немає.
@@ -322,21 +368,28 @@ export default function FinanceScreen() {
   // Load categories. У сховищі — пласкі рядки {id, type, name, icon}, екран
   // працює зі звичною мапою за типом; конвертуємо на межі.
   useEffect(() => {
-    loadData<CategoryRow[]>('categories', []).then(data => {
-      setCats(categoryRowsToMap(Array.isArray(data) ? data : [], DEFAULT_CATEGORIES));
+    loadDataResult<CategoryRow[]>('categories', []).then(r => {
+      // Провал читання НЕ вмикає catsInitialized: інакше наступний ефект
+      // записав би дефолтні категорії поверх власних (ERR-01).
+      if (!r.ok) return;
+      setCats(categoryRowsToMap(Array.isArray(r.value) ? r.value : [], DEFAULT_CATEGORIES));
       setCatsInitialized(true);
     });
   }, []);
 
   // Save categories
   useEffect(() => {
-    if (catsInitialized) void saveSynced('categories', categoryMapToRows(cats));
+    if (catsInitialized) {
+      void saveSynced('categories', categoryMapToRows(cats))
+        .catch(e => { if (__DEV__) console.warn('[finance] запис категорій не вдався:', e); });
+    }
   }, [cats, catsInitialized]);
 
   // Load custom currencies
   useEffect(() => {
-    loadData<Currency[]>('finance_currencies', []).then(data => {
-      setCustomCurrencies(Array.isArray(data) ? data : []);
+    loadDataResult<Currency[]>('finance_currencies', []).then(r => {
+      if (!r.ok) return;
+      setCustomCurrencies(Array.isArray(r.value) ? r.value : []);
       setCurrenciesInitialized(true);
     });
   }, []);
@@ -345,7 +398,8 @@ export default function FinanceScreen() {
   // офлайн додали ту саму валюту, мусять зійтись в один запис.
   useEffect(() => {
     if (currenciesInitialized) {
-      void saveSynced('finance_currencies', customCurrencies.map(c => ({ ...c, id: c.code })));
+      void saveSynced('finance_currencies', customCurrencies.map(c => ({ ...c, id: c.code })))
+        .catch(e => { if (__DEV__) console.warn('[finance] запис валют не вдався:', e); });
     }
   }, [customCurrencies, currenciesInitialized]);
 
@@ -359,10 +413,7 @@ export default function FinanceScreen() {
    */
   const persistAccounts = useCallback(async (next: Account[]) => {
     const merged = await trackWrite(async () => {
-      const stored = await loadData<Account[]>('accounts', []);
-      const result = mergeAccountsForSave(Array.isArray(stored) ? stored : [], next);
-      await saveSynced('accounts', result);
-      return result;
+      return updateSynced<Account>('accounts', stored => mergeAccountsForSave(stored, next));
     });
     // Долиті рахунки мають стати видимими — і повторний прохід ефекту вже
     // нічого не долиє, тож циклу немає.
@@ -378,13 +429,17 @@ export default function FinanceScreen() {
 
   // Load / save primary currency
   useEffect(() => {
-    loadData<string>('finance_primary_currency', 'UAH').then(code => {
-      setPrimaryCurrency(typeof code === 'string' && code ? code : 'UAH');
+    loadDataResult<string>('finance_primary_currency', 'UAH').then(r => {
+      if (!r.ok) return;
+      setPrimaryCurrency(typeof r.value === 'string' && r.value ? r.value : 'UAH');
       setPrimaryCurrencyInitialized(true);
     });
   }, []);
   useEffect(() => {
-    if (primaryCurrencyInitialized) void saveSyncedValue('finance_primary_currency', primaryCurrency);
+    if (primaryCurrencyInitialized) {
+      void saveSyncedValue('finance_primary_currency', primaryCurrency)
+        .catch(e => { if (__DEV__) console.warn('[finance] запис основної валюти не вдався:', e); });
+    }
   }, [primaryCurrency, primaryCurrencyInitialized]);
 
   const addInlineCurrency = () => {
@@ -403,10 +458,14 @@ export default function FinanceScreen() {
     setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol('');
   };
 
-  const getCatIcon = (catName: string, type: CatType): IconSymbolName =>
-    cats[type].find(c => c.name === catName)?.icon ??
-    DEFAULT_CATEGORIES[type].find(c => c.name === catName)?.icon ??
-    (type === 'income' ? 'arrow.up.trend' : 'arrow.down.trend');
+  /** PERF-4: те саме, що й з fmtCur — проп кожної групи стрічки. */
+  const getCatIcon = useCallback(
+    (catName: string, type: CatType): IconSymbolName =>
+      cats[type].find(c => c.name === catName)?.icon ??
+      DEFAULT_CATEGORIES[type].find(c => c.name === catName)?.icon ??
+      (type === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'),
+    [cats, DEFAULT_CATEGORIES],
+  );
 
   const addCategory = () => {
     const trimmed = newCatName.trim();
@@ -445,11 +504,23 @@ export default function FinanceScreen() {
     setAccountFilter(prev => resolveAccountFilter(prev, visibleAccounts.map(a => a.id)));
   }, [visibleAccounts]);
 
-  const accountBalances = useMemo(() => {
-    const out: Record<string, number> = {};
-    accounts.forEach(a => { out[a.id] = accountBalance(a, txs); });
-    return out;
-  }, [accounts, txs]);
+  /**
+   * Баланси, «Разом» по валютах і розклад «Звідки ця сума» — з ТОГО САМОГО
+   * financeOverview, що й плитка «Сьогодні»: два екрани більше не рахують
+   * «баланс» кожен по-своєму (utils/financeOverview.ts).
+   */
+  const overview = useMemo(
+    () => financeOverview({ txs, accounts, primary: primaryCurrency, now: new Date() }),
+    [txs, accounts, primaryCurrency],
+  );
+  const accountBalances = overview.balances;
+  /** Фільтр стрічки «лише операції без рахунку» — з попередження над рахунками. */
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
+  const unassignedIds = useMemo(() => new Set(overview.unassigned.ids), [overview.unassigned.ids]);
+  useEffect(() => {
+    if (overview.unassigned.count === 0) setUnassignedOnly(false);
+  }, [overview.unassigned.count]);
+
 
   /** Переказ належить обом рахункам: і тому, з якого пішов, і тому, куди прийшов. */
   const touchesAccount = useCallback(
@@ -467,16 +538,18 @@ export default function FinanceScreen() {
     [txs, accountFilter, touchesAccount],
   );
   const totalsByCurrency = useMemo(
-    () => calcTotalsByCurrency(totalsSource, activeMonth),
-    [totalsSource, activeMonth],
+    // Валюта — за РАХУНКОМ (resolveTxCurrency), як і на плитці «Сьогодні».
+    () => calcTotalsByCurrency(totalsSource, activeMonth, t => resolveTxCurrency(t, accounts)),
+    [totalsSource, activeMonth, accounts],
   );
 
   const filtered = useMemo(() => monthTxs.filter(t => {
     if (filter !== 'all' && t.type !== filter) return false;
+    if (unassignedOnly && !unassignedIds.has(t.id)) return false;
     if (accountFilter && !touchesAccount(t, accountFilter)) return false;
     if (dateFilter && !isSameDay(new Date(t.date), dateFilter)) return false;
     return true;
-  }), [monthTxs, filter, accountFilter, dateFilter, touchesAccount]);
+  }), [monthTxs, filter, accountFilter, dateFilter, touchesAccount, unassignedOnly, unassignedIds]);
 
   /** У віртуалізованому списку елементи монтуються заново при прокрутці. */
   const animatedGroups = useRef<Set<string>>(new Set());
@@ -543,31 +616,68 @@ export default function FinanceScreen() {
     return parts.length ? parts.join(' · ') : tr.transactionEdited;
   };
 
-  /** Відкрити чисту форму. Без цього наступний «+» відкривався б із чужими даними. */
-  const openAdd = (mode: FormType = 'expense') => {
+  /**
+   * Відкрити чисту форму. Без цього наступний «+» відкривався б із чужими
+   * даними. useCallback — не косметика: функція йде в шапку стрічки, і нова
+   * ідентичність щорендера робила б мемоізацію шапки безглуздою (PERF-4).
+   */
+  const openAdd = useCallback((mode: FormType = 'expense') => {
     setEditingId(null);
     setTxType(mode);
     setAmount(''); setCategory(''); setNote(''); setToAmount('');
     setFormAccountId(defaultAccountId(accounts, lastAccountRef.current));
     setFormToAccountId(null);
     setShowAdd(true);
-  };
+  }, [accounts]);
+
+  /**
+   * Форма операції, відкрита переходом `?create=1` (швидкі дії «Сьогодні»).
+   *
+   * `openAdd` перестворюється щорендера, тож у залежностях ефекту він
+   * відкривав би форму знову після кожної правки полів. Раніше його просто
+   * глушили `eslint-disable`, і це коштувало дорожче, ніж здається: React
+   * Compiler відмовляється оптимізувати КОМПОНЕНТ, у якому вимкнено правило
+   * хуків (PERF-2), тобто весь екран Фінансів лишався без мемоізації, і
+   * кожне натискання клавіші в полі суми прокочувало повний рендер стрічки.
+   * Свіжа функція живе в ref, а оновлює його ефект: запис у ref під час
+   * рендера був би для компілятора тим самим бейлаутом.
+   */
+  const openAddRef = useRef(openAdd);
+  // Оголошено ПЕРЕД ефектом-споживачем, тож на монтуванні ref уже свіжий.
+  useEffect(() => { openAddRef.current = openAdd; });
+  useEffect(() => {
+    if (createParam === '1') {
+      openAddRef.current();
+      router.setParams({ create: '' });
+    }
+  }, [createParam]);
 
   const startEdit = (tx: Transaction) => {
-    setEditingId(tx.id);
-    setTxType(tx.type);
-    setAmount(String(tx.amount));
-    setCategory(tx.category);
-    setNote(tx.note);
-    // Операція без рахунку (дані до міграції або запис із клієнта, де рахунків
-    // немає) отримує рахунок ТІЄЇ Ж валюти — або нічого. Типовий гаманець
-    // підставляти не можна: saveTx пише валюту рахунку, і правка примітки
-    // мовчки перетворила б витрату $100 на ₴100.
-    setFormAccountId(tx.accountId || accountIdForLegacyTx(accounts, tx, lastAccountRef.current));
-    setFormToAccountId(tx.toAccountId ?? null);
-    setToAmount(typeof tx.toAmount === 'number' ? String(tx.toAmount) : '');
-    setSelected(null);
-    setShowAdd(true);
+    const openForm = () => {
+      setEditingId(tx.id);
+      setTxType(tx.type);
+      setAmount(String(tx.amount));
+      setCategory(tx.category);
+      setNote(tx.note);
+      // Операція без рахунку (дані до міграції або запис із клієнта, де рахунків
+      // немає) отримує рахунок ТІЄЇ Ж валюти — або нічого. Типовий гаманець
+      // підставляти не можна: saveTx пише валюту рахунку, і правка примітки
+      // мовчки перетворила б витрату $100 на ₴100.
+      setFormAccountId(tx.accountId || accountIdForLegacyTx(accounts, tx, lastAccountRef.current));
+      setFormToAccountId(tx.toAccountId ?? null);
+      setToAmount(typeof tx.toAmount === 'number' ? String(tx.toAmount) : '');
+      setShowAdd(true);
+    };
+    // На широкому екрані деталь — колонка, а не модалка: мінятись нема з чим.
+    // На телефоні деталь — окремий Modal, і відкрити форму в тому ж тіку, у
+    // якому він зникає, означає презентувати друге вікно поверх ще живого
+    // першого (NAT-02).
+    if (isExpanded) {
+      setSelected(null);
+      openForm();
+      return;
+    }
+    openAfterModalExit(() => setSelected(null), openForm);
   };
 
   const formFrom = accountById(accounts, formAccountId ?? undefined);
@@ -654,33 +764,54 @@ export default function FinanceScreen() {
   const applyMarkAsTransfer = () => {
     const target = accountById(accounts, markTargetId ?? undefined);
     const tx = txs.find(t => t.id === markTxId);
-    if (!target || !tx || target.id === tx.accountId) return;
+    if (!target || !tx || !tx.accountId || target.id === tx.accountId) return;
     // Валюта призначення мусить збігатися з валютою операції: зарахована сума
     // тут не питається (курс минулого переказу невідомий), тож на рахунок
     // іншої валюти пішло б те саме ЧИСЛО — 100 USD стали б 100 UAH з повітря.
     if (!markTransferTargets(accounts, tx).some(a => a.id === target.id)) return;
+    // Дохід — гроші ПРИЙШЛИ на рахунок операції, тож він стає призначенням.
+    const direction = markAsTransferAccounts(tx, target.id);
+    const pair = findTransferPairCandidate(txs, tx, target.id, accounts);
     setTxs(prev => prev.map(t => (t.id !== tx.id ? t : appendTransactionHistory({
       ...t,
       type: 'transfer',
       category: tr.transfer,
-      toAccountId: target.id,
+      accountId: direction.accountId,
+      toAccountId: direction.toAccountId,
       // Курс минулого переказу невідомий, тож зарахована сума лишається
       // порожньою (= списаній). За різних валют її виправляють редагуванням.
       toAmount: undefined,
     }, {
       id: Date.now().toString() + Math.random().toString(36).slice(2),
       at: new Date().toISOString(),
-      note: `${tr.markAsTransfer}: ${accountName(t.accountId)} → ${target.name}`,
+      note: `${tr.markAsTransfer}: ${accountName(direction.accountId)} → ${accountName(direction.toAccountId)}`,
     }))));
     setSelected(null);
     setMarkTxId(null);
     setMarkTargetId(null);
     haptic.success();
+    // Друга половина старої пари лишилась би витратою/доходом поруч із
+    // переказом — гроші порахувались би двічі. Пропонуємо, не видаляємо самі.
+    if (pair) {
+      Alert.alert(
+        tr.markTransferPairTitle,
+        tr.markTransferPairHint
+          .replace('{account}', target.name)
+          .replace('{date}', new Date(pair.date).toLocaleDateString(locale, { day: 'numeric', month: 'long' })),
+        [
+          { text: tr.markTransferPairKeep, style: 'cancel' },
+          { text: tr.markTransferPairDelete, style: 'destructive', onPress: () => deleteTx(pair.id) },
+        ],
+      );
+    }
   };
 
   // ── Рахунки: створення, перейменування, архівація ──
-  const openAccountForm = (account: Account | null) => {
+  /** useCallback з тієї ж причини, що й openAdd: проп мемоізованої шапки. */
+  const openAccountForm = useCallback((account: Account | null) => {
     setShowAccounts(true);
+    setReconcileActual('');
+    setReconcileNote(null);
     setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol('');
     setAccForm(account
       ? {
@@ -688,7 +819,59 @@ export default function FinanceScreen() {
           currency: account.currency, opening: String(account.openingBalance ?? 0),
         }
       : { id: null, name: '', kind: 'cash', currency: primaryCurrency, opening: '' });
+  }, [primaryCurrency]);
+
+  const showBreakdown = useCallback((account: Account) => {
+    const b = overview.breakdowns[account.id];
+    if (!b) return;
+    const cur = curOf(account.currency);
+    const line = (label: string, value: number, sign = '') => `${label}: ${sign}${fmtCur(value, cur)}`;
+    const lines = [
+      line(tr.breakdownOpening, b.opening),
+      line(tr.breakdownIncome, b.income, '+'),
+      line(tr.breakdownExpense, b.expense, '−'),
+      line(tr.breakdownTransfersIn, b.transfersIn, '+'),
+      line(tr.breakdownTransfersOut, b.transfersOut, '−'),
+      `= ${line(tr.breakdownBalance, b.balance)}`,
+    ];
+    if (b.futureCount > 0) {
+      lines.push('', `${tr.breakdownFuture.replace('{n}', String(b.futureCount))} (${b.future > 0 ? '+' : ''}${fmtCur(b.future, cur)})`);
+    }
+    Alert.alert(`${tr.balanceBreakdown} · ${account.name}`, lines.join('\n'), [
+      { text: tr.reconcileBalance, onPress: () => openAccountForm(account) },
+      { text: tr.close, style: 'cancel' },
+    ]);
+  }, [overview.breakdowns, fmtCur, curOf, tr, openAccountForm]);
+
+  /**
+   * «Звірити з реальним залишком»: людина вводить, скільки РЕАЛЬНО лежить на
+   * рахунку зараз, і ми рахуємо, яким мав би бути початковий залишок, щоб
+   * баланс зійшовся (історія операцій лишається як є). Нічого не
+   * застосовується мовчки — нове значення лягає у форму разом із різницею,
+   * і людина сама натискає «Зберегти».
+   */
+  const applyReconcile = () => {
+    if (!accForm?.id) return;
+    const account = accounts.find(a => a.id === accForm.id);
+    const actual = parseFloat(reconcileActual.replace(',', '.').trim());
+    if (!account || !Number.isFinite(actual)) return;
+    const { opening, delta } = reconciledOpeningBalance(account, txs, actual, { asOf: new Date() });
+    const cur = curOf(account.currency);
+    setAccForm(prev => (prev ? { ...prev, opening: String(opening) } : prev));
+    setReconcileNote(tr.reconcileDelta.replace('{delta}', `${delta > 0 ? '+' : ''}${fmtCur(delta, cur)}`));
+    haptic.light();
   };
+
+  /** Яким стане баланс рахунку з поточним значенням поля «Початковий залишок». */
+  const accFormPreview = (() => {
+    if (!accForm) return null;
+    const raw = accForm.opening.replace(',', '.').trim();
+    const opening = raw === '' ? 0 : parseFloat(raw);
+    if (!Number.isFinite(opening)) return null;
+    const b = accForm.id ? overview.breakdowns[accForm.id] : undefined;
+    const history = b ? b.balance - b.opening : 0;
+    return opening + history;
+  })();
 
   const saveAccount = () => {
     if (!accForm) return;
@@ -730,11 +913,60 @@ export default function FinanceScreen() {
   // Cancel / backdrop-dismiss the Add-or-Edit sheet — must reset the form,
   // not just editingId, or the next "+" (new transaction) opens prefilled
   // with whatever transaction was being edited.
-  const closeAddSheet = () => {
-    setShowAdd(false);
+  const resetTxDraft = () => {
     setEditingId(null);
     setAmount(''); setCategory(''); setNote(''); setToAmount('');
     setFormToAccountId(null);
+  };
+
+  const closeAddSheet = () => {
+    setShowAdd(false);
+    resetTxDraft();
+  };
+
+  /**
+   * Аркуш операції СПРАВДІ зник (SheetModal кличе onClose після
+   * exit-анімації). Лише тепер можна показувати наступну модалку — і лише
+   * тепер видно, чи це було закриття, чи передача керування.
+   */
+  const handleAddSheetClosed = () => {
+    setShowAdd(false);
+    if (sheetHandoff.isPending()) {
+      // Чернетку лишаємо живою: користувач пішов заводити рахунок і
+      // повернеться в ту саму форму.
+      sheetHandoff.release();
+      return;
+    }
+    txDraftPausedRef.current = false;
+    resetTxDraft();
+  };
+
+  /**
+   * «+ Новий рахунок» із форми операції. Друге вікно відкриється з
+   * handleAddSheetClosed — див. sheetHandoff.
+   */
+  const goCreateFirstAccount = () => {
+    txDraftPausedRef.current = true;
+    sheetHandoff.queue(() => openAccountForm(null));
+    setShowAdd(false);
+  };
+
+  /**
+   * Аркуш рахунків зник. Якщо сюди прийшли з незавершеної операції й рахунок
+   * таки з'явився — повертаємо користувача в його чернетку.
+   */
+  const handleAccountsSheetClosed = () => {
+    setShowAccounts(false);
+    setAccForm(null);
+    const resume = txDraftPausedRef.current;
+    txDraftPausedRef.current = false;
+    if (resume && visibleAccounts.length > 0) {
+      sheetHandoff.queue(() => {
+        setFormAccountId(defaultAccountId(accounts, lastAccountRef.current));
+        setShowAdd(true);
+      });
+    }
+    sheetHandoff.release();
   };
 
   const deleteTx = (id: string) => {
@@ -847,12 +1079,58 @@ export default function FinanceScreen() {
   );
 
 
-  // Шапка списку: фільтри, баланси, порожній стан. Виносимо в змінну,
-  // щоб FlatList не перебудовував її на кожному кадрі прокрутки.
-  const listHeader = (
+  /**
+   * Рядок стрічки. useCallback обовʼязковий: FlatList тримає renderItem у
+   * рендері комірок, тож нова функція щорендера перемальовувала б увесь
+   * видимий місяць на кожну натиснуту клавішу у формі (PERF-4).
+   */
+  const renderGroup = useCallback(({ item, index }: { item: ReturnType<typeof groupTransactions>[number]; index: number }) => (
+    <Animated.View
+      entering={shouldAnimateGroup(item.dateStr) ? motion.entering(FadeInDown.duration(200).delay(Math.min(index, 10) * 40)) : undefined}
+      layout={motion.entering(LinearTransition.springify())}>
+      <TransactionGroup
+        group={item}
+        compact={compact}
+        isDark={isDark}
+        c={groupColors}
+        fmt={fmtCur}
+        currencyByCode={currencyByCode}
+        primaryCode={primaryCurrency}
+        accounts={accounts}
+        getCatIcon={getCatIcon}
+        onSelect={setSelected}
+        todayLabel={tr.today}
+        yesterdayLabel={tr.yesterday}
+        incomeLabel={tr.income}
+        expenseLabel={tr.expense}
+        transferLabel={tr.transfer}
+      />
+    </Animated.View>
+  ), [
+    accounts, compact, currencyByCode, fmtCur, getCatIcon, groupColors, isDark,
+    motion, primaryCurrency, shouldAnimateGroup, tr,
+  ]);
+
+  // Шапка списку: фільтри, баланси, порожній стан. Мемоізуємо, щоб FlatList
+  // не перебудовував її на кожен символ, надрукований у формі операції
+  // (PERF-4): у змінній без useMemo вона перестворювалась щорендера, попри
+  // коментар, який обіцяв протилежне.
+  const listHeader = useMemo(() => (
     <>
+            {/* ERR-01: збій читання — окремий стан, а не «немає транзакцій». */}
+            {loadFailed && (
+              <LoadErrorNotice
+                lang={lang}
+                isDark={isDark}
+                text={c.text}
+                sub={c.sub}
+                onRetry={retryLoad}
+                style={{ marginTop: 8 }}
+              />
+            )}
+
             {/* Skeleton — перший завантаження */}
-            {!initialized && (
+            {!initialized && !loadFailed && (
               <>
                 <SkeletonCard style={{ marginTop: 4 }} />
                 <SkeletonCard />
@@ -901,6 +1179,15 @@ export default function FinanceScreen() {
               noAccountsHint={tr.noAccountsHint}
               transfersNoteLabel={tr.transfersNotCounted}
               showTransfersNote={monthHasTransfers}
+              accountTotals={overview.totalByCurrency}
+              totalLabel={tr.totalOnAccounts}
+              onLongPressAccount={showBreakdown}
+              breakdownHint={tr.balanceBreakdown}
+              unassignedLabel={overview.unassigned.count > 0
+                ? tr.unassignedTxWarning.replace('{n}', String(overview.unassigned.count))
+                : null}
+              unassignedActive={unassignedOnly}
+              onPressUnassigned={() => { haptic.light(); setUnassignedOnly(v => !v); }}
             />
 
             {/* Найближчі оплати / прострочені підписки. Операцій не створюють —
@@ -914,12 +1201,20 @@ export default function FinanceScreen() {
               style={{ marginTop: 16, marginBottom: 0 }}
             />
 
-            {/* Filters */}
-            <View style={[s.filterRow, { backgroundColor: c.card, borderColor: c.border, marginTop: 16, marginBottom: 22 }]}>
+            {/* Filters. Вибраний стан передавався ВИКЛЮЧНО кольором тла, тож
+                VoiceOver читав три однакові кнопки, а дальтонік не відрізняв їх
+                зовсім (A11Y-04). Звідси role=tab + state.selected на кнопках і
+                tablist на самому ряду. */}
+            <View
+              accessibilityRole="tablist"
+              style={[s.filterRow, { backgroundColor: c.card, borderColor: c.border, marginTop: 16, marginBottom: 22 }]}>
               {(['all', 'income', 'expense'] as const).map(f => (
                 <TouchableOpacity
                   key={f}
                   onPress={() => setFilter(f)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: filter === f }}
+                  accessibilityLabel={f === 'all' ? tr.all : f === 'income' ? tr.incomes : tr.expenses}
                   style={[s.filterBtn, filter === f && { backgroundColor: f === 'income' ? c.green : f === 'expense' ? c.red : c.accent }]}>
                   <Text style={[s.filterLabel, { color: filter === f ? '#fff' : c.sub }]}>
                     {f === 'all' ? tr.all : f === 'income' ? tr.incomes : tr.expenses}
@@ -929,7 +1224,7 @@ export default function FinanceScreen() {
             </View>
 
             {/* Empty state with CTA */}
-            {groups.length === 0 && (
+            {groups.length === 0 && !loadFailed && (
               <View style={{ alignItems: 'center', paddingVertical: 48 }}>
                 <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.accent + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                   <IconSymbol name="banknote" size={32} color={c.accent} />
@@ -948,7 +1243,13 @@ export default function FinanceScreen() {
             )}
 
     </>
-  );
+  ), [
+    accountBalances, accountFilter, allCurrencies, c.accent, c.border, c.card, c.dim,
+    c.green, c.red, c.sub, c.text, dateFilter, filter, fmtCur, groups.length, initialized,
+    isDark, kindLabel, lang, loadFailed, locale, monthHasTransfers, openAccountForm, openAdd,
+    primaryCurrency, retryLoad, totalsByCurrency, tr, upcomingPayments, visibleAccounts,
+    overview.totalByCurrency, overview.unassigned.count, showBreakdown, unassignedOnly,
+  ]);
 
   // Той самий вміст показується модалкою на телефоні й колонкою на
   // планшеті — див. DetailPane.
@@ -975,7 +1276,11 @@ export default function FinanceScreen() {
                           <View style={{ flex: 1 }} />
                           <View style={[s.handle, { backgroundColor: c.border }]} />
                           <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                            <TouchableOpacity onPress={() => setSelected(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <TouchableOpacity
+                              onPress={() => setSelected(null)}
+                              accessibilityRole="button"
+                              accessibilityLabel={tr.close}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                               <IconSymbol name="xmark" size={17} color={c.sub} />
                             </TouchableOpacity>
                           </View>
@@ -1038,8 +1343,12 @@ export default function FinanceScreen() {
                         {canMark && (
                           <TouchableOpacity
                             onPress={() => {
-                              setMarkTxId(selected.id);
-                              setMarkTargetId(null);
+                              const txId = selected.id;
+                              const openMark = () => { setMarkTxId(txId); setMarkTargetId(null); };
+                              // Деталь на телефоні — модалка; аркуш переказу
+                              // поверх неї не презентується взагалі (NAT-02).
+                              if (isExpanded) { openMark(); return; }
+                              openAfterModalExit(() => setSelected(null), openMark);
                             }}
                             accessibilityRole="button"
                             accessibilityLabel={tr.markAsTransfer}
@@ -1136,34 +1445,17 @@ export default function FinanceScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
           ListHeaderComponent={listHeader}
-          renderItem={({ item, index }) => (
-            <Animated.View
-              entering={shouldAnimateGroup(item.dateStr) ? motion.entering(FadeInDown.duration(200).delay(Math.min(index, 10) * 40)) : undefined}
-              layout={motion.entering(LinearTransition.springify())}>
-              <TransactionGroup
-                group={item}
-                compact={compact}
-                isDark={isDark}
-                c={groupColors}
-                fmt={fmtCur}
-                currencyByCode={currencyByCode}
-                primaryCode={primaryCurrency}
-                accounts={accounts}
-                getCatIcon={getCatIcon}
-                onSelect={setSelected}
-                todayLabel={tr.today}
-                yesterdayLabel={tr.yesterday}
-                incomeLabel={tr.income}
-                expenseLabel={tr.expense}
-                transferLabel={tr.transfer}
-              />
-            </Animated.View>
-          )}
+          renderItem={renderGroup}
         />
       </View>
 
       {/* FAB */}
-      <PressableScale onPress={() => { haptic.medium(); openAdd(); }} scaleTo={0.92} style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
+      <PressableScale
+        onPress={() => { haptic.medium(); openAdd(); }}
+        accessibilityRole="button"
+        accessibilityLabel={tr.add}
+        scaleTo={0.92}
+        style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </PressableScale>
       </View>
@@ -1194,11 +1486,19 @@ export default function FinanceScreen() {
 
       {/* ─── Context Menu Modal ─── */}
       <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>
-        <Pressable
+        <Pressable accessible={false}
           style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
           onPress={() => setShowMenu(false)}>
+            {/* NAT-03: Pressable з onPress на iOS сам стає елементом
+                доступності й склеює ВСЕ піддерево в один вузол — VoiceOver
+                читає аркуш однією фразою й не має в ньому жодного контролу.
+                Тут Pressable існує лише заради stopPropagation. Модальну
+                ізоляцію (accessibilityViewIsModal) при цьому лишаємо. */}
           <Pressable
             onPress={e => e.stopPropagation()}
+            accessible={false}
+            accessibilityViewIsModal
+            importantForAccessibility="yes"
             style={{ position: 'absolute', top: insets.top + 62, right: 16, width: 220 }}>
             <BlurView intensity={isDark ? 60 : 75} tint={isDark ? 'dark' : 'light'} style={[s.menuBox, { borderColor: c.border }]}>
 
@@ -1217,7 +1517,7 @@ export default function FinanceScreen() {
 
               {/* Категорії */}
               <TouchableOpacity
-                onPress={() => { setShowMenu(false); setShowCats(true); }}
+                onPress={() => openAfterModalExit(() => setShowMenu(false), () => setShowCats(true))}
                 style={s.menuItem}>
                 <View style={[s.menuIconBox, { backgroundColor: '#F59E0B25' }]}>
                   <IconSymbol name="tag.fill" size={15} color="#F59E0B" />
@@ -1261,7 +1561,10 @@ export default function FinanceScreen() {
               {/* Рахунки. Замінили «розподіл балансу»: початковий залишок
                   тепер живе в самому рахунку, а не окремою поправкою. */}
               <TouchableOpacity
-                onPress={() => { setShowMenu(false); setAccForm(null); setShowAccounts(true); }}
+                onPress={() => openAfterModalExit(
+                  () => setShowMenu(false),
+                  () => { setAccForm(null); setShowAccounts(true); },
+                )}
                 style={s.menuItem}>
                 <View style={[s.menuIconBox, { backgroundColor: '#8B5CF625' }]}>
                   <IconSymbol name="banknote" size={15} color="#8B5CF6" />
@@ -1287,7 +1590,7 @@ export default function FinanceScreen() {
 
               {/* Календар */}
               <TouchableOpacity
-                onPress={() => { setShowMenu(false); setShowCal(true); }}
+                onPress={() => openAfterModalExit(() => setShowMenu(false), () => setShowCal(true))}
                 style={s.menuItem}>
                 <View style={[s.menuIconBox, { backgroundColor: dateFilter ? c.accent + '25' : c.dim }]}>
                   <IconSymbol name="calendar" size={15} color={dateFilter ? c.accent : c.sub} />
@@ -1311,15 +1614,24 @@ export default function FinanceScreen() {
       {/* ─── Calendar Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setShowCal(false)}>
+            <Pressable
+              onPress={e => e.stopPropagation()}
+              accessible={false}
+              accessibilityViewIsModal
+              importantForAccessibility="yes"
+              style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
 
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[s.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={() => setShowCal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => setShowCal(false)}
+                      accessibilityRole="button"
+                      accessibilityLabel={tr.close}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <IconSymbol name="xmark" size={17} color={c.sub} />
                     </TouchableOpacity>
                   </View>
@@ -1327,13 +1639,24 @@ export default function FinanceScreen() {
 
                 {/* Month nav */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                  <TouchableOpacity onPress={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }} style={s.navBtn}>
+                  {/* Ім'я кнопки — назва місяця, куди вона веде: власних ключів
+                      «попередній/наступний місяць» у словнику немає, а «chevron.left»
+                      VoiceOver вимовляв англійською (A11Y-01, NAT-28). */}
+                  <TouchableOpacity
+                    onPress={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={MONTHS_UA[(calMonth + 11) % 12]}
+                    style={s.navBtn}>
                     <IconSymbol name="chevron.left" size={20} color={c.sub} />
                   </TouchableOpacity>
                   <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontWeight: '700' }}>
                     {MONTHS_UA[calMonth]} {calYear}
                   </Text>
-                  <TouchableOpacity onPress={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }} style={s.navBtn}>
+                  <TouchableOpacity
+                    onPress={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={MONTHS_UA[(calMonth + 1) % 12]}
+                    style={s.navBtn}>
                     <IconSymbol name="chevron.right" size={20} color={c.sub} />
                   </TouchableOpacity>
                 </View>
@@ -1359,6 +1682,12 @@ export default function FinanceScreen() {
                         <TouchableOpacity
                           key={di}
                           onPress={() => { setDateFilter(isSel ? null : dayDate); setShowCal(false); }}
+                          accessibilityRole="button"
+                          accessibilityLabel={[
+                            dayDate.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }),
+                            isToday ? tr.today : null,
+                          ].filter(Boolean).join(', ')}
+                          accessibilityState={{ selected: isSel }}
                           style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}>
                           <View style={[s.dayCell, isSel && { backgroundColor: c.accent }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }]}>
                             <Text style={{ color: isSel ? '#fff' : isToday ? c.accent : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
@@ -1383,7 +1712,7 @@ export default function FinanceScreen() {
       </Modal>
 
       {/* ─── Add Modal ─── */}
-      <SheetModal visible={showAdd} onClose={closeAddSheet}>
+      <SheetModal visible={showAdd} onClose={handleAddSheetClosed}>
         <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -1432,6 +1761,7 @@ export default function FinanceScreen() {
                         value={amount}
                         onChangeText={t => setAmount(cleanAmountInput(t))}
                         keyboardType="decimal-pad"
+                        accessibilityLabel={tr.amount}
                         style={{ color: formColor, fontSize: 38, fontWeight: '700', letterSpacing: -1, flex: 1 }}
                       />
                     </View>
@@ -1476,7 +1806,7 @@ export default function FinanceScreen() {
 
                   {visibleAccounts.length === 0 && (
                     <TouchableOpacity
-                      onPress={() => { setShowAdd(false); openAccountForm(null); }}
+                      onPress={goCreateFirstAccount}
                       accessibilityRole="button"
                       accessibilityLabel={tr.newAccount}
                       style={[s.btn, { marginTop: 12, backgroundColor: c.accent + '15', borderWidth: 1, borderColor: c.accent + '40' }]}>
@@ -1500,6 +1830,7 @@ export default function FinanceScreen() {
                           value={toAmount}
                           onChangeText={t => setToAmount(cleanAmountInput(t))}
                           keyboardType="decimal-pad"
+                          accessibilityLabel={tr.transferReceived}
                           style={[s.input, { backgroundColor: c.dim, color: c.text, flex: 1 }]}
                         />
                       </View>
@@ -1532,11 +1863,12 @@ export default function FinanceScreen() {
                     placeholderTextColor={c.sub}
                     value={note}
                     onChangeText={setNote}
+                    accessibilityLabel={tr.note}
                     style={[s.input, { backgroundColor: c.dim, color: c.text }]}
                   />
 
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
-                    <TouchableOpacity onPress={closeAddSheet} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
+                    <TouchableOpacity onPress={() => closeAddSheet()} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                       <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -1559,14 +1891,23 @@ export default function FinanceScreen() {
 
       {/* ─── Primary Currency Picker ─── */}
       <Modal visible={showPrimaryPicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowPrimaryPicker(false)}>
-        <Pressable style={s.overlay} onPress={() => setShowPrimaryPicker(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+        <Pressable accessible={false} style={s.overlay} onPress={() => setShowPrimaryPicker(false)}>
+          <Pressable
+            onPress={e => e.stopPropagation()}
+            accessible={false}
+            accessibilityViewIsModal
+            importantForAccessibility="yes"
+            style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <TouchableOpacity onPress={() => setShowPrimaryPicker(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowPrimaryPicker(false)}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.close}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <IconSymbol name="xmark" size={17} color={c.sub} />
                   </TouchableOpacity>
                 </View>
@@ -1575,12 +1916,19 @@ export default function FinanceScreen() {
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 18, marginBottom: 14 }}>
                 {tr.primaryCurrencyDesc}
               </Text>
+              {/* Валют може бути скільки завгодно: BUILTIN — лише дві, решту
+                  заводить користувач. Без прокрутки восьма й далі опинялись за
+                  межею листа з overflow:'hidden' і обрати їх було неможливо (L4). */}
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {allCurrencies.map((curr, idx) => {
                 const isSelected = primaryCurrency === curr.code;
                 return (
                   <TouchableOpacity
                     key={curr.code}
                     onPress={() => { setPrimaryCurrency(curr.code); setShowPrimaryPicker(false); }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected, checked: isSelected }}
+                    accessibilityLabel={`${curr.code}, ${curr.kind === 'crypto' ? tr.cryptoKind : tr.fiatKind}`}
                     style={[{
                       flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4,
                     }, idx < allCurrencies.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
@@ -1599,6 +1947,7 @@ export default function FinanceScreen() {
                   </TouchableOpacity>
                 );
               })}
+              </ScrollView>
             </BlurView>
           </Pressable>
         </Pressable>
@@ -1607,8 +1956,13 @@ export default function FinanceScreen() {
       {/* ─── Categories Modal ─── */}
       <Modal visible={showCats} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { setShowCats(false); setShowAddCat(false); }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => { setShowCats(false); setShowAddCat(false); }}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => { setShowCats(false); setShowAddCat(false); }}>
+            <Pressable
+              onPress={e => e.stopPropagation()}
+              accessible={false}
+              accessibilityViewIsModal
+              importantForAccessibility="yes"
+              style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -1617,7 +1971,11 @@ export default function FinanceScreen() {
                     <View style={{ flex: 1 }} />
                     <View style={[s.handle, { backgroundColor: c.border }]} />
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <TouchableOpacity onPress={() => { setShowCats(false); setShowAddCat(false); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <TouchableOpacity
+                        onPress={() => { setShowCats(false); setShowAddCat(false); }}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr.close}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                         <IconSymbol name="xmark" size={17} color={c.sub} />
                       </TouchableOpacity>
                     </View>
@@ -1662,6 +2020,8 @@ export default function FinanceScreen() {
                               </View>
                             : <TouchableOpacity
                                 onPress={() => setCats(prev => ({ ...prev, [catTab]: prev[catTab].filter(cc => cc.name !== cat.name) }))}
+                                accessibilityRole="button"
+                                accessibilityLabel={`${tr.delete}: ${cat.name}`}
                                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                                 <IconSymbol name="trash" size={13} color={c.sub} />
                               </TouchableOpacity>
@@ -1679,6 +2039,7 @@ export default function FinanceScreen() {
                         placeholderTextColor={c.sub}
                         value={newCatName}
                         onChangeText={setNewCatName}
+                        accessibilityLabel={tr.newCategory}
                         style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 12 }]}
                         autoFocus
                       />
@@ -1733,7 +2094,7 @@ export default function FinanceScreen() {
       </Modal>
 
       {/* ─── Рахунки: створення, перейменування, архівація ─── */}
-      <SheetModal visible={showAccounts} onClose={() => { setShowAccounts(false); setAccForm(null); }}>
+      <SheetModal visible={showAccounts} onClose={handleAccountsSheetClosed}>
         <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -1810,6 +2171,7 @@ export default function FinanceScreen() {
                   placeholderTextColor={c.sub}
                   value={accForm.name}
                   onChangeText={t => setAccForm(prev => (prev ? { ...prev, name: t } : prev))}
+                  accessibilityLabel={tr.nameLabel}
                   style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text }]}
                 />
 
@@ -1882,6 +2244,7 @@ export default function FinanceScreen() {
                           onChangeText={t => setInlineCurTicker(t.toUpperCase())}
                           autoCapitalize="characters"
                           maxLength={8}
+                          accessibilityLabel={tr.currencyTicker}
                           style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 10 }]}
                         />
                         <TextInput
@@ -1890,6 +2253,7 @@ export default function FinanceScreen() {
                           value={inlineCurSymbol}
                           onChangeText={setInlineCurSymbol}
                           maxLength={4}
+                          accessibilityLabel={tr.currencySymbol}
                           style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 10 }]}
                         />
                         <View style={{ flexDirection: 'row', gap: 7 }}>
@@ -1916,11 +2280,51 @@ export default function FinanceScreen() {
                   placeholder="0"
                   placeholderTextColor={c.sub}
                   value={accForm.opening}
+                  accessibilityLabel={tr.openingBalance}
+                  accessibilityHint={tr.openingBalanceHint}
                   // Мінус лишаємо: борг по картці — теж стан рахунку.
-                  onChangeText={t => setAccForm(prev => (prev ? { ...prev, opening: t.replace(/[^0-9.,-]/g, '') } : prev))}
+                  onChangeText={t => { setReconcileNote(null); setAccForm(prev => (prev ? { ...prev, opening: t.replace(/[^0-9.,-]/g, '') } : prev)); }}
                   keyboardType="numbers-and-punctuation"
                   style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text }]}
                 />
+                {/* Пояснення поля + живий підсумок: головна причина розбіжності
+                    «Сьогодні» і «Фінансів» — поточний залишок, введений сюди
+                    поверх уже привʼязаної історії (вона рахується двічі). */}
+                <Text style={{ color: c.sub, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{tr.openingBalanceHint}</Text>
+                {accFormPreview !== null && (
+                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginTop: 6 }}>
+                    {tr.balanceWillBe.replace('{amount}', fmtCur(accFormPreview, curOf(accForm.currency)))}
+                  </Text>
+                )}
+                {!!accForm.id && (
+                  <>
+                    <Text style={[s.label, { color: c.sub }]}>{tr.reconcileActualLabel}</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                      <TextInput
+                        placeholder="0"
+                        placeholderTextColor={c.sub}
+                        value={reconcileActual}
+                        accessibilityLabel={tr.reconcileActualLabel}
+                        onChangeText={t => setReconcileActual(t.replace(/[^0-9.,-]/g, ''))}
+                        keyboardType="numbers-and-punctuation"
+                        style={[s.input, { flexGrow: 1, flexBasis: 120, backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text }]}
+                      />
+                      <TouchableOpacity
+                        onPress={applyReconcile}
+                        disabled={!reconcileActual.trim()}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !reconcileActual.trim() }}
+                        accessibilityLabel={tr.reconcileBalance}
+                        style={[s.btn, { flexGrow: 1, minHeight: 44, paddingHorizontal: 12, backgroundColor: reconcileActual.trim() ? c.accent + '20' : c.dim, borderWidth: 1, borderColor: reconcileActual.trim() ? c.accent + '55' : c.border }]}>
+                        <IconSymbol name="arrow.triangle.2.circlepath" size={14} color={reconcileActual.trim() ? c.accent : c.sub} />
+                        <Text style={{ color: reconcileActual.trim() ? c.accent : c.sub, fontWeight: '700', marginLeft: 6 }}>{tr.reconcileBalance}</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {reconcileNote && (
+                      <Text style={{ color: c.accent, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{reconcileNote}</Text>
+                    )}
+                  </>
+                )}
 
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
                   <TouchableOpacity onPress={() => setAccForm(null)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>

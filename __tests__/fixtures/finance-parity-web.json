@@ -1,0 +1,34 @@
+{
+  "description": "Shared web/mobile finance parity fixture. Both clients must produce these numbers from the same input. now = 2026-09-22 (local noon).",
+  "now": [2026, 8, 22, 12, 0, 0],
+  "primary": "UAH",
+  "accounts": [
+    { "id": "card", "name": "Картка", "kind": "card", "currency": "UAH", "openingBalance": 2000, "createdAt": "2026-01-01T00:00:00.000Z" },
+    { "id": "cash", "name": "Готівка", "kind": "cash", "currency": "UAH", "openingBalance": 0, "createdAt": "2026-01-01T00:00:00.000Z" },
+    { "id": "jar", "name": "Відпустка", "kind": "savings", "currency": "UAH", "openingBalance": 500, "createdAt": "2026-01-01T00:00:00.000Z" },
+    { "id": "old", "name": "Стара картка", "kind": "card", "currency": "UAH", "openingBalance": 100, "archived": true, "createdAt": "2026-01-01T00:00:00.000Z" }
+  ],
+  "transactions": [
+    { "id": "aug-salary", "type": "income", "category": "Зарплата", "amount": 10000, "date": "2026-08-05T12:00:00.000Z", "accountId": "card" },
+    { "id": "aug-food", "type": "expense", "category": "Їжа", "amount": 4000, "date": "2026-08-10T12:00:00.000Z", "accountId": "card" },
+    { "id": "sep-salary", "type": "income", "category": "Зарплата", "amount": 10000, "date": "2026-09-05T12:00:00.000Z", "accountId": "card" },
+    { "id": "sep-rent", "type": "expense", "category": "Житло", "amount": 7000, "date": "2026-09-06T12:00:00.000Z", "accountId": "card" },
+    { "id": "sep-negative", "type": "expense", "category": "Їжа", "amount": -200, "date": "2026-09-07T12:00:00.000Z", "accountId": "cash" },
+    { "id": "sep-atm", "type": "transfer", "category": "Переказ", "amount": 1000, "date": "2026-09-08T12:00:00.000Z", "accountId": "card", "toAccountId": "cash" },
+    { "id": "sep-save", "type": "transfer", "category": "Переказ", "amount": 300, "date": "2026-09-09T12:00:00.000Z", "accountId": "card", "toAccountId": "jar" },
+    { "id": "sep-orphan", "type": "expense", "category": "Кава", "amount": 50, "date": "2026-09-10T12:00:00.000Z" },
+    { "id": "sep-archived", "type": "income", "category": "Кешбек", "amount": 20, "date": "2026-09-11T12:00:00.000Z", "accountId": "old" },
+    { "id": "sep-planned", "type": "expense", "category": "Житло", "amount": 3000, "date": "2026-09-28T12:00:00.000Z", "accountId": "card" }
+  ],
+  "expected": {
+    "month": { "key": "2026-09", "income": 10020, "expense": 10250, "net": -230 },
+    "accounts": {
+      "card": { "opening": 2000, "income": 20000, "expense": 11000, "transfersIn": 0, "transfersOut": 1300, "future": -3000, "total": 9700 },
+      "cash": { "opening": 0, "income": 0, "expense": 200, "transfersIn": 1000, "transfersOut": 0, "future": 0, "total": 800 },
+      "jar": { "opening": 500, "income": 0, "expense": 0, "transfersIn": 300, "transfersOut": 0, "future": 0, "total": 800 }
+    },
+    "totalByCurrency": { "UAH": 11300 },
+    "unassigned": { "count": 2, "ids": ["sep-orphan", "sep-archived"], "netByCurrency": { "UAH": -30 } },
+    "future": { "count": 1, "netByCurrency": { "UAH": -3000 } }
+  }
+}

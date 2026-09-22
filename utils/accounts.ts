@@ -103,6 +103,103 @@ export function transferRate(tx: Transaction): number | null {
 }
 
 /**
+ * Сума операції як число. Сховище/синк інколи приносять рядок ("150") чи
+ * від'ємне значення — рядок у `sum += tx.amount` склеївся б ("0150"), а
+ * знак подвоїв би розбіжність між екранами. Напрям задає `type`, не знак.
+ */
+export function txAmount(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? Math.abs(n) : 0;
+}
+
+/**
+ * Кінець дня `now` — межа «вже відбулося». Операції з датою після неї
+ * (заплановані, помилково датовані майбутнім) у поточний баланс НЕ входять.
+ */
+function endOfDay(now: Date): number {
+  const d = new Date(now);
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
+function isFutureTx(tx: Transaction, cutoff: number | null): boolean {
+  if (cutoff === null) return false;
+  const t = new Date(tx.date).getTime();
+  return Number.isFinite(t) && t > cutoff;
+}
+
+/**
+ * З чого складається баланс рахунку — «Звідки ця сума».
+ *
+ *   balance = opening + income − expense + transfersIn − transfersOut
+ *
+ * `future` — чистий внесок операцій, датованих після `asOf` (у баланс НЕ
+ * входить, показується окремо, щоб людина бачила, що їх відкладено).
+ * Без `asOf` майбутні рахуються як звичайні (стара поведінка).
+ */
+export interface AccountBalanceBreakdown {
+  opening: number;
+  income: number;
+  expense: number;
+  transfersIn: number;
+  transfersOut: number;
+  future: number;
+  futureCount: number;
+  balance: number;
+}
+
+export function accountBalanceBreakdown(
+  account: Account,
+  txs: readonly Transaction[],
+  options: { asOf?: Date } = {},
+): AccountBalanceBreakdown {
+  const opening = Number.isFinite(Number(account.openingBalance)) ? Number(account.openingBalance) : 0;
+  const cutoff = options.asOf ? endOfDay(options.asOf) : null;
+  const out = { opening, income: 0, expense: 0, transfersIn: 0, transfersOut: 0, future: 0, futureCount: 0 };
+
+  for (const tx of txs) {
+    let delta = 0;
+    let bucket: 'income' | 'expense' | 'transfersIn' | 'transfersOut' | null = null;
+    if (isTransfer(tx)) {
+      // Обидві гілки навмисно НЕ виключають одна одну: переказ сам на себе
+      // (наприклад, після помилкового вибору рахунку) мусить зійтися в нуль.
+      const out1 = tx.accountId === account.id ? txAmount(tx.amount) : 0;
+      const in1 = tx.toAccountId === account.id ? txAmount(creditedAmount(tx)) : 0;
+      if (!out1 && !in1) continue;
+      if (isFutureTx(tx, cutoff)) {
+        out.future += in1 - out1;
+        out.futureCount += 1;
+        continue;
+      }
+      out.transfersOut += out1;
+      out.transfersIn += in1;
+      continue;
+    }
+    if (tx.accountId !== account.id) continue;
+    if (tx.type === 'income') { delta = txAmount(tx.amount); bucket = 'income'; }
+    else if (tx.type === 'expense') { delta = -txAmount(tx.amount); bucket = 'expense'; }
+    else continue;
+    if (isFutureTx(tx, cutoff)) {
+      out.future += delta;
+      out.futureCount += 1;
+      continue;
+    }
+    out[bucket] += Math.abs(delta);
+  }
+
+  return {
+    opening: round(out.opening),
+    income: round(out.income),
+    expense: round(out.expense),
+    transfersIn: round(out.transfersIn),
+    transfersOut: round(out.transfersOut),
+    future: round(out.future),
+    futureCount: out.futureCount,
+    balance: round(out.opening + out.income - out.expense + out.transfersIn - out.transfersOut),
+  };
+}
+
+/**
  * Баланс рахунку:
  *   openingBalance
  *     + доходи на цей рахунок
@@ -111,26 +208,28 @@ export function transferRate(tx: Transaction): number | null {
  *     − списані перекази
  *
  * Перекази тут ВРАХОВУЮТЬСЯ (гроші справді переїхали), на відміну від
- * підсумків обороту, де їх нема.
+ * підсумків обороту, де їх нема. `asOf` — див. accountBalanceBreakdown.
+ * Екрани беруть баланс НЕ звідси напряму, а з financeOverview
+ * (utils/financeOverview.ts) — одне джерело для «Сьогодні» і «Фінансів».
  */
-export function accountBalance(account: Account, txs: Transaction[]): number {
-  let sum = Number.isFinite(account.openingBalance) ? account.openingBalance : 0;
+export function accountBalance(account: Account, txs: readonly Transaction[], options: { asOf?: Date } = {}): number {
+  return accountBalanceBreakdown(account, txs, options).balance;
+}
 
-  for (const tx of txs) {
-    if (isTransfer(tx)) {
-      // Обидві гілки навмисно НЕ виключають одна одну: переказ сам на себе
-      // (наприклад, після помилкового вибору рахунку) мусить зійтися в нуль,
-      // а не списати чи зарахувати суму однобічно.
-      if (tx.accountId === account.id) sum -= tx.amount;
-      if (tx.toAccountId === account.id) sum += creditedAmount(tx);
-      continue;
-    }
-    if (tx.accountId !== account.id) continue;
-    if (tx.type === 'income') sum += tx.amount;
-    else if (tx.type === 'expense') sum -= tx.amount;
-  }
-
-  return round(sum);
+/**
+ * Скільки треба поставити в «Початковий залишок», щоб баланс рахунку
+ * дорівнював РЕАЛЬНОМУ залишку `actual` («Звірити з реальним залишком»).
+ * Решта історії лишається як є — змінюється лише точка відліку.
+ */
+export function reconciledOpeningBalance(
+  account: Account,
+  txs: readonly Transaction[],
+  actual: number,
+  options: { asOf?: Date } = {},
+): { opening: number; delta: number } {
+  const b = accountBalanceBreakdown(account, txs, options);
+  const history = b.balance - b.opening;
+  return { opening: round(actual - history), delta: round(actual - b.balance) };
 }
 
 /** Рахунки, які ще в обігу. Архівні лишаються в історії, але не в виборі. */
@@ -198,6 +297,56 @@ export function defaultAccountId(accounts: Account[], lastUsed?: string): string
 export function markTransferTargets(accounts: Account[], tx: Transaction): Account[] {
   const code = resolveTxCurrency(tx, accounts);
   return activeAccounts(accounts).filter(a => a.id !== tx.accountId && a.currency === code);
+}
+
+/**
+ * Напрям переказу, на який перетворюють наявну операцію.
+ *
+ * Витрата з рахунку A → «з A на обраний». ДОХІД на рахунок A — навпаки: гроші
+ * ПРИЙШЛИ на A, тож джерело — обраний рахунок, а A — призначення. Раніше
+ * `accountId` завжди лишався джерелом, і позначений переказом дохід списував
+ * гроші з A замість зарахування — баланс розʼїжджався на подвійну суму.
+ */
+export function markAsTransferAccounts(
+  tx: Pick<Transaction, 'type' | 'accountId'>,
+  targetId: string,
+): { accountId: string; toAccountId: string } {
+  return tx.type === 'income'
+    ? { accountId: targetId, toAccountId: tx.accountId }
+    : { accountId: tx.accountId, toAccountId: targetId };
+}
+
+/**
+ * Імовірна «друга половина» старого переказу, записаного парою: операція
+ * протилежного типу на ОБРАНОМУ рахунку, на ту саму суму й у тій самій
+ * валюті, в межах ±1 календарного дня. Лише пропозиція — видаляє людина
+ * (автоматично не можна: зарплата й покупка на ту саму суму теж збігаються).
+ */
+export function findTransferPairCandidate(
+  txs: readonly Transaction[],
+  tx: Transaction,
+  targetId: string,
+  accounts: Account[],
+): Transaction | undefined {
+  if (tx.type !== 'income' && tx.type !== 'expense') return undefined;
+  const opposite = tx.type === 'income' ? 'expense' : 'income';
+  const amount = txAmount(tx.amount);
+  const code = resolveTxCurrency(tx, accounts);
+  const at = new Date(tx.date);
+  if (!Number.isFinite(at.getTime())) return undefined;
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  let best: Transaction | undefined;
+  let bestGap = Infinity;
+  for (const t of txs) {
+    if (t.id === tx.id || t.type !== opposite || t.accountId !== targetId) continue;
+    if (txAmount(t.amount) !== amount || resolveTxCurrency(t, accounts) !== code) continue;
+    const d = new Date(t.date);
+    if (!Number.isFinite(d.getTime())) continue;
+    if (Math.abs(Math.round((day(d) - day(at)) / 86400000)) > 1) continue;
+    const gap = Math.abs(d.getTime() - at.getTime());
+    if (gap < bestGap) { best = t; bestGap = gap; }
+  }
+  return best;
 }
 
 /**

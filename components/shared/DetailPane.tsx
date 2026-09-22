@@ -80,8 +80,8 @@ export function DetailPane({
   return (
     <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <Pressable style={st.overlay} onPress={onClose}>
-          <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+        <Pressable accessible={false} style={st.overlay} onPress={onClose}>
+          <Pressable accessible={false} onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
             {open && (
               <BlurView
                 intensity={isDark ? 50 : 70}

@@ -60,7 +60,10 @@ export function useUpcomingPayments(withinDays = 7): UpcomingPaymentsData {
   useStorageRefresh(['subscriptions', 'finance_currencies'], load);
 
   const items = useMemo(() => upcomingPayments(subs, today, withinDays), [subs, today, withinDays]);
-  return { items, currencies };
+  // Обʼєкт-результат мемоізуємо разом із вмістом: новий літерал щорендера
+  // робив би нестабільним усе, що його читає, — зокрема мемоізовану шапку
+  // стрічки Фінансів (PERF-4).
+  return useMemo(() => ({ items, currencies }), [items, currencies]);
 }
 
 export function UpcomingPaymentsCard({

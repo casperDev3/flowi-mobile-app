@@ -11,6 +11,8 @@ import {
   RefreshControl,
   ScrollView,
   SectionList,
+  type SectionListData,
+  type SectionListRenderItemInfo,
   StyleSheet,
   Text,
   TextInput,
@@ -24,9 +26,6 @@ import Animated, {
   FadeInDown,
   FadeOutUp,
   LinearTransition,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
 } from 'react-native-reanimated';
 import { useMotion } from '@/hooks/use-motion';
 import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/shared/MeetingFormSheet';
@@ -37,6 +36,8 @@ import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
+import { useSyncedList } from '@/hooks/use-synced-list';
+import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { useTimerContext } from '@/store/timer-context';
 // Meeting — спільний тип (utils/meetings.ts). Локальна копія тут не знала про
@@ -49,40 +50,72 @@ import {
 import { MeetingDetailBody, MeetingDetailHeader } from '@/components/meetings/MeetingDetail';
 import { MeetingProjectChip } from '@/components/meetings/MeetingProjectChip';
 import { TaskDetailHeader } from '@/components/tasks/TaskDetailHeader';
+import { CommentsSection } from '@/components/shared/CommentsSection';
 import { loadData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { updateSynced } from '@/store/synced-storage';
+import { saveStatusLink } from '@/store/status-links';
 import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import {
-  comparePriority,
-  filterTasksByMonth,
+  assigneeDisplayName,
+  assigneeForPersonalProjectTask,
+  createdByAfterProjectChange,
+  isMyTask,
   isOverdue,
-  matchesPriorityFilter,
   normalizePriority,
   priorityFields,
-  taskMatchesSearch,
   priorityLabel as priorityLevelLabel,
-  type LegacyPriority,
+  type Filter,
   type PriorityLevel,
-  type TaskPriority,
+  type SortBy,
+  type Status,
+  type SubTask,
+  type Task as BaseTask,
 } from '@/utils/taskUtils';
 import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { PriorityFilterChips } from '@/components/tasks/PriorityFilterChips';
-import { buildStatusListSections, type TaskListScope } from '@/utils/taskListSections';
-import { isTodayTask } from '@/utils/taskToday';
-import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, subtaskToggleTransition, taskColumnId, taskStatusColumn, taskVisibleInList } from '@/utils/taskStatuses';
+import { type TaskListScope } from '@/utils/taskListSections';
+import {
+  applyTaskScope,
+  buildTaskGroups,
+  filterTasksForList,
+  limitGroupTasks,
+  TASK_GROUP_LIMIT,
+  overdueForList,
+  sortTasksForList,
+  taskListQueryToParams,
+  taskScopeCounts,
+  OVERDUE_GROUP_KEY,
+  type GroupLabels,
+  type TaskListGroup,
+  type TaskListQuery,
+} from '@/utils/taskListView';
+import { TaskCompactCard } from '@/components/tasks/TaskCompactCard';
+import { copyTextToClipboard } from '@/utils/clipboard';
+import { taskMarkdownLabels, taskToMarkdown } from '@/utils/taskMarkdown';
+import { inTaskScope, isWeekTask } from '@/utils/taskToday';
+import {
+  ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, personalDisplayColumn, projectEquivalentColumn,
+  projectEquivalentStrict,
+  scopedColumnFor, scopedTaskStatusColumn, subtaskToggleTransition,
+} from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { haptic } from '@/utils/haptics';
 import { nextProjectColor } from '@/utils/projectColors';
 import { projectQuickAction } from '@/utils/projectQuickCreate';
-import { applyProjectQuickAction } from '@/utils/projectQuickApply';
+import { applyProjectQuickAction, type ProjectQuickApplyResult } from '@/utils/projectQuickApply';
 import type { Project } from '../projects';
-import { applyFormSprint, retargetTaskProject, sprintBadgeLabel, type Sprint } from '@/utils/sprintUtils';
+import { projectRoute } from '@/constants/projectNav';
+import { applyFormSprint, retargetTaskProject, type Sprint } from '@/utils/sprintUtils';
 import { useResponsive } from '@/hooks/use-responsive';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { useToday } from '@/hooks/use-today';
 import { useCalendarNav, type CalSpan } from '@/hooks/use-calendar-nav';
-import { draftEstimatedMinutes, draftRecurrence, useTaskEditor } from '@/hooks/use-task-editor';
+import { draftEstimatedMinutes, draftRecurrence, editedDraftFields, useTaskEditor } from '@/hooks/use-task-editor';
+import { useAllProjectMembers, useProjectMembers } from '@/hooks/use-project-members';
+import type { MemberOut } from '@/store/project-team';
+import { useProjectRole } from '@/hooks/use-project-role';
+import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { DetailPane } from '@/components/shared/DetailPane';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
@@ -101,78 +134,34 @@ import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { formatClock, formatDuration, formatDurationShort } from '@/utils/durationFormat';
 
-// ─── expo-av conditional (install with: npx expo install expo-av) ────────────
-let AVAudio: any = null;
-try { AVAudio = require('expo-av').Audio; } catch {}
-
-type Status = 'active' | 'done';
-type SortBy = 'status' | 'priority' | 'newest' | 'oldest' | 'name' | 'deadline';
-type Filter = 'all' | 'active' | 'done';
 type ViewMode = 'list' | 'calendar';
 
-interface SubTask { id: string; title: string; done: boolean; reminderAt?: string; }
-
-interface TaskTimeEntry {
-  id: string;
-  startedAt: string;
-  endedAt?: string;
-  duration: number; // seconds
-}
-
-
-interface Task {
-  id: string;
-  title: string;
-  /** Опційний: веб-клієнт пише undefined замість порожнього рядка. */
-  description?: string;
-  /** Легасі-поле (dual-write). Може бути відсутнім у старих записах. */
-  priority?: LegacyPriority;
-  /** P0…P5 / null — CONTRACT §B; читати лише через normalizePriority. */
-  priorityLevel?: TaskPriority;
-  status: Status;
-  kanbanColumnId?: string;
-  subtasks: SubTask[];
-  createdAt: string;
-  startDate?: string;
-  estimatedMinutes?: number;
-  deadline?: string;
-  projectId?: string;
-  /**
-   * Спринт проєкту (utils/sprintUtils.ts). Порожній/відсутній = беклог
-   * проєкту — це НЕ помилка й не привід для міграції: усі наявні завдання
-   * саме такі. У «Сьогодні» спринт не впливає ні на що: там тягне виключно
-   * власний deadline завдання.
-   */
-  sprintId?: string;
-  reminderAt?: string;
-  timeEntries?: TaskTimeEntry[];
-  history?: TaskHistoryEvent[];
+/**
+ * Завдання цього екрана = спільний тип (utils/taskUtils.ts) + поля, які поки
+ * пише лише мобільний клієнт (повтор і аудіозаписи). Раніше тут стояла повна
+ * локальна копія інтерфейсу, і нове поле в утилітах доводилося дописувати
+ * двічі — або воно мовчки губилося на цьому екрані.
+ */
+interface Task extends BaseTask {
   recurrence?: RecurrenceRule;
   recordings?: string[];
 }
 
 
+/**
+ * Локальний `YYYY-MM-DD` — той самий ключ, яким живе `meeting.date`
+ * (`utils/meetings.ts` будує його з getFullYear/getMonth/getDate).
+ *
+ * Свідомо НЕ `toISOString().slice(0, 10)`: на схід від UTC локальна північ у
+ * ISO дає ПОПЕРЕДНЮ добу, тож попап дня шукав зустрічі за вчорашнім ключем
+ * (крапка «є зустріч» на дні раніше, «нічого не заплановано» на правильному
+ * числі), а створена з календаря зустріч зберігалась учорашнім числом.
+ */
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 
-
-/**
- * `today` приходить параметром, а не з модульної константи: та фіксувалась у
- * момент імпорту, і в застосунку, не закритому через північ, вчорашній день
- * ще підписувався «Сьогодні». Джерело свіжого значення — useToday().
- */
-function groupLabel(date: Date, today: Date, todayLabel: string, yesterdayLabel: string, tomorrowLabel: string, locale: string) {
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (date.toDateString() === today.toDateString()) return todayLabel;
-  if (date.toDateString() === yesterday.toDateString()) return yesterdayLabel;
-  const diff = Math.ceil((date.getTime() - today.getTime()) / 86400000);
-  if (diff === 1) return tomorrowLabel;
-  if (diff > 1 && diff <= 7) return date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' });
-  return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-}
 
 function getProgress(t: Task) {
   if (t.status === 'done') return 100;
@@ -225,8 +214,9 @@ function nextRecurrenceDate(fromDateStr: string, rule: RecurrenceRule): string |
   return nextStr;
 }
 
-
-
+/** Стабільне посилання для проєктів без кешу команди (соло) — щоб
+ *  assigneeLabelFor не створював новий масив щоразу. */
+const EMPTY_MEMBERS_LIST: MemberOut[] = [];
 
 export default function TasksScreen() {
   const tabBarInset = useTabBarInset();
@@ -246,6 +236,7 @@ export default function TasksScreen() {
   // потрапить у статусні групи.
   const today = useToday();
   const { tr, lang } = useI18n();
+  const { user } = useAuth();
   // Одиниці приходять зі словника: до цього кожен екран мав власну копію
   // форматування з вшитими «год» і «хв».
   const durationUnits = useMemo(
@@ -258,10 +249,11 @@ export default function TasksScreen() {
   const motion = useMotion();
 
   // Пріоритет для опису картки у VoiceOver: «Пріоритет P2»; без пріоритету — порожньо.
-  const priorityA11y = (t: Pick<Task, 'priority' | 'priorityLevel'>): string => {
+  // useCallback: іде в renderItem списку, який тепер стабільний.
+  const priorityA11y = useCallback((t: Pick<Task, 'priority' | 'priorityLevel'>): string => {
     const level = normalizePriority(t);
     return level === null ? '' : tr.priorityA11y.replace('{level}', priorityLevelLabel(level));
-  };
+  }, [tr.priorityA11y]);
   const SORT_OPTIONS: { key: SortBy; label: string; icon: string }[] = [
     { key: 'status',    label: tr.sortStatus,    icon: 'rectangle.3.group' },
     { key: 'deadline',  label: tr.sortDeadline,  icon: 'flag' },
@@ -278,7 +270,6 @@ export default function TasksScreen() {
   ];
   const MONTHS_UA = tr.months;
   const WEEKDAYS_SHORT = tr.weekdays;
-  const [tasks, setTasks] = useState<Task[]>([]);
   // Таймери завдань живуть у сторі, а не в цьому екрані: ту саму сесію можна
   // зупинити з вкладки часу або з іншого пристрою, і локальний стан про це
   // ніколи б не дізнався.
@@ -292,16 +283,47 @@ export default function TasksScreen() {
   // в те саме рішення тут навмисно немає.
   const [sprints, setSprints] = useState<Sprint[]>([]);
 
+  // Ролі в УСІХ моїх проєктах одразу (contract §4.1) — задачі різних проєктів
+  // лежать в одному списку («Особисте агрегує», §3.7), тож роль перевіряється
+  // за ВЛАСНИМ `projectId` кожної задачі, а не однією роллю на весь екран.
+  const projectRoles = useProjectRoles();
+
   // Пікери показують лише ЖИВІ проєкти, а `projects` лишається повним.
   // Це навмисно: підпис обраного значення шукається в повному списку, тож
   // задача в архівному проєкті й далі показує його назву, а не порожнє поле.
+  // Глядацькі проєкти прибрані (review finding): учасник не мусить мати
+  // змогу ПЕРЕНЕСТИ задачу в проєкт, де сервер однаково відхилить запис
+  // `forbidden` (contract §4.1 — upsert tasks недоступний viewer).
   const pickableProjects = useMemo(
-    () => projects.filter(p => !p.archivedAt),
-    [projects],
+    () => projects.filter(p => !p.archivedAt && canEditProjectItem(p.id, projectRoles)),
+    [projects, projectRoles],
   );
   const [storedTaskStatuses, setStoredTaskStatuses] = useState<TaskStatusColumn[]>([]);
   const taskStatuses = useMemo(() => mergeTaskStatusColumns(storedTaskStatuses), [storedTaskStatuses]);
   const [initialized, setInitialized] = useState(false);
+  /**
+   * Завдання, чий таймер треба зупинити, щойно наш власний запис 'tasks'
+   * долетить до сховища. Стор зупиняє таймер через read-modify-write того
+   * самого ключа — якби він прочитав список ДО нашого запису, або статус
+   * «готово», або дописана сесія загубилися б залежно від того, хто написав
+   * останнім.
+   */
+  const pendingTimerStops = useRef<string[]>([]);
+  /**
+   * 'tasks' більше НЕ зберігається цілим станом (saveSynced дифав масив зі
+   * сховищем, і застарілий стан екрана видаляв задачі, додані на вебі, або
+   * відкочував чужі відмітки). useSyncedList пише лише локальні зміни по
+   * полях і сам перечитує ключ, коли в нього пише рушій синку чи стор таймерів.
+   */
+  const { items: tasks, setItems: setTasks, reload: reloadTasks } = useSyncedList<Task>('tasks', {
+    enabled: initialized,
+    onSaved: () => {
+      if (pendingTimerStops.current.length === 0) return;
+      const ids = pendingTimerStops.current;
+      pendingTimerStops.current = [];
+      for (const id of ids) void stopTimerForTask(id);
+    },
+  });
   const [activeMonth, setActiveMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('active');
@@ -315,6 +337,15 @@ export default function TasksScreen() {
    * мусить назавжди отримати його при кожному відкритті вкладки.
    */
   const [scope, setScope] = useState<TaskListScope>('today');
+  /**
+   * Лише в режимі «Всі»: false (типово) — мої активні З дедлайном, true —
+   * БЕЗ дедлайну (utils/taskToday.ts inTaskScope). Поза «Всі» скидається.
+   */
+  const [noDeadline, setNoDeadline] = useState(false);
+  const selectScope = useCallback((next: TaskListScope, nextNoDeadline = false) => {
+    setScope(next);
+    setNoDeadline(next === 'all' && nextNoDeadline);
+  }, []);
 
   // Search & extra filters
   const [search, setSearch] = useState('');
@@ -365,6 +396,19 @@ export default function TasksScreen() {
   // Створення нового завдання користується тією самою формою й тим самим
   // станом, що й редагування — це той самий набір полів.
   const composer = useTaskEditor(ACTIVE_COLUMN_ID, today);
+  // Учасники проєкту, обраного ПРОСТО ЗАРАЗ у кожній з двох форм (контракт
+  // §4.5) — пікер «Виконавець» у TaskEditForm; порожній список ховає поле.
+  const editorMembers = useProjectMembers(editor.draft.projectId);
+  const composerMembers = useProjectMembers(composer.draft.projectId);
+  // Увесь кеш команд одразу (не один проєкт) — картки списку показують
+  // завдання з РІЗНИХ проєктів одночасно, підпис виконавця (§4.5) шукається
+  // по projectId кожного окремого завдання.
+  const allProjectMembers = useAllProjectMembers();
+  const assigneeLabelFor = useCallback((task: Task): string | null => {
+    if (!task.projectId) return null; // особисте завдання — виконавця нема
+    const members = allProjectMembers[task.projectId] ?? EMPTY_MEMBERS_LIST;
+    return assigneeDisplayName(task.assigneeId, members, user?.id, tr.taskAssigneeMe);
+  }, [allProjectMembers, user?.id, tr.taskAssigneeMe]);
 
   // Reminder picker state (shown inline in detail modal)
   const [showReminderPicker, setShowReminderPicker] = useState(false);
@@ -373,32 +417,30 @@ export default function TasksScreen() {
   const [reminderMins, setReminderMins] = useState('');
   const [reminderDate, setReminderDate] = useState<string | null>(null);
 
-  // Recording
-  const [recordingTaskId, setRecordingTaskId] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [playingUri, setPlayingUri] = useState<string | null>(null);
-  const recordingRef = useRef<any>(null);
-  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const soundRef = useRef<any>(null);
-
   // Detail tab + timer display
-  const [detailTab, setDetailTab] = useState<'info' | 'timer' | 'history'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'timer' | 'history' | 'comments'>('info');
 
-  const loadAll = useCallback(async () => {
-    const [t, p, m, statuses, s] = await Promise.all([
-      loadData<Task[]>('tasks', []),
+  const loadOthers = useCallback(async () => {
+    const [p, m, statuses, s] = await Promise.all([
       loadData<Project[]>('projects', []),
       loadData<Meeting[]>('meetings', []),
       loadData<TaskStatusColumn[]>('task_statuses', []),
       loadData<Sprint[]>('sprints', []),
     ]);
-    setTasks(t);
     setProjects(p);
     setMeetings(m);
     setStoredTaskStatuses(statuses);
     setSprints(s);
   }, []);
+
+  const loadAll = useCallback(async () => {
+    await Promise.all([reloadTasks(), loadOthers()]);
+  }, [reloadTasks, loadOthers]);
+
+  // Проєкти, спринти й статуси екран лише читає — чужий запис (пул синку,
+  // сторінка проєкту) перечитується одразу, без pull-to-refresh.
+  // 'meetings' тут немає: для них окрема підписка нижче (reloadMeetings).
+  useStorageRefresh(['projects', 'task_statuses', 'sprints'], loadOthers, initialized);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -409,7 +451,7 @@ export default function TasksScreen() {
   // Load from storage (useFocusEffect refreshes when returning from subtasks screen)
   useFocusEffect(useCallback(() => {
     loadAll().then(() => { setInitialized(true); setMeetingsInit(true); });
-  }, []));
+  }, [loadAll]));
 
   // Open create-task modal when navigated with ?create=1 (e.g. from Today quick actions)
   // ?projectId=&sprintId= — створення зі спринта в деталі проєкту: форма
@@ -422,57 +464,72 @@ export default function TasksScreen() {
     /** ?meeting=<id оригіналу>&meetingDate=YYYY-MM-DD — перегляд зустрічі (з «Сьогодні»). */
     meeting?: string; meetingDate?: string;
   }>();
+  /**
+   * Проєкт, у простір якого повернутись, коли закриється модалка, відкрита
+   * звідси нижче (review finding: «openTask/openFullForm пушать у /(tabs) —
+   * лишають простір проєкту; закриття лишає користувача в Особистому»).
+   * Повний редактор задачі й далі живе лише тут (один на застосунок) — але
+   * прихід із проєкту (`?open=`/`?create=1&projectId=`) запам'ятовує, куди
+   * повернутись, а ефект нижче виконує сам перехід, щойно і `selected`
+   * (деталь задачі), і `showAdd` (форма створення) знову закриті — байдуже,
+   * яким саме шляхом користувач це зробив (Готово, Видалити, свайп тощо).
+   */
+  const [returnToProject, setReturnToProject] = useState<string | null>(null);
+
+  // Окремою змінною, а не `composer` цілком: `reset` стабільний (useCallback
+  // на [today], а today тут — `useToday()`), тоді як сам composer міняє
+  // ідентичність на кожну зміну чернетки — ефект нижче бігав би на кожну
+  // натиснуту клавішу й скидав би форму. Раніше це вирішував eslint-disable,
+  // від якого React Compiler переставав оптимізувати ВЕСЬ екран (PERF-2).
+  const composerReset = composer.reset;
   useEffect(() => {
     if (createParam === '1') {
       if (projectParam) {
-        composer.reset(ACTIVE_COLUMN_ID, { projectId: projectParam, sprintId: sprintParam || null });
+        composerReset(ACTIVE_COLUMN_ID, { projectId: projectParam, sprintId: sprintParam || null });
+        setReturnToProject(projectParam);
       }
       setShowAdd(true);
       router.setParams({ create: '', projectId: '', sprintId: '' });
     }
-    // composer навмисно поза deps: реагуємо лише на прихід параметра.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createParam, projectParam, sprintParam, router]);
+  }, [createParam, projectParam, sprintParam, router, composerReset]);
 
   // Open task details when navigated with ?open=<taskId> (e.g. from Today rows)
   useEffect(() => {
     if (!openParam || !initialized) return;
     const t = tasks.find(x => x.id === openParam);
-    if (t) setSelected(t);
+    if (t) {
+      setSelected(t);
+      if (t.projectId) setReturnToProject(t.projectId);
+    }
     router.setParams({ open: '' });
-    // tasks навмисно поза deps: реагуємо лише на прихід параметра після ініціалізації
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openParam, initialized, router]);
+    // `tasks` у deps чесно: ефект усе одно виконується один раз — перший же
+    // прохід гасить `openParam` через router.setParams, а далі спрацьовує
+    // ранній вихід. Було в eslint-disable, який вимикав React Compiler на
+    // всьому екрані (PERF-2).
+  }, [openParam, initialized, router, tasks]);
 
-  /**
-   * Завдання, чий таймер треба зупинити, щойно наш власний запис 'tasks'
-   * долетить до сховища. Стор зупиняє таймер через read-modify-write того
-   * самого ключа — якби він прочитав список ДО нашого запису, або статус
-   * «готово», або дописана сесія загубилися б залежно від того, хто написав
-   * останнім.
-   */
-  const pendingTimerStops = useRef<string[]>([]);
-
-  // Save to storage
+  // Сам перехід назад — щойно ОБИДВІ модалки, які могли прийти з проєкту,
+  // знову закриті. `router.back()`, коли можна: цей екран стоїть у стеку
+  // ПОВЕРХ `/project/{id}/tasks` (routing — push, не replace), і повернення
+  // назад лишає скрол/стан того екрана як був; `router.replace` — запасний
+  // шлях, якщо стека раптом нема (наприклад, deep link).
   useEffect(() => {
-    if (!initialized) return;
-    void saveSynced('tasks', tasks).then(() => {
-      if (pendingTimerStops.current.length === 0) return;
-      const ids = pendingTimerStops.current;
-      pendingTimerStops.current = [];
-      for (const id of ids) void stopTimerForTask(id);
-    });
-  }, [tasks, initialized, stopTimerForTask]);
+    if (!returnToProject || selected || showAdd) return;
+    const target = returnToProject;
+    setReturnToProject(null);
+    if (router.canGoBack()) router.back();
+    else router.replace(projectRoute(target, 'tasks') as never);
+  }, [returnToProject, selected, showAdd, router]);
 
   // Стор пише 'tasks' повз наш стан: старт таймера дописує історію і рухає
-  // колонку, зупинка — додає завершену сесію. Без перечитування наступний
-  // запис цього екрана затер би все це своїм застарілим списком.
+  // колонку, зупинка — додає завершену сесію. Підписка useSyncedList це вже
+  // ловить; ревізія стору — запасний сигнал на випадок, якщо запис пройшов
+  // повз saveData.
   useEffect(() => {
     if (!initialized || tasksRevision === 0) return;
-    loadData<Task[]>('tasks', [])
-      .then(setTasks)
+    reloadTasks()
       .catch(e => { if (__DEV__) console.warn('[tasks] перечитування після запису стору не вдалося:', e); });
-  }, [tasksRevision, initialized]);
+  }, [tasksRevision, initialized, reloadTasks]);
 
   // 'meetings' цей екран більше НЕ зберігає цілим станом: saveSynced дифає
   // масив зі сховищем, і зустріч, додана деінде (синк-пул, екран «Зустрічі»,
@@ -487,10 +544,9 @@ export default function TasksScreen() {
   const mutateMeetings = useCallback((mutate: (list: Meeting[]) => Meeting[]) => {
     meetingsWriteQueue.current = meetingsWriteQueue.current
       .then(() => trackMeetingsWrite(async () => {
-        const fresh = await loadData<Meeting[]>('meetings', []);
-        const next = mutate(fresh);
-        setMeetings(next);
-        await saveSynced('meetings', next);
+        // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+        // ними інакше пішов би на сервер як DELETE.
+        setMeetings(await updateSynced<Meeting>('meetings', mutate));
       }))
       .catch(e => { if (__DEV__) console.warn('[meetings] збереження не вдалося:', e); });
   }, [trackMeetingsWrite]);
@@ -507,18 +563,24 @@ export default function TasksScreen() {
   // Ref для синхронного читання поточних tasks (використовується в callbacks без deps)
   const tasksRef = useRef<Task[]>([]);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+  const storedTaskStatusesRef = useRef<TaskStatusColumn[]>([]);
+  useEffect(() => { storedTaskStatusesRef.current = storedTaskStatuses; }, [storedTaskStatuses]);
 
   // Undo-тост (таб — над таб-баром)
   const { show: showUndo, element: undoElement } = useUndoToast(true);
 
   // Reset detail tab when opening a different task
+  // Ключ — саме id, а не об'єкт: інакше будь-яке оновлення задачі (синк,
+  // цокання таймера) викидало б людину з відкритої вкладки «Коментарі» на
+  // «Інфо». Окрема змінна замість `selected?.id` у тілі — щоб deps були
+  // чесні без eslint-disable, який глушив React Compiler (PERF-2).
+  const selectedId = selected?.id;
   useEffect(() => {
     setDetailTab('info');
     setShowReminderPicker(false);
     // Панель деталі одна на задачу й зустріч: відкрита задача витісняє зустріч.
-    if (selected) setSelectedMeeting(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id]);
+    if (selectedId) setSelectedMeeting(null);
+  }, [selectedId]);
 
   // Джерело правди про «йде» — реєстр активних таймерів у сторі. Читання
   // синхронне, але реактивне: стор оновлює стан разом із ref, тож цей рендер
@@ -528,7 +590,10 @@ export default function TasksScreen() {
 
   const todayStr = today.toDateString();
   // Tasks due today (deadline = today) — both done and not done
-  const dueTodayTasks   = tasks.filter(t => t.deadline && new Date(t.deadline).toDateString() === todayStr);
+  // Лише МОЄ (isMyTask): у шапці не має рахуватись робота інших учасників
+  // проєктів, якої немає в самому списку нижче.
+  const dueTodayTasks   = tasks.filter(t => t.deadline && new Date(t.deadline).toDateString() === todayStr
+    && (user?.id === undefined || isMyTask(t, user.id, projectRoles)));
   const doneCount       = dueTodayTasks.filter(t => t.status === 'done').length;
   const activeCount     = dueTodayTasks.filter(t => t.status === 'active').length;
   // Efficiency based on subtasks (if task has subtasks, count subtask progress; otherwise count task status)
@@ -557,25 +622,27 @@ export default function TasksScreen() {
     return set;
   }, [tasks]);
 
-  const sorted = useMemo(() => {
-    return [...tasks].sort((a, b) => {
-      switch (sort) {
-        case 'deadline': {
-          if (!a.deadline && !b.deadline) return 0;
-          if (!a.deadline) return 1;
-          if (!b.deadline) return -1;
-          return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-        }
-        // Усередині статусної групи порядок задає пріоритет: сам статус уже
-        // винесений у заголовок групи.
-        case 'status':
-        case 'priority': return comparePriority(a, b); // P0→P5, без пріоритету — в кінці
-        case 'newest':   return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        case 'oldest':   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        case 'name':     return a.title.localeCompare(b.title, 'uk');
-      }
-    });
-  }, [tasks, sort]);
+  const sorted = useMemo(() => sortTasksForList(tasks, sort), [tasks, sort]);
+
+  /**
+   * Усе, що звужує список, одним обʼєктом. Той самий обʼєкт іде параметрами
+   * маршруту на екран «Всі (N)» — і там із нього будується рівно той самий
+   * набір (utils/taskListView.ts), а не друга копія правил.
+   */
+  const listQuery = useMemo<TaskListQuery>(() => ({
+    filter, sort, scope, search,
+    projectId: filterProject,
+    priorities: filterPriorities,
+    dateFilter,
+    month: activeMonth,
+    // §3.7 «Особисте агрегує» — те саме правило «моє», що вже застосовує
+    // «Сьогодні» (groupTodayTasks): без нього «Завдання» показували чужі
+    // задачі з усіх проєктів, щойно в проєкті зʼявиться другий учасник
+    // (мінор із ревʼю).
+    myUserId: user?.id,
+    projectRoles,
+    noDeadline: scope === 'all' && noDeadline,
+  }), [filter, sort, scope, search, filterProject, filterPriorities, dateFilter, activeMonth, user?.id, projectRoles, noDeadline]);
 
   /**
    * Набір без урахування денного скоупу — тобто те, що людина побачила б,
@@ -585,45 +652,19 @@ export default function TasksScreen() {
    * порожньо, порожній стан мусить чесно сказати, СКІЛЬКИ роботи лежить поза
    * днем. Рахувати це «десь іще» означало б завести другу копію набору фільтрів.
    */
-  const filteredAll = useMemo(() => {
-    const monthFiltered = filterTasksByMonth(sorted, activeMonth);
-    return monthFiltered.filter(t => {
-      // Правило видимості — в утиліті: у режимі групування за статусом
-      // завершені лишаються, щоб група «Готово» взагалі мала з чого зʼявитись.
-      if (!taskVisibleInList(t, filter, sort)) return false;
-      if (dateFilter) {
-        const d = new Date(t.createdAt);
-        if (d.toDateString() !== dateFilter) return false;
-      }
-      if (!taskMatchesSearch(t, search)) return false;
-      if (filterProject && t.projectId !== filterProject) return false;
-      if (!matchesPriorityFilter(t, filterPriorities)) return false;
-      return true;
-    });
-  }, [sorted, activeMonth, filter, sort, dateFilter, search, filterProject, filterPriorities]);
+  const filteredAll = useMemo(() => filterTasksForList(sorted, listQuery), [sorted, listQuery]);
 
-  const filtered = useMemo(() => {
-    if (scope === 'all') return filteredAll;
-    const now = new Date();
-    return filteredAll.filter(t => {
-      // У денному режимі «Готово» — це закрите СЬОГОДНІ, а не за вікном у два
-      // дні: вчорашня закрита справа серед сьогоднішніх вдає незавершену роботу.
-      if (!taskVisibleInList(t, filter, sort, now, 'today')) return false;
-      // Денний скоуп відсіює несьогоднішнє тут, а не в побудові секцій, і для
-      // ВСІХ сортувань однаково. Раніше при групуванні за статусом виняток був:
-      // несьогоднішнє доходило до buildStatusListSections і лягало в згорнуті
-      // шухляди під групами. Шухляди прибрано, а разом з ними й виняток —
-      // інакше `filtered` рахував би беклог видимим, і порожній екран у
-      // «Сьогодні» лишався б без жодного порожнього стану під ним.
-      return isTodayTask(t, taskStatuses, today);
-    });
-  }, [filteredAll, scope, filter, sort, taskStatuses, today]);
+  const filtered = useMemo(
+    // storedTaskStatuses (сирий, усі потоки), а не taskStatuses (звужений до
+    // особистого) — інакше isTodayTask/статусні групи всередині не бачать
+    // власних колонок задач проєкту (§3.7 «Особисте агрегує»).
+    () => applyTaskScope(filteredAll, listQuery, storedTaskStatuses, today),
+    [filteredAll, listQuery, storedTaskStatuses, today],
+  );
 
   // Overdue tasks pulled into a dedicated top section (list view, active/all filter only)
   const overdueItems = useMemo(
-    () => (filter !== 'done' && viewMode === 'list')
-      ? filtered.filter(t => isOverdue(t))
-      : [],
+    () => overdueForList(filtered, filter, viewMode === 'list'),
     [filtered, filter, viewMode],
   );
 
@@ -633,44 +674,20 @@ export default function TasksScreen() {
     [filtered, overdueItems],
   );
 
-  const groups = useMemo<{ key: string; label: string; tasks: Task[] }[]>(() => {
-    // Статусні групи — це погляд на СЬОГОДНІ: правило, кого туди пускати,
-    // живе в утиліті поруч із правилом екрана дня, щоб копії не розходились.
-    // Скоуп їй передаємо попри те, що `filtered` вже відсіяв несьогоднішнє:
-    // друга перевірка нічого не коштує, а от мовчазна залежність від порядку
-    // фільтрів коштувала б наступній правці.
-    if (sort === 'status') {
-      return buildStatusListSections(groupsSource, taskStatuses, today, scope);
-    }
-    const map: Record<string, { label: string; tasks: Task[] }> = {};
-    const order: string[] = [];
-    groupsSource.forEach(t => {
-      let key: string;
-      let label: string;
-      if (sort === 'deadline') {
-        if (!t.deadline) {
-          key = '__no_deadline__';
-          label = tr.withoutDeadline;
-        } else {
-          const d = new Date(t.deadline);
-          key = d.toDateString();
-          label = groupLabel(d, today, tr.today, tr.yesterday, tr.tomorrow, locale);
-        }
-      } else {
-        const d = new Date(t.createdAt);
-        key = d.toDateString();
-        label = groupLabel(d, today, tr.today, tr.yesterday, tr.tomorrow, locale);
-      }
-      if (!map[key]) { map[key] = { label, tasks: [] }; order.push(key); }
-      map[key].tasks.push(t);
-    });
-    const noDeadlineIdx = order.indexOf('__no_deadline__');
-    if (noDeadlineIdx > 0) {
-      order.splice(noDeadlineIdx, 1);
-      order.push('__no_deadline__');
-    }
-    return order.map(k => ({ key: k, ...map[k] }));
-  }, [groupsSource, sort, scope, taskStatuses, today, tr, locale]);
+  const groupLabels = useMemo<GroupLabels>(() => ({
+    today: tr.today,
+    yesterday: tr.yesterday,
+    tomorrow: tr.tomorrow,
+    withoutDeadline: tr.withoutDeadline,
+    overdue: tr.overdueSection,
+  }), [tr]);
+
+  // Статусні групи — це погляд на СЬОГОДНІ: правило, кого туди пускати,
+  // живе в утиліті поруч із правилом екрана дня, щоб копії не розходились.
+  const groups = useMemo<TaskListGroup<Task>[]>(
+    () => buildTaskGroups(groupsSource, listQuery, storedTaskStatuses, today, groupLabels, locale),
+    [groupsSource, listQuery, storedTaskStatuses, today, groupLabels, locale],
+  );
 
   // Пошук навмисно не враховано: у нього власна гілка порожнього стану,
   // і змішувати їх означало б радити «скинути фільтри» людині, яка
@@ -681,7 +698,15 @@ export default function TasksScreen() {
   const addTask = useCallback(() => {
     const draft = composer.draft;
     if (!draft.title.trim()) return;
-    const selectedStatus = taskStatuses.find(column => column.id === draft.statusId) ?? taskStatuses[0];
+    const pickedStatus = taskStatuses.find(column => column.id === draft.statusId) ?? taskStatuses[0];
+    // Пікер форми пропонує ОСОБИСТІ статуси незалежно від обраного проєкту
+    // (§3.7); еквівалент у ЦЬОМУ проєкті — інакше нова задача проєкту
+    // отримувала б особистий status-active/status-done, якого немає серед
+    // колонок його дошки (review finding: «create at index.tsx:611 uses
+    // selectedStatus.id»), і зникала б із board view.
+    const selectedStatus = draft.projectId
+      ? projectEquivalentColumn(pickedStatus, storedTaskStatuses, draft.projectId) ?? pickedStatus
+      : pickedStatus;
     const base: Task = {
       id: Date.now().toString(),
       title: draft.title.trim(),
@@ -694,6 +719,12 @@ export default function TasksScreen() {
       estimatedMinutes: draftEstimatedMinutes(draft),
       deadline: draft.deadline ?? undefined,
       projectId: draft.projectId ?? undefined,
+      // §3.3 «createdBy — клієнт ставить при створенні в проєкті».
+      createdBy: draft.projectId ? user?.id : undefined,
+      // §4.5 — виконавець; має сенс лише для завдання проєкту. Не обраний —
+      // я: в особистому просторі видно лише призначене мені (isMyTask), і без
+      // цього щойно створена задача проєкту зникала б одразу після «Додати».
+      assigneeId: assigneeForPersonalProjectTask({ projectId: draft.projectId ?? undefined, assigneeId: draft.assigneeId ?? undefined }, user?.id),
       timeEntries: [],
       history: [makeHistoryEvent('created')],
       recurrence: draftRecurrence(draft),
@@ -709,14 +740,22 @@ export default function TasksScreen() {
     // невідрізнити від втрати даних: вона щойно натиснула кнопку й нічого не
     // побачила. Тому створення, що виводить завдання з поточного обсягу, САМЕ
     // розширює обсяг до «Усі» — дія користувача важить більше за фільтр.
-    if (!isTodayTask(created, taskStatuses, today)) setScope('all');
+    if (!inTaskScope(created, storedTaskStatuses, scope, { noDeadline }, today)) {
+      if (isWeekTask(created, storedTaskStatuses, today)) selectScope('week');
+      else selectScope('all', !created.deadline);
+    }
     composer.reset(ACTIVE_COLUMN_ID);
     setShowAdd(false);
     haptic.success();
-  }, [composer, taskStatuses, today, sprints]);
+  }, [composer, taskStatuses, storedTaskStatuses, today, sprints, setTasks, user, scope, noDeadline, selectScope]);
 
   const deleteTask = useCallback((id: string, title?: string) => {
     const taskToDelete = tasksRef.current.find(t => t.id === id);
+    // Contract §4.1: глядач не видаляє проєктні задачі. Перевірка ТУТ, а не
+    // лише прихованою кнопкою (review finding): та сама функція викликається
+    // з деталі задачі, з рядків «Сьогодні»/Завдань і з дошки/списку проєкту —
+    // один захист замість дублювання в кожному місці виклику.
+    if (!canEditProjectItem(taskToDelete?.projectId, projectRoles)) return;
     Alert.alert(
       tr.deletePermanently,
       title ? `«${title}»\n${tr.cannotUndo}` : tr.cannotUndo,
@@ -745,85 +784,7 @@ export default function TasksScreen() {
         },
       ],
     );
-  }, [selected, tr, showUndo, getTimerForTask]);
-
-  // ─── Recording ──────────────────────────────────────────────────────────────
-  const startRecording = useCallback(async (taskId: string) => {
-    if (!AVAudio) { Alert.alert('Потрібен пакет', 'Встановіть: npx expo install expo-av'); return; }
-    try {
-      const { granted } = await AVAudio.requestPermissionsAsync();
-      if (!granted) { Alert.alert('Немає дозволу', 'Дозвольте доступ до мікрофону в налаштуваннях.'); return; }
-      await AVAudio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await AVAudio.Recording.createAsync(AVAudio.RecordingOptionsPresets.HIGH_QUALITY);
-      recordingRef.current = recording;
-      setRecordingTaskId(taskId);
-      setIsRecording(true);
-      setRecordingSeconds(0);
-      recordTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
-    } catch (e: any) {
-      if (__DEV__) console.warn('[record] start error:', e);
-      Alert.alert('Помилка запису', e?.message);
-    }
-  }, []);
-
-  const stopRecording = useCallback(async () => {
-    if (!recordingRef.current) return;
-    if (recordTimerRef.current) { clearInterval(recordTimerRef.current); recordTimerRef.current = null; }
-    try {
-      await recordingRef.current.stopAndUnloadAsync();
-      await AVAudio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = recordingRef.current.getURI();
-      recordingRef.current = null;
-      setIsRecording(false);
-      if (uri && recordingTaskId) {
-        setTasks(prev => prev.map(t => t.id === recordingTaskId
-          ? { ...t, recordings: [...(t.recordings ?? []), uri] }
-          : t
-        ));
-      }
-      setRecordingTaskId(null);
-      setRecordingSeconds(0);
-    } catch (e: any) {
-      if (__DEV__) console.warn('[record] stop error:', e);
-    }
-  }, [recordingTaskId]);
-
-  const playRecording = useCallback(async (uri: string) => {
-    if (!AVAudio) return;
-    try {
-      if (soundRef.current) { await soundRef.current.unloadAsync(); soundRef.current = null; setPlayingUri(null); }
-      if (playingUri === uri) return;
-      const { sound } = await AVAudio.Sound.createAsync({ uri });
-      soundRef.current = sound;
-      setPlayingUri(uri);
-      await sound.playAsync();
-      sound.setOnPlaybackStatusUpdate((status: any) => {
-        if (status.didJustFinish) { setPlayingUri(null); sound.unloadAsync(); soundRef.current = null; }
-      });
-    } catch (e: any) {
-      if (__DEV__) console.warn('[record] play error:', e);
-    }
-  }, [playingUri]);
-
-  const deleteRecording = useCallback((taskId: string, uri: string) => {
-    Alert.alert('Видалити запис?', '', [
-      { text: 'Скасувати', style: 'cancel' },
-      { text: 'Видалити', style: 'destructive', onPress: () => {
-        setTasks(prev => prev.map(t => t.id === taskId
-          ? { ...t, recordings: (t.recordings ?? []).filter(r => r !== uri) }
-          : t
-        ));
-      }},
-    ]);
-  }, []);
-
-  // Cleanup recording on unmount
-  useEffect(() => () => {
-    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
-    recordingRef.current?.stopAndUnloadAsync().catch(() => {});
-    soundRef.current?.unloadAsync().catch(() => {});
-  }, []);
-  // ────────────────────────────────────────────────────────────────────────────
+  }, [selected, tr, showUndo, getTimerForTask, setTasks, projectRoles]);
 
   /**
    * Переносить завдання в іншу колонку статусу.
@@ -832,17 +793,15 @@ export default function TasksScreen() {
    * увійшовши в режим редагування. Тобто перевести завдання з «В роботі» в
    * будь-який інший кастомний статус із деталей було неможливо.
    */
-  const setTaskColumn = useCallback((id: string, columnId: string) => {
-    const column = taskStatuses.find(item => item.id === columnId);
-    if (!column) return;
-    haptic.light();
+  /** Ставить задачу в УЖЕ зведену до її простору колонку. */
+  const applyTaskColumn = useCallback((id: string, column: TaskStatusColumn) => {
     // Перенесення в колонку «готово» — така сама зупинка таймера, як і
     // чекбокс: інакше відлік лишався б на завершеному завданні, а кнопку
     // «Стоп» у деталі до нього вже не показують.
     if (column.isDone && getTimerForTask(id)) pendingTimerStops.current.push(id);
     setTasks(prev => prev.map(t => {
       if (t.id !== id) return t;
-      if (taskStatusColumn(t, taskStatuses).id === column.id) return t;
+      if (scopedTaskStatusColumn(t, storedTaskStatusesRef.current).id === column.id && t.kanbanColumnId === column.id) return t;
       const status: Status = column.isDone ? 'done' : 'active';
       return {
         ...t,
@@ -853,18 +812,60 @@ export default function TasksScreen() {
         history: [...(t.history ?? []), makeHistoryEvent(column.isDone ? 'done' : 'active', column.name)],
       };
     }));
-  }, [taskStatuses, getTimerForTask]);
+  }, [getTimerForTask, setTasks]);
+
+  const setTaskColumn = useCallback((id: string, columnId: string) => {
+    const chosen = taskStatuses.find(item => item.id === columnId);
+    if (!chosen) return;
+    const task = tasksRef.current.find(t => t.id === id);
+    if (!task) return;
+    // Contract §4.1: глядач не рухає проєктну задачу по статусах.
+    if (!canEditProjectItem(task.projectId, projectRoles)) return;
+    haptic.light();
+    // Пікер пропонує ОСОБИСТІ статуси незалежно від проєкту задачі (§3.7
+    // «Особисте агрегує»); задачі проєкту пишемо еквівалент у ВЛАСНОМУ
+    // проєкті: та сама назва → копія → явний зв'язок (utils/statusLinks.ts).
+    const strict = projectEquivalentStrict(chosen, storedTaskStatuses, task.projectId);
+    if (strict) { applyTaskColumn(id, strict); return; }
+    // Розбіжність: у проєкті немає такого статусу. Дія зроблена в ОСОБИСТОМУ
+    // просторі — питаємо, куди перенести задачу в проєкті, і запам'ятовуємо
+    // відповідь, щоб наступного разу не питати.
+    const projectId = task.projectId!;
+    const projectColumns = mergeTaskStatusColumns(storedTaskStatuses, projectId);
+    const projectName = projects.find(p => p.id === projectId)?.name ?? '';
+    Alert.alert(
+      tr.statusLinkAskProjectTitle,
+      tr.statusLinkAskProjectBody.replace('{project}', projectName).replace('{name}', chosen.name),
+      [
+        ...projectColumns.map(column => ({
+          text: column.name,
+          onPress: () => {
+            applyTaskColumn(id, column);
+            void saveStatusLink(chosen, projectId, column.id);
+          },
+        })),
+        { text: tr.cancel, style: 'cancel' as const },
+      ],
+    );
+  }, [taskStatuses, storedTaskStatuses, projectRoles, projects, tr, applyTaskColumn]);
 
   const toggleTask = useCallback((id: string) => {
-    haptic.light();
     // Знімок поточного стану задачі для undo
     const prevTask = tasksRef.current.find(t => t.id === id);
+    // Contract §4.1: глядач не відмічає проєктну задачу готовою.
+    if (!canEditProjectItem(prevTask?.projectId, projectRoles)) return;
+    haptic.light();
     const becomingDone = prevTask?.status === 'active';
 
     const patch = (t: Task): Task => {
       if (t.id !== id) return t;
       const status: Status = t.status === 'done' ? 'active' : 'done';
-      const kanbanColumnId = status === 'done' ? DONE_COLUMN_ID : ACTIVE_COLUMN_ID;
+      // Скоуп за ВЛАСНИМ проєктом задачі (§3.7): без цього чекбокс завжди
+      // ставив особистий status-active/status-done, і задача проєкту після
+      // відмітки «готово» лишалась у своїй дошці в колонці «todo» назавжди
+      // (review finding: «quick-toggle changes status but not kanbanColumnId»).
+      const kanbanColumnId = scopedColumnFor(storedTaskStatuses, t.projectId, status === 'done' ? 'done' : 'todo')?.id
+        ?? (status === 'done' ? DONE_COLUMN_ID : ACTIVE_COLUMN_ID);
       const histType: HistoryEventType = status === 'done' ? 'done' : 'active';
       // timeEntries тут не чіпаємо: завершену сесію допише стор при зупинці —
       // він єдиний знає, коли вона почалась.
@@ -890,7 +891,7 @@ export default function TasksScreen() {
             ...task,
             id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
             status: 'active',
-            kanbanColumnId: ACTIVE_COLUMN_ID,
+            kanbanColumnId: scopedColumnFor(storedTaskStatuses, task.projectId, 'todo')?.id ?? ACTIVE_COLUMN_ID,
             deadline: nextDeadline,
             subtasks: task.subtasks.map(s => ({ ...s, done: false })),
             timeEntries: [],
@@ -929,7 +930,7 @@ export default function TasksScreen() {
         setSelected(prev => prev?.id === id ? restore(prev) : prev);
       });
     }
-  }, [showUndo, tr.taskMarkedDone, getTimerForTask]);
+  }, [showUndo, tr.taskMarkedDone, getTimerForTask, setTasks, storedTaskStatuses, projectRoles]);
 
   const addSubtask = useCallback((taskId: string) => {
     if (!newSubtask.trim()) return;
@@ -942,15 +943,17 @@ export default function TasksScreen() {
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
     setNewSubtask('');
-  }, [newSubtask]);
+  }, [newSubtask, setTasks]);
 
   const toggleSubtask = useCallback((taskId: string, subId: string) => {
     const current = tasksRef.current.find(t => t.id === taskId);
+    // Contract §4.1: підзадача — частина запису задачі, тож той самий захист.
+    if (!canEditProjectItem(current?.projectId, projectRoles)) return;
     const nextSubs = current?.subtasks.map(s => s.id === subId ? { ...s, done: !s.done } : s) ?? [];
     // Єдине джерело правила «куди веде відмітка підзавдання» — утиліта.
     // null означає, що ні статус, ні колонку чіпати не можна: відмітка не
     // останньої підзадачі не мусить викидати завдання з «У процесі».
-    const transition = current ? subtaskToggleTransition(current, nextSubs) : null;
+    const transition = current ? subtaskToggleTransition(current, nextSubs, storedTaskStatusesRef.current) : null;
     // Закрита остання підзадача — робота скінчилась, тож таймер зупиняємо так
     // само, як від чекбокса завдання. Зупинка сама переставляє завдання в «На
     // перевірці», тобто пише ТУ САМУ колонку, що й перехід вище: два
@@ -971,13 +974,13 @@ export default function TasksScreen() {
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, [getTimerForTask]);
+  }, [getTimerForTask, setTasks, projectRoles]);
 
   const deleteSubtask = useCallback((taskId: string, subId: string) => {
     const patch = (t: Task): Task => t.id === taskId ? { ...t, subtasks: t.subtasks.filter(s => s.id !== subId) } : t;
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, []);
+  }, [setTasks]);
 
   const moveSubtask = useCallback((taskId: string, subId: string, dir: 'up' | 'down') => {
     const patch = (t: Task): Task => {
@@ -992,10 +995,10 @@ export default function TasksScreen() {
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, []);
+  }, [setTasks]);
 
   const duplicateSubtask = useCallback((taskId: string, sub: SubTask) => {
-    const copy: SubTask = { id: Date.now().toString(), title: sub.title + ' (копія)', done: false };
+    const copy: SubTask = { id: Date.now().toString(), title: sub.title + tr.subtaskCopySuffix, done: false };
     const patch = (t: Task): Task => {
       if (t.id !== taskId) return t;
       const idx = t.subtasks.findIndex(s => s.id === sub.id);
@@ -1005,7 +1008,7 @@ export default function TasksScreen() {
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, []);
+  }, [setTasks, tr.subtaskCopySuffix]);
 
   const saveSubEdit = useCallback((taskId: string, subId: string, text: string) => {
     if (!text.trim()) { setEditingSubId(null); return; }
@@ -1015,7 +1018,7 @@ export default function TasksScreen() {
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
     setEditingSubId(null);
-  }, []);
+  }, [setTasks]);
 
   const updateTaskProject = useCallback((taskId: string, projectId: string | null) => {
     // retargetTaskProject, а не просто підміна поля: разом із проєктом задача
@@ -1023,16 +1026,53 @@ export default function TasksScreen() {
     const patch = (t: Task): Task => t.id !== taskId ? t : retargetTaskProject(t, projectId ?? undefined);
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, []);
+  }, [setTasks]);
 
   // Стабільні посилання: інакше React.memo на картках нічого не дає.
   const sections = useMemo(
     // key, а не позиція в масиві: групи зʼявляються й зникають разом зі своїм
     // вмістом, і без стабільного ключа заголовки перемонтовувались би на
     // кожній зміні складу.
-    () => groups.map(group => ({ key: group.key, title: group.label, data: group.tasks })),
+    // Секція показує не більше TASK_GROUP_LIMIT завдань; решту відкриває
+    // «Всі (N)» у футері секції — окремий екран лише цієї групи.
+    () => groups.map(group => {
+      const { visible, total } = limitGroupTasks(group.tasks);
+      return { key: group.key, title: group.label, data: visible, total };
+    }),
     [groups],
   );
+  const overdueLimited = useMemo(() => limitGroupTasks(overdueItems), [overdueItems]);
+
+  /**
+   * «Всі (N)»: повний список однієї групи на окремому екрані. Передаємо не
+   * знімок завдань, а ФІЛЬТРИ — екран сам перечитує сховище й будує той самий
+   * набір тими самими утилітами, тож список там лишається живим.
+   */
+  const openGroup = useCallback((key: string, title: string) => {
+    router.push({
+      pathname: '/task-group',
+      params: { mode: 'tasks', group: key, title, ...taskListQueryToParams(listQuery) },
+    });
+  }, [router, listQuery]);
+
+  // ─── Копіювання як Markdown ────────────────────────────────────────────────
+  const copyTask = useCallback((task: Task) => {
+    const text = taskToMarkdown(task, { projects, sprints, columns: taskStatuses }, taskMarkdownLabels(tr));
+    void copyTextToClipboard(text).then(ok => { if (ok) showUndo(tr.taskCopied); });
+  }, [projects, sprints, taskStatuses, tr, showUndo]);
+
+  const copySubtask = useCallback((sub: { title: string }) => {
+    void copyTextToClipboard(sub.title).then(ok => { if (ok) showUndo(tr.subtaskCopied); });
+  }, [tr, showUndo]);
+
+  /** Довгий тап по картці списку — меню дій над завданням. */
+  const showTaskCardMenu = useCallback((task: Task) => {
+    haptic.light();
+    Alert.alert(task.title, undefined, [
+      { text: tr.copyTask, onPress: () => copyTask(task) },
+      { text: tr.cancel, style: 'cancel' },
+    ]);
+  }, [tr, copyTask]);
 
   /**
    * Скільки роботи припадає на сьогодні. Рахується від НАБОРУ до денного
@@ -1040,18 +1080,28 @@ export default function TasksScreen() {
    * список, і підрахунок по них показував би на тумблері «Сьогодні» його ж
    * число. Прострочене входить сюди само — воно сьогоднішнє за правилом.
    */
-  const todayCount = useMemo(
-    () => filteredAll.filter(t => isTodayTask(t, taskStatuses, today)).length,
-    [filteredAll, taskStatuses, today],
+  const scopeCounts = useMemo(
+    () => taskScopeCounts(filteredAll, listQuery, storedTaskStatuses, today),
+    [filteredAll, listQuery, storedTaskStatuses, today],
   );
-  /** Скільки роботи лишається поза сьогоднішнім днем — число на тумблері «Усі». */
-  const beyondTodayCount = filteredAll.length - todayCount;
+  const todayCount = scopeCounts.today;
+  /**
+   * Куди вести з порожнього «Сьогодні»: у найближчий непорожній режим —
+   * тиждень, далі «Всі» з дедлайном, далі «Без дедлайну».
+   */
+  const emptyTodayTarget = useMemo(() => (
+    scopeCounts.week > 0
+      ? { scope: 'week' as const, noDeadline: false, count: scopeCounts.week, label: tr.tasksScopeWeek }
+      : scopeCounts.all > 0
+        ? { scope: 'all' as const, noDeadline: false, count: scopeCounts.all, label: tr.allTasks }
+        : { scope: 'all' as const, noDeadline: true, count: scopeCounts.noDeadline, label: tr.withoutDeadline }
+  ), [scopeCounts, tr.tasksScopeWeek, tr.allTasks, tr.withoutDeadline]);
   /**
    * Порожній день при непорожньому списку. Пошук виключено навмисно: у нього
    * власна гілка порожнього стану, і пропонувати «показати всі» людині, яка
    * просто нічого не знайшла за запитом, означало б відповідати не на те питання.
    */
-  const todayEmpty = scope === 'today' && !search.trim() && todayCount === 0 && beyondTodayCount > 0;
+  const todayEmpty = scope === 'today' && !search.trim() && todayCount === 0 && emptyTodayTarget.count > 0;
 
   /**
    * У віртуалізованому списку елементи монтуються заново при поверненні
@@ -1091,23 +1141,25 @@ export default function TasksScreen() {
    * немає: запис робиться один раз, рівно на дію людини.
    */
   const quickCreateProject = useCallback(async (typed: string): Promise<string | null> => {
-    const stored = await loadData<Project[]>('projects', []);
-    const result = applyProjectQuickAction(stored, typed, name => ({
-      id: Date.now().toString(),
-      name,
-      // Колір — не прикраса, а крапка біля задачі й колір на графіках, тож
-      // новий проєкт бере наступний ВІЛЬНИЙ колір палітри (спільне з вебом
-      // правило), а не завжди перший.
-      color: nextProjectColor(stored),
-      createdAt: new Date().toISOString(),
-    }));
-    if (result.projects) {
-      await saveSynced('projects', result.projects);
-      setProjects(result.projects);
-    } else if (result.projectId) {
-      // Писати нічого, але сховище могло піти вперед — хай екран це побачить.
-      setProjects(stored);
-    }
+    // Читання й запис — під одним блокуванням ключа (updateSynced): проєкт,
+    // привезений pull-ом між ними, інакше отримав би тумбстоун.
+    let stored: Project[] = [];
+    let result!: ProjectQuickApplyResult<Project>;
+    const saved = await updateSynced<Project>('projects', fresh => {
+      stored = fresh;
+      result = applyProjectQuickAction(fresh, typed, name => ({
+        id: Date.now().toString(),
+        name,
+        // Колір — не прикраса, а крапка біля задачі й колір на графіках, тож
+        // новий проєкт бере наступний ВІЛЬНИЙ колір палітри (спільне з вебом
+        // правило), а не завжди перший.
+        color: nextProjectColor(fresh),
+        createdAt: new Date().toISOString(),
+      }));
+      return result.projects ?? fresh;
+    });
+    // Навіть без запису сховище могло піти вперед — хай екран це побачить.
+    if (result.projects || result.projectId) setProjects(saved);
 
     // Підпис кнопки рахується зі стану екрана, а дія — зі сховища, і за час,
     // поки відкритий список задач, синк міг привезти проєкт із такою назвою.
@@ -1158,37 +1210,76 @@ export default function TasksScreen() {
 
   const saveTaskEdit = useCallback(() => {
     if (!editor.draft.title.trim() || !selected) return;
-    const estimatedMinutes = draftEstimatedMinutes(editor.draft);
-    const recurrence = draftRecurrence(editor.draft);
-    const column = taskStatuses.find(item => item.id === editor.draft.statusId) ?? taskStatuses[0];
+    const draft = editor.draft;
+    // Лише поля, які людина змінила в цій формі: поки форма була відкрита,
+    // завдання могли змінити деінде (веб, інший пристрій), і список уже показує
+    // ті зміни. Незмінене поле форми — це старе значення, писати його назад
+    // означало б відкотити чужу правку.
+    const edited = editedDraftFields(editor.initial, draft);
+    const estimatedMinutes = draftEstimatedMinutes(draft);
+    const recurrence = draftRecurrence(draft);
+    const column = taskStatuses.find(item => item.id === draft.statusId) ?? taskStatuses[0];
     // Вибір done-статусу в редакторі — теж завершення завдання, і таймер на
     // ньому далі йти не має.
-    if (column.isDone && getTimerForTask(selected.id)) pendingTimerStops.current.push(selected.id);
+    if (edited.has('status') && column.isDone && getTimerForTask(selected.id)) {
+      pendingTimerStops.current.push(selected.id);
+    }
 
-    const patch = (t: Task): Task => t.id !== selected.id ? t : applyFormSprint({
+    const patch = (t: Task): Task => {
+      if (t.id !== selected.id) return t;
       // Спринт зникає разом зі зміною проєкту — див. retargetTaskProject.
-      ...retargetTaskProject(t, editor.draft.projectId ?? undefined),
-      title: editor.draft.title.trim(),
-      description: editor.draft.desc.trim(),
+      // Проєкт застосовується разом з рештою форми, а не миттєво при виборі:
+      // інакше «Скасувати» повертало б усе, крім нього.
+      let next: Task = edited.has('project')
+        ? { ...retargetTaskProject(t, draft.projectId ?? undefined), projectId: draft.projectId ?? undefined }
+        : { ...t };
+      // §3.7 review finding — createdByAfterProjectChange (utils/taskUtils.ts).
+      if (edited.has('project')) {
+        next.createdBy = createdByAfterProjectChange(next, user?.id);
+        // Перенесену в проєкт задачу без виконавця призначаємо мені — інакше
+        // вона зникла б з особистого простору (isMyTask: лише призначене мені).
+        if (!edited.has('assignee') && next.projectId && !next.assigneeId) {
+          next.assigneeId = assigneeForPersonalProjectTask(next, user?.id);
+        }
+      }
+      if (edited.has('title')) next.title = draft.title.trim();
+      if (edited.has('desc')) next.description = draft.desc.trim();
       // Dual-write: priorityLevel + валідне легасі для старих клієнтів.
-      ...priorityFields(editor.draft.priorityLevel),
-      status: column.isDone ? 'done' : 'active',
-      kanbanColumnId: editor.draft.statusId,
-      estimatedMinutes,
-      deadline: editor.draft.deadline ?? undefined,
-      // Проєкт застосовується разом з рештою форми, а не миттєво при
-      // виборі: інакше «Скасувати» повертало б усе, крім нього.
-      projectId: editor.draft.projectId ?? undefined,
-      recurrence,
-      history: [...(t.history ?? []), makeHistoryEvent('edited')],
+      if (edited.has('priority')) next = { ...next, ...priorityFields(draft.priorityLevel) };
+      if (edited.has('status')) {
+        // Пікер форми — ОСОБИСТІ статуси; задачі проєкту пишемо еквівалент
+        // у ВЛАСНОМУ проєкті (інакше особистий id, якого немає на дошці
+        // проєкту, і на інших пристроях задача «падала» в «До роботи»).
+        const target = projectEquivalentColumn(column, storedTaskStatuses, next.projectId) ?? column;
+        next.status = target.isDone ? 'done' : 'active';
+        next.kanbanColumnId = target.id;
+      } else if (edited.has('project') && t.kanbanColumnId) {
+        // Змінився простір — колонку старого зводимо до нового: спершу до
+        // особистої «за змістом», далі до еквівалента в новому проєкті.
+        const personalView = personalDisplayColumn(t, storedTaskStatuses);
+        const target = projectEquivalentColumn(personalView, storedTaskStatuses, next.projectId) ?? personalView;
+        next.kanbanColumnId = target.id;
+        next.status = target.isDone ? 'done' : 'active';
+      }
+      if (edited.has('estimate')) next.estimatedMinutes = estimatedMinutes;
+      if (edited.has('deadline')) next.deadline = draft.deadline ?? undefined;
+      if (edited.has('recurrence')) next.recurrence = recurrence;
+      // §4.5 — null (у формі: «Без виконавця») пишемо явно, а не пропускаємо:
+      // призначення треба вміти й ЗНЯТИ, а не лише поставити.
+      if (edited.has('assignee')) next.assigneeId = draft.assigneeId ?? null;
+      next.history = [...(t.history ?? []), makeHistoryEvent('edited')];
       // Поле «Спринт»: без змін — задача лишається де була (навіть у закритому
       // спринті); інакше assignTaskToSprint або беклог (ключ видаляється).
-    }, sprints, editor.draft.sprintId);
+      if (edited.has('project') || edited.has('sprint')) {
+        next = applyFormSprint(next, sprints, draft.sprintId);
+      }
+      return next;
+    };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === selected.id ? patch(prev) : prev);
     editor.finish();
     // Чернетка тепер один об'єкт, тож і залежність одна замість тринадцяти.
-  }, [editor, selected, taskStatuses, getTimerForTask, sprints]);
+  }, [editor, selected, taskStatuses, storedTaskStatuses, getTimerForTask, sprints, setTasks, user]);
 
   const openReminderPicker = useCallback((taskId: string, subtaskId?: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -1226,7 +1317,7 @@ export default function TasksScreen() {
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
     setShowReminderPicker(false);
     setReminderPickerTarget(null);
-  }, [reminderPickerTarget, reminderHours, reminderMins, reminderDate, tasks]);
+  }, [reminderPickerTarget, reminderHours, reminderMins, reminderDate, tasks, setTasks]);
 
   const removeReminder = useCallback(async (taskId: string, subtaskId?: string) => {
     await cancelReminder(taskId, subtaskId);
@@ -1240,12 +1331,12 @@ export default function TasksScreen() {
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, []);
+  }, [setTasks]);
 
   const showSubtaskActions = useCallback((taskId: string, sub: SubTask, idx: number, total: number) => {
     const buttons: any[] = [
       { text: tr.editAction, onPress: () => { setEditingSubId(sub.id); setEditingSubText(sub.title); } },
-      { text: lang === 'uk' ? 'Дублювати' : 'Duplicate', onPress: () => duplicateSubtask(taskId, sub) },
+      { text: tr.subtaskDuplicate, onPress: () => duplicateSubtask(taskId, sub) },
       ...(idx > 0 ? [{ text: lang === 'uk' ? 'Перемістити вгору' : 'Move up', onPress: () => moveSubtask(taskId, sub.id, 'up') }] : []),
       ...(idx < total - 1 ? [{ text: lang === 'uk' ? 'Перемістити вниз' : 'Move down', onPress: () => moveSubtask(taskId, sub.id, 'down') }] : []),
       { text: sub.reminderAt ? `Нагадування: ${new Date(sub.reminderAt).toLocaleString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : tr.reminderDate, onPress: () => openReminderPicker(taskId, sub.id) },
@@ -1254,7 +1345,7 @@ export default function TasksScreen() {
       { text: tr.cancel, style: 'cancel' as const },
     ];
     Alert.alert(sub.title, undefined, buttons);
-  }, [duplicateSubtask, moveSubtask, deleteSubtask, openReminderPicker, removeReminder]);
+  }, [duplicateSubtask, moveSubtask, deleteSubtask, openReminderPicker, removeReminder, tr, lang]);
 
   const startTimer = useCallback(() => {
     if (!selected) return;
@@ -1267,6 +1358,7 @@ export default function TasksScreen() {
       title: task.title,
       kanbanColumnId: task.kanbanColumnId,
       status: task.status,
+      projectId: task.projectId,
     });
   }, [selected, startTaskTimer]);
 
@@ -1284,6 +1376,7 @@ export default function TasksScreen() {
     setFilterPriorities([]);
     setDateFilter(null);
     setSearch('');
+    setNoDeadline(false);
   }, []);
 
   // Мемоізовано: палітра йде пропом у кожну картку списку, і новий об'єкт
@@ -1392,6 +1485,15 @@ export default function TasksScreen() {
   }, [tr, mutateMeetings]);
 
   const selectedTask = selected ? tasks.find(t => t.id === selected.id) ?? selected : null;
+  // Коментарі (contract §4.4) — лише для задач проєкту: колекція `comments`
+  // існує лише в потоці проєкту, особисті задачі коментарів не мають.
+  const selectedTaskRole = useProjectRole(selectedTask?.projectId);
+  const meetingFormRole = useProjectRole(meetingFormInitial?.projectId);
+  // Contract §4.1: глядач читає задачу, але не редагує, не видаляє й не
+  // відмічає — ✎/✕-кнопки й чекбокс у деталі ховаються (review finding:
+  // спільний редактор `(tabs)/index.tsx` раніше не питав роль ВЗАГАЛІ, тож
+  // виконував будь-яку дію ще ДО того, як сервер устигав її відхилити).
+  const canEditSelectedTask = canEditProjectItem(selectedTask?.projectId, projectRoles);
 
   // Вміст деталі. Однаковий для модалки й для колонки — різниться
   // лише обрамлення, див. DetailPane.
@@ -1424,6 +1526,21 @@ export default function TasksScreen() {
                       />
                     )}
 
+                    {/* ─── Comments Tab (contract §4.4) ─── */}
+                    {!editor.editing && detailTab === 'comments' && selectedTask.projectId && (
+                      <CommentsSection
+                        projectId={selectedTask.projectId}
+                        targetType="task"
+                        targetId={selectedTask.id}
+                        isOwner={selectedTaskRole === 'owner'}
+                        currentUserId={user?.id ? String(user.id) : null}
+                        colors={c}
+                        isDark={isDark}
+                        locale={locale}
+                        tr={tr}
+                      />
+                    )}
+
                     {editor.editing ? (
                       <TaskEditForm
                         submitLabel={tr.save}
@@ -1433,6 +1550,8 @@ export default function TasksScreen() {
                         projects={projects}
                         projectCreateOption={projectCreateOption(id => editor.patch({ projectId: id, sprintId: null }))}
                         sprints={sprints}
+                        members={editorMembers}
+                        myUserId={user?.id}
                         deadlineWeeks={editDlWeeks}
                         months={MONTHS_UA}
                         weekdays={WEEKDAYS_SHORT}
@@ -1460,7 +1579,7 @@ export default function TasksScreen() {
                       label={tr.status}
                       icon="rectangle.3.group"
                       options={statusOptions}
-                      value={taskStatusColumn(selectedTask, taskStatuses).id}
+                      value={personalDisplayColumn(selectedTask, storedTaskStatuses).id}
                       onSelect={id => { if (id) setTaskColumn(selectedTask.id, id); }}
                       colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
                       isDark={isDark}
@@ -1565,6 +1684,7 @@ export default function TasksScreen() {
                       onChangeEditingText={setEditingSubText}
                       onSaveEdit={(subId, text) => saveSubEdit(selectedTask.id, subId, text)}
                       onToggle={subId => toggleSubtask(selectedTask.id, subId)}
+                      onCopy={copySubtask}
                       onShowActions={(sub, idx) => showSubtaskActions(selectedTask.id, sub, idx, selectedTask.subtasks.length)}
                       onOpenAll={() => {
                         setSelected(null);
@@ -1608,6 +1728,10 @@ export default function TasksScreen() {
                       </TouchableOpacity>
                     )}
 
+                    {/* Contract §4.1: глядач читає, але не редагує/видаляє/
+                        відмічає — кнопки просто зникають, а не диз'юнктивно
+                        no-op'ляться (review finding). */}
+                    {canEditSelectedTask && (
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                       <TouchableOpacity
                         onPress={() => deleteTask(selectedTask.id, selectedTask.title)}
@@ -1621,6 +1745,7 @@ export default function TasksScreen() {
                         <Text style={{ color: '#fff', fontWeight: '700' }}>{selectedTask.status === 'done' ? tr.restore : tr.completed}</Text>
                       </TouchableOpacity>
                     </View>
+                    )}
                     </>
                     ) : null}
     </>
@@ -1632,6 +1757,32 @@ export default function TasksScreen() {
 
   // Липка шапка деталі: ✎, назва з пріоритетом, ✕ і вкладки стоять поза
   // прокруткою DetailPane — гортається лише тіло.
+  /**
+   * Закриття деталі завдання (× у шапці, бекдроп, свайп).
+   *
+   * Форма правки живе ВСЕРЕДИНІ деталі, тож закриття деталі мовчки викидало
+   * все введене — без жодного попередження, навіть якщо людина переписала
+   * назву. Питаємо лише коли є що втрачати: `editedDraftFields` порівнює
+   * чернетку з тією, з якої почали, тож відкрив-подивився-закрив проходить
+   * без діалогу.
+   */
+  const closeTaskDetail = useCallback((alsoMeeting: boolean) => {
+    const close = () => {
+      setSelected(null);
+      if (alsoMeeting) setSelectedMeeting(null);
+      editor.finish();
+    };
+    // Без відкритої задачі `editing` — лише залишок закритої панелі
+    // (та сама умова, що й у openMeetingView), і питати нема про що.
+    const dirty = editor.editing && !!selected
+      && editedDraftFields(editor.initial, editor.draft).size > 0;
+    if (!dirty) { close(); return; }
+    Alert.alert(tr.discardTaskEditTitle, tr.discardTaskEditMsg, [
+      { text: tr.cancel, style: 'cancel' },
+      { text: tr.discardChanges, style: 'destructive', onPress: close },
+    ]);
+  }, [editor, selected, tr]);
+
   const taskDetailHeader = selectedTask ? (
     <TaskDetailHeader
       title={selectedTask.title}
@@ -1642,7 +1793,7 @@ export default function TasksScreen() {
           borderColor={c.border}
           size={22}
           radius={7}
-          onPress={() => toggleTask(selectedTask.id)}
+          onPress={canEditSelectedTask ? () => toggleTask(selectedTask.id) : undefined}
           hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
         />
       }
@@ -1651,9 +1802,11 @@ export default function TasksScreen() {
       tab={detailTab}
       onTabChange={setDetailTab}
       timerRunning={isTimerRunning}
-      onEdit={() => editor.begin(selectedTask, taskColumnId(selectedTask, taskStatuses))}
-      onClose={() => { setSelected(null); editor.finish(); }}
+      onEdit={canEditSelectedTask ? () => editor.begin(selectedTask, personalDisplayColumn(selectedTask, storedTaskStatuses).id) : undefined}
+      onClose={() => closeTaskDetail(false)}
+      onCopy={() => copyTask(selectedTask)}
       showHandle={!showDetailColumn}
+      showComments={!!selectedTask.projectId}
       colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent }}
       tr={tr}
     />
@@ -1703,6 +1856,19 @@ export default function TasksScreen() {
 
   const closeMeetingView = useCallback(() => setSelectedMeeting(null), []);
 
+  /**
+   * Останній `openMeetingView` — у ref, бо сам колбек міняє ідентичність на
+   * кожну зміну чернетки редактора (він залежить від `editor`).
+   *
+   * У deps ефекту нижче його ставити не можна: `openMeetingView` викликає
+   * `setSelected(null)`, від чого змінюється `selected`, від чого змінюється
+   * сам колбек — і поки параметр маршруту ще не згас, ефект зациклився б.
+   * Раніше це вирішував eslint-disable, від якого React Compiler переставав
+   * оптимізувати весь екран (PERF-2).
+   */
+  const openMeetingViewRef = useRef(openMeetingView);
+  useEffect(() => { openMeetingViewRef.current = openMeetingView; }, [openMeetingView]);
+
   // ?meeting=<origId>&meetingDate= — перегляд зустрічі з вкладки «Сьогодні»
   // (екземпляр повтору адресується датою; редагування/таймер — оригінал).
   useEffect(() => {
@@ -1710,12 +1876,10 @@ export default function TasksScreen() {
     const orig = meetings.find(m => m.id === meetingParam);
     if (orig) {
       const date = typeof meetingDateParam === 'string' && meetingDateParam ? meetingDateParam : orig.date;
-      openMeetingView({ ...orig, date, _origId: orig.id });
+      openMeetingViewRef.current({ ...orig, date, _origId: orig.id });
     }
     router.setParams({ meeting: '', meetingDate: '' });
-    // meetings/openMeetingView навмисно поза deps: реагуємо лише на прихід параметра.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meetingParam, meetingDateParam, meetingsInit, router]);
+  }, [meetingParam, meetingDateParam, meetingsInit, router, meetings]);
 
   const editViewedMeeting = useCallback(() => {
     if (!viewedMeetingOrig) return;
@@ -1760,6 +1924,49 @@ export default function TasksScreen() {
     />
   ) : null;
 
+  // ─── Рендер списку ────────────────────────────────────────────────────────
+  // Стабільні колбеки замість інлайнових стрілок: SectionList інакше
+  // перемальовує кожен рядок на кожен рендер екрана (а тік таймера смикає
+  // його щосекунди).
+  const renderTaskItem = useCallback(({ item, index }: SectionListRenderItemInfo<Task, TaskSection>) => (
+    <TaskListItem
+      task={item}
+      index={index}
+      animate={shouldAnimateTask(item.id)}
+      motion={motion}
+      statusColumn={scopedTaskStatusColumn(item, storedTaskStatuses)}
+      onPress={handleSelectTask}
+      onToggle={handleToggleTask}
+      onLongPress={showTaskCardMenu}
+      c={c}
+      isDark={isDark}
+      projects={projects}
+      sprints={sprints}
+      overdueLabel={tr.overdueSection}
+      priorityLabel={priorityA11y(item)}
+      subtasksLabel={tr.subtasks}
+      assigneeLabel={assigneeLabelFor(item)}
+    />
+  ), [shouldAnimateTask, motion, storedTaskStatuses, handleSelectTask, handleToggleTask, showTaskCardMenu, c, isDark, projects, sprints, tr.overdueSection, tr.subtasks, priorityA11y, assigneeLabelFor]);
+
+  const renderSectionHeader = useCallback(({ section }: { section: SectionListData<Task, TaskSection> }) => (
+    <Text style={[s.groupLabel, { color: c.sub }]}>{section.title}</Text>
+  ), [c.sub]);
+
+  const renderSectionFooter = useCallback(({ section }: { section: SectionListData<Task, TaskSection> }) => (
+    section.total > TASK_GROUP_LIMIT ? (
+      <GroupShowAllButton
+        groupKey={section.key}
+        title={section.title}
+        total={section.total}
+        onPress={openGroup}
+        color={c.accent}
+        label={tr.groupShowAll}
+        a11yLabel={tr.groupShowAllA11y}
+      />
+    ) : null
+  ), [openGroup, c.accent, tr.groupShowAll, tr.groupShowAllA11y]);
+
   // Шапка спільна для обох режимів; у списку вона стає ListHeaderComponent.
   const listHeader = (
     <>
@@ -1784,7 +1991,10 @@ export default function TasksScreen() {
                 returnKeyType="search"
               />
               {search.length > 0 && (
-                <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <TouchableOpacity onPress={() => setSearch('')}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.clear}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
                 </TouchableOpacity>
               )}
@@ -1793,29 +2003,52 @@ export default function TasksScreen() {
             {/* Скоуп: денна робота чи весь список. Окремо від чипів фільтрів
                 і завжди на очах — це головний перемикач вкладки, а не одна з
                 прихованих у шторці опцій. У календарі його немає: там місяць,
-                і «сьогодні проти всього» нічого не означає. */}
+                і «сьогодні проти всього» нічого не означає.
+
+                flexWrap + flexShrink нижче: при найбільшому Dynamic Type (AX5)
+                чип «Сьогодні N» виїжджав за правий край екрана, а «Всі N»
+                обрізало рамкою — ряд не мав ні куди перенестись, ні як
+                стиснутись (NAT-06). */}
             {viewMode === 'list' && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                <View style={{ flexDirection: 'row', gap: 6, backgroundColor: c.dim, borderRadius: 12, padding: 3, borderWidth: 1, borderColor: c.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1, backgroundColor: c.dim, borderRadius: 12, padding: 3, borderWidth: 1, borderColor: c.border }}>
                   {([
-                    { key: 'today' as const, label: tr.today, count: todayCount },
-                    { key: 'all' as const, label: tr.allTasks, count: filteredAll.length },
+                    { key: 'today' as const, label: tr.today, count: scopeCounts.today },
+                    { key: 'week' as const, label: tr.tasksScopeWeek, count: scopeCounts.week },
+                    { key: 'all' as const, label: tr.allTasks, count: scopeCounts.all },
                   ]).map(option => {
                     const active = scope === option.key;
                     return (
                       <TouchableOpacity
                         key={option.key}
-                        onPress={() => { haptic.light(); setScope(option.key); }}
+                        onPress={() => { haptic.light(); selectScope(option.key); }}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
                         accessibilityLabel={`${option.label}, ${option.count}`}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: active ? c.accent : 'transparent' }}>
-                        <Text style={{ color: active ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }}>{option.label}</Text>
+                        <Text numberOfLines={1} style={{ color: active ? '#fff' : c.sub, fontSize: 13, fontWeight: '700', flexShrink: 1 }}>{option.label}</Text>
                         <Text style={{ color: active ? 'rgba(255,255,255,0.75)' : c.sub, fontSize: 11, fontWeight: '600' }}>{option.count}</Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
+
+                {/* «Без дедлайну» — лише в режимі «Всі»: особиста дошка
+                    типово показує завдання З дедлайном, а беклог без дати
+                    відкривається свідомо, цією кнопкою. */}
+                {scope === 'all' && (
+                  <TouchableOpacity
+                    onPress={() => { haptic.light(); setNoDeadline(v => !v); }}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: noDeadline }}
+                    accessibilityLabel={`${tr.withoutDeadline}, ${scopeCounts.noDeadline}`}
+                    accessibilityHint={tr.tasksNoDeadlineA11y}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: noDeadline ? c.accent : c.border, backgroundColor: noDeadline ? c.accent + '22' : c.dim }}>
+                    <IconSymbol name="calendar" size={13} color={noDeadline ? c.accent : c.sub} />
+                    <Text numberOfLines={1} style={{ color: noDeadline ? c.accent : c.sub, fontSize: 13, fontWeight: '700', flexShrink: 1 }}>{tr.withoutDeadline}</Text>
+                    <Text style={{ color: noDeadline ? c.accent : c.sub, fontSize: 11, fontWeight: '600' }}>{scopeCounts.noDeadline}</Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Фільтри й скидання — поруч із перемикачем, а не в хедері:
                     обидва органи керування звужують ОДИН набір завдань, і
@@ -1844,13 +2077,17 @@ export default function TasksScreen() {
               </View>
             )}
 
-            {/* Active filter chips */}
+            {/* Active filter chips.
+                keyboardShouldPersistTaps: ряд стоїть просто під полем пошуку,
+                і з відкритою клавіатурою перший тап по чипу витрачався на її
+                ховання — фільтр не скидався (CLAUDE.md, L3). */}
             {hasActiveFilters && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 4 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginTop: 10, marginBottom: 4 }}>
                 <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center' }}>
                   {filter !== 'active' && (
                     <TouchableOpacity
                       onPress={() => setFilter('active')}
+                      accessibilityRole="button"
                       style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
                       <Text style={[s.activeChipText, { color: c.accent }]}>
                         {filter === 'all' ? tr.allTasks : tr.allCompleted}
@@ -1861,6 +2098,7 @@ export default function TasksScreen() {
                   {sort !== 'status' && (
                     <TouchableOpacity
                       onPress={() => setSort('status')}
+                      accessibilityRole="button"
                       style={[s.activeChip, { backgroundColor: c.accent + '15', borderColor: c.accent + '40' }]}>
                       <IconSymbol name="arrow.up.arrow.down" size={10} color={c.accent} />
                       <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
@@ -1874,6 +2112,7 @@ export default function TasksScreen() {
                     return proj ? (
                       <TouchableOpacity
                         onPress={() => setFilterProject(null)}
+                        accessibilityRole="button"
                         style={[s.activeChip, { backgroundColor: proj.color + '20', borderColor: proj.color + '50' }]}>
                         <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color }} />
                         <Text style={[s.activeChipText, { color: proj.color, marginLeft: 4 }]}>{proj.name}</Text>
@@ -1894,6 +2133,7 @@ export default function TasksScreen() {
                   {dateFilter && (
                     <TouchableOpacity
                       onPress={() => setDateFilter(null)}
+                      accessibilityRole="button"
                       style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
                       <IconSymbol name="calendar" size={10} color={c.accent} />
                       <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
@@ -1904,6 +2144,8 @@ export default function TasksScreen() {
                   )}
                   <TouchableOpacity
                     onPress={clearAllFilters}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.resetAllFilters}
                     style={[s.activeChip, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
                     <Text style={[s.activeChipText, { color: '#EF4444' }]}>{tr.resetAll}</Text>
                   </TouchableOpacity>
@@ -1968,6 +2210,11 @@ export default function TasksScreen() {
                   )}
                   <TouchableOpacity
                     onPress={() => openAddMeeting()}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.addMeeting}
+                    // 30×30 намальовано, 44×44 натискається (Apple HIG 2.5.5):
+                    // +7 з кожного боку. Зміряно на пристрої — тут hitSlop не було.
+                    hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }}
                     style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#6366F118', borderWidth: 1, borderColor: '#6366F130', alignItems: 'center', justifyContent: 'center' }}>
                     <IconSymbol name="plus" size={14} color="#6366F1" />
                   </TouchableOpacity>
@@ -2071,12 +2318,12 @@ export default function TasksScreen() {
                 <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noTasksToday}</Text>
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7, textAlign: 'center' }}>{tr.noTasksTodayHint}</Text>
                 <TouchableOpacity
-                  onPress={() => setScope('all')}
+                  onPress={() => selectScope(emptyTodayTarget.scope, emptyTodayTarget.noDeadline)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${tr.showAllTasks}, ${beyondTodayCount}`}
+                  accessibilityLabel={`${emptyTodayTarget.label}, ${emptyTodayTarget.count}`}
                   style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <IconSymbol name="list.bullet" size={15} color={c.accent} />
-                  <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.showAllTasks} · {beyondTodayCount}</Text>
+                  <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{emptyTodayTarget.label} · {emptyTodayTarget.count}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -2086,10 +2333,14 @@ export default function TasksScreen() {
               <View style={{ alignItems: 'center', paddingVertical: 56 }}>
                 <IconSymbol name="checklist" size={40} color={c.sub} />
                 <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>
-                  {search.trim() ? tr.nothingFound : hasFiltersBesidesSearch ? tr.noTasksMatchFilters : tr.noTasks}
+                  {search.trim() ? tr.nothingFound : hasFiltersBesidesSearch ? tr.noTasksMatchFilters : scope === 'week' ? tr.noTasksWeekTitle : tr.noTasks}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7, textAlign: 'center' }}>
-                  {search.trim() ? tr.tryAnotherQuery : hasFiltersBesidesSearch ? tr.noTasksMatchFiltersHint : tr.pressToAdd}
+                  {search.trim() ? tr.tryAnotherQuery : hasFiltersBesidesSearch ? tr.noTasksMatchFiltersHint
+                    // «Всі» з дедлайном порожні, а без дедлайну є — сказати, де
+                    // вони, інакше людина вирішить, що задачі зникли.
+                    : scope === 'all' && !noDeadline && scopeCounts.noDeadline > 0 ? tr.noDatedTasksHint
+                    : tr.pressToAdd}
                 </Text>
                 {/* Дія має вести до виходу з глухого кута. Коли список порожній
                     через фільтри, кнопка «додати» безпорадна: нове завдання так
@@ -2127,7 +2378,7 @@ export default function TasksScreen() {
                   </View>
                 </View>
                 <View style={{ gap: 6 }}>
-                  {overdueItems.map((task, i) => {
+                  {overdueLimited.visible.map((task, i) => {
                     const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
                     const animExiting  = motion.entering(FadeOutUp.duration(150));
                     const animLayout   = motion.entering(LinearTransition.springify());
@@ -2137,11 +2388,12 @@ export default function TasksScreen() {
                         entering={animEntering}
                         exiting={animExiting}
                         layout={animLayout}>
-                        <CompactCard
+                        <TaskCompactCard
                           task={task}
-                          statusColumn={taskStatusColumn(task, taskStatuses)}
+                          statusColumn={scopedTaskStatusColumn(task, storedTaskStatuses)}
                           onPress={handleSelectTask}
                           onToggle={handleToggleTask}
+                          onLongPress={showTaskCardMenu}
                           c={c}
                           isDark={isDark}
                           projects={projects}
@@ -2149,11 +2401,23 @@ export default function TasksScreen() {
                           overdueLabel={tr.overdueSection}
                           priorityLabel={priorityA11y(task)}
                           subtasksLabel={tr.subtasks}
+                          assigneeLabel={assigneeLabelFor(task)}
                         />
                       </Animated.View>
                     );
                   })}
                 </View>
+                {overdueLimited.hasMore ? (
+                  <GroupShowAllButton
+                    groupKey={OVERDUE_GROUP_KEY}
+                    title={tr.overdueSection}
+                    total={overdueLimited.total}
+                    onPress={openGroup}
+                    color="#EF4444"
+                    label={tr.groupShowAll}
+                    a11yLabel={tr.groupShowAllA11y}
+                  />
+                ) : null}
               </View>
             )}
 
@@ -2237,28 +2501,10 @@ export default function TasksScreen() {
             stickySectionHeadersEnabled={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
             ListHeaderComponent={listHeader}
-            renderSectionHeader={({ section }) => (
-              <Text style={[s.groupLabel, { color: c.sub }]}>{section.title}</Text>
-            )}
-            ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
-            renderItem={({ item, index }) => (
-              <TaskListItem
-                task={item}
-                index={index}
-                animate={shouldAnimateTask(item.id)}
-                motion={motion}
-                statusColumn={taskStatusColumn(item, taskStatuses)}
-                onPress={handleSelectTask}
-                onToggle={handleToggleTask}
-                c={c}
-                isDark={isDark}
-                projects={projects}
-                sprints={sprints}
-                overdueLabel={tr.overdueSection}
-                priorityLabel={priorityA11y(item)}
-                subtasksLabel={tr.subtasks}
-              />
-            )}
+            renderSectionHeader={renderSectionHeader}
+            renderSectionFooter={renderSectionFooter}
+            ItemSeparatorComponent={TaskItemSeparator}
+            renderItem={renderTaskItem}
           />
         ) : (
           <ScrollView
@@ -2280,7 +2526,7 @@ export default function TasksScreen() {
         <DetailPane
           open={!!selectedTask || !!viewedMeeting}
           wide={showDetailColumn}
-          onClose={() => { setSelected(null); setSelectedMeeting(null); }}
+          onClose={() => closeTaskDetail(true)}
           header={selectedTask ? taskDetailHeader : meetingDetailHeader}
           isDark={isDark}
           sheetColor={c.sheet}
@@ -2310,6 +2556,8 @@ export default function TasksScreen() {
         lang={lang}
         tr={tr}
         projects={projects}
+        currentUserId={user?.id ? String(user.id) : null}
+        isProjectOwner={meetingFormRole === 'owner'}
       />
 
       {/* ─── Calendar Day Popup ─── */}
@@ -2319,10 +2567,10 @@ export default function TasksScreen() {
         animationType="slide"
         statusBarTranslucent
         onRequestClose={() => setCalPopupDate(null)}>
-        <Pressable
+        <Pressable accessible={false}
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'flex-end' }}
           onPress={() => setCalPopupDate(null)}>
-          <Pressable onPress={e => e.stopPropagation()}>
+          <Pressable onPress={e => e.stopPropagation()} accessible={false}>
             <BlurView
               intensity={isDark ? 60 : 80}
               tint={isDark ? 'dark' : 'light'}
@@ -2348,7 +2596,7 @@ export default function TasksScreen() {
                   </Text>
                   {calPopupDate && (() => {
                     const tCnt = (tasksByDate[calPopupDate.toDateString()] ?? []).length;
-                    const mCnt = (meetingsByDate[calPopupDate.toISOString().slice(0, 10)] ?? []).length;
+                    const mCnt = (meetingsByDate[localDateStr(calPopupDate)] ?? []).length;
                     const parts = [];
                     if (tCnt > 0) parts.push(`${tCnt} завдань`);
                     if (mCnt > 0) parts.push(`${mCnt} зустрічей`);
@@ -2357,6 +2605,8 @@ export default function TasksScreen() {
                 </View>
                 <TouchableOpacity
                   onPress={() => setCalPopupDate(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.close}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <IconSymbol name="xmark.circle.fill" size={24} color={c.sub} />
                 </TouchableOpacity>
@@ -2369,7 +2619,7 @@ export default function TasksScreen() {
 
                 {/* Meetings in popup */}
                 {calPopupDate && (() => {
-                  const dayMeetings = (meetingsByDate[calPopupDate.toISOString().slice(0, 10)] ?? [])
+                  const dayMeetings = (meetingsByDate[localDateStr(calPopupDate)] ?? [])
                     .sort((a, b) => a.time.localeCompare(b.time));
                   if (!dayMeetings.length) return null;
                   return (
@@ -2407,7 +2657,7 @@ export default function TasksScreen() {
                         );
                       })}
                       <TouchableOpacity
-                        onPress={() => { setCalPopupDate(null); openAddMeeting(calPopupDate.toISOString().slice(0, 10)); }}
+                        onPress={() => { setCalPopupDate(null); openAddMeeting(localDateStr(calPopupDate)); }}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 4 }}>
                         <IconSymbol name="plus.circle" size={14} color="#6366F1" />
                         <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '600' }}>{tr.addMeetingForDay}</Text>
@@ -2420,7 +2670,7 @@ export default function TasksScreen() {
                 })()}
 
                 {calPopupDate && (tasksByDate[calPopupDate.toDateString()] ?? []).length === 0
-                  && (meetingsByDate[calPopupDate.toISOString().slice(0, 10)] ?? []).length === 0 && (
+                  && (meetingsByDate[localDateStr(calPopupDate)] ?? []).length === 0 && (
                   <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                     <IconSymbol name="calendar.badge.checkmark" size={32} color={c.sub} />
                     <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600', marginTop: 10 }}>{tr.noTasksAndMeetings}</Text>
@@ -2443,6 +2693,14 @@ export default function TasksScreen() {
                       style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                       <TouchableOpacity
                         onPress={e => { e.stopPropagation(); toggleTask(task.id); }}
+                        accessibilityRole="checkbox"
+                        accessibilityLabel={task.title}
+                        accessibilityState={{ checked: task.status === 'done' }}
+                        // Єдина ціль дотику застосунку, що падала під WCAG 2.2
+                        // AA 2.5.8 (24×24): 22×22 всередині картки, яка
+                        // ВІДКРИВАЄ завдання, тобто промах дає протилежну дію.
+                        // 22 + 11×2 = рівно 44 (як у TaskCompactCard: 18 + 13).
+                        hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
                         style={{ width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', borderColor: task.status === 'done' ? '#10B981' : c.border, backgroundColor: task.status === 'done' ? '#10B981' : 'transparent', flexShrink: 0 }}>
                         {task.status === 'done' && <IconSymbol name="checkmark" size={11} color="#fff" />}
                       </TouchableOpacity>
@@ -2469,7 +2727,7 @@ export default function TasksScreen() {
 
       {/* ─── Options Dropdown ─── */}
       <Modal visible={showOptionsMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowOptionsMenu(false)}>
-        <Pressable
+        <Pressable accessible={false}
           style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
           onPress={() => setShowOptionsMenu(false)}>
           <BlurView
@@ -2581,15 +2839,17 @@ export default function TasksScreen() {
 
       {/* ─── Filter & Sort Bottom Sheet ─── */}
       <Modal visible={showFilterSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
-        <Pressable style={s.overlay} onPress={() => setShowFilterSheet(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+        <Pressable accessible={false} style={s.overlay} onPress={() => setShowFilterSheet(false)}>
+          <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[s.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={() => setShowFilterSheet(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity onPress={() => setShowFilterSheet(false)}
+                      accessibilityRole="button" accessibilityLabel={tr.close}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <IconSymbol name="xmark" size={17} color={c.sub} />
                     </TouchableOpacity>
                   </View>
@@ -2638,6 +2898,9 @@ export default function TasksScreen() {
                     <TouchableOpacity
                       key={f}
                       onPress={() => setFilter(f)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: filter === f, checked: filter === f }}
+                      accessibilityLabel={f === 'all' ? tr.allTasks : f === 'active' ? tr.allActive : tr.allCompleted}
                       style={[s.filterSegBtn, { flex: 1, backgroundColor: filter === f ? c.accent : c.dim, borderColor: filter === f ? c.accent : c.border }]}>
                       <IconSymbol
                         name={f === 'all' ? 'tray.full' : f === 'active' ? 'circle.dotted' : 'checkmark.circle.fill'}
@@ -2729,14 +2992,16 @@ export default function TasksScreen() {
       {/* ─── Calendar filter Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setShowCal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[s.handle, { backgroundColor: c.border }]} />
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={() => setShowCal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity onPress={() => setShowCal(false)}
+                      accessibilityRole="button" accessibilityLabel={tr.close}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                       <IconSymbol name="xmark" size={17} color={c.sub} />
                     </TouchableOpacity>
                   </View>
@@ -2779,6 +3044,8 @@ export default function TasksScreen() {
               projects={projects}
               projectCreateOption={projectCreateOption(id => composer.patch({ projectId: id, sprintId: null }))}
               sprints={sprints}
+              members={composerMembers}
+              myUserId={user?.id}
               deadlineWeeks={dlWeeks}
               months={MONTHS_UA}
               weekdays={WEEKDAYS_SHORT}
@@ -2796,73 +3063,6 @@ export default function TasksScreen() {
       </SheetModal>
 
 
-      {/* ─── Recording Modal ─── */}
-      <Modal visible={!!recordingTaskId} transparent animationType="fade" statusBarTranslucent
-        onRequestClose={() => { if (isRecording) stopRecording(); else setRecordingTaskId(null); }}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' }}
-          onPress={() => { if (!isRecording) setRecordingTaskId(null); }}>
-          <Pressable onPress={e => e.stopPropagation()}
-            style={{ backgroundColor: isDark ? '#12121E' : '#FFFFFF', borderRadius: 24, padding: 28,
-              alignItems: 'center', width: 280, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20 }}>
-            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: isRecording ? '#EF4444' + '20' : c.dim,
-              alignItems: 'center', justifyContent: 'center', marginBottom: 20,
-              borderWidth: 2, borderColor: isRecording ? '#EF4444' : c.border }}>
-              <IconSymbol name={isRecording ? 'stop.fill' : 'mic.fill'} size={32} color={isRecording ? '#EF4444' : c.sub} />
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#fff' : '#000', marginBottom: 6 }}>
-              {isRecording ? 'Запис...' : 'Аудіозапис'}
-            </Text>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: isRecording ? '#EF4444' : c.accent,
-              letterSpacing: 2, marginBottom: 24, fontVariant: ['tabular-nums'] }}>
-              {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}
-            </Text>
-            {isRecording ? (
-              <TouchableOpacity onPress={stopRecording}
-                style={{ backgroundColor: '#EF4444', borderRadius: 16, paddingVertical: 14,
-                  paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <IconSymbol name="stop.fill" size={16} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Зупинити</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity onPress={() => recordingTaskId && startRecording(recordingTaskId)}
-                style={{ backgroundColor: c.accent, borderRadius: 16, paddingVertical: 14,
-                  paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <IconSymbol name="mic.fill" size={16} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Почати запис</Text>
-              </TouchableOpacity>
-            )}
-            {/* Recordings list */}
-            {(() => {
-              const task = tasks.find(t => t.id === recordingTaskId);
-              if (!task?.recordings?.length) return null;
-              return (
-                <View style={{ width: '100%', marginTop: 20, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 14 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: c.sub, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                    ЗАПИСИ ({task.recordings.length})
-                  </Text>
-                  {task.recordings.map((uri, idx) => (
-                    <View key={uri} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6,
-                      backgroundColor: c.accent + '10', borderRadius: 10, padding: 8,
-                      borderWidth: 1, borderColor: c.accent + '25' }}>
-                      <IconSymbol name="waveform" size={14} color={c.accent} />
-                      <Text style={{ flex: 1, fontSize: 13, color: isDark ? '#fff' : '#000', marginLeft: 8 }}>Запис {idx + 1}</Text>
-                      <TouchableOpacity onPress={() => playRecording(uri)}
-                        style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.accent + '20', alignItems: 'center', justifyContent: 'center' }}>
-                        <IconSymbol name={playingUri === uri ? 'pause.fill' : 'play.fill'} size={11} color={c.accent} />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => { deleteRecording(recordingTaskId!, uri); }}
-                        style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: '#EF444415', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
-                        <IconSymbol name="trash" size={11} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              );
-            })()}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
       {/* Undo-тост */}
       {undoElement}
     </View>
@@ -2870,7 +3070,6 @@ export default function TasksScreen() {
 }
 
 // ─── Compact Card ────────────────────────────────────────────────────────────
-const AnimatedText = Animated.createAnimatedComponent(Text);
 
 /**
  * Рядок списку: анімаційна обгортка навколо картки.
@@ -2879,8 +3078,8 @@ const AnimatedText = Animated.createAnimatedComponent(Text);
  * заново — і щоб memo нижче мала що порівнювати.
  */
 const TaskListItem = React.memo(function TaskListItem({
-  task, index, animate, motion, statusColumn, onPress, onToggle,
-  c, isDark, projects, sprints, overdueLabel, priorityLabel, subtasksLabel,
+  task, index, animate, motion, statusColumn, onPress, onToggle, onLongPress,
+  c, isDark, projects, sprints, overdueLabel, priorityLabel, subtasksLabel, assigneeLabel,
 }: {
   task: Task;
   index: number;
@@ -2889,6 +3088,7 @@ const TaskListItem = React.memo(function TaskListItem({
   statusColumn: TaskStatusColumn;
   onPress: (task: Task) => void;
   onToggle: (task: Task) => void;
+  onLongPress: (task: Task) => void;
   c: any;
   isDark: boolean;
   projects: Project[];
@@ -2896,17 +3096,19 @@ const TaskListItem = React.memo(function TaskListItem({
   overdueLabel: string;
   priorityLabel: string;
   subtasksLabel: string;
+  assigneeLabel?: string | null;
 }) {
   return (
     <Animated.View
       entering={animate ? motion.entering(FadeInDown.duration(200).delay(Math.min(index, 10) * 40)) : undefined}
       exiting={motion.entering(FadeOutUp.duration(150))}
       layout={motion.entering(LinearTransition.springify())}>
-      <CompactCard
+      <TaskCompactCard
         task={task}
         statusColumn={statusColumn}
         onPress={onPress}
         onToggle={onToggle}
+        onLongPress={onLongPress}
         c={c}
         isDark={isDark}
         projects={projects}
@@ -2914,154 +3116,75 @@ const TaskListItem = React.memo(function TaskListItem({
         overdueLabel={overdueLabel}
         priorityLabel={priorityLabel}
         subtasksLabel={subtasksLabel}
+        assigneeLabel={assigneeLabel}
       />
     </Animated.View>
   );
 });
 
-/**
- * Мемоізована: у списку її примірників стільки ж, скільки завдань, а екран
- * перемальовується щосекунди, поки йде таймер. Щоб memo працювала,
- * колбеки приймають завдання аргументом — інакше виклик довелося б
- * загортати в стрілку, нову при кожному рендері.
- */
-const CompactCard = React.memo(function CompactCard({ task, statusColumn, onPress, onToggle, c, isDark, projects, sprints, overdueLabel, priorityLabel, subtasksLabel }: {
-  task: Task;
-  statusColumn: TaskStatusColumn;
-  /** Завдання приходить аргументом, щоб екран міг тримати колбек стабільним. */
-  onPress: (task: Task) => void;
-  onToggle: (task: Task) => void;
-  c: any;
-  isDark: boolean;
-  projects: Project[];
-  /** Лише для підпису бейджа — картка спринти не змінює. */
-  sprints: Sprint[];
-  /** Для VoiceOver: стан «прострочено» інакше ніяк не озвучується. */
-  overdueLabel: string;
-  /** Те саме для пріоритету: «Пріоритет P2» (порожньо — без пріоритету). */
-  priorityLabel: string;
-  /** Підпис до лічильника: «2/5» саме по собі нічого не означає. */
-  subtasksLabel: string;
+/** Секція списку: `data` — лише видимі (до ліміту), `total` — скільки в групі всього. */
+interface TaskSection {
+  key: string;
+  title: string;
+  total: number;
+}
+
+/** Відступ між картками. Модульний компонент — не нова функція щорендера. */
+function TaskItemSeparator() {
+  return <View style={s.itemSeparator} />;
+}
+
+/** «Всі (N)» під групою, у якій завдань більше за TASK_GROUP_LIMIT. */
+const GroupShowAllButton = React.memo(function GroupShowAllButton({
+  groupKey, title, total, onPress, color, label, a11yLabel,
+}: {
+  groupKey: string;
+  title: string;
+  total: number;
+  onPress: (key: string, title: string) => void;
+  color: string;
+  /** «Всі ({count})» */
+  label: string;
+  /** «Показати всі завдання групи «{name}»: {count}» */
+  a11yLabel: string;
 }) {
-  const overdue = isOverdue(task);
-  const proj = task.projectId ? projects.find(p => p.id === task.projectId) : null;
-  // «Проєкт · Спринт» одним підписом. Колір бейджа лишається проєктовим:
-  // спринт живе всередині проєкту, а не поруч із ним. Закритий спринт свій
-  // підпис зберігає — див. findSprint в utils/sprintUtils.ts.
-  const badgeLabel = sprintBadgeLabel(task, projects, sprints);
-  const isDone = task.status === 'done';
-  const doneSubtasks = task.subtasks.filter(sub => sub.done).length;
-  const allSubtasksDone = task.subtasks.length > 0 && doneSubtasks === task.subtasks.length;
-
-  /* Animate text opacity when done state changes */
-  const titleOpacity = useSharedValue(isDone ? 0.45 : 1);
-  useEffect(() => {
-    titleOpacity.value = withTiming(isDone ? 0.45 : 1, { duration: 250 });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDone]);
-  const titleAnimStyle = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
-
-  // Опис рядка для VoiceOver: інакше озвучувалась лише назва, а статус,
-  // дедлайн, пріоритет і проєкт передавались виключно кольором.
-  // Дата тут не озвучується, бо її не видно: опис має відповідати тому, що
-  // на екрані. Прострочення лишається — це стан, а не дата, і саме воно
-  // потребує уваги.
-  const a11ySummary = [
-    task.title,
-    statusColumn.name,
-    task.subtasks.length > 0 ? `${subtasksLabel}: ${doneSubtasks}/${task.subtasks.length}` : null,
-    overdue ? overdueLabel : null,
-    priorityLabel,
-    badgeLabel,
-  ].filter(Boolean).join(', ');
-
   return (
-    <PressableScale onPress={() => onPress(task)}>
-      <BlurView
-        intensity={isDark ? 18 : 35}
-        tint={isDark ? 'dark' : 'light'}
-        style={s.compactCard}
-        accessibilityRole="button"
-        accessibilityLabel={a11ySummary}>
-        <AnimatedCheck
-          checked={isDone}
-          color="#10B981"
-          borderColor={c.border}
-          size={18}
-          radius={5}
-          onPress={() => onToggle(task)}
-          hitSlop={{ top: 13, bottom: 13, left: 13, right: 13 }}
-          accessibilityRole="checkbox"
-          accessibilityLabel={task.title}
-          accessibilityState={{ checked: isDone }}
-          style={{ marginTop: 1 }}
-        />
-
-        {/* Два рядки: назва зверху на всю ширину, статус і проєкт під нею.
-            В один рядок назва змагалася за місце з рештою і обрізалась першою,
-            хоча вона тут найважливіша. Дату свідомо не показуємо — компактний
-            вигляд для швидкого перегляду списку, дедлайн видно в повному. */}
-        <View style={{ flex: 1, marginHorizontal: 10, gap: 4 }}>
-          <AnimatedText
-            style={[{ color: c.text, fontSize: 14, fontWeight: '600', textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
-            numberOfLines={2}>
-            {task.title}
-          </AnimatedText>
-
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}
-            importantForAccessibility="no-hide-descendants">
-            <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: statusColumn.color + '16' }}>
-              <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 4 }} />
-              <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 10, fontWeight: '700' }}>{statusColumn.name}</Text>
-            </View>
-
-            {proj && badgeLabel && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: proj.color + '16' }}>
-                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: proj.color, marginRight: 4 }} />
-                {/* maxWidth більший за колишні 110: у бейдж тепер уміщається
-                    ще й назва спринта, і на 110 від неї лишалося три літери. */}
-                <Text numberOfLines={1} style={{ color: proj.color, fontSize: 10, fontWeight: '600', maxWidth: 180 }}>{badgeLabel}</Text>
-              </View>
-            )}
-
-            {/* Виконані підзавдання. Показуємо лише коли вони є: «0/0» на
-                завданні без підзавдань — це шум, а не інформація. */}
-            {task.subtasks.length > 0 && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <IconSymbol
-                  name={allSubtasksDone ? 'checkmark.circle.fill' : 'list.bullet'}
-                  size={10}
-                  color={allSubtasksDone ? '#10B981' : c.sub}
-                />
-                <Text style={{
-                  color: allSubtasksDone ? '#10B981' : c.sub,
-                  fontSize: 10, fontWeight: '600', fontVariant: ['tabular-nums'],
-                }}>
-                  {doneSubtasks}/{task.subtasks.length}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Пріоритет — бейдж P0–P5 (замість кольорової крапки). Озвучується
-            в a11ySummary картки, тож сам бейдж від VoiceOver схований. */}
-        <View style={{ alignItems: 'center', justifyContent: 'center' }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-          <PriorityBadge level={normalizePriority(task)} />
-        </View>
-      </BlurView>
-    </PressableScale>
+    <TouchableOpacity
+      onPress={() => onPress(groupKey, title)}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel.replace('{name}', title).replace('{count}', String(total))}
+      style={[s.groupShowAll, { backgroundColor: color + '12', borderColor: color + '40' }]}>
+      <Text style={{ color, fontSize: 13, fontWeight: '600', flex: 1 }}>
+        {label.replace('{count}', String(total))}
+      </Text>
+      <IconSymbol name="chevron.right" size={12} color={color} />
+    </TouchableOpacity>
   );
 });
 
-
 // ─── Stat Cell ───────────────────────────────────────────────────────────────
+/**
+ * Стеля масштабування чисел і підписів картки статистики.
+ *
+ * Чотири комірки ділять ширину екрана порівну, тож при AX5 (×3) підпис
+ * «ефективність» ламався на три рядки («ефек/ти/сть») і вилазив за нижню
+ * межу картки, яка має `overflow: 'hidden'` (NAT-06). 1.6 — той самий
+ * прийом, що вже вжито для заголовка (`TITLE_MAX_FONT_SCALE`) і підписів
+ * табів, але трохи вільніший: тут є куди рости у два рядки.
+ */
+const STAT_MAX_FONT_SCALE = 1.6;
+
 function StatCell({ value, label, color, sub }: any) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}>
-      <Text style={{ color, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{value}</Text>
-      <Text style={{ color: sub, fontSize: 10, fontWeight: '500', marginTop: 3 }}>{label}</Text>
+    <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14, minWidth: 0 }}>
+      <Text
+        numberOfLines={1}
+        maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
+        style={{ color, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{value}</Text>
+      <Text
+        numberOfLines={2}
+        maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
+        style={{ color: sub, fontSize: 10, fontWeight: '500', marginTop: 3, textAlign: 'center' }}>{label}</Text>
     </View>
   );
 }
@@ -3077,9 +3200,6 @@ const s = StyleSheet.create({
   sortLabel:      { fontSize: 12, fontWeight: '600' },
   groupLabel:     { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 6 },
   taskCard:       { borderRadius: 16, borderWidth: 1, padding: 14, overflow: 'hidden' },
-  // minHeight 44 — мінімальна ціль дотику (Apple HIG). Було ~38: рядок цілком
-  // клікабельний, тож він мусить відповідати нормі, а не лише чекбокс у ньому.
-  compactCard:    { minHeight: 44, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' },
   boardCard:      { borderRadius: 13, padding: 11, overflow: 'hidden' },
   taskTitle:      { fontSize: 14, fontWeight: '600' },
   checkbox:       { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
@@ -3122,6 +3242,8 @@ const s = StyleSheet.create({
   filterActionBtn:{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
   filterSegBtn:   { paddingVertical: 11, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   viewAllBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11 },
+  itemSeparator:  { height: 6 },
+  groupShowAll:   { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginTop: 6 },
   dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
   dropdownList:   { borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
   dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 11 },

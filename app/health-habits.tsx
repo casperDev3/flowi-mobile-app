@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,13 +11,14 @@ import { Empty, Field } from '@/components/health/FormBits';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
-import { cancelDailyReminder, scheduleDailyReminder } from '@/store/notifications';
-import { loadData } from '@/store/storage';
+import { cancelDailyReminder, dailyReminderId, scheduleDailyReminder } from '@/store/notifications';
+import { loadDataResult, retryStorageRead } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
+import { LoadErrorNotice, ReminderBlockedNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
 import { HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
 import { HABITS_KEY, Habit, genId, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 
 // Типізовано: раніше це був string[], і назва без відповідника в маппінгу
 // мовчки малювала порожнє місце на Android.
@@ -27,14 +28,21 @@ const ACC = HEALTH_ACCENTS.prot;
 
 export default function HabitsScreen() {
   const contentWidth = useContentWidth();
+  const sheetSurface = useSheetSurface();
+  const sheetScreenMinHeight = useSheetScreenMinHeight();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const c = getHealthColors(isDark);
   useScreenView('health_habits');
 
   const [habits, setHabits] = useState<Habit[]>([]);
   const [initialized, setInitialized] = useState(false);
+  // ERR-01: «не прочиталось» ≠ «порожньо». Поки читання провалене,
+  // initialized лишається false — це і є заборона автозапису поверх даних.
+  const [loadFailed, setLoadFailed] = useState(false);
+  // ERR-10: планувальник відмовив — звичка збережена БЕЗ нагадування.
+  const [reminderBlocked, setReminderBlocked] = useState(false);
   const [add, setAdd] = useState(false);
   const [title, setTitle] = useState('');
   const [icon, setIcon] = useState(ICONS[0]);
@@ -42,16 +50,44 @@ export default function HabitsScreen() {
   const [remAt, setRemAt] = useState('');
   const canCreate = title.trim().length > 0;
 
-  useEffect(() => { loadData<Habit[]>(HABITS_KEY, []).then(d => { setHabits(d); setInitialized(true); }); }, []);
-  useEffect(() => { if (initialized) void saveSynced(HABITS_KEY, habits); }, [habits, initialized]);
+  useEffect(() => {
+    loadDataResult<Habit[]>(HABITS_KEY, []).then(r => {
+      if (r.ok) { setHabits(r.value); setInitialized(true); }
+      else setLoadFailed(true);
+    });
+  }, []);
+
+  const retryLoad = async () => {
+    const r = await retryStorageRead<Habit[]>(HABITS_KEY, []);
+    if (r.ok) { setHabits(r.value); setLoadFailed(false); setInitialized(true); }
+  };
+
+  useEffect(() => {
+    if (!initialized) return;
+    // saveSynced тепер може відхилитись (StorageWriteBlockedError) — без
+    // .catch RN лаявся б Possible Unhandled Promise Rejection.
+    void saveSynced(HABITS_KEY, habits).catch(e => { if (__DEV__) console.warn('[habits] save failed:', e); });
+  }, [habits, initialized]);
 
   const create = async () => {
     if (!title.trim()) return;
     const id = genId();
     let notifId: string | undefined;
     const m = remAt.match(/^(\d{1,2}):(\d{2})$/);
-    if (m) { await scheduleDailyReminder(`habit_${id}`, parseInt(m[1], 10), parseInt(m[2], 10), title.trim(), tr.habits); notifId = `habit_${id}`; }
-    const habit: Habit = { id, title: title.trim(), icon, color, log: [], reminderAt: m ? remAt : undefined, notifId, createdAt: new Date().toISOString() };
+    // ERR-10: результат планувальника більше не відкидається. scheduleDailyReminder
+    // повертає false, коли сповіщення вимкнені глобально або ОС не дала дозволу;
+    // до цього годину писали в запис усе одно, і застосунок стверджував, що
+    // нагадування є, хоча в ОС не було заплановано нічого.
+    // ERR-10 (поправка з пристрою): id нотифікації — детермінований і той
+    // самий, що будує планувальник (dailyReminderId → `daily_habit_<id>`),
+    // інакше звірка зі списком запланованих в ОС шукає неіснуючий ключ.
+    let scheduled = false;
+    if (m) {
+      scheduled = await scheduleDailyReminder(`habit_${id}`, parseInt(m[1], 10), parseInt(m[2], 10), title.trim(), tr.habits);
+      if (scheduled) notifId = dailyReminderId(`habit_${id}`);
+    }
+    setReminderBlocked(Boolean(m) && !scheduled);
+    const habit: Habit = { id, title: title.trim(), icon, color, log: [], reminderAt: scheduled ? remAt : undefined, notifId, createdAt: new Date().toISOString() };
     setHabits(p => [habit, ...p]);
     setTitle(''); setIcon(ICONS[0]); setColor(COLORS[0]); setRemAt(''); setAdd(false);
   };
@@ -66,12 +102,17 @@ export default function HabitsScreen() {
   };
 
   const remove = async (h: Habit) => {
-    if (h.notifId) await cancelDailyReminder(`habit_${h.id}`);
+    // Скасовуємо завжди, а не лише коли notifId є: після синку поле локальне
+    // й може не приїхати з іншого пристрою, а нотифікація в ОС — стоїть.
+    await cancelDailyReminder(`habit_${h.id}`);
     setHabits(p => p.filter(x => x.id !== h.id));
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    // NAT-14: екран поданий як formSheet, де корінь не отримує визначеної
+    // висоти — без minHeight `flex: 1` схлопувався до висоти вмісту, і нижні
+    // дві третини «аркуша» лишались прозорими.
+    <View style={{ flex: 1, minHeight: sheetScreenMinHeight }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={s.header}>
@@ -85,7 +126,13 @@ export default function HabitsScreen() {
         </View>
 
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
-          {habits.length === 0 ? <Empty c={c} text={tr.habitsSub} icon="checklist" /> : habits.map(h => {
+          {loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={retryLoad} />}
+          {reminderBlocked && (
+            <ReminderBlockedNotice lang={lang} c={c} isDark={isDark}
+              onOpenSettings={() => { void Linking.openSettings(); }}
+              onDismiss={() => setReminderBlocked(false)} />
+          )}
+          {loadFailed ? null : habits.length === 0 ? <Empty c={c} text={tr.habitsSub} icon="checklist" /> : habits.map(h => {
             const done = habitDoneToday(h); const streak = habitStreak(h);
             return (
               <BlurView key={h.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
@@ -113,9 +160,9 @@ export default function HabitsScreen() {
 
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessibilityViewIsModal importantForAccessibility="yes">
-              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setAdd(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addHabit}</Text>
                 <Field label={tr.title} value={title} onChange={setTitle} placeholder="Випити вітаміни" autoFocus c={c} />
@@ -162,8 +209,10 @@ const s = StyleSheet.create({
   check:     { width: 32, height: 32, borderRadius: 16, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   pick:      { width: 44, height: 44, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
-  sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '90%', overflow: 'hidden' },
+  sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти — числом із useSheetSurface(); відсоток тут не працював
+  // (батько має height:auto), і кнопка «Зберегти» лишалась за краєм вікна.
+  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
   sheetTitle:{ fontSize: 20, fontWeight: '800', marginBottom: 6 },
   label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
   btn:       { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

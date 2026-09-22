@@ -1,0 +1,18 @@
+appId: com.casper3.f-tracking-app
+---
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+    duration: 300
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+    duration: 300
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+    duration: 300
+- swipe:
+    start: "50%,80%"
+    end: "50%,20%"
+    duration: 300

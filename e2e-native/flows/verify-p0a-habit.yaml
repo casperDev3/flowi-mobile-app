@@ -1,0 +1,27 @@
+# P0 (а) NAT-01 — ЗВИЧКА створюється до кінця.
+# Заразом NAT-13 (плитка хабу ловить тап) і NAT-14 (аркуш зафарбований донизу).
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "70%,94%"
+- waitForAnimationToEnd
+- swipe:
+    start: "50%,70%"
+    end: "50%,25%"
+- waitForAnimationToEnd
+- tapOn: ".*Звички.*"
+- waitForAnimationToEnd
+- tapOn:
+    point: "89%,20%"
+- waitForAnimationToEnd
+- tapOn:
+    point: "50%,58%"        # поле «НАЗВА»
+- inputText: "P0 Habit"
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn:
+    point: "65%,91%"        # «Зберегти»
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/p0a-24-habit-created

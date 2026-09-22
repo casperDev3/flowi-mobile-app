@@ -26,11 +26,22 @@ describe('колонка bottom-sheet-а', () => {
       width: '100%',
       maxWidth: CONTENT_MAX_WIDTH,
       alignSelf: 'center',
+      flexShrink: 1,
     });
   });
 
   it('на телефоні — повна ширина й жодної стелі', () => {
-    expect(sheetColumnStyle(false)).toEqual({ width: '100%' });
+    expect(sheetColumnStyle(false)).toEqual({ width: '100%', flexShrink: 1 });
+  });
+
+  it('колонка вміє стискатись в обох гілках', () => {
+    // Колонка — прямий flex-нащадок контейнера з justifyContent:'flex-end'.
+    // У RN flexShrink типово 0, тож без цього форма, вища за вікно (довгий
+    // вміст або піднята клавіатура), виїздить за екран замість того, щоб
+    // віддати висоту внутрішньому ScrollView — і кнопку «Зберегти» не
+    // натиснути (NAT-01).
+    expect(sheetColumnStyle(true).flexShrink).toBe(1);
+    expect(sheetColumnStyle(false).flexShrink).toBe(1);
   });
 
   it('стеля лишилась однією константою', () => {

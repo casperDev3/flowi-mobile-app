@@ -39,7 +39,15 @@ import type { ActiveTimer, Shift } from '@/utils/activeTimers';
 
 interface ShiftCfg { label: string; icon: IconSymbolName; color: string; hours: string; }
 
-interface TimeEntry { id: string; task: string; shift: Shift; duration: number; date: string; }
+interface TimeEntry {
+  id: string;
+  task: string;
+  shift: Shift;
+  duration: number;
+  date: string;
+  /** Належність проєкту (WORKSPACE_PROJECTS_CONTRACT §3.3) — опційна. */
+  projectId?: string;
+}
 
 /** Рівно те, що рядок активного таймера показує про підзавдання. */
 interface RowSubtask { id: string; title: string; done: boolean }
@@ -55,6 +63,7 @@ interface PickableTask {
   status: 'active' | 'done';
   kanbanColumnId?: string;
   subtasks?: RowSubtask[];
+  projectId?: string;
 }
 
 const today = new Date();
@@ -198,6 +207,7 @@ export default function TimeScreen() {
         title: linkedTask.title,
         kanbanColumnId: linkedTask.kanbanColumnId,
         status: linkedTask.status,
+        projectId: linkedTask.projectId,
       });
     } else {
       await startAdHocTimer(taskName.trim() || tr.untitled, activeShift);
@@ -570,10 +580,10 @@ export default function TimeScreen() {
 
       {/* ─── Context Menu Modal ─── */}
       <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>
-        <Pressable
+        <Pressable accessible={false}
           style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
           onPress={() => setShowMenu(false)}>
-          <Pressable
+          <Pressable accessible={false}
             onPress={e => e.stopPropagation()}
             style={{ position: 'absolute', top: insets.top + 62, right: 16, width: 220 }}>
             <BlurView intensity={isDark ? 60 : 75} tint={isDark ? 'dark' : 'light'} style={[s.menuBox, { borderColor: c.border }]}>
@@ -617,8 +627,8 @@ export default function TimeScreen() {
       {/* ─── Calendar Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowCal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setShowCal(false)}>
+            <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
 
                 <View style={s.handleRow}>
@@ -688,8 +698,8 @@ export default function TimeScreen() {
       {/* ─── Add Manual ─── */}
       <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setShowAdd(false)}>
+            <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={s.handleRow}>
@@ -781,8 +791,8 @@ export default function TimeScreen() {
       {/* ─── Detail Modal ─── */}
       <Modal visible={!!selected} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setSelected(null)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setSelected(null)}>
+            <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
               {selected && (() => {
                 const cfg = SHIFTS[selected.shift];
                 return (

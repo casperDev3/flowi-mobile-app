@@ -15,6 +15,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
   setItem: jest.fn(async () => {}),
   removeItem: jest.fn(async () => {}),
+  getAllKeys: jest.fn(async () => []),
+  multiRemove: jest.fn(async () => {}),
 }));
 
 jest.mock('@/store/storage', () => ({
@@ -27,8 +29,11 @@ jest.mock('@/store/storage', () => ({
   }),
 }));
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import type { ActiveTimer } from '@/utils/activeTimers';
 import type { Account } from '@/utils/accounts';
+import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import {
   balanceAdjustmentsToMap,
   balanceAdjustmentsToRows,
@@ -497,5 +502,150 @@ describe('міграція рахунків у сховищі', () => {
   test('порожні фінанси — міграція не пише порожній масив рахунків', async () => {
     expect(await runStorageMigrations()).toEqual([]);
     expect(read<Account[] | null>('accounts', null)).toBeNull();
+  });
+});
+
+describe('«Спільне» прибрано (§4 плану, §6.3 контракту)', () => {
+  beforeEach(() => {
+    (AsyncStorage.getAllKeys as jest.Mock).mockReset().mockResolvedValue([]);
+    (AsyncStorage.multiRemove as jest.Mock).mockReset().mockResolvedValue(undefined);
+  });
+
+  test('прибирає точні й динамічні ключі «Спільне», лишає решту', async () => {
+    (AsyncStorage.getAllKeys as jest.Mock).mockResolvedValue([
+      'shared_device_id', 'shared_groups_list', 'shared_group', 'shared_section_counts',
+      'shared_items_abc', 'shared_items_def', 'tasks', 'workspace_config',
+    ]);
+
+    const done = await runStorageMigrations();
+
+    expect(done).toContain('shared:removed');
+    expect(AsyncStorage.multiRemove).toHaveBeenCalledWith([
+      'shared_device_id', 'shared_groups_list', 'shared_group', 'shared_section_counts',
+      'shared_items_abc', 'shared_items_def',
+    ]);
+  });
+
+  test('нема ключів «Спільне» — no-op, multiRemove не викликається', async () => {
+    (AsyncStorage.getAllKeys as jest.Mock).mockResolvedValue(['tasks', 'workspace_config']);
+
+    const done = await runStorageMigrations();
+
+    expect(done).not.toContain('shared:removed');
+    expect(AsyncStorage.multiRemove).not.toHaveBeenCalled();
+  });
+});
+
+describe('явний `type` в особистих статусах (§3.3 контракту, мінор з ревʼю)', () => {
+  test('дописує похідний type особистій колонці, якій його бракує', async () => {
+    seed('task_statuses', [
+      // Особиста, без type — легасі-запис до появи поля.
+      { id: 'status-active', name: 'До роботи', color: '#6366F1', position: 0, isDone: false },
+      // Проєктна — не чіпаємо, навіть якщо теж без type (мали б отримати його
+      // ще при seedProjectStatusColumns; захист про всяк випадок тут нижче).
+      { id: 'st-1', name: 'Проєктна', color: '#000', position: 0, isDone: false, projectId: 'p1' },
+      // Уже з явним type — не чіпаємо.
+      { id: 'status-done', name: 'Готово', color: '#10B981', position: 1, isDone: true, type: 'done' },
+    ]);
+
+    const done = await runStorageMigrations();
+
+    expect(done).toContain('task_statuses:explicit_type');
+    const byId = new Map(read<TaskStatusColumn[]>('task_statuses', []).map(c => [c.id, c]));
+    expect(byId.get('status-active')?.type).toBe('todo');
+    expect(byId.get('st-1')?.type).toBeUndefined(); // проєктна — не наша турбота тут
+    expect(byId.get('status-done')?.type).toBe('done');
+  });
+
+  test('надсилає дописаний type в outbox — зміну бачать і інші пристрої', async () => {
+    seed('task_statuses', [
+      { id: 'status-in-progress', name: 'У процесі', color: '#F59E0B', position: 1, isDone: false },
+    ]);
+
+    await runStorageMigrations();
+
+    const outbox = read<{ collection: string; local_id: string }[]>('sync_outbox', []);
+    expect(outbox.some(i => i.collection === 'task_statuses' && i.local_id === 'status-in-progress')).toBe(true);
+  });
+
+  test('усі колонки вже з явним type — no-op, ідемпотентно', async () => {
+    seed('task_statuses', [
+      { id: 'status-active', name: 'До роботи', color: '#6366F1', position: 0, isDone: false, type: 'todo' },
+    ]);
+
+    expect(await runStorageMigrations()).not.toContain('task_statuses:explicit_type');
+    // Другий прохід так само no-op.
+    expect(await runStorageMigrations()).not.toContain('task_statuses:explicit_type');
+  });
+
+  test('порожній/відсутній task_statuses — no-op', async () => {
+    expect(await runStorageMigrations()).not.toContain('task_statuses:explicit_type');
+  });
+});
+
+describe('бекфіл `createdBy` для проєктних задач без автора (major з ревʼю §3.7)', () => {
+  test('дописує createdBy=я лише задачам МОГО (owner) проєкту', async () => {
+    seed('auth_user', { id: 'u1', email: 'a@b.c', name: 'A' });
+    seed('workspace_projects', [
+      { id: 'p-own', role: 'owner' },
+      { id: 'p-member', role: 'member' },
+    ]);
+    seed('tasks', [
+      // Соло-проєкт до появи createdBy (моя роль — owner) — отримує автора.
+      { id: 't1', title: 'моя стара', projectId: 'p-own' },
+      // Уже з автором — не чіпаємо.
+      { id: 't2', title: 'вже підписана', projectId: 'p-own', createdBy: 'u2' },
+      // Особиста (без projectId) — не наша турбота тут.
+      { id: 't3', title: 'особиста' },
+      // Проєкт, де я лише member — чужа задача без автора лишається як є.
+      { id: 't4', title: 'чужа команди', projectId: 'p-member' },
+    ]);
+
+    const done = await runStorageMigrations();
+
+    expect(done).toContain('tasks:createdBy_backfill');
+    const byId = new Map(read<{ id: string; createdBy?: string }[]>('tasks', []).map(t => [t.id, t]));
+    expect(byId.get('t1')?.createdBy).toBe('u1');
+    expect(byId.get('t2')?.createdBy).toBe('u2');
+    expect(byId.get('t3')?.createdBy).toBeUndefined();
+    expect(byId.get('t4')?.createdBy).toBeUndefined();
+  });
+
+  test('project_sync_state_v1 перекриває устарілий кеш workspace_projects', async () => {
+    seed('auth_user', { id: 'u1' });
+    // Кеш GET /projects/ ще каже 'member', але свіжіший стан синку
+    // проєкту вже знає про підвищення до owner.
+    seed('workspace_projects', [{ id: 'p1', role: 'member' }]);
+    seed('project_sync_state_v1', { p1: { role: 'owner' } });
+    seed('tasks', [{ id: 't1', title: 'x', projectId: 'p1' }]);
+
+    await runStorageMigrations();
+
+    expect(read<{ id: string; createdBy?: string }[]>('tasks', []).find(t => t.id === 't1')?.createdBy).toBe('u1');
+  });
+
+  test('невідомий проєкт (жодної ролі ще не кешовано) — фолбек owner, як і скрізь у клієнті', async () => {
+    seed('auth_user', { id: 'u1' });
+    seed('tasks', [{ id: 't1', title: 'соло-проєкт до першого GET /projects/', projectId: 'p-brand-new' }]);
+
+    await runStorageMigrations();
+
+    expect(read<{ id: string; createdBy?: string }[]>('tasks', []).find(t => t.id === 't1')?.createdBy).toBe('u1');
+  });
+
+  test('без сесії (auth_user відсутній) — no-op, повторить спробу наступного старту', async () => {
+    seed('tasks', [{ id: 't1', title: 'x', projectId: 'p1' }]);
+
+    expect(await runStorageMigrations()).not.toContain('tasks:createdBy_backfill');
+    expect(read<{ id: string; createdBy?: string }[]>('tasks', []).find(t => t.id === 't1')?.createdBy).toBeUndefined();
+  });
+
+  test('немає задач без createdBy — no-op, ідемпотентно', async () => {
+    seed('auth_user', { id: 'u1' });
+    seed('workspace_projects', [{ id: 'p1', role: 'owner' }]);
+    seed('tasks', [{ id: 't1', title: 'x', projectId: 'p1', createdBy: 'u1' }]);
+
+    expect(await runStorageMigrations()).not.toContain('tasks:createdBy_backfill');
+    expect(await runStorageMigrations()).not.toContain('tasks:createdBy_backfill');
   });
 });

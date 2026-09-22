@@ -13,16 +13,19 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { cancelById, scheduleDateReminder } from '@/store/notifications';
-import { loadData } from '@/store/storage';
+import { loadDataResult, retryStorageRead } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
 import { ACCENT_PULSE, type HealthColors, getHealthColors } from '@/utils/healthTheme';
 import { CHECKUPS_KEY, Checkup, CheckupKind, genId } from '@/utils/preventionUtils';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
+import { LoadErrorNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
 
 export default function CheckupsScreen() {
   const contentWidth = useContentWidth();
+  const sheetSurface = useSheetSurface();
+  const sheetScreenMinHeight = useSheetScreenMinHeight();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -34,6 +37,9 @@ export default function CheckupsScreen() {
 
   const [items, setItems] = useState<Checkup[]>([]);
   const [initialized, setInitialized] = useState(false);
+  // ERR-01: провалене читання не вмикає initialized — автозапис порожнього
+  // масиву поверх нечитаних даних заборонено.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [add, setAdd] = useState(false);
   const [kind, setKind] = useState<CheckupKind>('analysis');
   const [title, setTitle] = useState('');
@@ -42,8 +48,22 @@ export default function CheckupsScreen() {
   const [nextDate, setNextDate] = useState('');
   const canCreate = title.trim().length > 0;
 
-  useEffect(() => { loadData<Checkup[]>(CHECKUPS_KEY, []).then(d => { setItems(d); setInitialized(true); }); }, []);
-  useEffect(() => { if (initialized) void saveSynced(CHECKUPS_KEY, items); }, [items, initialized]);
+  useEffect(() => {
+    loadDataResult<Checkup[]>(CHECKUPS_KEY, []).then(r => {
+      if (r.ok) { setItems(r.value); setInitialized(true); }
+      else setLoadFailed(true);
+    });
+  }, []);
+
+  const retryLoad = async () => {
+    const r = await retryStorageRead<Checkup[]>(CHECKUPS_KEY, []);
+    if (r.ok) { setItems(r.value); setLoadFailed(false); setInitialized(true); }
+  };
+
+  useEffect(() => {
+    if (!initialized) return;
+    void saveSynced(CHECKUPS_KEY, items).catch(e => { if (__DEV__) console.warn('[checkups] save failed:', e); });
+  }, [items, initialized]);
 
 
   const create = async () => {
@@ -77,7 +97,9 @@ export default function CheckupsScreen() {
   ), [remove, isDark, c, tr, locale]);
 
   return (
-    <View style={{ flex: 1 }}>
+    // NAT-14: formSheet не дає кореню визначеної висоти — без minHeight
+    // `flex: 1` схлопується до висоти вмісту, і низ аркуша лишається прозорим.
+    <View style={{ flex: 1, minHeight: sheetScreenMinHeight }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={s.header}>
@@ -98,15 +120,16 @@ export default function CheckupsScreen() {
           renderItem={renderItem}
           contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={<Empty c={c} text={tr.checkupsSub} icon="cross.case.fill" />}
+          ListHeaderComponent={loadFailed ? <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={retryLoad} /> : null}
+          ListEmptyComponent={loadFailed ? null : <Empty c={c} text={tr.checkupsSub} icon="cross.case.fill" />}
         />
       </SafeAreaView>
 
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessibilityViewIsModal importantForAccessibility="yes">
-              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setAdd(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addCheckup}</Text>
                   <Segment label={''} color={ACCENT_PULSE} c={c} value={kind} onChange={setKind}
@@ -172,8 +195,10 @@ const s = StyleSheet.create({
   card:      { borderRadius: 16, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 10 },
   next:      { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 },
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
-  sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, maxHeight: '85%', overflow: 'hidden' },
+  sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти — числом із useSheetSurface(); відсоток тут не працював
+  // (батько має height:auto), і кнопка «Зберегти» лишалась за краєм вікна.
+  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
   sheetTitle:{ fontSize: 20, fontWeight: '800', marginBottom: 6 },
   btn:       { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 });

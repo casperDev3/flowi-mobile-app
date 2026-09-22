@@ -2,6 +2,16 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
+
+/**
+ * Непрозорість скелетона при ввімкненому «Зменшенні руху».
+ *
+ * Не 0.5 і не 1: 0.5 — це дно пульсації, статичний блок на ньому виглядає
+ * зниклим; 1 — це звичайна плитка, яку легко сплутати з реальним вмістом.
+ * 0.75 лишає блок явно «недомальованим», не рухаючись.
+ */
+export const SKELETON_REDUCED_OPACITY = 0.75;
 
 // ─── Base Skeleton block ───────────────────────────────────────────────────────
 
@@ -14,9 +24,18 @@ interface SkeletonProps {
 
 export function Skeleton({ width = '100%', height = 16, radius = 8, style }: SkeletonProps) {
   const isDark = useColorScheme() === 'dark';
+  const reduced = useReduceMotion();
   const opacity = useRef(new Animated.Value(0.5)).current;
 
   useEffect(() => {
+    // Єдиний Animated.loop у застосунку — і він крутиться весь час, поки
+    // триває завантаження. Саме такий рух вимикають прапорцем «Зменшення
+    // руху», тож при ньому лишаємо статичну плитку без циклу.
+    if (reduced) {
+      opacity.setValue(SKELETON_REDUCED_OPACITY);
+      return;
+    }
+
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }),
@@ -25,7 +44,7 @@ export function Skeleton({ width = '100%', height = 16, radius = 8, style }: Ske
     );
     anim.start();
     return () => anim.stop();
-  }, [opacity]);
+  }, [opacity, reduced]);
 
   const bg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
 

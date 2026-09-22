@@ -1,14 +1,11 @@
 /**
- * __tests__/projects-sprint-refresh.test.tsx — «поклав задачу у спринт, а в
- * деталі проєкту її назви не видно».
+ * __tests__/projects-sprint-refresh.test.tsx — «поклав задачу у спринт, а на
+ * екрані Спринтів простору проєкту її назви не видно».
  *
- * Причини на мобільному були не у верстці, а в даних і модалках:
- *   1. екран читав сховище один раз на монтуванні — зміна спринта деінде
- *      (екран Завдань, синк, стор таймерів) до деталі не доходила;
- *   2. вибір спринта був другою модалкою поверх модалки деталі (iOS);
- *   3. ефект «зберегти стан» писав застарілий масив спринтів і тим самим
- *      ВИДАЛЯВ спринти, створені деінде (saveSynced дифає за id).
- * Тести монтують екран цілком на підробленому AsyncStorage.
+ * Було перевіркою інлайн-деталі `app/projects.tsx`; ту UI план §3 замінив
+ * простором проєкту (`app/project/[id]/*`) — сама поведінка та сама
+ * (useSyncedList/RMW не мають ЗАТИРАТИ записи, створені деінде), тести тепер
+ * монтують нові екрани: Спринти, Завдання, Наради.
  */
 
 const mockStore = new Map<string, string>();
@@ -25,7 +22,8 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: jest.fn(), push: jest.fn() }),
+  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
+  useLocalSearchParams: () => ({ id: 'p1' }),
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
 }));
 jest.mock('@/utils/haptics', () => ({
@@ -42,7 +40,9 @@ jest.mock('@/store/i18n', () => ({
 
 import React from 'react';
 
-import ProjectsScreen from '@/app/projects';
+import ProjectSprintsScreen from '@/app/project/[id]/sprints';
+import ProjectTasksScreen from '@/app/project/[id]/tasks';
+import ProjectMeetingsScreen from '@/app/project/[id]/meetings';
 import { saveData } from '@/store/storage';
 import { allTranslations } from '@/store/translations';
 
@@ -75,24 +75,6 @@ function allText(tree: any): string {
   return out.join('|');
 }
 
-/**
- * Текст лише деталі проєкту (від заголовка «Спринти»). Назва задачі
- * трапляється й вище — у графіках списку.
- */
-function detailText(tree: any): string {
-  const text = allText(tree);
-  return text.slice(text.lastIndexOf(tr.sprints));
-}
-
-/** Задача стоїть у групі спринта ⇔ її назва ВИЩЕ заголовка «Беклог» (беклог — остання група). */
-function taskInSprintGroup(tree: any, title: string): boolean {
-  const text = detailText(tree);
-  const titleAt = text.indexOf(title);
-  const backlogAt = text.indexOf(tr.sprintBacklog);
-  if (titleAt < 0 || backlogAt < 0) throw new Error(`немає «${title}» або «${tr.sprintBacklog}» у деталі`);
-  return titleAt < backlogAt;
-}
-
 function pressByLabel(tree: any, label: string) {
   const nodes = tree.root.findAll((n: any) => n.props?.accessibilityLabel === label && typeof n.props.onPress === 'function');
   if (nodes.length === 0) throw new Error(`немає кнопки «${label}»`);
@@ -103,18 +85,16 @@ function pressText(tree: any, text: string) {
   const nodes = tree.root.findAll((n: any) => typeof n.props?.onPress === 'function'
     && n.findAll((c: any) => c.props?.children === text).length > 0);
   if (nodes.length === 0) throw new Error(`немає кнопки з текстом «${text}»`);
-  // Найглибша кнопка — сам рядок, а не обгортка навколо всієї деталі.
+  // Найглибша кнопка — сам рядок, а не обгортка навколо всього екрана.
   return act(async () => { nodes[nodes.length - 1].props.onPress(); });
 }
 
 let mounted: any = null;
 
-async function mountAndOpenProject() {
+async function mountSprints() {
   let tree: any;
-  await act(async () => { tree = create(<ProjectsScreen />); });
+  await act(async () => { tree = create(<ProjectSprintsScreen />); });
   mounted = tree;
-  await flush();
-  await pressByLabel(tree, PROJECT.name);
   await flush();
   return tree;
 }
@@ -125,13 +105,12 @@ afterEach(async () => {
   mounted = null;
 });
 
-test('запис спринта задачі повз екран одразу видно в деталі проєкту', async () => {
+test('запис спринта задачі повз екран одразу видно на екрані Спринтів', async () => {
   seed({ projects: [PROJECT], sprints: [SPRINT], tasks: [TASK] });
-  const tree = await mountAndOpenProject();
+  const tree = await mountSprints();
 
-  // До: задача в беклозі.
-  expect(detailText(tree)).toContain(TASK.title);
-  expect(taskInSprintGroup(tree, TASK.title)).toBe(false);
+  // До: спринт порожній (задача в беклозі проєкту, тут не показана).
+  expect(allText(tree)).toContain(tr.sprintEmpty);
 
   // Інший екран (або синк) кладе задачу у спринт.
   await act(async () => {
@@ -139,51 +118,30 @@ test('запис спринта задачі повз екран одразу в
   });
   await flush();
 
-  // Після: назва на місці — задача перейшла в групу спринта (беклог лишається
-  // останньою групою, як у вебі, але вже порожній).
-  expect(detailText(tree)).toContain(TASK.title);
-  expect(taskInSprintGroup(tree, TASK.title)).toBe(true);
+  // Після: назва задачі з'явилась усередині розгорнутого спринта.
+  expect(allText(tree)).toContain(TASK.title);
 });
 
-test('вибір спринта з деталі — інлайн, без другої модалки, назва лишається видимою', async () => {
-  seed({ projects: [PROJECT], sprints: [SPRINT], tasks: [TASK] });
-  const tree = await mountAndOpenProject();
-  const modalsBefore = tree.root.findAll((n: any) => n.props?.visible === true && n.props?.transparent === true).length;
-
-  await pressByLabel(tree, tr.sprintPick);
-  // Панель вибору розгорнулась, а нова модалка не з'явилась.
-  expect(tree.root.findAll((n: any) => n.props?.visible === true && n.props?.transparent === true).length).toBe(modalsBefore);
-  await pressText(tree, SPRINT.name);
-  await flush();
-
-  expect(read<any[]>('tasks')[0].sprintId).toBe(SPRINT.id);
-  expect(detailText(tree)).toContain(TASK.title);
-  expect(taskInSprintGroup(tree, TASK.title)).toBe(true);
-});
-
-test('закритий спринт згорнутий за замовчуванням і розгортається тапом; у рядку є статус', async () => {
+test('закритий спринт згорнутий за замовчуванням і розгортається тапом', async () => {
   const CLOSED = { id: 's0', projectId: 'p1', name: 'Минулий спринт', createdAt: NOW, closedAt: NOW };
   const DONE_TASK = { ...TASK, id: 't2', title: 'Здана задача', status: 'done', sprintId: CLOSED.id };
   seed({ projects: [PROJECT], sprints: [SPRINT, CLOSED], tasks: [TASK, DONE_TASK] });
-  const tree = await mountAndOpenProject();
+  const tree = await mountSprints();
 
   // Заголовок закритого спринта видно, його задач — ні.
-  expect(detailText(tree)).toContain(CLOSED.name);
-  expect(detailText(tree)).not.toContain(DONE_TASK.title);
-  // Беклог — остання група, розгорнута; у рядку задачі — чип статусу.
-  expect(taskInSprintGroup(tree, TASK.title)).toBe(false);
-  expect(detailText(tree)).toContain(`${TASK.title}|До роботи`);
+  expect(allText(tree)).toContain(CLOSED.name);
+  expect(allText(tree)).not.toContain(DONE_TASK.title);
 
   await pressByLabel(tree, CLOSED.name);
-  expect(detailText(tree)).toContain(DONE_TASK.title);
+  expect(allText(tree)).toContain(DONE_TASK.title);
 
   await pressByLabel(tree, CLOSED.name);
-  expect(detailText(tree)).not.toContain(DONE_TASK.title);
+  expect(allText(tree)).not.toContain(DONE_TASK.title);
 });
 
 test('перейменування спринта не видаляє спринт, створений деінде', async () => {
   seed({ projects: [PROJECT], sprints: [SPRINT], tasks: [TASK] });
-  const tree = await mountAndOpenProject();
+  const tree = await mountSprints();
 
   // Інший пристрій додав спринт; сигналу екран не отримав (стан застарілий).
   const other = { id: 's2', projectId: 'p1', name: 'Спринт 2', createdAt: NOW };
@@ -200,9 +158,12 @@ test('перейменування спринта не видаляє сприн
   expect(stored.find(s => s.id === 's1').name).toBe('Спринт 1 (новий)');
 });
 
-test('задача, створена в деталі проєкту, має валідний пріоритет (екран Завдань не падає)', async () => {
+test('задача, створена на екрані Завдань, має валідний пріоритет (екран не падає)', async () => {
   seed({ projects: [PROJECT], sprints: [], tasks: [] });
-  const tree = await mountAndOpenProject();
+  let tree: any;
+  await act(async () => { tree = create(<ProjectTasksScreen />); });
+  mounted = tree;
+  await flush();
   const input = tree.root.findAll((n: any) => n.props?.placeholder === tr.projectAddTask && typeof n.props.onChangeText === 'function')[0];
   await act(async () => { input.props.onChangeText('Нова'); });
   await act(async () => { input.props.onSubmitEditing(); });
@@ -217,7 +178,7 @@ test('задача, створена в деталі проєкту, має ва
 
 test('«+» відкритого спринта створює задачу одразу в цьому спринті', async () => {
   seed({ projects: [PROJECT], sprints: [SPRINT], tasks: [] });
-  const tree = await mountAndOpenProject();
+  const tree = await mountSprints();
 
   await pressByLabel(tree, `${tr.sprintAddTaskA11y}: ${SPRINT.name}`);
   const placeholder = tr.sprintAddTaskIn.replace('{name}', SPRINT.name);
@@ -229,37 +190,38 @@ test('«+» відкритого спринта створює задачу од
   const [task] = read<any[]>('tasks');
   expect(task.title).toBe('Задача спринта');
   expect(task.sprintId).toBe(SPRINT.id);
-  expect(task.projectId).toBe(PROJECT.id);
   expect(task.priorityLevel).toBe(3);
-  expect(taskInSprintGroup(tree, 'Задача спринта')).toBe(true);
+  expect(allText(tree)).toContain('Задача спринта');
 });
 
 test('закритий спринт не пропонує «+ задача»', async () => {
   const CLOSED = { id: 's0', projectId: 'p1', name: 'Минулий спринт', createdAt: NOW, closedAt: NOW };
   seed({ projects: [PROJECT], sprints: [SPRINT, CLOSED], tasks: [] });
-  const tree = await mountAndOpenProject();
+  const tree = await mountSprints();
   const labels = tree.root.findAll((n: any) => typeof n.props?.accessibilityLabel === 'string'
     && n.props.accessibilityLabel.startsWith(`${tr.sprintAddTaskA11y}: `)).map((n: any) => n.props.accessibilityLabel);
   expect(new Set(labels)).toEqual(new Set([`${tr.sprintAddTaskA11y}: ${SPRINT.name}`]));
 });
 
-test('секція «Зустрічі»: найближчі видно, минулі згорнуті під «Минулі (N)»', async () => {
+test('екран Нарад проєкту: найближчі видно, минулі згорнуті під «Минулі (N)»', async () => {
   const future = { id: 'mf', title: 'Демо клієнту', date: '2099-01-10', time: '10:00', durationMinutes: 30, color: '#6366F1', projectId: 'p1' };
   const past = { id: 'mp', title: 'Старий кікоф', date: '2020-01-10', time: '10:00', durationMinutes: 30, color: '#0EA5E9', projectId: 'p1' };
   const foreign = { id: 'mx', title: 'Чужа зустріч', date: '2099-01-11', time: '10:00', durationMinutes: 30, color: '#0EA5E9', projectId: 'p2' };
   seed({ projects: [PROJECT], sprints: [], tasks: [TASK], meetings: [future, past, foreign] });
-  const tree = await mountAndOpenProject();
+  let tree: any;
+  await act(async () => { tree = create(<ProjectMeetingsScreen />); });
+  mounted = tree;
+  await flush();
 
   const text = allText(tree);
-  expect(text).toContain(tr.meetings);
   expect(text).toContain('Демо клієнту');
   expect(text).not.toContain('Чужа зустріч');
   const pastLabel = tr.projectMeetingsPast.replace('{count}', '1');
   expect(text).toContain(pastLabel);
   expect(text).not.toContain('Старий кікоф');
 
-  await pressText(tree, pastLabel);
+  await pressByLabel(tree, pastLabel);
   expect(allText(tree)).toContain('Старий кікоф');
-  // Екран зустрічей не пише.
+  // Екран зустрічей не пише, поки форма не збережена.
   expect(read<any[]>('meetings')).toHaveLength(3);
 });

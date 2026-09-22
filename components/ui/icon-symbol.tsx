@@ -8,6 +8,7 @@ const MAPPING: Record<string, MaterialIconName> = {
   // Navigation
   'house.fill': 'home',
   'paperplane.fill': 'send',
+  'bubble.left.and.bubble.right.fill': 'forum',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'chevron.left': 'chevron-left',
@@ -105,6 +106,11 @@ const MAPPING: Record<string, MaterialIconName> = {
   'ellipsis': 'more-horiz',
   'magnifyingglass': 'search',
   'square.grid.2x2': 'grid-view',
+  'square.grid.2x2.fill': 'grid-view',
+  // Простір проєкту (WORKSPACE_PROJECTS_PLAN.md §3): Огляд, Таймлайн задач,
+  // Спринти — своїх іконок на Android нема, беремо найближчі за змістом.
+  'chart.bar.xaxis': 'bar-chart',
+  'flag.checkered': 'flag',
   'folder': 'folder-open',
   'folder.fill': 'folder',
   'folder.badge.magnifyingglass': 'folder-open',
@@ -215,6 +221,7 @@ const MAPPING: Record<string, MaterialIconName> = {
   'person.2.badge.plus': 'group-add',
   'person.badge.key.fill': 'manage-accounts',
   'person.badge.plus': 'person-add',
+  'person.badge.minus': 'person-remove',
   'person.slash': 'person-off',
   // Finance / ICON_SUGGESTIONS (missing)
   'airplane': 'flight',

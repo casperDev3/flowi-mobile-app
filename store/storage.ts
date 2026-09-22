@@ -26,6 +26,11 @@ export function subscribeToStorage(listener: StorageListener): () => void {
  * AsyncStorage.multiRemove в «очистити всі дані».
  */
 export function notifyStorageChanged(key: string): void {
+  // Ключ змінився ПОВЗ saveData (multiRemove у «очистити всі дані», зміна
+  // workspace) — байтів, на яких спіткнулось читання, більше немає, тож
+  // позначку збою знімаємо: інакше після очищення даних запис у цей ключ
+  // лишався б заблокованим до перезапуску застосунку.
+  readFailures.delete(key);
   // Копія набору: слухач має право відписатися просто з колбека.
   for (const listener of [...listeners]) {
     try {
@@ -36,23 +41,167 @@ export function notifyStorageChanged(key: string): void {
   }
 }
 
-export async function loadData<T>(key: string, fallback: T): Promise<T> {
-  try {
-    const json = await AsyncStorage.getItem(key);
-    if (!json) return fallback;
-    return JSON.parse(json) as T;
-  } catch (e) {
-    if (__DEV__) console.warn(`[storage] loadData(${key}) failed:`, e);
-    return fallback;
+/**
+ * Ключі, останнє читання яких провалилось. Доки збій не визнано явно, запис у
+ * такий ключ заблоковано: будь-який масив, порахований з `fallback`, затер би
+ * дані, які ще лежать у сховищі.
+ *
+ * Позначка НАВМИСНО не знімається просто успішним читанням: успішно перечитати
+ * ключ може зовсім інший викликач (рушій синку, сусідній екран), а екран, що
+ * отримав `fallback`, далі тримає порожній масив у стані — і саме його запис
+ * знищував дані. Знімають позначку: `retryStorageRead` (кнопка «повторити»),
+ * `clearStorageReadFailure`, `removeData`, успішний примусовий запис
+ * (`{ force: true }`) і `notifyStorageChanged` (ключ змінили повз saveData).
+ */
+const readFailures = new Map<string, unknown>();
+
+/**
+ * Результат читання ключа. Головна відмінність від `loadData`: «ключа немає»
+ * (`ok: true, found: false`) і «прочитати не вдалося» (`ok: false`) — це два
+ * різні результати, а не однакове `fallback`.
+ *
+ * Навіщо: раніше зіпсований JSON, обірваний запис або «Row too big to fit into
+ * CursorWindow» віддавали екрану порожній масив, екран малював звичайний
+ * порожній стан, а його ефект-дзеркало одразу писало цей порожній масив назад —
+ * і ще читабельні байти знищувались. Екран, що читає через `loadDataResult`,
+ * бачить `ok: false` і мусить показати помилку з повтором, а не порожній стан.
+ */
+export type StorageReadResult<T> =
+  | { ok: true; value: T; found: boolean }
+  | { ok: false; value: T; found: false; error: unknown };
+
+
+/** Запис заблоковано, бо останнє читання цього ключа провалилось (ERR-01). */
+export class StorageWriteBlockedError extends Error {
+  readonly key: string;
+  readonly readError: unknown;
+  constructor(key: string, readError: unknown) {
+    super(
+      `[storage] запис у '${key}' заблоковано: останнє читання ключа провалилось. `
+      + 'Спочатку перечитайте ключ (loadDataResult) або пишіть із { force: true }.',
+    );
+    this.name = 'StorageWriteBlockedError';
+    this.key = key;
+    this.readError = readError;
   }
 }
 
-export async function saveData(key: string, data: unknown): Promise<void> {
+/** Чи провалилось останнє читання ключа (екран показує помилку, а не «порожньо»). */
+export function hasStorageReadFailure(key: string): boolean {
+  return readFailures.has(key);
+}
+
+/** Помилка останнього проваленого читання ключа — для діагностики й повтору. */
+export function getStorageReadFailure(key: string): unknown {
+  return readFailures.get(key);
+}
+
+/**
+ * Знімає позначку «читання провалилось». Викликати лише там, де дані ключа
+ * свідомо замінюються цілком (відновлення з копії, «очистити всі дані»).
+ */
+export function clearStorageReadFailure(key: string): void {
+  readFailures.delete(key);
+}
+
+/**
+ * Повторне читання після збою — те, що стоїть за кнопкою «повторити».
+ * Знімає позначку й читає наново: вдалося — ключ знову можна писати, ні —
+ * позначка стає назад.
+ */
+export async function retryStorageRead<T>(key: string, fallback: T): Promise<StorageReadResult<T>> {
+  readFailures.delete(key);
+  return loadDataResult<T>(key, fallback);
+}
+
+/**
+ * Читання, що РОЗРІЗНЯЄ «немає» і «не вдалося». Успіх знімає позначку збою,
+ * провал — ставить її й блокує наступний запис у цей ключ.
+ */
+export async function loadDataResult<T>(key: string, fallback: T): Promise<StorageReadResult<T>> {
+  try {
+    const json = await AsyncStorage.getItem(key);
+    // `!json` (а не `== null`) — точно та сама умова, що була в loadData:
+    // порожній рядок теж означає «значення немає».
+    if (!json) return { ok: true, value: fallback, found: false };
+    return { ok: true, value: JSON.parse(json) as T, found: true };
+  } catch (e) {
+    readFailures.set(key, e);
+    if (__DEV__) console.warn(`[storage] loadData(${key}) failed:`, e);
+    return { ok: false, value: fallback, found: false, error: e };
+  }
+}
+
+/**
+ * Сумісна обгортка: на збої віддає `fallback`, як і раніше, — щоб ~14 екранів
+ * не довелося правити одночасно. АЛЕ збій тепер не безслідний: ключ
+ * позначається, і наступний `saveData` у нього кидає `StorageWriteBlockedError`
+ * замість того, щоб мовчки затерти дані порожнім масивом.
+ *
+ * Новий код має читати через `loadDataResult` і показувати помилку з повтором.
+ */
+export async function loadData<T>(key: string, fallback: T): Promise<T> {
+  return (await loadDataResult<T>(key, fallback)).value;
+}
+
+export interface SaveOptions {
+  /**
+   * Писати навіть у ключ із проваленим читанням. Тільки для даних, що НЕ
+   * похідні від цього читання: відновлення з резервної копії, імпорт,
+   * «очистити всі дані». Успішний примусовий запис знімає позначку.
+   */
+  force?: boolean;
+}
+
+export async function saveData(key: string, data: unknown, options?: SaveOptions): Promise<void> {
+  if (!options?.force && readFailures.has(key)) {
+    // Саме тут гинули дані: масив, порахований з fallback після проваленого
+    // читання, лягав поверх ще читабельних байтів.
+    throw new StorageWriteBlockedError(key, readFailures.get(key));
+  }
   try {
     await AsyncStorage.setItem(key, JSON.stringify(data));
   } catch (e) {
     if (__DEV__) console.warn(`[storage] saveData(${key}) failed:`, e);
     return;
   }
+  readFailures.delete(key);
+  notifyStorageChanged(key);
+}
+
+/**
+ * Той самий запис, але ПРОКИДАЄ помилку сховища нагору. Для місць, де «не
+ * записалось» мусить бути видно користувачу (відновлення з копії, імпорт):
+ * `saveData` там показував би «Успішно · Дані відновлено» навіть тоді, коли не
+ * записано жодного ключа.
+ */
+export async function saveDataChecked(key: string, data: unknown, options?: SaveOptions): Promise<void> {
+  if (!options?.force && readFailures.has(key)) {
+    throw new StorageWriteBlockedError(key, readFailures.get(key));
+  }
+  await AsyncStorage.setItem(key, JSON.stringify(data));
+  readFailures.delete(key);
+  notifyStorageChanged(key);
+}
+
+/**
+ * Прибирає ключ ЦІЛКОМ (а не `saveData(key, null)`): останній пише рядок
+ * `"null"`, і `loadData` — бо вважає «нема даних» лише порожній рядок від
+ * AsyncStorage — повертав би СПРАВЖНІЙ `null` замість fallback усім читачам,
+ * а не «значення відсутнє». Для singleton-ключів (`SYNC_SINGLETON_KEYS`)
+ * читачі саме на `undefined` перевіряють «є локальні дані» (`hasAnyLocalData`,
+ * `generateFullOutbox` у `store/sync-engine.tsx`) — `saveData(key, null)` там
+ * лишав би щойно стертий singleton «локальними даними» назавжди.
+ */
+export async function removeData(key: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(key);
+  } catch (e) {
+    if (__DEV__) console.warn(`[storage] removeData(${key}) failed:`, e);
+    return;
+  }
+  // Ключа більше немає — нічого затирати, позначку «читання провалилось»
+  // знімаємо, інакше запис у щойно очищений ключ лишався б заблокованим.
+  readFailures.delete(key);
   notifyStorageChanged(key);
 }

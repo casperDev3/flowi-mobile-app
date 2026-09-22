@@ -60,7 +60,7 @@ export function SyncBadge() {
         activeOpacity={0.7}
         style={[s.pill, { backgroundColor: '#7C3AED18' }]}
         accessibilityRole="button"
-        accessibilityLabel="Синхронізація…">
+        accessibilityLabel={tr.sync}>
         <ActivityIndicator size="small" color="#7C3AED" style={{ transform: [{ scale: 0.7 }] }} />
         <Text style={[s.text, { color: '#7C3AED', marginLeft: 4 }]}>Синхр…</Text>
       </TouchableOpacity>

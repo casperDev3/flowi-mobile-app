@@ -2,9 +2,11 @@ import {
   draftCurrentSprintId,
   draftEstimatedMinutes,
   draftRecurrence,
+  editedDraftFields,
   taskToDraft,
   type EditableTask,
 } from '../hooks/use-task-editor';
+import { assigneeDisplayName, createdByAfterProjectChange } from '../utils/taskUtils';
 
 const base: EditableTask = { title: 'Купити молоко', priority: 'medium' };
 
@@ -155,5 +157,109 @@ describe('пріоритет P0–P5 у чернетці (CONTRACT §B.5)', () =
     expect(taskToDraft({ title: 'a', priority: 'high', priorityLevel: 0 }, 'c').priorityLevel).toBe(0);
     expect(taskToDraft({ title: 'a', priority: 'low', priorityLevel: 0 }, 'c').priorityLevel).toBe(4);
     expect(taskToDraft({ title: 'a', priority: 'low', priorityLevel: null }, 'c').priorityLevel).toBeNull();
+  });
+});
+
+describe('editedDraftFields — пишуться лише змінені у формі поля', () => {
+  it('створення (initial null) — змінено все', () => {
+    const d = taskToDraft(base, 'col');
+    expect(editedDraftFields(null, d).has('title')).toBe(true);
+    // 9 полів форми + 'assignee' (контракт §4.5) — виконавець.
+    expect(editedDraftFields(null, d).size).toBe(10);
+  });
+
+  it('форма без правок — нічого', () => {
+    const d = taskToDraft({ ...base, estimatedMinutes: 30, deadline: '2026-09-20' }, 'col');
+    expect(editedDraftFields(d, { ...d }).size).toBe(0);
+  });
+
+  it('змінена лише назва — лише title (статус з вебу не перезапишеться)', () => {
+    const d = taskToDraft(base, 'col');
+    expect([...editedDraftFields(d, { ...d, title: 'Купити хліб' })]).toEqual(['title']);
+  });
+
+  it('пробіли навколо назви — не правка', () => {
+    const d = taskToDraft(base, 'col');
+    expect(editedDraftFields(d, { ...d, title: ' Купити молоко ' }).size).toBe(0);
+  });
+
+  it('оцінка порівнюється у хвилинах, а не рядками полів', () => {
+    const d = taskToDraft({ ...base, estimatedMinutes: 60 }, 'col');
+    expect(editedDraftFields(d, { ...d, estHours: '', estMins: '60' }).size).toBe(0);
+    expect([...editedDraftFields(d, { ...d, estMins: '15' })]).toEqual(['estimate']);
+  });
+
+  it('повторення, статус і проєкт — окремі групи', () => {
+    const d = taskToDraft(base, 'col');
+    const edited = editedDraftFields(d, { ...d, repeat: true, statusId: 'done', projectId: 'p1' });
+    expect([...edited].sort()).toEqual(['project', 'recurrence', 'status']);
+  });
+
+  // §4.5 — виконавець: обрати, зняти («Без виконавця» → null) і «не чіпати».
+  it('виконавець — окрема група, null теж рахується зміною', () => {
+    const withAssignee = taskToDraft({ ...base, assigneeId: '42' }, 'col');
+    expect(editedDraftFields(withAssignee, { ...withAssignee }).size).toBe(0);
+    expect([...editedDraftFields(withAssignee, { ...withAssignee, assigneeId: null })]).toEqual(['assignee']);
+    expect([...editedDraftFields(withAssignee, { ...withAssignee, assigneeId: '7' })]).toEqual(['assignee']);
+  });
+
+  it('taskToDraft: відсутній assigneeId → null (не undefined)', () => {
+    expect(taskToDraft(base, 'col').assigneeId).toBeNull();
+  });
+});
+
+// §3.7 review finding: перенесення особистої/соло-проєктної задачі без
+// createdBy у проєкт не має ховати її з «Сьогодні»/«Завдання» власника —
+// isMyTask вимагає дослівної рівності createdBy == me, без фолбеку.
+describe('createdByAfterProjectChange', () => {
+  it('дописує мене автором задачі без createdBy, яка потрапляє в проєкт', () => {
+    expect(createdByAfterProjectChange({ projectId: 'p1', createdBy: undefined }, 'u1')).toBe('u1');
+  });
+
+  it('не чіпає наявний createdBy — авторство не змінюється переносом', () => {
+    expect(createdByAfterProjectChange({ projectId: 'p1', createdBy: 'u2' }, 'u1')).toBe('u2');
+  });
+
+  it('задача без проєкту (повернена в Особисте) — createdBy не займаємо', () => {
+    expect(createdByAfterProjectChange({ projectId: undefined, createdBy: undefined }, 'u1')).toBeUndefined();
+  });
+
+  it('без сесії (myUserId відсутній) — не пише порожнє значення', () => {
+    expect(createdByAfterProjectChange({ projectId: 'p1', createdBy: undefined }, null)).toBeUndefined();
+  });
+});
+
+// §4.5 — підпис виконавця на компактній картці (TaskCompactCard, task-group,
+// project/[id]/tasks). Чиста функція: та сама, що вже показує «Я»/ім'я в
+// пікері TaskEditForm, лише винесена, щоб її бачили й списки, де редактора
+// нема.
+describe('assigneeDisplayName', () => {
+  const members = [
+    { user: { id: 1, name: 'Оля', email: 'olya@example.com' } },
+    { user: { id: 2, name: '', email: 'bez-imeni@example.com' } },
+  ];
+
+  it('без assigneeId — null (немає виконавця)', () => {
+    expect(assigneeDisplayName(null, members, 'u1', 'Я')).toBeNull();
+  });
+
+  it('assigneeId === myUserId — мітка "Я", а не ім\'я з кешу', () => {
+    expect(assigneeDisplayName('1', members, '1', 'Я')).toBe('Я');
+  });
+
+  it('чужий assigneeId — ім\'я учасника з кешу', () => {
+    expect(assigneeDisplayName('1', members, '2', 'Я')).toBe('Оля');
+  });
+
+  it('учасник без імені — фолбек на email', () => {
+    expect(assigneeDisplayName('2', members, '1', 'Я')).toBe('bez-imeni@example.com');
+  });
+
+  it('assigneeId, якого нема в кеші (учасника прибрали) — null, не "невідомий"', () => {
+    expect(assigneeDisplayName('99', members, '1', 'Я')).toBeNull();
+  });
+
+  it('без сесії (myUserId відсутній) — все одно шукає в кеші', () => {
+    expect(assigneeDisplayName('1', members, null, 'Я')).toBe('Оля');
   });
 });

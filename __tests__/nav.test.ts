@@ -6,6 +6,7 @@ import {
   NAV_GROUPS,
   isGroupCollapsed,
   isRouteActive,
+  navGroupsFor,
 } from '../constants/nav';
 
 describe('isRouteActive', () => {
@@ -57,24 +58,28 @@ describe('NAV_GROUPS', () => {
 });
 
 describe('згортання груп сайдбара', () => {
-  const tools = NAV_GROUPS.find(g => g.id === 'tools')!;
+  // Групи й дефолт згорнутості — ті самі осі, що й на вебі
+  // (flowi-web-app/lib/nav-groups.ts): DEFAULT_COLLAPSED_GROUP_IDS = ['more', 'dev'].
+  const personal = NAV_GROUPS.find(g => g.id === 'personal')!;
   const more = NAV_GROUPS.find(g => g.id === 'more')!;
+  const dev = NAV_GROUPS.find(g => g.id === 'dev')!;
   const top = NAV_GROUPS.find(g => !g.id)!;
 
   it('групи без id не згортаються ніколи', () => {
-    // Найчастіші розділи й Налаштування — те, заради чого сайдбар існує.
-    expect(isGroupCollapsed(top, ['more', 'tools', undefined as never], '/')).toBe(false);
+    // Робота (найчастіші розділи) й Налаштування — те, заради чого сайдбар існує.
+    expect(isGroupCollapsed(top, ['more', 'dev', 'personal', undefined as never], '/')).toBe(false);
   });
 
-  it('за замовчуванням згорнуте лише «Ще»', () => {
+  it('за замовчуванням згорнуті «Ще» й «Розробка», «Особисте» — ні', () => {
     expect(isGroupCollapsed(more, DEFAULT_COLLAPSED_GROUP_IDS, '/')).toBe(true);
-    expect(isGroupCollapsed(tools, DEFAULT_COLLAPSED_GROUP_IDS, '/')).toBe(false);
+    expect(isGroupCollapsed(dev, DEFAULT_COLLAPSED_GROUP_IDS, '/')).toBe(true);
+    expect(isGroupCollapsed(personal, DEFAULT_COLLAPSED_GROUP_IDS, '/')).toBe(false);
   });
 
   it('група з поточним розділом розгортається попри згорнутість', () => {
     // Інакше на екрані «Баги» жоден пункт не підсвічений, і незрозуміло, де ви.
-    expect(isGroupCollapsed(more, ['more'], '/bugs')).toBe(false);
-    expect(isGroupCollapsed(more, ['more'], '/notes')).toBe(false);
+    expect(isGroupCollapsed(dev, ['dev'], '/bugs')).toBe(false);
+    expect(isGroupCollapsed(more, ['more'], '/containers')).toBe(false);
     // Розділ із СУСІДНЬОЇ групи такої поблажки не дає.
     expect(isGroupCollapsed(more, ['more'], '/projects')).toBe(true);
   });
@@ -89,6 +94,28 @@ describe('згортання груп сайдбара', () => {
     const alwaysVisible = NAV_GROUPS.filter(g => !g.id).flatMap(g => g.items);
     expect(alwaysVisible.length).toBeGreaterThanOrEqual(5);
   });
+});
+
+describe('navGroupsFor — «Адміністрування workspace» (контракт §2.7)', () => {
+  it('без прав адміна — той самий NAV_GROUPS, без нового пункту', () => {
+    const groups = navGroupsFor(false);
+    expect(groups).toBe(NAV_GROUPS);
+    expect(groups.flatMap(g => g.items).some(i => i.route === '/admin-workspace')).toBe(false);
+  });
+
+  it('адміну — пункт додається саме в «Особисте», решта груп не чіпаються', () => {
+    const groups = navGroupsFor(true);
+    expect(groups.length).toBe(NAV_GROUPS.length);
+    const personal = groups.find(g => g.id === 'personal')!;
+    expect(personal.items[personal.items.length - 1].route).toBe('/admin-workspace');
+    // Решта груп на своїх місцях — те саме посилання, що й у базовому
+    // маніфесті (не перебудовані даремно).
+    groups.forEach((group, i) => {
+      if (group.id === 'personal') return;
+      expect(group).toBe(NAV_GROUPS[i]);
+    });
+  });
+
 });
 
 describe('ширина, доступна екрану', () => {

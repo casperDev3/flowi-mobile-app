@@ -24,17 +24,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MeetingFormSheet, MeetingFormData } from '@/components/shared/MeetingFormSheet';
 
 import { DetailPane } from '@/components/shared/DetailPane';
+import { RecordingClock } from '@/components/shared/RecordingClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useProjectRole } from '@/hooks/use-project-role';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { isOnlineMode } from '@/store/app-mode';
 import { cancelMeetingNotification, scheduleMeetingNotification } from '@/store/notifications';
 import { loadData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { updateSynced } from '@/store/synced-storage';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useTimerContext } from '@/store/timer-context';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { MeetingDetailBody, MeetingDetailHeader } from '@/components/meetings/MeetingDetail';
 import { MeetingProjectChip, type MeetingChipProject } from '@/components/meetings/MeetingProjectChip';
 import { formatDuration } from '@/utils/durationFormat';
@@ -339,6 +342,9 @@ function WeekStrip({ weekStart, meetingsByDate, selected, onSelect, c }: {
 
 export default function MeetingsScreen() {
   const contentWidth = useContentWidth();
+  // NAT-01: стеля аркуша мусить бути ЧИСЛОМ. Відсоток рахується від батька
+  // з height:auto (sheetWrapper у flex-end контейнері) і не обмежує нічого.
+  const sheetSurface = useSheetSurface();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const c = useColors(isDark);
@@ -384,6 +390,9 @@ export default function MeetingsScreen() {
   const [showForm, setShowForm]           = useState(false);
   const [formInitial, setFormInitial]     = useState<MeetingFormData | null>(null);
   const [formPresetDate, setFormPresetDate] = useState<string | undefined>(undefined);
+  // Коментарі (contract §4.4) у формі — лише коли форма редагує нараду проєкту.
+  const { user } = useAuth();
+  const formProjectRole = useProjectRole(formInitial?.projectId);
 
   // Google Calendar
   const [gcalClientId, setGcalClientId]   = useState('');
@@ -398,10 +407,11 @@ export default function MeetingsScreen() {
   // Recording
   const [recordingMtgId, setRecordingMtgId] = useState<string | null>(null);
   const [isRecording, setIsRecording]     = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  // Мітка старту запису, а не лічильник секунд: цокає RecordingClock, і
+  // екран не перемальовується щосекунди.
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
   const [playingUri, setPlayingUri]       = useState<string | null>(null);
   const recordingRef = useRef<any>(null);
-  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundRef = useRef<any>(null);
 
   useFocusEffect(useCallback(() => {
@@ -443,10 +453,9 @@ export default function MeetingsScreen() {
     if (!initialized) return;
     writeQueueRef.current = writeQueueRef.current
       .then(() => trackWrite(async () => {
-        const fresh = await loadData<Meeting[]>('meetings', []);
-        const next = mutate(fresh);
-        setMeetings(next);
-        await saveSynced('meetings', next);
+        // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+        // ними інакше пішов би на сервер як DELETE.
+        setMeetings(await updateSynced<Meeting>('meetings', mutate));
       }))
       .catch(e => { if (__DEV__) console.warn('[meetings] збереження не вдалося:', e); });
   }, [initialized, trackWrite]);
@@ -725,8 +734,7 @@ export default function MeetingsScreen() {
       recordingRef.current = recording;
       setRecordingMtgId(mtgId);
       setIsRecording(true);
-      setRecordingSeconds(0);
-      recordTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+      setRecordingStartedAt(Date.now());
     } catch (e: any) {
       if (__DEV__) console.warn('[record] start error:', e);
       Alert.alert('Помилка запису', e?.message);
@@ -735,13 +743,13 @@ export default function MeetingsScreen() {
 
   const stopRecording = useCallback(async () => {
     if (!recordingRef.current) return;
-    if (recordTimerRef.current) { clearInterval(recordTimerRef.current); recordTimerRef.current = null; }
     try {
       await recordingRef.current.stopAndUnloadAsync();
       await AVAudio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
       setIsRecording(false);
+      setRecordingStartedAt(null);
 
       if (uri && recordingMtgId) {
         // recordingMtgId — завжди id ОРИГІНАЛУ (handleCardRecord / onRecord
@@ -750,8 +758,8 @@ export default function MeetingsScreen() {
         mutateMeetings(fresh => withMeetingRecording(fresh, origId, uri));
       }
       setRecordingMtgId(null);
-      setRecordingSeconds(0);
     } catch (e: any) {
+      setRecordingStartedAt(null);
       if (__DEV__) console.warn('[record] stop error:', e);
     }
   }, [recordingMtgId, mutateMeetings]);
@@ -787,7 +795,6 @@ export default function MeetingsScreen() {
 
   // Cleanup on unmount
   useEffect(() => () => {
-    if (recordTimerRef.current) clearInterval(recordTimerRef.current);
     recordingRef.current?.stopAndUnloadAsync().catch(() => {});
     soundRef.current?.unloadAsync().catch(() => {});
   }, []);
@@ -1202,15 +1209,17 @@ export default function MeetingsScreen() {
         tr={tr}
         markedDays={markedDays}
         projects={projects}
+        currentUserId={user?.id ? String(user.id) : null}
+        isProjectOwner={formProjectRole === 'owner'}
       />
 
       {/* ── Google Calendar Sheet ── */}
       <Modal visible={showGcalSheet} transparent animationType="slide" statusBarTranslucent
         onRequestClose={() => setShowGcalSheet(false)}>
-        <Pressable style={s.overlay} onPress={() => setShowGcalSheet(false)}>
-          <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
+        <Pressable accessible={false} style={s.overlay} onPress={() => setShowGcalSheet(false)}>
+          <Pressable accessible={false} onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
-              style={[s.sheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,12,22,0.98)' : 'rgba(240,240,255,0.98)', maxHeight: '90%' }]}>
+              style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,12,22,0.98)' : 'rgba(240,240,255,0.98)' }]}>
               <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
                 {/* Handle */}
@@ -1366,7 +1375,7 @@ export default function MeetingsScreen() {
         onRequestClose={() => { if (isRecording) stopRecording(); else setRecordingMtgId(null); }}>
         <Pressable style={[s.overlay, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }]}
           onPress={() => { if (!isRecording) setRecordingMtgId(null); }}>
-          <Pressable onPress={e => e.stopPropagation()}
+          <Pressable accessible={false} onPress={e => e.stopPropagation()}
             accessibilityViewIsModal importantForAccessibility="yes"
             style={{ backgroundColor: isDark ? '#12121E' : '#FFFFFF', borderRadius: 24, padding: 28,
               alignItems: 'center', width: 280, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20 }}>
@@ -1381,10 +1390,11 @@ export default function MeetingsScreen() {
             <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#fff' : '#000', marginBottom: 6 }}>
               {isRecording ? 'Запис...' : 'Аудіозапис'}
             </Text>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: isRecording ? '#EF4444' : ACCENT,
-              letterSpacing: 2, marginBottom: 24, fontVariant: ['tabular-nums'] }}>
-              {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}
-            </Text>
+            <RecordingClock
+              startedAt={recordingStartedAt}
+              style={{ fontSize: 28, fontWeight: '800', color: isRecording ? '#EF4444' : ACCENT,
+                letterSpacing: 2, marginBottom: 24, fontVariant: ['tabular-nums'] }}
+            />
 
             {isRecording ? (
               <TouchableOpacity onPress={stopRecording}
@@ -1419,8 +1429,8 @@ const s = StyleSheet.create({
   addMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 10 },
   fab:      { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:    { borderRadius: 22, borderWidth: 1, padding: 16, maxHeight: '90%', overflow: 'hidden' },
+  sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  sheet:    { borderRadius: 22, borderWidth: 1, padding: 16, overflow: 'hidden' },
   label:    { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, color: '#888', marginBottom: 6, marginTop: 12 },
   input:    { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
   inp:      { borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontWeight: '600', borderWidth: 1.5 },

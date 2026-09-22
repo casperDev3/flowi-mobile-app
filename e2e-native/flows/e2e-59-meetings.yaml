@@ -1,0 +1,15 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "360,235"
+- waitForAnimationToEnd
+- tapOn:
+    point: "38,94"
+- waitForAnimationToEnd
+- tapOn:
+    point: "364,95"
+- waitForAnimationToEnd
+- tapOn:
+    point: "229,328"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/59-meetings

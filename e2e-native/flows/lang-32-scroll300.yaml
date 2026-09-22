@@ -1,0 +1,9 @@
+appId: com.casper3.f-tracking-app
+---
+- repeat:
+    times: 10
+    commands:
+      - swipe:
+          start: "50%,80%"
+          end: "50%,25%"
+          duration: 250

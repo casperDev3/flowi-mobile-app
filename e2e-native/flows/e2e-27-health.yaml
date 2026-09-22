@@ -1,0 +1,10 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "275,502"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/27-after-delete
+- tapOn:
+    point: "281,818"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/27-health-hub

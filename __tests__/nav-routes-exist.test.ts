@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { NAV_GROUPS } from '../constants/nav';
+import { NAV_GROUPS, navGroupsFor } from '../constants/nav';
 
 /**
  * Сайдбар посилається на маршрути рядками. Помилка в шляху не ламає ні
@@ -35,8 +35,18 @@ describe('маршрути сайдбара', () => {
     // Вкладки з href:null не показуються внизу; саме заради них сайдбар і
     // потрібен, тож вони МАЮТЬ бути в списку — перевіряємо, що не забули.
     const routes = new Set(NAV_GROUPS.flatMap(g => g.items).map(i => i.route));
-    for (const hidden of ['/(tabs)/time', '/(tabs)/shared', '/(tabs)/agent']) {
+    for (const hidden of ['/(tabs)/time', '/(tabs)/agent']) {
       expect(routes.has(hidden)).toBe(true);
     }
+  });
+
+  it('пункт адміна (контракт §2.7) теж веде на наявний екран', () => {
+    // navGroupsFor(true) не входить у статичний NAV_GROUPS вище — рахуємо
+    // окремо, інакше зникнення app/admin-workspace.tsx лишилось би непоміченим.
+    const dead = navGroupsFor(true)
+      .flatMap(group => group.items)
+      .filter(item => !routeToFile(item.route))
+      .map(item => item.route);
+    expect(dead).toEqual([]);
   });
 });

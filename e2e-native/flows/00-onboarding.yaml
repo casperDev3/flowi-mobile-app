@@ -1,0 +1,33 @@
+# e2e-native/flows/00-onboarding.yaml
+#
+# Онбординг на СПРАВЖНЬОМУ симуляторі: адреса workspace → реєстрація → додаток.
+# Тут живе SecureStore, якого на вебі немає, тож цей шлях перевіряється лише так.
+#
+# clearState обов'язковий: без нього другий прогін стартує вже підключеним.
+# eraseText теж: поле приходить заповненим продакшн-адресою api.flowi.casperdev.site,
+# а inputText у Maestro ДОПИСУЄ, не замінює — без стирання вийшла б каша з двох адрес.
+appId: com.casper3.f-tracking-app
+---
+- clearState
+- launchApp
+
+- assertVisible: "Адреса workspace"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/00-workspace
+- tapOn:
+    below: "АДРЕСА СЕРВЕРА"
+    index: 0
+- eraseText
+- inputText: "127.0.0.1:8000"
+- hideKeyboard
+- tapOn: "Перевірити"
+
+- extendedWaitUntil:
+    visible: "Продовжити"
+    timeout: 15000
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/01-workspace-found
+- tapOn: "Продовжити"
+
+- extendedWaitUntil:
+    visible: "Зареєструватись"
+    timeout: 15000
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/02-welcome

@@ -1,0 +1,7 @@
+appId: com.casper3.f-tracking-app
+---
+# сховати клавіатуру тапом по нейтральній ділянці форми
+- tapOn:
+    point: "20%,37%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/09-kbd-dismissed

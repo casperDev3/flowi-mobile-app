@@ -1,0 +1,14 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn: "Додати завдання"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/a11y/01-add-sheet
+- tapOn:
+    point: "50%,30%"
+- inputText: "A11Y тест"
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn:
+    point: "64%,90%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/a11y/01-after-save

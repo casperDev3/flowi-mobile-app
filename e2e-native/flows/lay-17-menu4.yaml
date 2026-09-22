@@ -1,0 +1,11 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "364,95"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/P06-a
+- tapOn:
+    point: "364,95"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/P07-b
+- tapOn:
+    point: "364,95"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lay/P08-c

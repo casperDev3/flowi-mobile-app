@@ -1,0 +1,93 @@
+# e2e-native/flows/regression-e2.yaml
+#
+# Три P0 аудиту E2 поспіль. Падає, якщо котрийсь повернувся.
+#
+# Кожен крок тут навмисно тисне ТЕКСТОМ, а не координатами: до NAT-03 весь
+# аркуш був одним вузлом доступності, тому `tapOn: "Створити"` не знаходив
+# нічого, і попередній прогін довелось робити координатами. Тепер саме
+# можливість влучити текстом і є доказом, що аркуш розпався на контроли.
+#
+# clearState НЕ вживається навмисно — стенд спільний, а прогін має бути
+# повторюваним на вже наповненому акаунті.
+appId: com.casper3.f-tracking-app
+---
+# ─────────────────────────────────────────────────────────────────────────
+# P0-1 · NAT-01 — форма ПРОЄКТУ дочитується до кнопки, і проєкт створюється.
+# До правок: аркуш обрізався одразу після «Шаблон», від кнопки «Створити»
+# було видно 1–2 px, проєкт створити з інтерфейсу було НЕМОЖЛИВО.
+# ─────────────────────────────────────────────────────────────────────────
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "30%,94%"            # вкладка «Завдання»
+- waitForAnimationToEnd
+- tapOn:
+    point: "90%,11%"            # «…» у шапці
+- waitForAnimationToEnd
+# NAT-03: рядок меню — окремий вузол. Регекс, бо в підпис досі протікає
+# ім'я SF Symbol («move, Проєкти, Forward») — це NAT-05, окрема знахідка.
+- tapOn: ".*Проєкти.*"
+- waitForAnimationToEnd
+- tapOn:
+    point: "90%,11%"            # «+» новий проєкт
+- waitForAnimationToEnd
+# NAT-03: поле вводу мусить бути окремим вузлом. До правок `when visible:
+# "Назва"` давало SKIPPED — Maestro не бачив усередині аркуша нічого.
+- assertVisible: "Назва проєкту"
+- inputText: "Regress E2"
+- hideKeyboard
+- waitForAnimationToEnd
+# NAT-01 + NAT-03 разом: кнопка і видима, і досяжна без координат.
+- assertVisible: "Створити"
+- tapOn: "Створити"
+- waitForAnimationToEnd
+- assertVisible: "Огляд"        # ми в просторі щойно створеного проєкту
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/reg-01-project
+
+# ─────────────────────────────────────────────────────────────────────────
+# P0-2 · NAT-03 — аркуш «Нове завдання» розпадається на окремі контроли.
+# До правок: увесь аркуш = 1 вузол [0,138][402,874] з підписом на 40+
+# контролів; 22 вузли в усьому дереві, 5 листків доступності.
+# ─────────────────────────────────────────────────────────────────────────
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "30%,94%"
+- waitForAnimationToEnd
+- tapOn: "Додати завдання"
+- waitForAnimationToEnd
+- assertVisible: "ПРІОРИТЕТ"    # заголовок секції — свій вузол
+- assertVisible: "ДЕДЛАЙН"
+- assertVisible: "Скасувати"    # низ аркуша досяжний (це ще й NAT-01)
+- assertVisible: "Додати"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/reg-02-tasksheet
+- tapOn: "Скасувати"
+- waitForAnimationToEnd
+
+# ─────────────────────────────────────────────────────────────────────────
+# P0-3 · NAT-02 — Фінанси лишаються живими після передачі керування між
+# двома модалками. До правок екран назавжди переставав приймати дотики:
+# ні FAB, ні «…», ні сегмент фільтра; лікував лише перезапуск застосунку.
+# ─────────────────────────────────────────────────────────────────────────
+- tapOn:
+    point: "50%,94%"            # вкладка «Фінанси»
+- waitForAnimationToEnd
+- tapOn:
+    point: "90%,11%"            # «…» у шапці
+- waitForAnimationToEnd
+- tapOn: ".*Рахунки.*"          # модалка → аркуш: та сама черга передачі
+- waitForAnimationToEnd
+- assertVisible: "Рахунки"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/reg-03-handoff
+- tapOn: "Закрити"
+- waitForAnimationToEnd
+# ── екран ЖИВИЙ: три різні елементи мусять реагувати ──
+- tapOn: "Витрати"              # сегмент фільтра
+- waitForAnimationToEnd
+- tapOn: "Доходи"
+- waitForAnimationToEnd
+- tapOn:
+    point: "90%,11%"            # «…» у шапці реагує вдруге
+- waitForAnimationToEnd
+- assertVisible: ".*Статистика.*"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/reg-04-alive

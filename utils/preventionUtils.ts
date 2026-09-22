@@ -110,31 +110,76 @@ export function parseTimes(text: string): string[] {
 }
 
 // ─── Експорт-звіт для лікаря ───────────────────────────────────────────────────
+
+/**
+ * I18N-07. Підписи звіту.
+ *
+ * `buildHealthReport` — не підпис на екрані, а текст, який людина копіює або
+ * надсилає лікарю через Share. Функція сумлінно форматувала дати за `locale`,
+ * але всі заголовки, підписи й одиниці були зашиті українською: англомовний
+ * отримував документ, якого сам не прочитає.
+ *
+ * Тому підписи приходять ззовні (екран збирає їх із `tr.*`), а типове
+ * значення лишається українським — щоб жоден наявний виклик не змінив
+ * поведінку мовчки.
+ */
+export interface HealthReportLabels {
+  title: string;
+  weight: string;
+  bmi: string;
+  pulse: string;
+  unitKg: string;
+  unitBpm: string;
+  meds: string;
+  adherence: string;
+  checkups: string;
+  vaccines: string;
+  dose: string;
+  generatedBy: string;
+}
+
+export const UK_HEALTH_REPORT_LABELS: HealthReportLabels = {
+  title: "ЗВЕДЕННЯ ЗДОРОВ'Я",
+  weight: 'Вага',
+  bmi: 'ІМТ',
+  pulse: 'Пульс',
+  unitKg: 'кг',
+  unitBpm: 'уд/хв',
+  meds: 'Ліки/добавки',
+  adherence: 'дотримання',
+  checkups: 'Огляди/аналізи',
+  vaccines: 'Щеплення',
+  dose: 'доза',
+  generatedBy: 'Сформовано у Flowi',
+};
+
 export function buildHealthReport(opts: {
   meds: Medication[]; checkups: Checkup[]; vaccines: Vaccine[];
   latestWeight: number | null; bmi: number | null;
   todayPulse: number | null; locale: string;
+  labels?: HealthReportLabels;
 }): string {
   const { meds, checkups, vaccines, latestWeight, bmi, todayPulse, locale } = opts;
+  const t = opts.labels ?? UK_HEALTH_REPORT_LABELS;
   const fmtD = (d: string) => new Date(d).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
   const L: string[] = [];
-  L.push('🩺 ЗВЕДЕННЯ ЗДОРОВ\'Я');
+  L.push(`🩺 ${t.title}`);
   L.push('');
-  if (latestWeight) L.push(`Вага: ${latestWeight} кг${bmi ? ` · ІМТ ${bmi.toFixed(1)}` : ''}`);
-  if (todayPulse) L.push(`Пульс: ${todayPulse} уд/хв`);
+  if (latestWeight) L.push(`${t.weight}: ${latestWeight} ${t.unitKg}${bmi ? ` · ${t.bmi} ${bmi.toFixed(1)}` : ''}`);
+  if (todayPulse) L.push(`${t.pulse}: ${todayPulse} ${t.unitBpm}`);
   const activeMeds = meds.filter(m => m.active);
   if (activeMeds.length) {
-    L.push('', '💊 Ліки/добавки:');
-    activeMeds.forEach(m => L.push(`• ${m.name}${m.dose ? ` (${m.dose})` : ''} — ${m.times.join(', ')} · дотримання ${medAdherence(m)}%`));
+    L.push('', `💊 ${t.meds}:`);
+    activeMeds.forEach(m => L.push(`• ${m.name}${m.dose ? ` (${m.dose})` : ''} — ${m.times.join(', ')} · ${t.adherence} ${medAdherence(m)}%`));
   }
   if (checkups.length) {
-    L.push('', '📋 Огляди/аналізи:');
+    L.push('', `📋 ${t.checkups}:`);
     checkups.slice(0, 12).forEach(ch => L.push(`• ${fmtD(ch.date)} — ${ch.title}${ch.result ? `: ${ch.result}` : ''}`));
   }
   if (vaccines.length) {
-    L.push('', '💉 Щеплення:');
-    vaccines.forEach(v => L.push(`• ${fmtD(v.date)} — ${v.name}${v.doseNo ? ` (доза ${v.doseNo})` : ''}`));
+    L.push('', `💉 ${t.vaccines}:`);
+    vaccines.forEach(v => L.push(`• ${fmtD(v.date)} — ${v.name}${v.doseNo ? ` (${t.dose} ${v.doseNo})` : ''}`));
   }
-  L.push('', `Сформовано у Flowi · ${new Date().toLocaleDateString(locale)}`);
+  L.push('', `${t.generatedBy} · ${new Date().toLocaleDateString(locale)}`);
   return L.join('\n');
 }

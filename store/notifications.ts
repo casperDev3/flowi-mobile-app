@@ -15,17 +15,47 @@ import {
 } from '@/utils/subscriptions';
 
 import { loadData } from './storage';
-import type { Translations } from './translations';
+import { allTranslations, type Lang, type Translations } from './translations';
+import { ensurePushTokenRegistered, isForCurrentWorkspace, type PushPayloadData } from './push';
+
+const SUPPRESSED = {
+  shouldShowAlert: false,
+  shouldPlaySound: false,
+  shouldSetBadge: false,
+  shouldShowBanner: false,
+  shouldShowList: false,
+} as const;
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async notification => {
+    // Контракт §7: push для ІНШОГО workspace, ніж активний зараз, ігноруємо —
+    // токен на сервері старого workspace знімається лише при виході/зміні
+    // workspace (§2.3/§2.8), тож пуш звідти теоретично ще може долетіти.
+    const data = (notification.request.content.data ?? {}) as PushPayloadData;
+    if (!isForCurrentWorkspace(data)) return SUPPRESSED;
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
 });
+
+/**
+ * I18N-05: цей модуль живе поза React і не має доступу до `useI18n()`, тож
+ * мову локальних нагадувань читає з того самого ключа, у який її пише
+ * `I18nProvider` (`store/i18n.tsx` — `lang_option_v1`). Читаємо на кожному
+ * плануванні, а не кешуємо: нагадування планують рідко, а кеш пережив би
+ * перемикання мови і заголовок лишився б старою мовою до перезапуску.
+ */
+const LANG_STORAGE_KEY = 'lang_option_v1';
+
+export async function notificationTr(): Promise<Translations> {
+  const saved = await loadData<Lang>(LANG_STORAGE_KEY, 'uk');
+  return allTranslations[saved === 'en' ? 'en' : 'uk'];
+}
 
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (!Device.isDevice) {
@@ -40,13 +70,20 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   }
   if (finalStatus !== 'granted') return false;
   if (Platform.OS === 'android') {
+    // Ім'я каналу видно в системних налаштуваннях телефону; Android дозволяє
+    // оновити його для вже створеного каналу, тож зміна мови доходить і сюди.
+    const trCh = await notificationTr();
     await Notifications.setNotificationChannelAsync('flowi-reminders', {
-      name: 'Нагадування',
+      name: trCh.notifChannelReminders,
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#7C3AED',
     });
   }
+  // Контракт §2.8: дозвіл міг щойно з'явитись не при вході, а тут-таки —
+  // наприклад, користувач вмикає нагадування в Налаштуваннях. Без цього
+  // токен реєструвався б лише на наступному холодному старті/вході.
+  void ensurePushTokenRegistered();
   return true;
 }
 
@@ -91,10 +128,11 @@ export async function scheduleReminder(
   // Cancel existing before re-scheduling
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
 
+  const tr = await notificationTr();
   await Notifications.scheduleNotificationAsync({
     identifier: id,
     content: {
-      title: meta.type === 'task' ? '📋 Завдання' : '✅ Підзавдання',
+      title: meta.type === 'task' ? tr.notifTaskTitle : tr.notifSubtaskTitle,
       body: meta.title,
       data: { taskId: meta.taskId, subtaskId: meta.subtaskId ?? null },
       sound: true,
@@ -295,10 +333,11 @@ export async function scheduleMeetingNotification(
 
   const id = meetingNotifId(meetingId);
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  const tr = await notificationTr();
   await Notifications.scheduleNotificationAsync({
     identifier: id,
     content: {
-      title: '📅 Зустріч через 15 хв',
+      title: tr.notifMeetingTitle,
       body: title,
       sound: true,
       data: { meetingId },
@@ -504,4 +543,155 @@ export async function rescheduleSubscriptionRemindersFromStorage(
     formatDate: key => formatDateKey(key, locale),
     requestPermission: opts.requestPermission,
   });
+}
+
+// ─── Здоров'я: нагадування ліків і звичок переживають синхронізацію ──────────
+
+/** Префікси локальних id, якими володіє переплановувач здоров'я. */
+export const MED_NOTIFICATION_PREFIX = 'med_';
+export const HABIT_NOTIFICATION_PREFIX = 'daily_habit_';
+
+/** Детермінований id: той самий запис → той самий ідентифікатор на будь-якому пристрої. */
+export function medReminderId(medId: string, index: number): string {
+  return `med_${medId}_${index}`;
+}
+export function habitReminderId(habitId: string): string {
+  return dailyReminderId(`habit_${habitId}`);
+}
+
+interface HealthReminderSpec {
+  id: string;
+  hour: number;
+  minute: number;
+  title: string;
+  body: string;
+  data: Record<string, string>;
+}
+
+interface MedLike { id: string; name: string; times?: string[]; active?: boolean }
+interface HabitLike { id: string; title: string; reminderAt?: string }
+
+function parseHm(value: string | undefined): { hour: number; minute: number } | null {
+  const m = (value ?? '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hour = parseInt(m[1], 10), minute = parseInt(m[2], 10);
+  if (hour > 23 || minute > 59) return null;
+  return { hour, minute };
+}
+
+/**
+ * План нагадувань здоров'я зі сховища — чиста функція, щоб її можна було
+ * перевірити без expo-notifications.
+ */
+export function healthReminderPlan(
+  meds: MedLike[],
+  habits: HabitLike[],
+  tr: Pick<Translations, 'takeNow' | 'habits'>,
+): HealthReminderSpec[] {
+  const out: HealthReminderSpec[] = [];
+  for (const med of meds) {
+    if (!med || !med.id || med.active === false) continue;
+    const times = Array.isArray(med.times) ? med.times : [];
+    times.forEach((t, i) => {
+      const hm = parseHm(t);
+      if (!hm) return;
+      out.push({
+        id: medReminderId(med.id, i),
+        ...hm,
+        title: `💊 ${med.name}`,
+        body: tr.takeNow,
+        data: { medId: med.id },
+      });
+    });
+  }
+  for (const habit of habits) {
+    if (!habit || !habit.id) continue;
+    const hm = parseHm(habit.reminderAt);
+    if (!hm) continue;
+    out.push({
+      id: habitReminderId(habit.id),
+      ...hm,
+      title: habit.title,
+      body: tr.habits,
+      data: { habitId: habit.id },
+    });
+  }
+  return out;
+}
+
+let healthRemindersQueue: Promise<void> = Promise.resolve();
+
+/**
+ * DI-05: запис, що приїхав синком з іншого пристрою, має дані нагадування,
+ * але не має самої нотифікації в ОС — ніхто її тут не планував. Дзеркально:
+ * видалений на іншому пристрої запис лишав би нагадування назавжди.
+ *
+ * Тому єдине джерело правди — список запланованого в ОС проти сховища, а не
+ * поле `notifIds`/`notifId` у записі (воно локальне для пристрою і з чужого
+ * пристрою приходить порожнім — див. `store/synced-storage.ts`). Звірка йде
+ * за ДЕТЕРМІНОВАНИМИ id (`med_<id>_<i>`, `daily_habit_<id>`), тож повторний
+ * виклик нічого не дублює. Зразок — `rescheduleSubscriptionRemindersFromStorage`.
+ *
+ * Викликати з кореневого ефекту і на сигнал сховища по `health_meds` /
+ * `health_habits` (див. `app/_layout.tsx`, де вже так зроблено для підписок).
+ */
+export function rescheduleHealthRemindersFromStorage(
+  tr: Pick<Translations, 'takeNow' | 'habits'>,
+  opts: { requestPermission?: boolean } = {},
+): Promise<void> {
+  const run = async () => {
+    const [medsRaw, habitsRaw] = await Promise.all([
+      loadData<MedLike[]>('health_meds', []),
+      loadData<HabitLike[]>('health_habits', []),
+    ]);
+    const meds = Array.isArray(medsRaw) ? medsRaw : [];
+    const habits = Array.isArray(habitsRaw) ? habitsRaw : [];
+
+    let ours: string[] = [];
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      ours = scheduled
+        .map(n => n.identifier)
+        .filter(id => typeof id === 'string'
+          && (id.startsWith(MED_NOTIFICATION_PREFIX) || id.startsWith(HABIT_NOTIFICATION_PREFIX)));
+    } catch {
+      ours = [];
+    }
+
+    const enabled = await isNotificationsEnabled();
+    if (!enabled) {
+      await Promise.all(ours.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+      return;
+    }
+
+    const plan = healthReminderPlan(meds, habits, tr);
+    const stale = ours.filter(id => !plan.some(spec => spec.id === id));
+    await Promise.all(stale.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+
+    const missing = plan.filter(spec => !ours.includes(spec.id));
+    if (!missing.length) return;
+
+    // Дозвіл питаємо лише за явної дії користувача — фоновий старт не має
+    // права раптом показувати системний діалог (те саме правило, що й у підписок).
+    const granted = await hasNotificationPermission(!!opts.requestPermission);
+    if (!granted) return;
+
+    for (const spec of missing) {
+      try {
+        await Notifications.scheduleNotificationAsync({
+          identifier: spec.id,
+          content: { title: spec.title, body: spec.body, sound: true, data: spec.data },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DAILY,
+            hour: spec.hour,
+            minute: spec.minute,
+          },
+        });
+      } catch (e) {
+        if (__DEV__) console.warn('[notifications] health reminder failed:', spec.id, e);
+      }
+    }
+  };
+  healthRemindersQueue = healthRemindersQueue.then(run, run);
+  return healthRemindersQueue;
 }

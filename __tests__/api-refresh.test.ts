@@ -145,3 +145,61 @@ describe('apiFetch — single-flight оновлення токена', () => {
     expect(calls.filter(c => c.path === '/auth/refresh/')).toHaveLength(2);
   });
 });
+
+// ─── Токен для WebSocket (4401) ──────────────────────────────────────────────
+
+function jwt(payload: Record<string, unknown>): string {
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${encode({ alg: 'HS256' })}.${encode(payload)}.sig`;
+}
+
+describe('токен для сокета', () => {
+  it('getFreshAccessToken оновлює токен, що ось-ось протухне', async () => {
+    const { api, store } = loadApi();
+    store.flowi_access = jwt({ exp: Math.floor(Date.now() / 1000) + 10 });
+    const calls = installFetch(new Set());
+
+    const token = await api.getFreshAccessToken();
+
+    expect(calls.filter(c => c.path === '/auth/refresh/')).toHaveLength(1);
+    expect(token).toBe('access-1');
+  });
+
+  it('getFreshAccessToken не чіпає живий токен', async () => {
+    const { api, store } = loadApi();
+    const live = jwt({ exp: Math.floor(Date.now() / 1000) + 3600 });
+    store.flowi_access = live;
+    const calls = installFetch(new Set());
+
+    expect(await api.getFreshAccessToken()).toBe(live);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('refreshSession після 4401 кладе нову пару і повертає ok', async () => {
+    const { api, store } = loadApi();
+    installFetch(new Set());
+
+    expect(await api.refreshSession()).toBe('ok');
+    expect(store.flowi_access).toBe('access-1');
+    expect(await api.getAccessToken()).toBe('access-1');
+  });
+
+  it('refreshSession: мертвий refresh — invalid, токени стерто, session-expired', async () => {
+    const { api, store } = loadApi();
+    global.fetch = (async () => json({ detail: 'blacklisted' }, 401)) as unknown as typeof fetch;
+    const expired = jest.fn();
+    api.onSessionExpired(expired);
+
+    expect(await api.refreshSession()).toBe('invalid');
+    expect(store.flowi_access).toBeUndefined();
+    expect(expired).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshSession: 5xx — retry, токени лишаються', async () => {
+    const { api, store } = loadApi();
+    global.fetch = (async () => json({}, 503)) as unknown as typeof fetch;
+
+    expect(await api.refreshSession()).toBe('retry');
+    expect(store.flowi_refresh).toBe('refresh-old');
+  });
+});

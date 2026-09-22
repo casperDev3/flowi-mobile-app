@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { PanResponder, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/store/i18n';
 import type { GanttChart, GanttRow } from '@/utils/projectCharts';
@@ -114,6 +114,76 @@ function Legend({
   );
 }
 
+/** Смуга, яку зараз тягнуть за край — жива позиція вважається тут, у сховище нічого не пишеться. */
+interface DragState {
+  taskId: string;
+  edge: 'start' | 'end';
+  deltaDays: number;
+}
+
+/**
+ * Ручка одного краю смуги (contract §3 «тягнення країв змінює дати
+ * (планшет/веб)»).
+ *
+ * `PanResponder`, а не бібліотека жестів: рівно одна вісь (горизонталь), рівно
+ * один палець, і проєкт уже ніде більше не тягне gesture-handler у залежності
+ * — заводити його заради цього єдиного місця не варто.
+ *
+ * `pxPerDayRef`/`onDrag`/`onCommit` — через реф, а не пряме замикання:
+ * `PanResponder.create` викликається ОДИН РАЗ (useRef), і без рефа обробники
+ * назавжди бачили б `pxPerDay` й callback-и з першого рендера (типова пастка
+ * PanResponder+React) — ширина шкали від viewport якраз і приходить пізніше.
+ */
+function EdgeHandle({
+  edge, pxPerDay, onDrag, onCommit,
+}: {
+  edge: 'start' | 'end';
+  pxPerDay: number;
+  onDrag: (deltaDays: number) => void;
+  onCommit: (deltaDays: number) => void;
+}) {
+  const live = useRef({ pxPerDay, onDrag, onCommit, days: 0 });
+  live.current.pxPerDay = pxPerDay;
+  live.current.onDrag = onDrag;
+  live.current.onCommit = onCommit;
+
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => { live.current.days = 0; },
+      onPanResponderMove: (_evt, gesture) => {
+        const perDay = live.current.pxPerDay || 1;
+        const days = Math.round(gesture.dx / perDay);
+        if (days !== live.current.days) {
+          live.current.days = days;
+          live.current.onDrag(days);
+        }
+      },
+      onPanResponderRelease: () => {
+        live.current.onCommit(live.current.days);
+        live.current.days = 0;
+      },
+      onPanResponderTerminate: () => {
+        live.current.onCommit(0);
+        live.current.days = 0;
+      },
+    }),
+  ).current;
+
+  return (
+    <View
+      {...responder.panHandlers}
+      // Тач-таргет ширший за саму смугу (10pt) — інакше по краю не влучити
+      // пальцем; hitSlop додає ще запасу без роздування видимого хендла.
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      style={[
+        st.edgeHandle,
+        edge === 'start' ? { left: -6 } : { right: -6 },
+      ]}
+    />
+  );
+}
+
 /**
  * Діаграма Ганта по задачах проєкту — RN-версія веб-компонента
  * (flowi-web-app/components/projects/project-gantt.tsx).
@@ -127,18 +197,28 @@ function Legend({
  * переведення часток у пікселі, і вона потрібна саме для скролу.
  */
 export function ProjectGantt({
-  chart, wide, palette,
+  chart, wide, palette, onEdgeDrag,
 }: {
   chart: GanttChart;
   /** Планшет: місця під назви більше, тож колонка ширша. */
   wide: boolean;
   palette: GanttPalette;
+  /**
+   * Викликається ПІСЛЯ відпускання ручки краю смуги: скільки календарних днів
+   * зсунути початок/кінець ('start'/'end') задачі `taskId` (contract §3
+   * «тягнення країв змінює дати»). Відсутнє — ручок немає взагалі (телефон:
+   * «перегляд + редагування дат у картці», не тут).
+   */
+  onEdgeDrag?: (taskId: string, edge: 'start' | 'end', deltaDays: number) => void;
 }) {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   // Ширина видимої частини шкали. Доки її не виміряно, шкала все одно має
   // ширину з днів — просто без гарантії, що вона не вужча за екран.
   const [viewport, setViewport] = useState(0);
+  // Смуга, яку зараз тягнуть — лише для ЖИВОГО показу під пальцем; фактична
+  // зміна дати йде через onEdgeDrag на відпускання, дані тут не чіпаються.
+  const [dragging, setDragging] = useState<DragState | null>(null);
 
   const { rows, todayOffset } = chart;
 
@@ -159,6 +239,10 @@ export function ProjectGantt({
   // датою), зате її підпис наїжджає на цю дату.
   const ticks = chart.ticks.filter(tick => tick.offset > 0.04 && tick.offset < 0.96);
   const gridHeight = rows.length * ROW_HEIGHT;
+  const pxPerDay = chart.days > 0 ? width / chart.days : 0;
+  // Ручки — лише планшет/веб (contract §3): телефон редагує дати текстом у
+  // картці під графіком (див. app/project/[id]/tasks.tsx), а не тут.
+  const editable = wide && !!onEdgeDrag;
 
   return (
     <View>
@@ -189,6 +273,9 @@ export function ProjectGantt({
           horizontal
           showsHorizontalScrollIndicator={false}
           onLayout={event => setViewport(event.nativeEvent.layout.width)}
+          // Скрол вимкнено на час перетягування ручки — інакше горизонтальний
+          // ScrollView перехоплює жест і тягне ВСЮ шкалу замість краю смуги.
+          scrollEnabled={!dragging}
           style={{ flex: 1 }}>
           <View style={{ width, paddingRight: 8 }}>
             {ticks.map(tick => (
@@ -213,9 +300,20 @@ export function ProjectGantt({
             ) : null}
 
             {rows.map(row => {
-              // Одноденна робота дає ширину майже нуль. Без цієї стелі вона
-              // зникає зовсім, і рядок виглядає як порожній.
-              const barWidth = Math.max(6, row.width * width);
+              const drag = dragging?.taskId === row.taskId ? dragging : null;
+              const dragPx = drag ? drag.deltaDays * pxPerDay : 0;
+              // Тягнення лівого краю зсуває ліву межу й ОБЕРНЕНО змінює
+              // ширину (права межа лишається на місці); правого — тільки
+              // ширину. Стеля 6pt лишається — за нею вгадати одноденну смугу
+              // під пальцем неможливо.
+              let barLeft = row.offset * width;
+              let barWidth = Math.max(6, row.width * width);
+              if (drag?.edge === 'start') {
+                barLeft += dragPx;
+                barWidth = Math.max(6, barWidth - dragPx);
+              } else if (drag?.edge === 'end') {
+                barWidth = Math.max(6, barWidth + dragPx);
+              }
               return (
                 <View key={row.taskId} style={{ height: ROW_HEIGHT, justifyContent: 'center' }}>
                   <View
@@ -224,12 +322,12 @@ export function ProjectGantt({
                     accessibilityLabel={barLabel(row, locale, tr)}
                     style={{
                       position: 'absolute',
-                      left: row.offset * width,
+                      left: barLeft,
                       top: (ROW_HEIGHT - BAR_HEIGHT) / 2,
                       width: barWidth,
                       height: BAR_HEIGHT,
                       borderRadius: 3,
-                      opacity: row.done ? 0.55 : 1,
+                      opacity: row.done ? 0.55 : drag ? 0.85 : 1,
                       // Справжній старт — суцільна заливка. Вигаданий —
                       // прозоре тло з контуром і штрихуванням: контур утримує
                       // форму там, де штрих тонкий, інакше одноденна смуга
@@ -237,11 +335,35 @@ export function ProjectGantt({
                       backgroundColor: row.startSource === 'startDate' ? row.color : 'transparent',
                       borderWidth: row.startSource === 'startDate' ? 0 : 1,
                       borderColor: row.color,
-                      overflow: 'hidden',
+                      overflow: 'visible',
                     }}>
-                    {row.startSource === 'startDate' ? null : (
-                      <Hatch width={barWidth} height={BAR_HEIGHT} color={row.color} />
-                    )}
+                    <View style={{ flex: 1, overflow: 'hidden', borderRadius: 3 }}>
+                      {row.startSource === 'startDate' ? null : (
+                        <Hatch width={barWidth} height={BAR_HEIGHT} color={row.color} />
+                      )}
+                    </View>
+                    {editable && !row.done ? (
+                      <>
+                        <EdgeHandle
+                          edge="start"
+                          pxPerDay={pxPerDay}
+                          onDrag={days => setDragging({ taskId: row.taskId, edge: 'start', deltaDays: days })}
+                          onCommit={days => {
+                            setDragging(null);
+                            if (days !== 0) onEdgeDrag?.(row.taskId, 'start', days);
+                          }}
+                        />
+                        <EdgeHandle
+                          edge="end"
+                          pxPerDay={pxPerDay}
+                          onDrag={days => setDragging({ taskId: row.taskId, edge: 'end', deltaDays: days })}
+                          onCommit={days => {
+                            setDragging(null);
+                            if (days !== 0) onEdgeDrag?.(row.taskId, 'end', days);
+                          }}
+                        />
+                      </>
+                    ) : null}
                   </View>
                 </View>
               );
@@ -298,4 +420,7 @@ const st = StyleSheet.create({
   legendText: { fontSize: 10, fontWeight: '600', flexShrink: 1 },
   axis:       { position: 'absolute', top: 4, fontSize: 9, fontWeight: '600' },
   note:       { fontSize: 11, lineHeight: 15 },
+  // Позиція абсолютна відносно смуги (яка сама absolute, overflow: 'visible')
+  // — ширина/висота більша за 10pt-смугу навмисно, це тач-таргет, не вигляд.
+  edgeHandle: { position: 'absolute', top: -8, bottom: -8, width: 20 },
 });

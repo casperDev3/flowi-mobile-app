@@ -28,6 +28,8 @@ export interface TaskSubtasksProps {
   onChangeEditingText: (text: string) => void;
   onSaveEdit: (subtaskId: string, text: string) => void;
   onToggle: (subtaskId: string) => void;
+  /** Кнопка копіювання в рядку: у буфер іде лише назва підзавдання. */
+  onCopy: (subtask: Subtask) => void;
   /** Довгий тап або «…»: меню дій над підзавданням. */
   onShowActions: (subtask: Subtask, indexInTask: number) => void;
   /** Перехід на повний екран підзавдань. */
@@ -44,7 +46,7 @@ export interface TaskSubtasksProps {
 
 export function TaskSubtasks({
   task, progressPercent, editingId, editingText, onChangeEditingText, onSaveEdit,
-  onToggle, onShowActions, onOpenAll, newText, onChangeNewText, onAdd, onFocusInput,
+  onToggle, onCopy, onShowActions, onOpenAll, newText, onChangeNewText, onAdd, onFocusInput,
   colors: c, isDark, tr,
 }: TaskSubtasksProps) {
   return (
@@ -112,7 +114,15 @@ export function TaskSubtasks({
                   {sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
                 </View>
                 <Text style={[st.subTitle, { color: sub.done ? c.sub : c.text, textDecorationLine: sub.done ? 'line-through' : 'none', flex: 1, marginHorizontal: 10 }]}>{sub.title}</Text>
-                <TouchableOpacity onPress={() => onShowActions(sub, originalIdx)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <TouchableOpacity
+                  onPress={() => onCopy(sub)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${tr.copySubtask}: ${sub.title}`}
+                  style={{ marginRight: 14 }}>
+                  <IconSymbol name="doc.on.doc" size={13} color={c.sub} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => onShowActions(sub, originalIdx)} hitSlop={{ top: 8, bottom: 8, left: 6, right: 8 }}>
                   <IconSymbol name="ellipsis" size={14} color={c.sub} />
                 </TouchableOpacity>
               </TouchableOpacity>

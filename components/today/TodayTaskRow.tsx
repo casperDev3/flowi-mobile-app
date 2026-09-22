@@ -5,6 +5,7 @@ import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } fr
 
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { PressableScale } from '@/components/shared/PressableScale';
+import { MeetingProjectChip, type MeetingChipProject } from '@/components/meetings/MeetingProjectChip';
 import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { Motion } from '@/constants/motion';
 import { useMotion } from '@/hooks/use-motion';
@@ -19,6 +20,12 @@ interface Props {
   onToggle: (id: string) => void;
   /** Тап по рядку (не по чекбоксу) — відкрити деталі задачі. */
   onOpen?: (id: string) => void;
+  /**
+   * Проєкти — для мітки проєкту на завданні (WORKSPACE_PROJECTS_PLAN §3.7:
+   * «Сьогодні … показують моє з усіх проєктів з міткою проєкту»). Відсутнє —
+   * і мітки просто немає (особисті завдання без projectId).
+   */
+  projects?: readonly MeetingChipProject[];
 }
 
 // ─── Per-task row component (manages local checked state for animation) ────────
@@ -29,9 +36,10 @@ interface RowProps {
   c: { border: string; text: string; sub: string };
   onToggle: (id: string) => void;
   onOpen?: (id: string) => void;
+  project?: MeetingChipProject | null;
 }
 
-function TodayTaskItem({ task, isDark, c, onToggle, onOpen }: RowProps) {
+function TodayTaskItem({ task, isDark, c, onToggle, onOpen, project }: RowProps) {
   const { reduced } = useMotion();
 
   const done = task.status === 'done';
@@ -90,6 +98,9 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen }: RowProps) {
           numberOfLines={1}>
           {task.title}
         </Animated.Text>
+        {/* Мітка проєкту — §3.7: агреговане «Сьогодні» показує задачі з усіх
+            проєктів, і без мітки незрозуміло, звідки саме кожна з них. */}
+        {project ? <MeetingProjectChip project={project} textColor={c.sub} maxWidth={90} /> : null}
         {/* Пріоритет — бейдж P0–P5 біля назви (замість кольорової смужки зліва). */}
         <PriorityBadge level={normalizePriority(task)} />
         {!done && isOverdue(task) && (
@@ -104,7 +115,7 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen }: RowProps) {
 
 // ─── Public component ─────────────────────────────────────────────────────────
 
-export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle, onOpen }: Props) {
+export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle, onOpen, projects }: Props) {
   const motion = useMotion();
 
   // Компонент НІЧОГО не відбирає й не сортує — малює рівно те, що дали.
@@ -130,6 +141,7 @@ export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle, onOpen }: Pr
             c={c}
             onToggle={onToggle}
             onOpen={onOpen}
+            project={task.projectId ? projects?.find(p => p.id === task.projectId) ?? null : null}
           />
         </Animated.View>
       ))}

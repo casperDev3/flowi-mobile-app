@@ -37,7 +37,11 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
         <TouchableOpacity
           onPress={this.reset}
           accessibilityRole="button"
-          accessibilityLabel="Спробувати знову"
+          // Підпису тут навмисно немає: він дослівно дублював видимий Text
+          // нижче, тож VoiceOver і так читає ту саму фразу, а зайвий літерал
+          // був ще одним місцем, де українське просочувалось в англійський UI.
+          // Повна локалізація цього екрана — окрема робота (I18N-01): межа
+          // помилок стоїть НАД I18nProvider, тож tr.* тут просто недосяжний.
           style={{ backgroundColor: '#0EA5E9', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
           <Text style={{ color: '#fff', fontWeight: '700' }}>Спробувати знову</Text>
         </TouchableOpacity>

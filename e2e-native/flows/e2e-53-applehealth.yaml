@@ -1,0 +1,13 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "38,94"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      text: ".*Apple Health.*"
+    timeout: 20000
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/53-settings-ah
+- tapOn: ".*Apple Health.*"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/53-apple-health

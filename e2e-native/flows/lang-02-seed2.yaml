@@ -1,0 +1,8 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn: "Назва"
+- inputText: "Seed task alpha"
+- tapOn: "У процесі"
+- tapOn: "Сьогодні"
+- tapOn: "Додати"
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/lang/02-added

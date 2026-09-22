@@ -144,6 +144,8 @@ export interface Translations {
   history: string;
   trackedTime: string;
   currentSession: string;
+  timerWorkflowMissingTitle: string;
+  timerWorkflowMissingMessage: string;
   startTimer: string;
   stopTimer: string;
   nothingFound: string;
@@ -250,6 +252,35 @@ export interface Translations {
   accountDefaultName: string;      // назва рахунку, створеного міграцією
   newAccount: string;
   openingBalance: string;
+  tasksScopeWeek: string;
+  tasksNoDeadlineA11y: string;
+  noTasksWeekTitle: string;
+  noDatedTasksHint: string;
+  statusLinkAskPersonalTitle: string;
+  statusLinkAskPersonalBody: string;
+  statusLinkAskProjectTitle: string;
+  statusLinkAskProjectBody: string;
+  statusLinkKeepAsIs: string;
+  monthNet: string;
+  totalOnAccounts: string;
+  balanceBreakdown: string;
+  breakdownOpening: string;
+  breakdownIncome: string;
+  breakdownExpense: string;
+  breakdownTransfersIn: string;
+  breakdownTransfersOut: string;
+  breakdownFuture: string;
+  breakdownBalance: string;
+  openingBalanceHint: string;
+  balanceWillBe: string;
+  reconcileBalance: string;
+  reconcileActualLabel: string;
+  reconcileDelta: string;
+  unassignedTxWarning: string;
+  markTransferPairTitle: string;
+  markTransferPairHint: string;
+  markTransferPairDelete: string;
+  markTransferPairKeep: string;
   selectAccount: string;
   noAccounts: string;
   noAccountsHint: string;
@@ -266,7 +297,6 @@ export interface Translations {
   markAsTransfer: string;
   markTransferSameCurrency: string;
   // Shared
-  sharedTitle: string;
   noGroups: string;
   noGroupsHint: string;
   createGroup: string;
@@ -381,6 +411,22 @@ export interface Translations {
   sendToDev: string;
   copied: string;
   copiedMsg: string;
+  // Копіювання завдання як Markdown (utils/taskMarkdown.ts) і підзавдання
+  copyTask: string;
+  copySubtask: string;
+  taskCopied: string;
+  subtaskCopied: string;
+  copyMdProject: string;
+  copyMdSprint: string;
+  copyMdStatus: string;
+  copyMdDeadline: string;
+  copyMdSubtasks: string;
+  subtaskDuplicate: string;
+  subtaskCopySuffix: string;
+  // Ліміт 15 у групі списку й екран «Всі (N)»
+  groupShowAll: string;          // "Всі ({count})"
+  groupShowAllA11y: string;      // "Показати всі завдання групи «{name}»: {count}"
+  groupEmpty: string;
   sentToDev: string;
   sendToDevLabel: string;
   ideaCount: string;
@@ -603,13 +649,13 @@ export interface Translations {
   modeOnline: string;
   modeOffline: string;
   offlineDesc: string;
+  onlineDesc: string;
   unavailableOffline: string;
   enableOnline: string;
   offlineBadge: string;
   onlineBadge: string;
   sendUnavailableOffline: string;
   // Today screen — new sections
-  sharedSubtitle: string;
   quickAddTask: string;
   quickAddExpense: string;
   quickAddWater: string;
@@ -778,17 +824,102 @@ export interface Translations {
   authOfflineError: string;
   authNetworkError: string;
   authServerError: string;
+  /** 429 від throttle, коли сервер сказав, коли повторити. {n} — хвилини. */
+  authTooManyAttemptsIn: string;
+  authShowPassword: string;
+  authHidePassword: string;
   budgetOtherCurrenciesHint: string;
   welcomeSubtitle: string;
-  startOffline: string;
   onlineNeedsAccount: string;
   onlineNeedsAccountMsg: string;
   sessionExpired: string;
   sessionExpiredMsg: string;
 
+  // Workspace (§2 плану WORKSPACE_PROJECTS_PLAN.md)
+  workspaceScreenTitle: string;
+  workspaceSubtitle: string;
+  workspaceAddressLabel: string;
+  workspaceAddressPlaceholder: string;
+  workspaceCheckButton: string;
+  workspaceContinueButton: string;
+  workspaceChecking: string;
+  workspaceFirstAccountHint: string;
+  workspaceErrorInvalidUrl: string;
+  workspaceErrorInsecureUrl: string;
+  workspaceErrorNetwork: string;
+  workspaceErrorNetworkScheme: string;
+  workspaceErrorServerUnavailable: string;
+  workspaceErrorNotWorkspace: string;
+  workspaceErrorUpdateApp: string;
+  workspaceErrorUpdateServer: string;
+  workspaceErrorUpdateAppTo: string;
+  workspaceErrorChanged: string;
+  workspaceChangeLink: string;
+  workspaceSwitchConfirmTitle: string;
+  workspaceSwitchConfirmMsg: string;
+  workspaceSwitchOutboxWarning: string;
+  workspaceSwitchButton: string;
+  workspaceSwitchSyncFailedTitle: string;
+  workspaceSwitchSyncFailedMsg: string;
+  workspaceSwitchProceedAnyway: string;
+  workspaceIncompatibleTitle: string;
+  workspaceCurrentLabel: string;
+  authRegistrationPending: string;
+  authRegistrationRejected: string;
+
+  // Реєстрація в режимі "за погодженням"
+  registrationPendingTitle: string;
+  registrationPendingMsg: string;
+  registrationPendingChecking: string;
+  registrationPendingRejectedTitle: string;
+  registrationPendingRejectedMsg: string;
+  registrationPendingBack: string;
+  registrationPendingCancel: string;
+  registrationPendingCancelConfirm: string;
+
+  // Адміністрування workspace
+  adminWorkspaceTitle: string;
+  settingsAdminWorkspace: string;
+  adminRequestsSection: string;
+  adminUsersSection: string;
+  adminSettingsSection: string;
+  adminNoRequests: string;
+  adminApprove: string;
+  adminReject: string;
+  adminRejectReasonPrompt: string;
+  adminRegistrationModeLabel: string;
+  adminRegistrationModeOpen: string;
+  adminRegistrationModeApproval: string;
+  adminMakeAdmin: string;
+  adminRevokeAdmin: string;
+  adminDeactivateUser: string;
+  adminActivateUser: string;
+  /**
+   * Мінор із ревʼю: обидві дії руйнівні й НЕ мають зворотної кнопки «Скасувати»
+   * дію заднім числом (адмін втрачає доступ до цього ж екрана; деактивований
+   * втрачає сесію) — підтвердження перед викликом, а не одразу після тапу.
+   */
+  adminConfirmRevokeAdminMsg: string;
+  adminConfirmDeactivateMsg: string;
+  adminYouLabel: string;
+  adminInvitedByLabel: string;
+  adminLastAdminError: string;
+  adminCannotDeactivateSelfError: string;
+  adminAlreadyDecidedError: string;
+  adminEmailTakenError: string;
+  adminAdminBadge: string;
+  adminOffBadge: string;
+  adminLoadError: string;
+  adminRetry: string;
+  adminActionFailedTitle: string;
+
+  // Об'єднання локальних даних з акаунтом при вході
+  mergeDataTitle: string;
+  mergeDataMsg: string;
+  mergeDataMerge: string;
+  mergeDataUseAccount: string;
+
   // Sync — cloud
-  syncNowTitle: string;
-  syncNowMsg: string;
   later: string;
   cloudSync: string;
   syncNow: string;
@@ -836,17 +967,26 @@ export interface Translations {
   accountDeleteConfirmMsg: string;
   accountDeletedMsg: string;
   accountDeleteConfirmPwd: string;
+  accountDeleteOwnsProjectsError: string;
+  accountDeleteLastAdminError: string;
 
   // Shared screen — invite deeplink
   shareInviteBtn: string;
   shareInviteText: string;
-  // Sidebar (широкий екран)
+  // Sidebar (широкий екран) — групи й пункти повторюють веб (NAV_GROUPS)
   navGroupMain: string;
   navGroupTools: string;
   navGroupMore: string;
+  navGroupWork: string;
+  navGroupPersonal: string;
+  navGroupDev: string;
   navTimeTracker: string;
   navBudget: string;
   navAgent: string;
+  navMeetings: string;
+  navTime: string;
+  navHealthSummary: string;
+  navAgentLabel: string;
 
   // Порожня колонка деталі (master-detail)
   detailEmptyTitle: string;
@@ -915,6 +1055,10 @@ export interface Translations {
 
   /** Деталь проєкту. Див. utils/projectStats. */
   projectDeadline: string;
+  /** Підказка формату текстового поля дати (Таймлайн проєкту — редагування дат). */
+  dateInputFormatHint: string;
+  /** Alert, коли текст у полі дати не парситься/поза календарними межами. */
+  invalidDateInput: string;
   projectDescription: string;
   projectTasks: string;
   projectTracked: string;
@@ -923,6 +1067,8 @@ export interface Translations {
   projectAddTask: string;
   projectNoTasks: string;
   projectNoTasksHint: string;
+  projectGroupByLabel: string;
+  projectGroupByNone: string;
   projectPickHint: string;
   projectDone: string;
   projectTimelineSpread: string;
@@ -986,7 +1132,6 @@ export interface Translations {
   chartOverdueDebt: string;
   chartBeyondHorizon: string;
   chartNoDeadline: string;
-  ganttTitle: string;
   ganttLegendReal: string;
   ganttLegendEstimated: string;
   ganttLegendColor: string;
@@ -1102,15 +1247,194 @@ export interface Translations {
   subNotifOverdueBody: string;
   subNotifEndTitle: string;
   subNotifEndBody: string;
+  // Локальні нагадування (store/notifications.ts)
+  notifChannelReminders: string;
+  notifTaskTitle: string;
+  notifSubtaskTitle: string;
+  notifMeetingTitle: string;
+
+  // Простір проєкту (WORKSPACE_PROJECTS_PLAN.md §3)
+  projectNavOverview: string;
+  projectNotFound: string;
+  overviewHoursThisWeek: string;
+  overviewUpcomingMeetings: string;
+  overviewBudgetSpent: string;
+  notesSortTitle: string;
+  notesSearch: string;
+  notesPersonal: string;
+  notesSelectHint: string;
+  notesNoResults: string;
+  notesReadOnly: string;
+  notesUnsavedTitle: string;
+  notesUnsavedBody: string;
+  notesEmptyError: string;
+  notesSaveError: string;
+  notesReadError: string;
+  notesRetry: string;
+  notesDeleteConfirm: string;
+  noteBodyPlaceholder: string;
+  timeManualTask: string;
+  timeManualMinutes: string;
+  timeNoEntries: string;
+  projectModuleDisabled: string;
+  projectBudgetOwnerOnly: string;
+  projectBudgetLimit: string;
+  projectBudgetTransactions: string;
+  projectBudgetNoTransactions: string;
+  projectSettingsInfo: string;
+  projectNamePlaceholder: string;
+  projectDescriptionPlaceholder: string;
+  projectTemplateLabel: string;
+  projectTemplateSimple: string;
+  projectTemplateWork: string;
+  projectSettingsModules: string;
+  projectSettingsStatuses: string;
+  projectStatusAdd: string;
+  projectStatusSeed: string;
+  projectStatusNew: string;
+  statusTypeTodo: string;
+  statusTypeInProgress: string;
+  statusTypeDone: string;
+  projectExitToPersonal: string;
+  projectSwitcherTitle: string;
+  projectSwitcherRecent: string;
+  projectSwitcherAll: string;
+  projectSwitcherEmpty: string;
+
+  // Команда проєкту (WORKSPACE_PROJECTS_PLAN.md §4, контракт §4.2–4.3)
+  projectMembersTitle: string;
+  projectMembersYou: string;
+  projectMembersCount: string;
+  roleOwner: string;
+  roleMember: string;
+  roleViewer: string;
+  projectMembersChangeRole: string;
+  projectMembersRemove: string;
+  projectMembersRemoveConfirm: string;
+  projectMembersLeave: string;
+  projectMembersLeaveConfirm: string;
+  projectMembersLeaveUnsyncedWarning: string;
+  projectMembersOwnerCannotLeave: string;
+  projectMembersTransferOwnership: string;
+  projectMembersTransferOwnershipHint: string;
+  projectMembersTransferOwnershipConfirm: string;
+  projectMembersTransferOwnershipNoMembers: string;
+  projectMembersInviteMaxUses: string;
+  projectMembersInviteMaxUsesUnlimited: string;
+  projectMembersInvitedBy: string;
+  projectMembersInviteSection: string;
+  projectMembersCreateLink: string;
+  projectMembersLinkRole: string;
+  projectMembersLinkExpiry: string;
+  projectMembersExpiry24h: string;
+  projectMembersExpiry7d: string;
+  projectMembersExpiry30d: string;
+  projectMembersLinkCreated: string;
+  projectMembersShareLink: string;
+  projectMembersCopyLink: string;
+  projectMembersLinkCopied: string;
+  projectMembersActiveLinks: string;
+  projectMembersRevokeLink: string;
+  projectMembersRevokeConfirm: string;
+  projectMembersInviteByEmail: string;
+  projectMembersEmailPlaceholder: string;
+  projectMembersSendInvite: string;
+  projectMembersEmailInviteSent: string;
+  projectMembersEmailUserNotFound: string;
+  projectMembersEmailAlreadyMember: string;
+  projectSettingsMembersRow: string;
+  projectMembersError: string;
+  projectMembersOfflineHint: string;
+
+  // Коментарі та @згадки (§4.4)
+  commentsTitle: string;
+  commentsEmpty: string;
+  commentsPlaceholder: string;
+  commentsSend: string;
+  commentsEdited: string;
+  commentsEditAction: string;
+  commentsDeleteAction: string;
+  commentsDeleteConfirm: string;
+  commentsSaveEdit: string;
+  commentsCancelEdit: string;
+
+  // Стрічка активності проєкту (§4.6)
+  projectActivityTitle: string;
+  projectActivityEmpty: string;
+  projectActivityError: string;
+  projectActivityShowAll: string;
+  projectActivityLoadMore: string;
+  projectActivityCreated: string;      // "{actor} створив(ла) «{title}»"
+  projectActivityUpdated: string;      // "{actor} оновив(ла) «{title}»"
+  projectActivityDeleted: string;      // "{actor} видалив(ла) «{title}»"
+  projectActivityStatusChanged: string; // "{actor} змінив(ла) статус «{title}»: {from} → {to}"
+  projectActivityAssigned: string;     // "{actor} призначив(ла) виконавця у «{title}»"
+  projectActivityCommented: string;    // "{actor} прокоментував(ла) «{title}»"
+  projectActivityMemberJoined: string; // "{actor} приєднався(лася) до проєкту"
+  projectActivityMemberLeft: string;   // "{actor} покинув(ла) проєкт"
+  projectActivityRoleChanged: string;  // "{actor} змінив(ла) роль"
+  projectActivityUnknownActor: string;
+
+  // Запрошення — deep link ftrackingapp://invite (контракт §4.3)
+  inviteScreenTitle: string;
+  inviteLoading: string;
+  inviteCheckingWorkspace: string;
+  inviteSwitchWorkspaceTitle: string;
+  inviteSwitchWorkspaceMsg: string;
+  inviteSwitchWorkspaceConfirm: string;
+  inviteWorkspaceUnreachable: string;
+  inviteInvalid: string;
+  inviteExpired: string;
+  inviteInvitedByLabel: string;
+  inviteExpiresLabel: string;
+  inviteJoinButton: string;
+  inviteJoining: string;
+  inviteAlreadyMember: string;
+  inviteJoinedTitle: string;
+  inviteJoinedOpenProject: string;
+  inviteLoginButton: string;
+  inviteRegisterButton: string;
+  inviteGuestHint: string;
+  inviteNetworkError: string;
+  inviteConfirmWorkspaceTitle: string;
+  inviteConfirmWorkspaceMsg: string;
+  inviteConfirmWorkspaceButton: string;
+  registerInvitedTitle: string;
+  registerInvitedMsg: string;
+  /**
+   * Контракт §2.4: `400 invite_invalid` / `410 invite_expired` на
+   * `POST /auth/register/` — сервер не зареєстрував акаунт узагалі (не лише
+   * «запрошення не додалось»), клієнт пропонує продовжити реєстрацію БЕЗ
+   * `invite_token`, повторивши запит без цього поля (мінор із ревʼю).
+   */
+  registerInviteBrokenTitle: string;
+  registerInviteInvalidMsg: string;
+  registerInviteExpiredMsg: string;
+  registerContinueWithoutInvite: string;
+
+  // Виконавець завдання (§4.5)
+  taskAssignee: string;
+  taskAssigneeUnassigned: string;
+  taskAssigneeMe: string;
+
+  // Роль-обмежений режим перегляду (viewer, контракт §4.1)
+  viewerReadOnlyNotice: string;
 }
 
 const uk: Translations = {
   navGroupMain: 'Головне',
   navGroupTools: 'Інструменти',
   navGroupMore: 'Ще',
+  navGroupWork: 'Робота',
+  navGroupPersonal: 'Особисте',
+  navGroupDev: 'Розробка',
   navTimeTracker: 'Трекер часу',
   navBudget: 'Бюджет',
   navAgent: 'OpenClaw Agent',
+  navMeetings: 'Наради',
+  navTime: 'Час',
+  navHealthSummary: "Зведення здоров'я",
+  navAgentLabel: 'Агент',
   detailEmptyTitle: 'Оберіть завдання',
   detailEmptyHint: 'Деталі, підзавдання й таймер зʼявляться тут.',
   noTasksMatchFilters: 'Під фільтри нічого не підходить',
@@ -1220,7 +1544,7 @@ const uk: Translations = {
   resetAll: 'Скинути все',
   subtasksToday: 'Підзавдання на сьогодні',
   noTasksToday: 'Немає завдань на сьогодні',
-  noTasksTodayHint: 'Решта роботи нікуди не зникла — вона в режимі «Всі».',
+  noTasksTodayHint: 'Решта роботи нікуди не зникла — вона в режимах «Тиждень» і «Всі».',
   showAllTasks: 'Показати всі',
   meetings: 'Зустрічі',
   addMeeting: 'Додати зустріч',
@@ -1278,6 +1602,8 @@ const uk: Translations = {
   history: 'Історія',
   trackedTime: 'Відстежений час',
   currentSession: 'Поточна сесія',
+  timerWorkflowMissingTitle: 'Налаштуйте статуси проєкту',
+  timerWorkflowMissingMessage: 'Власник проєкту має додати статуси «У процесі» та «На перевірці». Поточний статус завдання збережено.',
   startTimer: 'Запустити',
   stopTimer: 'Зупинити',
   nothingFound: 'Нічого не знайдено',
@@ -1377,6 +1703,35 @@ const uk: Translations = {
   accountDefaultName: 'Основний',
   newAccount: 'Новий рахунок',
   openingBalance: 'Початковий залишок',
+  tasksScopeWeek: 'Тиждень',
+  tasksNoDeadlineA11y: 'Показати завдання без дедлайну',
+  noTasksWeekTitle: 'На тиждень завдань немає',
+  noDatedTasksHint: 'Завдання без дедлайну — під кнопкою «Без дедлайну».',
+  statusLinkAskPersonalTitle: 'Статус в особистому',
+  statusLinkAskPersonalBody: 'В особистому просторі немає статусу «{name}» (проєкт «{project}»). Куди переносити такі задачі в особистому?',
+  statusLinkAskProjectTitle: 'Статус у проєкті',
+  statusLinkAskProjectBody: 'У проєкті «{project}» немає статусу «{name}». Куди перенести задачу в проєкті?',
+  statusLinkKeepAsIs: 'Залишити як є',
+  monthNet: 'Сальдо місяця',
+  totalOnAccounts: 'На рахунках',
+  balanceBreakdown: 'Звідки ця сума',
+  breakdownOpening: 'Початковий залишок',
+  breakdownIncome: 'Доходи',
+  breakdownExpense: 'Витрати',
+  breakdownTransfersIn: 'Перекази на рахунок',
+  breakdownTransfersOut: 'Перекази з рахунку',
+  breakdownFuture: 'Майбутні операції (не враховано): {n}',
+  breakdownBalance: 'Баланс',
+  openingBalanceHint: 'Сума ДО першої записаної операції цього рахунку — не поточний залишок. Щоб баланс збігся з реальним, скористайтесь «Звірити з реальним залишком».',
+  balanceWillBe: 'Баланс стане: {amount}',
+  reconcileBalance: 'Звірити з реальним залишком',
+  reconcileActualLabel: 'Реальний залишок зараз',
+  reconcileDelta: 'Початковий залишок зміниться на {delta}. Збережіть рахунок, щоб застосувати.',
+  unassignedTxWarning: 'Операцій без рахунку чи на архівних рахунках: {n} — у баланс не входять',
+  markTransferPairTitle: 'Друга половина переказу?',
+  markTransferPairHint: 'Знайдено операцію на ту саму суму на рахунку «{account}» ({date}). Якщо це друга половина старого переказу, її треба видалити — інакше гроші порахуються двічі.',
+  markTransferPairDelete: 'Видалити другу половину',
+  markTransferPairKeep: 'Залишити',
   selectAccount: 'Оберіть рахунок',
   noAccounts: 'Немає рахунків',
   noAccountsHint: 'Заведіть гаманець, картку чи заощадження — операції мусять звідкись іти',
@@ -1392,7 +1747,6 @@ const uk: Translations = {
   transfersNotCounted: 'Перекази не входять у доходи й витрати',
   markAsTransfer: 'Позначити як переказ',
   markTransferSameCurrency: 'Лише рахунки в тій самій валюті — курс минулого переказу невідомий',
-  sharedTitle: 'Спільне',
   noGroups: 'Немає груп',
   noGroupsHint: 'Створіть групу або приєднайтесь за кодом',
   createGroup: 'Створити',
@@ -1501,6 +1855,20 @@ const uk: Translations = {
   sendToDev: '✉️ Надіслати розробнику',
   copied: 'Скопійовано',
   copiedMsg: 'Заголовок та опис скопійовано в буфер обміну.',
+  copyTask: 'Копіювати',
+  copySubtask: 'Копіювати підзавдання',
+  taskCopied: 'Завдання скопійовано',
+  subtaskCopied: 'Підзавдання скопійовано',
+  copyMdProject: 'Проєкт',
+  copyMdSprint: 'Спринт',
+  copyMdStatus: 'Статус',
+  copyMdDeadline: 'Дедлайн',
+  copyMdSubtasks: 'Підзавдання',
+  subtaskDuplicate: 'Дублювати',
+  subtaskCopySuffix: ' (копія)',
+  groupShowAll: 'Всі ({count})',
+  groupShowAllA11y: 'Показати всі завдання групи «{name}»: {count}',
+  groupEmpty: 'У цій групі немає завдань',
   sentToDev: 'Надіслано розробнику',
   sendToDevLabel: 'Надіслати розробнику',
   ideaCount: 'Ідей',
@@ -1530,7 +1898,10 @@ const uk: Translations = {
 
   projects: 'Проєкти',
   deleteProject: 'Видалити проект?',
-  projectTasksRemain: "Завдання проекту залишаться, але без прив'язки.",
+  // review finding (minor): текст обіцяв лише «завдання без прив'язки», але
+  // wipeLocalProject (§9.4) прибирає з пристрою ще й наради/нотатки/записи
+  // часу/фінанси проекту — власник має бачити це ПЕРЕД підтвердженням.
+  projectTasksRemain: "Завдання проекту залишаться без прив'язки, але наради, нотатки, записи часу та фінансові дані проекту буде видалено з пристрою назавжди.",
   noProjects: 'Немає проектів',
   noTasksInProject: 'Немає завдань',
   editProject: 'Редагувати проект',
@@ -1707,13 +2078,13 @@ const uk: Translations = {
   workMode: 'Режим роботи',
   modeOnline: 'Онлайн',
   modeOffline: 'Офлайн',
-  offlineDesc: 'Дані лише на пристрої. Онлайн-функції (Спільне, синхронізація, AI, інтеграції) вимкнено.',
+  offlineDesc: 'Дані лише на пристрої. Онлайн-функції (синхронізація, команда, AI, інтеграції) вимкнено.',
+  onlineDesc: 'Дані синхронізуються з workspace і доступні на всіх ваших пристроях.',
   unavailableOffline: 'Недоступно в офлайн-режимі',
   enableOnline: 'Увімкнути онлайн',
   offlineBadge: 'Офлайн',
   onlineBadge: 'Онлайн',
   sendUnavailableOffline: 'Надсилання недоступне в офлайн-режимі',
-  sharedSubtitle: 'Спільні списки та групи',
   quickAddTask: '+ Завдання',
   quickAddExpense: '+ Витрата',
   quickAddWater: '+ Вода',
@@ -1853,7 +2224,7 @@ const uk: Translations = {
   authLogin: 'Увійти',
   authRegister: 'Зареєструватись',
   authLogout: 'Вийти',
-  logoutConfirm: 'Вийти з акаунта? Дані залишаться на пристрої.',
+  logoutConfirm: 'Вийти з акаунта? Синхронізовані дані буде видалено з пристрою (на сервері вони лишаться).',
   authEmail: 'Email',
   authPassword: 'Пароль',
   authPasswordRepeat: 'Повторіть пароль',
@@ -1868,16 +2239,91 @@ const uk: Translations = {
   authOfflineError: 'Увімкніть онлайн-режим для входу',
   authNetworkError: 'Перевірте підключення до мережі',
   authServerError: 'Помилка сервера. Спробуйте пізніше',
+  authTooManyAttemptsIn: 'Забагато спроб. Спробуйте за {n} хв',
+  authShowPassword: 'Показати пароль',
+  authHidePassword: 'Сховати пароль',
   budgetOtherCurrenciesHint: 'Транзакції в інших валютах ({n}) не враховано',
   welcomeSubtitle: 'Завдання, фінанси, здоров\'я — приватно і офлайн-first',
-  startOffline: 'Розпочати офлайн',
   onlineNeedsAccount: 'Для онлайн-функцій потрібен акаунт',
   onlineNeedsAccountMsg: 'Увійдіть або зареєструйтесь, щоб увімкнути онлайн-режим.',
   sessionExpired: 'Сесію завершено. Увійдіть знову.',
   sessionExpiredMsg: 'Увійдіть знову, щоб продовжити синхронізацію. Локальні дані збережено.',
 
-  syncNowTitle: 'Синхронізувати дані?',
-  syncNowMsg: 'Завантажити зміни на сервер і отримати актуальні дані.',
+  workspaceScreenTitle: 'Адреса workspace',
+  workspaceSubtitle: 'Введіть адресу сервера Flowi, з яким працюватиме застосунок.',
+  workspaceAddressLabel: 'АДРЕСА СЕРВЕРА',
+  workspaceAddressPlaceholder: 'api.flowi.casperdev.site',
+  workspaceCheckButton: 'Перевірити',
+  workspaceContinueButton: 'Продовжити',
+  workspaceChecking: 'Перевіряємо…',
+  workspaceFirstAccountHint: 'Ви створюєте перший акаунт — він стане адміном workspace.',
+  workspaceErrorInvalidUrl: 'Некоректна адреса',
+  workspaceErrorInsecureUrl: 'http:// дозволено лише для локальної мережі',
+  workspaceErrorNetwork: 'Не вдалося з\'єднатися з workspace',
+  workspaceErrorNetworkScheme: 'Не вдалося з\'єднатися з workspace. Вкажіть схему явно — https:// або http:// для локального сервера',
+  workspaceErrorServerUnavailable: 'Сервер workspace тимчасово недоступний. Спробуйте ще раз',
+  workspaceErrorNotWorkspace: 'Це не Flowi workspace або сервер застарів — оновіть сервер',
+  workspaceErrorUpdateApp: 'Оновіть застосунок до останньої версії',
+  workspaceErrorUpdateServer: 'Оновіть сервер workspace',
+  workspaceErrorUpdateAppTo: 'Оновіть застосунок до версії {v}',
+  workspaceErrorChanged: 'Ця адреса тепер веде на інший workspace. Перевірте адресу ще раз і продовжіть — це вийде з поточного акаунта.',
+  workspaceChangeLink: 'Змінити workspace',
+  workspaceSwitchConfirmTitle: 'Змінити workspace?',
+  workspaceSwitchConfirmMsg: 'Це вихід із поточного акаунта. Локальні дані цього workspace буде видалено з пристрою (на сервері вони лишаться).',
+  workspaceSwitchOutboxWarning: 'Є незбережені зміни — намагаємось синхронізувати перед виходом…',
+  workspaceSwitchButton: 'Змінити workspace',
+  workspaceSwitchSyncFailedTitle: 'Не вдалося синхронізувати',
+  workspaceSwitchSyncFailedMsg: 'Частина незбережених змін не дійшла до сервера. Продовжити зміну workspace все одно? Ці зміни буде втрачено.',
+  workspaceSwitchProceedAnyway: 'Продовжити (втратити зміни)',
+  workspaceIncompatibleTitle: 'Workspace недоступний',
+  workspaceCurrentLabel: 'Поточний workspace',
+  authRegistrationPending: 'Заявку на реєстрацію ще розглядають',
+  authRegistrationRejected: 'Заявку відхилено',
+
+  registrationPendingTitle: 'Заявку надіслано',
+  registrationPendingMsg: 'Адміністратор workspace розгляне заявку. Ви дізнаєтесь про рішення тут і через сповіщення.',
+  registrationPendingChecking: 'Перевіряємо статус…',
+  registrationPendingRejectedTitle: 'Заявку відхилено',
+  registrationPendingRejectedMsg: 'Адміністратор workspace відхилив заявку.',
+  registrationPendingBack: 'До входу',
+  registrationPendingCancel: 'Скасувати заявку',
+  registrationPendingCancelConfirm: 'Скасувати заявку на реєстрацію?',
+
+  adminWorkspaceTitle: 'Адміністрування workspace',
+  settingsAdminWorkspace: 'Адміністрування workspace',
+  adminRequestsSection: 'Заявки на реєстрацію',
+  adminUsersSection: 'Користувачі',
+  adminSettingsSection: 'Налаштування workspace',
+  adminNoRequests: 'Немає заявок',
+  adminApprove: 'Погодити',
+  adminReject: 'Відхилити',
+  adminRejectReasonPrompt: 'Причина відмови (необовʼязково)',
+  adminRegistrationModeLabel: 'Режим реєстрації',
+  adminRegistrationModeOpen: 'Відкрита',
+  adminRegistrationModeApproval: 'За погодженням',
+  adminMakeAdmin: 'Зробити адміном',
+  adminRevokeAdmin: 'Забрати права адміна',
+  adminDeactivateUser: 'Деактивувати',
+  adminActivateUser: 'Активувати',
+  adminConfirmRevokeAdminMsg: 'Забрати права адміністратора у «{name}»? Ця дія оборотна лише іншим адміном.',
+  adminConfirmDeactivateMsg: 'Деактивувати «{name}»? Користувач втратить доступ до workspace, доки ви не активуєте його знову.',
+  adminYouLabel: '(ви)',
+  adminInvitedByLabel: 'Запросив(ла)',
+  adminLastAdminError: 'Це останній активний адмін workspace',
+  adminCannotDeactivateSelfError: 'Не можна деактивувати самого себе',
+  adminAlreadyDecidedError: 'Заявку вже розглянуто',
+  adminEmailTakenError: 'Хтось із такою поштою вже зареєструвався інакше',
+  adminAdminBadge: ' · адмін',
+  adminOffBadge: ' · вимкнено',
+  adminLoadError: 'Не вдалося завантажити дані адміністрування',
+  adminRetry: 'Повторити',
+  adminActionFailedTitle: 'Дія не виконана',
+
+  mergeDataTitle: 'Знайдено дані в акаунті',
+  mergeDataMsg: 'В акаунті вже є дані. Об\'єднати їх із локальними, чи використати дані акаунта (локальні буде стерто)?',
+  mergeDataMerge: 'Об\'єднати',
+  mergeDataUseAccount: 'Використати дані акаунта',
+
   later: 'Пізніше',
   cloudSync: 'Хмарна синхронізація',
   syncNow: 'Синхронізувати зараз',
@@ -1919,6 +2365,8 @@ const uk: Translations = {
   accountDeleteConfirmMsg: 'Ця дія незворотна. Синхронізовані дані буде видалено з сервера.',
   accountDeletedMsg: 'Акаунт видалено. Локальні дані залишились на пристрої.',
   accountDeleteConfirmPwd: 'Введіть пароль для підтвердження',
+  accountDeleteOwnsProjectsError: 'Ви власник проєктів з іншими учасниками — спершу передайте власність над ними.',
+  accountDeleteLastAdminError: 'Ви єдиний активний адмін workspace — спершу призначте іншого адміна.',
 
   shareInviteBtn: 'Поділитись запрошенням',
   shareInviteText: '{name} запрошує тебе у спільну групу!\nКод: {code}\n{link}',
@@ -1934,6 +2382,8 @@ const uk: Translations = {
   stopTimerAction: 'Зупинити таймер',
   budgetUncounted: 'не враховано — немає курсу',
   projectDeadline: 'Термін проєкту',
+  dateInputFormatHint: 'РРРР-ММ-ДД',
+  invalidDateInput: 'Невірна дата. Формат: РРРР-ММ-ДД, напр. 2026-09-19.',
   projectDescription: 'Опис',
   projectTasks: 'Задачі',
   projectTracked: 'Відпрацьовано',
@@ -1942,6 +2392,8 @@ const uk: Translations = {
   projectAddTask: 'Додати задачу',
   projectNoTasks: 'Задач ще немає',
   projectNoTasksHint: 'Додайте першу — вона одразу потрапить у цей проєкт',
+  projectGroupByLabel: 'Групувати:',
+  projectGroupByNone: 'Без групування',
   projectPickHint: 'Оберіть проєкт, щоб побачити його задачі',
   projectDone: 'виконано',
   projectTimelineSpread: 'розкид дедлайнів',
@@ -1986,7 +2438,6 @@ const uk: Translations = {
   chartOverdueDebt: 'Прострочено — це борг, а не план',
   chartBeyondHorizon: 'З дедлайном далі за горизонт',
   chartNoDeadline: 'Незавершених без дедлайну',
-  ganttTitle: 'Гантт',
   ganttLegendReal: 'Справжня дата початку',
   ganttLegendEstimated: 'Початок узято з дати створення — тривалість завищена',
   ganttLegendColor: 'Колір смуги — колір проєкту',
@@ -2101,15 +2552,183 @@ const uk: Translations = {
   subNotifOverdueBody: '{name}: {amount}. Позначте «Продовжено», коли оплатите.',
   subNotifEndTitle: '📅 Підписка скоро завершиться',
   subNotifEndBody: '{name} — {date}',
+
+  // Локальні нагадування (store/notifications.ts)
+  notifChannelReminders: 'Нагадування',
+  notifTaskTitle: '📋 Завдання',
+  notifSubtaskTitle: '✅ Підзавдання',
+  notifMeetingTitle: '📅 Зустріч через 15 хв',
+
+  // Простір проєкту (WORKSPACE_PROJECTS_PLAN.md §3)
+  projectNavOverview: 'Огляд',
+  projectNotFound: 'Проєкт не знайдено',
+  overviewHoursThisWeek: 'Годин за тиждень',
+  overviewUpcomingMeetings: 'Найближчі наради',
+  overviewBudgetSpent: 'Витрачено',
+  notesSortTitle: 'За назвою',
+  notesSearch: 'Пошук у нотатках…',
+  notesPersonal: 'Особисті',
+  notesSelectHint: 'Виберіть нотатку або створіть нову',
+  notesNoResults: 'Нічого не знайдено. Змініть запит або фільтр.',
+  notesReadOnly: 'Лише перегляд',
+  notesUnsavedTitle: 'Незбережена нотатка',
+  notesUnsavedBody: 'Залишитися в редакторі чи відкинути зміни?',
+  notesEmptyError: 'Додайте заголовок або текст нотатки.',
+  notesSaveError: 'Не вдалося зберегти. Текст залишився в редакторі — спробуйте ще раз.',
+  notesReadError: 'Не вдалося прочитати нотатки. Повторіть спробу.',
+  notesRetry: 'Повторити',
+  notesDeleteConfirm: 'Видалити цю нотатку з усіх синхронізованих пристроїв?',
+  noteBodyPlaceholder: 'Текст нотатки...',
+  timeManualTask: 'Над чим працювали',
+  timeManualMinutes: 'Хв',
+  timeNoEntries: 'Ще немає записів часу',
+  projectModuleDisabled: 'Цей розділ вимкнено в налаштуваннях проєкту',
+  projectBudgetOwnerOnly: 'Бюджет бачить лише власник проєкту',
+  projectBudgetLimit: 'Бюджет на місяць',
+  projectBudgetTransactions: 'Витрати проєкту',
+  projectBudgetNoTransactions: 'Ще немає витрат',
+  projectSettingsInfo: 'ПРОЄКТ',
+  projectNamePlaceholder: 'Назва проєкту',
+  projectDescriptionPlaceholder: 'Опис',
+  projectTemplateLabel: 'Шаблон',
+  projectTemplateSimple: 'Простий',
+  projectTemplateWork: 'Робочий',
+  projectSettingsModules: 'РОЗДІЛИ',
+  projectSettingsStatuses: 'СТАТУСИ ЗАВДАНЬ',
+  projectStatusAdd: 'Додати статус',
+  projectStatusSeed: 'Скопіювати типові статуси',
+  projectStatusNew: 'Новий статус',
+  statusTypeTodo: 'До роботи',
+  statusTypeInProgress: 'У процесі',
+  statusTypeDone: 'Готово',
+  projectExitToPersonal: 'Особисте',
+  projectSwitcherTitle: 'Проєкти',
+  projectSwitcherRecent: 'Нещодавні',
+  projectSwitcherAll: 'Усі проєкти',
+  projectSwitcherEmpty: 'Проєктів ще немає',
+
+  projectMembersTitle: 'Учасники',
+  projectMembersYou: 'Ви',
+  projectMembersCount: 'учасників',
+  roleOwner: 'Власник',
+  roleMember: 'Учасник',
+  roleViewer: 'Глядач',
+  projectMembersChangeRole: 'Змінити роль',
+  projectMembersRemove: 'Видалити з проєкту',
+  projectMembersRemoveConfirm: 'Видалити цього учасника з проєкту?',
+  projectMembersLeave: 'Вийти з проєкту',
+  projectMembersLeaveConfirm: 'Вийти з цього проєкту? Доступ до нього буде втрачено.',
+  projectMembersLeaveUnsyncedWarning: 'Тут є незбережені зміни, які ще не дійшли до сервера. Вийти зараз — і втратити їх назавжди?',
+  projectMembersOwnerCannotLeave: 'Власник не може вийти — спершу передайте власність іншому учаснику.',
+  projectMembersTransferOwnership: 'Передати власність',
+  projectMembersTransferOwnershipHint: 'Оберіть, кому передати проєкт',
+  projectMembersTransferOwnershipConfirm: 'Передати власність цим проєктом учаснику {name}?',
+  projectMembersTransferOwnershipNoMembers: 'У проєкті немає інших учасників, кому можна передати власність.',
+  projectMembersInviteMaxUses: 'Ліміт використань',
+  projectMembersInviteMaxUsesUnlimited: 'Без обмежень',
+  projectMembersInvitedBy: 'Запросив(ла)',
+  projectMembersInviteSection: 'ЗАПРОСИТИ',
+  projectMembersCreateLink: 'Створити посилання',
+  projectMembersLinkRole: 'Роль запрошеного',
+  projectMembersLinkExpiry: 'Термін дії',
+  projectMembersExpiry24h: '24 години',
+  projectMembersExpiry7d: '7 днів',
+  projectMembersExpiry30d: '30 днів',
+  projectMembersLinkCreated: 'Посилання створено',
+  projectMembersShareLink: 'Поділитися',
+  projectMembersCopyLink: 'Скопіювати посилання',
+  projectMembersLinkCopied: 'Посилання скопійовано',
+  projectMembersActiveLinks: 'Активні посилання',
+  projectMembersRevokeLink: 'Відкликати',
+  projectMembersRevokeConfirm: 'Відкликати це запрошення? Ним більше не можна буде скористатись.',
+  projectMembersInviteByEmail: 'Запросити за email',
+  projectMembersEmailPlaceholder: 'email@example.com',
+  projectMembersSendInvite: 'Запросити',
+  projectMembersEmailInviteSent: 'Учасника додано до проєкту',
+  projectMembersEmailUserNotFound: 'Користувача з таким email не знайдено',
+  projectMembersEmailAlreadyMember: 'Ця людина вже в проєкті',
+  projectSettingsMembersRow: 'Учасники',
+  projectMembersError: 'Не вдалося завантажити учасників',
+  projectMembersOfflineHint: 'Команда доступна лише онлайн',
+
+  commentsTitle: 'Коментарі',
+  commentsEmpty: 'Поки що немає коментарів',
+  commentsPlaceholder: 'Написати коментар… (@ — згадати учасника)',
+  commentsSend: 'Надіслати',
+  commentsEdited: '(редаговано)',
+  commentsEditAction: 'Редагувати',
+  commentsDeleteAction: 'Видалити',
+  commentsDeleteConfirm: 'Видалити цей коментар?',
+  commentsSaveEdit: 'Зберегти',
+  commentsCancelEdit: 'Скасувати',
+
+  projectActivityTitle: 'Активність',
+  projectActivityEmpty: 'Поки що немає активності',
+  projectActivityError: 'Не вдалося завантажити активність',
+  projectActivityShowAll: 'Уся активність',
+  projectActivityLoadMore: 'Показати ще',
+  projectActivityCreated: '{actor} створив(ла) «{title}»',
+  projectActivityUpdated: '{actor} оновив(ла) «{title}»',
+  projectActivityDeleted: '{actor} видалив(ла) «{title}»',
+  projectActivityStatusChanged: '{actor} змінив(ла) статус «{title}»: {from} → {to}',
+  projectActivityAssigned: '{actor} призначив(ла) виконавця у «{title}»',
+  projectActivityCommented: '{actor} прокоментував(ла) «{title}»',
+  projectActivityMemberJoined: '{actor} приєднався(лася) до проєкту',
+  projectActivityMemberLeft: '{actor} покинув(ла) проєкт',
+  projectActivityRoleChanged: '{actor} змінив(ла) роль {target}',
+  projectActivityUnknownActor: 'Хтось',
+
+  inviteScreenTitle: 'Запрошення',
+  inviteLoading: 'Перевіряємо запрошення…',
+  inviteCheckingWorkspace: 'Перевіряємо workspace…',
+  inviteSwitchWorkspaceTitle: 'Перейти в інший workspace?',
+  inviteSwitchWorkspaceMsg: 'Це запрошення — з іншого workspace. Перехід вийде з поточного акаунта; дані лишаться на сервері.',
+  inviteSwitchWorkspaceConfirm: 'Перейти',
+  inviteWorkspaceUnreachable: 'Не вдалося з\'єднатися з workspace цього запрошення',
+  inviteInvalid: 'Це запрошення недійсне',
+  inviteExpired: 'Термін дії запрошення сплив або його відкликано',
+  inviteInvitedByLabel: 'Запросив(ла)',
+  inviteExpiresLabel: 'Діє до',
+  inviteJoinButton: 'Приєднатися',
+  inviteJoining: 'Приєднання…',
+  inviteAlreadyMember: 'Ви вже учасник цього проєкту',
+  inviteJoinedTitle: 'Готово!',
+  inviteJoinedOpenProject: 'Відкрити проєкт',
+  inviteLoginButton: 'Увійти',
+  inviteRegisterButton: 'Зареєструватися',
+  inviteGuestHint: 'Увійдіть або зареєструйтесь, щоб приєднатись до проєкту',
+  inviteNetworkError: 'Немає з\'єднання — спробуйте пізніше',
+  inviteConfirmWorkspaceTitle: 'Використати workspace цього запрошення?',
+  inviteConfirmWorkspaceMsg: 'Посилання веде на інший workspace ({name}). Застосунок підставить його адресу.',
+  inviteConfirmWorkspaceButton: 'Продовжити',
+  registerInvitedTitle: 'Запрошення в проєкт',
+  registerInvitedMsg: 'Після реєстрації ви приєднаєтесь до проєкту «{project}» ({role})',
+  registerInviteBrokenTitle: 'Проблема із запрошенням',
+  registerInviteInvalidMsg: 'Це запрошення недійсне. Зареєструватися без нього?',
+  registerInviteExpiredMsg: 'Термін дії запрошення сплив або його відкликано. Зареєструватися без нього?',
+  registerContinueWithoutInvite: 'Зареєструватися без запрошення',
+
+  taskAssignee: 'Виконавець',
+  taskAssigneeUnassigned: 'Без виконавця',
+  taskAssigneeMe: 'Я',
+
+  viewerReadOnlyNotice: 'Лише перегляд — роль «Глядач»',
 };
 
 const en: Translations = {
   navGroupMain: 'Main',
   navGroupTools: 'Tools',
   navGroupMore: 'More',
+  navGroupWork: 'Work',
+  navGroupPersonal: 'Personal',
+  navGroupDev: 'Development',
   navTimeTracker: 'Time Tracker',
   navBudget: 'Budget',
   navAgent: 'OpenClaw Agent',
+  navMeetings: 'Meetings',
+  navTime: 'Time',
+  navHealthSummary: 'Health summary',
+  navAgentLabel: 'Agent',
   detailEmptyTitle: 'Select a task',
   detailEmptyHint: 'Details, subtasks and timer will appear here.',
   noTasksMatchFilters: 'Nothing matches the filters',
@@ -2219,7 +2838,7 @@ const en: Translations = {
   resetAll: 'Reset All',
   subtasksToday: 'Subtasks today',
   noTasksToday: 'No tasks today',
-  noTasksTodayHint: 'The rest of your work is still there — under “All”.',
+  noTasksTodayHint: 'The rest of your work is still there — under “Week” and “All”.',
   showAllTasks: 'Show all',
   meetings: 'Meetings',
   addMeeting: 'Add Meeting',
@@ -2277,6 +2896,8 @@ const en: Translations = {
   history: 'History',
   trackedTime: 'Tracked Time',
   currentSession: 'Current Session',
+  timerWorkflowMissingTitle: 'Configure project statuses',
+  timerWorkflowMissingMessage: 'The project owner needs to add In progress and In review statuses. The current task status was preserved.',
   startTimer: 'Start',
   stopTimer: 'Stop',
   nothingFound: 'Nothing found',
@@ -2376,6 +2997,35 @@ const en: Translations = {
   accountDefaultName: 'Main',
   newAccount: 'New account',
   openingBalance: 'Opening balance',
+  tasksScopeWeek: 'Week',
+  tasksNoDeadlineA11y: 'Show tasks without a deadline',
+  noTasksWeekTitle: 'No tasks this week',
+  noDatedTasksHint: 'Tasks without a deadline are under “No deadline”.',
+  statusLinkAskPersonalTitle: 'Status in personal space',
+  statusLinkAskPersonalBody: 'Your personal space has no “{name}” status (project “{project}”). Where should such tasks go in your personal space?',
+  statusLinkAskProjectTitle: 'Status in project',
+  statusLinkAskProjectBody: 'Project “{project}” has no “{name}” status. Where should the task go in the project?',
+  statusLinkKeepAsIs: 'Keep as is',
+  monthNet: 'Month net',
+  totalOnAccounts: 'On accounts',
+  balanceBreakdown: 'Where this amount comes from',
+  breakdownOpening: 'Opening balance',
+  breakdownIncome: 'Income',
+  breakdownExpense: 'Expenses',
+  breakdownTransfersIn: 'Transfers in',
+  breakdownTransfersOut: 'Transfers out',
+  breakdownFuture: 'Future transactions (not counted): {n}',
+  breakdownBalance: 'Balance',
+  openingBalanceHint: 'The amount BEFORE this account’s first recorded transaction — not the current balance. To match your real balance, use “Reconcile with actual balance”.',
+  balanceWillBe: 'Balance will be: {amount}',
+  reconcileBalance: 'Reconcile with actual balance',
+  reconcileActualLabel: 'Actual balance now',
+  reconcileDelta: 'Opening balance changes by {delta}. Save the account to apply.',
+  unassignedTxWarning: 'Transactions without an account or on archived accounts: {n} — not in the balance',
+  markTransferPairTitle: 'Other half of the transfer?',
+  markTransferPairHint: 'Found a transaction for the same amount on “{account}” ({date}). If it is the other half of an old transfer, delete it — otherwise the money is counted twice.',
+  markTransferPairDelete: 'Delete the other half',
+  markTransferPairKeep: 'Keep',
   selectAccount: 'Select an account',
   noAccounts: 'No accounts',
   noAccountsHint: 'Add a wallet, a card or savings — every operation needs a place to come from',
@@ -2391,7 +3041,6 @@ const en: Translations = {
   transfersNotCounted: 'Transfers are not counted as income or expenses',
   markAsTransfer: 'Mark as transfer',
   markTransferSameCurrency: 'Same-currency accounts only — the rate of a past transfer is unknown',
-  sharedTitle: 'Shared',
   noGroups: 'No groups',
   noGroupsHint: 'Create a group or join with a code',
   createGroup: 'Create',
@@ -2500,6 +3149,20 @@ const en: Translations = {
   sendToDev: '✉️ Send to developer',
   copied: 'Copied',
   copiedMsg: 'Title and description copied to clipboard.',
+  copyTask: 'Copy',
+  copySubtask: 'Copy subtask',
+  taskCopied: 'Task copied',
+  subtaskCopied: 'Subtask copied',
+  copyMdProject: 'Project',
+  copyMdSprint: 'Sprint',
+  copyMdStatus: 'Status',
+  copyMdDeadline: 'Deadline',
+  copyMdSubtasks: 'Subtasks',
+  subtaskDuplicate: 'Duplicate',
+  subtaskCopySuffix: ' (copy)',
+  groupShowAll: 'All ({count})',
+  groupShowAllA11y: 'Show all tasks in “{name}”: {count}',
+  groupEmpty: 'No tasks in this group',
   sentToDev: 'Sent to developer',
   sendToDevLabel: 'Send to developer',
   ideaCount: 'Ideas',
@@ -2529,7 +3192,7 @@ const en: Translations = {
 
   projects: 'Projects',
   deleteProject: 'Delete project?',
-  projectTasksRemain: 'Project tasks will remain but without binding.',
+  projectTasksRemain: "Project tasks will remain unlinked, but the project's meetings, notes, time entries and financial records will be permanently removed from this device.",
   noProjects: 'No projects',
   noTasksInProject: 'No tasks',
   editProject: 'Edit project',
@@ -2706,13 +3369,13 @@ const en: Translations = {
   workMode: 'Mode',
   modeOnline: 'Online',
   modeOffline: 'Offline',
-  offlineDesc: 'Data stays on device only. Online features (Shared, sync, AI, integrations) are off.',
+  offlineDesc: 'Data stays on device only. Online features (sync, team, AI, integrations) are off.',
+  onlineDesc: 'Data syncs with your workspace and is available on all your devices.',
   unavailableOffline: 'Unavailable in offline mode',
   enableOnline: 'Go online',
   offlineBadge: 'Offline',
   onlineBadge: 'Online',
   sendUnavailableOffline: 'Sending is unavailable offline',
-  sharedSubtitle: 'Shared lists & groups',
   quickAddTask: '+ Task',
   quickAddExpense: '+ Expense',
   quickAddWater: '+ Water',
@@ -2852,7 +3515,7 @@ const en: Translations = {
   authLogin: 'Sign In',
   authRegister: 'Register',
   authLogout: 'Sign Out',
-  logoutConfirm: 'Sign out? Your data will remain on the device.',
+  logoutConfirm: 'Sign out? Synced data will be removed from this device (it stays on the server).',
   authEmail: 'Email',
   authPassword: 'Password',
   authPasswordRepeat: 'Repeat password',
@@ -2867,16 +3530,91 @@ const en: Translations = {
   authOfflineError: 'Enable online mode to sign in',
   authNetworkError: 'Check your network connection',
   authServerError: 'Server error. Please try again later',
+  authTooManyAttemptsIn: 'Too many attempts. Try again in {n} min',
+  authShowPassword: 'Show password',
+  authHidePassword: 'Hide password',
   budgetOtherCurrenciesHint: 'Transactions in other currencies ({n}) not included',
   welcomeSubtitle: 'Tasks, finance, health — private and offline-first',
-  startOffline: 'Start offline',
   onlineNeedsAccount: 'Online features require an account',
   onlineNeedsAccountMsg: 'Sign in or register to enable online mode.',
   sessionExpired: 'Session expired. Please sign in again.',
   sessionExpiredMsg: 'Sign in again to continue syncing. Your local data is preserved.',
 
-  syncNowTitle: 'Sync data?',
-  syncNowMsg: 'Upload local changes to the server and fetch the latest data.',
+  workspaceScreenTitle: 'Workspace address',
+  workspaceSubtitle: 'Enter the address of the Flowi server this app will work with.',
+  workspaceAddressLabel: 'SERVER ADDRESS',
+  workspaceAddressPlaceholder: 'api.flowi.casperdev.site',
+  workspaceCheckButton: 'Check',
+  workspaceContinueButton: 'Continue',
+  workspaceChecking: 'Checking…',
+  workspaceFirstAccountHint: 'You are creating the first account — it will become the workspace admin.',
+  workspaceErrorInvalidUrl: 'Invalid address',
+  workspaceErrorInsecureUrl: 'http:// is only allowed for local networks',
+  workspaceErrorNetwork: 'Could not connect to the workspace',
+  workspaceErrorNetworkScheme: 'Could not connect to the workspace. Add the scheme explicitly — https://, or http:// for a local server',
+  workspaceErrorServerUnavailable: 'The workspace server is temporarily unavailable. Please try again',
+  workspaceErrorNotWorkspace: 'This is not a Flowi workspace, or the server is outdated — please update it',
+  workspaceErrorUpdateApp: 'Update the app to the latest version',
+  workspaceErrorUpdateServer: 'Update the workspace server',
+  workspaceErrorUpdateAppTo: 'Update the app to version {v}',
+  workspaceErrorChanged: 'This address now points to a different workspace. Check the address again and continue — this will sign you out of the current account.',
+  workspaceChangeLink: 'Change workspace',
+  workspaceSwitchConfirmTitle: 'Change workspace?',
+  workspaceSwitchConfirmMsg: 'This signs you out of the current account. Local data for this workspace will be removed from the device (it stays on the server).',
+  workspaceSwitchOutboxWarning: 'There are unsaved changes — trying to sync before signing out…',
+  workspaceSwitchButton: 'Change workspace',
+  workspaceSwitchSyncFailedTitle: 'Sync failed',
+  workspaceSwitchSyncFailedMsg: 'Some unsaved changes did not reach the server. Continue changing workspace anyway? Those changes will be lost.',
+  workspaceSwitchProceedAnyway: 'Continue (lose changes)',
+  workspaceIncompatibleTitle: 'Workspace unavailable',
+  workspaceCurrentLabel: 'Current workspace',
+  authRegistrationPending: 'Your registration request is still pending',
+  authRegistrationRejected: 'Your registration request was rejected',
+
+  registrationPendingTitle: 'Request sent',
+  registrationPendingMsg: 'The workspace admin will review your request. You will see the decision here and via a notification.',
+  registrationPendingChecking: 'Checking status…',
+  registrationPendingRejectedTitle: 'Request rejected',
+  registrationPendingRejectedMsg: 'The workspace admin rejected your request.',
+  registrationPendingBack: 'Back to sign in',
+  registrationPendingCancel: 'Cancel request',
+  registrationPendingCancelConfirm: 'Cancel the registration request?',
+
+  adminWorkspaceTitle: 'Workspace administration',
+  settingsAdminWorkspace: 'Workspace administration',
+  adminRequestsSection: 'Registration requests',
+  adminUsersSection: 'Users',
+  adminSettingsSection: 'Workspace settings',
+  adminNoRequests: 'No requests',
+  adminApprove: 'Approve',
+  adminReject: 'Reject',
+  adminRejectReasonPrompt: 'Rejection reason (optional)',
+  adminRegistrationModeLabel: 'Registration mode',
+  adminRegistrationModeOpen: 'Open',
+  adminRegistrationModeApproval: 'By approval',
+  adminMakeAdmin: 'Make admin',
+  adminRevokeAdmin: 'Revoke admin',
+  adminDeactivateUser: 'Deactivate',
+  adminActivateUser: 'Activate',
+  adminConfirmRevokeAdminMsg: 'Revoke admin rights from “{name}”? Only another admin can undo this.',
+  adminConfirmDeactivateMsg: 'Deactivate “{name}”? The user will lose access to the workspace until you activate them again.',
+  adminYouLabel: '(you)',
+  adminInvitedByLabel: 'Invited by',
+  adminLastAdminError: 'This is the last active workspace admin',
+  adminCannotDeactivateSelfError: 'You cannot deactivate yourself',
+  adminAlreadyDecidedError: 'This request was already decided',
+  adminEmailTakenError: 'Someone with that email already registered a different way',
+  adminAdminBadge: ' · admin',
+  adminOffBadge: ' · off',
+  adminLoadError: 'Failed to load administration data',
+  adminRetry: 'Retry',
+  adminActionFailedTitle: 'Action failed',
+
+  mergeDataTitle: 'Account data found',
+  mergeDataMsg: 'This account already has data. Merge it with your local data, or use the account data (local data will be erased)?',
+  mergeDataMerge: 'Merge',
+  mergeDataUseAccount: 'Use account data',
+
   later: 'Later',
   cloudSync: 'Cloud Sync',
   syncNow: 'Sync now',
@@ -2918,6 +3656,8 @@ const en: Translations = {
   accountDeleteConfirmMsg: 'This action is irreversible. Synced server data will be deleted.',
   accountDeletedMsg: 'Account deleted. Local data remains on this device.',
   accountDeleteConfirmPwd: 'Enter your password to confirm',
+  accountDeleteOwnsProjectsError: 'You own projects with other members — transfer ownership first.',
+  accountDeleteLastAdminError: 'You are the only active workspace admin — make someone else an admin first.',
 
   shareInviteBtn: 'Share invitation',
   shareInviteText: '{name} invites you to a shared group!\nCode: {code}\n{link}',
@@ -2933,6 +3673,8 @@ const en: Translations = {
   stopTimerAction: 'Stop timer',
   budgetUncounted: 'not counted — no exchange rate',
   projectDeadline: 'Project deadline',
+  dateInputFormatHint: 'YYYY-MM-DD',
+  invalidDateInput: 'Invalid date. Format: YYYY-MM-DD, e.g. 2026-09-19.',
   projectDescription: 'Description',
   projectTasks: 'Tasks',
   projectTracked: 'Tracked',
@@ -2941,6 +3683,8 @@ const en: Translations = {
   projectAddTask: 'Add a task',
   projectNoTasks: 'No tasks yet',
   projectNoTasksHint: 'Add the first one — it lands in this project',
+  projectGroupByLabel: 'Group by:',
+  projectGroupByNone: 'No grouping',
   projectPickHint: 'Pick a project to see its tasks',
   projectDone: 'done',
   projectTimelineSpread: 'deadline spread',
@@ -2985,7 +3729,6 @@ const en: Translations = {
   chartOverdueDebt: 'Overdue — that is debt, not a plan',
   chartBeyondHorizon: 'Due beyond the horizon',
   chartNoDeadline: 'Unfinished with no deadline',
-  ganttTitle: 'Gantt',
   ganttLegendReal: 'Real start date',
   ganttLegendEstimated: 'Start taken from the creation date — duration overstated',
   ganttLegendColor: 'Bar colour is the project colour',
@@ -3100,6 +3843,167 @@ const en: Translations = {
   subNotifOverdueBody: '{name}: {amount}. Mark it “Renewed” once paid.',
   subNotifEndTitle: '📅 Subscription ends soon',
   subNotifEndBody: '{name} — {date}',
+
+  // Local reminders (store/notifications.ts)
+  notifChannelReminders: 'Reminders',
+  notifTaskTitle: '📋 Task',
+  notifSubtaskTitle: '✅ Subtask',
+  notifMeetingTitle: '📅 Meeting in 15 min',
+
+  // Project space (WORKSPACE_PROJECTS_PLAN.md §3)
+  projectNavOverview: 'Overview',
+  projectNotFound: 'Project not found',
+  overviewHoursThisWeek: 'Hours this week',
+  overviewUpcomingMeetings: 'Upcoming meetings',
+  overviewBudgetSpent: 'Spent',
+  notesSortTitle: 'By title',
+  notesSearch: 'Search notes…',
+  notesPersonal: 'Personal',
+  notesSelectHint: 'Select a note or create a new one',
+  notesNoResults: 'No matches. Change the search or filter.',
+  notesReadOnly: 'Read only',
+  notesUnsavedTitle: 'Unsaved note',
+  notesUnsavedBody: 'Stay in the editor or discard your changes?',
+  notesEmptyError: 'Add a title or note text.',
+  notesSaveError: 'Could not save. Your text remains in the editor. Please retry.',
+  notesReadError: 'Could not read notes. Please retry.',
+  notesRetry: 'Retry',
+  notesDeleteConfirm: 'Delete this note from all synced devices?',
+  noteBodyPlaceholder: 'Note text...',
+  timeManualTask: 'What did you work on',
+  timeManualMinutes: 'Min',
+  timeNoEntries: 'No time entries yet',
+  projectModuleDisabled: 'This section is turned off in project settings',
+  projectBudgetOwnerOnly: 'Only the project owner sees the budget',
+  projectBudgetLimit: 'Monthly budget',
+  projectBudgetTransactions: 'Project expenses',
+  projectBudgetNoTransactions: 'No expenses yet',
+  projectSettingsInfo: 'PROJECT',
+  projectNamePlaceholder: 'Project name',
+  projectDescriptionPlaceholder: 'Description',
+  projectTemplateLabel: 'Template',
+  projectTemplateSimple: 'Simple',
+  projectTemplateWork: 'Full',
+  projectSettingsModules: 'SECTIONS',
+  projectSettingsStatuses: 'TASK STATUSES',
+  projectStatusAdd: 'Add status',
+  projectStatusSeed: 'Copy default statuses',
+  projectStatusNew: 'New status',
+  statusTypeTodo: 'To do',
+  statusTypeInProgress: 'In progress',
+  statusTypeDone: 'Done',
+  projectExitToPersonal: 'Personal',
+  projectSwitcherTitle: 'Projects',
+  projectSwitcherRecent: 'Recent',
+  projectSwitcherAll: 'All projects',
+  projectSwitcherEmpty: 'No projects yet',
+
+  projectMembersTitle: 'Members',
+  projectMembersYou: 'You',
+  projectMembersCount: 'members',
+  roleOwner: 'Owner',
+  roleMember: 'Member',
+  roleViewer: 'Viewer',
+  projectMembersChangeRole: 'Change role',
+  projectMembersRemove: 'Remove from project',
+  projectMembersRemoveConfirm: 'Remove this member from the project?',
+  projectMembersLeave: 'Leave project',
+  projectMembersLeaveConfirm: 'Leave this project? You will lose access to it.',
+  projectMembersLeaveUnsyncedWarning: 'There are unsynced changes here that never reached the server. Leave now and lose them for good?',
+  projectMembersOwnerCannotLeave: 'The owner cannot leave — transfer ownership to another member first.',
+  projectMembersTransferOwnership: 'Transfer ownership',
+  projectMembersTransferOwnershipHint: 'Choose who to transfer the project to',
+  projectMembersTransferOwnershipConfirm: 'Transfer ownership of this project to {name}?',
+  projectMembersTransferOwnershipNoMembers: 'There are no other members to transfer ownership to.',
+  projectMembersInviteMaxUses: 'Use limit',
+  projectMembersInviteMaxUsesUnlimited: 'Unlimited',
+  projectMembersInvitedBy: 'Invited by',
+  projectMembersInviteSection: 'INVITE',
+  projectMembersCreateLink: 'Create link',
+  projectMembersLinkRole: 'Invitee role',
+  projectMembersLinkExpiry: 'Expires in',
+  projectMembersExpiry24h: '24 hours',
+  projectMembersExpiry7d: '7 days',
+  projectMembersExpiry30d: '30 days',
+  projectMembersLinkCreated: 'Link created',
+  projectMembersShareLink: 'Share',
+  projectMembersCopyLink: 'Copy link',
+  projectMembersLinkCopied: 'Link copied',
+  projectMembersActiveLinks: 'Active links',
+  projectMembersRevokeLink: 'Revoke',
+  projectMembersRevokeConfirm: 'Revoke this invite? It can no longer be used.',
+  projectMembersInviteByEmail: 'Invite by email',
+  projectMembersEmailPlaceholder: 'email@example.com',
+  projectMembersSendInvite: 'Invite',
+  projectMembersEmailInviteSent: 'Member added to the project',
+  projectMembersEmailUserNotFound: 'No account found with this email',
+  projectMembersEmailAlreadyMember: 'This person is already in the project',
+  projectSettingsMembersRow: 'Members',
+  projectMembersError: 'Failed to load members',
+  projectMembersOfflineHint: 'Team is available online only',
+
+  commentsTitle: 'Comments',
+  commentsEmpty: 'No comments yet',
+  commentsPlaceholder: 'Write a comment… (@ to mention a member)',
+  commentsSend: 'Send',
+  commentsEdited: '(edited)',
+  commentsEditAction: 'Edit',
+  commentsDeleteAction: 'Delete',
+  commentsDeleteConfirm: 'Delete this comment?',
+  commentsSaveEdit: 'Save',
+  commentsCancelEdit: 'Cancel',
+
+  projectActivityTitle: 'Activity',
+  projectActivityEmpty: 'No activity yet',
+  projectActivityError: 'Failed to load activity',
+  projectActivityShowAll: 'All activity',
+  projectActivityLoadMore: 'Show more',
+  projectActivityCreated: '{actor} created "{title}"',
+  projectActivityUpdated: '{actor} updated "{title}"',
+  projectActivityDeleted: '{actor} deleted "{title}"',
+  projectActivityStatusChanged: '{actor} changed status of "{title}": {from} → {to}',
+  projectActivityAssigned: '{actor} assigned "{title}"',
+  projectActivityCommented: '{actor} commented on "{title}"',
+  projectActivityMemberJoined: '{actor} joined the project',
+  projectActivityMemberLeft: '{actor} left the project',
+  projectActivityRoleChanged: '{actor} changed role {target}',
+  projectActivityUnknownActor: 'Someone',
+
+  inviteScreenTitle: 'Invitation',
+  inviteLoading: 'Checking invitation…',
+  inviteCheckingWorkspace: 'Checking workspace…',
+  inviteSwitchWorkspaceTitle: 'Switch workspace?',
+  inviteSwitchWorkspaceMsg: 'This invite is from a different workspace. Switching signs you out of the current account; your data stays on the server.',
+  inviteSwitchWorkspaceConfirm: 'Switch',
+  inviteWorkspaceUnreachable: 'Could not reach this invitation\'s workspace',
+  inviteInvalid: 'This invitation is invalid',
+  inviteExpired: 'This invitation has expired or was revoked',
+  inviteInvitedByLabel: 'Invited by',
+  inviteExpiresLabel: 'Expires',
+  inviteJoinButton: 'Join',
+  inviteJoining: 'Joining…',
+  inviteAlreadyMember: 'You are already a member of this project',
+  inviteJoinedTitle: 'You\'re in!',
+  inviteJoinedOpenProject: 'Open project',
+  inviteLoginButton: 'Log in',
+  inviteRegisterButton: 'Sign up',
+  inviteGuestHint: 'Log in or sign up to join the project',
+  inviteNetworkError: 'No connection — try again later',
+  inviteConfirmWorkspaceTitle: 'Use this invitation\'s workspace?',
+  inviteConfirmWorkspaceMsg: 'This link points to a different workspace ({name}). The app will switch to its address.',
+  inviteConfirmWorkspaceButton: 'Continue',
+  registerInvitedTitle: 'Project invitation',
+  registerInvitedMsg: 'After signing up you will join the project “{project}” ({role})',
+  registerInviteBrokenTitle: 'Invitation problem',
+  registerInviteInvalidMsg: 'This invitation is invalid. Sign up without it?',
+  registerInviteExpiredMsg: 'This invitation has expired or was revoked. Sign up without it?',
+  registerContinueWithoutInvite: 'Sign up without the invitation',
+
+  taskAssignee: 'Assignee',
+  taskAssigneeUnassigned: 'Unassigned',
+  taskAssigneeMe: 'Me',
+
+  viewerReadOnlyNotice: 'View only — Viewer role',
 };
 
 export const allTranslations: Record<Lang, Translations> = { uk, en };

@@ -1,21 +1,20 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Radius, getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
-import { useAppMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
+import { loadWorkspaceConfig } from '@/store/workspace';
 
 export default function WelcomeScreen() {
   const cs = useColorScheme();
   const isDark = cs === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
-  const { setOnline } = useAppMode();
   // Перший екран додатку: на планшеті картка з кнопками не має розповзатися
   // на всю ширину — три кнопки завширшки з вікно виглядають як панель, а не
   // як вибір із трьох варіантів.
@@ -23,10 +22,14 @@ export default function WelcomeScreen() {
 
   const c = getScreenColors('auth', isDark);
 
-  const handleStartOffline = () => {
-    setOnline(false);
-    router.replace('/(tabs)');
-  };
+  // Назва workspace — контекст «куди саме заходжу», а не голий вибір
+  // «Увійти/Зареєструватись»; порожньо, доки конфіг не прочитано з AsyncStorage.
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    void loadWorkspaceConfig().then(config => { if (mounted) setWorkspaceName(config?.name ?? null); });
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <View style={{ flex: 1 }}>
@@ -51,6 +54,8 @@ export default function WelcomeScreen() {
               style={[st.primaryBtn, { backgroundColor: c.accent }]}
               activeOpacity={0.82}
               onPress={() => router.push('/login')}
+              accessibilityRole="button"
+              accessibilityLabel={tr.authLogin}
             >
               <Text style={st.primaryBtnText}>{tr.authLogin}</Text>
             </TouchableOpacity>
@@ -59,18 +64,27 @@ export default function WelcomeScreen() {
               style={[st.secondaryBtn, { borderColor: c.accent }]}
               activeOpacity={0.82}
               onPress={() => router.push('/register')}
+              accessibilityRole="button"
+              accessibilityLabel={tr.authRegister}
             >
               <Text style={[st.secondaryBtnText, { color: c.accent }]}>{tr.authRegister}</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={st.ghostBtn}
-              activeOpacity={0.7}
-              onPress={handleStartOffline}
-            >
-              <Text style={[st.ghostBtnText, { color: c.sub }]}>{tr.startOffline}</Text>
-            </TouchableOpacity>
           </View>
+
+          {workspaceName ? (
+            <TouchableOpacity
+              style={st.workspaceRow}
+              activeOpacity={0.7}
+              onPress={() => router.push({ pathname: '/workspace', params: { change: '1' } })}
+              accessibilityRole="button"
+              accessibilityLabel={`${tr.workspaceCurrentLabel}: ${workspaceName}. ${tr.workspaceChangeLink}`}
+            >
+              <Text style={[st.workspaceText, { color: c.sub }]}>
+                {tr.workspaceCurrentLabel}: {workspaceName}
+              </Text>
+              <Text style={[st.workspaceLink, { color: c.accent }]}>{tr.workspaceChangeLink}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Bottom spacer */}
@@ -141,12 +155,16 @@ const st = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  ghostBtn: {
-    paddingVertical: 10,
+  workspaceRow: {
+    marginTop: 20,
     alignItems: 'center',
+    gap: 4,
   },
-  ghostBtnText: {
-    fontSize: 14,
-    fontWeight: '500',
+  workspaceText: {
+    fontSize: 12,
+  },
+  workspaceLink: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

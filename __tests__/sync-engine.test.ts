@@ -186,9 +186,48 @@ describe('deduplicateOutbox', () => {
     expect(result[0].force).toBe(true);
   });
 
+  test('force НЕ губиться, якщо звичайна правка того самого запису прийшла ПІЗНІШЕ (регресія з ревʼю)', () => {
+    // markDirty(force=true) — конфлікт щойно вирішено на користь локальної
+    // сторони. Форма (mutation_id/queued_at) наступного, звичайного edit-у
+    // мусить перемогти («останній перемагає»), АЛЕ force має пережити цей
+    // edit — інакше сервер знову підняв би той самий, уже вирішений конфлікт.
+    const items = [
+      { ...makeItem('tasks', 'a', false, true), mutation_id: 'm-force', queued_at: 1 },
+      { ...makeItem('tasks', 'a', false, false), mutation_id: 'm-edit', queued_at: 2 },
+    ];
+    const result = deduplicateOutbox(items);
+    expect(result).toHaveLength(1);
+    expect(result[0].force).toBe(true);
+    expect(result[0].mutation_id).toBe('m-edit'); // форма — від останнього
+    expect(result[0].queued_at).toBe(2);
+  });
+
   test('різні колекції — зберігаються обидва', () => {
     const items = [makeItem('tasks', 'a'), makeItem('notes', 'a')];
     expect(deduplicateOutbox(items)).toHaveLength(2);
+  });
+
+  test('WORKSPACE_PROJECTS_CONTRACT §3.5: той самий local_id у ДВОХ потоках — не витісняють одне одного', () => {
+    // Переміщення між потоками — delete у старому + upsert у новому,
+    // одночасно в чергу. Без stream у ключі дедупу лишався б лише один.
+    const items: OutboxItem[] = [
+      { ...makeItem('tasks', 'a', false), stream: 'project:p-2' },
+      { ...makeItem('tasks', 'a', true), stream: 'project:p-1' },
+    ];
+    const result = deduplicateOutbox(items);
+    expect(result).toHaveLength(2);
+    expect(result.find(i => i.stream === 'project:p-2')?.deleted).toBe(false);
+    expect(result.find(i => i.stream === 'project:p-1')?.deleted).toBe(true);
+  });
+
+  test('дублі в межах ОДНОГО потоку й далі дедупляться як раніше', () => {
+    const items: OutboxItem[] = [
+      { ...makeItem('tasks', 'a', false), stream: 'project:p-1', queued_at: 1 },
+      { ...makeItem('tasks', 'a', true), stream: 'project:p-1', queued_at: 2 },
+    ];
+    const result = deduplicateOutbox(items);
+    expect(result).toHaveLength(1);
+    expect(result[0].deleted).toBe(true);
   });
 });
 
@@ -255,6 +294,21 @@ describe('applyPullItems', () => {
     const dirtyIds = new Set(['tasks:a']);
     const result = applyPullItems(local, serverItems, dirtyIds, 'tasks');
     expect(result).toHaveLength(1);
+  });
+
+  test('WORKSPACE_PROJECTS_CONTRACT §3.6: тумбстоун з data._movedTo ІГНОРУЄТЬСЯ, запис не видаляється', () => {
+    const local = [mkLocal('a', 1), mkLocal('b', 2)];
+    const serverItems = [{ local_id: 'a', data: { val: 1, _movedTo: { projectId: 'p-1' } }, deleted: true }];
+    const result = applyPullItems(local, serverItems, new Set(), 'tasks');
+    expect(result).toHaveLength(2);
+    expect(result.find(i => i.id === 'a')).toBeTruthy();
+  });
+
+  test('звичайний тумбстоун (без _movedTo) видаляє, як і раніше', () => {
+    const local = [mkLocal('a', 1)];
+    const serverItems = [{ local_id: 'a', data: { val: 1 }, deleted: true }];
+    const result = applyPullItems(local, serverItems, new Set(), 'tasks');
+    expect(result).toHaveLength(0);
   });
 
   test('порожній serverItems — повертає local без змін', () => {

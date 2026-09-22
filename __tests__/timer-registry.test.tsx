@@ -11,6 +11,14 @@
  * зв'язка «diff проти сховища ↔ стан провайдера». Мок лише на AsyncStorage.
  */
 
+import React, { useMemo } from 'react';
+import { Alert } from 'react-native';
+
+import { saveData } from '@/store/storage';
+import { TimerProvider, useTimerContext, type TimerContextValue } from '@/store/timer-context';
+import type { OutboxItem } from '@/store/synced-storage';
+import type { ActiveTimer } from '@/utils/activeTimers';
+
 const mockStore = new Map<string, string>();
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -18,13 +26,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(async (key: string, value: string) => { mockStore.set(key, value); }),
   removeItem: jest.fn(async (key: string) => { mockStore.delete(key); }),
 }));
-
-import React from 'react';
-
-import { saveData } from '@/store/storage';
-import { TimerProvider, useTimerContext, type TimerContextValue } from '@/store/timer-context';
-import type { OutboxItem } from '@/store/synced-storage';
-import type { ActiveTimer } from '@/utils/activeTimers';
 
 // Уникаємо TS7016 (відсутні @types/react-test-renderer — відома базова помилка)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -40,9 +41,13 @@ function read<T>(key: string, fallback: T): T {
 }
 
 let api!: TimerContextValue;
+let renderedTimer: ActiveTimer | undefined;
 
 function Probe() {
   api = useTimerContext();
+  const { getTimerForTask } = api;
+  // React Compiler can memoize this lookup from its visible dependencies.
+  renderedTimer = useMemo(() => getTimerForTask('t1'), [getTimerForTask]);
   return null;
 }
 
@@ -293,5 +298,46 @@ describe('зупинка з будь-якого місця', () => {
       expect(result.mirrored).toBe(1);
       expect(result.registry).toBe(0);
     }
+  });
+});
+
+
+describe('TIMER-01: reactive task timer and project workflow', () => {
+  test('memoized detail observes start and stop without reopening the task', async () => {
+    seed('tasks', [{ id: 't1', title: 'Task', status: 'active' }]);
+    await mount();
+    expect(renderedTimer).toBeUndefined();
+    await act(async () => { await api.startTaskTimer({ id: 't1', title: 'Task', status: 'active' }); });
+    expect(renderedTimer?.taskId).toBe('t1');
+    await act(async () => { await api.stopTimerForTask('t1'); });
+    expect(renderedTimer).toBeUndefined();
+  });
+
+  beforeEach(() => { jest.spyOn(Alert, 'alert').mockImplementation(() => {}); });
+
+  test.each([true, false])('project start/stop use its own columns (review exists: %s)', async (hasReview) => {
+    seed('tasks', [{ id: 't1', title: 'Task', status: 'active', projectId: 'p1' }]);
+    seed('task_statuses', [
+      { id: 'p-todo', name: 'Todo', position: 0, isDone: false, projectId: 'p1', type: 'todo' },
+      { id: 'p-progress', name: 'Doing', position: 1, isDone: false, projectId: 'p1', type: 'in_progress' },
+      ...(hasReview ? [{ id: 'p-review', name: 'Review', position: 2, isDone: false, projectId: 'p1', sourceStatusId: 'status-review', type: 'todo' }] : []),
+      { id: 'other-review', name: 'Review', position: 2, isDone: false, projectId: 'p2', sourceStatusId: 'status-review' },
+    ]);
+    await mount();
+    await act(async () => { await api.startTaskTimer({ id: 't1', title: 'Task', status: 'active', projectId: 'p1' }); });
+    expect(read<any[]>('tasks', [])[0].kanbanColumnId).toBe('p-progress');
+    await act(async () => { await api.stopTimerForTask('t1'); });
+    const review = read<any[]>('task_statuses', []).find(c => c.projectId === 'p1' && c.sourceStatusId === 'status-review');
+    const task = read<any[]>('tasks', [])[0];
+    if (hasReview) expect(task.kanbanColumnId).toBe(review.id);
+    else {
+      expect(task.kanbanColumnId).toBe('p-progress');
+      expect(review).toBeUndefined();
+      expect(Alert.alert).toHaveBeenCalled();
+    }
+    expect(task.timeEntries).toHaveLength(1);
+    expect(api.activeTimers).toHaveLength(0);
+    await act(async () => { await api.startTaskTimer(task); await api.stopTimerForTask('t1'); });
+    expect(read<any[]>('task_statuses', []).filter(c => c.projectId === 'p1' && c.sourceStatusId === 'status-review')).toHaveLength(hasReview ? 1 : 0);
   });
 });

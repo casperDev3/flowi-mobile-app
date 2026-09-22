@@ -13,6 +13,19 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
+/**
+ * Ціль дотику 44×44 навколо стрілки 36×36 — той самий прийом, що вже стоїть
+ * у HEADER_BUTTON_HIT_SLOP (components/shared/ScreenHeader.tsx) і в чекбоксі
+ * TaskCompactCard: сама кнопка лишається 36pt на око, а натискання ловиться
+ * за нормою HIG.
+ *
+ * Тут slop симетричний, на відміну від хедера. У хедері 4pt по горизонталі —
+ * компроміс із сусідньою кнопкою за 7pt; стрілки місяця стоять по краях
+ * рядка, між ними — заголовок на flex:1, тож перекриватися нема з чим, і
+ * 4pt з усіх боків дають рівно 44×44.
+ */
+export const CALENDAR_NAV_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 } as const;
+
 export function CalendarGrid({ year, month, markedDays, selectedDate, todayDate, weeks, onPrevMonth, onNextMonth, onSelectDay, c, months, weekdays }: {
   year: number; month: number; markedDays: Set<string>; selectedDate: string | null;
   todayDate: Date; weeks: (number | null)[][]; onPrevMonth: () => void; onNextMonth: () => void;
@@ -22,13 +35,13 @@ export function CalendarGrid({ year, month, markedDays, selectedDate, todayDate,
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-        <TouchableOpacity onPress={onPrevMonth} style={st.navBtn}>
+        <TouchableOpacity onPress={onPrevMonth} style={st.navBtn} hitSlop={CALENDAR_NAV_HIT_SLOP}>
           <IconSymbol name="chevron.left" size={20} color={c.sub} />
         </TouchableOpacity>
         <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontWeight: '700' }}>
           {months[month]} {year}
         </Text>
-        <TouchableOpacity onPress={onNextMonth} style={st.navBtn}>
+        <TouchableOpacity onPress={onNextMonth} style={st.navBtn} hitSlop={CALENDAR_NAV_HIT_SLOP}>
           <IconSymbol name="chevron.right" size={20} color={c.sub} />
         </TouchableOpacity>
       </View>

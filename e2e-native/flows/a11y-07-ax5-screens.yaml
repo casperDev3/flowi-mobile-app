@@ -1,0 +1,14 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "88%,94%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/a11y/07-ax5-settings
+- tapOn:
+    point: "50%,94%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/a11y/07-ax5-finance
+- tapOn:
+    point: "12%,94%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/a11y/07-ax5-today

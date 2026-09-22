@@ -1,0 +1,8 @@
+appId: com.casper3.f-tracking-app
+---
+- swipe:
+    start: "50%,57%"
+    end: "50%,95%"
+    duration: 300
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/24-list-clean

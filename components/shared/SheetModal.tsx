@@ -42,6 +42,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Motion } from '@/constants/motion';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useI18n } from '@/store/i18n';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,9 @@ export function SheetModal({
 }: SheetModalProps) {
   const reduced = useReducedMotion() ?? false;
   const { height, isWide } = useResponsive();
+  // I18N-06: ця модалка обгортає КОЖНУ шторку застосунку, тож
+  // захардкоджене «Закрити» озвучувало українською й англійський інтерфейс.
+  const { tr } = useI18n();
 
   /**
    * Дистанція, на яку лист їде за нижній край екрана.
@@ -237,10 +241,19 @@ export function SheetModal({
              * Pressable зупиняє поширення дотиків до backdrop dismiss-Pressable.
              * Дочірні ScrollView/TextInput/кнопки перехоплюють свої дотики
              * у звичному порядку (глибший view — вищий пріоритет у RN).
+             *
+             * accessible={false} ОБОВ'ЯЗКОВЕ. Pressable з onPress на iOS
+             * сам стає елементом доступності й склеює ВСЕ піддерево в один
+             * вузол: VoiceOver читає аркуш однією фразою на 40+ підписів і
+             * не має всередині жодного керованого контролу (NAT-03). Тут
+             * Pressable існує лише заради stopPropagation — озвучувати в
+             * ньому нічого. На onPress і на accessibilityViewIsModal прапорець
+             * не впливає: модальна ізоляція лишається на цій самій обгортці.
              */}
             <Pressable
               style={styles.wrapper}
               onPress={(e) => e.stopPropagation()}
+              accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
             >
@@ -254,7 +267,7 @@ export function SheetModal({
                     <TouchableOpacity
                       onPress={triggerClose}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      accessibilityLabel="Закрити"
+                      accessibilityLabel={tr.close}
                       accessibilityRole="button"
                     >
                       <IconSymbol name="xmark" size={17} color="rgba(128,128,128,0.6)" />
@@ -287,9 +300,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  // flexShrink: 1 — щоб аркуш, вищий за вікно (клавіатура + довга форма),
+  // віддавав висоту внутрішньому ScrollView замість виїзду за край екрана.
+  // Див. sheetSurfaceStyle у hooks/use-content-width.ts.
   wrapper: {
     paddingHorizontal: 12,
     paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    flexShrink: 1,
   },
   handleRow: {
     flexDirection: 'row',

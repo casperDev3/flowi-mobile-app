@@ -1,0 +1,17 @@
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- waitForAnimationToEnd
+- tapOn:
+    point: "30%,94%"
+- waitForAnimationToEnd
+- tapOn:
+    point: "90%,11%"
+- waitForAnimationToEnd
+- tapOn: ".*Проєкти.*"      # меню «…»: після правки бекдропу рядок — окремий вузол
+                            # (регекс, бо NAT-05 домішує в підпис ім’я SF Symbol «move»)
+- waitForAnimationToEnd
+- tapOn:
+    point: "90%,11%"
+- waitForAnimationToEnd
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/verify/afterfix-projform

@@ -21,7 +21,7 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useAppMode } from '@/store/app-mode';
-import { useAuth } from '@/store/auth';
+import { UnsyncedOutboxError, useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { pullAllFromServer, pushAllToServer, useSync } from '@/store/sync-engine';
 import { getAllScheduledNotifications } from '@/store/notifications';
@@ -29,7 +29,7 @@ import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
 import { Lang } from '@/store/translations';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { useResponsive } from '@/hooks/use-responsive';
 
@@ -42,6 +42,9 @@ type RowPress = (route?: Href) => void;
 
 export default function SettingsScreen() {
   const contentWidth = useContentWidth();
+  // NAT-01: стеля аркуша — ЧИСЛО від висоти вікна; відсоток від батька з
+  // height:auto у Yoga не резолвиться і обмеження просто зникає.
+  const sheetSurface = useSheetSurface();
   const topInset = useTopInset();
   const tabBarInset = useTabBarInset();
   const { isWide } = useResponsive();
@@ -51,7 +54,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { lang, setLang, tr } = useI18n();
-  const { online, setOnline } = useAppMode();
+  const { online } = useAppMode();
   const { user, status, logout } = useAuth();
   const { syncNow, state: syncState, lastSyncAt, pendingCount } = useSync();
 
@@ -72,16 +75,43 @@ export default function SettingsScreen() {
     saveData('pref_task_reminders', val);
   }, []);
 
+  // Контракт §9.3: logout() сама пробує досинхронізувати непорожній outbox,
+  // а якщо після спроби (чи взагалі без мережі) щось лишилось непровштовхнуте
+  // — кидає UnsyncedOutboxError замість мовчки стерти. Той самий патерн
+  // «попередити → на «Продовжити» повторити з force», що й у зміні workspace
+  // (app/account.tsx, app/workspace.tsx).
+  const runLogout = useCallback((force: boolean) => {
+    logout(force).catch(e => {
+      if (e instanceof UnsyncedOutboxError) {
+        Alert.alert(tr.workspaceSwitchSyncFailedTitle, tr.workspaceSwitchSyncFailedMsg, [
+          { text: tr.cancel, style: 'cancel' },
+          // Замикання того самого `runLogout`: до моменту натискання кнопки
+          // ця const уже присвоєна (виклик асинхронний, синхронне
+          // оголошення завершилось раніше).
+          { text: tr.workspaceSwitchProceedAnyway, style: 'destructive', onPress: () => runLogout(true) },
+        ]);
+        return;
+      }
+      if (__DEV__) console.warn('[settings] logout failed:', e);
+    });
+  }, [logout, tr]);
+
   const handleLogout = useCallback(() => {
+    // pendingCount — той самий лічильник, що й рядок «Синхронізація» нижче:
+    // попереджаємо про непровштовхнуті зміни ДО підтвердження, а не лише
+    // постфактум у діалозі помилки синку.
+    const message = pendingCount > 0
+      ? `${tr.workspaceSwitchOutboxWarning}\n\n${tr.logoutConfirm}`
+      : tr.logoutConfirm;
     Alert.alert(
       tr.authLogout,
-      tr.logoutConfirm,
+      message,
       [
         { text: tr.cancel, style: 'cancel' },
-        { text: tr.authLogout, style: 'destructive', onPress: () => void logout() },
+        { text: tr.authLogout, style: 'destructive', onPress: () => runLogout(false) },
       ],
     );
-  }, [tr, logout]);
+  }, [tr, runLogout, pendingCount]);
 
   // Гейт для ручних синк-дій: потрібні онлайн-режим і акаунт.
   const guardSync = useCallback((fn: () => void | Promise<void>) => {
@@ -91,32 +121,6 @@ export default function SettingsScreen() {
     }
     void fn();
   }, [online, status, tr]);
-
-  const handleOnlineToggle = useCallback((v: boolean) => {
-    if (v && status !== 'authed') {
-      Alert.alert(
-        tr.onlineNeedsAccount,
-        tr.onlineNeedsAccountMsg,
-        [
-          { text: tr.authLogin, onPress: () => router.push('/login') },
-          { text: tr.authRegister, onPress: () => router.push('/register') },
-          { text: tr.cancel, style: 'cancel' },
-        ],
-      );
-      return;
-    }
-    setOnline(v);
-    if (v && status === 'authed') {
-      Alert.alert(
-        tr.syncNowTitle,
-        tr.syncNowMsg,
-        [
-          { text: tr.yes, onPress: () => void syncNow() },
-          { text: tr.later, style: 'cancel' },
-        ],
-      );
-    }
-  }, [status, tr, router, setOnline, syncNow]);
 
   // ── Стабільні дії рядків ───────────────────────────────────────────────────
   const go = useCallback<RowPress>(route => {
@@ -172,7 +176,9 @@ export default function SettingsScreen() {
   // ── Динамічне значення рядку Синхронізації ──────────────────────────────────
   const syncValue = useMemo(() => {
     if (!online) return tr.offlineBadge;
-    if (status !== 'authed') return tr.syncGuestHint.slice(0, 18) + '…';
+    // I18N-09: slice(0,18) різав посеред слова в обох мовах і не знав ні
+    // про ширину екрана, ні про розмір шрифту. Ріже RN по ширині — нижче.
+    if (status !== 'authed') return tr.syncGuestHint;
     if (syncState === 'error') return tr.syncError;
     if (pendingCount > 0) return `${pendingCount} ${tr.syncPending}`;
     if (lastSyncAt) {
@@ -238,6 +244,19 @@ export default function SettingsScreen() {
                       border={c.border}
                       last={false}
                     />
+                    {user.isAdmin && (
+                      <SettingRow
+                        icon="person.badge.key.fill"
+                        iconColor="#0EA5E9"
+                        label={tr.settingsAdminWorkspace}
+                        route="/admin-workspace"
+                        onPress={go}
+                        text={c.text}
+                        sub={c.sub}
+                        border={c.border}
+                        last={false}
+                      />
+                    )}
                     <TouchableOpacity
                       onPress={handleLogout}
                       style={st.row}>
@@ -276,23 +295,26 @@ export default function SettingsScreen() {
               </BlurView>
             </View>
 
-            {/* Режим роботи */}
+            {/* Режим роботи — §2 плану: «офлайн» тепер лише тимчасова
+                відсутність мережі, не ручний вибір користувача, тож
+                перемикача тут більше немає — лише поточний стан. */}
             <View style={colStyle}>
               <SectionLabel label={tr.workMode} color={c.sub} />
               <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <ToggleRow
+                <StatusRow
                   icon={online ? 'wifi' : 'icloud.slash'}
                   iconColor="#0EA5E9"
                   label={online ? tr.modeOnline : tr.modeOffline}
-                  value={online}
-                  onChange={handleOnlineToggle}
                   text={c.text}
                   border={c.border}
                   last
                 />
               </BlurView>
+              {/* NAT-15: підпис ішов безумовно офлайновий, тобто в режимі
+                  «Онлайн» екран сам собі суперечив — людина читала «дані лише
+                  на пристрої» під рядком «Онлайн». */}
               <Text style={{ color: c.sub, fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 6, marginBottom: 18 }}>
-                {tr.offlineDesc}
+                {online ? tr.onlineDesc : tr.offlineDesc}
               </Text>
             </View>
 
@@ -475,17 +497,6 @@ export default function SettingsScreen() {
                   last={false}
                 />
                 <SettingRow
-                  icon="person.2.fill"
-                  iconColor="#7C3AED"
-                  label={tr.sharedTitle}
-                  route="/(tabs)/shared"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
                   icon="brain"
                   iconColor="#8B5CF6"
                   label={tr.navAgent}
@@ -618,9 +629,13 @@ export default function SettingsScreen() {
       {/* ─── Theme Modal ─── */}
       <Modal visible={showThemeModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeThemeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={closeThemeModal}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <Pressable accessible={false} style={st.overlay} onPress={closeThemeModal}>
+            <Pressable
+              onPress={e => e.stopPropagation()}
+              accessible={false}
+              accessibilityViewIsModal
+              style={st.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
@@ -658,9 +673,13 @@ export default function SettingsScreen() {
       {/* ─── Language Modal ─── */}
       <Modal visible={showLangModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeLangModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={st.overlay} onPress={closeLangModal}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <Pressable accessible={false} style={st.overlay} onPress={closeLangModal}>
+            <Pressable
+              onPress={e => e.stopPropagation()}
+              accessible={false}
+              accessibilityViewIsModal
+              style={st.sheetWrapper}>
+              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
@@ -727,8 +746,12 @@ const SettingRow = React.memo(function SettingRow(
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        {value && <Text style={[st.rowValue, { color: sub }]}>{value}</Text>}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
+        {value && (
+          <Text style={[st.rowValue, { color: sub }]} numberOfLines={1} ellipsizeMode="tail">
+            {value}
+          </Text>
+        )}
         <IconSymbol name="chevron.right" size={16} color={sub} />
       </View>
     </TouchableOpacity>
@@ -755,13 +778,46 @@ const ToggleRow = React.memo(function ToggleRow(
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
+      {/* A11Y-03: підпис і Switch — сусідні вузли, тож без імені друга зупинка
+          VoiceOver звучала як «увімкнено, перемикач» без вказівки, ЩО саме.
+          Ім'я вішаємо на сам Switch, а не на обгортку з accessible: обгортка
+          склеїла б рядок в один елемент і сховала керований контрол (NAT-03). */}
       <Switch
         value={value}
         onValueChange={onChange}
+        accessibilityLabel={label}
+        accessibilityState={{ checked: value }}
         trackColor={{ false: 'rgba(128,128,128,0.3)', true: '#7C3AED' }}
         thumbColor="#fff"
         ios_backgroundColor="rgba(128,128,128,0.3)"
       />
+    </View>
+  );
+});
+
+interface StatusRowProps {
+  icon: IconSymbolName;
+  iconColor: string;
+  label: string;
+  text: string;
+  border: string;
+  last?: boolean;
+}
+
+/**
+ * Рядок стану без перемикача — §2 плану: «онлайн/офлайн» більше не ручний
+ * вибір користувача (той сам вибирав собі персистентний офлайн-режим), а
+ * лише поточний факт мережі, тож тут нема чого перемикати.
+ */
+const StatusRow = React.memo(function StatusRow(
+  { icon, iconColor, label, text, border, last }: StatusRowProps,
+) {
+  return (
+    <View style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+      <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
+        <IconSymbol name={icon} size={17} color={iconColor} />
+      </View>
+      <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
     </View>
   );
 });
@@ -844,8 +900,9 @@ const st = StyleSheet.create({
   footerName:  { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
   footerBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden', maxHeight: '90%' },
+  sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  // Стеля висоти приходить із useSheetSurface() на місці використання.
+  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
   sheetTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 12 },

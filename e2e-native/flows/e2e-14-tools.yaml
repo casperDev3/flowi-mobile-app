@@ -1,0 +1,8 @@
+appId: com.casper3.f-tracking-app
+---
+- scrollUntilVisible:
+    element:
+      text: ".*Архів.*"
+    direction: UP
+    timeout: 12000
+- takeScreenshot: /Users/a1d/Desktop/Pets/Flowi/flowi-mobile-app/.artifacts/rn-native/e2e/14-tools

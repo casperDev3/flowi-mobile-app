@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -26,16 +26,21 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useMotion } from '@/hooks/use-motion';
 import { useScreenView } from '@/hooks/use-screen-view';
+import { useStorageRefresh } from '@/hooks/use-storage-refresh';
+import { useToday } from '@/hooks/use-today';
+import { useAuth } from '@/store/auth';
+import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { loadData } from '@/store/storage';
 import { useTimerContext } from '@/store/timer-context';
 import { meetingProject, meetingsOnDate, orderTodayMeetings, type Meeting } from '@/utils/meetings';
-import { mergeTaskStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
+import { type TaskStatusColumn } from '@/utils/taskStatuses';
 import { groupTodayTasks } from '@/utils/todayGroups';
-import { saveSynced } from '@/store/synced-storage';
+import { updateSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { isSameDay } from '@/utils/dateUtils';
-import { Transaction, calcTotals, filterByMonth } from '@/utils/financeUtils';
-import { resolveTxCurrency, type Account } from '@/utils/accounts';
+import { Transaction } from '@/utils/financeUtils';
+import { financeOverview } from '@/utils/financeOverview';
+import { type Account } from '@/utils/accounts';
 import {
   ACCENT, ACCENT_CAL, ACCENT_SLEEP, ACCENT_STEPS, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
@@ -46,7 +51,9 @@ import { haptic } from '@/utils/haptics';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { formatDuration } from '@/utils/durationFormat';
 import { BUILTIN_CURRENCIES, formatCurrency, type Currency } from '@/utils/financeUtils';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useScreenWidth } from '@/hooks/use-responsive';
+import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
+import { masonryColumnCount } from '@/utils/masonry';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -63,7 +70,6 @@ interface TodayProject {
 const ACCENT_TASK  = '#7C3AED';
 const ACCENT_FIN   = '#0EA5E9';
 const ACCENT_TIME  = '#6366F1';
-const ACCENT_SHARE = '#8B5CF6';
 const QUICK_WATER  = 250;
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -83,31 +89,39 @@ const TODAY_PREVIEW_LIMIT = 3;
  * новий тип компонента при кожному рендері, і React перемонтовує всі
  * вісім секцій — разом з їхніми анімаціями появи.
  *
- * На широкому екрані секції лягають у дві колонки. Дашборд із восьми
- * карток в одну колонку на планшеті — це смуга контенту посеред
- * порожнечі, а прокрутка вдвічі довша за потрібну.
+ * На широкому екрані секції розкладає MasonryColumns (2–3 незалежні
+ * колонки). Дашборд із восьми карток в одну колонку на планшеті — це смуга
+ * контенту посеред порожнечі, а прокрутка вдвічі довша за потрібну.
+ *
+ * `animate` — лише під час першої появи екрана: masonry зрідка переносить
+ * секцію в іншу колонку (це перемонтування), і повторний FadeInDown тоді
+ * виглядав би як мерехтіння.
  */
-function Section({ index, wide, motion, children }: {
+function Section({ index, animate, motion, children }: {
   index: number;
-  wide: boolean;
+  animate: boolean;
   motion: ReturnType<typeof useMotion>;
   children: React.ReactNode;
 }) {
   return (
     <Animated.View
-      style={wide ? { width: '48.5%' } : undefined}
-      entering={motion.entering(FadeInDown.duration(250).delay(index * 50))}>
+      entering={animate ? motion.entering(FadeInDown.duration(250).delay(index * 50)) : undefined}>
       {children}
     </Animated.View>
   );
 }
 
+/** Скільки триває вступна анімація секцій (8 × 50мс затримки + 250мс). */
+const INTRO_ANIMATION_MS = 800;
+
 export default function TodayScreen() {
   const tabBarInset = useTabBarInset();
-  const { isWide } = useResponsive();
+  // Колонки дашборду — від ширини самого екрана (вікно мінус сайдбар).
+  const columnCount = masonryColumnCount(useScreenWidth());
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
+  const { user } = useAuth();
   const motion = useMotion();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const c = getHealthColors(isDark);
@@ -131,46 +145,90 @@ export default function TodayScreen() {
   const [projects, setProjects] = useState<TodayProject[]>([]);
   const [habits,   setHabits]   = useState<Habit[]>([]);
   const [statusColumns, setStatusColumns] = useState<TaskStatusColumn[]>([]);
-  const [notesCount, setNotesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const firstLoadDone = useRef(false);
 
+  /**
+   * Читання по ключу: і повне завантаження, і точкове перечитування, коли в
+   * один ключ записали повз екран (пул синку з вебу, інший екран).
+   */
+  const loaders = useMemo<Record<string, () => Promise<void>>>(() => ({
+    tasks: async () => setTasks(await loadData<Task[]>('tasks', [])),
+    task_statuses: async () => setStatusColumns(await loadData<TaskStatusColumn[]>('task_statuses', [])),
+    transactions: async () => setTxs(await loadData<Transaction[]>('transactions', [])),
+    time_entries: async () => setTime(await loadData<TimeEntry[]>('time_entries', [])),
+    health_entries_v2: async () => setHealth(await loadData<HealthEntry[]>('health_entries_v2', [])),
+    health_profile: async () => setProfile(await loadData<HealthProfile | null>('health_profile', null)),
+    meetings: async () => {
+      const m = await loadData<Meeting[]>('meetings', []);
+      setMeetings(Array.isArray(m) ? m : []);
+    },
+    health_habits: async () => setHabits(await loadData<Habit[]>('health_habits', [])),
+    finance_currencies: async () => {
+      const curs = await loadData<Currency[]>('finance_currencies', []);
+      setCurrencies(Array.isArray(curs) ? curs : []);
+    },
+    finance_primary_currency: async () => {
+      const primary = await loadData<string>('finance_primary_currency', 'UAH');
+      setPrimaryCode(typeof primary === 'string' && primary ? primary : 'UAH');
+    },
+    accounts: async () => {
+      const accs = await loadData<Account[]>('accounts', []);
+      setAccounts(Array.isArray(accs) ? accs : []);
+    },
+    projects: async () => {
+      const prj = await loadData<TodayProject[]>('projects', []);
+      setProjects(Array.isArray(prj) ? prj.filter(x => x && typeof x.id === 'string') : []);
+    },
+  }), []);
+
   const load = useCallback(async () => {
-    const [t, cols, x, tm, h, p, m, hb, notes, curs, primary, accs, prj] = await Promise.all([
-      loadData<Task[]>('tasks', []),
-      loadData<TaskStatusColumn[]>('task_statuses', []),
-      loadData<Transaction[]>('transactions', []),
-      loadData<TimeEntry[]>('time_entries', []),
-      loadData<HealthEntry[]>('health_entries_v2', []),
-      loadData<HealthProfile | null>('health_profile', null),
-      loadData<Meeting[]>('meetings', []),
-      loadData<Habit[]>('health_habits', []),
-      loadData<{ updatedAt?: string; createdAt?: string }[]>('notes', []),
-      loadData<Currency[]>('finance_currencies', []),
-      loadData<string>('finance_primary_currency', 'UAH'),
-      loadData<Account[]>('accounts', []),
-      loadData<TodayProject[]>('projects', []),
-    ]);
-    setTasks(t); setStatusColumns(cols); setTxs(x); setTime(tm); setHealth(h); setProfile(p);
-    setMeetings(Array.isArray(m) ? m : []); setHabits(hb);
-    setProjects(Array.isArray(prj) ? prj.filter(x => x && typeof x.id === 'string') : []);
-    setNotesCount(Array.isArray(notes) ? notes.length : 0);
-    setCurrencies(Array.isArray(curs) ? curs : []);
-    setPrimaryCode(typeof primary === 'string' && primary ? primary : 'UAH');
-    setAccounts(Array.isArray(accs) ? accs : []);
-  }, []);
+    await Promise.all(Object.values(loaders).map(loadKey => loadKey()));
+  }, [loaders]);
+
+  /**
+   * Дані читаються ОДИН раз, далі — лише змінені ключі.
+   *
+   * Раніше кожен фокус перечитував усі тринадцять ключів (і перераховував
+   * увесь дашборд), хоча зазвичай між переходами не змінюється нічого. Тепер
+   * кожен запис у сховище (saveData → notifyStorageChanged) приходить сюди
+   * підпискою:
+   *  - екран у фокусі — перечитуємо саме цей ключ одразу;
+   *  - екран у фоні (вкладка лишається змонтованою) — лише позначаємо ключ
+   *    брудним, а перечитуємо на наступному фокусі. Фоновий дашборд, який
+   *    ніхто не бачить, не рендериться на кожен запис синку.
+   */
+  const focusedRef = useRef(false);
+  const dirtyKeys = useRef(new Set<string>());
+  const refreshKeys = useMemo(() => Object.keys(loaders), [loaders]);
+  const onKeyChanged = useCallback((key: string) => {
+    if (focusedRef.current) return loaders[key]?.();
+    dirtyKeys.current.add(key);
+  }, [loaders]);
+  useStorageRefresh(refreshKeys, onKeyChanged, loaded);
 
   useFocusEffect(useCallback(() => {
-    const doLoad = async () => {
-      await load();
-      if (!firstLoadDone.current) {
-        firstLoadDone.current = true;
-        setLoaded(true);
-      }
-    };
-    doLoad();
-  }, [load]));
+    focusedRef.current = true;
+    if (!firstLoadDone.current) {
+      firstLoadDone.current = true;
+      dirtyKeys.current.clear();
+      void load().then(() => setLoaded(true));
+    } else if (dirtyKeys.current.size > 0) {
+      const keys = [...dirtyKeys.current];
+      dirtyKeys.current.clear();
+      void Promise.all(keys.map(key => loaders[key]?.()));
+    }
+    return () => { focusedRef.current = false; };
+  }, [load, loaders]));
+
+  // Вступна анімація секцій — лише при першій появі; див. Section.
+  const [introDone, setIntroDone] = useState(false);
+  useEffect(() => {
+    if (!loaded) return;
+    const t = setTimeout(() => setIntroDone(true), INTRO_ANIMATION_MS);
+    return () => clearTimeout(t);
+  }, [loaded]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -180,8 +238,22 @@ export default function TodayScreen() {
 
   // ─── Derived data ──────────────────────────────────────────────────────────
 
-  const today = new Date();
-  const hour  = today.getHours();
+  /**
+   * «Сьогодні» для мемоізованих зрізів — СТАБІЛЬНЕ посилання в межах доби
+   * (`hooks/use-today.ts`: нове значення лише коли доба справді змінилась,
+   * на фокусі екрана й на поверненні з фону).
+   *
+   * Було `const today = new Date()` на кожен рендер, і тому кожен мемо, що
+   * від нього залежить, мусив брехати в deps (локальний `dayKey` замість
+   * `today`) під eslint-disable — а від disable React Compiler переставав
+   * оптимізувати ВЕСЬ екран (PERF-2). `useToday()` — той самий хук, яким це
+   * вже вирішено на екрані Завдань і в «Усі (N)», з тією ж семантикою
+   * оновлення, що й колишній `dayKey`.
+   */
+  const today = useToday();
+  // Година — окремо й на кожен рендер: привітання залежить від ЧАСУ доби, а
+  // не від дати, і не має застигати на момент, коли доба почалась.
+  const hour  = new Date().getHours();
   const greet = hour < 6
     ? tr.todayGreetNight
     : hour < 12
@@ -205,12 +277,15 @@ export default function TodayScreen() {
    * перша трійка, а й загальна кількість — щоб знати, чи показувати «показати
    * всі», і що написати на кнопці статистики.
    */
-  const columns = useMemo(() => mergeTaskStatusColumns(statusColumns), [statusColumns]);
-
+  // Сирий (немерджений) `statusColumns`, а не mergeTaskStatusColumns(...) —
+  // особистий merge відфільтровує колонки ЧУЖОГО (тобто будь-якого) проєкту,
+  // а groupTodayTasks сам звужує колонки до ВЛАСНОГО проєкту кожної задачі
+  // (§3.7 «Особисте агрегує»); з попереднім особистим-only списком задача
+  // проєкту в «У процесі» завжди показувалась як звичайне «До роботи».
+  const projectRoles = useProjectRoles();
   const todayGroups = useMemo(
-    () => groupTodayTasks(tasks, columns, today, TODAY_PREVIEW_LIMIT),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, columns],
+    () => groupTodayTasks(tasks, statusColumns, today, TODAY_PREVIEW_LIMIT, user?.id, projectRoles),
+    [tasks, statusColumns, today, user?.id, projectRoles],
   );
 
   // Health
@@ -235,18 +310,18 @@ export default function TodayScreen() {
   );
 
   /**
-   * Зведення дня рахує лише оборот основної валюти. Перекази сюди не
-   * потрапляють: `calcTotals` бере тільки 'income' і 'expense', тож переїзд
-   * грошей між своїми рахунками не роздуває ні дохід, ні витрату місяця.
+   * Цифри плитки — з ТОГО САМОГО джерела, що й екран «Фінанси»
+   * (utils/financeOverview.ts). Раніше тут був оборот місяця, підписаний як
+   * баланс, а на «Фінансах» — баланс рахунків, і різниця між ними виглядала
+   * як помилка. Тепер головна цифра — «На рахунках» (та сама, що на
+   * «Фінансах»), а оборот місяця — окремим рядком «Сальдо місяця».
    */
-  const fin = useMemo(() => {
-    const month = filterByMonth(
-      txs.filter(t => resolveTxCurrency(t, accounts) === primaryCode),
-      today,
-    );
-    return calcTotals(month);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txs, accounts, primaryCode]);
+  const overview = useMemo(
+    () => financeOverview({ txs, accounts, primary: primaryCode, now: today }),
+    [txs, accounts, primaryCode, today],
+  );
+  const hasPrimaryAccounts = accounts.some(a => !a.archived && (a.currency || 'UAH') === primaryCode);
+  const headlineValue = hasPrimaryAccounts ? overview.totalByCurrency[primaryCode] ?? 0 : overview.month.net;
 
   // Time today
   const trackedSec = time
@@ -257,23 +332,27 @@ export default function TodayScreen() {
   // екрані Завдань і веб-дашборд): поточні/майбутні за часом, минулі в кінці.
   const todayMeetings = useMemo(
     () => orderTodayMeetings(meetingsOnDate(meetings, today), today),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [meetings],
+    [meetings, today],
   );
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
   const { stopTimerForTask } = useTimerContext();
+  // Contract §4.1: «Сьогодні» агрегує задачі БУДЬ-ЯКОГО проєкту (§3.7) —
+  // глядач бачить їх тут так само, як на екрані Завдань, і без цієї
+  // перевірки міг відмічати чужі проєктні задачі готовими просто зі списку
+  // дня (review finding, той самий гандикап, що й у `(tabs)/index.tsx`).
 
   const handleToggleTask = useCallback(async (id: string) => {
-    const fresh = await loadData<Task[]>('tasks', []);
+    if (!canEditProjectItem(tasks.find(t => t.id === id)?.projectId, projectRoles)) return;
+    // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+    // ними інакше пішов би на сервер як DELETE.
     let becameDone = false;
-    const updated = fresh.map(t => {
+    const updated = await updateSynced<Task>('tasks', fresh => fresh.map(t => {
       if (t.id !== id) return t;
       becameDone = t.status !== 'done';
       return { ...t, status: t.status === 'done' ? 'active' : 'done' } as Task;
-    });
-    await saveSynced('tasks', updated);
+    }));
     setTasks(updated);
     haptic.light();
     // Як на екрані Завдань (pendingTimerStops) і у вебі: «готово» зупиняє
@@ -284,7 +363,7 @@ export default function TodayScreen() {
       await stopTimerForTask(id);
       setTasks(await loadData<Task[]>('tasks', []));
     }
-  }, [stopTimerForTask]);
+  }, [stopTimerForTask, tasks, projectRoles]);
 
   /** Перегляд зустрічі — на екрані Завдань (там живе MeetingDetail), екземпляр за датою. */
   const openMeeting = useCallback((m: Meeting) => {
@@ -298,25 +377,21 @@ export default function TodayScreen() {
       value: QUICK_WATER,
       date: new Date().toISOString(),
     };
-    const current = await loadData<HealthEntry[]>('health_entries_v2', []);
-    const updated  = [newEntry, ...current];
-    await saveSynced('health_entries_v2', updated);
+    const updated = await updateSynced<HealthEntry>('health_entries_v2', current => [newEntry, ...current]);
     setHealth(updated);
     haptic.success();
   }, []);
 
   const handleToggleHabit = useCallback(async (id: string) => {
-    const fresh = await loadData<Habit[]>('health_habits', []);
     const todayDate = new Date();
-    const updated = fresh.map(h => {
+    const updated = await updateSynced<Habit>('health_habits', fresh => fresh.map(h => {
       if (h.id !== id) return h;
       const doneToday = h.log.some(l => isSameDay(new Date(l), todayDate));
       if (doneToday) {
         return { ...h, log: h.log.filter(l => !isSameDay(new Date(l), todayDate)) };
       }
       return { ...h, log: [...h.log, new Date().toISOString()] };
-    });
-    await saveSynced('health_habits', updated);
+    }));
     setHabits(updated);
     haptic.light();
   }, []);
@@ -338,6 +413,287 @@ export default function TodayScreen() {
     [primaryCurrency, locale],
   );
 
+
+  // ─── Секції дашборду ───────────────────────────────────────────────────────
+
+  // У кількох колонках секції без власної анімації появи: MasonryColumns
+  // переносить секцію в іншу колонку (перемонтування) просто під час
+  // вступної анімації, і на Fabric Reanimated лишав «привида» старої копії
+  // поверх сусідньої картки, а нова застрягала невидимою — звідси
+  // накладання й порожня діра в колонці. Сітку й так проявляє сам
+  // MasonryColumns (opacity після першого виміру).
+  const animateIntro = !introDone && columnCount === 1;
+
+  const sections: MasonryEntry[] = [];
+
+  // 1. Завдання на сьогодні
+  sections.push({
+    key: 'tasks',
+    node: (
+      <Section index={0} animate={animateIntro} motion={motion}>
+        <View style={{ marginBottom: 12 }}>
+          <View style={s.sectionRow}>
+            <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayTasks}</Text>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {overdueCount > 0 && (
+                <View style={[s.badge, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}>
+                  <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
+                    {overdueCount} {tr.todayOverdue}
+                  </Text>
+                </View>
+              )}
+              <View style={[s.badge, { backgroundColor: ACCENT_TASK + '18', borderColor: ACCENT_TASK + '35' }]}>
+                <Text style={{ color: ACCENT_TASK, fontSize: 11, fontWeight: '700' }}>
+                  {activeCount} {tr.todayActive}
+                </Text>
+              </View>
+            </View>
+          </View>
+          {/* Групи за статусом. «У процесі» йде першою і не обрізається:
+              на екрані дня спершу те, що робиться просто зараз. Заголовок
+              групи показуємо лише коли груп справді кілька — над єдиним
+              списком він був би шумом. */}
+          {todayGroups.groups.map(group => (
+            <View key={group.id}>
+              {todayGroups.groups.length > 1 && (
+                <View style={s.groupRow}>
+                  <View style={[s.groupDot, { backgroundColor: group.color }]} />
+                  <Text style={[s.groupName, { color: c.sub }]}>{group.name}</Text>
+                  <Text style={[s.groupCount, { color: c.sub }]}>{group.tasks.length}</Text>
+                </View>
+              )}
+              <TodayTaskRow
+                tasks={group.tasks}
+                isDark={isDark}
+                c={c}
+                tr={tr}
+                onToggle={handleToggleTask}
+                onOpen={openTaskDetails}
+                projects={projects}
+              />
+            </View>
+          ))}
+          {todayGroups.hidden > 0 && (
+            <ShowAllRow
+              label={tr.showAllCount.replace('{count}', String(todayGroups.total))}
+              color={ACCENT_TASK}
+              c={c}
+              onPress={() => router.push('/')}
+            />
+          )}
+          {todayGroups.total === 0 && (
+            <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
+          )}
+        </View>
+      </Section>
+    ),
+  });
+
+  // 2. Зустрічі сьогодні
+  if (todayMeetings.length > 0) {
+    sections.push({
+      key: 'meetings',
+      node: (
+        <Section index={1} animate={animateIntro} motion={motion}>
+          <View style={{ marginBottom: 12 }}>
+            <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayMeetings}</Text>
+            {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(({ meeting: m, phase }) => (
+              <PressableScale
+                key={m.id}
+                onPress={() => openMeeting(m)}
+                accessibilityRole="button"
+                accessibilityLabel={`${m.time} ${m.title}`}
+                style={{ marginBottom: 6, opacity: phase === 'past' ? 0.5 : 1 }}>
+                <BlurView
+                  intensity={isDark ? 18 : 36}
+                  tint={isDark ? 'dark' : 'light'}
+                  style={[s.meetingRow, { borderColor: c.border }]}>
+                  <View style={[s.meetingBar, { backgroundColor: m.color || ACCENT_TASK }]} />
+                  <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
+                  <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
+                  <MeetingProjectChip project={meetingProject(m, projects)} textColor={c.sub} maxWidth={110} />
+                </BlurView>
+              </PressableScale>
+            ))}
+            {todayMeetings.length > TODAY_PREVIEW_LIMIT && (
+              <ShowAllRow
+                label={tr.showAllCount.replace('{count}', String(todayMeetings.length))}
+                color="#6366F1"
+                c={c}
+                onPress={() => router.push('/meetings')}
+              />
+            )}
+          </View>
+        </Section>
+      ),
+    });
+  }
+
+  // 2б. Найближчі оплати / прострочені підписки
+  if (upcomingPayments.items.length > 0) {
+    sections.push({
+      key: 'payments',
+      node: (
+        <Section index={1} animate={animateIntro} motion={motion}>
+          <UpcomingPaymentsCard data={upcomingPayments} isDark={isDark} c={c} tr={tr} lang={lang} />
+        </Section>
+      ),
+    });
+  }
+
+  // 3. Здоровʼя — hero-стрічка кілець
+  sections.push({
+    key: 'health',
+    node: (
+      <Section index={2} animate={animateIntro} motion={motion}>
+        <PressableScale
+          onPress={() => router.push('/health')}
+          accessibilityRole="button"
+          accessibilityLabel={tr.tabHealth}
+          style={{ marginBottom: 12 }}>
+          <BlurView
+            intensity={isDark ? 22 : 42}
+            tint={isDark ? 'dark' : 'light'}
+            style={[s.card, { borderColor: c.border }]}>
+            <View style={s.cardHead}>
+              <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.tabHealth}</Text>
+              <IconSymbol name="chevron.right" size={12} color={c.sub} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
+              <RingCell pct={goals.calories ? Math.max(0, calNet) / goals.calories : 0} color={ACCENT_CAL} label={tr.calories} value={`${calNet}кк`} />
+              <RingCell pct={steps / goals.steps} color={ACCENT_STEPS} label={tr.steps} value={steps >= 1000 ? `${(steps / 1000).toFixed(1)}т` : `${steps}`} />
+              <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={water >= 1000 ? `${(water / 1000).toFixed(1)}л` : `${water}мл`} />
+              <RingCell pct={sleep ? sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep} value={sleep ? fmtSleep(sleep) : '—'} />
+            </View>
+          </BlurView>
+        </PressableScale>
+      </Section>
+    ),
+  });
+
+  // 4. Швидкі дії
+  sections.push({
+    key: 'quick',
+    node: (
+      <Section index={3} animate={animateIntro} motion={motion}>
+        <QuickActions
+          isDark={isDark}
+          c={c}
+          tr={tr}
+          onAddTask={() => router.push({ pathname: '/', params: { create: '1' } })}
+          onAddExpense={() => router.push({ pathname: '/explore', params: { create: '1' } })}
+          onAddWater={handleAddWater}
+          onTimer={() => router.push('/time')}
+        />
+      </Section>
+    ),
+  });
+
+  // 5. Звички
+  if (habits.length > 0) {
+    sections.push({
+      key: 'habits',
+      node: (
+        <Section index={4} animate={animateIntro} motion={motion}>
+          <View style={{ marginBottom: 12 }}>
+            <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayHabits}</Text>
+            {habits.map(h => {
+              const done   = habitDoneToday(h);
+              const streak = habitStreak(h);
+              return (
+                <PressableScale
+                  key={h.id}
+                  onPress={() => handleToggleHabit(h.id)}
+                  style={{ marginBottom: 6 }}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: done }}
+                  accessibilityLabel={h.title}>
+                  <BlurView
+                    intensity={isDark ? 18 : 36}
+                    tint={isDark ? 'dark' : 'light'}
+                    style={[s.habitRow, { borderColor: c.border }]}>
+                    <View style={[s.habitBar, { backgroundColor: h.color || ACCENT }]} />
+                    <AnimatedCheck
+                      checked={done}
+                      size={20}
+                      color={h.color || ACCENT}
+                      borderColor={c.sub}
+                    />
+                    <Text style={[s.habitTitle, { color: c.text }]} numberOfLines={1}>{h.title}</Text>
+                    {streak > 0 && (
+                      <Text style={[s.streakBadge, { color: h.color || ACCENT }]}>
+                        🔥{streak}
+                      </Text>
+                    )}
+                  </BlurView>
+                </PressableScale>
+              );
+            })}
+          </View>
+        </Section>
+      ),
+    });
+  }
+
+  // 6. Фінанси + Час — сітка 2 колонки
+  sections.push({
+    key: 'stats',
+    node: (
+      <Section index={5} animate={animateIntro} motion={motion}>
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+          <StatTile
+            c={c} isDark={isDark}
+            icon="banknote" color={ACCENT_FIN}
+            title={tr.tabFinance}
+            onPress={() => router.push('/explore')}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, fontWeight: '600', flexShrink: 1 }}>
+                {hasPrimaryAccounts ? tr.totalOnAccounts : tr.monthNet}
+              </Text>
+              {overview.unassigned.count > 0 && (
+                <View
+                  accessible
+                  accessibilityLabel={tr.unassignedTxWarning.replace('{n}', String(overview.unassigned.count))}>
+                  <IconSymbol name="exclamationmark.triangle.fill" size={11} color="#F59E0B" />
+                </View>
+              )}
+            </View>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={{ color: headlineValue >= 0 ? '#10B981' : '#EF4444', fontSize: 20, fontWeight: '800', marginTop: 2 }}>
+              {fmtMoney(headlineValue)}
+            </Text>
+            {hasPrimaryAccounts && (
+              <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+                {tr.monthNet}: {overview.month.net > 0 ? '+' : ''}{fmtMoney(overview.month.net)}
+              </Text>
+            )}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 2 }}>
+              <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>↑ {fmtMoney(overview.month.income)}</Text>
+              <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>↓ {fmtMoney(overview.month.expense)}</Text>
+            </View>
+          </StatTile>
+          <StatTile
+            c={c} isDark={isDark}
+            icon="timer" color={ACCENT_TIME}
+            title={tr.quickTimer}
+            onPress={() => router.push('/time')}>
+            <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginTop: 6 }}>
+              {fmtTime(trackedSec)}
+            </Text>
+            <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.todayTracked}</Text>
+          </StatTile>
+        </View>
+      </Section>
+    ),
+  });
+
+  // На телефоні (одна колонка) завдання й оплати стоять під «Фінанси + Час»:
+  // верх екрана лишається за оглядом дня — здоров'я, швидкі дії, зведення.
+  // («Спільне» плитка тут стояла раніше — прибрана: WORKSPACE_PROJECTS_PLAN.md
+  // §4, «Спільне» зливається в проєкти, жорсткий перехід.)
+  const orderedSections = columnCount === 1 ? moveAfter(sections, ['tasks', 'payments'], 'stats') : sections;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -369,283 +725,22 @@ export default function TodayScreen() {
           )}
 
           {loaded && (
-          <View style={isWide ? s.grid : undefined}>
-
-          {/* 1. Завдання на сьогодні */}
-          <Section index={0} wide={isWide} motion={motion}>
-            <View style={{ marginBottom: 12 }}>
-              <View style={s.sectionRow}>
-                <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayTasks}</Text>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {overdueCount > 0 && (
-                    <View style={[s.badge, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}>
-                      <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
-                        {overdueCount} {tr.todayOverdue}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={[s.badge, { backgroundColor: ACCENT_TASK + '18', borderColor: ACCENT_TASK + '35' }]}>
-                    <Text style={{ color: ACCENT_TASK, fontSize: 11, fontWeight: '700' }}>
-                      {activeCount} {tr.todayActive}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              {/* Групи за статусом. «У процесі» йде першою і не обрізається:
-                  на екрані дня спершу те, що робиться просто зараз. Заголовок
-                  групи показуємо лише коли груп справді кілька — над єдиним
-                  списком він був би шумом. */}
-              {todayGroups.groups.map(group => (
-                <View key={group.id}>
-                  {todayGroups.groups.length > 1 && (
-                    <View style={s.groupRow}>
-                      <View style={[s.groupDot, { backgroundColor: group.color }]} />
-                      <Text style={[s.groupName, { color: c.sub }]}>{group.name}</Text>
-                      <Text style={[s.groupCount, { color: c.sub }]}>{group.tasks.length}</Text>
-                    </View>
-                  )}
-                  <TodayTaskRow
-                    tasks={group.tasks}
-                    isDark={isDark}
-                    c={c}
-                    tr={tr}
-                    onToggle={handleToggleTask}
-                    onOpen={openTaskDetails}
-                  />
-                </View>
-              ))}
-              {todayGroups.hidden > 0 && (
-                <ShowAllRow
-                  label={tr.showAllCount.replace('{count}', String(todayGroups.total))}
-                  color={ACCENT_TASK}
-                  c={c}
-                  onPress={() => router.push('/')}
-                />
-              )}
-              {todayGroups.total === 0 && (
-                <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
-              )}
-            </View>
-          </Section>
-
-          {/* 2. Зустрічі сьогодні */}
-          {todayMeetings.length > 0 && (
-            <Section index={1} wide={isWide} motion={motion}>
-              <View style={{ marginBottom: 12 }}>
-                <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayMeetings}</Text>
-                {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(({ meeting: m, phase }) => (
-                  <PressableScale
-                    key={m.id}
-                    onPress={() => openMeeting(m)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${m.time} ${m.title}`}
-                    style={{ marginBottom: 6, opacity: phase === 'past' ? 0.5 : 1 }}>
-                    <BlurView
-                      intensity={isDark ? 18 : 36}
-                      tint={isDark ? 'dark' : 'light'}
-                      style={[s.meetingRow, { borderColor: c.border }]}>
-                      <View style={[s.meetingBar, { backgroundColor: m.color || ACCENT_TASK }]} />
-                      <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
-                      <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
-                      <MeetingProjectChip project={meetingProject(m, projects)} textColor={c.sub} maxWidth={110} />
-                    </BlurView>
-                  </PressableScale>
-                ))}
-                {todayMeetings.length > TODAY_PREVIEW_LIMIT && (
-                  <ShowAllRow
-                    label={tr.showAllCount.replace('{count}', String(todayMeetings.length))}
-                    color="#6366F1"
-                    c={c}
-                    onPress={() => router.push('/meetings')}
-                  />
-                )}
-              </View>
-            </Section>
-          )}
-
-          {/* 2б. Найближчі оплати / прострочені підписки */}
-          {upcomingPayments.items.length > 0 && (
-            <Section index={1} wide={isWide} motion={motion}>
-              <UpcomingPaymentsCard data={upcomingPayments} isDark={isDark} c={c} tr={tr} lang={lang} />
-            </Section>
-          )}
-
-          {/* 3. Здоровʼя — hero-стрічка кілець */}
-          <Section index={2} wide={isWide} motion={motion}>
-            <PressableScale
-              onPress={() => router.push('/health')}
-              accessibilityRole="button"
-              accessibilityLabel={tr.tabHealth}
-              style={{ marginBottom: 12 }}>
-              <BlurView
-                intensity={isDark ? 22 : 42}
-                tint={isDark ? 'dark' : 'light'}
-                style={[s.card, { borderColor: c.border }]}>
-                <View style={s.cardHead}>
-                  <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.tabHealth}</Text>
-                  <IconSymbol name="chevron.right" size={12} color={c.sub} />
-                </View>
-                <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
-                  <RingCell pct={goals.calories ? Math.max(0, calNet) / goals.calories : 0} color={ACCENT_CAL} label={tr.calories} value={`${calNet}кк`} />
-                  <RingCell pct={steps / goals.steps} color={ACCENT_STEPS} label={tr.steps} value={steps >= 1000 ? `${(steps / 1000).toFixed(1)}т` : `${steps}`} />
-                  <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={water >= 1000 ? `${(water / 1000).toFixed(1)}л` : `${water}мл`} />
-                  <RingCell pct={sleep ? sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep} value={sleep ? fmtSleep(sleep) : '—'} />
-                </View>
-              </BlurView>
-            </PressableScale>
-          </Section>
-
-          {/* 4. Швидкі дії */}
-          <Section index={3} wide={isWide} motion={motion}>
-            <QuickActions
-              isDark={isDark}
-              c={c}
-              tr={tr}
-              onAddTask={() => router.push({ pathname: '/', params: { create: '1' } })}
-              onAddExpense={() => router.push({ pathname: '/explore', params: { create: '1' } })}
-              onAddWater={handleAddWater}
-              onTimer={() => router.push('/time')}
-            />
-          </Section>
-
-          {/* 5. Звички */}
-          {habits.length > 0 && (
-            <Section index={4} wide={isWide} motion={motion}>
-              <View style={{ marginBottom: 12 }}>
-                <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayHabits}</Text>
-                {habits.map(h => {
-                  const done   = habitDoneToday(h);
-                  const streak = habitStreak(h);
-                  return (
-                    <PressableScale
-                      key={h.id}
-                      onPress={() => handleToggleHabit(h.id)}
-                      style={{ marginBottom: 6 }}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: done }}
-                      accessibilityLabel={h.title}>
-                      <BlurView
-                        intensity={isDark ? 18 : 36}
-                        tint={isDark ? 'dark' : 'light'}
-                        style={[s.habitRow, { borderColor: c.border }]}>
-                        <View style={[s.habitBar, { backgroundColor: h.color || ACCENT }]} />
-                        <AnimatedCheck
-                          checked={done}
-                          size={20}
-                          color={h.color || ACCENT}
-                          borderColor={c.sub}
-                        />
-                        <Text style={[s.habitTitle, { color: c.text }]} numberOfLines={1}>{h.title}</Text>
-                        {streak > 0 && (
-                          <Text style={[s.streakBadge, { color: h.color || ACCENT }]}>
-                            🔥{streak}
-                          </Text>
-                        )}
-                      </BlurView>
-                    </PressableScale>
-                  );
-                })}
-              </View>
-            </Section>
-          )}
-
-          {/* 6. Фінанси + Час — сітка 2 колонки */}
-          <Section index={5} wide={isWide} motion={motion}>
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-              <StatTile
-                c={c} isDark={isDark}
-                icon="banknote" color={ACCENT_FIN}
-                title={tr.tabFinance}
-                onPress={() => router.push('/explore')}>
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  style={{ color: fin.balance >= 0 ? '#10B981' : '#EF4444', fontSize: 20, fontWeight: '800', marginTop: 6 }}>
-                  {fmtMoney(fin.balance)}
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 2 }}>
-                  <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>↑ {fmtMoney(fin.income)}</Text>
-                  <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>↓ {fmtMoney(fin.expense)}</Text>
-                </View>
-              </StatTile>
-              <StatTile
-                c={c} isDark={isDark}
-                icon="timer" color={ACCENT_TIME}
-                title={tr.quickTimer}
-                onPress={() => router.push('/time')}>
-                <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginTop: 6 }}>
-                  {fmtTime(trackedSec)}
-                </Text>
-                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.todayTracked}</Text>
-              </StatTile>
-            </View>
-          </Section>
-
-          {/* 7. Спільне */}
-          <Section index={6} wide={isWide} motion={motion}>
-            <PressableScale
-              onPress={() => router.push('/(tabs)/shared')}
-              accessibilityRole="button"
-              accessibilityLabel={tr.sharedTitle}
-              style={{ marginBottom: 12 }}>
-              <BlurView
-                intensity={isDark ? 22 : 42}
-                tint={isDark ? 'dark' : 'light'}
-                style={[s.card, { borderColor: c.border }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={[s.cardIcon, { backgroundColor: ACCENT_SHARE + '22' }]}>
-                    <IconSymbol name="person.2.fill" size={16} color={ACCENT_SHARE} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={{ color: c.text, fontSize: 14, fontWeight: '800' }}>{tr.sharedTitle}</Text>
-                    <Text style={{ color: c.sub, fontSize: 12, marginTop: 1 }}>{tr.sharedSubtitle}</Text>
-                  </View>
-                  <IconSymbol name="chevron.right" size={13} color={c.sub} />
-                </View>
-              </BlurView>
-            </PressableScale>
-          </Section>
-
-          {/* 8. Швидкі переходи з лічильниками за сьогодні */}
-          <Section index={7} wide={isWide} motion={motion}>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              <NavStat
-                icon="calendar"
-                count={todayMeetings.length}
-                label={tr.meetings}
-                color="#6366F1"
-                c={c}
-                isDark={isDark}
-                onPress={() => router.push('/meetings')}
-              />
-              <NavStat
-                icon="checklist"
-                count={todayGroups.total}
-                label={tr.tabTasks}
-                color={ACCENT_TASK}
-                c={c}
-                isDark={isDark}
-                onPress={() => router.push('/')}
-              />
-              <NavStat
-                icon="note.text"
-                count={notesCount}
-                label={tr.notes}
-                color="#F59E0B"
-                c={c}
-                isDark={isDark}
-                onPress={() => router.push('/notes')}
-              />
-            </View>
-          </Section>
-
-          </View>
+            <MasonryColumns items={orderedSections} columnCount={columnCount} />
           )}
 
         </ScrollView>
       </View>
     </View>
   );
+}
+
+/** Переставляє секції `keys` (у їхньому порядку) одразу за секцію `anchor`. */
+function moveAfter(items: MasonryEntry[], keys: string[], anchor: string): MasonryEntry[] {
+  const moved = items.filter(item => keys.includes(item.key));
+  const rest = items.filter(item => !keys.includes(item.key));
+  const at = rest.findIndex(item => item.key === anchor);
+  if (at < 0) return items;
+  return [...rest.slice(0, at + 1), ...moved, ...rest.slice(at + 1)];
 }
 
 // ─── StatTile — компактна плитка сітки ────────────────────────────────────────
@@ -686,9 +781,6 @@ function StatTile({ c, isDark, icon, color, title, onPress, children }: {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  // Дві колонки з рівним проміжком. alignItems: 'flex-start' — щоб картка
-  // не розтягувалася до висоти сусідки й не лишала порожнечі всередині.
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', columnGap: 12 },
   // lineHeight явний: ScreenHeader задає 38 під свої 32pt, і без переозначення
   // 26-й кегль тягнув би за собою чужий міжрядковий інтервал.
   title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.6, lineHeight: 32, marginTop: 2 },
@@ -715,16 +807,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 6,
-  },
-  navStat: {
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    overflow: 'hidden',
-    minHeight: 88,
-    justifyContent: 'center',
   },
   sectionTitle: {
     fontSize: 11,
@@ -826,42 +908,5 @@ function ShowAllRow({ label, color, c, onPress }: {
       <Text style={{ color, fontSize: 13, fontWeight: '700' }}>{label}</Text>
       <IconSymbol name="chevron.right" size={12} color={color} />
     </TouchableOpacity>
-  );
-}
-
-/**
- * Плитка-перехід із лічильником за сьогодні.
- *
- * Цифра і підпис разом: «3» саме по собі не каже, чого саме три, а сама лише
- * назва не дає причини натиснути.
- */
-function NavStat({ icon, count, label, color, c, isDark, onPress }: {
-  icon: string;
-  count: number;
-  label: string;
-  color: string;
-  c: any;
-  isDark: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <PressableScale
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${label}: ${count}`}
-      style={{ flex: 1 }}>
-      <BlurView
-        intensity={isDark ? 22 : 42}
-        tint={isDark ? 'dark' : 'light'}
-        style={[s.navStat, { borderColor: c.border }]}>
-        <IconSymbol name={icon as any} size={16} color={color} />
-        <Text style={{ color: c.text, fontSize: 19, fontWeight: '800', marginTop: 6, fontVariant: ['tabular-nums'] }}>
-          {count}
-        </Text>
-        <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 1 }}>
-          {label}
-        </Text>
-      </BlurView>
-    </PressableScale>
   );
 }

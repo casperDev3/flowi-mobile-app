@@ -18,12 +18,13 @@ import {
   ACCENT, ACCENT_MOOD, ACCENT_PULSE, ACCENT_STEPS, ACCENT_WEIGHT, ModalKey, getHealthColors,
 } from '@/utils/healthTheme';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { LoadErrorNotice } from '@/components/health/HealthNotices';
 
 export default function VitalsScreen() {
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const c = getHealthColors(isDark);
   useScreenView('health_vitals');
 
@@ -60,6 +61,9 @@ export default function VitalsScreen() {
 
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]} showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+          {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+          {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
 
           {/* Вага */}
           <SectionHeader title={tr.weight} icon="scalemass.fill" color={ACCENT_WEIGHT} textColor={c.text} top={8} />

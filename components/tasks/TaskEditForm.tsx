@@ -17,6 +17,7 @@ import { PriorityPicker } from '@/components/tasks/PriorityPicker';
 import { PickerField, type PickerCreateOption } from '@/components/shared/PickerField';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { draftCurrentSprintId, type useTaskEditor } from '@/hooks/use-task-editor';
+import type { MemberOut } from '@/store/project-team';
 import type { Translations } from '@/store/translations';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import {
@@ -55,6 +56,14 @@ export interface TaskEditFormProps {
    * є з чого вибирати (sprintFieldVisible). Без пропа поля немає.
    */
   sprints?: readonly Sprint[];
+  /**
+   * Учасники ПОТОЧНОГО обраного в чернетці проєкту (контракт §4.5) — пікер
+   * «Виконавець» зʼявляється лише коли їх більше нуля: соло-проєкт чи особисте
+   * завдання не мають кого призначати, і порожній пікер лише плутав би.
+   */
+  members?: readonly MemberOut[];
+  /** Мій `user.id` — рядок «Я» замінює власне імʼя у пікері виконавця. */
+  myUserId?: string | null;
   /** Сітка місяця для вибору дедлайну. */
   deadlineWeeks: (number | null)[][];
   months: string[];
@@ -72,8 +81,11 @@ export interface TaskEditFormProps {
 
 const NO_SPRINTS: readonly Sprint[] = [];
 
+const NO_MEMBERS: readonly MemberOut[] = [];
+
 export function TaskEditForm({
-  title, submitLabel, editor, taskStatuses, pickableProjects, projects, projectCreateOption, sprints = NO_SPRINTS, deadlineWeeks,
+  title, submitLabel, editor, taskStatuses, pickableProjects, projects, projectCreateOption, sprints = NO_SPRINTS,
+  members = NO_MEMBERS, myUserId, deadlineWeeks,
   months: MONTHS_UA, weekdays: WEEKDAYS_SHORT,
   deadlinePresets: DEADLINE_PRESETS,
   today, onSave, onCancel, colors: c, isDark, tr, locale,
@@ -116,7 +128,11 @@ export function TaskEditForm({
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={{ flexDirection: 'row', gap: 7 }}>
             {taskStatuses.map(column => (
-              <TouchableOpacity key={column.id} onPress={() => editor.patch({ statusId: column.id })} style={[st.sortChip, { backgroundColor: editor.draft.statusId === column.id ? column.color : c.dim, borderColor: editor.draft.statusId === column.id ? column.color : c.border }]}>
+              <TouchableOpacity key={column.id} onPress={() => editor.patch({ statusId: column.id })}
+                accessibilityRole="radio"
+                accessibilityLabel={column.name}
+                accessibilityState={{ selected: editor.draft.statusId === column.id, checked: editor.draft.statusId === column.id }}
+                style={[st.sortChip, { backgroundColor: editor.draft.statusId === column.id ? column.color : c.dim, borderColor: editor.draft.statusId === column.id ? column.color : c.border }]}>
                 <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: editor.draft.statusId === column.id ? '#fff' : column.color, marginRight: 5 }} />
                 <Text style={{ color: editor.draft.statusId === column.id ? '#fff' : c.text, fontSize: 12, fontWeight: '600' }}>{column.name}</Text>
               </TouchableOpacity>
@@ -178,6 +194,31 @@ export function TaskEditForm({
               </View>
             </ScrollView>
           </>
+        ) : null}
+
+        {/* Виконавець (контракт §4.5) — лише коли обраний проєкт справді
+            командний (є кеш учасників, §9.1). Соло-проєкт і особисте завдання
+            цього поля просто не показують — призначати нема кому. */}
+        {members.length > 0 ? (
+          <PickerField
+            label={tr.taskAssignee}
+            icon="person.fill"
+            options={members.map(m => ({
+              id: String(m.user.id),
+              label: String(m.user.id) === myUserId ? tr.taskAssigneeMe : (m.user.name || m.user.email),
+            }))}
+            value={editor.draft.assigneeId ?? null}
+            onSelect={id => editor.patch({ assigneeId: id })}
+            emptyOption={{ label: tr.taskAssigneeUnassigned }}
+            selectedLabel={(() => {
+              const m = members.find(x => String(x.user.id) === editor.draft.assigneeId);
+              if (!m) return null;
+              return String(m.user.id) === myUserId ? tr.taskAssigneeMe : (m.user.name || m.user.email);
+            })()}
+            colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
+            isDark={isDark}
+            tr={tr}
+          />
         ) : null}
 
         <Text style={[st.label, { color: c.sub }]}>{tr.timeEstimate}</Text>
@@ -289,12 +330,19 @@ export function TaskEditForm({
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>Кожні</Text>
+              {/* 28×28 намальовано, 44×44 натискається. hitSlop по 8
+                  ліворуч/праворуч, а не по 8 всюди: сусідні «−» і «+»
+                  розділяє gap 8, і ширші зони почали б перекриватись. */}
               <TouchableOpacity onPress={() => editor.patch({ repeatInterval: Math.max(1, editor.draft.repeatInterval - 1) })}
+                accessibilityRole="button"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
                 style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>−</Text>
               </TouchableOpacity>
               <Text style={{ color: c.accent, fontSize: 16, fontWeight: '800', minWidth: 24, textAlign: 'center' }}>{editor.draft.repeatInterval}</Text>
               <TouchableOpacity onPress={() => editor.patch({ repeatInterval: Math.min(99, editor.draft.repeatInterval + 1) })}
+                accessibilityRole="button"
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
                 style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>+</Text>
               </TouchableOpacity>

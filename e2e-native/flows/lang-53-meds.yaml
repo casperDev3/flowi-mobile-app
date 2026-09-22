@@ -1,0 +1,4 @@
+appId: com.casper3.f-tracking-app
+---
+- tapOn:
+    point: "89%,36%"

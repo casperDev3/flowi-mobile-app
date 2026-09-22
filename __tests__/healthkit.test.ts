@@ -7,6 +7,9 @@ const mockHealthKit = {
     async () => ({ sumQuantity: { quantity: 0 } }),
   ),
   queryQuantitySamples: jest.fn<Promise<any[]>, any[]>(async () => []),
+  // ERR-14: метод мусить бути в моку — інакше його відсутність рахується
+  // як провал запиту (саме так і має бути в продукті).
+  getMostRecentQuantitySample: jest.fn<Promise<any>, any[]>(async () => null),
   queryCategorySamples: jest.fn<Promise<any[]>, any[]>(async () => []),
   queryWorkoutSamples: jest.fn<Promise<any[]>, any[]>(async () => []),
 };
@@ -20,7 +23,7 @@ jest.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
 
-import { fetchTodayData, fetchWorkouts, initHealthKit } from '@/store/healthkit';
+import { fetchTodayData, fetchTodayDataResult, fetchWorkouts, initHealthKit } from '@/store/healthkit';
 
 const STEPS = 'HKQuantityTypeIdentifierStepCount';
 const ACTIVE_ENERGY = 'HKQuantityTypeIdentifierActiveEnergyBurned';
@@ -41,6 +44,7 @@ beforeEach(() => {
   mockHealthKit.requestAuthorization.mockResolvedValue(true);
   mockHealthKit.queryStatisticsForQuantity.mockResolvedValue({ sumQuantity: { quantity: 0 } });
   mockHealthKit.queryQuantitySamples.mockResolvedValue([]);
+  mockHealthKit.getMostRecentQuantitySample.mockResolvedValue(null);
   mockHealthKit.queryCategorySamples.mockResolvedValue([]);
   mockHealthKit.queryWorkoutSamples.mockResolvedValue([]);
 });
@@ -140,5 +144,51 @@ describe('відʼємні величини від Apple', () => {
 
     expect(data.steps).toBe(0);
     expect(data.activeCalories).toBe(0);
+  });
+});
+
+/**
+ * ERR-14. До правки `querySum`/`querySamples` ковтали будь-яку помилку і
+ * віддавали 0/[], тож «запит упав» і «сьогодні нуль кроків» приходили на
+ * екран однаковими — а зверху ще й стояло «Оновлено HH:MM».
+ */
+describe('HealthKit — збій читання відрізняється від справжнього нуля', () => {
+  test('усі запити впали → outcome.ok === false', async () => {
+    mockHealthKit.queryStatisticsForQuantity.mockRejectedValue(new Error('HKError 5: authorization denied'));
+    mockHealthKit.queryQuantitySamples.mockRejectedValue(new Error('HKError 5'));
+    mockHealthKit.queryCategorySamples.mockRejectedValue(new Error('HKError 5'));
+    mockHealthKit.getMostRecentQuantitySample.mockRejectedValue(new Error('HKError 5'));
+
+    const { data, outcome } = await fetchTodayDataResult();
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.failures).toBeGreaterThan(0);
+    expect(outcome.failures).toBe(outcome.queries);
+    // Нулі нікуди не поділись — але тепер їх нема кому видати за факт.
+    expect(data.steps).toBe(0);
+  });
+
+  test('справжній нуль: запити вдались → outcome.ok === true', async () => {
+    const { data, outcome } = await fetchTodayDataResult();
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.failures).toBe(0);
+    expect(data.steps).toBe(0);
+  });
+
+  test('частковий збій не оголошується повною відмовою', async () => {
+    // Падає лише вибірка пульсу; суми читаються.
+    mockHealthKit.queryQuantitySamples.mockRejectedValue(new Error('HKError 5'));
+
+    const { outcome } = await fetchTodayDataResult();
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.failures).toBeGreaterThan(0);
+  });
+
+  test('сумісна обгортка fetchTodayData поводиться як раніше', async () => {
+    const data = await fetchTodayData();
+    expect(data.steps).toBe(0);
+    expect(data.heartRateAvg).toBeNull();
   });
 });

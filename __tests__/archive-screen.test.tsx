@@ -144,3 +144,34 @@ test('restore і deleteForever працюють по свіжому стану',
   expect(stored().map(t => t.id)).toContain('late');
   expect(outboxDeletes()).toHaveLength(1);
 });
+
+test('відновлене завдання виходить із колонки «Готово» (NAT-10)', async () => {
+  // Раніше restore міняв лише status, а kanbanColumnId лишався 'status-done':
+  // картка показувала зелений бейдж «Готово» в секції «До роботи», а шапка
+  // рахувала «1 активних» і «100 % ефективність» одночасно.
+  mockStore.set('tasks', JSON.stringify([task('x', { kanbanColumnId: 'status-done' })]));
+  const tree = await mount();
+
+  const restoreBtn = tree.root.find((n: any) => n.props.accessibilityLabel === tr.restore && typeof n.props.onPress === 'function');
+  await act(async () => { restoreBtn.props.onPress(); });
+  await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+
+  const [restored] = JSON.parse(mockStore.get('tasks') ?? '[]') as any[];
+  expect(restored.status).toBe('active');
+  expect(restored.kanbanColumnId).toBe('status-active');
+});
+
+test('відновлення не чіпає НЕ-готову колонку, в якій завдання відмітили', async () => {
+  // Завдання позначили виконаним чекбоксом, не рухаючи по дошці: повертаємо
+  // людину рівно туди, звідки вона пішла.
+  mockStore.set('tasks', JSON.stringify([task('x', { kanbanColumnId: 'status-in-progress' })]));
+  const tree = await mount();
+
+  const restoreBtn = tree.root.find((n: any) => n.props.accessibilityLabel === tr.restore && typeof n.props.onPress === 'function');
+  await act(async () => { restoreBtn.props.onPress(); });
+  await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+
+  const [restored] = JSON.parse(mockStore.get('tasks') ?? '[]') as any[];
+  expect(restored.status).toBe('active');
+  expect(restored.kanbanColumnId).toBe('status-in-progress');
+});

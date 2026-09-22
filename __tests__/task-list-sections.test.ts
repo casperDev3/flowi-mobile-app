@@ -201,3 +201,35 @@ describe('scope «all»', () => {
     expect(keys(sections)).toEqual([IN_PROGRESS_COLUMN_ID, ACTIVE_COLUMN_ID, DONE_COLUMN_ID]);
   });
 });
+
+describe('особистий список зводить колонки проєктів до особистих', () => {
+  // Кожен проєкт має власні колонки з власними id. Групування за id давало на
+  // екрані «Завдання» окрему «До роботи» на кожен проєкт — дублікати груп.
+  const project = (projectId: string) => [
+    { id: `st-${projectId}-todo`, name: 'До роботи', color: '#6366F1', position: 0, isDone: false, projectId, type: 'todo' as const, sourceStatusId: ACTIVE_COLUMN_ID },
+    { id: `st-${projectId}-done`, name: 'Готово', color: '#10B981', position: 1, isDone: true, projectId, type: 'done' as const },
+    { id: `st-${projectId}-qa`, name: 'Тестування', color: '#0EA5E9', position: 2, isDone: false, projectId, type: 'in_progress' as const },
+  ];
+  const all = [...mergeTaskStatusColumns([]), ...project('p1'), ...project('p2')];
+  const tasks = [
+    task({ id: 'personal', deadline: TODAY_ISO }),
+    task({ id: 'p1-todo', projectId: 'p1', kanbanColumnId: 'st-p1-todo', deadline: TODAY_ISO }),
+    task({ id: 'p2-todo', projectId: 'p2', kanbanColumnId: 'st-p2-todo', deadline: TODAY_ISO }),
+    task({ id: 'p1-done', projectId: 'p1', kanbanColumnId: 'st-p1-done', status: 'done', deadline: TODAY_ISO }),
+    task({ id: 'p2-qa', projectId: 'p2', kanbanColumnId: 'st-p2-qa', deadline: TODAY_ISO }),
+  ];
+
+  it('одна група на статус: за sourceStatusId, назвою, а потім типом', () => {
+    const sections = buildStatusListSections(tasks, all, TODAY, 'all', true);
+    // «У процесі» в списку першою — так упорядковує orderColumnsForList.
+    expect(keys(sections)).toEqual([IN_PROGRESS_COLUMN_ID, ACTIVE_COLUMN_ID, DONE_COLUMN_ID]);
+    expect(ids(sections[0])).toEqual(['p2-qa']);
+    expect(ids(sections[1])).toEqual(['personal', 'p1-todo', 'p2-todo']);
+    expect(ids(sections[2])).toEqual(['p1-done']);
+  });
+
+  it('список усередині проєкту лишає власні колонки проєкту', () => {
+    const sections = buildStatusListSections(tasks.filter(t => t.projectId === 'p1'), all, TODAY, 'all');
+    expect(keys(sections)).toEqual(['st-p1-todo', 'st-p1-done']);
+  });
+});

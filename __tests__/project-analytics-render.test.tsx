@@ -147,7 +147,7 @@ describe('рендер Гантта', () => {
 describe('рендер панелі аналітики', () => {
   const palette = { ...PALETTE, dim: '#EEE', accent: '#7C3AED' };
 
-  it('монтується цілком — усі пʼять графіків разом', () => {
+  it('монтується цілком — усі чотири графіки разом, без Ганта', () => {
     let tree: any;
     act(() => {
       tree = create(
@@ -156,12 +156,14 @@ describe('рендер панелі аналітики', () => {
           tasks={tasks}
           columns={mergeTaskStatusColumns([])}
           scopeLabel="Проєкти"
-          wide={false}
           palette={palette}
         />,
       );
     });
     expect(tree.toJSON()).toBeTruthy();
+    // Гант прибрано з екрана проєктів (запит 2026-09-22): він лишився тільки
+    // у Таймлайні всередині проєкту.
+    expect(tree.root.findAllByType(ProjectGantt)).toHaveLength(0);
     act(() => { tree.unmount(); });
   });
 
@@ -176,7 +178,6 @@ describe('рендер панелі аналітики', () => {
           tasks={[]}
           columns={mergeTaskStatusColumns([])}
           scopeLabel="Проєкти"
-          wide={false}
           palette={palette}
         />,
       );

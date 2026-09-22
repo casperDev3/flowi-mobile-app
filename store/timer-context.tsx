@@ -21,11 +21,12 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AppState } from 'react-native';
+import { Alert, AppState } from 'react-native';
+import { useI18n } from './i18n';
 
 import { ensureStorageMigrations } from './migrations';
 import { loadData, subscribeToStorage } from './storage';
-import { saveSynced } from './synced-storage';
+import { updateSynced } from './synced-storage';
 import {
   adHocTimerId,
   findTimerForTask,
@@ -42,7 +43,7 @@ import {
   meetingTimerId,
   type Meeting,
 } from '@/utils/meetings';
-import { IN_PROGRESS_COLUMN_ID, REVIEW_COLUMN_ID } from '@/utils/taskStatuses';
+import { DEFAULT_TASK_STATUS_COLUMNS, IN_PROGRESS_COLUMN_ID, REVIEW_COLUMN_ID, mergeTaskStatusColumns, resolvedStatusType, type TaskStatusColumn } from '@/utils/taskStatuses';
 import type { Task, TaskHistoryEvent, HistoryEventType } from '@/utils/taskUtils';
 
 const TIMERS_KEY = 'active_timers';
@@ -57,6 +58,8 @@ interface MirroredTimeEntry {
   shift: Shift;
   duration: number;
   date: string;
+  /** Проєкт сесії (WORKSPACE_PROJECTS_PLAN §3 «години за тиждень» на Огляді). */
+  projectId?: string;
 }
 
 /** Мінімум, потрібний сторy для старту: решту полів завдання він не читає. */
@@ -65,6 +68,7 @@ export interface TimerTaskInput {
   title: string;
   kanbanColumnId?: string;
   status: 'active' | 'done';
+  projectId?: string;
 }
 
 /**
@@ -153,6 +157,7 @@ async function readStoredTimers(): Promise<ActiveTimer[]> {
 }
 
 export function TimerProvider({ children }: { children: React.ReactNode }) {
+  const { tr } = useI18n();
   const [pendingTask, setPendingTask] = useState('');
   const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
   const [timersReady, setTimersReady] = useState(false);
@@ -184,15 +189,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     async (mutate: (current: ActiveTimer[]) => ActiveTimer[]) => {
       writesInFlight.current += 1;
       try {
-        const current = await readStoredTimers();
-        const mutated = mutate(current);
-        const next = sortTimers(mutated);
-        timersRef.current = next;
-        setActiveTimers(next);
-        // mutate повернув той самий масив — робити нічого, але свіжий стан зі
-        // сховища ми вже підхопили.
-        if (mutated === current) return;
-        await saveSynced(TIMERS_KEY, next);
+        // Читання й запис — одна операція під блокуванням ключа, інакше pull,
+        // що ліг між ними, пішов би на сервер як DELETE.
+        await updateSynced<ActiveTimer>(TIMERS_KEY, raw => {
+          const current = sortTimers(raw.filter(t => t?.id && t.startedAt));
+          const mutated = mutate(current);
+          const next = sortTimers(mutated);
+          timersRef.current = next;
+          setActiveTimers(next);
+          // mutate повернув той самий масив — робити нічого, але свіжий стан зі
+          // сховища ми вже підхопили.
+          return mutated === current ? raw : next;
+        });
       } catch (e) {
         // Мовчки ковтати не можна: таймер лишиться на екрані, але не переживе
         // перезапуск, і причина має бути видимою.
@@ -261,14 +269,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [readTimers]);
 
+  // The callback identity must follow React state: consumers/compiler may
+  // memoize lookups. A stable getter over a ref hides start/stop changes.
   const getTimerForTask = useCallback(
-    (taskId: string) => findTimerForTask(timersRef.current, taskId),
-    [],
+    (taskId: string) => findTimerForTask(activeTimers, taskId),
+    [activeTimers],
   );
 
   const getTimerForMeeting = useCallback(
-    (meetingId: string) => findTimerForMeeting(timersRef.current, meetingId),
-    [],
+    (meetingId: string) => findTimerForMeeting(activeTimers, meetingId),
+    [activeTimers],
   );
 
   /**
@@ -279,13 +289,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const patchTask = useCallback(
     async (taskId: string, patch: (task: Task) => Task) => {
       try {
-        const tasks = await loadData<Task[]>(TASKS_KEY, []);
-        const index = tasks.findIndex(t => t.id === taskId);
-        if (index < 0) return;
-        const next = [...tasks];
-        next[index] = patch(tasks[index]);
-        await saveSynced(TASKS_KEY, next);
-        setTasksRevision(n => n + 1);
+        // Читання, патч і запис — одна операція під блокуванням ключа: pull,
+        // що встиг би лягти між loadData і saveSynced, пішов би на сервер як DELETE.
+        let found = false;
+        await updateSynced<Task>(TASKS_KEY, tasks => {
+          const index = tasks.findIndex(t => t.id === taskId);
+          if (index < 0) return tasks;
+          found = true;
+          const next = [...tasks];
+          next[index] = patch(tasks[index]);
+          return next;
+        });
+        if (found) setTasksRevision(n => n + 1);
       } catch (e) {
         if (__DEV__) console.warn(`[timers] запис 'tasks' не вдався (${taskId}):`, e);
       }
@@ -303,15 +318,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const patchMeeting = useCallback(
     async (meetingId: string, patch: (meeting: Meeting) => Meeting) => {
       try {
-        const meetings = await loadData<Meeting[]>(MEETINGS_KEY, []);
-        const index = meetings.findIndex(m => m.id === meetingId);
-        // Нараду могли видалити, поки таймер ішов. Сесії немає куди класти —
-        // але в 'time_entries' вона все одно потрапить, тож час не зникне.
-        if (index < 0) return;
-        const next = [...meetings];
-        next[index] = patch(meetings[index]);
-        await saveSynced(MEETINGS_KEY, next);
-        setMeetingsRevision(n => n + 1);
+        let found = false;
+        await updateSynced<Meeting>(MEETINGS_KEY, meetings => {
+          const index = meetings.findIndex(m => m.id === meetingId);
+          // Нараду могли видалити, поки таймер ішов. Сесії немає куди класти —
+          // але в 'time_entries' вона все одно потрапить, тож час не зникне.
+          if (index < 0) return meetings;
+          found = true;
+          const next = [...meetings];
+          next[index] = patch(meetings[index]);
+          return next;
+        });
+        if (found) setMeetingsRevision(n => n + 1);
       } catch (e) {
         if (__DEV__) console.warn(`[timers] запис 'meetings' не вдався (${meetingId}):`, e);
       }
@@ -324,15 +342,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     async (timer: ActiveTimer, duration: number, endedAt: Date) => {
       if (duration <= 0) return;
       try {
-        const existing = await loadData<MirroredTimeEntry[]>(TIME_ENTRIES_KEY, []);
         const entry: MirroredTimeEntry = {
           id: `timer_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
           task: timer.label,
           shift: timer.shift,
           duration,
           date: endedAt.toISOString(),
+          projectId: timer.projectId,
         };
-        await saveSynced(TIME_ENTRIES_KEY, [entry, ...existing]);
+        await updateSynced<MirroredTimeEntry>(TIME_ENTRIES_KEY, existing => [entry, ...existing]);
         setTimeEntriesRevision(n => n + 1);
       } catch (e) {
         if (__DEV__) console.warn('[timers] дзеркало у time_entries не вдалося:', e);
@@ -341,12 +359,37 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  // Проєктні колонки мають власні id. «Перевірка» має той самий type,
+  // що й «До роботи», тому підбір лише за type повертав би не ту колонку.
+  const resolveTimerColumn = useCallback(async (taskId: string, target: string) => {
+    const tasks = await loadData<Task[]>(TASKS_KEY, []);
+    const task = tasks.find(task => task.id === taskId);
+    if (task?.status === 'done') return task.kanbanColumnId;
+    const projectId = task?.projectId;
+    if (!projectId) return target;
+    const columns = await loadData<TaskStatusColumn[]>('task_statuses', []);
+    const scoped = mergeTaskStatusColumns(columns, projectId);
+    if (!scoped.length) return target;
+    const source = DEFAULT_TASK_STATUS_COLUMNS.find(column => column.id === target)!;
+    const match = scoped.find(column => !column.isDone && column.sourceStatusId === target)
+      ?? scoped.find(column => !column.isDone && column.name === source.name)
+      ?? (target === IN_PROGRESS_COLUMN_ID
+        ? scoped.find(column => !column.isDone && resolvedStatusType(column) === 'in_progress') : undefined);
+    if (match) return match.id;
+    // Workflow changes are owner-only on the server. Never create a local
+    // column that a member cannot synchronize, or silently select Todo.
+    Alert.alert(tr.timerWorkflowMissingTitle, tr.timerWorkflowMissingMessage);
+    return undefined;
+  }, [tr.timerWorkflowMissingTitle, tr.timerWorkflowMissingMessage]);
+
   const startTaskTimer = useCallback(
     async (task: TimerTaskInput) => {
       // Завершене завдання не трекають: сесія на ньому нікуди не веде, а
       // колонку done автоматика чіпати не сміє.
       if (task.status === 'done') return;
 
+      const columnId = await resolveTimerColumn(task.id, IN_PROGRESS_COLUMN_ID);
+      if (!columnId) return;
       const now = new Date();
 
       const timer: ActiveTimer = {
@@ -355,6 +398,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         label: task.title,
         startedAt: now.toISOString(),
         shift: shiftForDate(now),
+        projectId: task.projectId,
       };
 
       let created = false;
@@ -375,11 +419,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         // прийшло. Робота почалась — і на дошці це має бути видно однаково,
         // незалежно від того, чи лежало завдання в «До роботи», чи у власній
         // колонці користувача.
-        kanbanColumnId: IN_PROGRESS_COLUMN_ID,
+        kanbanColumnId: columnId,
         history: [...(t.history ?? []), makeHistoryEvent('timer_start')],
       }));
     },
-    [mutateTimers, patchTask],
+    [mutateTimers, patchTask, resolveTimerColumn],
   );
 
   const startAdHocTimer = useCallback(
@@ -440,6 +484,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       // 2. Завершена сесія переїжджає в timeEntries завдання. endedAt тут є
       //    ЗАВЖДИ: відкритих записів у timeEntries більше не буває.
       if (timer.taskId) {
+        const columnId = await resolveTimerColumn(timer.taskId, REVIEW_COLUMN_ID);
         await patchTask(timer.taskId, t => ({
           ...t,
           // Зупинка ЗАВЖДИ переводить у «На перевірці»: робота скінчилась, але
@@ -451,7 +496,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           // і цей запис прилітає сюди вже ПІСЛЯ того, як екран переставив
           // завдання в «Готово»; безумовний перенос скасував би щойно
           // завершену роботу й повернув її на дошку.
-          kanbanColumnId: t.status === 'done' ? t.kanbanColumnId : REVIEW_COLUMN_ID,
+          kanbanColumnId: t.status === 'done' ? t.kanbanColumnId : (columnId ?? t.kanbanColumnId),
           timeEntries: [
             ...(t.timeEntries ?? []),
             {
@@ -478,7 +523,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       // 3. Дзеркало для екранів часу.
       await mirrorToTimeEntries(timer, duration, endedAt);
     },
-    [mutateTimers, mirrorToTimeEntries, patchTask, patchMeeting],
+    [mutateTimers, mirrorToTimeEntries, patchTask, patchMeeting, resolveTimerColumn],
   );
 
   const stopTimerForTask = useCallback(

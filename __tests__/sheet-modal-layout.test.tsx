@@ -17,6 +17,14 @@ jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
 // Модалка не читає маршрут, але useResponsive тягне expo-router транзитивно.
 jest.mock('expo-router', () => ({ usePathname: () => '/' }));
 
+// I18N-06: SheetModal бере підпис «Закрити» з tr.*, тож тягне store/i18n,
+// а той — AsyncStorage. У jsdom нативного модуля немає.
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async () => null),
+  setItem: jest.fn(async () => {}),
+  removeItem: jest.fn(async () => {}),
+}));
+
 // Нативного модуля жестів у jsdom немає; для компонування досить, щоб
 // GestureDetector просто пропустив дітей крізь себе.
 jest.mock('react-native-gesture-handler', () => {
@@ -113,6 +121,15 @@ describe('SheetModal — ширина аркуша', () => {
     expect(flat(outer.props.style).alignItems).toBeUndefined();
   });
 
+  it('обгортка аркуша вміє стискатись', () => {
+    // NAT-01: без flexShrink обгортка з відступами не віддає висоту
+    // внутрішньому ScrollView, і низ форми виїздить за край екрана.
+    const tree = open();
+    const wrapper = tree.root.findAll((n: any) => n.props?.accessibilityViewIsModal === true)[0];
+    expect(wrapper).toBeDefined();
+    expect(flat(wrapper.props.style).flexShrink).toBe(1);
+  });
+
   it('тап по бекдропу й далі закриває аркуш', () => {
     // Бічні поля на планшеті — єдиний спосіб закрити лист, окрім хрестика.
     jest.useFakeTimers();
@@ -132,5 +149,62 @@ describe('SheetModal — ширина аркуша', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('SheetModal — доступність аркуша', () => {
+  afterEach(() => {
+    act(() => { while (trees.length) trees.pop().unmount(); });
+  });
+
+  /**
+   * NAT-03. На пристрої ВЕСЬ аркуш був ОДНИМ елементом доступності: дерево
+   * форми «Нове завдання» — 22 вузли, з них один 402×736 із підписом на
+   * ~400 символів («Закрити, Нове завдання, Назва, … Скасувати, Додати»).
+   * Жодного керованого контролу всередині — створити задачу з VoiceOver
+   * неможливо. Склеював піддерево Pressable-обгортка, що існує лише заради
+   * stopPropagation: Pressable з onPress на iOS сам стає елементом
+   * доступності.
+   */
+  it('обгортка stopPropagation не є елементом доступності', () => {
+    const tree = open();
+    const wrapper = tree.root.findAll((n: any) => n.props?.accessibilityViewIsModal === true)[0];
+    expect(wrapper).toBeDefined();
+    expect(wrapper.props.accessible).toBe(false);
+  });
+
+  it('при цьому вона й далі зупиняє поширення дотику', () => {
+    // accessible={false} не чіпає обробник: інакше тап по полях аркуша
+    // провалювався б у backdrop і закривав форму.
+    const tree = open();
+    const wrapper = tree.root.findAll((n: any) => n.props?.accessibilityViewIsModal === true)[0];
+    expect(typeof wrapper.props.onPress).toBe('function');
+    const stop = jest.fn();
+    act(() => { wrapper.props.onPress({ stopPropagation: stop }); });
+    expect(stop).toHaveBeenCalled();
+  });
+
+  it('модальна ізоляція лишилась на тій самій обгортці', () => {
+    // «Перевірені позитиви» нативного звіту: при відкритому аркуші в дереві
+    // немає жодного вузла фонового екрана. Цю ізоляцію дає рівно
+    // accessibilityViewIsModal, і зняти її разом з accessible не можна.
+    const tree = open();
+    // Рахуємо лише host-вузли: Pressable віддає той самий проп крізь кілька
+    // рівнів React-обгорток, і всі вони знайшлись би як окремі збіги.
+    const modals = tree.root.findAll(
+      (n: any) => typeof n.type === 'string' && n.props?.accessibilityViewIsModal === true,
+    );
+    expect(modals.length).toBe(1);
+    expect(modals[0].props.accessible).toBe(false);
+  });
+
+  it('хрестик «Закрити» лишається окремою кнопкою', () => {
+    // Він був частиною злиплого підпису; тепер мусить бути власним вузлом.
+    const tree = open();
+    const close = tree.root.findAll(
+      (n: any) => n.props?.accessibilityRole === 'button' && n.props?.accessibilityLabel === 'Закрити',
+    )[0];
+    expect(close).toBeDefined();
+    expect(close.props.accessible).not.toBe(false);
   });
 });

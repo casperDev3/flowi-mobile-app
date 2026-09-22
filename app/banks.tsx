@@ -34,14 +34,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
 import { PressableScale } from '@/components/shared/PressableScale';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
-import { loadData, saveData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
+import { loadDataResult, retryStorageRead, saveData } from '@/store/storage';
+import { updateSynced } from '@/store/synced-storage';
 import {
   accountBalance,
   activeAccounts,
@@ -133,6 +134,12 @@ export default function BanksScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [initialized, setInitialized] = useState(false);
+  /**
+   * ERR-01. `finally { setInitialized(true) }` вмикав автозапис НАВІТЬ коли
+   * читання впало: наступний же ефект писав порожній стан у 'accounts' —
+   * скарбнички зникали не від збою читання, а від запису одразу після нього.
+   */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [primaryCurrency, setPrimaryCurrency] = useState('UAH');
   const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
   const [lastSource, setLastSource] = useState('');
@@ -157,26 +164,36 @@ export default function BanksScreen() {
   const [selColor, setSelColor] = useState(JAR_COLORS[0]);
   const [selCurrency, setSelCurrency] = useState('UAH');
 
-  const load = useCallback(async () => {
-    try {
-      const [accs, txs, cur, curList, last] = await Promise.all([
-        loadData<Account[]>('accounts', []),
-        loadData<Transaction[]>('transactions', []),
-        loadData<string>('finance_primary_currency', 'UAH'),
-        loadData<Currency[]>('finance_currencies', []),
-        loadData<string>(LAST_SOURCE_KEY, ''),
-      ]);
-      setAccounts(Array.isArray(accs) ? accs : []);
-      setTransactions(Array.isArray(txs) ? txs : []);
-      setPrimaryCurrency(cur);
-      setCustomCurrencies(Array.isArray(curList) ? curList : []);
-      setLastSource(last);
-    } catch (e) {
-      warn('load', e);
-    } finally {
-      setInitialized(true);
+  const load = useCallback(async (retry = false) => {
+    // Аліас із явним типом: union двох generic-функцій втрачає параметр T.
+    const read: typeof loadDataResult = retry ? retryStorageRead : loadDataResult;
+    const [accs, txs, cur, curList, last] = await Promise.all([
+      read<Account[]>('accounts', []),
+      read<Transaction[]>('transactions', []),
+      read<string>('finance_primary_currency', 'UAH'),
+      read<Currency[]>('finance_currencies', []),
+      read<string>(LAST_SOURCE_KEY, ''),
+    ]);
+    // 'accounts' — єдиний ключ, у який цей екран пише. Якщо він не прочитався,
+    // автозапис лишається вимкненим, а користувач бачить причину.
+    if (!accs.ok) {
+      warn('load', accs.error);
+      setLoadFailed(true);
+      return false;
     }
+    setAccounts(Array.isArray(accs.value) ? accs.value : []);
+    // Решта — лише для показу; їхній збій не привід ховати скарбнички.
+    if (txs.ok) setTransactions(Array.isArray(txs.value) ? txs.value : []);
+    if (cur.ok) setPrimaryCurrency(cur.value);
+    if (curList.ok) setCustomCurrencies(Array.isArray(curList.value) ? curList.value : []);
+    if (last.ok) setLastSource(last.value);
+    setLoadFailed(false);
+    setInitialized(true);
+    return true;
   }, []);
+
+  /** «Повторити»: без retryStorageRead ключ лишається заблокованим на запис. */
+  const retryLoad = useCallback(() => { void load(true); }, [load]);
 
   // Баланс заощадження рахується з транзакцій, а їх створюють інші екрани —
   // тож перечитуємо при кожному поверненні, інакше прогрес відстає від дійсності.
@@ -190,9 +207,9 @@ export default function BanksScreen() {
    * applyDeposit.
    */
   const persistAccounts = useCallback(async (next: Account[]) => {
-    const stored = await loadData<Account[]>('accounts', []);
-    const merged = mergeAccountsForSave(Array.isArray(stored) ? stored : [], next);
-    await saveSynced('accounts', merged);
+    // Читання й запис — під одним блокуванням ключа (updateSynced): pull між
+    // ними інакше пішов би на сервер як DELETE.
+    const merged = await updateSynced<Account>('accounts', stored => mergeAccountsForSave(stored, next));
     if (merged.length !== next.length) setAccounts(merged);
   }, []);
 
@@ -223,7 +240,9 @@ export default function BanksScreen() {
   /** Накопичене = баланс рахунку, а не збережене поле. */
   const balances = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const a of savings) map[a.id] = accountBalance(a, transactions);
+    // Як «Фінанси» і веб: баланс на сьогодні, без запланованих наперед операцій.
+    const asOf = new Date();
+    for (const a of savings) map[a.id] = accountBalance(a, transactions, { asOf });
     return map;
   }, [savings, transactions]);
 
@@ -370,12 +389,8 @@ export default function BanksScreen() {
     // Список перечитуємо просто перед записом, а не беремо зі стану: поки
     // екран відкритий, синхронізація могла долити транзакції зі сервера, і
     // запис застарілого масиву позначив би їх видаленими.
-    loadData<Transaction[]>('transactions', [])
-      .then(existing => {
-        const next = [tx, ...(Array.isArray(existing) ? existing : [])];
-        setTransactions(next);
-        return saveSynced('transactions', next);
-      })
+    updateSynced<Transaction>('transactions', existing => [tx, ...existing])
+      .then(setTransactions)
       .catch(e => warn('save transaction', e));
 
     if (sourceAccount) {
@@ -405,12 +420,13 @@ export default function BanksScreen() {
         showCurrency={multiCurrency}
         depositLabel={tr.deposit}
         doneLabel={tr.donePiggy}
+        editLabel={tr.edit}
         grow={columns > 1}
         onEdit={openEdit}
         onDeposit={openDeposit}
       />
     ),
-    [balances, c, isDark, fmt, multiCurrency, tr.deposit, tr.donePiggy, columns, openEdit, openDeposit],
+    [balances, c, isDark, fmt, multiCurrency, tr.deposit, tr.donePiggy, tr.edit, columns, openEdit, openDeposit],
   );
 
   const formValid = !!name.trim() && isPositive(parseAmount(goal));
@@ -430,6 +446,8 @@ export default function BanksScreen() {
         <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity
             onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel={tr.back}
             style={[s.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
             <IconSymbol name="chevron.left" size={17} color={c.sub} />
           </TouchableOpacity>
@@ -491,32 +509,50 @@ export default function BanksScreen() {
             ) : null
           }
           ListEmptyComponent={
+            loadFailed ? (
+              <LoadErrorNotice lang={lang} isDark={isDark} text={c.text} sub={c.sub} onRetry={retryLoad} />
+            ) : (
             <View style={{ alignItems: 'center', paddingVertical: 56 }}>
               <Text style={{ fontSize: 48 }}>🫙</Text>
               <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noPiggyBanks}</Text>
               <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>Натисніть + щоб створити ціль</Text>
             </View>
+            )
           }
         />
       </SafeAreaView>
 
       {/* FAB */}
-      <PressableScale onPress={() => { haptic.medium(); openAdd(); }} scaleTo={0.92} style={[s.fab, { backgroundColor: c.accent }]}>
+      <PressableScale
+        onPress={() => { haptic.medium(); openAdd(); }}
+        accessibilityRole="button"
+        accessibilityLabel={tr.add}
+        scaleTo={0.92}
+        style={[s.fab, { backgroundColor: c.accent }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </PressableScale>
 
       {/* ─── Add / Edit Modal ─── */}
       <Modal visible={showForm} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowForm(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowForm(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, contentWidth]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setShowForm(false)}>
+            <Pressable
+              onPress={e => e.stopPropagation()}
+              accessible={false}
+              accessibilityViewIsModal
+              importantForAccessibility="yes"
+              style={[s.sheetWrapper, contentWidth]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={s.handleRow}>
                     <View style={{ flex: 1 }} />
                     <View style={[s.handle, { backgroundColor: c.border }]} />
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <TouchableOpacity onPress={() => setShowForm(false)} hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
+                      <TouchableOpacity
+                        onPress={() => setShowForm(false)}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr.close}
+                        hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
                         <IconSymbol name="xmark" size={17} color={c.sub} />
                       </TouchableOpacity>
                     </View>
@@ -571,6 +607,9 @@ export default function BanksScreen() {
                         <TouchableOpacity
                           key={cur.code}
                           onPress={() => setSelCurrency(cur.code)}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: selCurrency === cur.code, checked: selCurrency === cur.code }}
+                          accessibilityLabel={cur.code}
                           style={[s.chip, {
                             backgroundColor: selCurrency === cur.code ? selColor + '25' : c.dim,
                             borderColor: selCurrency === cur.code ? selColor : c.border,
@@ -601,6 +640,9 @@ export default function BanksScreen() {
                       <TouchableOpacity
                         key={icon}
                         onPress={() => setSelIcon(icon)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: selIcon === icon, checked: selIcon === icon }}
+                        accessibilityLabel={`${tr.icon} ${JAR_ICONS.indexOf(icon) + 1}`}
                         style={[s.iconChip, {
                           backgroundColor: selIcon === icon ? selColor + '25' : c.dim,
                           borderColor: selIcon === icon ? selColor : c.border,
@@ -618,6 +660,9 @@ export default function BanksScreen() {
                       <TouchableOpacity
                         key={color}
                         onPress={() => setSelColor(color)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: selColor === color, checked: selColor === color }}
+                        accessibilityLabel={`${tr.subColor} ${JAR_COLORS.indexOf(color) + 1}`}
                         style={[s.colorDot, { backgroundColor: color, borderWidth: selColor === color ? 3 : 0, borderColor: isDark ? '#fff' : '#333' }]}
                       />
                     ))}
@@ -656,8 +701,13 @@ export default function BanksScreen() {
       {/* ─── Deposit Modal — переказ між рахунками ─── */}
       <Modal visible={showDeposit} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowDeposit(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={s.overlay} onPress={() => setShowDeposit(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrapper, contentWidth]}>
+          <Pressable accessible={false} style={s.overlay} onPress={() => setShowDeposit(false)}>
+            <Pressable
+              onPress={e => e.stopPropagation()}
+              accessible={false}
+              accessibilityViewIsModal
+              importantForAccessibility="yes"
+              style={[s.sheetWrapper, contentWidth]}>
               {depositAccount && (
                 <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
                   <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -665,7 +715,11 @@ export default function BanksScreen() {
                       <View style={{ flex: 1 }} />
                       <View style={[s.handle, { backgroundColor: c.border }]} />
                       <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <TouchableOpacity onPress={() => setShowDeposit(false)} hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
+                        <TouchableOpacity
+                          onPress={() => setShowDeposit(false)}
+                          accessibilityRole="button"
+                          accessibilityLabel={tr.close}
+                          hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
                           <IconSymbol name="xmark" size={17} color={c.sub} />
                         </TouchableOpacity>
                       </View>
@@ -816,7 +870,7 @@ function JarSeparator() {
  * усі BlurView разом із прогресами.
  */
 const JarCard = React.memo(function JarCard({
-  account, balance, c, isDark, fmt, showCurrency, depositLabel, doneLabel, grow, onEdit, onDeposit,
+  account, balance, c, isDark, fmt, showCurrency, depositLabel, doneLabel, editLabel, grow, onEdit, onDeposit,
 }: {
   account: Account;
   /** Накопичене = баланс рахунку, порахований із транзакцій. */
@@ -828,6 +882,8 @@ const JarCard = React.memo(function JarCard({
   showCurrency: boolean;
   depositLabel: string;
   doneLabel: string;
+  /** Підпис кнопки-олівця: сама іконка скрінрідеру нічого не каже (A11Y-01). */
+  editLabel: string;
   /** У сітці на планшеті картка ділить рядок навпіл. */
   grow: boolean;
   onEdit: (account: Account) => void;
@@ -861,6 +917,8 @@ const JarCard = React.memo(function JarCard({
         </View>
         <TouchableOpacity
           onPress={() => onEdit(account)}
+          accessibilityRole="button"
+          accessibilityLabel={`${editLabel}: ${account.name}`}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           style={[s.editBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
           <IconSymbol name="pencil" size={13} color={c.sub} />

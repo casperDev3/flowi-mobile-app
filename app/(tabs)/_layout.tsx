@@ -1,7 +1,7 @@
 import {BlurView} from 'expo-blur';
 import {Tabs} from 'expo-router';
 import React from 'react';
-import {Platform, StyleSheet, View} from 'react-native';
+import {Platform, StyleSheet, Text, View} from 'react-native';
 
 import {HapticTab} from '@/components/haptic-tab';
 import {ActiveTimersBar} from '@/components/time/ActiveTimersBar';
@@ -9,9 +9,52 @@ import {IconSymbol} from '@/components/ui/icon-symbol';
 import {useColorScheme} from '@/hooks/use-color-scheme';
 import {useI18n} from '@/store/i18n';
 import {useResponsive} from '@/hooks/use-responsive';
-import {TAB_BAR_HEIGHT} from '@/constants/nav';
+import {
+    TAB_BAR_HEIGHT,
+    TAB_BAR_TINT,
+    TAB_LABEL_FONT_SIZE,
+    TAB_LABEL_MAX_FONT_SCALE,
+} from '@/constants/nav';
 
 export const unstable_settings = { initialRouteName: 'today' };
+
+/**
+ * Підпис таба власним <Text> замість `tabBarLabelStyle`.
+ *
+ * @react-navigation/bottom-tabs вимикає масштабування підпису на iOS за
+ * замовчуванням (BottomTabItem.js:40 — `allowFontScaling = SUPPORTS_LARGE_CONTENT_VIEWER
+ * ? false : undefined`), і перевизначити це, лишивши стиль, можна тільки
+ * прапорцем `tabBarAllowFontScaling`, у якого немає стелі. Без стелі
+ * Dynamic Type на максимумі дає 11pt × ~3 = 33pt підпису при 54pt висоти
+ * контенту панелі — підпис обріже разом з іконкою.
+ *
+ * Функція-підпис віддає звичайний <Text>, а отже і `maxFontSizeMultiplier`.
+ * Ім'я екрана для скрінрідера при цьому й далі бере `title`, тож
+ * accessibilityLabel кнопки таба не змінюється.
+ */
+function tabLabel(label: string) {
+    // Іменована функція, а не стрілка: @react-navigation викликає її як
+    // звичайний рендер-колбек, але eslint-plugin-react бачить JSX і вимагає
+    // displayName.
+    function TabLabel({color}: {color: string}) {
+        return (
+        <Text
+            numberOfLines={1}
+            allowFontScaling
+            maxFontSizeMultiplier={TAB_LABEL_MAX_FONT_SCALE}
+            style={{
+                fontSize: TAB_LABEL_FONT_SIZE,
+                fontWeight: '600',
+                marginTop: -2,
+                textAlign: 'center',
+                color,
+            }}>
+            {label}
+        </Text>
+        );
+    }
+    return TabLabel;
+}
 
 export default function TabLayout() {
     const isDark = useColorScheme() === 'dark';
@@ -27,17 +70,26 @@ export default function TabLayout() {
             screenOptions={{
                 headerShown: false,
                 tabBarButton: HapticTab,
-                tabBarActiveTintColor: isDark ? '#A78BFA' : '#7C3AED',
-                tabBarInactiveTintColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(80,60,120,0.45)',
+                // Кольори — у constants/nav.ts: їх рахує тест контрасту, і той
+                // самий набір має взяти панель простору проєкту.
+                tabBarActiveTintColor: isDark ? TAB_BAR_TINT.dark.active : TAB_BAR_TINT.light.active,
+                tabBarInactiveTintColor: isDark ? TAB_BAR_TINT.dark.inactive : TAB_BAR_TINT.light.inactive,
                 tabBarShowLabel: true,
-                tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: -2 },
+                // Стилю підпису тут немає навмисно: кожен екран віддає підпис
+                // через tabLabel() — див. коментар до нього.
                 tabBarStyle: isWide ? {display: 'none'} : {
                     position: 'absolute',
                     borderTopWidth: 0,
                     elevation: 0,
                     backgroundColor: 'transparent',
                     height: TAB_BAR_HEIGHT,
-                    paddingTop: 10
+                    // paddingTop тут був 10 і створював мертву смугу: висота
+                    // панелі задана числом, тож @react-navigation НЕ додає до
+                    // неї нижній інсет, а віднімає його зсередини
+                    // (BottomTabBar.js:87-90 + :250-252). Виходило
+                    // 88 − 10 − 34 = 44pt кнопки при 88pt видимої панелі —
+                    // верхні 10pt було видно, але не натиснути. Без paddingTop
+                    // кнопка займає всі 54pt над home-indicator.
                 },
                 tabBarBackground: () =>
                     Platform.OS === 'android' ? (
@@ -60,6 +112,7 @@ export default function TabLayout() {
                 name="today"
                 options={{
                     title: tr.tabToday,
+                    tabBarLabel: tabLabel(tr.tabToday),
                     tabBarIcon: ({color}) => <IconSymbol size={26} name="house.fill" color={color}/>,
                 }}
             />
@@ -67,6 +120,7 @@ export default function TabLayout() {
                 name="index"
                 options={{
                     title: tr.tabTasks,
+                    tabBarLabel: tabLabel(tr.tabTasks),
                     tabBarIcon: ({color}) => <IconSymbol size={26} name="checklist" color={color}/>,
                 }}
             />
@@ -74,6 +128,7 @@ export default function TabLayout() {
                 name="explore"
                 options={{
                     title: tr.tabFinance,
+                    tabBarLabel: tabLabel(tr.tabFinance),
                     tabBarIcon: ({color}) => <IconSymbol size={26} name="banknote" color={color}/>,
                 }}
             />
@@ -81,6 +136,7 @@ export default function TabLayout() {
                 name="health"
                 options={{
                     title: tr.tabHealth,
+                    tabBarLabel: tabLabel(tr.tabHealth),
                     tabBarIcon: ({color}) => <IconSymbol size={26} name="figure.run" color={color}/>,
                 }}
             />
@@ -88,12 +144,9 @@ export default function TabLayout() {
                 name="settings"
                 options={{
                     title: tr.tabOptions,
+                    tabBarLabel: tabLabel(tr.tabOptions),
                     tabBarIcon: ({color}) => <IconSymbol size={26} name="gearshape.fill" color={color}/>,
                 }}
-            />
-            <Tabs.Screen
-                name="shared"
-                options={{ href: null }}
             />
             <Tabs.Screen
                 name="agent"

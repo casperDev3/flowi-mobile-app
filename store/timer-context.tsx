@@ -102,6 +102,7 @@ export interface TimerTaskInput {
 export interface TimerMeetingInput {
   id: string;
   title: string;
+  projectId?: string;
 }
 
 export interface TimerContextValue {
@@ -355,6 +356,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       if (duration <= 0) return;
       try {
         const endedAtIso = endedAt.toISOString();
+        // Таймер без проєкту (запущений у вебі чи старою версією) — беремо
+        // проєкт задачі або наради, інакше сесія впала б в «Особисте».
+        let projectId = timer.projectId;
+        if (!projectId && timer.taskId) {
+          const tasks = await loadData<Task[]>(TASKS_KEY, []);
+          projectId = tasks.find(task => task.id === timer.taskId)?.projectId;
+        } else if (!projectId && timer.meetingId) {
+          const meetings = await loadData<Meeting[]>(MEETINGS_KEY, []);
+          projectId = meetings.find(meeting => meeting.id === timer.meetingId)?.projectId;
+        }
         const entry: MirroredTimeEntry = {
           id: `timer_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
           task: timer.label,
@@ -363,7 +374,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           date: endedAtIso,
           startedAt: timer.startedAt,
           endedAt: endedAtIso,
-          projectId: timer.projectId,
+          ...(projectId ? { projectId } : {}),
         };
         await updateSynced<MirroredTimeEntry>(TIME_ENTRIES_KEY, existing => [entry, ...existing]);
         setTimeEntriesRevision(n => n + 1);

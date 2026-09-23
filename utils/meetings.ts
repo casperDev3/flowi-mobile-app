@@ -97,7 +97,7 @@ export function findTimerForMeeting(
  * саме тому стоп наради коротший за стоп завдання рівно на цей крок.
  */
 export function buildMeetingTimer(
-  meeting: Pick<Meeting, 'id' | 'title'>,
+  meeting: Pick<Meeting, 'id' | 'title'> & { projectId?: string },
   now: Date = new Date(),
 ): ActiveTimer {
   return {
@@ -108,6 +108,8 @@ export function buildMeetingTimer(
     // Зміну доби беремо з годинника, як для завдання: нараду не «планують на
     // вечір» окремо від того, коли її насправді почали трекати.
     shift: shiftForDate(now),
+    // Сесія проєктної наради рахується за проєктом, а не як «Особисте».
+    ...(meeting.projectId ? { projectId: meeting.projectId } : {}),
   };
 }
 

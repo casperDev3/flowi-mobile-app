@@ -938,7 +938,7 @@ export default function MeetingsScreen() {
   const toggleMeetingTimer = useCallback(async (meeting: Meeting) => {
     const running = findTimerForMeeting(activeTimers, meeting.id);
     if (running) await stopTimer(running.id);
-    else await startMeetingTimer({ id: meeting.id, title: meeting.title });
+    else await startMeetingTimer({ id: meeting.id, title: meeting.title, projectId: meeting.projectId });
   }, [activeTimers, startMeetingTimer, stopTimer]);
 
   /** Які наради трекаються просто зараз — для позначки в списку. */

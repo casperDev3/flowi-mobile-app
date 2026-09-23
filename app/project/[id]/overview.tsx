@@ -38,6 +38,7 @@ import { projectMeetingSections, type Meeting } from '@/utils/meetings';
 import { activityIcon, formatActivityMessage } from '@/utils/projectActivity';
 import { projectStats } from '@/utils/projectStats';
 import { budgetSpentTotal, hoursThisWeekSeconds, type ProjectTimeEntryLike } from '@/utils/projectOverview';
+import { taskProjectMap } from '@/utils/timeEntries';
 import { currentSprintCard, projectCounters } from '@/utils/projectStatsMetrics';
 import type { Sprint, SprintTaskLike } from '@/utils/sprintUtils';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
@@ -205,8 +206,8 @@ export default function ProjectOverviewScreen() {
           : tr.sprintDaysLeft.replace('{n}', String(sprintStats.daysLeft ?? 0))
     : '';
   const weekSeconds = useMemo(
-    () => (project ? hoursThisWeekSeconds(timeEntries, project.id) : 0),
-    [project, timeEntries],
+    () => (project ? hoursThisWeekSeconds(timeEntries, project.id, new Date(), taskProjectMap(tasks)) : 0),
+    [project, timeEntries, tasks],
   );
   const budget = project ? budgets.find(b => b.id === project.id) : undefined;
   /**

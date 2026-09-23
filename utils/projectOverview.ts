@@ -11,6 +11,7 @@
  * projectStats() і projectMeetingSections() — тут лише те, чого там нема:
  * тиждень часу і місяць бюджету.
  */
+import { recordProjectId, type TaskProjects } from '@/utils/timeEntries';
 import { accountById, type Account } from './accounts';
 import { budgetTxCurrency } from './budgetUtils';
 import { isSameMonth } from './dateUtils';
@@ -19,6 +20,8 @@ import { openSprintsForProject, sprintProgress, type Sprint, type SprintTaskLike
 
 export interface ProjectTimeEntryLike {
   projectId?: string;
+  /** Задача сесії — за нею визначається проєкт, коли projectId не записаний. */
+  taskId?: string;
   /** Тривалість сесії, секунди. */
   duration: number;
   /**
@@ -54,10 +57,12 @@ export function hoursThisWeekSeconds(
   entries: readonly ProjectTimeEntryLike[],
   projectId: string,
   now: Date = new Date(),
+  /** Проєкти задач — для записів без projectId (utils/timeEntries.recordProjectId). */
+  taskProjects?: TaskProjects,
 ): number {
   const from = startOfWeek(now);
   return entries.reduce((acc, entry) => {
-    if (entry.projectId !== projectId) return acc;
+    if (recordProjectId(entry, taskProjects) !== projectId) return acc;
     const at = parseEntryDate(entry.date);
     if (Number.isNaN(at.getTime()) || at < from) return acc;
     return acc + (Number.isFinite(entry.duration) ? entry.duration : 0);

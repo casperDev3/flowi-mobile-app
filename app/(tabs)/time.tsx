@@ -61,6 +61,9 @@ import {
   groupByDay,
   groupByProject,
   projectBreakdown,
+  recordProjectId,
+  taskProjectMap,
+  type TaskProjects,
   sortRecords,
   taskOptions,
   totalSeconds,
@@ -108,6 +111,7 @@ export default function TimeScreen() {
 
   const [entries, setEntries] = useState<TimeRecord[]>([]);
   const [projects, setProjects] = useState<ProjectLike[]>([]);
+  const [taskProjects, setTaskProjects] = useState<TaskProjects>(() => new Map());
   const [timerSubtasks, setTimerSubtasks] = useState<Record<string, RowSubtask[]>>({});
   const [initialized, setInitialized] = useState(false);
 
@@ -159,6 +163,8 @@ export default function TimeScreen() {
     try {
       const stored = await loadData<ProjectLike[]>('projects', []);
       setProjects(stored.filter(p => p?.id));
+      const tasks = await loadData<{ id: string; projectId?: string }[]>('tasks', []);
+      setTaskProjects(taskProjectMap(tasks));
     } catch (e) {
       if (__DEV__) console.warn('[time] проєкти не прочитались:', e);
     }
@@ -238,8 +244,8 @@ export default function TimeScreen() {
   // ─── Вибірка ────────────────────────────────────────────────────────────────
 
   const filtered = useMemo(
-    () => filterRecords(entries, { period, projectId: filterProjectId, taskKey: filterTaskKey }, now),
-    [entries, period, filterProjectId, filterTaskKey, now],
+    () => filterRecords(entries, { period, projectId: filterProjectId, taskKey: filterTaskKey }, now, taskProjects),
+    [entries, period, filterProjectId, filterTaskKey, now, taskProjects],
   );
   const sorted = useMemo(() => sortRecords(filtered, sort), [filtered, sort]);
 
@@ -248,15 +254,18 @@ export default function TimeScreen() {
     [entries, period, now],
   );
   const tasksForFilter = useMemo(
-    () => taskOptions(filterProjectId ? periodOnly.filter(e => e.projectId === filterProjectId) : periodOnly),
-    [periodOnly, filterProjectId],
+    () => taskOptions(filterProjectId ? periodOnly.filter(e => recordProjectId(e, taskProjects) === filterProjectId) : periodOnly),
+    [periodOnly, filterProjectId, taskProjects],
   );
   const projectsForFilter = useMemo(() => {
-    const ids = new Set(periodOnly.map(e => e.projectId).filter(Boolean));
+    const ids = new Set(periodOnly.map(e => recordProjectId(e, taskProjects)).filter(Boolean));
     return projects.filter(p => ids.has(p.id));
-  }, [periodOnly, projects]);
+  }, [periodOnly, projects, taskProjects]);
 
-  const breakdown = useMemo(() => projectBreakdown(filtered, projects), [filtered, projects]);
+  const breakdown = useMemo(
+    () => projectBreakdown(filtered, projects, undefined, undefined, taskProjects),
+    [filtered, projects, taskProjects],
+  );
   const total = useMemo(() => totalSeconds(filtered), [filtered]);
   const average = useMemo(() => averageTaskSeconds(filtered), [filtered]);
 
@@ -269,7 +278,7 @@ export default function TimeScreen() {
 
   const sections = useMemo<Section[]>(() => {
     if (grouping === 'project') {
-      return groupByProject(sorted, projects).map(group => ({
+      return groupByProject(sorted, projects, undefined, undefined, taskProjects).map(group => ({
         key: group.projectId ?? 'personal',
         title: group.name,
         seconds: group.seconds,
@@ -425,8 +434,8 @@ export default function TimeScreen() {
           renderItem={({ item }) => (
             <EntryRow
               entry={item}
-              projectName={item.projectId ? projectById.get(item.projectId)?.name : undefined}
-              projectColor={item.projectId ? projectById.get(item.projectId)?.color : undefined}
+              projectName={projectById.get(recordProjectId(item, taskProjects) ?? '')?.name}
+              projectColor={projectById.get(recordProjectId(item, taskProjects) ?? '')?.color}
               accent={c.indigo}
               border={c.border}
               text={c.text}

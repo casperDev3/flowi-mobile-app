@@ -25,7 +25,7 @@ import { haptic } from '@/utils/haptics';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
 // Форма запису — спільна з екраном «Час» (`utils/timeEntries.ts`): локальна
 // копія інтерфейсу вже одного разу розійшлася з ним на полі `shift`.
-import type { TimeRecord } from '@/utils/timeEntries';
+import { recordProjectId, taskProjectMap, type TimeRecord } from '@/utils/timeEntries';
 
 
 export default function ProjectTimeScreen() {
@@ -43,13 +43,19 @@ export default function ProjectTimeScreen() {
   const { items: entries, setItems: setEntries, reload: reloadEntries } = useSyncedList<TimeRecord>('time_entries', { enabled: true });
   // useSyncedList перечитує ключ сам лише на ЗМІНУ ззовні — початкове
   // читання (дані вже в сховищі до монтування) екран запускає явно.
-  useFocusEffect(useCallback(() => { void reloadEntries(); }, [reloadEntries]));
+  // Задачі — щоб записи без projectId (таймер із вебу чи старої версії)
+  // потрапляли в проєкт своєї задачі.
+  const { items: tasks, reload: reloadTasks } = useSyncedList<{ id: string; projectId?: string }>('tasks', { enabled: true });
+  const taskProjects = useMemo(() => taskProjectMap(tasks), [tasks]);
+  useFocusEffect(useCallback(() => { void reloadEntries(); void reloadTasks(); }, [reloadEntries, reloadTasks]));
   const [taskName, setTaskName] = useState('');
   const [minutes, setMinutes] = useState('');
 
   const own = useMemo(
-    () => entries.filter(e => e.projectId === projectId).sort((a, b) => b.date.localeCompare(a.date)),
-    [entries, projectId],
+    () => entries
+      .filter(e => recordProjectId(e, taskProjects) === projectId)
+      .sort((a, b) => b.date.localeCompare(a.date)),
+    [entries, projectId, taskProjects],
   );
   const totalSeconds = useMemo(() => own.reduce((acc, e) => acc + (e.duration || 0), 0), [own]);
 

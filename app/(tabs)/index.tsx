@@ -1905,7 +1905,7 @@ export default function TasksScreen() {
     if (!viewedMeetingOrig) return;
     // Таймер завжди адресує ОРИГІНАЛ (meeting:<origId>).
     if (viewedMeetingTimer) void stopTimerById(viewedMeetingTimer.id);
-    else void startMeetingTimer({ id: viewedMeetingOrig.id, title: viewedMeetingOrig.title });
+    else void startMeetingTimer({ id: viewedMeetingOrig.id, title: viewedMeetingOrig.title, projectId: viewedMeetingOrig.projectId });
   }, [viewedMeetingOrig, viewedMeetingTimer, stopTimerById, startMeetingTimer]);
 
   const meetingDetailColors = { text: c.text, sub: c.sub, border: c.border, dim: c.dim };

@@ -79,6 +79,32 @@ export interface TimeFilters {
 }
 
 /** Ключ задачі для фільтра: id, коли він є, інакше назва. */
+/**
+ * Проєкт задачі за її id — для записів, у яких `projectId` не записаний
+ * (таймер, запущений у вебі чи старою версією, писав запис без проєкту, і
+ * сесії на проєктних задачах падали в «Особисте»). Дані не переписуємо —
+ * визначаємо проєкт при показі. Дзеркало web lib/time-entries.ts.
+ */
+export type TaskProjects = ReadonlyMap<string, string>;
+
+export function taskProjectMap(tasks: readonly { id: string; projectId?: string }[] | undefined): TaskProjects {
+  const map = new Map<string, string>();
+  for (const task of tasks ?? []) {
+    if (task?.id && task.projectId) map.set(task.id, task.projectId);
+  }
+  return map;
+}
+
+/** Проєкт запису: власний `projectId`, інакше — проєкт його задачі. */
+export function recordProjectId(
+  entry: { projectId?: string; taskId?: string },
+  taskProjects?: TaskProjects,
+): string | null {
+  if (entry?.projectId) return entry.projectId;
+  if (entry?.taskId && taskProjects) return taskProjects.get(entry.taskId) ?? null;
+  return null;
+}
+
 export function recordTaskKey(entry: TimeRecord): string {
   if (entry?.taskId) return `id:${entry.taskId}`;
   return `title:${(entry?.task ?? '').trim().toLowerCase()}`;
@@ -88,12 +114,13 @@ export function filterRecords(
   records: readonly TimeRecord[],
   filters: TimeFilters,
   now: Date,
+  taskProjects?: TaskProjects,
 ): TimeRecord[] {
   const from = periodStartMs(filters.period, now);
   return (records ?? []).filter(entry => {
     if (!entry) return false;
     if (from !== null && recordTimeMs(entry) < from) return false;
-    if (filters.projectId && (entry.projectId ?? null) !== filters.projectId) return false;
+    if (filters.projectId && recordProjectId(entry, taskProjects) !== filters.projectId) return false;
     if (filters.taskKey && recordTaskKey(entry) !== filters.taskKey) return false;
     return true;
   });
@@ -157,11 +184,12 @@ function collectByProject(
   projects: readonly ProjectLike[],
   personalLabel: string,
   personalColor: string,
+  taskProjects?: TaskProjects,
 ): ProjectGroup[] {
   const byId = new Map((projects ?? []).map(project => [project.id, project]));
   const groups = new Map<string, ProjectGroup>();
   for (const entry of records ?? []) {
-    const key = entry.projectId ?? '';
+    const key = recordProjectId(entry, taskProjects) ?? '';
     let group = groups.get(key);
     if (!group) {
       const project = key ? byId.get(key) : undefined;
@@ -186,9 +214,10 @@ export function projectBreakdown(
   projects: readonly ProjectLike[],
   personalLabel = 'Особисте',
   personalColor = '#6366F1',
+  taskProjects?: TaskProjects,
 ): ProjectShare[] {
   const total = totalSeconds(records);
-  return collectByProject(records, projects, personalLabel, personalColor)
+  return collectByProject(records, projects, personalLabel, personalColor, taskProjects)
     .filter(group => group.seconds > 0)
     .map(group => ({
       projectId: group.projectId,
@@ -205,8 +234,9 @@ export function groupByProject(
   projects: readonly ProjectLike[],
   personalLabel = 'Особисте',
   personalColor = '#6366F1',
+  taskProjects?: TaskProjects,
 ): ProjectGroup[] {
-  return collectByProject(records, projects, personalLabel, personalColor);
+  return collectByProject(records, projects, personalLabel, personalColor, taskProjects);
 }
 
 export interface DayGroup {

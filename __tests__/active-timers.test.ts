@@ -15,12 +15,15 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => {}),
 }));
 
+import fs from 'fs';
+import path from 'path';
+
 import {
   adHocTimerId,
   findTimerForTask,
-  shiftForDate,
   sortTimers,
   taskTimerId,
+  timerProject,
   type ActiveTimer,
 } from '@/utils/activeTimers';
 import { migrateOpenTimeEntries } from '@/store/migrations';
@@ -30,7 +33,6 @@ const timer = (id: string, startedAt: string, taskId?: string): ActiveTimer => (
   taskId,
   label: id,
   startedAt,
-  shift: 'day',
 });
 
 describe('похідні id', () => {
@@ -90,18 +92,26 @@ describe('findTimerForTask', () => {
   });
 });
 
-describe('shiftForDate', () => {
-  const at = (hour: number) => new Date(2026, 7, 29, hour, 30);
+describe('timerProject — мітка «чий таймер» замість частини доби', () => {
+  // Побайтова копія web lib/__fixtures__/timer-project-parity.json: веб і
+  // телефон мусять підписати той самий таймер тим самим проєктом.
+  const fixture = JSON.parse(
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'timer-project-parity.json'), 'utf8'),
+  ) as {
+    projects: { id: string; name?: string; color?: string }[];
+    tasks: { id: string; projectId?: string | null }[];
+    meetings: { id: string; projectId?: string | null }[];
+    cases: { name: string; timer: ActiveTimer; expected: unknown }[];
+  };
 
-  test('межі змін', () => {
-    expect(shiftForDate(at(0))).toBe('night');
-    expect(shiftForDate(at(5))).toBe('night');
-    expect(shiftForDate(at(6))).toBe('morning');
-    expect(shiftForDate(at(11))).toBe('morning');
-    expect(shiftForDate(at(12))).toBe('day');
-    expect(shiftForDate(at(17))).toBe('day');
-    expect(shiftForDate(at(18))).toBe('evening');
-    expect(shiftForDate(at(23))).toBe('evening');
+  test.each(fixture.cases.map(c => [c.name, c] as const))('%s', (_name, c) => {
+    expect(timerProject(c.timer, fixture.projects, fixture.tasks, fixture.meetings)).toStrictEqual(c.expected);
+  });
+
+  test('без списків задач і нарад — лише власний projectId таймера', () => {
+    expect(timerProject({ taskId: 't1' }, fixture.projects)).toEqual({ kind: 'personal' });
+    expect(timerProject({ projectId: 'p1' }, fixture.projects))
+      .toEqual({ kind: 'project', id: 'p1', name: 'Сайт', color: '#F97316' });
   });
 });
 
@@ -122,7 +132,19 @@ describe('міграція відкритих сесій', () => {
       label: 'Звіт',
       startedAt: open.startedAt,
     });
+    // Частин доби більше немає: мігрований таймер поля shift не отримує.
+    expect(result.timers[0]).not.toHaveProperty('shift');
     expect(result.tasks[0].timeEntries).toEqual([closed]);
+  });
+
+  test('мігрований таймер несе projectId задачі, як і startTaskTimer', () => {
+    const inProject = migrateOpenTimeEntries(
+      [{ id: 't-2', title: 'Макет', projectId: 'p-1', timeEntries: [open] }],
+      [],
+    );
+    expect(inProject.timers[0].projectId).toBe('p-1');
+    const personal = migrateOpenTimeEntries([{ id: 't-3', title: 'Своє', timeEntries: [open] }], []);
+    expect(personal.timers[0]).not.toHaveProperty('projectId');
   });
 
   test('ідемпотентність: без відкритих записів нічого не додається', () => {

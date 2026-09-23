@@ -9,13 +9,13 @@
  * завдання чи режиму зосередження: реєстр → завдання/нарада → time_entries.
  */
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 import { useTimerContext } from '@/store/timer-context';
-import type { ActiveTimer } from '@/utils/activeTimers';
+import type { ActiveTimer, TimerProject } from '@/utils/activeTimers';
 import { timerKind, type TimerKind } from '@/utils/activeTimersBar';
 import { formatClock } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
@@ -65,6 +65,36 @@ export function useTimerStopper() {
   return { busy, stop };
 }
 
+/**
+ * Чий таймер: крапка кольору проєкту + назва, або «Особисте».
+ *
+ * Замінила частину доби (ранок/день/вечір/ніч): та нічого не казала про саму
+ * роботу, а проєкт — саме те, за чим сесія потім ляже у звіт. Для проєкту,
+ * якого ще немає в завантаженому списку (kind 'unknown'), мітки немає зовсім:
+ * «Особисте» там було б неправдою.
+ */
+export function TimerProjectTag({
+  project, tr, color, size = 12, style,
+}: {
+  project: TimerProject | undefined;
+  tr: Translations;
+  /** Колір тексту — приглушений колір контейнера. */
+  color: string;
+  size?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  if (!project || project.kind === 'unknown') return null;
+  const name = project.kind === 'project' ? project.name.trim() || tr.project : tr.timerProjectPersonal;
+  return (
+    <View style={[st.tag, style]} accessibilityLabel={`${tr.project}: ${name}`}>
+      {project.kind === 'project' && project.color
+        ? <View style={[st.tagDot, { backgroundColor: project.color }]} />
+        : null}
+      <Text numberOfLines={1} style={[st.tagText, { color, fontSize: size }]}>{name}</Text>
+    </View>
+  );
+}
+
 export interface TimerRowColors {
   text: string;
   sub: string;
@@ -95,9 +125,11 @@ export function StopTimerButton({
 }
 
 export function ActiveTimerRow({
-  timer, busy, onStop, colors: c, tr, compact = false,
+  timer, project, busy, onStop, colors: c, tr, compact = false,
 }: {
   timer: ActiveTimer;
+  /** Проєкт таймера (useTimerProjects); undefined — мітки немає. */
+  project?: TimerProject;
   busy: boolean;
   onStop: () => void;
   colors: TimerRowColors;
@@ -115,12 +147,15 @@ export function ActiveTimerRow({
       </View>
       <View style={st.body}>
         <Text numberOfLines={compact ? 2 : 1} style={[st.label, { color: c.text }]}>{label}</Text>
-        <ElapsedClock
-          running
-          seconds={now => elapsedSince(timer.startedAt, now)}
-          format={formatClock}
-          style={[st.clock, { color: c.sub }]}
-        />
+        <View style={st.meta}>
+          <ElapsedClock
+            running
+            seconds={now => elapsedSince(timer.startedAt, now)}
+            format={formatClock}
+            style={[st.clock, { color: c.sub }]}
+          />
+          <TimerProjectTag project={project} tr={tr} color={c.sub} style={st.metaTag} />
+        </View>
       </View>
       <StopTimerButton
         busy={busy}
@@ -139,4 +174,9 @@ const st = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '600' },
   clock: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'], marginTop: 1 },
   stop:  { backgroundColor: STOP_COLOR, alignItems: 'center', justifyContent: 'center' },
+  meta:    { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
+  metaTag: { flexShrink: 1, marginTop: 1 },
+  tag:     { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 },
+  tagDot:  { width: 7, height: 7, borderRadius: 4 },
+  tagText: { fontWeight: '600', flexShrink: 1 },
 });

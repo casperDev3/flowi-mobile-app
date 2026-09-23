@@ -56,7 +56,7 @@ test('перенесений міграцією таймер видно одра
   expect(api.timersReady).toBe(true);
   expect(api.activeTimers.map(t => t.taskId)).toEqual(['t1']);
 
-  await act(async () => { await api.startAdHocTimer('Своє', 'day'); });
+  await act(async () => { await api.startAdHocTimer('Своє'); });
 
   const stored = JSON.parse(mockStore.get('active_timers') ?? '[]') as ActiveTimer[];
   expect(stored.map(t => t.taskId)).toContain('t1');

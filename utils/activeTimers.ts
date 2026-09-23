@@ -44,13 +44,13 @@ export interface ActiveTimer {
    */
   startedAt: string;
   /**
-   * ЛЕГАСІ. Поділ доби на ранок/день/вечір/ніч прибрано з продукту: за ним не
-   * будувався жоден звіт, а на екрані часу він з'їдав місце під чотири пігулки.
-   * Поле лишилось обов'язковим лише тому, що його ще пише `store/timer-context`
-   * (і дзеркалить у запис часу). Жоден екран його більше не показує й не
-   * рахує — прибирати з запису й зі старих даних не треба, просто не читати.
+   * ЛЕГАСІ, лише читання. Поділ доби на ранок/день/вечір/ніч прибрано з
+   * продукту: за ним не будувався жоден звіт, а мітка «День» у блоці «Йде
+   * зараз» нічого не казала про саму роботу — замість неї тепер проєкт
+   * (timerProject нижче). Нові таймери поля не пишуть; у старих записах воно
+   * лишається, і прибирати його з даних не треба — просто не читати.
    */
-  shift: Shift;
+  shift?: Shift;
   /** Проставляє saveSynced — основа LWW. */
   updatedAt?: string;
 }
@@ -104,17 +104,69 @@ export function findTimerForTask(
   return timers.find(timer => timer.taskId === taskId);
 }
 
+/** Мінімум проєкту, потрібний мітці таймера. */
+export interface TimerProjectSource {
+  id: string;
+  name?: string;
+  color?: string;
+}
+
+/** Мінімум завдання/наради: лише чий це проєкт. */
+export interface TimerProjectOwner {
+  id: string;
+  projectId?: string | null;
+}
+
 /**
- * Зміна доби за годиною старту: 06–12 ранок, 12–18 день, 18–24 вечір,
- * 00–06 ніч.
+ * Чий таймер — для мітки в «Йде зараз» і в режимі зосередження.
  *
- * ЛЕГАСІ разом із самим полем `shift` (див. вище): лишається тільки щоб стор
- * таймерів мав чим заповнити обов'язкове поле. Новий код цього не питає.
+ *   personal — сесія ні до якого проєкту не належить («Особисте»);
+ *   project  — проєкт знайдено: є назва й колір для крапки;
+ *   unknown  — проєкт у таймера Є, але його немає в переданому списку (ще не
+ *              завантажився, або доступ до проєкту втрачено). Показувати тут
+ *              «Особисте» було б неправдою, тож мітки просто немає.
  */
-export function shiftForDate(date: Date = new Date()): Shift {
-  const hour = date.getHours();
-  if (hour >= 6 && hour < 12) return 'morning';
-  if (hour >= 12 && hour < 18) return 'day';
-  if (hour >= 18) return 'evening';
-  return 'night';
+export type TimerProject =
+  | { kind: 'personal' }
+  | { kind: 'project'; id: string; name: string; color?: string }
+  | { kind: 'unknown'; id: string };
+
+function ownerProject(
+  owners: readonly TimerProjectOwner[] | undefined,
+  id: string | undefined,
+): string | undefined {
+  if (!id || !Array.isArray(owners)) return undefined;
+  const owner = owners.find(item => item?.id === id);
+  return typeof owner?.projectId === 'string' && owner.projectId ? owner.projectId : undefined;
+}
+
+/**
+ * Проєкт таймера. Однакова назва й поведінка з вебом (lib/active-timers.ts),
+ * паритет — __tests__/fixtures/timer-project-parity.json.
+ *
+ * Порядок джерел:
+ *   1. timer.projectId — його копіює стор при старті, і саме за ним сесія
+ *      ляже в запис часу; мітка мусить казати те саме, що потім покаже звіт;
+ *   2. проєкт завдання (tasks[taskId].projectId) — для старих таймерів, що
+ *      стартували до появи timer.projectId;
+ *   3. проєкт наради (meetings[meetingId].projectId), якщо наради передано.
+ */
+export function timerProject(
+  timer: Pick<ActiveTimer, 'projectId' | 'taskId' | 'meetingId'>,
+  projects: readonly TimerProjectSource[],
+  tasks: readonly TimerProjectOwner[] = [],
+  meetings: readonly TimerProjectOwner[] = [],
+): TimerProject {
+  const projectId = (typeof timer.projectId === 'string' && timer.projectId ? timer.projectId : undefined)
+    ?? ownerProject(tasks, timer.taskId)
+    ?? ownerProject(meetings, timer.meetingId);
+  if (!projectId) return { kind: 'personal' };
+  const project = Array.isArray(projects) ? projects.find(item => item?.id === projectId) : undefined;
+  if (!project) return { kind: 'unknown', id: projectId };
+  return {
+    kind: 'project',
+    id: projectId,
+    name: typeof project.name === 'string' ? project.name : '',
+    ...(typeof project.color === 'string' && project.color ? { color: project.color } : {}),
+  };
 }

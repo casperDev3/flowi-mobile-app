@@ -35,6 +35,18 @@ describe('id таймера наради', () => {
     expect(phone.id).toBe(laptop.id);
   });
 
+  it('частину доби (shift) не пише — її прибрано з продукту', () => {
+    const timer = buildMeetingTimer(meeting({ projectId: 'p1' }), NOW);
+    expect(timer).not.toHaveProperty('shift');
+    expect(timer).toEqual({
+      id: 'meeting:m1',
+      meetingId: 'm1',
+      label: 'Планерка',
+      startedAt: NOW.toISOString(),
+      projectId: 'p1',
+    });
+  });
+
   it('не перетинається з id таймера завдання', () => {
     // Нарада і завдання можуть мати однаковий id — вони з різних колекцій.
     // Спільний простір local_id склеїв би два різні таймери в один.
@@ -44,8 +56,8 @@ describe('id таймера наради', () => {
 
 describe('впізнавання таймера наради', () => {
   const timers: ActiveTimer[] = [
-    { id: 'adhoc:1', label: 'Читання', startedAt: NOW.toISOString(), shift: 'day' },
-    { id: 'task:7', taskId: '7', label: 'Завдання', startedAt: NOW.toISOString(), shift: 'day' },
+    { id: 'adhoc:1', label: 'Читання', startedAt: NOW.toISOString() },
+    { id: 'task:7', taskId: '7', label: 'Завдання', startedAt: NOW.toISOString() },
     buildMeetingTimer(meeting(), NOW),
   ];
 

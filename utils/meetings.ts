@@ -20,7 +20,7 @@
 // Копія тут була б третьою по рахунку і першою, яка тихо відстане.
 import type { RecurrenceRule } from '@/components/shared/MeetingFormSheet';
 
-import { shiftForDate, type ActiveTimer } from './activeTimers';
+import { type ActiveTimer } from './activeTimers';
 import { totalTrackedSeconds, type TimeEntry } from './taskTimer';
 
 export interface Meeting {
@@ -105,9 +105,6 @@ export function buildMeetingTimer(
     meetingId: meeting.id,
     label: meeting.title,
     startedAt: now.toISOString(),
-    // Зміну доби беремо з годинника, як для завдання: нараду не «планують на
-    // вечір» окремо від того, коли її насправді почали трекати.
-    shift: shiftForDate(now),
     // Сесія проєктної наради рахується за проєктом, а не як «Особисте».
     ...(meeting.projectId ? { projectId: meeting.projectId } : {}),
   };

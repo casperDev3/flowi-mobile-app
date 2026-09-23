@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TimerProjectTag } from '@/components/time/ActiveTimerRow';
 import { TimerCell } from '@/components/time/TimerCell';
 import { TimerDial } from '@/components/time/dials/TimerDial';
 import { DialPicker } from '@/components/time/DialPicker';
@@ -41,7 +42,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
-import type { ActiveTimer } from '@/utils/activeTimers';
+import { timerProject, type ActiveTimer } from '@/utils/activeTimers';
 import { isOverdue, type HistoryEventType, type Task, type TaskHistoryEvent } from '@/utils/taskUtils';
 
 const STOP = '#EF4444';
@@ -136,13 +137,12 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
     [tasks],
   );
 
-  const projectColorFor = useCallback(
-    (timer: ActiveTimer): string | undefined => {
-      const task = taskById(timer.taskId);
-      if (!task?.projectId) return undefined;
-      return projects.find(p => p.id === task.projectId)?.color;
-    },
-    [projects, taskById],
+  // Мітка «чий таймер» — та сама чиста функція, що в панелі над табами й на
+  // вебі. Проєкт наради береться з timer.projectId (його копіює стор при
+  // старті), тож 'meetings' тут не читаються.
+  const projectFor = useCallback(
+    (timer: ActiveTimer) => timerProject(timer, projects, tasks),
+    [projects, tasks],
   );
 
   /**
@@ -281,9 +281,12 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                     чекбоксах, і згортання під пальцем було б несподіванкою. */}
                 <Pressable onPress={() => setExpandedId(null)} style={st.bigClockBox}>
                   <View style={st.head}>
-                    {projectColorFor(expanded) ? (
-                      <View style={[st.dot, { backgroundColor: projectColorFor(expanded) }]} />
-                    ) : null}
+                    {(() => {
+                      const project = projectFor(expanded);
+                      return project.kind === 'project' && project.color
+                        ? <View style={[st.dot, { backgroundColor: project.color }]} />
+                        : null;
+                    })()}
                     <Text numberOfLines={2} style={[st.bigLabel, { color: c.text }]}>
                       {expanded.label}
                     </Text>
@@ -301,6 +304,13 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                     smooth={smoothExpanded}
                   />
                   <Text style={[st.caption, { color: c.sub }]}>{tr.currentSession}</Text>
+                  <TimerProjectTag
+                    project={projectFor(expanded)}
+                    tr={tr}
+                    color={c.sub}
+                    size={13}
+                    style={{ marginTop: 6, alignSelf: 'center' }}
+                  />
                 </Pressable>
 
                 {expandedTask ? (
@@ -325,19 +335,6 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                       </View>
                     ) : null}
 
-                    {(() => {
-                      const project = projects.find(p => p.id === expandedTask.projectId);
-                      if (!project) return null;
-                      return (
-                        <View style={[st.metaRow, { borderColor: c.border, backgroundColor: dim }]}>
-                          <View style={[st.dot, { backgroundColor: project.color, marginRight: 0 }]} />
-                          <Text style={[st.metaLabel, { color: c.sub }]}>{tr.project}</Text>
-                          <Text numberOfLines={1} style={[st.metaValue, { color: c.text }]}>
-                            {project.name}
-                          </Text>
-                        </View>
-                      );
-                    })()}
 
                     {expandedTask.subtasks?.length ? (
                       <View style={{ marginTop: 14 }}>
@@ -391,7 +388,8 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                     key={timer.id}
                     timer={timer}
                     subtasks={taskById(timer.taskId)?.subtasks}
-                    projectColor={projectColorFor(timer)}
+                    project={projectFor(timer)}
+                    tr={tr}
                     height={layout.cellHeight}
                     dial={dialFor(timer.id)}
                     /* Розмір один на всі клітинки: головного циферблата немає,

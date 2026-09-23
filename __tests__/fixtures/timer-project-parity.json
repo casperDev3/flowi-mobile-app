@@ -1,0 +1,74 @@
+{
+  "_about": "Паритет timerProject: web lib/active-timers.ts ↔ mobile utils/activeTimers.ts. Побайтова копія: web lib/__fixtures__/timer-project-parity.json = mobile __tests__/fixtures/timer-project-parity.json.",
+  "projects": [
+    { "id": "p1", "name": "Сайт", "color": "#F97316" },
+    { "id": "p2", "name": "Без кольору" }
+  ],
+  "tasks": [
+    { "id": "t1", "projectId": "p1" },
+    { "id": "t2" },
+    { "id": "t3", "projectId": "p-gone" },
+    { "id": "t4", "projectId": null }
+  ],
+  "meetings": [
+    { "id": "m1", "projectId": "p2" },
+    { "id": "m2", "projectId": null }
+  ],
+  "cases": [
+    {
+      "name": "власний projectId таймера важливіший за проєкт задачі",
+      "timer": { "id": "task:t1", "taskId": "t1", "projectId": "p2" },
+      "expected": { "kind": "project", "id": "p2", "name": "Без кольору" }
+    },
+    {
+      "name": "старий таймер без projectId бере проєкт задачі",
+      "timer": { "id": "task:t1", "taskId": "t1" },
+      "expected": { "kind": "project", "id": "p1", "name": "Сайт", "color": "#F97316" }
+    },
+    {
+      "name": "порожній projectId не рахується проєктом",
+      "timer": { "id": "task:t1", "taskId": "t1", "projectId": "" },
+      "expected": { "kind": "project", "id": "p1", "name": "Сайт", "color": "#F97316" }
+    },
+    {
+      "name": "особиста задача",
+      "timer": { "id": "task:t2", "taskId": "t2" },
+      "expected": { "kind": "personal" }
+    },
+    {
+      "name": "задача з projectId null",
+      "timer": { "id": "task:t4", "taskId": "t4" },
+      "expected": { "kind": "personal" }
+    },
+    {
+      "name": "задачі вже немає в списку",
+      "timer": { "id": "task:zz", "taskId": "zz" },
+      "expected": { "kind": "personal" }
+    },
+    {
+      "name": "нарада проєкту",
+      "timer": { "id": "meeting:m1", "meetingId": "m1" },
+      "expected": { "kind": "project", "id": "p2", "name": "Без кольору" }
+    },
+    {
+      "name": "особиста нарада",
+      "timer": { "id": "meeting:m2", "meetingId": "m2" },
+      "expected": { "kind": "personal" }
+    },
+    {
+      "name": "вільний таймер",
+      "timer": { "id": "adhoc:1" },
+      "expected": { "kind": "personal" }
+    },
+    {
+      "name": "проєкт є, але його немає у списку — не «Особисте»",
+      "timer": { "id": "task:t3", "taskId": "t3" },
+      "expected": { "kind": "unknown", "id": "p-gone" }
+    },
+    {
+      "name": "легасі shift ні на що не впливає",
+      "timer": { "id": "adhoc:2", "shift": "evening" },
+      "expected": { "kind": "personal" }
+    }
+  ]
+}

@@ -20,7 +20,9 @@ import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } fro
 
 import { TimerDial } from '@/components/time/dials/TimerDial';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import type { ActiveTimer } from '@/utils/activeTimers';
+import { TimerProjectTag } from '@/components/time/ActiveTimerRow';
+import type { Translations } from '@/store/translations';
+import type { ActiveTimer, TimerProject } from '@/utils/activeTimers';
 import type { DialId } from '@/utils/timerDials';
 import { timerCellSubtaskRows } from '@/utils/timerGrid';
 
@@ -50,10 +52,12 @@ export interface TimerCellProps {
    */
   subtasks?: CellSubtask[];
   /**
-   * Колір проєкту завдання. undefined → крапки немає взагалі: вільний таймер
-   * або завдання поза проєктом не отримує сірого «нічого», яке лише шумить.
+   * Чий таймер (timerProject): крапка кольору й назва проєкту або «Особисте».
+   * Замінила частину доби — та нічого не казала про саму роботу.
    */
-  projectColor?: string;
+  project?: TimerProject;
+  /** Рядки мітки проєкту — у компонент не зашиваються. */
+  tr: Translations;
   /** Висота клітинки. Рахує сітка — див. коментар до файлу. */
   height: number;
   /** Обраний циферблат — один на застосунок, приходить із хука вище. */
@@ -86,7 +90,8 @@ export interface TimerCellProps {
 export function TimerCell({
   timer,
   subtasks,
-  projectColor,
+  project,
+  tr,
   height,
   dial,
   dialSize,
@@ -123,7 +128,6 @@ export function TimerCell({
         tint={isDark ? 'dark' : 'light'}
         style={[st.card, { height, borderColor: c.border }]}>
         <View style={st.head}>
-          {projectColor ? <View style={[st.dot, { backgroundColor: projectColor }]} /> : null}
           <Text numberOfLines={1} style={[st.label, { color: c.sub }]}>{timer.label}</Text>
           {/* Вибір циферблата належить конкретному таймеру, тому кнопка стоїть
               у ЙОГО картці, а не в шапці режиму: у шапці вона неминуче
@@ -167,15 +171,20 @@ export function TimerCell({
 
         {/* Зупинка незворотна — пише сесію в історію і повертає колонку. Тому
             вона тут окремою кнопкою, а не жестом по клітинці. */}
-        <Pressable
-          onPress={onStop}
-          accessibilityRole="button"
-          accessibilityLabel={stopLabel}
-          hitSlop={8}
-          style={[st.stop, { borderColor: STOP + '55', backgroundColor: STOP + '16' }]}>
-          <IconSymbol name="stop.fill" size={13} color={STOP} />
-          <Text style={st.stopText}>{stopLabel}</Text>
-        </Pressable>
+        {/* Проєкт — у рядку зі «Стоп», а не окремим рядком: висоту клітинки
+            ділить utils/timerGrid, і зайвий рядок з'їв би полотно циферблата. */}
+        <View style={st.foot}>
+          <TimerProjectTag project={project} tr={tr} color={c.sub} style={st.tag} />
+          <Pressable
+            onPress={onStop}
+            accessibilityRole="button"
+            accessibilityLabel={stopLabel}
+            hitSlop={8}
+            style={[st.stop, { borderColor: STOP + '55', backgroundColor: STOP + '16' }]}>
+            <IconSymbol name="stop.fill" size={13} color={STOP} />
+            <Text style={st.stopText}>{stopLabel}</Text>
+          </Pressable>
+        </View>
       </BlurView>
     </Pressable>
   );
@@ -196,12 +205,13 @@ const st = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   head:     { flexDirection: 'row', alignItems: 'center' },
-  dot:      { width: 8, height: 8, borderRadius: 4, marginRight: 7 },
   label:    { flex: 1, fontSize: 12, fontWeight: '700' },
   dialBtn:  { width: 24, height: 24, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
   clockRow: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  foot:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  tag:      { flex: 1 },
   stop: {
-    alignSelf: 'center',
+    marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 999,

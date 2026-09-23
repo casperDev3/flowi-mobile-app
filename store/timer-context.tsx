@@ -30,11 +30,9 @@ import { updateSynced } from './synced-storage';
 import {
   adHocTimerId,
   findTimerForTask,
-  shiftForDate,
   sortTimers,
   taskTimerId,
   type ActiveTimer,
-  type Shift,
 } from '@/utils/activeTimers';
 import {
   buildMeetingTimer,
@@ -113,7 +111,7 @@ export interface TimerContextValue {
   /** false, доки сховище не прочитане: до цього «немає таймерів» — брехня. */
   timersReady: boolean;
   startTaskTimer: (task: TimerTaskInput) => Promise<void>;
-  startAdHocTimer: (label: string, shift: Shift) => Promise<void>;
+  startAdHocTimer: (label: string) => Promise<void>;
   /** Нарада трекається так само, як завдання, — але без дошки, див. stopTimer. */
   startMeetingTimer: (meeting: TimerMeetingInput) => Promise<void>;
   stopTimer: (id: string) => Promise<void>;
@@ -423,7 +421,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         taskId: task.id,
         label: task.title,
         startedAt: now.toISOString(),
-        shift: shiftForDate(now),
         projectId: task.projectId,
       };
 
@@ -453,15 +450,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const startAdHocTimer = useCallback(
-    async (label: string, shift: Shift) => {
-      const now = new Date();
+    async (label: string) => {
+      // Частини доби (shift) більше не пишемо: поділ на ранок/день/вечір/ніч
+      // прибрано з продукту, мітка таймера тепер — проєкт (timerProject).
       const timer: ActiveTimer = {
         id: adHocTimerId(),
         label,
-        startedAt: now.toISOString(),
-        // Зміну для вільного таймера обирає користувач вручну — тому вона
-        // приходить пропом, а не рахується з годинника.
-        shift,
+        startedAt: new Date().toISOString(),
       };
       await mutateTimers(current => [...current, timer]);
     },

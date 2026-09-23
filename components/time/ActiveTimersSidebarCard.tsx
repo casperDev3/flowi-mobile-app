@@ -18,9 +18,11 @@ import {
   ActiveTimerRow,
   StopTimerButton,
   TIMER_KIND_ICON,
+  TimerProjectTag,
   timerKindLabel,
   useTimerStopper,
 } from '@/components/time/ActiveTimerRow';
+import { useTimerProjects } from '@/components/time/useTimerProjects';
 import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -44,6 +46,7 @@ export function ActiveTimersSidebarCard({ colors: c }: { colors: SidebarCardColo
   const { tr, lang } = useI18n();
   const { activeTimers } = useTimerContext();
   const { busy, stop } = useTimerStopper();
+  const projectOf = useTimerProjects(activeTimers);
   const [expanded, setExpanded] = useState(false);
   const [focusOpen, setFocusOpen] = useState(false);
 
@@ -86,12 +89,17 @@ export function ActiveTimersSidebarCard({ colors: c }: { colors: SidebarCardColo
             <Text numberOfLines={single ? 2 : 1} style={[st.title, { color: c.text }]}>
               {single ? primaryLabel : timersCountLabel(count, lang, tr)}
             </Text>
-            <ElapsedClock
-              running
-              seconds={now => elapsedSince(primary.startedAt, now)}
-              format={formatClock}
-              style={[st.clock, { color: c.accent }]}
-            />
+            <View style={st.meta}>
+              <ElapsedClock
+                running
+                seconds={now => elapsedSince(primary.startedAt, now)}
+                format={formatClock}
+                style={[st.clock, { color: c.accent }]}
+              />
+              {single && (
+                <TimerProjectTag project={projectOf(primary)} tr={tr} color={c.sub} size={11} style={st.tag} />
+              )}
+            </View>
           </View>
           {!single && (
             <IconSymbol name={expanded ? 'chevron.down' : 'chevron.up'} size={13} color={c.sub} />
@@ -117,6 +125,7 @@ export function ActiveTimersSidebarCard({ colors: c }: { colors: SidebarCardColo
             <ActiveTimerRow
               key={timer.id}
               timer={timer}
+              project={projectOf(timer)}
               busy={busy.has(timer.id)}
               onStop={() => stop(timer.id)}
               colors={rowColors}
@@ -158,6 +167,8 @@ const st = StyleSheet.create({
   icon:     { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   title:    { fontSize: 13, fontWeight: '700' },
   clock:    { fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 1 },
+  meta:     { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
+  tag:      { flexShrink: 1, marginTop: 1 },
   list:     { maxHeight: 260, marginTop: 4 },
   actions:  { flexDirection: 'row', gap: 6, marginTop: 6 },
   action: {

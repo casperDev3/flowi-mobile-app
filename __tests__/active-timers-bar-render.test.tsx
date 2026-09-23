@@ -3,8 +3,10 @@
  * картка в сайдбарі (планшет): 1 таймер → назва + стоп; N → «N таймери» і
  * список зі стопом для кожного, а під ним «Трекер часу» і «Зосередження».
  */
+// Сховище — словник: мітці проєкту треба прочитати 'projects'.
+const mockStorage: Record<string, string> = {};
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: jest.fn(async () => null),
+  getItem: jest.fn(async (key: string) => mockStorage[key] ?? null),
   setItem: jest.fn(async () => {}),
   removeItem: jest.fn(async () => {}),
 }));
@@ -64,6 +66,7 @@ beforeEach(() => {
   mockPush.mockClear();
   mockWide = false;
   mockTimers = [];
+  for (const key of Object.keys(mockStorage)) delete mockStorage[key];
 });
 
 describe('ActiveTimersBar (телефон)', () => {
@@ -157,5 +160,39 @@ describe('ActiveTimersSidebarCard (планшет)', () => {
     const focus = tree.root.find((n: any) => n.props.accessibilityLabel === 'Зосередження, Активні таймери: 2' && n.props.onPress);
     act(() => { focus.props.onPress(); });
     expect(tree.root.findByType('FullscreenTimers' as any).props.visible).toBe(true);
+  });
+});
+
+describe('мітка таймера — проєкт, а не частина доби', () => {
+  // T1/T2 навмисно несуть легасі shift ('morning'/'day'): показуватись він не сміє.
+  const PROJECTS = JSON.stringify([{ id: 'p1', name: 'Сайт', color: '#F97316' }]);
+
+  it('1 таймер у панелі: назва проєкту поруч із назвою таймера', async () => {
+    mockStorage.projects = PROJECTS;
+    mockTimers = [{ ...T1, projectId: 'p1' }];
+    let tree: any;
+    await act(async () => { tree = create(<ActiveTimersBar />); });
+    expect(texts(tree)).toContain('Сайт');
+    expect(texts(tree)).not.toContain('Ранок');
+  });
+
+  it('аркуш: проєктний таймер — проєкт, вільний — «Особисте», частин доби немає', async () => {
+    mockStorage.projects = PROJECTS;
+    mockTimers = [{ ...T1, projectId: 'p1' }, T2];
+    let tree: any;
+    await act(async () => { tree = create(<ActiveTimersBar />); });
+    const body = tree.root.find((n: any) => n.props.accessibilityLabel === 'Показати всі активні таймери' && n.props.onPress);
+    act(() => { body.props.onPress(); });
+    expect(texts(tree)).toEqual(expect.arrayContaining(['Сайт', 'Особисте']));
+    for (const part of ['Ранок', 'День', 'Вечір', 'Ніч']) expect(texts(tree)).not.toContain(part);
+  });
+
+  it('старий таймер задачі без projectId бере проєкт із задачі (картка сайдбара)', async () => {
+    mockStorage.projects = PROJECTS;
+    mockStorage.tasks = JSON.stringify([{ id: '1', title: 'Звіт', projectId: 'p1' }]);
+    mockTimers = [T1];
+    let tree: any;
+    await act(async () => { tree = create(<ActiveTimersSidebarCard colors={COLORS} />); });
+    expect(texts(tree)).toContain('Сайт');
   });
 });

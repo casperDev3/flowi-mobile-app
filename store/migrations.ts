@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { loadData, saveData } from './storage';
 import { saveSynced } from './synced-storage';
-import { sortTimers, taskTimerId, shiftForDate, type ActiveTimer } from '@/utils/activeTimers';
+import { sortTimers, taskTimerId, type ActiveTimer } from '@/utils/activeTimers';
 import type { Account } from '@/utils/accounts';
 import { deriveStatusType, type TaskStatusColumn } from '@/utils/taskStatuses';
 import type { TimeRecord } from '@/utils/timeEntries';
@@ -149,6 +149,7 @@ async function migrateBalanceAdjustments(): Promise<boolean> {
 interface MigratableTask {
   id?: unknown;
   title?: unknown;
+  projectId?: unknown;
   timeEntries?: { id?: string; startedAt?: string; endedAt?: string; duration?: number }[];
   [key: string]: unknown;
 }
@@ -199,10 +200,9 @@ export function migrateOpenTimeEntries(
         taskId: id,
         label: typeof task.title === 'string' ? task.title : '',
         startedAt,
-        // Зміну відновлюємо з часу СТАРТУ старої сесії, а не з «зараз»:
-        // інакше нічна сесія після ранкового запуску застосунку осіла б у
-        // статистиці як ранкова.
-        shift: shiftForDate(new Date(startedAt)),
+        // Як і startTaskTimer: таймер несе проєкт задачі, щоб мітка й запис
+        // часу не залежали від того, чи завантажена колекція задач.
+        ...(typeof task.projectId === 'string' && task.projectId ? { projectId: task.projectId } : {}),
         // restoreColumn немає навмисно: куди саме класти завдання після
         // зупинки, стара форма не зберігала, а вгадувати означало б
         // переставити його всупереч рішенню користувача.

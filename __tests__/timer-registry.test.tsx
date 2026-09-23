@@ -82,7 +82,7 @@ describe('чужі записи в active_timers', () => {
     await act(async () => { await saveData('active_timers', [remote]); });
     expect(api.activeTimers.map(t => t.id)).toEqual(['task:remote']);
 
-    await act(async () => { await api.startAdHocTimer('Своє', 'day'); });
+    await act(async () => { await api.startAdHocTimer('Своє'); });
 
     const stored = read<ActiveTimer[]>('active_timers', []);
     expect(stored.map(t => t.id)).toContain('task:remote');
@@ -141,10 +141,12 @@ describe('колонка завдання під таймером', () => {
     seed('tasks', [{ ...activeTask, kanbanColumnId: 'status-active' }]);
     await mount();
 
-    await act(async () => { await api.startAdHocTimer('Читання', 'day'); });
+    await act(async () => { await api.startAdHocTimer('Читання'); });
     const running = read<{ id: string; taskId?: string; startedAt: string }[]>('active_timers', []);
     expect(running).toHaveLength(1);
     expect(running[0].taskId).toBeUndefined();
+    // Частину доби (shift) новий таймер більше не пише — її прибрано з продукту.
+    expect(running[0]).not.toHaveProperty('shift');
 
     // Відсуваємо старт на хвилину назад: сесія нульової тривалості навмисно
     // нікуди не пишеться, і на ній цей тест нічого б не перевірив.

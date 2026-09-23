@@ -27,9 +27,11 @@ import {
   ActiveTimerRow,
   StopTimerButton,
   TIMER_KIND_ICON,
+  TimerProjectTag,
   timerKindLabel,
   useTimerStopper,
 } from '@/components/time/ActiveTimerRow';
+import { useTimerProjects } from '@/components/time/useTimerProjects';
 import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -54,6 +56,7 @@ export function ActiveTimersBar() {
   const { tr, lang } = useI18n();
   const { activeTimers } = useTimerContext();
   const { busy, stop } = useTimerStopper();
+  const projectOf = useTimerProjects(activeTimers);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [focusOpen, setFocusOpen] = useState(false);
   const focusDelay = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,6 +125,9 @@ export function ActiveTimersBar() {
               <IconSymbol name={single ? TIMER_KIND_ICON[timerKind(primary)] : 'timer'} size={15} color={c.accent} />
             </View>
             <Text numberOfLines={1} style={[st.title, { color: c.text }]}>{title}</Text>
+            {single && (
+              <TimerProjectTag project={projectOf(primary)} tr={tr} color={c.sub} style={st.tag} />
+            )}
             <ElapsedClock
               running
               seconds={now => elapsedSince(primary.startedAt, now)}
@@ -157,6 +163,7 @@ export function ActiveTimersBar() {
               <ActiveTimerRow
                 key={timer.id}
                 timer={timer}
+                project={projectOf(timer)}
                 busy={busy.has(timer.id)}
                 onStop={() => stop(timer.id)}
                 colors={rowColors}
@@ -210,6 +217,8 @@ const st = StyleSheet.create({
   icon:  { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontSize: 14, fontWeight: '700' },
   clock: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  // Назва таймера головніша за проєкт: мітка стискається першою.
+  tag:   { flexShrink: 1, maxWidth: '38%' },
 
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {

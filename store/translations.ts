@@ -1460,6 +1460,8 @@ export interface Translations {
   timerKindTask: string;
   timerKindMeeting: string;
   timerKindAdhoc: string;
+  // пункт 5: мітка таймера — проєкт замість частини доби
+  timerProjectPersonal: string;
 
   /** Прикріплення завдання до таймера на вкладці Час. */
   attachTask: string;
@@ -3676,6 +3678,8 @@ const uk: Translations = {
   timerKindTask: 'Завдання',
   timerKindMeeting: 'Зустріч',
   timerKindAdhoc: 'Вільний таймер',
+  // пункт 5: мітка таймера — проєкт замість частини доби
+  timerProjectPersonal: 'Особисте',
   attachTask: 'Прикріпити завдання',
   detachTask: 'Відкріпити',
   pickTaskTitle: 'Яке завдання відлічуємо?',
@@ -5879,6 +5883,8 @@ const en: Translations = {
   timerKindTask: 'Task',
   timerKindMeeting: 'Meeting',
   timerKindAdhoc: 'Free timer',
+  // пункт 5: мітка таймера — проєкт замість частини доби
+  timerProjectPersonal: 'Personal',
   attachTask: 'Attach a task',
   detachTask: 'Detach',
   pickTaskTitle: 'Which task are you timing?',

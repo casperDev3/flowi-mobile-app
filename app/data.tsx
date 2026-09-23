@@ -17,6 +17,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
+
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAutoBackup } from '@/store/auto-backup';
@@ -24,6 +26,8 @@ import { BACKUP_KEYS } from '@/store/backup-keys';
 import { loadData, notifyStorageChanged, saveData } from '@/store/storage';
 import { SYNC_ARRAY_KEYS, saveSynced } from '@/store/synced-storage';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useI18n } from '@/store/i18n';
+import { localDateKey } from '@/utils/dateUtils';
 
 const ALL_KEYS = [
   { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
@@ -53,6 +57,13 @@ const ALL_KEYS = [
   { key: 'subscriptions',     label: 'Підписки',    icon: 'repeat',             color: '#8B5CF6' },
 ] as const;
 
+// Ключі, що йдуть у файловий експорт БЕЗ плитки-лічильника на екрані:
+// регулярні доходи (finance-revamp.md §4.2) і контейнери v2 (containers.md §3.4 —
+// місця й речі). `media_assets` (метадані фото без байтів) і
+// `training_sessions` (розгортає сервер із програми групи) у файл свідомо не
+// йдуть — див. NOT_IN_JSON_EXPORT у __tests__/backup-keys.test.ts.
+const EXPORT_ONLY_KEYS = ['recurring_incomes', 'container_places', 'container_items'] as const;
+
 // export key maps storage key → JSON key (snake_case → camelCase where needed)
 const EXPORT_KEY_MAP: Record<string, string> = {
   tasks: 'tasks', task_statuses: 'taskStatuses', transactions: 'transactions', accounts: 'accounts', time_entries: 'timeEntries',
@@ -64,6 +75,7 @@ const EXPORT_KEY_MAP: Record<string, string> = {
   health_meds: 'healthMeds', health_checkups: 'healthCheckups',
   health_vaccines: 'healthVaccines', health_habits: 'healthHabits',
   subscriptions: 'subscriptions',
+  recurring_incomes: 'recurringIncomes', container_places: 'containerPlaces', container_items: 'containerItems',
 };
 const IMPORT_KEY_MAP: Record<string, string> = {
   tasks: 'tasks', taskStatuses: 'task_statuses', transactions: 'transactions', accounts: 'accounts', timeEntries: 'time_entries',
@@ -75,6 +87,7 @@ const IMPORT_KEY_MAP: Record<string, string> = {
   healthMeds: 'health_meds', healthCheckups: 'health_checkups',
   healthVaccines: 'health_vaccines', healthHabits: 'health_habits',
   subscriptions: 'subscriptions',
+  recurringIncomes: 'recurring_incomes', containerPlaces: 'container_places', containerItems: 'container_items',
   // categories is an object — handled separately
   categories: 'categories',
 };
@@ -110,6 +123,7 @@ function formatBackupTime(date: Date | null): string {
 type Counts = Record<string, number>;
 
 export default function DataScreen() {
+  const { tr } = useI18n();
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -164,9 +178,11 @@ export default function DataScreen() {
         exportedAt: new Date().toISOString(),
       };
       ALL_KEYS.forEach((k, i) => { payload[EXPORT_KEY_MAP[k.key]] = results[i]; });
+      const extra = await Promise.all(EXPORT_ONLY_KEYS.map(key => loadData(key, [])));
+      EXPORT_ONLY_KEYS.forEach((key, i) => { payload[EXPORT_KEY_MAP[key]] = extra[i]; });
       payload['categories'] = categories;
 
-      const dateStr = new Date().toISOString().slice(0, 10);
+      const dateStr = localDateKey(new Date()); // локальна доба, не UTC
       const fileName = `flowi-export-${dateStr}.json`;
       const file = new File(Paths.document, fileName);
       file.create({ overwrite: true });
@@ -375,7 +391,10 @@ export default function DataScreen() {
                   // multiRemove іде повз saveData, тож підписники сховища про
                   // очищення не дізнались би. Стор активних таймерів після
                   // цього повернув би стертий реєстр першим же стартом.
-                  cleared.forEach(notifyStorageChanged);
+                  // Стрілка, а не `forEach(notifyStorageChanged)`: у сигналу
+                  // тепер є другий параметр (джерело запису), і точкова
+                  // передача передавала б туди ІНДЕКС масиву.
+                  cleared.forEach(key => notifyStorageChanged(key));
                   const empty: Counts = {};
                   ALL_KEYS.forEach(k => { empty[k.key] = 0; });
                   setCounts(empty);
@@ -393,15 +412,29 @@ export default function DataScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
+          useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={[]}>
 
-        <View style={st.header}>
-          <TouchableOpacity onPress={() => router.back()} style={[st.backBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-            <IconSymbol name="chevron.left" size={17} color={c.sub} />
-          </TouchableOpacity>
-          <Text style={[st.title, { color: c.text }]}>Управління даними</Text>
-          <View style={{ width: 36 }} />
-        </View>
+        {/* Заголовок був вшитий рядком — тепер зі словника. Розділу немає в
+            сайдбарі, тож на планшеті замість стрілки — шлях «Налаштування →
+            Управління даними»: він каже, звідки прийшов, чого стрілка не
+            казала ніколи. */}
+        <ScreenHeader
+          title={tr.dataManagement}
+          color={c.text}
+          back={{
+            onPress: () => router.back(),
+            label: tr.back,
+            color: c.sub,
+            style: { backgroundColor: c.dim, borderColor: c.border },
+          }}
+          crumbs={[
+            { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
+            { label: tr.dataManagement },
+          ]}
+          crumbColor={c.sub}
+        />
 
         <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]} showsVerticalScrollIndicator={false}>
 
@@ -590,9 +623,6 @@ const StatRow = React.memo(function StatRow(
 });
 
 const st = StyleSheet.create({
-  header:      { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' },
-  title:       { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, flex: 1, textAlign: 'center' },
-  backBtn:     { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10, marginLeft: 2 },
   card:        { borderRadius: 18, borderWidth: 1, overflow: 'hidden', marginBottom: 0 },
   statRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },

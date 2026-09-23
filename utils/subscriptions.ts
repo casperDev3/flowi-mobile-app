@@ -6,14 +6,20 @@
  * масивів, тож усе перевіряється unit-тестами (__tests__/subscriptions.test.ts).
  *
  * Головні інваріанти:
- *  - Підписка НІКОЛИ не створює фінансових операцій і не чіпає балансів.
- *    «Продовжено» лише зсуває дату наступної оплати на один період і дописує
- *    запис в історію.
+ *  - «Продовжено» (renewSubscription) фінансових операцій НЕ створює: воно лише
+ *    зсуває дату наступної оплати на один період і дописує запис в історію.
+ *    Операцію створює ЛИШЕ окрема дія «Оплачено» (paySubscription), і створює
+ *    її як звичайну витрату, яку видно й правлять у Фінансах як будь-яку іншу.
  *  - Дати — ключі 'YYYY-MM-DD' у ЛОКАЛЬНОМУ календарі. Уся математика —
  *    цілочисельна Y/M/D (через Date.UTC лише як календар), без зсувів часових
  *    поясів і стрибків на переході літнього часу.
  *  - Історія append-only.
+ *
+ * Модуль лишається чистим: із фінансів імпортується ЛИШЕ тип операції (import
+ * type стирається при компіляції), тож ані RN, ані сховище сюди не приходять.
  */
+
+import type { Transaction } from '@/utils/financeUtils';
 
 // ─── Типи (G.1) ───────────────────────────────────────────────────────────────
 
@@ -202,7 +208,10 @@ function dayOfKey(dateKey: string): number | undefined {
   return parseDateKey(dateKey)?.d;
 }
 
-/** Один клік = один період. Фінансових операцій не створює. */
+/**
+ * Один клік = один період. Фінансових операцій не створює — це «Продовжено».
+ * Дію, що ще й записує витрату, див. `paySubscription`.
+ */
 export function renewSubscription(sub: Subscription, opts?: { amount?: number; now?: Date }): Subscription {
   const now = opts?.now ?? new Date();
   const amount = typeof opts?.amount === 'number' && Number.isFinite(opts.amount) && opts.amount > 0
@@ -219,6 +228,95 @@ export function renewSubscription(sub: Subscription, opts?: { amount?: number; n
     amount,
     history: [...(Array.isArray(sub.history) ? sub.history : []), renewal],
     nextPaymentDate: addPeriod(sub.nextPaymentDate, sub.period, sub.billingDay ?? dayOfKey(sub.nextPaymentDate)),
+  };
+}
+
+// ─── «Оплачено»: витрата + новий цикл ─────────────────────────────────────────
+
+/**
+ * Момент ISO для дня `dateKey` з годиною з `now`.
+ *
+ * Операція датується днем ЦИКЛУ, який оплатили, а не «сьогодні»: прострочену
+ * підписку позначають заднім числом, і витрата мусить лягти в той місяць, за
+ * який заплатили, інакше бюджет місяця розходиться з підписками. Час доби
+ * береться поточний — інакше всі операції дня злиплись би в опівніч і порядок
+ * усередині дня став би випадковим (те саме правило, що у формі операції).
+ */
+export function dateKeyAtTime(dateKey: string, now: Date = new Date()): string {
+  const p = parseDateKey(dateKey);
+  if (!p) return now.toISOString();
+  const at = new Date(now.getTime());
+  at.setFullYear(p.y, p.m - 1, p.d);
+  return at.toISOString();
+}
+
+/** Сума оплати: підтверджена користувачем, а якщо її немає — ціна підписки. */
+export function subscriptionPaymentAmount(sub: Subscription, amount?: number): number {
+  return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? amount : sub.amount;
+}
+
+export interface SubscriptionPaymentOptions {
+  /** id нової операції — генерує платформа (веб: crypto.randomUUID). */
+  id: string;
+  /** Рахунок списання; порожній — операція без рахунку (як дані до міграції). */
+  accountId?: string;
+  /** Валюта операції: валюта РАХУНКУ, якщо вона відома, інакше валюта підписки. */
+  currency?: string;
+  /** Сума, підтверджена в діалозі (ціна могла змінитися). */
+  amount?: number;
+  /** Категорія, коли в підписці її не вказано. */
+  fallbackCategory: string;
+  now?: Date;
+}
+
+/**
+ * Витрата за один цикл підписки.
+ *
+ * Звичайнісінька операція: рахунок, категорія й сума беруться з підписки, але
+ * жодного зворотного зв'язку з неї немає. Саме тому скасування (видалення чи
+ * правка) створеної операції нічого не ламає — дата наступної оплати живе в
+ * підписці й про операцію не знає.
+ */
+export function subscriptionPaymentTx(sub: Subscription, opts: SubscriptionPaymentOptions): Transaction {
+  const now = opts.now ?? new Date();
+  return {
+    id: opts.id,
+    type: 'expense',
+    category: (sub.category ?? '').trim() || opts.fallbackCategory,
+    amount: subscriptionPaymentAmount(sub, opts.amount),
+    note: sub.name,
+    date: dateKeyAtTime(sub.nextPaymentDate, now),
+    accountId: opts.accountId ?? '',
+    currency: opts.currency || sub.currency,
+    projectId: sub.projectId,
+  };
+}
+
+export interface SubscriptionPaymentResult {
+  /** Підписка з новим циклом і дописаним рядком історії. */
+  subscription: Subscription;
+  /** Витрата, яку треба покласти в 'transactions'. */
+  transaction: Transaction;
+}
+
+/**
+ * «Оплачено» — одна дія з двох половин: витрата у Фінансах і новий цикл.
+ *
+ * Обидві половини рахує ця функція (а не екран), щоб сума в операції й сума в
+ * історії продовжень не могли розійтися, і щоб мобільний з вебом рахували
+ * ОДНАКОВО — дзеркало живе в lib/subscriptions.ts.
+ *
+ * Атомарності між двома колекціями тут немає й бути не може: записи йдуть
+ * окремо. Порядок на боці екрана — спершу підписка (там сидить захист від
+ * повторного продовження), потім операція; так найгірший випадок — зсунутий
+ * цикл без витрати, яку людина бачить і додасть руками, а не подвійне списання.
+ */
+export function paySubscription(sub: Subscription, opts: SubscriptionPaymentOptions): SubscriptionPaymentResult {
+  const now = opts.now ?? new Date();
+  const amount = subscriptionPaymentAmount(sub, opts.amount);
+  return {
+    subscription: renewSubscription(sub, { amount, now }),
+    transaction: subscriptionPaymentTx(sub, { ...opts, amount, now }),
   };
 }
 

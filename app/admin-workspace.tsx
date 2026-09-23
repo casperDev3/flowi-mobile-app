@@ -24,7 +24,7 @@ import {
   View,
 } from 'react-native';
 
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -243,15 +243,12 @@ export default function AdminWorkspaceScreen() {
         <ScreenHeader
           title={tr.adminWorkspaceTitle}
           color={c.text}
-          actions={
-            <HeaderButton
-              onPress={() => router.back()}
-              accessibilityLabel={tr.back}
-              style={{ backgroundColor: c.dim, borderColor: c.border }}
-            >
-              <IconSymbol name="chevron.left" size={19} color={c.text} />
-            </HeaderButton>
-          }
+          back={{
+            onPress: () => router.back(),
+            label: tr.back,
+            color: c.text,
+            style: { backgroundColor: c.dim, borderColor: c.border },
+          }}
         />
 
         {loading ? (

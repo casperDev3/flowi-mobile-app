@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { NotesWorkspace } from '@/components/notes/NotesWorkspace';
 import { ScreenHeader } from '@/components/shared/ScreenHeader';
@@ -12,12 +12,11 @@ export default function NotesScreen() {
   const router = useRouter();
   const color = isDark ? '#F4F1FA' : '#241C32';
   return <View style={{ flex: 1, backgroundColor: isDark ? '#15131D' : '#FAF8FF' }}>
-    <ScreenHeader title={tr.notes} color={color} actions={
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.back} onPress={() => router.back()}
-        style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', paddingHorizontal: 12 }}>
-        <Text style={{ color }}>{tr.back}</Text>
-      </TouchableOpacity>
-    } />
+    <ScreenHeader
+      title={tr.notes}
+      color={color}
+      back={{ onPress: () => router.back(), label: tr.back }}
+    />
     <NotesWorkspace isDark={isDark} />
   </View>;
 }

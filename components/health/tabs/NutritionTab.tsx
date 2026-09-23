@@ -1,0 +1,226 @@
+/**
+ * components/health/tabs/NutritionTab.tsx — вкладка «Харчування».
+ *
+ * Вміст колишнього екрана `app/health-nutrition.tsx` дослівно: калорії, білок,
+ * вода, нагадування і журнал їжі. Формули не чіпались — велике число й смужка
+ * міряють ЗʼЇДЕНЕ проти ліміту їжі, а спалене лишається окремим числом.
+ */
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState } from 'react';
+import { Linking, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+
+import { CalStat, SectionHeader } from '@/components/health/HealthBits';
+import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
+import { LoadErrorNotice, ReminderBlockedNotice } from '@/components/health/HealthNotices';
+import { MetricTrend } from '@/components/health/MetricTrend';
+import type { HealthTabProps } from '@/components/health/tabs/types';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useContentWidth } from '@/hooks/use-content-width';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useI18n } from '@/store/i18n';
+import { isSameDay } from '@/utils/dateUtils';
+import {
+  ACCENT, ACCENT_CAL, ACCENT_PROT, ACCENT_PULSE, ACCENT_STEPS, ModalKey, getHealthColors,
+} from '@/utils/healthTheme';
+
+export function NutritionTab({ h }: HealthTabProps) {
+  const contentWidth = useContentWidth();
+  const tabBarInset = useTabBarInset();
+  const isDark = useColorScheme() === 'dark';
+  const { tr, lang } = useI18n();
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+  const c = getHealthColors(isDark);
+
+  const { today, goals, cal } = h;
+  const [refreshing, setRefreshing] = useState(false);
+  const [modal, setModal] = useState<ModalKey | null>(null);
+  // ERR-10: планувальник відмовив — перемикач лишається вимкненим, а причину
+  // показуємо, замість того щоб малювати «увімкнено» і мовчати.
+  const [reminderBlocked, setReminderBlocked] = useState(false);
+
+  const onRefresh = async () => { setRefreshing(true); await h.reload(); setRefreshing(false); };
+  const onSubmit = (e: NewEntryPayload) => { h.addEntry(e); setModal(null); };
+
+  const foodToday = h.entries.filter(e => e.type === 'calories' && isSameDay(new Date(e.date), new Date()));
+
+  return (
+    <>
+      <ScrollView
+        contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: tabBarInset + 32 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+        {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+        {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
+
+        {/* Калорії */}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1 }}>
+            <SectionHeader title={tr.calories} icon="flame.fill" color={ACCENT_CAL} textColor={c.text} top={8} />
+          </View>
+          <TouchableOpacity onPress={() => setModal('calories')} accessibilityRole="button" accessibilityLabel={tr.add}
+            style={[s.addBtn, { backgroundColor: ACCENT_CAL }]}>
+            <IconSymbol name="plus" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+          {/* Велике число — ЗʼЇДЕНЕ, і смужка міряє теж його. Спалене сюди не
+              входить: день без їжі й із 500 спаленими має показувати нуль
+              зʼїдених, а не «500 / 2200». Вплив тренувань видно в залишку. */}
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
+            <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{cal.consumed}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>/ {goals.calories} кк</Text>
+            <View style={{ flex: 1 }} />
+            <View style={[s.badge, { backgroundColor: (cal.over ? ACCENT_PULSE : ACCENT_CAL) + '20', borderColor: (cal.over ? ACCENT_PULSE : ACCENT_CAL) + '40' }]}>
+              <Text style={{ color: cal.over ? ACCENT_PULSE : ACCENT_CAL, fontSize: 11, fontWeight: '700' }}>
+                {cal.over ? tr.overLimit : `${Math.round(cal.pct * 100)}%`}
+              </Text>
+            </View>
+          </View>
+          <View style={[s.track, { backgroundColor: c.track, marginBottom: 8 }]}>
+            <LinearGradient colors={cal.over ? [ACCENT_PULSE + 'AA', ACCENT_PULSE] : [ACCENT_CAL + 'AA', ACCENT_CAL]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={[s.fill, { width: `${Math.round(cal.pct * 100)}%` as any }]} />
+          </View>
+          {/* Три незалежні числа. Підпис третього — «Залишок» (tr.calRemaining),
+              рівно як у вебі (`CALORIE_STAT_LABEL.remaining`): «дефіцит» на
+              тому самому числі читався як інший показник. Перевищений ліміт
+              так само, як у вебі, підписаний «профіцит» — знак несе ПІДПИС, а
+              не мінус у значенні. */}
+          <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+            <CalStat label={tr.consumed} value={`${cal.consumed}`} color={ACCENT_CAL} sub={c.sub} />
+            <CalStat label={tr.burned} value={`${cal.burned}`} color={ACCENT_STEPS} sub={c.sub} />
+            <CalStat label={cal.remaining < 0 ? tr.surplus : tr.calRemaining} value={`${Math.abs(cal.remaining)}`}
+              color={cal.remaining < 0 ? ACCENT_PULSE : ACCENT} sub={c.sub} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {[200, 350, 500, 700].map(kk => (
+              <TouchableOpacity key={kk} onPress={() => h.addQuick('calories', kk)}
+                style={[s.chip, { borderColor: ACCENT_CAL + '50', backgroundColor: ACCENT_CAL + '12' }]}>
+                <Text style={{ color: ACCENT_CAL, fontSize: 11, fontWeight: '700' }}>+{kk} кк</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </BlurView>
+
+        {/* Динаміка калорій */}
+        <View style={{ marginTop: 14 }}>
+          <MetricTrend entries={h.entries} type="calories" agg="sum" color={ACCENT_CAL} goal={goals.calories}
+            format={v => `${Math.round(v)} кк`} isDark={isDark} c={c} tr={tr} />
+        </View>
+
+        {/* Білок */}
+        <SectionHeader title={tr.protein} icon="bolt.fill" color={ACCENT_PROT} textColor={c.text} />
+        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
+            <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{Math.round(today.protein)}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>/ {goals.protein} г</Text>
+            <View style={{ flex: 1 }} />
+            <View style={[s.badge, { backgroundColor: ACCENT_PROT + '20', borderColor: ACCENT_PROT + '40' }]}>
+              <Text style={{ color: ACCENT_PROT, fontSize: 11, fontWeight: '700' }}>{Math.round(Math.min(today.protein / goals.protein, 1) * 100)}%</Text>
+            </View>
+          </View>
+          <View style={[s.track, { backgroundColor: c.track, marginBottom: 6 }]}>
+            <LinearGradient colors={[ACCENT_PROT + 'AA', ACCENT_PROT]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={[s.fill, { width: `${Math.round(Math.min(today.protein / goals.protein, 1) * 100)}%` as any }]} />
+          </View>
+          {/* Рядок лишається українським, як і був: окремого ключа під нього в
+              словнику немає, а вигадувати його тут — міняти контракт i18n
+              мимохідь (винесено в followups). */}
+          <Text style={{ color: c.sub, fontSize: 11 }}>
+            {today.protein < goals.protein ? `Залишилось ${Math.round(goals.protein - today.protein)} г білка` : 'Норму білка досягнуто 💪'}
+          </Text>
+        </BlurView>
+
+        {/* Вода */}
+        <SectionHeader title={tr.water} icon="drop.fill" color={ACCENT} textColor={c.text} />
+        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
+            <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>
+              {today.water >= 1000 ? `${(today.water / 1000).toFixed(1)} л` : `${today.water} мл`}
+            </Text>
+            <Text style={{ color: c.sub, fontSize: 11, marginLeft: 5 }}>/ {goals.water} мл</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>
+              {today.water >= goals.water ? tr.target : `${Math.round(today.water / goals.water * 100)}%`}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
+            {Array.from({ length: 8 }, (_, i) => {
+              const threshold = ((i + 1) / 8) * goals.water;
+              return <View key={i} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: today.water >= threshold ? ACCENT : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)') }} />;
+            })}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {[150, 250, 350, 500].map(ml => (
+              <TouchableOpacity key={ml} onPress={() => h.addQuick('water', ml)}
+                style={[s.chip, { borderColor: ACCENT + '50', backgroundColor: ACCENT + '12' }]}>
+                <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>+{ml} мл</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </BlurView>
+
+        {/* Нагадування про воду */}
+        <SectionHeader title={tr.reminders} icon="bell.fill" color={ACCENT} textColor={c.text} />
+        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, paddingVertical: 6 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
+            <IconSymbol name="drop.fill" size={16} color={ACCENT} />
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 10 }}>{tr.waterReminder}</Text>
+            <Switch
+              value={h.reminders.water}
+              disabled={!h.remindersLoaded || h.reminderBusy !== null}
+              accessibilityLabel={tr.waterReminder}
+              accessibilityState={{ checked: h.reminders.water, disabled: !h.remindersLoaded || h.reminderBusy !== null }}
+              onValueChange={v => { void h.setReminder('water', v, tr.water, tr.waterReminder).then(ok => setReminderBlocked(v && !ok)); }}
+              trackColor={{ true: ACCENT }} />
+          </View>
+          {reminderBlocked && (
+            <ReminderBlockedNotice lang={lang} c={c} isDark={isDark}
+              onOpenSettings={() => { void Linking.openSettings(); }}
+              onDismiss={() => setReminderBlocked(false)} />
+          )}
+        </BlurView>
+
+        {/* Журнал їжі */}
+        {foodToday.length > 0 && (
+          <>
+            <SectionHeader title={tr.todayLabel} icon="list.bullet" color={ACCENT_CAL} textColor={c.text} />
+            <View style={{ gap: 8 }}>
+              {foodToday.map(e => (
+                <BlurView key={e.id} intensity={isDark ? 18 : 38} tint={isDark ? 'dark' : 'light'}
+                  style={[s.logRow, { borderColor: c.border }]}>
+                  <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
+                    <IconSymbol name="flame.fill" size={15} color={ACCENT_CAL} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>
+                      {e.value} кк{e.protein ? ` · ${e.protein}${tr.proteinShort}` : ''}
+                    </Text>
+                    {e.note ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{e.note}</Text> : null}
+                  </View>
+                  <Text style={{ color: c.sub, fontSize: 11 }}>
+                    {new Date(e.date).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </BlurView>
+              ))}
+            </View>
+          </>
+        )}
+      </ScrollView>
+
+      <HealthEntryModal modalKey={modal} onClose={() => setModal(null)} onSubmit={onSubmit} isDark={isDark} tr={tr} />
+    </>
+  );
+}
+
+const s = StyleSheet.create({
+  addBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  card:   { borderRadius: 18, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
+  track:  { height: 8, borderRadius: 4, overflow: 'hidden' },
+  fill:   { height: '100%', borderRadius: 4 },
+  chip:   { flex: 1, borderRadius: 11, borderWidth: 1.5, paddingVertical: 7, alignItems: 'center' },
+  badge:  { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
+  logRow: { borderRadius: 14, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+});

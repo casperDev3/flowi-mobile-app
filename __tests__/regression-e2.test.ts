@@ -105,8 +105,26 @@ describe('NAT-03 (P0) — модальні аркуші не злипаютьс�
    * Два справжні контроли, що збігаються з евристикою бекдропу, але ними не є:
    * обидва — кнопки з `flex: 1` і майже прозорим тлом `rgba(0,0,0,0.0…)`.
    * Їм `accessible={false}` ставити НЕ можна — вони й мають озвучуватись.
+   *
+   * ПРИВ'ЯЗКА ЗА ВМІСТОМ, А НЕ ЗА НОМЕРОМ РЯДКА. Раніше тут стояли
+   * `app/workouts.tsx:368` і `:1140`. Номер рядка — не ідентифікатор контролу,
+   * а його поточна координата: будь-яка правка ВИЩЕ по файлу зсуває її, і
+   * виняток мовчки з'їжджає на сусідній тег. Обидва результати погані, але
+   * по-різному: у кращому разі перелік «протухає» й тест червоніє на
+   * недоторканому контролі, у гіршому — виняток накриває тег, який тепер
+   * справді є бекдропом, і дефект доступності проїжджає в зелене.
+   *
+   * Обробник `onPress` переживає зсуви рядків і зникає рівно тоді, коли
+   * зникає сам контроль. Тест нижче (`перелік винятків не протух») стежить,
+   * щоб кожен маркер і далі знаходив РІВНО один тег.
    */
-  const NOT_BACKDROPS = new Set(['app/workouts.tsx:367', 'app/workouts.tsx:1145']);
+  const NOT_BACKDROPS: { rel: string; marker: string; why: string }[] = [
+    { rel: 'app/workouts.tsx', marker: 'toggleDay(idx)', why: 'перемикачі днів тижня для нагадування' },
+    { rel: 'app/workouts.tsx', marker: 'setTab(t.key)', why: 'вкладки всередині екрана тренувань' },
+  ];
+
+  const isKnownNotBackdrop = (rel: string, attrs: string) =>
+    NOT_BACKDROPS.some(exception => exception.rel === rel && attrs.includes(exception.marker));
 
   it('кожна обгортка-stopPropagation має accessible={false}', () => {
     const offenders: string[] = [];
@@ -125,11 +143,25 @@ describe('NAT-03 (P0) — модальні аркуші не злипаютьс�
       if (!text.includes('<Modal')) continue;
       for (const tag of touchableTags(text)) {
         if (tag.selfClosing || !isDismissBackdrop(tag.attrs)) continue;
-        if (NOT_BACKDROPS.has(`${rel}:${tag.line}`)) continue;
+        if (isKnownNotBackdrop(rel, tag.attrs)) continue;
         if (!tag.attrs.includes('accessible={false}')) offenders.push(`${rel}:${tag.line}`);
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('перелік винятків не протух: кожен маркер і далі знаходить рівно один контроль', () => {
+    for (const exception of NOT_BACKDROPS) {
+      const source = SOURCES.find(s => s.rel === exception.rel);
+      // Файл перейменували або прибрали — виняток треба переглянути, а не нести далі.
+      expect(source).toBeDefined();
+      const matched = touchableTags(source!.text).filter(
+        tag => !tag.selfClosing && isDismissBackdrop(tag.attrs) && tag.attrs.includes(exception.marker),
+      );
+      // 0 — контролю («${exception.why}») більше немає, виняток зайвий.
+      // >1 — маркер перестав бути унікальним і мовчки накриває зайві теги.
+      expect({ marker: exception.marker, matches: matched.length }).toEqual({ marker: exception.marker, matches: 1 });
+    }
   });
 
   it('accessible={false} не з\'їв ізоляцію фону: accessibilityViewIsModal лишився в репозиторії', () => {

@@ -232,9 +232,20 @@ export async function getFreshAccessToken(): Promise<string | null> {
 // ─── Публічний apiFetch ──────────────────────────────────────────────────────
 export async function apiFetch<T>(
   path: string,
-  options: { method?: string; body?: unknown; auth?: boolean; allowOffline?: boolean } = {},
+  options: {
+    method?: string;
+    body?: unknown;
+    auth?: boolean;
+    allowOffline?: boolean;
+    /**
+     * Додаткові заголовки запиту (наприклад, `If-Match: <revision>` для
+     * налаштувань сповіщень, notifications-module.md §6.3). Не можуть
+     * перевизначити `Authorization` — його ставить сам клієнт.
+     */
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<T> {
-  const { method = 'GET', body, auth = true, allowOffline = false } = options;
+  const { method = 'GET', body, auth = true, allowOffline = false, headers: extraHeaders } = options;
 
   // Офлайн-гейт — жодного мережевого виклику.
   // Виняток (allowOffline): автентифікація — інакше з офлайну неможливо
@@ -242,6 +253,12 @@ export async function apiFetch<T>(
   if (!isOnlineMode() && !allowOffline) throw new OfflineError();
 
   const headers = await buildHeaders(auth);
+  if (extraHeaders) {
+    for (const [name, value] of Object.entries(extraHeaders)) {
+      if (name.toLowerCase() === 'authorization') continue;
+      (headers as Record<string, string>)[name] = value;
+    }
+  }
   const init: RequestInit = {
     method,
     headers,

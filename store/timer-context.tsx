@@ -43,21 +43,42 @@ import {
   meetingTimerId,
   type Meeting,
 } from '@/utils/meetings';
+import { appendHistory } from '@/utils/taskHistory';
 import { DEFAULT_TASK_STATUS_COLUMNS, IN_PROGRESS_COLUMN_ID, REVIEW_COLUMN_ID, mergeTaskStatusColumns, resolvedStatusType, type TaskStatusColumn } from '@/utils/taskStatuses';
-import type { Task, TaskHistoryEvent, HistoryEventType } from '@/utils/taskUtils';
+import type { Task } from '@/utils/taskUtils';
 
 const TIMERS_KEY = 'active_timers';
 const TASKS_KEY = 'tasks';
 const MEETINGS_KEY = 'meetings';
 const TIME_ENTRIES_KEY = 'time_entries';
 
-/** Запис дзеркала у 'time_entries' — форма, якої чекають time-stats/time-records. */
+/**
+ * Запис дзеркала у 'time_entries' — підмножина `TimeRecord` (utils/timeEntries).
+ *
+ * `shift` тут більше немає: поділу на ранок/день/вечір/ніч у продукті не
+ * лишилось, жоден підсумок за ним не рахується, і писати його в НОВІ записи
+ * означало б плодити дані, які ніхто не читає. У `TimeRecord` поле збережене
+ * лише для читання старих записів.
+ *
+ * Натомість дзеркало пише `taskId`, `startedAt` і `endedAt` — те, чим воно
+ * відрізнялося від записів, перенесених `utils/timeMigration.ts`:
+ *   • `taskId` — щоб фільтр за задачею (`recordTaskKey`) і відсів дублів
+ *     (`sessionKeys`) працювали за id, а не за збігом НАЗВИ задачі;
+ *   • `startedAt`/`endedAt` — щоб блок аномалій бачив справжні межі сесії.
+ *     Без `startedAt` `entryStartMs` відлічує початок від кінця на тривалість,
+ *     а це вгадування: сесію, що перетнула північ, воно показує вірно лише
+ *     випадково, і «Перетинає північ» для дзеркала таймера не спрацьовувало.
+ */
 interface MirroredTimeEntry {
   id: string;
   task: string;
-  shift: Shift;
+  /** Задача, з якої пішла сесія. Немає — вільний таймер або нарада. */
+  taskId?: string;
   duration: number;
+  /** ISO кінця сесії — те саме, що `endedAt`; лишається, бо за ним сортують. */
   date: string;
+  startedAt: string;
+  endedAt: string;
   /** Проєкт сесії (WORKSPACE_PROJECTS_PLAN §3 «години за тиждень» на Огляді). */
   projectId?: string;
 }
@@ -133,15 +154,6 @@ const TimerContext = createContext<TimerContextValue>({
   meetingsRevision: 0,
   timeEntriesRevision: 0,
 });
-
-function makeHistoryEvent(type: HistoryEventType, note?: string): TaskHistoryEvent {
-  return {
-    id: Date.now().toString() + Math.random().toString(36).slice(2),
-    at: new Date().toISOString(),
-    type,
-    note,
-  };
-}
 
 function elapsedSeconds(startedAt: string, now: number): number {
   // Годинник пристрою може зʼїхати назад (зміна поясу, ручне переведення) —
@@ -342,12 +354,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     async (timer: ActiveTimer, duration: number, endedAt: Date) => {
       if (duration <= 0) return;
       try {
+        const endedAtIso = endedAt.toISOString();
         const entry: MirroredTimeEntry = {
           id: `timer_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
           task: timer.label,
-          shift: timer.shift,
+          taskId: timer.taskId,
           duration,
-          date: endedAt.toISOString(),
+          date: endedAtIso,
+          startedAt: timer.startedAt,
+          endedAt: endedAtIso,
           projectId: timer.projectId,
         };
         await updateSynced<MirroredTimeEntry>(TIME_ENTRIES_KEY, existing => [entry, ...existing]);
@@ -420,7 +435,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         // незалежно від того, чи лежало завдання в «До роботи», чи у власній
         // колонці користувача.
         kanbanColumnId: columnId,
-        history: [...(t.history ?? []), makeHistoryEvent('timer_start')],
+        history: appendHistory(t, 'timer_start'),
       }));
     },
     [mutateTimers, patchTask, resolveTimerColumn],
@@ -506,7 +521,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
               duration,
             },
           ],
-          history: [...(t.history ?? []), makeHistoryEvent('timer_stop')],
+          history: appendHistory(t, 'timer_stop'),
         }));
       }
 

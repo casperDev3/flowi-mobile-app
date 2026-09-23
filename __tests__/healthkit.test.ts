@@ -23,7 +23,9 @@ jest.mock('react-native', () => ({
   Platform: { OS: 'ios' },
 }));
 
-import { fetchTodayData, fetchTodayDataResult, fetchWorkouts, initHealthKit } from '@/store/healthkit';
+import {
+  fetchTodayData, fetchTodayDataResult, fetchWorkouts, initHealthKit, readHealthKitDay, readHealthKitWeights,
+} from '@/store/healthkit';
 
 const STEPS = 'HKQuantityTypeIdentifierStepCount';
 const ACTIVE_ENERGY = 'HKQuantityTypeIdentifierActiveEnergyBurned';
@@ -190,5 +192,65 @@ describe('HealthKit — збій читання відрізняється ві�
     const data = await fetchTodayData();
     expect(data.steps).toBe(0);
     expect(data.heartRateAvg).toBeNull();
+  });
+});
+
+/**
+ * ВАДА-1 / ВАДА-2 / H2 — нове читання доби.
+ */
+describe('readHealthKitDay / readHealthKitWeights', () => {
+  const SLEEP = 'HKCategoryTypeIdentifierSleepAnalysis';
+  const REST = 'HKQuantityTypeIdentifierRestingHeartRate';
+  const SPO2 = 'HKQuantityTypeIdentifierOxygenSaturation';
+  const d = (day: number, h: number, m = 0) => new Date(2026, 8, day, h, m);
+
+  test('сон читається з вікна [D-1 18:00, D 12:00], а не з «учора 00:00»', async () => {
+    const now = d(22, 20);
+    await readHealthKitDay(d(22, 0), now);
+    const call = mockHealthKit.queryCategorySamples.mock.calls.find(c => c[0] === SLEEP)!;
+    expect(call[1].filter.date.startDate.getTime()).toBe(d(21, 18).getTime());
+    expect(call[1].filter.date.endDate.getTime()).toBe(d(22, 12).getTime());
+  });
+
+  test('подвійний запис ночі не подвоює сон; inBed не рахується; фази окремо', async () => {
+    mockHealthKit.queryCategorySamples.mockResolvedValue([
+      { value: 0, startDate: d(21, 22), endDate: d(22, 7, 30) },  // inBed
+      { value: 3, startDate: d(21, 23), endDate: d(22, 3) },
+      { value: 4, startDate: d(22, 3), endDate: d(22, 4) },
+      { value: 5, startDate: d(22, 4), endDate: d(22, 6) },
+      { value: 2, startDate: d(22, 6), endDate: d(22, 6, 15) },
+      { value: 1, startDate: d(21, 23), endDate: d(22, 6) },      // друге джерело, та сама ніч
+    ]);
+    const { read } = await readHealthKitDay(d(22, 0), d(22, 20));
+    expect(read.sleep).toEqual({ total: 420, deep: 60, rem: 120, light: 420, awake: 15 });
+  });
+
+  test('пульс спокою — останній семпл ДОБИ; SpO2 частка → %', async () => {
+    mockHealthKit.queryQuantitySamples.mockImplementation(async (id: string) => {
+      if (id === REST) return [{ quantity: 58, startDate: d(22, 7) }, { quantity: 54, startDate: d(22, 23) }];
+      if (id === SPO2) return [{ quantity: 0.95 }, { quantity: 0.97 }, { quantity: 0.98 }];
+      return [];
+    });
+    const { read } = await readHealthKitDay(d(22, 0), d(22, 23, 30));
+    expect(read.restingHeartRate).toBe(54);
+    expect(read.spo2).toBe(97);
+  });
+
+  test('вага — кожен семпл зі своєю датою й uuid', async () => {
+    mockHealthKit.queryQuantitySamples.mockResolvedValue([
+      { quantity: 80.4, startDate: d(1, 7), uuid: 'A' },
+      { quantity: 80.1, startDate: d(5, 7) },
+    ]);
+    const { samples, outcome } = await readHealthKitWeights(d(1, 0), d(7, 0));
+    expect(outcome.ok).toBe(true);
+    expect(samples[0]).toEqual({ value: 80.4, measuredAt: d(1, 7).toISOString(), sourceKey: 'A' });
+    expect(samples[1].sourceKey).toBe(`${d(5, 7).toISOString()}:801`);
+  });
+
+  test('fetchTodayDataResult: вага приходить разом із датою заміру', async () => {
+    mockHealthKit.getMostRecentQuantitySample.mockResolvedValue({ quantity: 79.9, startDate: d(1, 7) });
+    const { data } = await fetchTodayDataResult();
+    expect(data.weight).toBe(79.9);
+    expect(data.weightAt).toBe(d(1, 7).toISOString());
   });
 });

@@ -23,6 +23,7 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
+import { isoToLocalDateInput, localDateInputToIso } from '@/utils/dateUtils';
 import { haptic } from '@/utils/haptics';
 import { PROJECT_COLORS } from '@/utils/projectColors';
 import { MODULES_BY_TEMPLATE, projectModules, type ProjectModules } from '@/utils/projectUtils';
@@ -65,12 +66,9 @@ export default function ProjectSettingsScreen() {
   const [deadline, setDeadline] = useState('');
   const [dirty, setDirty] = useState(false);
   const [columns, setColumns] = useState<TaskStatusColumn[]>([]);
-  const [personalColumns, setPersonalColumns] = useState<TaskStatusColumn[]>([]);
 
   const loadColumns = useCallback(async () => {
-    const all = await loadData<TaskStatusColumn[]>('task_statuses', []);
-    setColumns(all);
-    setPersonalColumns(mergeTaskStatusColumns(all));
+    setColumns(await loadData<TaskStatusColumn[]>('task_statuses', []));
   }, []);
   useFocusEffect(useCallback(() => { void loadColumns(); }, [loadColumns]));
   const trackColumnsWrite = useStorageRefresh(['task_statuses'], loadColumns);
@@ -84,7 +82,7 @@ export default function ProjectSettingsScreen() {
     setName(project.name);
     setColor(project.color);
     setDescription(project.description ?? '');
-    setDeadline(project.deadline ? project.deadline.slice(0, 10) : '');
+    setDeadline(isoToLocalDateInput(project.deadline));
     setDirty(false);
   }
 
@@ -97,11 +95,12 @@ export default function ProjectSettingsScreen() {
 
   const saveInfo = useCallback(async () => {
     if (!projectId || !name.trim()) return;
-    const parsed = deadline.trim() ? new Date(deadline.trim()) : null;
-    const deadlineIso = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : undefined;
     try {
+      // Локальна доба поля, а не UTC-північ `new Date('YYYY-MM-DD')`; поле, що
+      // збігається зі збереженою добою, лишає збережене значення як є.
       await updateSynced<Project>('projects', fresh => fresh.map(p => (p.id !== projectId ? p : {
-        ...p, name: name.trim(), color, description: description.trim() || undefined, deadline: deadlineIso,
+        ...p, name: name.trim(), color, description: description.trim() || undefined,
+        deadline: localDateInputToIso(deadline, p.deadline),
       })));
       setDirty(false);
       haptic.success();
@@ -124,19 +123,44 @@ export default function ProjectSettingsScreen() {
     }
   }, [projectId]);
 
+  /**
+   * «Скопіювати стандартні статуси» — РІВНО ОДИН раз на проєкт.
+   *
+   * Кнопка малюється, коли `scopedColumns` порожній, але цей масив — знімок
+   * стану екрана, а колонки проєкту тепер зʼявляються й САМІ: перше створення
+   * задачі в проєкті сіє їх (`ensureProjectColumns` у
+   * `app/project/[id]/tasks.tsx`), як і синк чужого пристрою. Між рендером
+   * кнопки й дотиком по ній колонки цілком можуть виникнути — а старий код
+   * дописував `[...fresh, ...seeded]` беззастережно, і дошка проєкту діставала
+   * два комплекти «До роботи / У процесі / Готово» з різними id. Розібрати це
+   * вручну неможливо: колонки виглядають однаково, а задачі розкидані по
+   * обох комплектах.
+   *
+   * Тому рішення ухвалюється не за станом екрана, а за `fresh` — тим самим
+   * масивом, що зараз лежить у сховищі, вже ВСЕРЕДИНІ `updateSynced`:
+   * колонки цього проєкту є — не додаємо нічого й віддаємо `fresh` як є.
+   * Джерело копіювання теж береться з `fresh` (особисті колонки могли
+   * змінитись відтоді, як екран їх прочитав).
+   */
   const seedStatuses = useCallback(async () => {
     if (!projectId) return;
     try {
+      let seededCount = 0;
       await trackColumnsWrite(async () => {
-        const seeded = seedProjectStatusColumns(personalColumns, projectId);
-        const next = await updateSynced<TaskStatusColumn>('task_statuses', fresh => [...fresh, ...seeded]);
+        const next = await updateSynced<TaskStatusColumn>('task_statuses', fresh => {
+          if (mergeTaskStatusColumns(fresh, projectId).length) return fresh;
+          const seeded = seedProjectStatusColumns(mergeTaskStatusColumns(fresh), projectId);
+          seededCount = seeded.length;
+          return seeded.length ? [...fresh, ...seeded] : fresh;
+        });
         setColumns(next);
       });
-      haptic.success();
+      // Без колонок тиша зрозуміліша за «успіх»: нічого ж не додалося.
+      if (seededCount) haptic.success();
     } catch (e) {
       if (__DEV__) console.warn('[project/settings] копіювання статусів не вдалося:', e);
     }
-  }, [projectId, personalColumns, trackColumnsWrite]);
+  }, [projectId, trackColumnsWrite]);
 
   const addStatus = useCallback(async () => {
     if (!projectId) return;

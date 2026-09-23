@@ -20,6 +20,7 @@ import type { Translations } from '@/store/translations';
 import { ACCENT_PULSE, type HealthColors, getHealthColors } from '@/utils/healthTheme';
 import { CHECKUPS_KEY, Checkup, CheckupKind, genId } from '@/utils/preventionUtils';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
+import { localDateInputToIso, localDateKey } from '@/utils/dateUtils';
 import { LoadErrorNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
 
 export default function CheckupsScreen() {
@@ -43,7 +44,7 @@ export default function CheckupsScreen() {
   const [add, setAdd] = useState(false);
   const [kind, setKind] = useState<CheckupKind>('analysis');
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localDateKey(new Date()));
   const [result, setResult] = useState('');
   const [nextDate, setNextDate] = useState('');
   const canCreate = title.trim().length > 0;
@@ -68,6 +69,11 @@ export default function CheckupsScreen() {
 
   const create = async () => {
     if (!title.trim()) return;
+    // Поле — локальна доба, не UTC (див. localDateInputToIso); нерозбірна
+    // дата раніше валила create через RangeError з toISOString.
+    const dateIso = localDateInputToIso(date);
+    const nextIso = nextDate.trim() ? localDateInputToIso(nextDate) : undefined;
+    if (!dateIso || (nextDate.trim() && !nextIso)) return;
     const id = genId();
     let notifId: string | undefined;
     if (nextDate) {
@@ -76,12 +82,12 @@ export default function CheckupsScreen() {
       notifId = r ?? undefined;
     }
     const item: Checkup = {
-      id, kind, title: title.trim(), date: new Date(date).toISOString(),
-      result: result.trim() || undefined, nextDate: nextDate ? new Date(nextDate).toISOString() : undefined,
+      id, kind, title: title.trim(), date: dateIso,
+      result: result.trim() || undefined, nextDate: nextIso,
       notifId, createdAt: new Date().toISOString(),
     };
     setItems(p => [item, ...p].sort((a, b) => +new Date(b.date) - +new Date(a.date)));
-    setKind('analysis'); setTitle(''); setDate(new Date().toISOString().slice(0, 10)); setResult(''); setNextDate(''); setAdd(false);
+    setKind('analysis'); setTitle(''); setDate(localDateKey(new Date())); setResult(''); setNextDate(''); setAdd(false);
   };
 
   // Колбек мусить бути стабільним і приймати елемент аргументом — інакше

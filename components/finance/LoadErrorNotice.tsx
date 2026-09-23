@@ -13,37 +13,19 @@
  * (`retryStorageRead`), бо без повтору ключ лишається заблокованим на запис до
  * перезапуску застосунку — і це свідомо.
  *
- * Про рядки. Ключів під цей стан у `store/translations.ts` немає, а сам словник
- * у цьому проході — чужа зона (його правлять паралельно). Щоб англомовний
- * користувач не отримав українську плашку, тексти лежать тут двомовною
- * табличкою за `lang`; перенести їх у `Translations` — окрема задача
- * (винесено в needsOtherZone).
+ * Про рядки. Вони живуть у `store/translations.ts` (`loadErrorTitle`,
+ * `loadErrorBody`, `loadErrorRetry`) — двомовної таблички тут більше немає.
+ * Плашка бере мову прямо зі словника за пропом `lang`, а не через `tr`: її
+ * малюють десяток екранів, і всі вони вже передають саме `lang`.
  */
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import type { Lang } from '@/store/translations';
+import { allTranslations, type Lang } from '@/store/translations';
 
 const ERR = '#EF4444';
-
-const TEXT = {
-  uk: {
-    title: 'Дані не прочитались',
-    sub: 'Сховище повернуло помилку. Це НЕ порожній список — щоб не втратити записи, зміни поки не зберігаються.',
-    retry: 'Повторити',
-  },
-  en: {
-    title: 'Could not read your data',
-    sub: 'Storage returned an error. This is NOT an empty list — changes are not being saved so nothing gets overwritten.',
-    retry: 'Try again',
-  },
-} as const;
-
-export function loadErrorText(lang: Lang) {
-  return TEXT[lang] ?? TEXT.uk;
-}
 
 export function LoadErrorNotice({ lang, isDark, text, sub, onRetry, style }: {
   lang: Lang;
@@ -55,7 +37,7 @@ export function LoadErrorNotice({ lang, isDark, text, sub, onRetry, style }: {
   onRetry: () => void;
   style?: object;
 }) {
-  const t = loadErrorText(lang);
+  const t = allTranslations[lang] ?? allTranslations.uk;
   return (
     <BlurView
       intensity={isDark ? 22 : 42}
@@ -66,18 +48,18 @@ export function LoadErrorNotice({ lang, isDark, text, sub, onRetry, style }: {
       }, style]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <IconSymbol name="exclamationmark.triangle.fill" size={16} color={ERR} />
-        <Text style={{ color: text, fontSize: 14, fontWeight: '700', flex: 1 }}>{t.title}</Text>
+        <Text style={{ color: text, fontSize: 14, fontWeight: '700', flex: 1 }}>{t.loadErrorTitle}</Text>
       </View>
-      <Text style={{ color: sub, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{t.sub}</Text>
+      <Text style={{ color: sub, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{t.loadErrorBody}</Text>
       <TouchableOpacity
         onPress={onRetry}
         accessibilityRole="button"
-        accessibilityLabel={t.retry}
+        accessibilityLabel={t.loadErrorRetry}
         style={{
           alignSelf: 'flex-start', marginTop: 10, paddingHorizontal: 14, paddingVertical: 8,
           borderRadius: 10, backgroundColor: ERR + '1A', borderWidth: 1, borderColor: ERR + '55',
         }}>
-        <Text style={{ color: ERR, fontSize: 13, fontWeight: '700' }}>{t.retry}</Text>
+        <Text style={{ color: ERR, fontSize: 13, fontWeight: '700' }}>{t.loadErrorRetry}</Text>
       </TouchableOpacity>
     </BlurView>
   );

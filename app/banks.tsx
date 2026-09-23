@@ -34,6 +34,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
+
 import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
 import { PressableScale } from '@/components/shared/PressableScale';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
@@ -440,19 +442,23 @@ export default function BanksScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
+          useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={[]}>
 
-        {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel={tr.back}
-            style={[s.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-            <IconSymbol name="chevron.left" size={17} color={c.sub} />
-          </TouchableOpacity>
-          <Text style={[s.pageTitle, { color: c.text, flex: 1 }]}>{tr.piggyBanks}</Text>
-        </View>
+        {/* «Скарбнички» є пунктом сайдбара, тож на планшеті стрілку «Назад»
+            ScreenHeader ховає сам. */}
+        <ScreenHeader
+          title={tr.piggyBanks}
+          color={c.text}
+          paddingBottom={14}
+          back={{
+            onPress: () => router.back(),
+            label: tr.back,
+            color: c.sub,
+            style: { backgroundColor: c.dim, borderColor: c.border },
+          }}
+        />
 
         <FlatList
           // numColumns не можна змінювати на льоту — при повороті чи Split View
@@ -958,8 +964,6 @@ const JarCard = React.memo(function JarCard({
 });
 
 const s = StyleSheet.create({
-  pageTitle:    { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
-  headerBtn:    { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   summaryCard:  { borderRadius: 20, borderWidth: 1, padding: 18, overflow: 'hidden' },
   summaryLabel: { fontSize: 11, fontWeight: '600', marginBottom: 4 },
   summaryAmount:{ fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },

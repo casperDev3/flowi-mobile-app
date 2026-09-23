@@ -35,7 +35,7 @@ describe('маршрути сайдбара', () => {
     // Вкладки з href:null не показуються внизу; саме заради них сайдбар і
     // потрібен, тож вони МАЮТЬ бути в списку — перевіряємо, що не забули.
     const routes = new Set(NAV_GROUPS.flatMap(g => g.items).map(i => i.route));
-    for (const hidden of ['/(tabs)/time', '/(tabs)/agent']) {
+    for (const hidden of ['/(tabs)/time']) {
       expect(routes.has(hidden)).toBe(true);
     }
   });

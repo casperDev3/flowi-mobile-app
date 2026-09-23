@@ -1,31 +1,50 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
-import {
-  HK_AVAILABLE, type HKAccess, fetchTodayDataResult, getHealthKitAccess, initHealthKit,
-} from '@/store/healthkit';
+import { useAutoBackup } from '@/store/auto-backup';
+import { healthConnectSource } from '@/store/health-connect';
+import { enableHealthKitBackground, healthKitSource } from '@/store/healthkit';
 import { cancelDailyReminder, scheduleDailyReminder, scheduleWeeklyReminder } from '@/store/notifications';
-import { loadData, loadDataResult, retryStorageRead } from '@/store/storage';
-import { saveSynced, saveSyncedValue } from '@/store/synced-storage';
+import { loadData, loadDataResult, retryStorageRead, saveData } from '@/store/storage';
+import { saveSynced, saveSyncedValue, updateSynced } from '@/store/synced-storage';
 import { Events, track } from '@/utils/analytics';
-import { isSameDay } from '@/utils/dateUtils';
+import { isSameDay, localDateKey } from '@/utils/dateUtils';
 import {
   EntryType,
   FALLBACK_WEIGHT,
   HealthEntry,
   HealthProfile,
-  calcNetCalories,
+  WorkoutCalorieRecord,
   PROFILE_KEY,
   bmiCategory,
+  burnedForDay,
   calcBMI,
+  calcCalorieDay,
+  buildAutoDayEntries,
+  buildWeightEntries,
+  collapseStaleHkWeights,
   computeGoals,
+  daysToSync,
+  isDerivedAutoId,
   lastForDay,
   latestValue,
+  mergeAutoEntries,
+  sleepNightForDay,
+  sleepQuality,
   sumForDay,
+  type HealthAccess,
+  type HealthSourceApi,
 } from '@/utils/healthUtils';
 
 export const ENTRIES_KEY = 'health_entries_v2';
 export const REMINDERS_KEY = 'health_reminders';
+/**
+ * Колекція тренувань. Читається сюди лише заради поля `calories`: тренування
+ * Flowi мусять зараховуватись у спалене за той самий день (див. burnedForDay),
+ * інакше пробіжка, записана в застосунку, ніяк не впливає на залишок калорій.
+ */
+export const WORKOUTS_KEY = 'workouts';
 
 export interface Reminders { water: boolean; sleep: boolean; weight: boolean; measurements: boolean; }
 const DEFAULT_REMINDERS: Reminders = { water: false, sleep: false, weight: false, measurements: false };
@@ -49,11 +68,196 @@ function genId() {
   return `${Date.now()}_${_idSeq}`;
 }
 
-// HealthKit init/sync — один раз за сесію застосунку (спільно для всіх екземплярів хука).
-// Решта екранів отримують HK-дані через сховище (reload-on-focus), без повторних синків.
-let _hkInited = false;
+// ═════════════════════════════════════════════════════════════════════════════
+// Автоматичні дані (HealthKit / Health Connect) — спільний рушій для
+// переднього плану і фонової задачі. Специфікація:
+// flowi-server-app/docs/specs/health-auto-data.md §8, §10, §11.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Локальний (НЕ синхронізований) стан пристрою: що вже прочитано з цього телефона. */
+export const AUTO_STATE_KEY = 'health_auto_state';
+/** Локальні тумбстоуни: автоматичні id, які людина видалила, — синк їх не відтворює. */
+export const AUTO_SUPPRESSED_KEY = 'health_auto_suppressed';
+/** Прапорець одноразового прибирання ваги, переклеєної на «сьогодні» (ВАДА-2). */
+export const WEIGHT_CLEANUP_KEY = 'health_weight_cleanup_v1';
+/** Не частіше — інакше витрачаємо бюджет ОС і батарею. Ручне «оновити» обходить. */
+export const AUTO_SYNC_MIN_INTERVAL_MS = 30 * 60 * 1000;
+export const HEALTH_BG_TASK = 'health-auto-sync';
+
+export interface HealthAutoState {
+  lastSyncedDay: string | null;
+  lastRunAt: string | null;
+  lastError: string | null;
+  platform: string | null;
+}
+const EMPTY_AUTO_STATE: HealthAutoState = { lastSyncedDay: null, lastRunAt: null, lastError: null, platform: null };
+
+/** Реалізація джерела для платформи; хук не знає, яка ОС під ним. */
+export function pickHealthSource(os: string = Platform.OS): HealthSourceApi | null {
+  if (os === 'ios') return healthKitSource ?? null;
+  if (os === 'android') return healthConnectSource ?? null;
+  return null;
+}
+
+const healthSource = pickHealthSource();
+const SOURCE_AVAILABLE = !!healthSource?.isAvailable;
+
+export interface AutoReadResult {
+  /** Свіжі автоматичні записи з похідними id. */
+  entries: HealthEntry[];
+  suppressed: Set<string>;
+  /** false — жодна доба не прочиталась (не «нулі», а «нічого не знаємо»). */
+  ok: boolean;
+  days: string[];
+}
+
+function parseDayKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+const pause = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+let _running: Promise<AutoReadResult | null> | null = null;
+
+/**
+ * Прочитати пропущені доби (до 7) + заміри ваги. Спільна функція для
+ * переднього плану й фону. Паралельні виклики отримують той самий прохід
+ * (м'ютекс), а без `force` — не частіше, ніж раз на 30 хв (`lastRunAt`).
+ * null — прохід пропущено (тротлінг або джерела немає).
+ */
+export function readAutoHealth(opts: {
+  force?: boolean;
+  source?: HealthSourceApi | null;
+  now?: Date;
+  pauseMs?: number;
+} = {}): Promise<AutoReadResult | null> {
+  if (_running) return _running;
+  _running = (async () => {
+    try {
+      const src = opts.source === undefined ? healthSource : opts.source;
+      if (!src?.isAvailable) return null;
+      const now = opts.now ?? new Date();
+      const state = { ...EMPTY_AUTO_STATE, ...(await loadData<HealthAutoState | null>(AUTO_STATE_KEY, null) ?? {}) };
+      if (!opts.force && state.lastRunAt) {
+        const since = now.getTime() - new Date(state.lastRunAt).getTime();
+        if (Number.isFinite(since) && since >= 0 && since < AUTO_SYNC_MIN_INTERVAL_MS) return null;
+      }
+
+      const days = daysToSync(state.lastSyncedDay, now);
+      const fresh: HealthEntry[] = [];
+      let anyOk = false;
+      // По одній добі, від найстарішої, з мікропаузою — щоб не блокувати UI.
+      for (let i = 0; i < days.length; i++) {
+        const { read, outcome } = await src.readDay(parseDayKey(days[i]), now);
+        if (outcome.ok) {
+          anyOk = true;
+          fresh.push(...buildAutoDayEntries(read, src.source, now));
+        }
+        if (i < days.length - 1) await pause(opts.pauseMs ?? 40);
+      }
+      const weights = await src.readWeights(parseDayKey(days[0]), now);
+      if (weights.outcome.ok) fresh.push(...buildWeightEntries(weights.samples, src.source));
+
+      const suppressed = new Set(await loadData<string[]>(AUTO_SUPPRESSED_KEY, []));
+      await saveData(AUTO_STATE_KEY, {
+        lastSyncedDay: anyOk ? localDateKey(now) : state.lastSyncedDay,
+        lastRunAt: now.toISOString(),
+        lastError: anyOk ? null : 'read_failed',
+        platform: src.source,
+      } satisfies HealthAutoState);
+      return { entries: fresh, suppressed, ok: anyOk, days };
+    } catch (e) {
+      if (__DEV__) console.warn('[health] auto read failed:', e);
+      return { entries: [], suppressed: new Set<string>(), ok: false, days: [] };
+    } finally {
+      _running = null;
+    }
+  })();
+  return _running;
+}
+
+/** Тільки для тестів. */
+export function __resetAutoHealthForTests(): void {
+  _running = null;
+}
+
+/**
+ * Фоновий прохід: той самий readAutoHealth + злиття прямо в сховище під
+ * блокуванням ключа (updateSynced), бо React-стану у фоні немає.
+ */
+export async function runHealthAutoSyncInBackground(): Promise<'new' | 'none' | 'failed'> {
+  const res = await readAutoHealth({ force: false });
+  if (!res) return 'none';
+  if (!res.ok) return 'failed';
+  let changed = false;
+  try {
+    await updateSynced<HealthEntry>(ENTRIES_KEY, prev => {
+      const next = mergeAutoEntries(prev, res.entries, res.suppressed);
+      changed = next !== prev;
+      return next;
+    });
+  } catch (e) {
+    if (__DEV__) console.warn('[health] background merge failed:', e);
+    return 'failed';
+  }
+  return changed ? 'new' : 'none';
+}
+
+// ─── Фонова задача (§10) ─────────────────────────────────────────────────────
+// Пакети опційні: без них збірка працює, фон просто вимкнений. Задачу треба
+// визначити в ГЛОБАЛЬНІЙ області модуля — expo-router завантажує маршрути, а з
+// ними й цей хук, на старті JS, у тому числі при фоновому запуску.
+/* eslint-disable @typescript-eslint/no-require-imports */
+let TaskManager: any = null;
+let BackgroundTask: any = null;
+try { TaskManager = require('expo-task-manager'); } catch { TaskManager = null; }
+try { BackgroundTask = require('expo-background-task'); } catch { BackgroundTask = null; }
+/* eslint-enable @typescript-eslint/no-require-imports */
+
+if (SOURCE_AVAILABLE && TaskManager && typeof TaskManager.defineTask === 'function') {
+  try {
+    TaskManager.defineTask(HEALTH_BG_TASK, async () => {
+      try {
+        const r = await runHealthAutoSyncInBackground();
+        // Android без READ_HEALTH_DATA_IN_BACKGROUND нічого не прочитає —
+        // тихо виходимо, нулів не пишемо (readAutoHealth їх і не дасть).
+        return r === 'failed'
+          ? (BackgroundTask?.BackgroundTaskResult?.Failed ?? 2)
+          : (BackgroundTask?.BackgroundTaskResult?.Success ?? 1);
+      } catch {
+        return BackgroundTask?.BackgroundTaskResult?.Failed ?? 2;
+      }
+    });
+  } catch (e) {
+    if (__DEV__) console.warn('[health] defineTask failed:', e);
+  }
+}
+
+let _backgroundArmed = false;
+
+/** Увімкнути фон один раз за сесію: BGTask (обидві ОС) + HealthKit background delivery. */
+async function armBackground(): Promise<void> {
+  if (_backgroundArmed) return;
+  _backgroundArmed = true;
+  if (BackgroundTask && typeof BackgroundTask.registerTaskAsync === 'function') {
+    try { await BackgroundTask.registerTaskAsync(HEALTH_BG_TASK, { minimumInterval: 15 }); } catch (e) {
+      if (__DEV__) console.warn('[health] registerTaskAsync failed:', e);
+    }
+  }
+  if (Platform.OS === 'ios' && typeof enableHealthKitBackground === 'function') {
+    // На передньому плані синк робить сам екран (фокус/повернення) —
+    // тут лише фон, щоб не писати в сховище повз React-стан відкритого екрана.
+    await enableHealthKitBackground(() => {
+      if (AppState.currentState !== 'active') void runHealthAutoSyncInBackground();
+    });
+  }
+}
+
+// Доступ кешується на сесію: екземпляри хука не питають ОС щоразу.
+let _authRequested = false;
 let _hkAuthorized = false;
-let _hkAccess: HKAccess = HK_AVAILABLE ? 'unknown' : 'unavailable';
+let _hkAccess: HealthAccess = SOURCE_AVAILABLE ? 'unknown' : 'unavailable';
 
 /**
  * Єдине джерело даних здоров'я: записи + профіль + нагадування + HealthKit-синк,
@@ -61,6 +265,7 @@ let _hkAccess: HKAccess = HK_AVAILABLE ? 'unknown' : 'unavailable';
  */
 export function useHealthEntries() {
   const [entries, setEntries] = useState<HealthEntry[]>([]);
+  const [workouts, setWorkouts] = useState<WorkoutCalorieRecord[]>([]);
   const [profile, setProfile] = useState<HealthProfile | null>(null);
   const [reminders, setReminders] = useState<Reminders>(DEFAULT_REMINDERS);
   const [remindersLoaded, setRemindersLoaded] = useState(false);
@@ -75,8 +280,11 @@ export function useHealthEntries() {
   // ERR-14: стан доступу окремо від «модуль є у збірці» і окремо від
   // «останнє читання провалилось». Нулі можна малювати лише коли доступ є
   // і запити вдались; інакше це «немає даних», а не «нуль кроків».
-  const [hkAccess, setHkAccess] = useState<HKAccess>(_hkAccess);
+  const [hkAccess, setHkAccess] = useState<HealthAccess>(_hkAccess);
   const [hkFailed, setHkFailed] = useState(false);
+  /** Скільки повторів ваги прибрала одноразова міграція (показати людині). */
+  const [weightCleanupRemoved, setWeightCleanupRemoved] = useState<number | null>(null);
+  const { triggerBackup } = useAutoBackup();
 
   // ERR-01: читання ключа провалилось. Екран мусить показати помилку з
   // повтором, а не порожній список; автозапис у такий ключ заборонено.
@@ -108,10 +316,20 @@ export function useHealthEntries() {
     setProfile(await loadData<HealthProfile | null>(PROFILE_KEY, null));
   }, []);
 
+  /**
+   * Тренування читаються через loadData, а не loadDataResult: збій цього ключа
+   * не має блокувати весь розділ здоров'я. Найгірше, що станеться, — спалене
+   * не врахує тренувань цього дня; записів здоров'я це не псує й нічого не
+   * перезаписує, бо хук у `workouts` не пише.
+   */
+  const loadWorkouts = useCallback(async () => {
+    setWorkouts(await loadData<WorkoutCalorieRecord[]>(WORKOUTS_KEY, []));
+  }, []);
+
   const reload = useCallback(async () => {
-    const [ok] = await Promise.all([loadEntries(), loadProfile()]);
+    const [ok] = await Promise.all([loadEntries(), loadProfile(), loadWorkouts()]);
     return ok;
-  }, [loadEntries, loadProfile]);
+  }, [loadEntries, loadProfile, loadWorkouts]);
 
   /** «Повторити» після збою читання: лише retryStorageRead знімає блокування запису. */
   const retryLoad = useCallback(async () => {
@@ -123,61 +341,109 @@ export function useHealthEntries() {
     return true;
   }, [migrate]);
 
-  const syncHealthKit = useCallback(async () => {
-    if (!HK_AVAILABLE) return;
+  /**
+   * Синк автоматичних даних (обидві ОС). Без `force` — не частіше ніж раз на
+   * 30 хв; `force` — ручне «оновити» / «повторити».
+   *
+   * Замість «видалити все `__hk__` за сьогодні й вставити заново з новими id»
+   * (ВАДА-3) — злиття за похідними id: той самий семпл перезаписує сам себе.
+   */
+  const syncHealthKit = useCallback(async (force: boolean = true) => {
+    if (!SOURCE_AVAILABLE) return;
     setHkSyncing(true);
-    const { data, outcome } = await fetchTodayDataResult();
-    setHkFailed(!outcome.ok);
-    // ERR-14: «оновлено щойно» ставимо лише коли справді щось прочитали —
-    // інакше підпис стверджував свіжість нулів, яких ніхто не читав.
-    if (outcome.ok) setHkLastSync(new Date());
-    else { setHkSyncing(false); return; }
-    setEntries(prev => {
-      const todayDate = new Date();
-      const filtered = prev.filter(e => {
-        const isToday = isSameDay(new Date(e.date), todayDate);
-        return !isToday || e.note !== '__hk__';
-      });
-      const iso = new Date().toISOString();
-      const hk: HealthEntry[] = [];
-      if (data.steps > 0)          hk.push({ id: genId(), type: 'steps',        value: data.steps,           note: '__hk__', source: 'healthkit', date: iso });
-      if (data.heartRateAvg)       hk.push({ id: genId(), type: 'pulse',        value: data.heartRateAvg,    note: '__hk__', source: 'healthkit', date: iso });
-      if (data.weight)             hk.push({ id: genId(), type: 'weight',       value: data.weight,          note: '__hk__', source: 'healthkit', date: iso });
-      if (data.activeCalories > 0) hk.push({ id: genId(), type: 'calories_out', value: data.activeCalories,  note: '__hk__', source: 'healthkit', date: iso });
-      if (data.sleepMinutes)       hk.push({ id: genId(), type: 'sleep',        value: data.sleepMinutes,    note: '__hk__', source: 'healthkit', date: iso });
-      return [...hk, ...filtered];
-    });
-    setHkSyncing(false);
+    try {
+      const res = await readAutoHealth({ force });
+      if (!res) {
+        // Прохід пропущено (тротлінг) — підпис «оновлено» беремо зі стану пристрою.
+        const st = await loadData<HealthAutoState | null>(AUTO_STATE_KEY, null);
+        if (st?.lastRunAt && !st.lastError) setHkLastSync(new Date(st.lastRunAt));
+        return;
+      }
+      setHkFailed(!res.ok);
+      // ERR-14: «оновлено щойно» ставимо лише коли справді щось прочитали —
+      // інакше підпис стверджував свіжість нулів, яких ніхто не читав.
+      if (!res.ok) return;
+      setHkLastSync(new Date());
+      setEntries(prev => mergeAutoEntries(prev, res.entries, res.suppressed));
+      void armBackground();
+    } finally {
+      setHkSyncing(false);
+    }
   }, []);
+
+  /** Доступ дозволяє читати (Apple не каже, що саме дозволено → `unknown` теж читаємо). */
+  const canRead = hkAuthorized && (hkAccess === 'granted' || hkAccess === 'unknown');
 
   useEffect(() => {
     // initialized вмикається ЛИШЕ на успішному читанні — це і є заборона
     // автозапису поверх ключа, який не прочитався (ERR-01).
-    Promise.all([loadEntries(), loadProfile()]).then(([ok]) => { if (ok) setInitialized(true); });
+    Promise.all([loadEntries(), loadProfile(), loadWorkouts()]).then(([ok]) => { if (ok) setInitialized(true); });
     loadData<Reminders>(REMINDERS_KEY, DEFAULT_REMINDERS).then(r => { setReminders(r); setRemindersLoaded(true); });
-    if (HK_AVAILABLE) {
-      if (_hkInited) {
-        setHkAuthorized(_hkAuthorized); // вже ініціалізовано в цій сесії — не синкаємо повторно
-        setHkAccess(_hkAccess);
-      } else {
-        _hkInited = true;
-        initHealthKit().then(async ok => {
-          _hkAuthorized = ok;
-          setHkAuthorized(ok);
-          // requestAuthorization не кидає й не повертає «дозволено» — питаємо
-          // систему окремо, інакше «модуль є» видавалось за «доступ є».
-          const access = await getHealthKitAccess();
-          _hkAccess = access;
-          setHkAccess(access);
-          if (ok && access !== 'denied') syncHealthKit();
-        });
-      }
+    if (!SOURCE_AVAILABLE || !healthSource) return;
+    if (_authRequested) {
+      setHkAuthorized(_hkAuthorized);
+      setHkAccess(_hkAccess);
+      return;
     }
+    _authRequested = true;
+    // iOS: діалог HealthKit показується на першому відкритті розділу (як і
+    // раніше; повторно iOS його не показує). Android: дозволи Health Connect
+    // просимо лише кнопкою «Підключити» — тут тільки питаємо, що вже дали.
+    const request = Platform.OS === 'ios' ? healthSource.requestAccess() : Promise.resolve(true);
+    request.then(async ok => {
+      const access = await healthSource.getAccess();
+      _hkAuthorized = ok && access !== 'unavailable';
+      _hkAccess = access;
+      setHkAuthorized(_hkAuthorized);
+      setHkAccess(access);
+    }).catch(e => { if (__DEV__) console.warn('[health] access check failed:', e); });
   }, []);
+
+  // Синк — лише ПІСЛЯ читання сховища: злиття в ще порожній стан загубилось
+  // би при завантаженні (loadEntries замінює масив цілком).
+  useEffect(() => {
+    if (initialized && canRead) void syncHealthKit(false);
+  }, [initialized, canRead, syncHealthKit]);
+
+  // Повернення застосунку на передній план — головний шлях оновлення
+  // (фон на iOS опортуністичний і не є джерелом правди).
+  useEffect(() => {
+    if (!initialized || !canRead) return;
+    const sub = AppState.addEventListener('change', st => { if (st === 'active') void syncHealthKit(false); });
+    return () => sub.remove();
+  }, [initialized, canRead, syncHealthKit]);
+
+  // ВАДА-2, одноразово: прибрати ланцюжки однакової ваги, які старий синк
+  // щодня переклеював на «сьогодні». Спершу — авто-бекап; без бекапу нічого
+  // не видаляємо (спробуємо наступного разу). Людині показуємо підсумок.
+  const cleanupStarted = useRef(false);
+  useEffect(() => {
+    if (!initialized || cleanupStarted.current) return;
+    cleanupStarted.current = true;
+    void (async () => {
+      const done = await loadData<{ at: string; removed: number } | null>(WEIGHT_CLEANUP_KEY, null);
+      if (done) return;
+      const current = await loadDataResult<HealthEntry[]>(ENTRIES_KEY, []);
+      if (!current.ok) return;
+      const { removed } = collapseStaleHkWeights(current.value);
+      if (removed > 0) {
+        const backup = await triggerBackup();
+        if (!backup) return;
+        setEntries(prev => collapseStaleHkWeights(prev).entries);
+        setWeightCleanupRemoved(removed);
+      }
+      await saveData(WEIGHT_CLEANUP_KEY, { at: new Date().toISOString(), removed });
+    })();
+  }, [initialized, triggerBackup]);
 
   // Перечитувати записи+профіль при поверненні на екран
   // (модулі мають власні екземпляри хука — так зміни синхронізуються через сховище)
-  useFocusEffect(useCallback(() => { if (initialized) reload(); }, [initialized, reload]));
+  // + синк автоданих (сам тротлиться до разу на 30 хв).
+  useFocusEffect(useCallback(() => {
+    if (!initialized) return;
+    void reload();
+    if (canRead) void syncHealthKit(false);
+  }, [initialized, reload, canRead, syncHealthKit]));
 
   // Зберігати записи після ініціалізації.
   // .catch обовʼязковий: saveSynced тепер відхиляється StorageWriteBlockedError,
@@ -233,17 +499,33 @@ export function useHealthEntries() {
     }
   }, []);
 
-  /** Повторний запит доступу до HealthKit з екрана (ERR-14). */
+  /**
+   * Видалити запис. Автоматичний (похідний id) ще й потрапляє в локальні
+   * тумбстоуни — інакше наступний синк відтворив би його (§11.6).
+   */
+  const deleteEntry = useCallback((id: string) => {
+    setEntries(p => p.filter(e => e.id !== id));
+    if (isDerivedAutoId(id)) {
+      void (async () => {
+        const list = await loadData<string[]>(AUTO_SUPPRESSED_KEY, []);
+        if (!list.includes(id)) await saveData(AUTO_SUPPRESSED_KEY, [...list, id].slice(-500));
+      })();
+    }
+  }, []);
+
+  /** Запит доступу з екрана («Підключити дані»; ERR-14). */
   const requestHkAccess = useCallback(async () => {
-    if (!HK_AVAILABLE) return false;
-    const ok = await initHealthKit();
-    _hkAuthorized = ok;
-    setHkAuthorized(ok);
-    const access = await getHealthKitAccess();
+    if (!SOURCE_AVAILABLE || !healthSource) return false;
+    const ok = await healthSource.requestAccess();
+    const access = await healthSource.getAccess();
+    _authRequested = true;
+    _hkAuthorized = ok && access !== 'unavailable';
     _hkAccess = access;
+    setHkAuthorized(_hkAuthorized);
     setHkAccess(access);
-    if (ok && access !== 'denied') await syncHealthKit();
-    return ok && access !== 'denied';
+    const granted = _hkAuthorized && access !== 'denied';
+    if (granted) await syncHealthKit(true);
+    return granted;
   }, [syncHealthKit]);
 
   // ─── Агрегати (сьогодні) ──────────────────────────────────────────────────
@@ -255,6 +537,11 @@ export function useHealthEntries() {
   const todayWeight  = useMemo(() => lastForDay(entries, 'weight', today),      [entries]);
   const todaySleep   = useMemo(() => lastForDay(entries, 'sleep', today),       [entries]);
   const todayPulse   = useMemo(() => lastForDay(entries, 'pulse', today),       [entries]);
+  const todayPulseRest = useMemo(() => lastForDay(entries, 'pulse_rest', today), [entries]);
+  const todaySpo2    = useMemo(() => lastForDay(entries, 'spo2', today),        [entries]);
+  const todayDistance = useMemo(() => lastForDay(entries, 'distance', today),   [entries]);
+  /** Ніч, що закінчилась сьогодні: тривалість + фази (якщо джерело їх дало). */
+  const todaySleepNight = useMemo(() => sleepNightForDay(entries, today), [entries]);
   const todayProtein = useMemo(
     () => entries.filter(e => e.type === 'calories' && isSameDay(new Date(e.date), today)).reduce((s, e) => s + (e.protein ?? 0), 0),
     [entries],
@@ -270,10 +557,32 @@ export function useHealthEntries() {
   const heightCm = profile?.heightCm ?? 175;
   const bmi = useMemo(() => (latestWeight ? calcBMI(latestWeight, heightCm) : null), [latestWeight, heightCm]);
 
-  const calNet = calcNetCalories(todayCalIn, todayCalOut);
-  const calRemaining = goals.calories - calNet;
-  const calPct = goals.calories > 0 ? calNet / goals.calories : 0;
-  const calOver = calNet > goals.calories;
+  /**
+   * Спалене за сьогодні = `calories_out` + калорії тренувань Flowi.
+   *
+   * Тримається окремо від `today.calOut` (це чисті записи) свідомо: екран
+   * «Активність» показує саме зведене число, а графіки метрики `calories_out`
+   * мусять лишатись графіками записів, інакше стовпчик за сьогодні розійдеться
+   * з журналом.
+   */
+  const todayBurned = useMemo(
+    () => burnedForDay(entries, workouts, today),
+    [entries, workouts],
+  );
+
+  // Три незалежні числа: з'їдене, спалене й залишок. Кільце міряє лише перше.
+  /** Якість сну з фаз (§6.2); без фаз — за тривалістю (`byDurationOnly`). */
+  const todaySleepQuality = useMemo(
+    () => (todaySleepNight
+      ? sleepQuality(todaySleepNight.total, todaySleepNight.deep, todaySleepNight.rem, todaySleepNight.awake, goals.sleep)
+      : null),
+    [todaySleepNight, goals.sleep],
+  );
+
+  const cal = useMemo(
+    () => calcCalorieDay(goals.calories, todayCalIn, todayBurned),
+    [goals.calories, todayCalIn, todayBurned],
+  );
 
   // ─── 7-денні чарти ─────────────────────────────────────────────────────────
   const last7 = useMemo(() => Array.from({ length: 7 }, (_, i) => {
@@ -302,21 +611,30 @@ export function useHealthEntries() {
     today: {
       water: todayWater, calIn: todayCalIn, calOut: todayCalOut, steps: todaySteps,
       weight: todayWeight, sleep: todaySleep, pulse: todayPulse, protein: todayProtein,
+      pulseRest: todayPulseRest, spo2: todaySpo2, distance: todayDistance,
+      sleepNight: todaySleepNight, sleepQuality: todaySleepQuality,
     },
-    cal: { net: calNet, remaining: calRemaining, pct: calPct, over: calOver },
+    cal,
     charts: { cal: calChart, weight: weightChart, steps: stepsChart, sleep: sleepChart },
     last7, prevWeight,
-    addEntry, addQuick,
+    addEntry, addQuick, deleteEntry,
+    /** Одноразове прибирання ваги: N прибраних повторів (null — нічого показувати). */
+    weightCleanupRemoved,
+    dismissWeightCleanup: () => setWeightCleanupRemoved(null),
     reminders, remindersLoaded, reminderBusy, setReminder,
     hk: {
-      available: HK_AVAILABLE,
+      available: SOURCE_AVAILABLE,
+      /** 'healthkit' | 'healthconnect' | null — яке джерело на цій ОС. */
+      source: healthSource?.source ?? null,
+      /** Назва сервісу («Apple Health» / «Health Connect») — не перекладається. */
+      label: healthSource?.label ?? null,
       authorized: hkAuthorized,
       access: hkAccess,
       /** true — останній синк не зміг прочитати нічого (не плутати з «нуль кроків»). */
       failed: hkFailed,
       syncing: hkSyncing,
       lastSync: hkLastSync,
-      sync: syncHealthKit,
+      sync: () => syncHealthKit(true),
       requestAccess: requestHkAccess,
     },
     reload,

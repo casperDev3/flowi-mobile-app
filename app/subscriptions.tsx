@@ -7,6 +7,9 @@
  *    (без конвертації валют);
  *  - «Продовжено» — новий цикл (дата += період) з редагованою сумою й записом в
  *    історію. Фінансових операцій НЕ створює, баланси не чіпає;
+ *  - «Оплачено» (з блоку «Найближчі оплати», параметр `pay=1`) — те саме
+ *    продовження ПЛЮС витрата у Фінансах: рахунок, категорія й сума беруться з
+ *    підписки, сума редагується перед підтвердженням;
  *  - статуси: активна / «Прострочено» / архів (зокрема авто — минула дата
  *    завершення), відновлення з архіву;
  *  - телефон: деталь — модальний лист; планшет (expanded): список + колонка.
@@ -15,6 +18,7 @@
  * id, і запис застарілого React-стану видалив би підписки, що прийшли синком.
  * Єдине видалення — явна дія «Видалити» з підтвердженням.
  */
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -24,6 +28,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -38,33 +43,41 @@ import {
   SubscriptionRow,
   type SubscriptionUiColors,
 } from '@/components/finance/SubscriptionDetail';
+import { useTodayKey } from '@/components/finance/UpcomingPaymentsCard';
 import { DetailPane } from '@/components/shared/DetailPane';
+import { RecurringIncomesSection } from '@/components/finance/RecurringIncomesSection';
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
-import { useTopInset } from '@/hooks/use-top-inset';
 import { useI18n } from '@/store/i18n';
 import type { CategoryRow } from '@/store/migrations';
 import { rescheduleSubscriptionRemindersFromStorage } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
-import { activeAccounts, type Account } from '@/utils/accounts';
+import { accountById, activeAccounts, defaultAccountId, type Account } from '@/utils/accounts';
 import { expenseCategoryPresets } from '@/utils/financeCategories';
-import { BUILTIN_CURRENCIES, type Currency } from '@/utils/financeUtils';
+import { BUILTIN_CURRENCIES, type Currency, type Transaction } from '@/utils/financeUtils';
 import { isProjectArchived, type ProjectLike } from '@/utils/projectUtils';
 import {
+  addPeriod,
   applySubscriptionDraft,
   archiveSubscription,
   dateKeyOf,
   draftFromSubscription,
   emptySubscriptionDraft,
+  formatDateKey,
+  formatSubscriptionMoney,
   formatTotalsLine,
   mergeSubscriptionWrite,
   normalizeSubscription,
   normalizeSubscriptions,
+  parseAmountInput,
+  paySubscription,
   rebaseSubscriptionDraft,
   renewSubscription,
   restoreSubscription,
@@ -109,13 +122,23 @@ interface FormState {
   original: SubscriptionDraft | null;
 }
 
+/**
+ * Вкладка «Підписки та регулярні платежі» розділу «Фінанси» (finance-revamp.md
+ * §2.4, §9.5): регулярні платежі й регулярні доходи — два списки в одній
+ * вкладці. Stack-маршрут `/subscriptions` (deep link нотифікацій, бюджет
+ * проєкту, сайдбар) малює ТОЙ САМИЙ компонент зі своєю шапкою; вкладка
+ * `(tabs)/explore?tab=subscriptions` — вбудованим, під шапкою розділу.
+ */
 export default function SubscriptionsScreen() {
+  return <SubscriptionsPanel />;
+}
+
+export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: number } } = {}) {
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
   const uiLang: 'uk' | 'en' = lang === 'en' ? 'en' : 'uk';
   const locale = uiLang === 'uk' ? 'uk-UA' : 'en-US';
   const router = useRouter();
-  const topInset = useTopInset();
   const contentWidth = useContentWidth();
   // Contract §4.1: Бюджет (і всі колекції, що його читають — тут `subscriptions`)
   // доступний ЛИШЕ власнику проєкту. Раніше пікер пропонував УСІ проєкти
@@ -129,7 +152,7 @@ export default function SubscriptionsScreen() {
     () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, red: c.red, green: c.green }),
     [c],
   );
-  const params = useLocalSearchParams<{ open?: string; renew?: string; create?: string; projectId?: string }>();
+  const params = useLocalSearchParams<{ open?: string; renew?: string; pay?: string; create?: string; projectId?: string }>();
 
   // ─── Дані ──────────────────────────────────────────────────────────────────
 
@@ -139,7 +162,16 @@ export default function SubscriptionsScreen() {
   const [categoryRows, setCategoryRows] = useState<CategoryRow[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [primaryCurrency, setPrimaryCurrency] = useState('UAH');
-  const [today, setToday] = useState(() => dateKeyOf(new Date()));
+  /**
+   * «Сьогодні» — окремим хуком, а не полем `load()`.
+   *
+   * Перераховувати дату разом із читанням сховища означало робити це лише на
+   * фокусі екрана: застосунок, згорнутий через північ, повертався зі вчорашнім
+   * «сьогодні», і підписка з оплатою на сьогодні лишалась у списку зі старим
+   * статусом. useTodayKey слухає ще й повернення з фону та перехід через
+   * північ при відкритому екрані.
+   */
+  const today = useTodayKey();
   const [initialized, setInitialized] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -158,7 +190,6 @@ export default function SubscriptionsScreen() {
     setCategoryRows(Array.isArray(cats) ? cats : []);
     setAccounts(Array.isArray(accs) ? accs : []);
     setPrimaryCurrency(typeof primary === 'string' && primary ? primary : 'UAH');
-    setToday(dateKeyOf(new Date()));
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -189,6 +220,13 @@ export default function SubscriptionsScreen() {
    * продовження перескочило б цілий період.
    */
   const renewForRef = useRef<{ id: string; date: string } | null>(null);
+  /**
+   * Відкрите підтвердження «Оплачено»: підписка і дата циклу, яку бачив
+   * користувач. Та сама перевірка, що й у продовженні, — оплатити двічі один
+   * цикл (пул між відкриттям і тапом) не можна.
+   */
+  const [payFor, setPayFor] = useState<{ id: string; date: string } | null>(null);
+  const [payAmountText, setPayAmountText] = useState('');
   const [form, setForm] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<SubscriptionDraftError | 'save' | null>(null);
   const [busy, setBusy] = useState(false);
@@ -262,6 +300,18 @@ export default function SubscriptionsScreen() {
     setRenewOpen(true);
     detailScrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [subs]);
+
+  /** «Оплачено» з блоку найближчих оплат: підтвердження суми поверх екрана. */
+  const openPay = useCallback((id: string) => {
+    const sub = subs.find(s => s.id === id);
+    if (!sub) return;
+    setPayFor({ id, date: sub.nextPaymentDate });
+    setPayAmountText(String(sub.amount));
+    setSelectedId(null);
+    setRenewOpen(false);
+  }, [subs]);
+
+  const closePay = useCallback(() => setPayFor(null), []);
 
   const onRenewOpenChange = useCallback((open: boolean) => {
     renewForRef.current = open && selected ? { id: selected.id, date: selected.nextPaymentDate } : null;
@@ -384,6 +434,88 @@ export default function SubscriptionsScreen() {
     }
   }, [selected, busy, updateOne, reportError, tr]);
 
+  // ─── «Оплачено» ────────────────────────────────────────────────────────────
+
+  const paySub = useMemo(() => (payFor ? subs.find(s => s.id === payFor.id) ?? null : null), [payFor, subs]);
+
+  /**
+   * З якого рахунку списати: вказаний у підписці → перший активний у ТІЙ САМІЙ
+   * валюті → типовий. Валюта операції визначається рахунком, тож підставити
+   * гривневий гаманець під доларову підписку означало б записати 9.99 ₴.
+   */
+  const payAccount = useMemo(() => {
+    if (!paySub) return null;
+    const own = accountById(accounts, paySub.accountId);
+    if (own) return own;
+    const sameCurrency = activeAccounts(accounts).find(a => a.currency === paySub.currency);
+    if (sameCurrency) return sameCurrency;
+    return accountById(accounts, defaultAccountId(accounts) ?? undefined) ?? null;
+  }, [paySub, accounts]);
+
+  /** Категорія для підписки, у якої її не вказано: «Інше» зі списку витрат. */
+  const fallbackCategory = useMemo(() => {
+    const presets = expenseCategoryPresets(categoryRows, lang);
+    const other = uiLang === 'en' ? 'Other' : 'Інше';
+    if (presets.some(p => p.name === other)) return other;
+    return presets[presets.length - 1]?.name ?? other;
+  }, [categoryRows, lang, uiLang]);
+
+  const payAmount = parseAmountInput(payAmountText);
+  const payValid = Number.isFinite(payAmount) && payAmount > 0;
+
+  /**
+   * Витрата + новий цикл. Формулу рахує `paySubscription` — спільна з вебом.
+   *
+   * Порядок навмисний: спершу підписка (там перевірка «цей цикл ще не
+   * оплачено»), потім операція окремим записом. Операція ні на що не
+   * посилається, тож її скасування чи правка у Фінансах дати наступної оплати
+   * вже не чіпає — і навпаки, не вдалась операція, а цикл зсунувся, людина
+   * бачить це повідомленням і додає витрату руками.
+   */
+  const paySelected = useCallback(async () => {
+    if (!paySub || !payFor || busy) return;
+    const amount = parseAmountInput(payAmountText);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const expectedDate = payFor.date;
+    const txId = Date.now().toString() + Math.random().toString(36).slice(2);
+    let stale = false;
+    let created: Transaction | null = null;
+    setBusy(true);
+    try {
+      await updateOne(paySub.id, sub => {
+        if (sub.nextPaymentDate !== expectedDate) { stale = true; return sub; }
+        const result = paySubscription(sub, {
+          id: txId,
+          accountId: payAccount?.id,
+          currency: payAccount?.currency,
+          amount,
+          fallbackCategory,
+          now: new Date(),
+        });
+        created = result.transaction;
+        return result.subscription;
+      });
+      setPayFor(null);
+      if (stale) { Alert.alert(tr.payStale); return; }
+      if (created) {
+        try {
+          // Свіже читання під блокуванням ключа: поки екран був відкритий,
+          // синк міг долити операції, і запис самого лише нашого масиву
+          // поставив би їм тумбстоуни.
+          const tx = created as Transaction;
+          await updateSynced<Transaction>('transactions', existing => [tx, ...existing]);
+        } catch (e) {
+          if (__DEV__) console.warn('[subscriptions] витрату не створено:', e);
+          Alert.alert(tr.payTxFailed);
+        }
+      }
+    } catch (e) {
+      reportError(e);
+    } finally {
+      setBusy(false);
+    }
+  }, [paySub, payFor, busy, payAmountText, payAccount, fallbackCategory, updateOne, reportError, tr]);
+
   const archiveSelected = useCallback(async () => {
     if (!selected || busy) return;
     setBusy(true);
@@ -439,12 +571,13 @@ export default function SubscriptionsScreen() {
    * бейлаута; оновлює його ефект, бо запис у ref під час рендера компілятор
    * так само не пропускає.
    */
-  const deepLinkRef = useRef({ subs, quickRenew, openCreate, router, projectId: params.projectId });
+  const deepLinkRef = useRef({ subs, quickRenew, openPay, openCreate, router, projectId: params.projectId });
   useEffect(() => {
-    deepLinkRef.current = { subs, quickRenew, openCreate, router, projectId: params.projectId };
+    deepLinkRef.current = { subs, quickRenew, openPay, openCreate, router, projectId: params.projectId };
   });
 
-  // Параметри переходу: ?open=<id>[&renew=1] (з блоку «Найближчі оплати»), ?create=1&projectId= (з проєкту).
+  // Параметри переходу: ?open=<id>[&pay=1|&renew=1] (з блоку «Найближчі оплати»),
+  // ?create=1&projectId= (з проєкту).
   useEffect(() => {
     if (!initialized) return;
     const open = typeof params.open === 'string' ? params.open : '';
@@ -453,8 +586,11 @@ export default function SubscriptionsScreen() {
     const live = deepLinkRef.current;
     if (open && live.subs.some(s => s.id === open)) {
       const target = live.subs.find(s => s.id === open);
-      // «Продовжено» з блоку: одразу підтвердження суми; архівну не продовжуємо.
-      if (params.renew === '1' && target && subscriptionStatus(target, dateKeyOf(new Date())) !== 'archived') {
+      // Архівну не оплачуємо й не продовжуємо — просто відкриваємо деталь.
+      const actionable = target && subscriptionStatus(target, dateKeyOf(new Date())) !== 'archived';
+      if (params.pay === '1' && actionable) {
+        live.openPay(open);
+      } else if (params.renew === '1' && actionable) {
         live.quickRenew(open);
       } else {
         setSelectedId(open);
@@ -462,8 +598,8 @@ export default function SubscriptionsScreen() {
       }
     }
     if (create) live.openCreate(typeof live.projectId === 'string' && live.projectId ? live.projectId : null);
-    live.router.setParams({ open: '', renew: '', create: '', projectId: '' });
-  }, [initialized, params.open, params.renew, params.create]);
+    live.router.setParams({ open: '', renew: '', pay: '', create: '', projectId: '' });
+  }, [initialized, params.open, params.renew, params.pay, params.create]);
 
   // ─── Похідне ───────────────────────────────────────────────────────────────
 
@@ -545,35 +681,57 @@ export default function SubscriptionsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      {!embedded ? <Stack.Screen options={{ headerShown: false }} /> : null}
+      {!embedded ? <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} /> : null}
 
       <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
         <View style={{ flex: 1 }}>
-          {/* Header */}
-          <View style={[st.header, { paddingTop: topInset + 14 }]}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel={tr.back}
-              style={[st.headerBtn, { backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
-              <IconSymbol name="chevron.left" size={17} color={c.sub} />
-            </TouchableOpacity>
-            <Text numberOfLines={1} style={[st.title, { color: c.text }]}>{tr.navSubscriptions}</Text>
-            <TouchableOpacity
-              onPress={() => openCreate()}
-              accessibilityRole="button"
-              accessibilityLabel={tr.subNew}
-              style={[st.headerBtn, { backgroundColor: ACCENT + '20' }]}>
-              <IconSymbol name="plus" size={18} color={ACCENT} />
-            </TouchableOpacity>
-          </View>
+          {/* Шапка — спільна: на планшеті «Підписки» відкриваються прямо з
+              сайдбара, і стрілку «Назад» ScreenHeader там сам ховає. */}
+          {!embedded ? (
+          <ScreenHeader
+            title={tr.navSubscriptions}
+            color={c.text}
+            back={{
+              onPress: () => router.back(),
+              label: tr.back,
+              color: c.sub,
+              style: { backgroundColor: c.dim, borderColor: c.border },
+            }}
+            actions={
+              <HeaderButton
+                onPress={() => openCreate()}
+                accessibilityLabel={tr.subNew}
+                style={{ backgroundColor: ACCENT + '20', borderColor: 'transparent' }}>
+                <IconSymbol name="plus" size={18} color={ACCENT} />
+              </HeaderButton>
+            }
+          />
+          ) : null}
 
           <ScrollView
-            contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 100 }]}
+            contentContainerStyle={[contentWidth, {
+              paddingHorizontal: 20,
+              paddingTop: embedded ? 12 : 0,
+              paddingBottom: embedded ? embedded.bottomInset + 24 : 100,
+            }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+            {/* Два списки однієї вкладки (§9.5): спершу платежі, нижче доходи. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={[st.sectionLabel, { color: c.sub, flex: 1, marginBottom: 0 }]}>{tr.finRecurringPayments}</Text>
+              {embedded ? (
+                <TouchableOpacity
+                  onPress={() => openCreate()}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.subNew}
+                  style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                  <IconSymbol name="plus" size={17} color={ACCENT} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
 
             {/* Підсумки за валютами */}
             {totals.length > 0 ? (
@@ -656,6 +814,13 @@ export default function SubscriptionsScreen() {
                 {showArchive ? <View style={{ gap: 10 }}>{archived.map(renderRow)}</View> : null}
               </>
             ) : null}
+
+            <RecurringIncomesSection
+              c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: c.dim, accent: c.accent, green: c.green, red: c.red, sheet: c.sheet }}
+              tr={tr}
+              lang={uiLang}
+              isDark={isDark}
+            />
           </ScrollView>
         </View>
 
@@ -706,6 +871,87 @@ export default function SubscriptionsScreen() {
         </DetailPane>
       </View>
 
+      {/* «Оплачено»: підтвердження суми перед створенням витрати */}
+      <SheetModal visible={!!paySub} onClose={closePay}>
+        <BlurView
+          intensity={isDark ? 50 : 70}
+          tint={isDark ? 'dark' : 'light'}
+          style={[st.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={st.handleRow}>
+              <View style={{ flex: 1 }} />
+              <View style={[st.handle, { backgroundColor: c.border }]} />
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <TouchableOpacity
+                  onPress={closePay}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.close}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <IconSymbol name="xmark" size={17} color={c.sub} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {paySub ? (
+              <>
+                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+                  {tr.payTitle}
+                </Text>
+                <Text numberOfLines={2} style={{ color: c.text, fontSize: 19, fontWeight: '800', marginTop: 4 }}>
+                  {paySub.name}
+                </Text>
+
+                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginTop: 16 }}>
+                  {tr.payAmount} ({paySub.currency})
+                </Text>
+                <TextInput
+                  value={payAmountText}
+                  onChangeText={setPayAmountText}
+                  keyboardType="decimal-pad"
+                  autoFocus
+                  accessibilityLabel={tr.payAmount}
+                  style={[st.payInput, { color: c.text, borderColor: payValid ? c.border : c.red }]}
+                />
+
+                <Text style={{ color: c.sub, fontSize: 12, lineHeight: 18, marginTop: 10 }}>
+                  {tr.payHint
+                    .replace('{category}', (paySub.category ?? '').trim() || fallbackCategory)
+                    .replace('{account}', payAccount ? `${payAccount.name} · ${payAccount.currency}` : tr.payNoAccount)
+                    .replace('{date}', formatDateKey(
+                      addPeriod(paySub.nextPaymentDate, paySub.period, paySub.billingDay),
+                      locale,
+                    ))}
+                </Text>
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
+                  <TouchableOpacity
+                    onPress={closePay}
+                    accessibilityRole="button"
+                    style={[st.payBtn, { flex: 1, backgroundColor: c.dim }]}>
+                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => { void paySelected(); }}
+                    disabled={!payValid || busy}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: !payValid || busy }}
+                    accessibilityLabel={tr.payConfirm}
+                    style={[st.payBtn, { flex: 1.6, backgroundColor: payValid && !busy ? c.accent : c.dim }]}>
+                    <IconSymbol name="checkmark" size={14} color={payValid && !busy ? '#fff' : c.sub} />
+                    <Text style={{ color: payValid && !busy ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>
+                      {tr.payConfirm}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ color: c.sub, fontSize: 11, marginTop: 10, textAlign: 'center' }}>
+                  {formatSubscriptionMoney(payValid ? payAmount : paySub.amount, payAccount?.currency || paySub.currency, currencies, locale)}
+                </Text>
+              </>
+            ) : null}
+          </ScrollView>
+        </BlurView>
+      </SheetModal>
+
       <SubscriptionForm
         visible={!!form}
         editing={!!form?.editingId}
@@ -727,13 +973,15 @@ export default function SubscriptionsScreen() {
 }
 
 const st = StyleSheet.create({
-  header:        { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingBottom: 12 },
-  title:         { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, flex: 1, textAlign: 'center' },
-  headerBtn:     { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   totalsCard:    { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 14 },
   sectionLabel:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 },
   filterChip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   emptyIcon:     { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  sheet:         { borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 28 },
+  handleRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  handle:        { width: 38, height: 4, borderRadius: 2 },
+  payInput:      { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 17, fontWeight: '700', marginTop: 6 },
+  payBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 14, paddingVertical: 13 },
   addBtn:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 16 },
   archiveToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 14, marginTop: 8 },
 });

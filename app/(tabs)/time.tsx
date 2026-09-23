@@ -1,80 +1,94 @@
-import { BlurView } from 'expo-blur';
+/**
+ * app/(tabs)/time.tsx — єдина сторінка про час.
+ *
+ * Сюди зведено те, що раніше жило на трьох екранах: сам трекер, «Записи часу»
+ * (`app/time-records.tsx`) і «Статистика часу» (`app/time-stats.tsx`). Причина
+ * не в економії екранів, а в тому, що вони мали РІЗНІ джерела даних —
+ * `time_entries` і `task.timeEntries` — і показували різні підсумки про одне й
+ * те саме. Джерело тепер одне, `time_entries`; старі сесії задач переносить у
+ * нього `utils/timeMigration.ts`.
+ *
+ * Порядок блоків задає порядок питань: що йде ЗАРАЗ → скільки вийшло за період
+ * → що треба перевірити → самі записи.
+ *
+ * Чого тут навмисно НЕМАЄ:
+ *  • блоку «Новий таймер» — таймер стартує лише із задачі або зустрічі, бо
+ *    вільний секундомір лишав час, не привʼязаний ні до чого, і його однаково
+ *    доводилось потім переписувати руками;
+ *  • поділу на ранок/день/вечір/ніч — жоден звіт за ним не будувався.
+ */
+
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
+  Alert,
   SectionList,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/shared/PressableScale';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
-import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
+import { AnomalyPanel } from '@/components/time/AnomalyPanel';
+import { FullscreenTimers } from '@/components/time/FullscreenTimers';
+import { TimeEntrySheet } from '@/components/time/TimeEntrySheet';
+import { TimeFilterSheet } from '@/components/time/TimeFilterSheet';
+import { TimeKpi } from '@/components/time/TimeKpi';
+import { timeColors } from '@/components/time/TimePalette';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useContentWidth } from '@/hooks/use-content-width';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useScreenView } from '@/hooks/use-screen-view';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useI18n } from '@/store/i18n';
+import type { Translations } from '@/store/translations';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
-import { useI18n } from '@/store/i18n';
-import { haptic } from '@/utils/haptics';
-import { FullscreenTimers } from '@/components/time/FullscreenTimers';
-import { useResponsive } from '@/hooks/use-responsive';
-import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import type { ActiveTimer } from '@/utils/activeTimers';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
+import { haptic } from '@/utils/haptics';
 import { elapsedSince } from '@/utils/taskTimer';
-import { CONTENT_MAX_WIDTH, sheetColumnStyle, useContentWidth } from '@/hooks/use-content-width';
-import { monthGrid } from '@/utils/dateUtils';
-import type { ActiveTimer, Shift } from '@/utils/activeTimers';
-
-interface ShiftCfg { label: string; icon: IconSymbolName; color: string; hours: string; }
-
-interface TimeEntry {
-  id: string;
-  task: string;
-  shift: Shift;
-  duration: number;
-  date: string;
-  /** Належність проєкту (WORKSPACE_PROJECTS_CONTRACT §3.3) — опційна. */
-  projectId?: string;
-}
+import { applyDuration, detectAnomalies } from '@/utils/timeAnomalies';
+import {
+  averageTaskSeconds,
+  filterRecords,
+  groupByDay,
+  groupByProject,
+  projectBreakdown,
+  sortRecords,
+  taskOptions,
+  totalSeconds,
+  type ProjectLike,
+  type TimeGrouping,
+  type TimePeriod,
+  type TimeRecord,
+  type TimeSort,
+} from '@/utils/timeEntries';
+import { migrateTaskSessions, type MigratableTask } from '@/utils/timeMigration';
 
 /** Рівно те, що рядок активного таймера показує про підзавдання. */
 interface RowSubtask { id: string; title: string; done: boolean }
 
-/**
- * Мінімум про завдання, потрібний, щоб прикріпити його до таймера.
- * Колонка й статус — не зайве: саме за ними стор вирішує, чи рухати завдання
- * в «У процесі» на старті.
- */
-interface PickableTask {
-  id: string;
+interface Section {
+  key: string;
   title: string;
-  status: 'active' | 'done';
-  kanbanColumnId?: string;
-  subtasks?: RowSubtask[];
-  projectId?: string;
+  seconds: number;
+  color: string | null;
+  data: TimeRecord[];
 }
 
-const today = new Date();
-const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
-
-function groupLabel(date: Date, todayStr: string, yesterdayStr: string, locale: string) {
-  if (date.toDateString() === today.toDateString()) return todayStr;
-  if (date.toDateString() === yesterday.toDateString()) return yesterdayStr;
-  return date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-}
-
+/**
+ * Міграція виконується ОДИН раз на запуск застосунку, а не на кожен фокус
+ * екрана: сама вона ідемпотентна, але зайве читання всіх задач при кожному
+ * поверненні на вкладку нічого не дає.
+ */
+let migrationRan = false;
 
 export default function TimeScreen() {
   const contentWidth = useContentWidth();
@@ -82,88 +96,122 @@ export default function TimeScreen() {
   const { height, isWide } = useResponsive();
   const isDark = useColorScheme() === 'dark';
   useScreenView('time');
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { pendingTask, setPendingTask, activeTimers, startAdHocTimer, startTaskTimer, stopTimer, tasksRevision, timeEntriesRevision } = useTimerContext();
+  const { activeTimers, stopTimer, tasksRevision, timeEntriesRevision } = useTimerContext();
   const { tr, lang } = useI18n();
-  // Одиниці приходять зі словника: до цього кожен екран мав власну копію
-  // форматування з вшитими «год» і «хв».
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+
   const durationUnits = useMemo(
     () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
     [tr.unitHour, tr.unitHourLong, tr.unitMinute],
   );
-  const fmtDurLocal = useCallback((s: number) => formatDuration(s, durationUnits), [durationUnits]);
-  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  // Мемоізовано, бо цей обʼєкт іде пропом у React.memo-рядок списку: новий
-  // обʼєкт щосекунди (таймер) перерендерював би всю історію.
-  const SHIFTS = useMemo<Record<Shift, ShiftCfg>>(() => ({
-    morning: { label: tr.morning, icon: 'sun.horizon.fill', color: '#F59E0B', hours: '06–12' },
-    day:     { label: tr.daytime, icon: 'sun.max.fill',     color: '#EF4444', hours: '12–18' },
-    evening: { label: tr.evening, icon: 'sunset.fill',      color: '#8B5CF6', hours: '18–24' },
-    night:   { label: tr.night,   icon: 'moon.fill',        color: '#0EA5E9', hours: '00–06' },
-  }), [tr.morning, tr.daytime, tr.evening, tr.night]);
-  const months = tr.months;
-  const weekdaysShort = tr.weekdays;
+  const fmtDur = useCallback((s: number) => formatDuration(s, durationUnits), [durationUnits]);
 
-  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [entries, setEntries] = useState<TimeRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectLike[]>([]);
   const [timerSubtasks, setTimerSubtasks] = useState<Record<string, RowSubtask[]>>({});
   const [initialized, setInitialized] = useState(false);
-  const [activeShift, setActiveShift] = useState<Shift>('morning');
-  const [taskName, setTaskName] = useState('');
-  // Прикріплене завдання. null — вільний таймер: час піде лише в історію
-  // трекера, без сесії в завданні й без руху по дошці.
-  const [linkedTask, setLinkedTask] = useState<PickableTask | null>(null);
-  const [showTaskPick, setShowTaskPick] = useState(false);
-  const [pickQuery, setPickQuery] = useState('');
-  const [pickable, setPickable] = useState<PickableTask[]>([]);
-  const [selected, setSelected] = useState<TimeEntry | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
-  const [manTask, setManTask] = useState('');
-  const [manHours, setManHours] = useState('');
-  const [manMins, setManMins] = useState('');
-  const [manShift, setManShift] = useState<Shift>('morning');
 
-  const [dateFilter, setDateFilter] = useState<string | null>(null);
-  const [showCal, setShowCal] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-  // Режим зосередження відкривається лише звідси — з шапки вкладки «Час».
+  const [period, setPeriod] = useState<TimePeriod>('week');
+  const [sort, setSort] = useState<TimeSort>('date-desc');
+  const [grouping, setGrouping] = useState<TimeGrouping>('list');
+  const [filterProjectId, setFilterProjectId] = useState<string | null>(null);
+  const [filterTaskKey, setFilterTaskKey] = useState<string | null>(null);
+
+  const [showFilters, setShowFilters] = useState(false);
   const [fsOpen, setFsOpen] = useState(false);
-  const [calYear, setCalYear] = useState(today.getFullYear());
-  const [calMonth, setCalMonth] = useState(today.getMonth());
+  const [sheetEntry, setSheetEntry] = useState<TimeRecord | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  // Стор зупинки таймера дописує завершену сесію в 'time_entries' сам, повз
-  // наш стан — без перечитування наступне локальне збереження (ручний запис,
-  // видалення) затерло б її. Ідентичність масиву зберігаємо, коли нічого не
-  // змінилось: інакше ефект збереження ганяв би в синк ті самі дані.
+  /**
+   * «Сьогодні» перераховується, поки екран відкритий.
+   *
+   * Раніше межа доби бралася з `const today = new Date()` НА РІВНІ МОДУЛЯ:
+   * модуль обчислюється один раз за запуск застосунку, тож після півночі
+   * фільтр «сьогодні» й підпис «Сьогодні» лишались учорашніми до перезапуску.
+   * Тепер дата живе в стані й оновлюється на кожен фокус екрана та на межі доби.
+   */
+  const [now, setNow] = useState(() => new Date());
+  const refreshNow = useCallback(() => setNow(current => {
+    const fresh = new Date();
+    // Нове значення лише тоді, коли доба справді змінилась: інакше кожен фокус
+    // давав би новий обʼєкт і перераховував усі мемоізації екрана ні за що.
+    return fresh.toDateString() === current.toDateString() ? current : fresh;
+  }), []);
+
+  useEffect(() => {
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    // +1 с, щоб таймер спрацював уже ПІСЛЯ межі, а не рівно на ній.
+    const timer = setTimeout(refreshNow, midnight.getTime() - Date.now() + 1000);
+    return () => clearTimeout(timer);
+  }, [now, refreshNow]);
+
   const reloadEntries = useCallback(async () => {
-    const data = await loadData<TimeEntry[]>('time_entries', []);
+    const data = await loadData<TimeRecord[]>('time_entries', []);
+    // Ідентичність масиву зберігаємо, коли нічого не змінилось: інакше ефект
+    // збереження ганяв би в синк ті самі дані.
     setEntries(prev =>
       prev.length === data.length && prev.every((e, i) => e.id === data[i].id) ? prev : data,
     );
   }, []);
 
-  // Load from storage
-  useEffect(() => {
-    loadData<TimeEntry[]>('time_entries', []).then(data => {
-      setEntries(data);
-      setInitialized(true);
-    });
+  const reloadProjects = useCallback(async () => {
+    try {
+      const stored = await loadData<ProjectLike[]>('projects', []);
+      setProjects(stored.filter(p => p?.id));
+    } catch (e) {
+      if (__DEV__) console.warn('[time] проєкти не прочитались:', e);
+    }
   }, []);
 
-  // Таймер тепер зупиняють і з кореневої кнопки режиму зосередження — тобто
-  // поверх ЦЬОГО екрана, без його розмонтування й без повернення фокуса.
-  // Лічилка стору — єдиний сигнал, що дзеркало сесії дописане; без неї список
-  // лишався б таким, яким був до зупинки.
+  /**
+   * Перше читання — з міграцією сесій задач у `time_entries`.
+   *
+   * Міграція мусить відпрацювати ДО того, як екран покаже підсумки: інакше
+   * людина побачила б суму без перенесених годин, а за мить — стрибок.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const stored = await loadData<TimeRecord[]>('time_entries', []);
+      let next = stored;
+      if (!migrationRan) {
+        migrationRan = true;
+        try {
+          const tasks = await loadData<MigratableTask[]>('tasks', []);
+          const result = migrateTaskSessions(tasks, stored);
+          if (result.added > 0) {
+            next = result.entries;
+            await saveSynced('time_entries', next);
+            if (__DEV__) console.log(`[time] перенесено сесій задач: ${result.added}`);
+          }
+        } catch (e) {
+          // Провал міграції не має ламати екран: записи з `time_entries`
+          // читаються й показуються, а наступний запуск спробує ще раз.
+          migrationRan = false;
+          if (__DEV__) console.warn('[time] міграція сесій задач не вдалась:', e);
+        }
+      }
+      if (cancelled) return;
+      setEntries(next);
+      setInitialized(true);
+    })();
+    void reloadProjects();
+    return () => { cancelled = true; };
+  }, [reloadProjects]);
+
+  // Стор зупинки таймера дописує завершену сесію в 'time_entries' сам, повз наш
+  // стан — лічилка стору єдиний сигнал, що дзеркало сесії дописане.
   useEffect(() => {
     if (timeEntriesRevision > 0) void reloadEntries();
   }, [timeEntriesRevision, reloadEntries]);
 
-  // Підзавдання для рядків активних таймерів.
-  //
-  // Читаємо 'tasks' ЛИШЕ коли серед активних є таймер завдання: у користувача,
-  // який тримає вільний секундомір, немає причин щоразу піднімати зі сховища
-  // весь список завдань. tasksRevision у залежностях, бо стор пише в 'tasks'
-  // повз наш стан — і без нього список лишався б таким, яким був до старту.
+  useEffect(() => {
+    if (initialized) void saveSynced('time_entries', entries);
+  }, [entries, initialized]);
+
+  // Підзавдання для рядків активних таймерів. 'tasks' читаємо ЛИШЕ коли серед
+  // активних є таймер задачі.
   const hasTaskTimers = activeTimers.some(t => t.taskId);
   const reloadTimerSubtasks = useCallback(async () => {
     if (!hasTaskTimers) { setTimerSubtasks({}); return; }
@@ -181,165 +229,174 @@ export default function TimeScreen() {
 
   useEffect(() => { void reloadTimerSubtasks(); }, [reloadTimerSubtasks, tasksRevision]);
 
-  // Save to storage
-  useEffect(() => {
-    if (initialized) void saveSynced('time_entries', entries);
-  }, [entries, initialized]);
-
-  // Pick up task from tasks screen
   useFocusEffect(useCallback(() => {
-    if (pendingTask) {
-      setTaskName(pendingTask);
-      setPendingTask('');
-    }
-    // Повернення на вкладку — момент підхопити сесії, дописані стором
-    // (зупинка з деталі завдання або з повноекранного режиму).
+    refreshNow();
     void reloadEntries();
-  }, [pendingTask, setPendingTask, reloadEntries]));
+    void reloadProjects();
+  }, [refreshNow, reloadEntries, reloadProjects]));
 
-  const startNew = useCallback(async () => {
-    haptic.medium();
-    if (linkedTask) {
-      // Таймер завдання, а не вільний: лише він дописує сесію в task.timeEntries
-      // і рухає завдання «До роботи» → «У процесі» → на стопі «На перевірці».
-      await startTaskTimer({
-        id: linkedTask.id,
-        title: linkedTask.title,
-        kanbanColumnId: linkedTask.kanbanColumnId,
-        status: linkedTask.status,
-        projectId: linkedTask.projectId,
-      });
-    } else {
-      await startAdHocTimer(taskName.trim() || tr.untitled, activeShift);
-    }
-    setTaskName('');
-    setLinkedTask(null);
-  }, [activeShift, linkedTask, startAdHocTimer, startTaskTimer, taskName, tr.untitled]);
+  // ─── Вибірка ────────────────────────────────────────────────────────────────
 
-  /** Список завдань для прикріплення. Читаємо при відкритті, а не тримаємо. */
-  const openTaskPick = useCallback(async () => {
-    setShowTaskPick(true);
-    setPickQuery('');
-    try {
-      const stored = await loadData<PickableTask[]>('tasks', []);
-      setPickable(stored.filter(t => t?.id && t.status !== 'done'));
-    } catch (e) {
-      if (__DEV__) console.warn('[time] список завдань не прочитався:', e);
+  const filtered = useMemo(
+    () => filterRecords(entries, { period, projectId: filterProjectId, taskKey: filterTaskKey }, now),
+    [entries, period, filterProjectId, filterTaskKey, now],
+  );
+  const sorted = useMemo(() => sortRecords(filtered, sort), [filtered, sort]);
+
+  const periodOnly = useMemo(
+    () => filterRecords(entries, { period, projectId: null, taskKey: null }, now),
+    [entries, period, now],
+  );
+  const tasksForFilter = useMemo(
+    () => taskOptions(filterProjectId ? periodOnly.filter(e => e.projectId === filterProjectId) : periodOnly),
+    [periodOnly, filterProjectId],
+  );
+  const projectsForFilter = useMemo(() => {
+    const ids = new Set(periodOnly.map(e => e.projectId).filter(Boolean));
+    return projects.filter(p => ids.has(p.id));
+  }, [periodOnly, projects]);
+
+  const breakdown = useMemo(() => projectBreakdown(filtered, projects), [filtered, projects]);
+  const total = useMemo(() => totalSeconds(filtered), [filtered]);
+  const average = useMemo(() => averageTaskSeconds(filtered), [filtered]);
+
+  /**
+   * Аномалії шукаємо у ВСІХ записах, а не лише у відфільтрованих: медіана за
+   * тижнем на трьох сесіях — не медіана, а випадкове число, і фільтр «сьогодні»
+   * щоразу давав би інший список «перевір».
+   */
+  const anomalies = useMemo(() => detectAnomalies(entries), [entries]);
+
+  const sections = useMemo<Section[]>(() => {
+    if (grouping === 'project') {
+      return groupByProject(sorted, projects).map(group => ({
+        key: group.projectId ?? 'personal',
+        title: group.name,
+        seconds: group.seconds,
+        color: group.color,
+        data: group.items,
+      }));
     }
+    const todayKey = now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = yesterday.toDateString();
+    return groupByDay(sorted).map(group => {
+      const date = new Date(group.ms);
+      const key = date.toDateString();
+      const title = key === todayKey ? tr.today
+        : key === yesterdayKey ? tr.yesterday
+        : date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+      return { key: group.key, title, seconds: group.seconds, color: null, data: group.items };
+    });
+  }, [grouping, sorted, projects, now, tr.today, tr.yesterday, locale]);
+
+  const c = useMemo(() => timeColors(isDark), [isDark]);
+  const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);
+
+  // ─── Дії над записами ───────────────────────────────────────────────────────
+
+  const upsertEntry = useCallback((entry: TimeRecord) => {
+    setEntries(prev => {
+      const index = prev.findIndex(e => e.id === entry.id);
+      if (index < 0) return [entry, ...prev];
+      const next = [...prev];
+      next[index] = entry;
+      return next;
+    });
   }, []);
 
-  const pickedTasks = useMemo(() => {
-    const q = pickQuery.trim().toLowerCase();
-    const list = q ? pickable.filter(t => t.title.toLowerCase().includes(q)) : pickable;
-    return list.slice(0, 60);
-  }, [pickable, pickQuery]);
+  const patchEntry = useCallback((id: string, patch: Partial<TimeRecord>) => {
+    setEntries(prev => prev.map(e => (e.id === id ? { ...e, ...patch } : e)));
+  }, []);
+
+  const deleteEntry = useCallback((entry: TimeRecord) => {
+    Alert.alert(tr.deletePermanently, tr.cannotUndo, [
+      { text: tr.cancel, style: 'cancel' },
+      {
+        text: tr.delete,
+        style: 'destructive',
+        onPress: () => setEntries(prev => prev.filter(e => e.id !== entry.id)),
+      },
+    ]);
+  }, [tr.cancel, tr.cannotUndo, tr.delete, tr.deletePermanently]);
+
+  const openEntry = useCallback((entry: TimeRecord | null) => {
+    haptic.light();
+    setSheetEntry(entry);
+    setSheetOpen(true);
+  }, []);
+
+  const trimEntry = useCallback((entry: TimeRecord, seconds: number) => {
+    haptic.medium();
+    patchEntry(entry.id, applyDuration(entry, seconds));
+  }, [patchEntry]);
+
+  const markNormal = useCallback((entry: TimeRecord) => {
+    haptic.light();
+    patchEntry(entry.id, { markedNormal: true });
+  }, [patchEntry]);
 
   const stopActive = useCallback(async (id: string) => {
     haptic.medium();
     await stopTimer(id);
-    // Стор щойно дописав дзеркало сесії — забираємо його у свій стан.
     await reloadEntries();
   }, [reloadEntries, stopTimer]);
 
-  const addManual = () => {
-    const h = parseInt(manHours || '0', 10), m = parseInt(manMins || '0', 10);
-    const dur = h * 3600 + m * 60;
-    if (!dur || !manTask.trim()) return;
-    setEntries(p => [{ id: Date.now().toString(), task: manTask.trim(), shift: manShift, duration: dur, date: new Date().toISOString() }, ...p]);
-    setManTask(''); setManHours(''); setManMins(''); setShowAdd(false);
-  };
+  const resetFilters = useCallback(() => {
+    setPeriod('week');
+    setSort('date-desc');
+    setGrouping('list');
+    setFilterProjectId(null);
+    setFilterTaskKey(null);
+  }, []);
 
-  const deleteEntry = (id: string) => { setEntries(p => p.filter(e => e.id !== id)); if (selected?.id === id) setSelected(null); };
+  const hasFilters = !!(filterProjectId || filterTaskKey) || period !== 'week' || grouping !== 'list';
 
-  const total = entries.reduce((s, e) => s + e.duration, 0);
-  const avg   = entries.length > 0 ? Math.round(total / entries.length) : 0;
+  const periodLabels = useMemo<Record<TimePeriod, string>>(() => ({
+    today: tr.periodToday,
+    week: tr.periodWeek,
+    month: tr.periodMonth,
+    all: tr.periodAll,
+  }), [tr.periodToday, tr.periodWeek, tr.periodMonth, tr.periodAll]);
 
-  const filteredEntries = useMemo(() => {
-    if (!dateFilter) return entries;
-    return entries.filter(e => new Date(e.date).toDateString() === dateFilter);
-  }, [entries, dateFilter]);
-
-  const sections = useMemo(() => {
-    const map: Record<string, { label: string; dayTotal: number; data: TimeEntry[] }> = {};
-    const order: string[] = [];
-    filteredEntries.forEach(e => {
-      const d = new Date(e.date);
-      const key = d.toDateString();
-      if (!map[key]) { map[key] = { label: groupLabel(d, tr.today, tr.yesterday, locale), dayTotal: 0, data: [] }; order.push(key); }
-      map[key].data.push(e);
-      map[key].dayTotal += e.duration;
-    });
-    return order.map(k => map[k]);
-    // Підписи груп («Сьогодні», «Вчора») залежать від мови — без цих
-    // залежностей історія лишалася б підписаною попередньою мовою.
-  }, [filteredEntries, tr.today, tr.yesterday, locale]);
-
-  // Сітка місяця — зі спільної утиліти; локальна копія рахувала зсув
-  // понеділка окремо й могла розійтися з календарем завдань.
-  const calWeeks = useMemo(() => monthGrid(calYear, calMonth), [calYear, calMonth]);
-
-  const markedDays = useMemo(() => {
-    const set = new Set<string>();
-    entries.forEach(e => {
-      const d = new Date(e.date);
-      set.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
-    });
-    return set;
-  }, [entries]);
-
-  // Мемоізовано разом із рядками списку: інакше memo не спрацює.
-  const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,205,255,0.5)',
-    text:   isDark ? '#EEF0FF' : '#0D1033',
-    sub:    isDark ? 'rgba(238,240,255,0.62)' : 'rgba(13,16,51,0.58)',
-    indigo: '#6366F1',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(10,12,24,0.98)' : 'rgba(250,251,255,0.98)',
-  }), [isDark]);
-
-  const handleSelect = useCallback((entry: TimeEntry) => setSelected(entry), []);
+  const formatEntryDate = useCallback(
+    (iso: string) => {
+      const date = new Date(iso);
+      return Number.isNaN(date.getTime())
+        ? '—'
+        : date.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+    },
+    [locale],
+  );
 
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <View style={{ flex: 1 }}>
-
-        {/* Fixed Header */}
         <ScreenHeader
           title={tr.navTimeTracker}
           color={c.text}
           paddingBottom={14}
           actions={
             <>
-              {/*
-                Єдиний вхід у режим зосередження — і на телефоні, і на планшеті.
-                Плаваючої кнопки в кореневому лейауті більше немає: вона висіла
-                над кожним екраном, а режим показує таймери, тож його місце —
-                у їхньому розділі.
-
-                Умова на активні таймери: режим показує те, що йде просто зараз,
-                і вхід у порожню сітку обіцяв би, що там щось є.
-              */}
+              {/* Режим зосередження показує те, що йде просто зараз, тож вхід у
+                  порожню сітку обіцяв би, що там щось є. */}
               {activeTimers.length > 0 && (
                 <HeaderButton
                   onPress={() => { haptic.light(); setFsOpen(true); }}
-                  accessibilityLabel={
-                    activeTimers.length > 0
-                      ? `${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`
-                      : `${tr.fullscreenTimers}, ${tr.noActiveTimers}`
-                  }
+                  accessibilityLabel={`${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`}
                   style={{ backgroundColor: c.indigo + '20', borderColor: c.indigo }}>
                   <IconSymbol name="timer" size={17} color={c.indigo} />
                 </HeaderButton>
               )}
               <HeaderButton
-                onPress={() => setShowMenu(true)}
+                onPress={() => setShowFilters(true)}
                 accessibilityLabel={tr.filtersAndSort}
-                style={{ backgroundColor: dateFilter ? c.indigo + '20' : c.dim, borderColor: dateFilter ? c.indigo : c.border }}>
-                <IconSymbol name="slider.horizontal.3" size={17} color={dateFilter ? c.indigo : c.sub} />
+                style={{
+                  backgroundColor: hasFilters ? c.indigo + '20' : c.dim,
+                  borderColor: hasFilters ? c.indigo : c.border,
+                }}>
+                <IconSymbol name="slider.horizontal.3" size={17} color={hasFilters ? c.indigo : c.sub} />
               </HeaderButton>
             </>
           }
@@ -350,515 +407,183 @@ export default function TimeScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
           showsVerticalScrollIndicator={false}
-          // Заголовки днів не липкі — так було й до віртуалізації.
           stickySectionHeadersEnabled={false}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          renderSectionFooter={() => <View style={{ height: 6 }} />}
           renderSectionHeader={({ section }) => (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 14 }}>
-              <Text style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{section.label}</Text>
+              {section.color && (
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: section.color, marginRight: 7 }} />
+              )}
+              <Text numberOfLines={1} style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{section.title}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <IconSymbol name="timer" size={11} color={c.sub} />
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{fmtDurLocal(section.dayTotal)}</Text>
+                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{fmtDur(section.seconds)}</Text>
               </View>
             </View>
           )}
-          // Відступи повторюють колишню розмітку: 8 між картками,
-          // 6 після групи (разом із marginTop заголовка — ті самі 20).
-          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          renderSectionFooter={() => <View style={{ height: 6 }} />}
           renderItem={({ item }) => (
             <EntryRow
               entry={item}
-              cfg={SHIFTS[item.shift]}
-              isDark={isDark}
+              projectName={item.projectId ? projectById.get(item.projectId)?.name : undefined}
+              projectColor={item.projectId ? projectById.get(item.projectId)?.color : undefined}
+              accent={c.indigo}
               border={c.border}
               text={c.text}
               sub={c.sub}
-              duration={fmtDurLocal(item.duration)}
-              onPress={handleSelect}
+              danger={c.danger}
+              duration={fmtDur(item.duration)}
+              when={formatEntryDate(item.date)}
+              tr={tr}
+              onPress={openEntry}
+              onDelete={deleteEntry}
             />
           )}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 48 }}>
               <IconSymbol name="clock.fill" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noRecordsYet}</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>Натисніть + для ручного запису</Text>
+              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noRecords}</Text>
+              {hasFilters ? (
+                <TouchableOpacity onPress={resetFilters} style={[s.emptyAction, { backgroundColor: c.indigo }]}>
+                  <IconSymbol name="xmark" size={12} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', marginLeft: 6 }}>{tr.resetAllFilters}</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>
+                  {tr.timeEmptyHint}
+                </Text>
+              )}
             </View>
           }
           ListHeaderComponent={
             <>
-          {/* Date filter chip */}
-          {dateFilter && (
-            <TouchableOpacity
-              onPress={() => setDateFilter(null)}
-              style={[s.dateChip, { backgroundColor: c.indigo + '20', borderColor: c.indigo + '60' }]}>
-              <IconSymbol name="calendar" size={13} color={c.indigo} />
-              <Text style={{ color: c.indigo, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>
-                {new Date(dateFilter).toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
-              </Text>
-              <IconSymbol name="xmark" size={13} color={c.indigo} style={{ marginLeft: 4 }} />
-            </TouchableOpacity>
-          )}
-
-          {/* Запуск нового таймера. Годинника тут більше немає: сесії, що
-              тривають, живуть у секції нижче — їх може бути кілька одразу. */}
-          <BlurView intensity={isDark ? 25 : 45} tint={isDark ? 'dark' : 'light'} style={[s.timerCard, { borderColor: c.border }]}>
-            <Text style={[s.cardTitle, { color: c.sub }]}>{tr.newTimer}</Text>
-
-            {linkedTask ? (
-              // Прикріплене завдання заміщає поле назви: назва береться з нього,
-              // і два джерела імені таймера тільки збивали б з пантелику.
-              <View style={[s.linkedRow, { borderColor: c.indigo + '60', backgroundColor: c.indigo + '14' }]}>
-                <IconSymbol name="checklist" size={14} color={c.indigo} />
-                <Text numberOfLines={1} style={{ flex: 1, marginLeft: 8, color: c.text, fontSize: 14, fontWeight: '600' }}>
-                  {linkedTask.title}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setLinkedTask(null)}
-                  accessibilityLabel={tr.detachTask}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <IconSymbol name="xmark" size={13} color={c.sub} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <>
-                <TextInput
-                  placeholder={tr.taskNamePlaceholder2}
-                  placeholderTextColor={c.sub}
-                  value={taskName}
-                  onChangeText={setTaskName}
-                  style={[s.taskInput, { color: c.text, borderColor: c.border }]}
-                  textAlign="center"
-                  returnKeyType="go"
-                  onSubmitEditing={() => { void startNew(); }}
-                />
-
-                {/* Без завдання таймер нічого не змінює на дошці й не лишає
-                    сесії в завданні — про це треба сказати ДО старту, а не
-                    після, коли час уже пішов не туди. */}
-                <TouchableOpacity
-                  onPress={() => { void openTaskPick(); }}
-                  style={[s.attachBtn, { borderColor: c.border }]}>
-                  <IconSymbol name="link" size={13} color={c.indigo} />
-                  <Text style={{ color: c.indigo, fontSize: 13, fontWeight: '600', marginLeft: 6 }}>
-                    {tr.attachTask}
+              {/* 1. Що йде ЗАРАЗ. Порожньої секції немає навмисно: заголовок
+                  «Активні (0)» щодня займав би екран ні за що. */}
+              {activeTimers.length > 0 && (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={[s.sectionTitle, { color: c.text, marginBottom: 10 }]}>
+                    {tr.activeTimers} ({activeTimers.length})
                   </Text>
-                </TouchableOpacity>
-                <Text style={{ color: c.sub, fontSize: 11, textAlign: 'center', marginTop: 6, opacity: 0.8 }}>
-                  {tr.freeTimerHint}
+                  {activeTimers.map(timer => (
+                    <ActiveTimerRow
+                      key={timer.id}
+                      timer={timer}
+                      subtasks={timer.taskId ? timerSubtasks[timer.taskId] : undefined}
+                      accent={c.indigo}
+                      border={c.border}
+                      card={c.card}
+                      text={c.text}
+                      sub={c.sub}
+                      stopLabel={tr.stopTimerAction}
+                      onStop={stopActive}
+                    />
+                  ))}
+                </View>
+              )}
+
+              {/* 2. KPI за обраним періодом. */}
+              <TimeKpi
+                c={c}
+                isDark={isDark}
+                totalSeconds={total}
+                averageTaskSeconds={average}
+                recordCount={filtered.length}
+                breakdown={breakdown}
+                formatDuration={fmtDur}
+                tr={tr}
+              />
+
+              {/* 3. Що треба перевірити. */}
+              {anomalies.length > 0 && (
+                <View style={{ marginTop: 14 }}>
+                  <AnomalyPanel
+                    reports={anomalies}
+                    c={c}
+                    isDark={isDark}
+                    formatDuration={fmtDur}
+                    formatDate={formatEntryDate}
+                    onTrim={trimEntry}
+                    onEditDuration={openEntry}
+                    onDelete={deleteEntry}
+                    onMarkNormal={markNormal}
+                    tr={tr}
+                    lang={lang}
+                  />
+                </View>
+              )}
+
+              {/* 4. Самі записи. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 4 }}>
+                <Text style={[s.sectionTitle, { color: c.text, flex: 1 }]}>{tr.history}</Text>
+                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>
+                  {periodLabels[period]}
+                  {grouping === 'project' ? tr.timeByProjectSuffix : ''}
                 </Text>
-              </>
-            )}
-
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 16, marginBottom: 18, alignSelf: 'stretch' }}>
-              {(Object.keys(SHIFTS) as Shift[]).map(sh => {
-                const cfg = SHIFTS[sh]; const active = activeShift === sh;
-                return (
-                  <TouchableOpacity
-                    key={sh}
-                    onPress={() => setActiveShift(sh)}
-                    style={[s.shiftPill, { borderColor: active ? cfg.color : c.border, backgroundColor: active ? cfg.color + '20' : 'transparent' }]}>
-                    <IconSymbol name={cfg.icon} size={14} color={active ? cfg.color : c.sub} />
-                    <Text style={{ fontSize: 11, fontWeight: '600', marginLeft: 3, color: active ? cfg.color : c.sub }}>{cfg.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <TouchableOpacity
-              onPress={() => { void startNew(); }}
-              accessibilityLabel={tr.startTimerAction}
-              style={[s.timerBtn, { backgroundColor: c.indigo }]}
-              activeOpacity={0.85}>
-              <IconSymbol name="play.fill" size={14} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700', marginLeft: 7 }}>{tr.start}</Text>
-            </TouchableOpacity>
-          </BlurView>
-
-          {/* Активні таймери. Порожньої секції немає навмисно: місце під
-              заголовок «Активні (0)» щодня займало б екран ні за що. */}
-          {activeTimers.length > 0 && (
-            <View style={{ marginTop: 18 }}>
-              <Text style={[s.sectionTitle, { color: c.text, marginBottom: 10 }]}>
-                {tr.activeTimers} ({activeTimers.length})
-              </Text>
-              {activeTimers.map(timer => (
-                <ActiveTimerRow
-                  key={timer.id}
-                  timer={timer}
-                  subtasks={timer.taskId ? timerSubtasks[timer.taskId] : undefined}
-                  cfg={SHIFTS[timer.shift] ?? SHIFTS.day}
-                  isDark={isDark}
-                  border={c.border}
-                  text={c.text}
-                  sub={c.sub}
-                  stopLabel={tr.stopTimerAction}
-                  onStop={stopActive}
-                />
-              ))}
-            </View>
-          )}
-
-          {/* Stats */}
-          <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card, marginTop: 14 }]}>
-            <StatCell value={total > 0 ? fmtDurLocal(total) : '—'} label={tr.totalLabel}    color={c.indigo} sub={c.sub} />
-            <View style={{ width: 1, backgroundColor: c.border }} />
-            <StatCell value={String(entries.length)}           label={tr.sessionsCount} color="#10B981" sub={c.sub} />
-            <View style={{ width: 1, backgroundColor: c.border }} />
-            <StatCell value={avg > 0 ? fmtDurLocal(avg) : '—'}     label={tr.avgLabel}      color="#F59E0B" sub={c.sub} />
-          </View>
-
-          {/* History */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 4 }}>
-            <Text style={[s.sectionTitle, { color: c.text, flex: 1 }]}>{tr.history}</Text>
-          </View>
+              </View>
             </>
           }
         />
       </View>
 
-      {/* FAB */}
-      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.indigo }]}>
+      <PressableScale
+        onPress={() => openEntry(null)}
+        scaleTo={0.92}
+        accessibilityLabel={tr.timeAddEntry}
+        style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.indigo }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </PressableScale>
 
-      {/* ─── Вибір завдання для таймера ─── */}
-      <Modal visible={showTaskPick} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowTaskPick(false)}>
-        <Pressable
-          style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
-          onPress={() => setShowTaskPick(false)}
-          accessibilityRole="button"
-        />
-        <View
-          style={[
-            s.pickSheet,
-            { backgroundColor: c.sheet, paddingBottom: insets.bottom + 14 },
-            // На планшеті список завдань на всю ширину дає рядки завдовжки з
-            // екран — око не встигає повернутися до початку наступного.
-            isWide && { maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
-          ]}>
-          <View style={[s.handle, { backgroundColor: c.border, alignSelf: 'center', marginBottom: 12 }]} />
-          <Text style={[s.sheetTitle, { color: c.text, marginBottom: 10 }]}>{tr.pickTaskTitle}</Text>
+      <TimeEntrySheet
+        visible={sheetOpen}
+        entry={sheetEntry}
+        c={c}
+        isDark={isDark}
+        height={height}
+        isWide={isWide}
+        tr={tr}
+        onClose={() => { setSheetOpen(false); setSheetEntry(null); }}
+        onSubmit={upsertEntry}
+      />
 
-          <TextInput
-            placeholder={tr.taskNamePlaceholder2}
-            placeholderTextColor={c.sub}
-            value={pickQuery}
-            onChangeText={setPickQuery}
-            style={[s.pickSearch, { color: c.text, borderColor: c.border }]}
-            autoCorrect={false}
-          />
-
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ marginTop: 10 }}>
-            {pickedTasks.length === 0 ? (
-              <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 26 }}>
-                {tr.noTasks}
-              </Text>
-            ) : pickedTasks.map(task => (
-              <TouchableOpacity
-                key={task.id}
-                onPress={() => {
-                  haptic.light();
-                  setLinkedTask(task);
-                  setTaskName(task.title);
-                  setShowTaskPick(false);
-                }}
-                style={[s.pickRow, { borderColor: c.border }]}>
-                <IconSymbol name="checklist" size={15} color={c.indigo} />
-                <Text numberOfLines={1} style={{ flex: 1, marginLeft: 10, color: c.text, fontSize: 14 }}>
-                  {task.title}
-                </Text>
-                {task.subtasks?.length ? (
-                  <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>
-                    {task.subtasks.filter(x => x.done).length}/{task.subtasks.length}
-                  </Text>
-                ) : null}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* ─── Context Menu Modal ─── */}
-      <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>
-        <Pressable accessible={false}
-          style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
-          onPress={() => setShowMenu(false)}>
-          <Pressable accessible={false}
-            onPress={e => e.stopPropagation()}
-            style={{ position: 'absolute', top: insets.top + 62, right: 16, width: 220 }}>
-            <BlurView intensity={isDark ? 60 : 75} tint={isDark ? 'dark' : 'light'} style={[s.menuBox, { borderColor: c.border }]}>
-
-              {/* Календар */}
-              <TouchableOpacity
-                onPress={() => { setShowMenu(false); setShowCal(true); }}
-                style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: dateFilter ? c.indigo + '25' : c.dim }]}>
-                  <IconSymbol name="calendar" size={15} color={dateFilter ? c.indigo : c.sub} />
-                </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>{tr.calendar}</Text>
-                {dateFilter
-                  ? <View style={[s.menuPill, { backgroundColor: c.indigo + '20', borderColor: c.indigo + '40' }]}>
-                      <Text style={[s.menuPillText, { color: c.indigo }]}>
-                        {new Date(dateFilter).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-                      </Text>
-                    </View>
-                  : <IconSymbol name="chevron.right" size={13} color={c.sub} />
-                }
-              </TouchableOpacity>
-
-              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-              {/* Статистика */}
-              <TouchableOpacity
-                onPress={() => { setShowMenu(false); router.push('/time-stats'); }}
-                style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: c.indigo + '25' }]}>
-                  <IconSymbol name="chart.bar.fill" size={15} color={c.indigo} />
-                </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>{tr.statistics}</Text>
-                <IconSymbol name="chevron.right" size={13} color={c.sub} />
-              </TouchableOpacity>
-
-            </BlurView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* ─── Calendar Modal ─── */}
-      <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setShowCal(false)}>
-            <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
-
-                <View style={s.handleRow}>
-                  <View style={{ flex: 1 }} />
-                  <View style={[s.handle, { backgroundColor: c.border }]} />
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={() => setShowCal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <IconSymbol name="xmark" size={17} color={c.sub} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-                  <TouchableOpacity onPress={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1); }} style={s.navBtn}>
-                    <IconSymbol name="chevron.left" size={20} color={c.sub} />
-                  </TouchableOpacity>
-                  <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontWeight: '700' }}>
-                    {months[calMonth]} {calYear}
-                  </Text>
-                  <TouchableOpacity onPress={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1); }} style={s.navBtn}>
-                    <IconSymbol name="chevron.right" size={20} color={c.sub} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                  {weekdaysShort.map(d => (
-                    <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
-                  ))}
-                </View>
-
-                {calWeeks.map((week, wi) => (
-                  <View key={wi} style={{ flexDirection: 'row', marginBottom: 4 }}>
-                    {week.map((day, di) => {
-                      if (!day) return <View key={di} style={{ flex: 1 }} />;
-                      const dayDate = new Date(calYear, calMonth, day);
-                      const keyStr = `${calYear}-${calMonth}-${day}`;
-                      const isToday = dayDate.toDateString() === today.toDateString();
-                      const isSel = dateFilter === dayDate.toDateString();
-                      const hasMark = markedDays.has(keyStr);
-                      return (
-                        <TouchableOpacity
-                          key={di}
-                          onPress={() => { setDateFilter(isSel ? null : dayDate.toDateString()); setShowCal(false); }}
-                          style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}>
-                          <View style={[s.dayCell, isSel && { backgroundColor: c.indigo }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.indigo }]}>
-                            <Text style={{ color: isSel ? '#fff' : isToday ? c.indigo : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
-                          </View>
-                          {hasMark && !isSel && <View style={[s.daydot, { backgroundColor: c.indigo }]} />}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                ))}
-
-                {dateFilter && (
-                  <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { borderColor: c.border }]}>
-                    <IconSymbol name="xmark" size={13} color={c.sub} />
-                    <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5 }}>{tr.resetFilter}</Text>
-                  </TouchableOpacity>
-                )}
-              </BlurView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* ─── Add Manual ─── */}
-      <Modal visible={showAdd} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowAdd(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setShowAdd(false)}>
-            <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                  <View style={s.handleRow}>
-                    <View style={{ flex: 1 }} />
-                    <View style={[s.handle, { backgroundColor: c.border }]} />
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <TouchableOpacity onPress={() => setShowAdd(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                        <IconSymbol name="xmark" size={17} color={c.sub} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <Text style={[s.sheetTitle, { color: c.text }]}>Ручний запис</Text>
-
-                  {/* Task name */}
-                  <Text style={[s.label, { color: c.sub }]}>ЗАВДАННЯ</Text>
-                  <TextInput
-                    placeholder={tr.taskNamePlaceholder2}
-                    placeholderTextColor={c.sub}
-                    value={manTask}
-                    onChangeText={setManTask}
-                    style={[s.input, { backgroundColor: c.dim, color: c.text }]}
-                  />
-
-                  {/* Duration block */}
-                  <Text style={[s.label, { color: c.sub }]}>ТРИВАЛІСТЬ</Text>
-                  <View style={[s.durBlock, { backgroundColor: c.indigo + '12', borderColor: c.indigo + '30' }]}>
-                    <View style={{ flex: 1, alignItems: 'center' }}>
-                      <TextInput
-                        placeholder="0"
-                        placeholderTextColor={c.sub}
-                        value={manHours}
-                        onChangeText={setManHours}
-                        keyboardType="number-pad"
-                        style={{ color: c.indigo, fontSize: 36, fontWeight: '700', textAlign: 'center', letterSpacing: -1 }}
-                      />
-                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.hrs}</Text>
-                    </View>
-                    <Text style={{ color: c.sub, fontSize: 28, fontWeight: '200', alignSelf: 'center', marginBottom: 16 }}>:</Text>
-                    <View style={{ flex: 1, alignItems: 'center' }}>
-                      <TextInput
-                        placeholder="0"
-                        placeholderTextColor={c.sub}
-                        value={manMins}
-                        onChangeText={setManMins}
-                        keyboardType="number-pad"
-                        style={{ color: c.indigo, fontSize: 36, fontWeight: '700', textAlign: 'center', letterSpacing: -1 }}
-                      />
-                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.mins}</Text>
-                    </View>
-                  </View>
-
-                  {/* Shift */}
-                  <Text style={[s.label, { color: c.sub }]}>ЗМІНА</Text>
-                  <View style={{ flexDirection: 'row', gap: 7 }}>
-                    {(Object.keys(SHIFTS) as Shift[]).map(sh => {
-                      const cfg = SHIFTS[sh]; const active = manShift === sh;
-                      return (
-                        <TouchableOpacity
-                          key={sh}
-                          onPress={() => setManShift(sh)}
-                          style={[s.shiftOption, { borderColor: active ? cfg.color : c.border, backgroundColor: active ? cfg.color + '20' : 'transparent' }]}>
-                          <IconSymbol name={cfg.icon} size={16} color={active ? cfg.color : c.sub} />
-                          <Text style={{ color: active ? cfg.color : c.sub, fontSize: 10, fontWeight: '600', marginTop: 3 }}>{cfg.label}</Text>
-                          <Text style={{ color: active ? cfg.color : c.sub, fontSize: 9, opacity: 0.7 }}>{cfg.hours}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 22 }}>
-                    <TouchableOpacity onPress={() => setShowAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                      <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={addManual}
-                      disabled={!manTask.trim()}
-                      style={[s.btn, { flex: 2, backgroundColor: manTask.trim() ? c.indigo : c.dim }]}>
-                      <IconSymbol name="timer" size={15} color={manTask.trim() ? '#fff' : c.sub} />
-                      <Text style={{ color: manTask.trim() ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>{tr.save}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
-              </BlurView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* ─── Detail Modal ─── */}
-      <Modal visible={!!selected} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setSelected(null)}>
-            <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
-              {selected && (() => {
-                const cfg = SHIFTS[selected.shift];
-                return (
-                  <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
-                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                      <View style={s.handleRow}>
-                        <View style={{ flex: 1 }} />
-                        <View style={[s.handle, { backgroundColor: c.border }]} />
-                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                          <TouchableOpacity onPress={() => setSelected(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                            <IconSymbol name="xmark" size={17} color={c.sub} />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-
-                      {/* Hero */}
-                      <View style={[s.detailHero, { backgroundColor: cfg.color + '12', borderColor: cfg.color + '25' }]}>
-                        <View style={[s.detailIcon, { backgroundColor: cfg.color + '25' }]}>
-                          <IconSymbol name={cfg.icon} size={30} color={cfg.color} />
-                        </View>
-                        <Text style={[s.detailDur, { color: cfg.color, marginTop: 12 }]}>{fmtDurLocal(selected.duration)}</Text>
-                        <Text style={[s.detailTask, { color: c.text, marginTop: 4, textAlign: 'center' }]}>{selected.task}</Text>
-                        <View style={[s.shiftBadge, { borderColor: cfg.color + '50', backgroundColor: cfg.color + '20', marginTop: 10 }]}>
-                          <IconSymbol name={cfg.icon} size={12} color={cfg.color} />
-                          <Text style={{ color: cfg.color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>
-                            {cfg.label} · {cfg.hours}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={[s.infoBlock, { borderColor: c.border, backgroundColor: c.dim, marginTop: 14 }]}>
-                        <InfoRow icon="timer"    label={tr.duration}  value={fmtDurLocal(selected.duration)} text={c.text} sub={c.sub} border={c.border} last={false} />
-                        <InfoRow icon="calendar" label={tr.date}      value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} text={c.text} sub={c.sub} border={c.border} last />
-                      </View>
-
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
-                        <TouchableOpacity
-                          onPress={() => deleteEntry(selected.id)}
-                          style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
-                          <IconSymbol name="trash" size={15} color="#EF4444" />
-                          <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 2, backgroundColor: c.indigo }]}>
-                          <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.close}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </ScrollView>
-                  </BlurView>
-                );
-              })()}
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
+      <TimeFilterSheet
+        visible={showFilters}
+        c={c}
+        isDark={isDark}
+        height={height}
+        isWide={isWide}
+        period={period}
+        sort={sort}
+        grouping={grouping}
+        projectId={filterProjectId}
+        taskKey={filterTaskKey}
+        projects={projectsForFilter}
+        tasks={tasksForFilter}
+        periodLabels={periodLabels}
+        tr={tr}
+        onChange={next => {
+          if (next.period !== undefined) setPeriod(next.period);
+          if (next.sort !== undefined) setSort(next.sort);
+          if (next.grouping !== undefined) setGrouping(next.grouping);
+          if (next.projectId !== undefined) setFilterProjectId(next.projectId);
+          if (next.taskKey !== undefined) setFilterTaskKey(next.taskKey);
+        }}
+        onReset={resetFilters}
+        onClose={() => setShowFilters(false)}
+      />
 
       <FullscreenTimers visible={fsOpen} onClose={() => setFsOpen(false)} />
     </View>
   );
 }
 
+// ─── Рядки списків ────────────────────────────────────────────────────────────
+
 interface ActiveTimerRowProps {
   subtasks?: RowSubtask[];
   timer: ActiveTimer;
-  cfg: ShiftCfg;
-  isDark: boolean;
+  accent: string;
   border: string;
+  card: string;
   text: string;
   sub: string;
   stopLabel: string;
@@ -866,41 +591,38 @@ interface ActiveTimerRowProps {
 }
 
 /**
- * Рядок таймера, що йде. Час іде через ElapsedClock, а не через
- * formatClock прямо в <Text>: інакше число завмирає до наступного
- * перерендеру екрана — саме через це «час змінювався лише після оновлення».
+ * Рядок таймера, що йде. Час іде через ElapsedClock, а не через formatClock
+ * прямо в <Text>: інакше число завмирає до наступного перерендеру екрана.
  */
-const ActiveTimerRow = React.memo(function ActiveTimerRow({ timer, subtasks, cfg, isDark, border, text, sub, stopLabel, onStop }: ActiveTimerRowProps) {
+const ActiveTimerRow = React.memo(function ActiveTimerRow({
+  timer, subtasks, accent, border, card, text, sub, stopLabel, onStop,
+}: ActiveTimerRowProps) {
   const all = subtasks ?? [];
   const doneCount = all.filter(x => x.done).length;
-  // Два рядки — стеля: список тут довідка збоку від годинника, а не екран
-  // завдання. Решта ховається за лічильник, щоб рядок не ріс без меж.
+  // Два рядки — стеля: список тут довідка збоку від годинника, а не екран задачі.
   const pending = all.filter(x => !x.done).slice(0, 2);
   const hidden = all.filter(x => !x.done).length - pending.length;
   return (
-    <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.activeRow, { borderColor: border }]}>
-      <View style={[s.rowDot, { backgroundColor: cfg.color }]} />
+    <View style={[s.activeRow, { borderColor: border, backgroundColor: card }]}>
+      <View style={[s.rowDot, { backgroundColor: accent }]} />
       <View style={{ flex: 1, marginLeft: 11, marginRight: 8 }}>
         <Text style={[s.entryTask, { color: text }]} numberOfLines={1}>{timer.label}</Text>
-        <Text style={[s.entryMeta, { color: sub }]}>
-          {cfg.label} · {cfg.hours}
-          {all.length > 0 ? ` · ${doneCount}/${all.length}` : ''}
-        </Text>
+        {all.length > 0 && (
+          <Text style={[s.entryMeta, { color: sub }]}>{doneCount}/{all.length}</Text>
+        )}
         {pending.map(item => (
           <View key={item.id} style={s.rowSubLine}>
             <View style={[s.rowSubDot, { borderColor: sub }]} />
             <Text numberOfLines={1} style={[s.rowSubText, { color: sub }]}>{item.title}</Text>
           </View>
         ))}
-        {hidden > 0 && (
-          <Text style={[s.rowSubMore, { color: sub }]}>+{hidden}</Text>
-        )}
+        {hidden > 0 && <Text style={[s.rowSubMore, { color: sub }]}>+{hidden}</Text>}
       </View>
       <ElapsedClock
         running
         seconds={now => elapsedSince(timer.startedAt, now)}
         format={formatClock}
-        style={[s.rowClock, { color: cfg.color }]}
+        style={[s.rowClock, { color: accent }]}
       />
       <TouchableOpacity
         onPress={() => onStop(timer.id)}
@@ -909,119 +631,79 @@ const ActiveTimerRow = React.memo(function ActiveTimerRow({ timer, subtasks, cfg
         style={s.stopBtn}>
         <IconSymbol name="stop.fill" size={13} color="#EF4444" />
       </TouchableOpacity>
-    </BlurView>
+    </View>
   );
 });
 
 interface EntryRowProps {
-  entry: TimeEntry;
-  cfg: ShiftCfg;
-  isDark: boolean;
+  entry: TimeRecord;
+  projectName?: string;
+  projectColor?: string;
+  accent: string;
   border: string;
   text: string;
   sub: string;
-  /** Готовий рядок, а не секунди: щоб не тягти сюди функцію форматування. */
+  danger: string;
+  /** Готові рядки, а не секунди: щоб не тягти сюди форматування. */
   duration: string;
-  onPress: (entry: TimeEntry) => void;
+  when: string;
+  tr: Translations;
+  onPress: (entry: TimeRecord) => void;
+  onDelete: (entry: TimeRecord) => void;
 }
 
 /**
- * Рядок історії окремим memo-компонентом: поки біжить таймер, екран
- * перемальовується щосекунди, і без цього разом із ним перемальовувався
- * б увесь список записів.
+ * Рядок запису окремим memo-компонентом: поки біжить таймер, екран
+ * перемальовується щосекунди, і без цього разом із ним перемальовувався б увесь
+ * список записів.
  */
-const EntryRow = React.memo(function EntryRow({ entry, cfg, isDark, border, text, sub, duration, onPress }: EntryRowProps) {
+const EntryRow = React.memo(function EntryRow({
+  entry, projectName, projectColor, accent, border, text, sub, danger, duration, when, tr, onPress, onDelete,
+}: EntryRowProps) {
   return (
-    <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(entry)}>
-      <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[s.entryCard, { borderColor: border }]}>
-        <View style={[s.shiftIcon, { backgroundColor: cfg.color + '20' }]}>
-          <IconSymbol name={cfg.icon} size={17} color={cfg.color} />
-        </View>
-        <View style={{ flex: 1, marginLeft: 13 }}>
-          <Text style={[s.entryTask, { color: text }]}>{entry.task}</Text>
-          <Text style={[s.entryMeta, { color: sub }]}>{cfg.label} · {cfg.hours}</Text>
-        </View>
-        <Text style={[s.entryDur, { color: cfg.color }]}>{duration}</Text>
-      </BlurView>
+    <TouchableOpacity
+      activeOpacity={0.75}
+      onPress={() => onPress(entry)}
+      accessibilityRole="button"
+      accessibilityLabel={`${entry.task}, ${duration}. ${tr.edit}`}
+      style={[s.entryCard, { borderColor: border }]}>
+      <View style={[s.entryBar, { backgroundColor: projectColor ?? accent }]} />
+      <View style={{ flex: 1, marginLeft: 11 }}>
+        <Text numberOfLines={1} style={[s.entryTask, { color: text }]}>{entry.task || tr.untitled}</Text>
+        <Text numberOfLines={1} style={[s.entryMeta, { color: sub }]}>
+          {when}
+          {projectName ? ` · ${projectName}` : ''}
+          {entry.note ? ` · ${entry.note}` : ''}
+        </Text>
+      </View>
+      <Text style={[s.entryDur, { color: text }]}>{duration}</Text>
+      <TouchableOpacity
+        onPress={() => onDelete(entry)}
+        accessibilityLabel={tr.timeDeleteEntryA11y.replace('{task}', entry.task)}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={{ marginLeft: 10 }}>
+        <IconSymbol name="trash" size={14} color={danger} />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 });
 
-function StatCell({ value, label, color, sub }: { value: string; label: string; color: string; sub: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14 }}>
-      <Text style={{ color, fontSize: 17, fontWeight: '800' }}>{value}</Text>
-      <Text style={{ color: sub, fontSize: 10, fontWeight: '500', marginTop: 3 }}>{label}</Text>
-    </View>
-  );
-}
-
-function InfoRow({ icon, label, value, text, sub, border, last }: any) {
-  return (
-    <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 13 }, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
-      <IconSymbol name={icon as IconSymbolName} size={14} color={sub} style={{ width: 20 }} />
-      <Text style={{ color: sub, fontSize: 12, fontWeight: '600', width: 80, marginLeft: 8 }}>{label}</Text>
-      <Text style={{ color: text, fontSize: 13, fontWeight: '600', flex: 1 }}>{value}</Text>
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
-  dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
-  timerCard:   { borderRadius: 22, borderWidth: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20, overflow: 'hidden', alignItems: 'center' },
-  cardTitle:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  linkedRow:   { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginTop: 4 },
-  attachBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7, marginTop: 10 },
-  pickSheet:   { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '78%', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 10 },
-  pickSearch:  { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
-  pickRow:     { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 13 },
-  taskInput:   { fontSize: 15, fontWeight: '600', borderBottomWidth: 1, paddingVertical: 9, minWidth: 220, alignSelf: 'stretch', textAlign: 'center', marginTop: 10 },
-  activeRow:   { borderRadius: 14, borderWidth: 1, padding: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  rowDot:      { width: 9, height: 9, borderRadius: 5 },
+  activeRow: { borderRadius: 14, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  rowDot: { width: 9, height: 9, borderRadius: 5 },
   rowSubLine: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
-  rowSubDot:  { width: 6, height: 6, borderRadius: 3, borderWidth: 1.2, marginRight: 6 },
+  rowSubDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1.2, marginRight: 6 },
   rowSubText: { flex: 1, fontSize: 11, opacity: 0.85 },
   rowSubMore: { fontSize: 10, fontWeight: '700', marginTop: 3, letterSpacing: 0.3 },
-  rowClock:    { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, fontVariant: ['tabular-nums'], marginRight: 10 },
-  stopBtn:     { width: 32, height: 32, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(239,68,68,0.28)', backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' },
-  shiftPill:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 7, borderRadius: 10, borderWidth: 1.5 },
-  shiftBadge:  { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
-  timerBtn:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 32, paddingVertical: 12, borderRadius: 14 },
-  statsRow:    { flexDirection: 'row', borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  sectionTitle:{ fontSize: 17, fontWeight: '800' },
-  groupLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  entryCard:   { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  shiftIcon:   { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  entryTask:   { fontSize: 13, fontWeight: '600' },
-  entryMeta:   { fontSize: 11, marginTop: 2 },
-  entryDur:    { fontSize: 13, fontWeight: '800' },
-  fab:         { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
-  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  // Context menu
-  menuBox:     { borderRadius: 18, borderWidth: 1, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 10 },
-  menuItem:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
-  menuIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  menuLabel:   { flex: 1, fontSize: 14, fontWeight: '600' },
-  menuDivider: { height: 1, marginHorizontal: 14 },
-  menuPill:    { borderRadius: 7, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
-  menuPillText:{ fontSize: 11, fontWeight: '700' },
-  durBlock:    { flexDirection: 'row', borderRadius: 16, borderWidth: 1, padding: 16, alignItems: 'flex-start', marginBottom: 4 },
-  detailHero:  { borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center' },
-  handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:  { fontSize: 20, fontWeight: '800', marginBottom: 16 },
-  input:       { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
-  label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  shiftOption: { flex: 1, borderRadius: 11, borderWidth: 1.5, paddingVertical: 11, alignItems: 'center' },
-  btn:         { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  detailIcon:  { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  detailDur:   { fontSize: 30, fontWeight: '800', letterSpacing: -1 },
-  detailTask:  { fontSize: 15, fontWeight: '600', marginTop: 4 },
-  infoBlock:   { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  navBtn:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell:     { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  daydot:      { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
-  clearBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1 },
+  rowClock: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, fontVariant: ['tabular-nums'], marginRight: 10 },
+  stopBtn: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(239,68,68,0.28)', backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: 17, fontWeight: '800' },
+  groupLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  entryCard: { borderRadius: 14, borderWidth: 1, paddingVertical: 11, paddingRight: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  entryBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginLeft: 11 },
+  entryTask: { fontSize: 13, fontWeight: '600' },
+  entryMeta: { fontSize: 11, marginTop: 2 },
+  entryDur: { fontSize: 13, fontWeight: '800' },
+  emptyAction: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 11 },
+  fab: { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
 });

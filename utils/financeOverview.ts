@@ -26,6 +26,7 @@ import {
   type Account,
   type AccountBalanceBreakdown,
 } from './accounts';
+import { DEFAULT_MONEY_SCOPE, matchesMoneyScope, type MoneyScope } from './budgetScope';
 import { isSameMonth } from './dateUtils';
 import type { Transaction } from './financeUtils';
 
@@ -38,6 +39,8 @@ export interface FinanceMonthFlow {
 
 export interface FinanceOverview {
   primary: string;
+  /** Ракурс, у якому пораховано `month` (див. utils/budgetScope.ts). */
+  scope: MoneyScope;
   month: FinanceMonthFlow;
   /** id рахунку → баланс на сьогодні (без майбутніх операцій). */
   balances: Record<string, number>;
@@ -58,11 +61,23 @@ export function financeOverview({
   accounts,
   primary,
   now = new Date(),
+  scope = DEFAULT_MONEY_SCOPE,
 }: {
   txs: readonly Transaction[];
   accounts: readonly Account[];
   primary: string;
   now?: Date;
+  /**
+   * «Всі / Особисті / Проєктні». Звужує САЛЬДО МІСЯЦЯ — і тільки його.
+   *
+   * Баланси рахунків, «без рахунку» і «майбутні» рахуються з УСІХ операцій
+   * незалежно від ракурсу, і це не недогляд: баланс — факт про рахунок, а не
+   * про погляд. Приховати з нього витрату проєкту означало б показати на
+   * картці суму, якої на картці немає, — і звести її з банком стало б
+   * неможливо. Фільтр змінює те, про що питають («скільки я витратив ОСОБИСТО
+   * цього місяця»), а не те, скільки грошей лежить.
+   */
+  scope?: MoneyScope;
 }): FinanceOverview {
   const accountList = [...accounts];
   const txList = [...txs];
@@ -104,12 +119,14 @@ export function financeOverview({
       future.netByCurrency[code] = round((future.netByCurrency[code] ?? 0) + signed);
     }
     if (code !== primary || !isSameMonth(date, now)) continue;
+    if (!matchesMoneyScope(tx, scope)) continue;
     if (tx.type === 'income') month.income += txAmount(tx.amount);
     else if (tx.type === 'expense') month.expense += txAmount(tx.amount);
   }
 
   return {
     primary,
+    scope,
     month: { income: round(month.income), expense: round(month.expense), net: round(month.income - month.expense) },
     balances,
     breakdowns,

@@ -82,7 +82,9 @@ describe('I18N-09: різати має ширина, а не лічильник 
 });
 
 describe('I18N-03: дати не форматуються жорстко в uk-UA', () => {
-  it.each(['app/notifications.tsx', SETTINGS])('%s — локаль залежить від мови', (file) => {
+  // Список локальних нагадувань переїхав з екрана в компонент вкладки
+  // «Нагадування» центру сповіщень — перевіряється там, де тепер живе дата.
+  it.each(['components/notifications/ScheduledReminders.tsx', SETTINGS])('%s — локаль залежить від мови', (file) => {
     const src = read(file);
     const hard = src.match(/toLocale\w*\('uk-UA'/g) ?? [];
     expect(hard).toEqual([]);
@@ -143,16 +145,31 @@ describe('A11Y: імена й ролі, яких бракувало в моїх 
     expect(toggle).toMatch(/accessibilityState=\{\{ checked: value \}\}/);
   });
 
-  it('глобальний тумблер push теж названий', () => {
-    const src = read('app/notifications.tsx');
-    expect(src).toMatch(/accessibilityLabel=\{tr\.pushNotifications\}/);
+  it('глобальний тумблер локальних нагадувань теж названий', () => {
+    // Тумблер вимикає саме ЛОКАЛЬНІ нагадування (серверні — на екрані
+    // налаштувань сповіщень), тож і підпис тепер про них.
+    const src = read('components/notifications/ScheduledReminders.tsx');
+    expect(src).toMatch(/accessibilityLabel=\{tr\.ncLocalRemindersToggle\}/);
   });
 
   it('кнопки «назад» у зоні мають роль і локалізоване ім\'я', () => {
-    for (const file of ['app/login.tsx', 'app/account.tsx', 'app/forgot-password.tsx', 'app/workspace.tsx']) {
+    for (const file of ['app/login.tsx', 'app/forgot-password.tsx', 'app/workspace.tsx']) {
       const src = read(file);
       expect(src).toMatch(/accessibilityLabel=\{tr\.back\}/);
     }
+  });
+
+  /*
+   * «Акаунт» віддав стрілку спільному ScreenHeader: роль і ім'я тепер
+   * ставить сам хедер (`back.label` → accessibilityLabel кнопки, див.
+   * __tests__/screen-header-back.test.tsx), а екран лише каже, куди йти.
+   * Тому тут перевіряємо не розмітку, а що підпис так само зі словника й
+   * дійсно дійшов до хедера.
+   */
+  it('«Акаунт» передає локалізований підпис «назад» у спільний хедер', () => {
+    const src = read('app/account.tsx');
+    expect(src).toMatch(/<ScreenHeader/);
+    expect(src).toMatch(/back=\{\{[\s\S]{0,160}?label: tr\.back/);
   });
 });
 

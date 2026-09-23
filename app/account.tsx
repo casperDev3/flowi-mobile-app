@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
+
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -223,16 +225,23 @@ export default function AccountScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={st.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel={tr.back}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={22} color={c.accent} />
-          </TouchableOpacity>
-        </View>
+      {/* Без верхнього краю: інсет зверху дає ScreenHeader через
+          useTopInset() (CLAUDE.md) — інакше шапка з'їжджає двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
+        {/* Заголовок переїхав із прокрутки в шапку: гола стрілка без назви не
+            казала, де ти, а на планшеті ще й вела навмання. Розділу немає в
+            сайдбарі, тож там її заступає шлях «Налаштування → Акаунт». */}
+        <ScreenHeader
+          title={tr.accountManage}
+          color={c.text}
+          titleStyle={st.title}
+          back={{ onPress: () => router.back(), label: tr.back, color: c.accent }}
+          crumbs={[
+            { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
+            { label: tr.accountManage },
+          ]}
+          crumbColor={c.sub}
+        />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -243,8 +252,6 @@ export default function AccountScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Text style={[st.title, { color: c.text }]}>{tr.accountManage}</Text>
-
             {/* Email (readonly) */}
             <SectionLabel label={tr.authEmail} color={c.sub} />
             <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
@@ -480,21 +487,17 @@ const SectionLabel = React.memo(function SectionLabel(
 });
 
 const st = StyleSheet.create({
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 4,
-  },
   scroll: {
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 80,
   },
+  // Кегль лишається 28/700, як був у прокрутці: ScreenHeader бере його
+  // через titleStyle, тож переїзд у шапку не змінив вигляду заголовка.
   title: {
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.4,
-    marginBottom: 8,
   },
   sectionLabel: {
     fontSize: 11,

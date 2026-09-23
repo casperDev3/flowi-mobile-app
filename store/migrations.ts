@@ -16,9 +16,14 @@ import { saveSynced } from './synced-storage';
 import { sortTimers, taskTimerId, shiftForDate, type ActiveTimer } from '@/utils/activeTimers';
 import type { Account } from '@/utils/accounts';
 import { deriveStatusType, type TaskStatusColumn } from '@/utils/taskStatuses';
+import type { TimeRecord } from '@/utils/timeEntries';
+// Аліас: у цьому файлі вже є власний `MigratableTask` — мінімум полів для
+// переносу ВІДКРИТИХ сесій у реєстр. Це інша форма й інша міграція.
+import { migrateTaskSessions, type MigratableTask as TaskWithSessions } from '@/utils/timeMigration';
 // Правило id живе в utils/recordIds: його читає ще й форма категорій, а
 // імпортувати цей файл із чистої логіки не можна — він тягне сховище.
 import { categoryRowId, isUsableId } from '@/utils/recordIds';
+import { categoryMeta, isCategoryGroup, isCostKind, subscriptionCategoryNames, type SubscriptionRef } from '@/utils/finance/classify';
 
 export { categoryRowId, isUsableId };
 
@@ -211,21 +216,83 @@ export function migrateOpenTimeEntries(
   return { tasks: nextTasks, timers: sortTimers([...byId.values()]), moved };
 }
 
-async function migrateOpenTaskTimers(): Promise<boolean> {
+/**
+ * Результат кроку — ще й самі задачі ПІСЛЯ нього.
+ *
+ * Наступний крок (`migrateTaskSessionsToTimeEntries`) працює з тим самим
+ * ключем, і власне читання коштувало б розбору всієї колекції задач ще раз —
+ * на КОЖНОМУ старті застосунку, назавжди. Тому задачі віддаються далі, а не
+ * перечитуються: єдина причина цієї пари в сигнатурі.
+ */
+interface OpenTimersStep {
+  changed: boolean;
+  /** Порожньо — задач у сховищі немає (або вони биті). */
+  tasks: MigratableTask[];
+}
+
+async function migrateOpenTaskTimers(): Promise<OpenTimersStep> {
   const tasks = await loadData<MigratableTask[] | null>('tasks', null);
-  if (!Array.isArray(tasks) || !tasks.length) return false;
+  if (!Array.isArray(tasks) || !tasks.length) return { changed: false, tasks: [] };
   const hasOpen = tasks.some(task =>
     Array.isArray(task?.timeEntries) && task.timeEntries.some(e => e && !e.endedAt && e.startedAt),
   );
   // Ідемпотентність: після переносу відкритих записів не лишається, тож
   // повторний старт застосунку сюди вже не заходить.
-  if (!hasOpen) return false;
+  if (!hasOpen) return { changed: false, tasks };
 
   const existing = await loadData<ActiveTimer[]>('active_timers', []);
   const result = migrateOpenTimeEntries(tasks, Array.isArray(existing) ? existing : []);
   await saveData('active_timers', result.timers);
   await saveData('tasks', result.tasks);
-  return true;
+  return { changed: true, tasks: result.tasks };
+}
+
+// ─── Завершені сесії задач → time_entries ─────────────────────────────────────
+
+/**
+ * Копіює завершені сесії з `task.timeEntries` у спільну колекцію `time_entries`.
+ *
+ * Сам перенос описаний в `utils/timeMigration.ts`; тут — лише його місце в
+ * ЖИТТІ застосунку. Досі його робив екран «Час» на першому відкритті, і це
+ * прив'язувало цілісність даних до навігації: людина, яка не заходила на цю
+ * вкладку, мала розʼїхані підсумки на Огляді й у проєкті, а синк весь цей час
+ * розносив по пристроях неповну колекцію. Міграція на старті прибирає цю
+ * залежність — екран часу після неї нічого не знаходить і лишається no-op.
+ *
+ * Порядок важливий: `migrateOpenTaskTimers` вище вже винесла з задач сесії без
+ * `endedAt`, тож сюди приходять тільки завершені — і приходять ПАРАМЕТРОМ, від
+ * того ж кроку, щоб не розбирати колекцію задач удруге на кожному старті.
+ */
+async function migrateTaskSessionsToTimeEntries(raw: MigratableTask[]): Promise<boolean> {
+  try {
+    // Задачі без жодної завершеної сесії переносити нічого — і саме це
+    // НОРМАЛЬНИЙ стан після першого разу. Перевірка тут, а не всередині
+    // `migrateTaskSessions`, рятує від читання всієї колекції `time_entries`
+    // на кожному старті застосунку.
+    const hasClosed = raw.some(task =>
+      Array.isArray(task?.timeEntries) && task.timeEntries.some(e => e?.endedAt && e.id),
+    );
+    if (!hasClosed) return false;
+    // Локальний `MigratableTask` описує мінімум для переносу ВІДКРИТИХ сесій і
+    // навмисно нестрогий (`id?: unknown`). `migrateTaskSessions` сама відкидає
+    // записи без id, назви чи тривалості, тож звуження тут було б подвійним.
+    const tasks = raw as unknown as TaskWithSessions[];
+    const existing = await loadData<TimeRecord[]>('time_entries', []);
+    const result = migrateTaskSessions(tasks, Array.isArray(existing) ? existing : []);
+    // Ідемпотентність: наступні старти сюди заходять (стоп таймера пише сесію
+    // і в задачу, і в дзеркало), але додають 0 — перенесений запис має похідний
+    // id, а дзеркало відсікається за природним ключем «задача + кінець +
+    // тривалість». Саме тому дзеркало тепер пише `taskId`: доки ключем була
+    // НАЗВА, перейменована задача давала дубль часу на кожному старті.
+    if (!result.added) return false;
+    // saveSynced, а не saveData: перенесені сесії — це РЕАЛЬНО нові записи
+    // колекції, які мусять доїхати на інші пристрої.
+    await saveSynced('time_entries', result.entries as unknown as { id: string }[]);
+    return true;
+  } catch (e) {
+    if (__DEV__) console.warn('[migrations] перенесення сесій задач не вдалося:', e);
+    return false;
+  }
 }
 
 // ─── Валюта операції → рахунок ────────────────────────────────────────────────
@@ -556,6 +623,66 @@ async function backfillProjectTaskCreatedBy(): Promise<boolean> {
   return true;
 }
 
+// ─── Групи категорій і ознака фікс/змінна (finance-revamp.md §4.5.2) ─────────
+
+const CATEGORY_GROUP_COST_MIGRATION = 'categories:group_cost';
+
+interface CategoryRowForMeta { id?: unknown; type?: unknown; name?: unknown; group?: unknown; cost?: unknown }
+
+/**
+ * Проставити `group`/`cost` рядкам `categories`, де їх немає, тим самим
+ * `categoryMeta`, яким обидва клієнти й так читають категорії. Пишуться ЛИШЕ
+ * відсутні поля; id, назва, іконка й наявні значення не чіпаються; `cost` —
+ * лише витратам (для доходів ознака не має сенсу). Повертає той самий масив,
+ * якщо змінювати нічого.
+ */
+export function withCategoryGroupCost<T extends CategoryRowForMeta>(
+  rows: readonly T[],
+  subscriptions: readonly SubscriptionRef[] = [],
+): T[] {
+  const fixedByReference = subscriptionCategoryNames(subscriptions);
+  let changed = false;
+  const next = rows.map(row => {
+    if (!row || typeof row !== 'object') return row;
+    const needGroup = !isCategoryGroup(row.group);
+    const needCost = row.type === 'expense' && !isCostKind(row.cost);
+    if (!needGroup && !needCost) return row;
+    const meta = categoryMeta(row as never, { fixedByReference });
+    changed = true;
+    return {
+      ...row,
+      ...(needGroup ? { group: meta.group } : {}),
+      ...(needCost ? { cost: meta.cost } : {}),
+    };
+  });
+  return changed ? next : (rows as T[]);
+}
+
+/**
+ * Одноразова (§4.5.2): не умова правильності — цифри однакові й без неї, —
+ * а щоб у редакторі категорій людина побачила заповнені поля. Веб її не
+ * запускає. Після першого проходу не повторюється (прапорець у
+ * `storage_migrations_applied`), тож рядок, якому людина потім явно прибере
+ * значення, його не отримає назад.
+ */
+async function migrateCategoryGroupCost(applied: readonly string[]): Promise<boolean> {
+  if (applied.includes(CATEGORY_GROUP_COST_MIGRATION)) return false;
+  const stored = await loadData<unknown>('categories', null);
+  // Порожньо (свіжий вхід, синк ще не приніс категорій) — не позначаємо
+  // виконаною: інакше рядки, що приїдуть першим pull-ом, її вже не отримали б.
+  if (!Array.isArray(stored) || !stored.length) return false;
+  const subs = await loadData<unknown>('subscriptions', []);
+  const refs = Array.isArray(subs) ? (subs as SubscriptionRef[]) : [];
+  const next = withCategoryGroupCost(stored as CategoryRowForMeta[], refs);
+  // Рядки є, але змінювати нічого — теж виконана: прохід не повторюється на
+  // кожному старті для кожного майбутнього рядка без полів.
+  if (next !== stored) {
+    // saveSynced: група й ознака — реальна зміна даних, її бачать інші пристрої й веб.
+    await saveSynced('categories', next as unknown as { id: string }[]);
+  }
+  return true;
+}
+
 // ─── «Спільне» → прибрано (§4 плану, §6.3 контракту) ──────────────────────────
 
 /** Точні ключі легасі-функції «Спільне» — без динамічного `shared_items_<sid>`. */
@@ -598,12 +725,20 @@ export async function runStorageMigrations(): Promise<string[]> {
   if (await addDerivedIds('budget_limits', 'category')) done.push('budget_limits:ids');
   if (await migrateBalanceAdjustments()) done.push('finance_balance_adjustments:rows');
   if (await migrateCategories()) done.push('categories:rows');
-  if (await migrateOpenTaskTimers()) done.push('active_timers:from_open_entries');
+  const openTimers = await migrateOpenTaskTimers();
+  if (openTimers.changed) done.push('active_timers:from_open_entries');
+  // Задачі беремо з попереднього кроку: у них уже лишились тільки завершені
+  // сесії, і другого читання ключа 'tasks' це не коштує.
+  if (await migrateTaskSessionsToTimeEntries(openTimers.tasks)) {
+    done.push('time_entries:from_task_sessions');
+  }
   // Після нормалізації adjustments: міграція рахунків читає їх уже рядками.
   if (await migrateAccounts()) done.push('accounts:from_currencies');
   if (await removeSharedFeatureKeys()) done.push('shared:removed');
   if (await migratePersonalStatusTypes()) done.push('task_statuses:explicit_type');
   if (await backfillProjectTaskCreatedBy()) done.push('tasks:createdBy_backfill');
+  // Після migrateCategories: читає вже рядки, а не легасі-мапу.
+  if (await migrateCategoryGroupCost(applied)) done.push(CATEGORY_GROUP_COST_MIGRATION);
 
   if (done.length) {
     await saveData(MIGRATIONS_KEY, [...applied, ...done]);

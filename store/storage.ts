@@ -8,8 +8,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * синхронізації (застосування чужих змін), міграції, відновлення бекапу,
  * «очистити всі дані». Без сигналу такий запис лишається невидимим, і
  * наступне збереження зі старого стану затирає його.
+ *
+ * Разом із ключем слухач отримує НЕОБОВʼЯЗКОВЕ джерело запису — `StorageOrigin`.
  */
-type StorageListener = (key: string) => void;
+
+/**
+ * Хто саме записав ключ — довільна мітка, яку джерело запису придумує собі
+ * само (`useStorageRefresh` бере лічильник власних записів, рушій синку —
+ * свою назву). Значення нікуди не зберігається й ні з чим не звіряється:
+ * підписник лише порівнює його зі СВОЄЮ міткою.
+ *
+ * Навіщо. Слухач, що сам пише в ті самі ключі, мусить розрізняти два сигнали,
+ * які досі виглядали однаково: «долетів мій власний запис» (перечитувати не
+ * можна — відкотить щойно збережений стан) і «в той самий ключ написав хтось
+ * інший, поки мій запис був у польоті» (перечитати ТРЕБА, інакше зміна
+ * лишиться невидимою до наступного фокуса). Без джерела єдиний доступний
+ * спосіб розрізнення — ключ: усе, що прилітає в «мій» ключ під час мого
+ * запису, вважається моїм і глушиться разом із чужим.
+ *
+ * `undefined` означає «джерело не назвалось» — так поводяться всі наявні
+ * викликачі, і для них нічого не змінюється.
+ */
+export type StorageOrigin = string;
+
+type StorageListener = (key: string, origin?: StorageOrigin) => void;
 
 const listeners = new Set<StorageListener>();
 
@@ -24,8 +46,10 @@ export function subscribeToStorage(listener: StorageListener): () => void {
 /**
  * Сигнал про зміну ключа повз saveData — наприклад, після
  * AsyncStorage.multiRemove в «очистити всі дані».
+ *
+ * `origin` (необовʼязковий) — мітка джерела запису, див. `StorageOrigin`.
  */
-export function notifyStorageChanged(key: string): void {
+export function notifyStorageChanged(key: string, origin?: StorageOrigin): void {
   // Ключ змінився ПОВЗ saveData (multiRemove у «очистити всі дані», зміна
   // workspace) — байтів, на яких спіткнулось читання, більше немає, тож
   // позначку збою знімаємо: інакше після очищення даних запис у цей ключ
@@ -34,7 +58,7 @@ export function notifyStorageChanged(key: string): void {
   // Копія набору: слухач має право відписатися просто з колбека.
   for (const listener of [...listeners]) {
     try {
-      listener(key);
+      listener(key, origin);
     } catch (e) {
       if (__DEV__) console.warn(`[storage] слухач ${key} впав:`, e);
     }
@@ -151,6 +175,11 @@ export interface SaveOptions {
    * «очистити всі дані». Успішний примусовий запис знімає позначку.
    */
   force?: boolean;
+  /**
+   * Мітка джерела (`StorageOrigin`), яка приїде підписникам разом із ключем.
+   * Без неї сигнал анонімний — рівно те, що було тут завжди.
+   */
+  origin?: StorageOrigin;
 }
 
 export async function saveData(key: string, data: unknown, options?: SaveOptions): Promise<void> {
@@ -166,7 +195,7 @@ export async function saveData(key: string, data: unknown, options?: SaveOptions
     return;
   }
   readFailures.delete(key);
-  notifyStorageChanged(key);
+  notifyStorageChanged(key, options?.origin);
 }
 
 /**
@@ -181,7 +210,7 @@ export async function saveDataChecked(key: string, data: unknown, options?: Save
   }
   await AsyncStorage.setItem(key, JSON.stringify(data));
   readFailures.delete(key);
-  notifyStorageChanged(key);
+  notifyStorageChanged(key, options?.origin);
 }
 
 /**
@@ -193,7 +222,7 @@ export async function saveDataChecked(key: string, data: unknown, options?: Save
  * `generateFullOutbox` у `store/sync-engine.tsx`) — `saveData(key, null)` там
  * лишав би щойно стертий singleton «локальними даними» назавжди.
  */
-export async function removeData(key: string): Promise<void> {
+export async function removeData(key: string, options?: { origin?: StorageOrigin }): Promise<void> {
   try {
     await AsyncStorage.removeItem(key);
   } catch (e) {
@@ -203,5 +232,5 @@ export async function removeData(key: string): Promise<void> {
   // Ключа більше немає — нічого затирати, позначку «читання провалилось»
   // знімаємо, інакше запис у щойно очищений ключ лишався б заблокованим.
   readFailures.delete(key);
-  notifyStorageChanged(key);
+  notifyStorageChanged(key, options?.origin);
 }

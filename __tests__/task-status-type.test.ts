@@ -13,6 +13,7 @@ import {
   isTaskDoneByType,
   mergeTaskStatusColumns,
   newProjectStatusId,
+  personalStatusIdFor,
   projectEquivalentColumn,
   resolvedStatusType,
   scopedColumnFor,
@@ -209,6 +210,84 @@ describe('projectEquivalentColumn — обраний статус → еквів
   it('легасі-проєкт без власних колонок лишає обране як є', () => {
     const chosen = personal.find(c => c.id === ACTIVE_COLUMN_ID);
     expect(projectEquivalentColumn(chosen, allColumns, 'p-legacy')).toBe(chosen);
+  });
+
+  it('обраного статусу немає взагалі — перша НЕ-готова колонка проєкту, а не «Готово»', () => {
+    const fallback = projectEquivalentColumn(undefined, allColumns, 'p-1');
+    expect(fallback?.projectId).toBe('p-1');
+    expect(fallback?.isDone).toBe(false);
+  });
+});
+
+describe('personalStatusIdFor ↔ projectEquivalentColumn — дорога «колонка проєкту → пікер → назад»', () => {
+  /**
+   * Пікер «Статус» у повній формі показує ЛИШЕ особисті колонки (§3.7), а
+   * форму часто відкривають з «+» у шапці колонки ДОШКИ проєкту. Тобто
+   * значення двічі міняє простір: колонка проєкту → особистий id для пікера
+   * (`personalStatusIdFor`) → назад у колонку проєкту при збереженні
+   * (`projectEquivalentColumn`).
+   *
+   * Обидві половини вже були, але ПАРУ ніхто не перевіряв — а ціна розриву
+   * саме в парі: задача, створена з колонки «На перевірці», мовчки лягала в
+   * першу-ліпшу колонку, і людина бачила її не там, куди клала.
+   */
+  const personal = mergeTaskStatusColumns([]);
+  const seeded = seedProjectStatusColumns(personal, 'p-1');
+  const allColumns = [...personal, ...seeded];
+
+  it('кожна засіяна колонка проєкту робить повне коло і повертається собою', () => {
+    for (const projectColumn of seeded) {
+      const pickerId = personalStatusIdFor(projectColumn.id, allColumns);
+      // У пікері мусить бути саме ОСОБИСТИЙ id — інакше форма не знайде його
+      // серед варіантів і мовчки впаде на перший.
+      expect(personal.some(c => c.id === pickerId)).toBe(true);
+      const chosen = personal.find(c => c.id === pickerId);
+      expect(projectEquivalentColumn(chosen, allColumns, 'p-1')?.id).toBe(projectColumn.id);
+    }
+  });
+
+  it('коло тримається і після перейменування колонки проєкту — через sourceStatusId', () => {
+    // Збіг назв зникає першим (колонки проєкту спільні, їх перейменовують), і
+    // саме тут раніше губився зв'язок. Лишається копія (§3.3).
+    const renamed = seeded.map(c => (c.sourceStatusId === IN_PROGRESS_COLUMN_ID ? { ...c, name: 'Ревʼю' } : c));
+    const columns = [...personal, ...renamed];
+    const target = renamed.find(c => c.sourceStatusId === IN_PROGRESS_COLUMN_ID)!;
+
+    expect(personalStatusIdFor(target.id, columns)).toBe(IN_PROGRESS_COLUMN_ID);
+    const chosen = personal.find(c => c.id === IN_PROGRESS_COLUMN_ID);
+    expect(projectEquivalentColumn(chosen, columns, 'p-1')?.id).toBe(target.id);
+  });
+
+  it('явний зв\'язок, обраний людиною, працює в обидва боки', () => {
+    // Колонка проєкту без спільної назви і без копії: людину один раз
+    // запитали «куди перенести», відповідь лежить у projectLinks.
+    const custom: TaskStatusColumn = { id: 'st-custom', name: 'Блокери', color: '#EF4444', position: 4, isDone: false, projectId: 'p-1' };
+    const linkedPersonal = personal.map(c => (c.id === ACTIVE_COLUMN_ID ? { ...c, projectLinks: { 'p-1': ['st-custom'] } } : c));
+    const columns = [...linkedPersonal, custom];
+
+    expect(personalStatusIdFor('st-custom', columns)).toBe(ACTIVE_COLUMN_ID);
+    const chosen = linkedPersonal.find(c => c.id === ACTIVE_COLUMN_ID);
+    expect(projectEquivalentColumn(chosen, columns, 'p-1')?.id).toBe('st-custom');
+  });
+
+  it('особистий id проходить наскрізь — підміняти нема чого', () => {
+    expect(personalStatusIdFor(DONE_COLUMN_ID, allColumns)).toBe(DONE_COLUMN_ID);
+  });
+
+  it('порожній і невідомий id падають на запасний, а не на undefined', () => {
+    expect(personalStatusIdFor(undefined, allColumns)).toBe(ACTIVE_COLUMN_ID);
+    expect(personalStatusIdFor('st-deleted', allColumns)).toBe(ACTIVE_COLUMN_ID);
+    // Викликач може задати свій запасний — «+» у шапці колонки «Готово».
+    expect(personalStatusIdFor(undefined, allColumns, DONE_COLUMN_ID)).toBe(DONE_COLUMN_ID);
+  });
+
+  it('колонка ЧУЖОГО проєкту не зводиться через колонки нашого', () => {
+    const other = seedProjectStatusColumns(personal, 'p-2');
+    const columns = [...personal, ...seeded, ...other];
+    const foreignDone = other.find(c => c.isDone)!;
+    // Звестись вона має до особистої «Готово» (назва), а не витягти за собою
+    // копію p-1: особистий простір один на всі проєкти.
+    expect(personalStatusIdFor(foreignDone.id, columns)).toBe(DONE_COLUMN_ID);
   });
 });
 

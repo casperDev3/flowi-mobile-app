@@ -22,7 +22,9 @@ import {
   type ScheduleCaller,
   type SyncTrigger,
 } from './sync-diagnostics';
-import { assertCompatibleSyncContract } from './sync-contract';
+import { assertCompatibleSyncContract, SYNC_SERVER_OWNED_KEYS } from './sync-contract';
+import { emitTrainingGroupsChanged } from './training-socket';
+import { handleNotificationsSignal } from '@/api/notifications';
 import { EMPTY_LOCAL_ONLY, findLocalOnly, type LocalOnlyReport } from '@/utils/syncDivergence';
 import {
   SYNC_ARRAY_KEYS,
@@ -235,8 +237,11 @@ export function applyRevisionUpdates(
 
 /** Усі колекції поточного контракту (масиви + singleton). */
 export function currentSyncCollections(): string[] {
-  return [...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS];
+  return [...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS, ...SYNC_SERVER_OWNED_KEYS];
 }
+
+/** Масиви, які pull записує в сховище: клієнтські + серверні (лише читання). */
+const PULLED_ARRAY_KEYS: readonly string[] = [...SYNC_ARRAY_KEYS, ...SYNC_SERVER_OWNED_KEYS];
 
 /**
  * Колекції, яких не знала збірка, що рухала курсор востаннє.
@@ -776,7 +781,7 @@ async function applyPullResponse(
       }
       continue;
     }
-    if (!(SYNC_ARRAY_KEYS as readonly string[]).includes(collection)) continue;
+    if (!PULLED_ARRAY_KEYS.includes(collection)) continue;
     // Під блокуванням ключа: екран (saveSynced/saveSyncedChanges) пише той
     // самий масив read-modify-write, і без черги пізніший запис затирав би
     // ранній — або серверні зміни, або щойно зроблену локальну правку.
@@ -1326,7 +1331,7 @@ export async function pushAllToServer(): Promise<void> {
  * і обнуління зламало б дефолти в UI.
  */
 async function pruneRecordsMissingOnServer(seenKeys: Set<string>): Promise<void> {
-  for (const collection of SYNC_ARRAY_KEYS) {
+  for (const collection of PULLED_ARRAY_KEYS) {
     const storedLocal = await loadData<unknown>(collection, []);
     if (!Array.isArray(storedLocal)) continue;
     const local = storedLocal as { id: string }[];
@@ -1461,8 +1466,15 @@ function useUserSyncSocket(isAuthed: boolean): void {
         if (typeof event?.data === 'string') {
           try {
             const msg: unknown = JSON.parse(event.data);
-            if (msg && typeof msg === 'object' && (msg as { type?: unknown }).type === 'projects_changed') {
+            // notifications-module.md §6.2: інбокс/налаштування сповіщень —
+            // окремий від синку канал; особистий синк вище лишається як є.
+            if (handleNotificationsSignal(msg)) return;
+            const type = msg && typeof msg === 'object' ? (msg as { type?: unknown }).type : undefined;
+            if (type === 'projects_changed') {
               _projectsChangedHandler?.();
+            } else if (type === 'training_groups_changed') {
+              // training-module.md §2.5 — аналог `projects_changed` для груп.
+              emitTrainingGroupsChanged();
             }
           } catch {
             // не JSON / не той формат — ігноруємо, особистий синк вище й так запланований

@@ -23,14 +23,10 @@ import { useI18n } from '@/store/i18n';
 import { formatDuration } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
+// Форма запису — спільна з екраном «Час» (`utils/timeEntries.ts`): локальна
+// копія інтерфейсу вже одного разу розійшлася з ним на полі `shift`.
+import type { TimeRecord } from '@/utils/timeEntries';
 
-interface ProjectTimeEntry {
-  id: string;
-  task: string;
-  duration: number;
-  date: string;
-  projectId?: string;
-}
 
 export default function ProjectTimeScreen() {
   const { id: projectId } = useLocalSearchParams<{ id: string }>();
@@ -44,7 +40,7 @@ export default function ProjectTimeScreen() {
   const canEdit = useProjectRole(projectId) !== 'viewer';
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
 
-  const { items: entries, setItems: setEntries, reload: reloadEntries } = useSyncedList<ProjectTimeEntry>('time_entries', { enabled: true });
+  const { items: entries, setItems: setEntries, reload: reloadEntries } = useSyncedList<TimeRecord>('time_entries', { enabled: true });
   // useSyncedList перечитує ключ сам лише на ЗМІНУ ззовні — початкове
   // читання (дані вже в сховищі до монтування) екран запускає явно.
   useFocusEffect(useCallback(() => { void reloadEntries(); }, [reloadEntries]));

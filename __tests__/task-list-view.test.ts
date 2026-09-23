@@ -24,7 +24,7 @@ import {
   type TaskListQuery,
 } from '@/utils/taskListView';
 import { BACKLOG_GROUP_KEY, type Sprint } from '@/utils/sprintUtils';
-import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns } from '@/utils/taskStatuses';
+import { ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, seedProjectStatusColumns } from '@/utils/taskStatuses';
 import type { Task } from '@/utils/taskUtils';
 
 const COLUMNS = mergeTaskStatusColumns([]);
@@ -300,5 +300,78 @@ describe('buildProjectListGroups (WORKSPACE_PROJECTS_PLAN.md §3: Список �
 
   test("'sprint': проєкт без жодної задачі — усі групи (включно з беклогом) прибираються", () => {
     expect(buildProjectListGroups([], 'sprint', COLUMNS, [sprint1], 'p1', GROUP_LABELS)).toEqual([]);
+  });
+
+  describe('includeEmpty — порожня секція статусу це МІСЦЕ, куди кладуть задачу', () => {
+    /**
+     * Розділ «Завдання» проєкту передає `includeEmpty: true`, і не заради
+     * симетрії: тап по порожній секції відкриває інлайн-поле зі статусом цієї
+     * колонки (паритет із дошкою вебу). Прибрана порожня секція забирає з
+     * собою єдиний спосіб створити першу задачу в колонці — порожній проєкт
+     * показував би сам лише напис «Задач ще немає» замість власних колонок.
+     *
+     * Особисті COLUMNS вище для цього не годяться: вони без `projectId`, і
+     * дописувати порожні колонки проєкту нема з чого. Тут — справжні копії
+     * статусів проєкту (contract §3.3).
+     */
+    const PROJECT_COLUMNS = seedProjectStatusColumns(mergeTaskStatusColumns([]), 'p1');
+    const col = (name: string) => PROJECT_COLUMNS.find(c => c.name === name)!;
+    // Порядок дошки: «У процесі» попереду, «Готово» — завжди наприкінці.
+    const BOARD_ORDER = ['У процесі', 'До роботи', 'На перевірці', 'Готово'];
+
+    const inColumn = (id: string, name: string) =>
+      task({ id, projectId: 'p1', kanbanColumnId: col(name).id });
+
+    test('порожні колонки дописуються В ПОРЯДКУ ДОШКИ, а не в кінець', () => {
+      const tasks = [inColumn('a', 'На перевірці')];
+      const groups = buildProjectListGroups(tasks, 'status', PROJECT_COLUMNS, [], 'p1', GROUP_LABELS, { includeEmpty: true });
+      expect(groups.map(g => g.label)).toEqual(BOARD_ORDER);
+      expect(groups.find(g => g.label === 'На перевірці')?.tasks.map(t => t.id)).toEqual(['a']);
+      expect(groups.filter(g => g.tasks.length === 0).map(g => g.label))
+        .toEqual(['У процесі', 'До роботи', 'Готово']);
+    });
+
+    test('без прапорця той самий вхід дає рівно одну секцію — стеля поведінки не зсунулась', () => {
+      const tasks = [inColumn('a', 'На перевірці')];
+      const groups = buildProjectListGroups(tasks, 'status', PROJECT_COLUMNS, [], 'p1', GROUP_LABELS);
+      expect(groups.map(g => g.label)).toEqual(['На перевірці']);
+    });
+
+    test('ПОРОЖНІЙ проєкт показує всі свої колонки, а не порожній список', () => {
+      const groups = buildProjectListGroups([], 'status', PROJECT_COLUMNS, [], 'p1', GROUP_LABELS, { includeEmpty: true });
+      expect(groups.map(g => g.label)).toEqual(BOARD_ORDER);
+      expect(groups.every(g => g.tasks.length === 0)).toBe(true);
+      // Ключ секції — id колонки ПРОЄКТУ: саме його інлайн-поле поставить новій задачі.
+      expect(groups.map(g => g.key)).toEqual(BOARD_ORDER.map(name => col(name).id));
+    });
+
+    test('легасі-проєкт без власних колонок дописувати нема чим — лишається те, що дали задачі', () => {
+      // COLUMNS — особисті, без projectId; scoped для 'p1' порожній.
+      const tasks = [task({ id: 'a', projectId: 'p1', status: 'active' })];
+      const withFlag = buildProjectListGroups(tasks, 'status', COLUMNS, [], 'p1', GROUP_LABELS, { includeEmpty: true });
+      const without = buildProjectListGroups(tasks, 'status', COLUMNS, [], 'p1', GROUP_LABELS);
+      expect(withFlag).toEqual(without);
+      expect(withFlag.map(g => g.key)).toEqual([ACTIVE_COLUMN_ID]);
+    });
+
+    test("'sprint': прапорець лишає спринт без задач, беклог теж", () => {
+      const tasks = [task({ id: 't1', projectId: 'p1', sprintId: 's1' })];
+      const groups = buildProjectListGroups(tasks, 'sprint', PROJECT_COLUMNS, [sprint1, sprint2], 'p1', GROUP_LABELS, { includeEmpty: true });
+      expect(groups.map(g => g.key)).toEqual(['s1', 's2', BACKLOG_GROUP_KEY]);
+      expect(groups.find(g => g.key === 's2')?.tasks).toEqual([]);
+      expect(groups.find(g => g.key === BACKLOG_GROUP_KEY)?.tasks).toEqual([]);
+    });
+
+    test("'priority' прапорець НЕ зачіпає: пріоритет — ознака, а не місце", () => {
+      // Покласти задачу «в P3» не можна, її можна лише такою створити, тож
+      // порожня секція пріоритету — чистий шум і прибирається завжди.
+      const tasks = [task({ id: 'p0', projectId: 'p1', priorityLevel: 0 })];
+      const groups = buildProjectListGroups(tasks, 'priority', PROJECT_COLUMNS, [], 'p1', GROUP_LABELS, { includeEmpty: true });
+      expect(groups.map(g => g.key)).toEqual(['p0']);
+    });
+
+    test("'none' не групує навіть із прапорцем", () => {
+      expect(buildProjectListGroups([], 'none', PROJECT_COLUMNS, [], 'p1', GROUP_LABELS, { includeEmpty: true })).toEqual([]);
+    });
   });
 });

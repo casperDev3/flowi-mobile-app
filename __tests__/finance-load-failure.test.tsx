@@ -35,7 +35,8 @@ jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   router: { back: jest.fn(), push: jest.fn(), setParams: jest.fn() },
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), setParams: jest.fn() }),
-  useLocalSearchParams: () => ({}),
+  // Стрічка операцій — вкладка «Операції» розділу (типова тепер «Огляд»).
+  useLocalSearchParams: () => ({ tab: 'transactions' }),
   usePathname: () => '/explore',
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
 }));
@@ -55,14 +56,14 @@ jest.mock('@/utils/haptics', () => ({
 import React from 'react';
 import { Text } from 'react-native';
 
-import { loadErrorText } from '@/components/finance/LoadErrorNotice';
+import { allTranslations } from '@/store/translations';
 import { clearStorageReadFailure } from '@/store/storage';
 
 // Уникаємо TS7016 (відсутні @types/react-test-renderer — відома базова помилка)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { create, act } = require('react-test-renderer') as any;
 
-const t = loadErrorText('uk');
+const t = allTranslations.uk;
 const ISO = new Date().toISOString();
 
 function texts(tree: any): string[] {
@@ -116,13 +117,13 @@ describe('ERR-01 на екрані Фінансів', () => {
     expect(JSON.parse(mockStore.get('transactions')!)).toHaveLength(1);
 
     // Користувач бачить причину, а не «Немає транзакцій».
-    expect(texts(tree)).toContain(t.title);
+    expect(texts(tree)).toContain(t.loadErrorTitle);
 
     // «Повторити» після того, як сховище ожило, повертає дані.
     mockFailing.clear();
-    await act(async () => { pressableWithLabel(tree, t.retry).props.onPress(); });
+    await act(async () => { pressableWithLabel(tree, t.loadErrorRetry).props.onPress(); });
     await act(async () => {});
-    expect(texts(tree)).not.toContain(t.title);
+    expect(texts(tree)).not.toContain(t.loadErrorTitle);
   });
 
   it('справне читання лишає екран у звичайному режимі', async () => {
@@ -133,6 +134,6 @@ describe('ERR-01 на екрані Фінансів', () => {
     await act(async () => {});
     trees.push(tree);
 
-    expect(texts(tree)).not.toContain(t.title);
+    expect(texts(tree)).not.toContain(t.loadErrorTitle);
   });
 });

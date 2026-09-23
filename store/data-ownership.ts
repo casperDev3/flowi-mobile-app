@@ -15,7 +15,7 @@
 import { apiFetch } from './api';
 import { loadData, removeData, saveData } from './storage';
 import { generateFullOutbox, resetPersonalSyncState } from './sync-engine';
-import { SYNC_ARRAY_KEYS, SYNC_SINGLETON_KEYS } from './sync-contract';
+import { SYNC_ARRAY_KEYS, SYNC_SERVER_OWNED_KEYS, SYNC_SINGLETON_KEYS } from './sync-contract';
 import { appendToOutbox, createMutationId, loadOutbox, OUTBOX_KEY, resolveOutboxStreamForRecord, type OutboxItem } from './synced-storage';
 
 export interface DataOwner {
@@ -93,6 +93,15 @@ export async function wipeLocalSyncedData(): Promise<void> {
   await saveData('recent_projects', []);
   await saveData('projects_migrated_v1', null);
   await saveData('pending_project_deletes', []);
+  // Серверні колекції (лише читання) — повний pull з курсора 0 принесе їх
+  // знову для нового власника; їхній кеш теж його.
+  for (const key of SYNC_SERVER_OWNED_KEYS) await saveData(key, []);
+  await removeData('feedback_status_cache_v1');
+  // Контейнери v2: черга вивантаження фото прив'язана до записів попереднього
+  // власника, лічильники відкриттів — теж його (containers.md §5).
+  // `containers_backup_v1` (резервна копія до міграції) свідомо не чіпаємо.
+  await removeData('media_upload_queue');
+  await removeData('containers_open_counts');
 }
 
 interface RemoteSyncChange {

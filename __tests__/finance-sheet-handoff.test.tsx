@@ -41,7 +41,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), setParams: jest.fn() }),
   // Той самий шлях, яким на екран приходять із «Сьогодні»: форма операції
   // відкривається одразу на монтуванні.
-  useLocalSearchParams: () => ({ create: '1' }),
+  useLocalSearchParams: () => ({ create: '1', tab: 'transactions' }),
   usePathname: () => '/explore',
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
 }));

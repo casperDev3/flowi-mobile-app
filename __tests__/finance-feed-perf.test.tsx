@@ -31,7 +31,7 @@ jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   router: { back: jest.fn(), push: jest.fn(), setParams: jest.fn() },
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), setParams: jest.fn() }),
-  useLocalSearchParams: () => ({ create: '1' }),
+  useLocalSearchParams: () => ({ create: '1', tab: 'transactions' }),
   usePathname: () => '/explore',
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
 }));

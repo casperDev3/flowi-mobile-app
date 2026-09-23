@@ -7,8 +7,13 @@
  *
  * Список має перемикач групування (без групи / за статусом / за пріоритетом /
  * за спринтом — `buildProjectListGroups` в `utils/taskListView.ts`, чиста
- * функція з юніт-тестами; порожні групи прибираються). Дошка гортається
- * горизонтально (`ScrollView horizontal` — «телефон = горизонтальний свайп
+ * функція з юніт-тестами). Порожні секції СТАТУСУ тут НЕ прибираються
+ * (`includeEmpty`): секція — це ще й місце, куди задачу кладуть
+ * (тап по порожньому місцю відкриває інлайн-поле зі статусом цієї колонки —
+ * `InlineTaskComposer`, паритет із дошкою вебу), а порожній проєкт мусить
+ * показувати свої колонки, а не самий лише напис «Задач ще немає».
+ *
+ * Дошка гортається горизонтально (`ScrollView horizontal` — «телефон = горизонтальний свайп
  * колонок» із контракту §3); саме тягнення пальцем картки МІЖ колонками —
  * НЕ реалізоване (свідомо, попередній прохід: велика окрема функція з
  * autoscroll на межах горизонтального ScrollView) — довге натискання
@@ -25,7 +30,10 @@
  *
  * Повний редактор задачі (підзавдання, таймер, спринт, нагадування) лишається
  * єдиним на застосунок — на екрані Завдань `(tabs)`, а не тут: `openTask`/
- * `openFullForm` нижче `router.push` туди з `?open=`/`?create=1&projectId=`.
+ * `openFullForm` нижче `router.push` туди з `?open=`/
+ * `?create=1&projectId=&statusId=&sprintId=` — `statusId` несе колонку ЦЬОГО
+ * проєкту, щоб «Детальніше» з інлайн-поля відкривало форму з тим самим
+ * статусом, а не з типовим «До роботи».
  * Це ЗАЛИШАЄ запис у навігаційному стеку на цьому екрані (push, не replace)
  * — `(tabs)/index.tsx` сам відстежує, що прийшов із проєкту (`projectId`
  * задачі/параметра), і щойно редактор закриється, повертає `router.back()`
@@ -36,11 +44,13 @@
  */
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { MonthPicker } from '@/components/shared/MonthPicker';
 import { ProjectGantt } from '@/components/projects/ProjectGantt';
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
+import { ProjectSyncIndicator } from '@/components/projects/ProjectSyncIndicator';
+import { InlineComposerSlot, InlineTaskComposer } from '@/components/tasks/InlineTaskComposer';
 import { TaskCompactCard } from '@/components/tasks/TaskCompactCard';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -53,6 +63,7 @@ import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { projectRoute } from '@/constants/projectNav';
 import { useI18n } from '@/store/i18n';
+import { refreshProjectNow } from '@/store/project-sync';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
@@ -66,7 +77,8 @@ import {
   type GroupLabels, type ProjectListGroupBy,
 } from '@/utils/taskListView';
 import {
-  boardColumnForTask, mergeTaskStatusColumns, orderColumnsForList, personalEquivalentStrict, scopedColumnFor,
+  boardColumnForTask, mergeTaskStatusColumns, orderColumnsForList, personalEquivalentStrict,
+  projectEquivalentColumn, scopedColumnFor, seedProjectStatusColumns,
   type TaskStatusColumn,
 } from '@/utils/taskStatuses';
 import { saveStatusLink } from '@/store/status-links';
@@ -76,9 +88,24 @@ import {
   filterTasksByMonth, priorityFields, priorityLabel as priorityLevelLabel, DEFAULT_PRIORITY_LEVEL,
   normalizePriority, type Filter, type Task,
 } from '@/utils/taskUtils';
-import { type Sprint } from '@/utils/sprintUtils';
+import { applyFormSprint, BACKLOG_GROUP_KEY, type Sprint } from '@/utils/sprintUtils';
 
 type ViewMode = 'list' | 'board' | 'calendar' | 'timeline';
+
+/**
+ * Ключі, яких торкаються ВЛАСНІ записи цього екрана (`trackWrite`) — усі
+ * правки тут ідуть лише в `tasks`. Завдяки цьому сигнал про чужий запис у
+ * `sprints`/`task_statuses`/`meetings`, що прилетів саме під час нашого
+ * збереження (обмін проєкту цілком може дописати їх у ту ж мить), не
+ * відкидається, а програється після запису — див. `hooks/use-storage-refresh.ts`.
+ */
+const TASKS_KEY_ONLY = ['tasks'] as const;
+/**
+ * `ensureProjectColumns` нижче — єдине місце на екрані, що пише статуси.
+ * Оголошуємо це окремо, щоб сигнал про ЧУЖИЙ запис у `tasks`, який прилетів
+ * саме в ту мить, не був відкинутий як «наш».
+ */
+const STATUSES_KEY_ONLY = ['task_statuses'] as const;
 
 const GROUP_BY_OPTIONS: { key: ProjectListGroupBy }[] = [
   { key: 'none' }, { key: 'status' }, { key: 'priority' }, { key: 'sprint' },
@@ -121,6 +148,15 @@ export default function ProjectTasksScreen() {
   const [groupBy, setGroupBy] = useState<ProjectListGroupBy>('none');
   const [activeMonth, setActiveMonth] = useState(() => startOfMonth(new Date()));
   const [newTitle, setNewTitle] = useState('');
+  /**
+   * Відкрите інлайн-поле створення: КУДИ саме впаде задача.
+   * `columnId` — колонка дошки / секція статусу, `sprintId` — група спринта
+   * (лише за групування «за спринтом»); `null` в обох — беклог без статусу.
+   * Одне поле на екран: два відкритих поля означали б два курсори і два
+   * місця, куди піде наступний Enter.
+   */
+  const [compose, setCompose] = useState<{ columnId: string | null; sprintId: string | null } | null>(null);
+  const [composeTitle, setComposeTitle] = useState('');
   // `origStart`/`origDeadline` — значення на момент відкриття редактора
   // (review finding, resolveTimelineDatePatch у utils/dateUtils.ts): «Зберегти»
   // без правок не повинно мовчки перезаписувати дату переклопаною з локального
@@ -140,6 +176,28 @@ export default function ProjectTasksScreen() {
 
   useFocusEffect(useCallback(() => { void loadAll(); }, [loadAll]));
   const trackWrite = useStorageRefresh(['tasks', 'sprints', 'task_statuses', 'meetings'], loadAll);
+
+  /**
+   * Pull-to-refresh — справжній: іде на сервер (`refreshProjectNow`), а не
+   * перечитує AsyncStorage. Саме його тут не було взагалі, і вкладка Завдань
+   * проєкту лишалась на локальних даних, поки не спрацює поллінг.
+   * Офлайн `refreshProjectNow` тихо виходить, і лишається перечитування
+   * локальних даних — офлайн-режим нічого не ламає.
+   */
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void (async () => {
+      try {
+        if (projectId) await refreshProjectNow(projectId);
+      } catch (e) {
+        if (__DEV__) console.warn('[project/tasks] оновлення не вдалося:', e);
+      } finally {
+        await loadAll();
+        setRefreshing(false);
+      }
+    })();
+  }, [projectId, loadAll]);
 
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
 
@@ -179,13 +237,34 @@ export default function ProjectTasksScreen() {
     return buildProjectCalendarDays(inMonth, monthMeetings, new Date(), groupLabels, locale);
   }, [filtered, activeMonth, monthMeetings, groupLabels, locale]);
 
+  /**
+   * Групування, яким список малюється НАСПРАВДІ.
+   *
+   * Порожній проєкт має показувати свої колонки, а не самий лише напис
+   * «Задач ще немає»: колонки — це і структура проєкту, і єдине місце, де
+   * першу задачу можна завести одразу в потрібному статусі. Поки задач
+   * жодної, «без групи» і «за пріоритетом» не розрізняють нічого (групувати
+   * нічого), тож список показує статуси; щойно з'явиться перша задача —
+   * діє вибір людини, як і раніше.
+   */
+  const effectiveGroupBy: ProjectListGroupBy = useMemo(
+    () => (filtered.length === 0 && (groupBy === 'none' || groupBy === 'priority') ? 'status' : groupBy),
+    [filtered.length, groupBy],
+  );
+
   const listGroups = useMemo(
     () => (projectId
-      ? buildProjectListGroups(filtered, groupBy, columns, sprints, projectId, {
+      ? buildProjectListGroups(filtered, effectiveGroupBy, columns, sprints, projectId, {
         priorityNone: tr.priorityNone, sprintBacklog: tr.sprintBacklog,
-      })
+      // Порожні секції СТАТУСУ лишаються: секція — це ще й місце, куди
+      // задачу кладуть (тап відкриває інлайн-поле), а порожній проєкт має
+      // показувати свої колонки, а не сам лише напис «Задач ще немає».
+      // На спринти це не поширюється: там порожня група — це здебільшого
+      // ЗАКРИТИЙ спринт, і десяток таких заголовків не місце для нової
+      // задачі, а шум.
+      }, { includeEmpty: effectiveGroupBy === 'status' })
       : []),
-    [filtered, groupBy, columns, sprints, projectId, tr.priorityNone, tr.sprintBacklog],
+    [filtered, effectiveGroupBy, columns, sprints, projectId, tr.priorityNone, tr.sprintBacklog],
   );
 
   const timelineTasks = useMemo(
@@ -223,7 +302,7 @@ export default function ProjectTasksScreen() {
           return { ...t, status, kanbanColumnId: column?.id ?? t.kanbanColumnId };
         }));
         setTasks(updated);
-      });
+      }, TASKS_KEY_ONLY);
       haptic.light();
       if (becameDone) await stopTimerForTask(task.id);
     } catch (e) {
@@ -275,7 +354,7 @@ export default function ProjectTasksScreen() {
           return { ...t, status: column.isDone ? 'done' : 'active', kanbanColumnId: column.id };
         }));
         setTasks(updated);
-      });
+      }, TASKS_KEY_ONLY);
       haptic.light();
       if (becameDone) await stopTimerForTask(task.id);
       askPersonalStatusLink(task, column);
@@ -298,21 +377,65 @@ export default function ProjectTasksScreen() {
     );
   }, [boardColumns, moveToColumn, tr.cancel]);
 
-  const addTask = useCallback(async () => {
-    const title = newTitle.trim();
-    if (!canEdit || !title || !projectId) return;
+  /**
+   * Весь `task_statuses` із ГАРАНТОВАНИМИ колонками цього проєкту.
+   *
+   * Проєкт копіює власні статуси при створенні (contract §3.3), але проєкти,
+   * заведені до тієї фази (а також ті, кому копіювання не вдалося — це
+   * окремий запис, паралельний до самого проєкту), живуть без жодної. Раніше
+   * швидке додавання в такому проєкті писало задачу БЕЗ `kanbanColumnId`: на
+   * вигляд усе гаразд (дошка падала на особисті колонки), але щойно колонки
+   * проєкту з'являлись, задача опинялась казна-де — і рівно цей мовчазний
+   * промах тепер сигналить `boardColumnForTask` у dev.
+   *
+   * Тому колонки створюються ТУТ, перед записом задачі, тими самими копіями
+   * системних, що й при створенні проєкту (`seedProjectStatusColumns`), а
+   * задача пишеться вже в справжню колонку.
+   */
+  const ensureProjectColumns = useCallback(async (): Promise<TaskStatusColumn[]> => {
+    if (!projectId) return [];
+    const current = await loadData<TaskStatusColumn[]>('task_statuses', []);
+    if (mergeTaskStatusColumns(current, projectId).length) return current;
+    const seeded = seedProjectStatusColumns(mergeTaskStatusColumns(current), projectId);
+    if (!seeded.length) return current;
+    const next = await trackWrite(
+      () => updateSynced<TaskStatusColumn>('task_statuses', fresh => [...fresh, ...seeded]),
+      STATUSES_KEY_ONLY,
+    );
+    setColumns(next);
+    return next;
+  }, [projectId, trackWrite]);
+
+  /**
+   * Одна точка створення задачі на весь екран: і рядок угорі, і «+» у шапці
+   * колонки, і тап по порожньому місцю секції. `target.column` — колонка
+   * ДОШКИ, тобто, для легасі-проєкту, можливо особиста; `projectEquivalentColumn`
+   * зводить її до колонки цього проєкту вже ПІСЛЯ того, як колонки
+   * гарантовано існують.
+   */
+  const createTask = useCallback(async (
+    rawTitle: string,
+    target?: { column?: TaskStatusColumn; sprintId?: string | null },
+  ): Promise<boolean> => {
+    const title = rawTitle.trim();
+    if (!canEdit || !title || !projectId) return false;
     try {
-      await trackWrite(async () => {
+      const all = await ensureProjectColumns();
+      const column = target?.column
+        ? projectEquivalentColumn(target.column, all, projectId)
         // Колонка «todo» ЦЬОГО проєкту — інакше задача без kanbanColumnId
         // падала на дефолт першої колонки дошки (boardColumnForTask), що
         // випадково міг бути НЕ todo-колонкою (review finding: «quick-add
         // task also sets no kanbanColumnId»).
-        const column = scopedColumnFor(columns, projectId, 'todo');
-        const created: Task = {
+        : scopedColumnFor(all, projectId, 'todo');
+      await trackWrite(async () => {
+        const base: Task = {
           id: Date.now().toString(),
           title,
           projectId,
-          status: 'active',
+          // Колонка «Готово» дає одразу завершену задачу — та сама пара полів,
+          // що й у `moveToColumn`: розійтись вони не мають права.
+          status: column?.isDone ? 'done' : 'active',
           kanbanColumnId: column?.id,
           // §3.3 «createdBy — клієнт ставить при створенні в проєкті».
           createdBy: user?.id,
@@ -320,18 +443,59 @@ export default function ProjectTasksScreen() {
           createdAt: new Date().toISOString(),
           subtasks: [],
         };
+        // Спринт групи (CONTRACT §D.3): null — беклог, інакше assignTaskToSprint.
+        const created = applyFormSprint(base, sprints, target?.sprintId ?? null);
         const updated = await updateSynced<Task>('tasks', fresh => [created, ...fresh]);
         setTasks(updated);
-      });
-      setNewTitle('');
+      }, TASKS_KEY_ONLY);
       haptic.success();
+      return true;
     } catch (e) {
       if (__DEV__) console.warn('[project/tasks] створення не вдалося:', e);
+      return false;
     }
-  }, [canEdit, newTitle, projectId, trackWrite, columns, user]);
+  }, [canEdit, projectId, ensureProjectColumns, trackWrite, sprints, user]);
 
-  const openFullForm = useCallback(() => {
-    router.push({ pathname: '/(tabs)', params: { create: '1', projectId } } as never);
+  const addTask = useCallback(async () => {
+    if (await createTask(newTitle)) setNewTitle('');
+  }, [createTask, newTitle]);
+
+  const openCompose = useCallback((target: { columnId?: string | null; sprintId?: string | null }) => {
+    if (!canEdit) return;
+    setCompose({ columnId: target.columnId ?? null, sprintId: target.sprintId ?? null });
+    setComposeTitle('');
+  }, [canEdit]);
+
+  const closeCompose = useCallback(() => { setCompose(null); setComposeTitle(''); }, []);
+
+  const submitCompose = useCallback(async () => {
+    if (!compose) return;
+    const column = compose.columnId ? boardColumns.find(col => col.id === compose.columnId) : undefined;
+    // Поле лишається відкритим: у колонку зазвичай заводять кілька задач
+    // поспіль, і закриття після кожної коштувало б тап на кожну наступну.
+    if (await createTask(composeTitle, { column, sprintId: compose.sprintId })) setComposeTitle('');
+  }, [compose, composeTitle, boardColumns, createTask]);
+
+  /** Чи це поле відкрите саме тут (колонка + спринт — повна адреса місця). */
+  const composingAt = useCallback(
+    (columnId: string | null, sprintId: string | null) =>
+      !!compose && compose.columnId === columnId && compose.sprintId === sprintId,
+    [compose],
+  );
+
+  const openFullForm = useCallback((preset?: { columnId?: string | null; sprintId?: string | null }) => {
+    router.push({
+      pathname: '/(tabs)',
+      params: {
+        create: '1',
+        projectId,
+        // `statusId` — колонка ЦЬОГО проєкту; форма зводить її до особистого
+        // еквівалента для свого пікера й повертає назад при збереженні
+        // (personalStatusIdFor / projectEquivalentColumn).
+        statusId: preset?.columnId ?? '',
+        sprintId: preset?.sprintId ?? '',
+      },
+    } as never);
   }, [router, projectId]);
 
   const saveDates = useCallback(async () => {
@@ -357,7 +521,7 @@ export default function ProjectTasksScreen() {
           return next;
         }));
         setTasks(updated);
-      });
+      }, TASKS_KEY_ONLY);
     } catch (e) {
       if (__DEV__) console.warn('[project/tasks] збереження дат не вдалося:', e);
     }
@@ -380,7 +544,7 @@ export default function ProjectTasksScreen() {
       await trackWrite(async () => {
         const updated = await updateSynced<Task>('tasks', fresh => fresh.map(t => (t.id !== taskId ? t : { ...t, ...patch })));
         setTasks(updated);
-      });
+      }, TASKS_KEY_ONLY);
       haptic.light();
     } catch (e) {
       if (__DEV__) console.warn('[project/tasks] тягнення краю не вдалося:', e);
@@ -399,6 +563,9 @@ export default function ProjectTasksScreen() {
       project={project}
       isDark={isDark}
       title={tr.tabTasks}
+      actions={projectId ? (
+        <ProjectSyncIndicator projectId={projectId} accent={c.accent} subColor={c.sub} dimColor={c.dim} />
+      ) : undefined}
       headerChildren={
         <View style={{ flexDirection: 'row', gap: 6 }}>
           {VIEWS.map(v => (
@@ -429,7 +596,12 @@ export default function ProjectTasksScreen() {
         showsVerticalScrollIndicator={false}
         // L3: перший тап по «+» поруч із полем назви інакше лише ховає
         // клавіатуру, і завдання не створюється.
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        // Після keyboardShouldPersistTaps навмисно: аудит простору проєкту
+        // (`__tests__/audit-project-space.test.tsx`) читає ПЕРШИЙ тег
+        // <ScrollView> регуляркою до першого «>», а вкладений
+        // <RefreshControl … /> обриває їй цей тег передчасно.
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
 
         {/* Швидке створення — повна форма (проєкт/спринт/пріоритет/дедлайн)
             лишається на екрані Завдань, тут лише назва. Глядач (contract §4.1)
@@ -447,7 +619,7 @@ export default function ProjectTasksScreen() {
               style={{ flex: 1, color: c.text, fontSize: 14, paddingVertical: 10 }}
             />
             <TouchableOpacity
-              onPress={openFullForm}
+              onPress={() => openFullForm()}
               accessibilityRole="button"
               accessibilityLabel={tr.openFullTaskForm}
               hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}>
@@ -486,9 +658,7 @@ export default function ProjectTasksScreen() {
               ))}
             </ScrollView>
 
-            {filtered.length === 0 ? (
-              <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 40 }}>{tr.projectNoTasks}</Text>
-            ) : groupBy === 'none' ? (
+            {effectiveGroupBy === 'none' ? (
               <View style={{ gap: 8 }}>
                 {filtered.map(task => (
                   <TaskCompactCard
@@ -508,35 +678,77 @@ export default function ProjectTasksScreen() {
                   />
                 ))}
               </View>
+            ) : listGroups.length === 0 ? (
+              <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 40 }}>{tr.projectNoTasks}</Text>
             ) : (
               <View style={{ gap: 16 }}>
-                {listGroups.map(group => (
-                  <View key={group.key}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                      <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{group.label}</Text>
-                      <Text style={{ color: c.sub, fontSize: 11 }}>{group.tasks.length}</Text>
+                {listGroups.map(group => {
+                  // Секція статусу — це колонка дошки; секція спринта — сам
+                  // спринт (беклог = без спринта). За пріоритетом створювати
+                  // нема куди: пріоритет — ознака задачі, а не місце.
+                  const groupColumn = effectiveGroupBy === 'status' ? boardColumns.find(col => col.id === group.key) : undefined;
+                  const groupSprintId = effectiveGroupBy === 'sprint' && group.key !== BACKLOG_GROUP_KEY ? group.key : null;
+                  const canCompose = canEdit && effectiveGroupBy !== 'priority';
+                  const composeColumnId = groupColumn?.id ?? null;
+                  return (
+                    <View key={group.key}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{group.label}</Text>
+                        <Text style={{ color: c.sub, fontSize: 11 }}>{group.tasks.length}</Text>
+                        <View style={{ flex: 1 }} />
+                        {canCompose && (
+                          <TouchableOpacity
+                            onPress={() => openCompose({ columnId: composeColumnId, sprintId: groupSprintId })}
+                            accessibilityRole="button"
+                            accessibilityLabel={tr.projectAddTask}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <IconSymbol name="plus" size={15} color={c.sub} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <View style={{ gap: 8 }}>
+                        {group.tasks.map(task => (
+                          <TaskCompactCard
+                            key={task.id}
+                            task={task}
+                            statusColumn={boardColumnForTask(task, boardColumns, columns) ?? boardColumns[0]}
+                            onPress={openTask}
+                            onToggle={toggleTask}
+                            c={c}
+                            isDark={isDark}
+                            projects={projectForBadge}
+                            sprints={sprints}
+                            overdueLabel={tr.overdueSection}
+                            priorityLabel={priorityA11yFor(task)}
+                            subtasksLabel={tr.subtasks}
+                            assigneeLabel={assigneeLabelFor(task)}
+                          />
+                        ))}
+                        {canCompose && (composingAt(composeColumnId, groupSprintId) ? (
+                          <InlineTaskComposer
+                            value={composeTitle}
+                            onChangeText={setComposeTitle}
+                            onSubmit={() => void submitCompose()}
+                            onCancel={closeCompose}
+                            onDetails={() => openFullForm({ columnId: composeColumnId, sprintId: groupSprintId })}
+                            placeholder={tr.projectAddTask}
+                            submitLabel={tr.add}
+                            cancelLabel={tr.cancel}
+                            detailsLabel={tr.openFullTaskForm}
+                            colors={c}
+                            accentColor={groupColumn?.color}
+                          />
+                        ) : (
+                          <InlineComposerSlot
+                            label={group.tasks.length === 0 ? tr.projectNoTasksHint : tr.projectAddTask}
+                            colors={c}
+                            onPress={() => openCompose({ columnId: composeColumnId, sprintId: groupSprintId })}
+                          />
+                        ))}
+                      </View>
                     </View>
-                    <View style={{ gap: 8 }}>
-                      {group.tasks.map(task => (
-                        <TaskCompactCard
-                          key={task.id}
-                          task={task}
-                          statusColumn={boardColumnForTask(task, boardColumns, columns) ?? boardColumns[0]}
-                          onPress={openTask}
-                          onToggle={toggleTask}
-                          c={c}
-                          isDark={isDark}
-                          projects={projectForBadge}
-                          sprints={sprints}
-                          overdueLabel={tr.overdueSection}
-                          priorityLabel={priorityA11yFor(task)}
-                          subtasksLabel={tr.subtasks}
-                          assigneeLabel={assigneeLabelFor(task)}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </>
@@ -556,6 +768,15 @@ export default function ProjectTasksScreen() {
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: col.color }} />
                     <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '700' }}>{col.name}</Text>
                     <Text style={{ color: c.sub, fontSize: 11 }}>{colTasks.length}</Text>
+                    {canEdit && (
+                      <TouchableOpacity
+                        onPress={() => openCompose({ columnId: col.id })}
+                        accessibilityRole="button"
+                        accessibilityLabel={tr.projectAddTask}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                        <IconSymbol name="plus" size={15} color={c.sub} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                   {colTasks.map(task => (
                     <View key={task.id} style={{ marginBottom: 6 }}>
@@ -575,6 +796,31 @@ export default function ProjectTasksScreen() {
                         assigneeLabel={assigneeLabelFor(task)}
                       />
                     </View>
+                  ))}
+                  {/* Порожнє місце колонки — ціль тапу, а не просто пустота:
+                      інакше «створити одразу в цій колонці» на телефоні немає
+                      взагалі, і статус доводиться міняти вже після створення. */}
+                  {canEdit && (composingAt(col.id, null) ? (
+                    <InlineTaskComposer
+                      value={composeTitle}
+                      onChangeText={setComposeTitle}
+                      onSubmit={() => void submitCompose()}
+                      onCancel={closeCompose}
+                      onDetails={() => openFullForm({ columnId: col.id })}
+                      placeholder={tr.projectAddTask}
+                      submitLabel={tr.add}
+                      cancelLabel={tr.cancel}
+                      detailsLabel={tr.openFullTaskForm}
+                      colors={c}
+                      accentColor={col.color}
+                    />
+                  ) : (
+                    <InlineComposerSlot
+                      label={colTasks.length === 0 ? tr.projectNoTasksHint : tr.projectAddTask}
+                      colors={c}
+                      onPress={() => openCompose({ columnId: col.id })}
+                      minHeight={colTasks.length === 0 ? 80 : 44}
+                    />
                   ))}
                 </View>
               );

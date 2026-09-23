@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { ContainerSearchPanel } from '@/components/containers/ContainerSearchPanel';
 import { UpcomingPaymentsCard, useUpcomingPayments } from '@/components/finance/UpcomingPaymentsCard';
 import { MeetingProjectChip } from '@/components/meetings/MeetingProjectChip';
 import { RingCell } from '@/components/health/RingCell';
@@ -30,6 +31,8 @@ import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useToday } from '@/hooks/use-today';
 import { useAuth } from '@/store/auth';
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
+import { MODULE_SETTINGS_ROUTE, type ModuleId } from '@/constants/nav';
+import { areModulesEnabled, isModuleEnabled, useUiModules } from '@/store/ui-preferences';
 import { loadData } from '@/store/storage';
 import { useTimerContext } from '@/store/timer-context';
 import { meetingProject, meetingsOnDate, orderTodayMeetings, type Meeting } from '@/utils/meetings';
@@ -44,7 +47,7 @@ import { type Account } from '@/utils/accounts';
 import {
   ACCENT, ACCENT_CAL, ACCENT_SLEEP, ACCENT_STEPS, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
-import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, calcNetCalories, computeGoals, lastForDay, sumForDay } from '@/utils/healthUtils';
+import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, calcCalorieDay, computeGoals, lastForDay, sumForDay } from '@/utils/healthUtils';
 import { Habit, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { Task, isOverdue } from '@/utils/taskUtils';
 import { haptic } from '@/utils/haptics';
@@ -126,6 +129,22 @@ export default function TodayScreen() {
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const c = getHealthColors(isDark);
   useScreenView('today');
+  /**
+   * Вимкнені модулі — з того самого синхронізованого 'ui_preferences', що й
+   * сайдбар із панеллю табів (`app/(tabs)/_layout.tsx`): вимкнули розділ тут
+   * або у вебі — його немає й на дашборді.
+   *
+   * Дашборд — другий вхід у кожен модуль, і без цього фільтра він лишався б
+   * єдиним видимим: пункт меню зникав, а плитка «Фінанси» на «Сьогодні» далі
+   * вела в розділ, якого у користувача, за його ж вибором, немає.
+   *
+   * `ready` навмисно не чекаємо: доки сховище не прочитане, `disabledModules`
+   * порожній, тобто видно все. Показати секцію й прибрати її наступним кадром
+   * гірше, ніж показати на кадр пізніше — а кеш на процес (див. хук) лишає це
+   * блимання щонайбільше на перший запуск застосунку.
+   */
+  const { disabledModules } = useUiModules();
+  const moduleOn = (...modules: ModuleId[]) => areModulesEnabled(disabledModules, modules);
   // Найближчі й прострочені оплати підписок — окремий блок, власне читання сховища.
   const upcomingPayments = useUpcomingPayments();
 
@@ -294,10 +313,12 @@ export default function TodayScreen() {
     const lw = weights.length ? weights[0].value : null;
     return computeGoals(profile, lw ?? FALLBACK_WEIGHT);
   }, [health, profile]);
-  const calNet = calcNetCalories(
-    sumForDay(health, 'calories', today),
-    sumForDay(health, 'calories_out', today),
-  );
+  // Дашборд показує лише кільце калорій, а кільце міряє З'ЇДЕНЕ проти ліміту
+  // їжі — спалене на нього не впливає, тому тут свідомо 0. День без жодного
+  // запису їжі мусить давати порожнє кільце, навіть якщо спалено 500 кк.
+  // Якщо на дашборді колись зʼявиться «залишок», знадобиться колекція
+  // workouts і burnedForDay замість цього нуля.
+  const calDay = calcCalorieDay(goals.calories, sumForDay(health, 'calories', today), 0);
   const steps  = sumForDay(health, 'steps', today);
   const water  = sumForDay(health, 'water', today);
   const sleep  = lastForDay(health, 'sleep', today);
@@ -427,7 +448,7 @@ export default function TodayScreen() {
   const sections: MasonryEntry[] = [];
 
   // 1. Завдання на сьогодні
-  sections.push({
+  if (moduleOn('tasks')) sections.push({
     key: 'tasks',
     node: (
       <Section index={0} animate={animateIntro} motion={motion}>
@@ -490,7 +511,7 @@ export default function TodayScreen() {
   });
 
   // 2. Зустрічі сьогодні
-  if (todayMeetings.length > 0) {
+  if (moduleOn('meetings') && todayMeetings.length > 0) {
     sections.push({
       key: 'meetings',
       node: (
@@ -530,7 +551,7 @@ export default function TodayScreen() {
   }
 
   // 2б. Найближчі оплати / прострочені підписки
-  if (upcomingPayments.items.length > 0) {
+  if (moduleOn('subscriptions') && upcomingPayments.items.length > 0) {
     sections.push({
       key: 'payments',
       node: (
@@ -542,7 +563,7 @@ export default function TodayScreen() {
   }
 
   // 3. Здоровʼя — hero-стрічка кілець
-  sections.push({
+  if (moduleOn('health')) sections.push({
     key: 'health',
     node: (
       <Section index={2} animate={animateIntro} motion={motion}>
@@ -560,7 +581,7 @@ export default function TodayScreen() {
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
             </View>
             <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
-              <RingCell pct={goals.calories ? Math.max(0, calNet) / goals.calories : 0} color={ACCENT_CAL} label={tr.calories} value={`${calNet}кк`} />
+              <RingCell pct={calDay.pct} color={ACCENT_CAL} label={tr.calories} value={`${calDay.consumed}кк`} />
               <RingCell pct={steps / goals.steps} color={ACCENT_STEPS} label={tr.steps} value={steps >= 1000 ? `${(steps / 1000).toFixed(1)}т` : `${steps}`} />
               <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={water >= 1000 ? `${(water / 1000).toFixed(1)}л` : `${water}мл`} />
               <RingCell pct={sleep ? sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep} value={sleep ? fmtSleep(sleep) : '—'} />
@@ -572,7 +593,15 @@ export default function TodayScreen() {
   });
 
   // 4. Швидкі дії
-  sections.push({
+  //
+  // Ряд з чотирьох плиток веде в чотири різні модулі (завдання, фінанси,
+  // здоров'я, час), а `QuickActions` приймає рівно чотири обов'язкові дії —
+  // відфільтрувати ОДНУ плитку звідси неможливо. Тому секція зникає лише
+  // тоді, коли вимкнено всі чотири: сховати весь ряд через вимкнений
+  // «Трекер часу» означало б забрати і «+ Завдання». Плитка вимкненого
+  // модуля веде на заглушку «Ви вимкнули цю функцію» (app/(tabs)/_layout.tsx),
+  // тобто в глухий кут не заводить — див. followups про проп `actions`.
+  if (moduleOn('tasks') || moduleOn('finance') || moduleOn('health') || moduleOn('time')) sections.push({
     key: 'quick',
     node: (
       <Section index={3} animate={animateIntro} motion={motion}>
@@ -589,8 +618,9 @@ export default function TodayScreen() {
     ),
   });
 
-  // 5. Звички
-  if (habits.length > 0) {
+  // 5. Звички — це модуль «Профілактика» всередині «Здоров'я»: на вебі це
+  // окремі перемикачі, тож вимкнення будь-якого з двох прибирає секцію.
+  if (moduleOn('health', 'prevention') && habits.length > 0) {
     sections.push({
       key: 'habits',
       node: (
@@ -636,11 +666,18 @@ export default function TodayScreen() {
   }
 
   // 6. Фінанси + Час — сітка 2 колонки
-  sections.push({
+  //
+  // Плитки з РІЗНИХ модулів, тож фільтруються поокремо: кожна має flex:1,
+  // тому та, що лишилась сама, просто займає весь ряд. Ряд без жодної
+  // плитки не додається взагалі — інакше лишився б порожній відступ.
+  const showFinanceTile = moduleOn('finance');
+  const showTimeTile = moduleOn('time');
+  if (showFinanceTile || showTimeTile) sections.push({
     key: 'stats',
     node: (
       <Section index={5} animate={animateIntro} motion={motion}>
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+          {showFinanceTile && (
           <StatTile
             c={c} isDark={isDark}
             icon="banknote" color={ACCENT_FIN}
@@ -674,6 +711,8 @@ export default function TodayScreen() {
               <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>↓ {fmtMoney(overview.month.expense)}</Text>
             </View>
           </StatTile>
+          )}
+          {showTimeTile && (
           <StatTile
             c={c} isDark={isDark}
             icon="timer" color={ACCENT_TIME}
@@ -684,16 +723,60 @@ export default function TodayScreen() {
             </Text>
             <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.todayTracked}</Text>
           </StatTile>
+          )}
         </View>
       </Section>
     ),
   });
 
-  // На телефоні (одна колонка) завдання й оплати стоять під «Фінанси + Час»:
-  // верх екрана лишається за оглядом дня — здоров'я, швидкі дії, зведення.
+  // Порядок секцій ОДИН для телефона і планшета: завдання → зустрічі → оплати
+  // → здоров'я → швидкі дії → звички → зведення. Раніше на телефоні (одна
+  // колонка) завдання й оплати зсувались під «Фінанси + Час», і день
+  // починався зі статистики, а не з того, що треба зробити; на планшеті ж
+  // порядок був інший, тож два пристрої показували різні екрани з тих самих
+  // даних. На планшеті лишається masonry — він лише розкладає цей самий
+  // порядок по колонках.
   // («Спільне» плитка тут стояла раніше — прибрана: WORKSPACE_PROJECTS_PLAN.md
   // §4, «Спільне» зливається в проєкти, жорсткий перехід.)
-  const orderedSections = columnCount === 1 ? moveAfter(sections, ['tasks', 'payments'], 'stats') : sections;
+  //
+  // Фільтр вимкнених модулів цього порядку не змінює: секції додаються тим
+  // самим ланцюжком push'ів, вимкнена просто не додається, а решта лишається
+  // на своїх місцях і в тій же послідовності.
+
+  // Вимкнено геть усе: порожній екран мовчить про причину, тож кажемо її
+  // прямо й ведемо туди, де модулі вмикають назад.
+  if (sections.length === 0) {
+    sections.push({
+      key: 'all-modules-off',
+      node: (
+        <Section index={0} animate={animateIntro} motion={motion}>
+          <PressableScale
+            // `as never` — той самий обхід, що й у заглушці вкладки
+            // (app/(tabs)/_layout.tsx): типізовані маршрути expo-router не
+            // приймають рядкову константу, лише літерал.
+            onPress={() => router.push(MODULE_SETTINGS_ROUTE as never)}
+            accessibilityRole="button"
+            accessibilityLabel={tr.modulesOpenSettings}
+            style={{ marginBottom: 12 }}>
+            <BlurView
+              intensity={isDark ? 22 : 42}
+              tint={isDark ? 'dark' : 'light'}
+              style={[s.card, { borderColor: c.border, gap: 6 }]}>
+              <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>
+                {tr.modulesDashboardEmptyTitle}
+              </Text>
+              <Text style={{ color: c.sub, fontSize: 13, lineHeight: 18 }}>
+                {tr.modulesDashboardEmptyBody}
+              </Text>
+              <Text style={{ color: ACCENT_TASK, fontSize: 13, fontWeight: '700' }}>
+                {tr.modulesOpenSettings}
+              </Text>
+            </BlurView>
+          </PressableScale>
+        </Section>
+      ),
+    });
+  }
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -713,7 +796,18 @@ export default function TodayScreen() {
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset + 24 }}
           showsVerticalScrollIndicator={false}
+          // Тап по результату пошуку речей при відкритій клавіатурі має
+          // спрацювати з першого разу, а не лише сховати клавіатуру.
+          keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+          {/* Пошук речей у контейнерах (containers.md §7.2) — під шапкою.
+              Сам ховається, коли модуль вимкнено; обгортка — лише для відступу. */}
+          {isModuleEnabled(disabledModules, 'containers') ? (
+            <View style={{ marginBottom: 12 }}>
+              <ContainerSearchPanel />
+            </View>
+          ) : null}
 
           {/* Skeleton — перше завантаження */}
           {!loaded && (
@@ -725,22 +819,13 @@ export default function TodayScreen() {
           )}
 
           {loaded && (
-            <MasonryColumns items={orderedSections} columnCount={columnCount} />
+            <MasonryColumns items={sections} columnCount={columnCount} />
           )}
 
         </ScrollView>
       </View>
     </View>
   );
-}
-
-/** Переставляє секції `keys` (у їхньому порядку) одразу за секцію `anchor`. */
-function moveAfter(items: MasonryEntry[], keys: string[], anchor: string): MasonryEntry[] {
-  const moved = items.filter(item => keys.includes(item.key));
-  const rest = items.filter(item => !keys.includes(item.key));
-  const at = rest.findIndex(item => item.key === anchor);
-  if (at < 0) return items;
-  return [...rest.slice(0, at + 1), ...moved, ...rest.slice(at + 1)];
 }
 
 // ─── StatTile — компактна плитка сітки ────────────────────────────────────────

@@ -28,7 +28,8 @@ jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   router: { back: jest.fn(), push: jest.fn(), setParams: jest.fn() },
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), setParams: jest.fn() }),
-  useLocalSearchParams: () => ({}),
+  // Стрічка операцій — вкладка «Операції» розділу (типова тепер «Огляд»).
+  useLocalSearchParams: () => ({ tab: 'transactions' }),
   usePathname: () => '/explore',
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
 }));
@@ -91,7 +92,10 @@ describe('Фінанси: дерево доступності', () => {
   it('сегмент «Всі / Доходи / Витрати» повідомляє про вибір, а не лише фарбує', async () => {
     const tree = await mountFinance();
 
-    const tabs = pressables(tree).filter((n: any) => n.props.accessibilityRole === 'tab');
+    // Над стрічкою є ще смуга вкладок розділу (теж role=tab) — тут лише сегмент стрічки.
+    const feedLabels = [tr.all, tr.incomes, tr.expenses];
+    const tabs = pressables(tree).filter((n: any) => n.props.accessibilityRole === 'tab'
+      && feedLabels.includes(n.props.accessibilityLabel));
     const labels = tabs.map((n: any) => n.props.accessibilityLabel);
     expect(labels).toEqual(expect.arrayContaining([tr.all, tr.incomes, tr.expenses]));
 

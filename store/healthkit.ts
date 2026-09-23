@@ -1,5 +1,20 @@
 import { Platform } from 'react-native';
 
+import { localDateKey } from '@/utils/dateUtils';
+import {
+  type AutoDayRead,
+  type HealthAccess,
+  type HealthSourceApi,
+  type SleepInterval,
+  type SleepNight,
+  type WeightSample,
+  aggregateSleep,
+  hkSleepStage,
+  median,
+  sleepWindow,
+  spo2Percent,
+} from '@/utils/healthUtils';
+
 export const HK_AVAILABLE = Platform.OS === 'ios';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -12,8 +27,12 @@ export interface HKDayData {
   heartRateMax: number | null;
   restingHeartRate: number | null;
   weight: number | null;
+  /** Коли зважувались (ISO) — вага не обовʼязково сьогоднішня. */
+  weightAt?: string | null;
   distanceKm: number | null;
   sleepMinutes: number | null;
+  /** Ніч з фазами (якщо джерело їх дає). */
+  sleep?: SleepNight | null;
   flightsClimbed?: number | null;
   hrv?: number | null;
   spo2?: number | null;
@@ -55,7 +74,7 @@ export interface HKHeartRateSample {
  * саме типи дозволено на читання; тоді єдина ознака — чи повертають запити
  * хоч щось і чи не падають вони (див. HKReadOutcome).
  */
-export type HKAccess = 'unavailable' | 'granted' | 'denied' | 'unknown';
+export type HKAccess = HealthAccess;
 
 /** Підсумок пачки запитів: скільки зроблено і скільки з них упало. */
 export interface HKReadOutcome {
@@ -307,12 +326,153 @@ async function queryDistance(sdk: any, from: Date, to: Date, stats?: HKStats): P
   }
 }
 
+// ─── Одна доба (спільний контракт з Health Connect) ──────────────────────────
+
+/** Вибрати значення зі семпла, де б SDK його не поклав. */
+function sampleValue(sample: any): number {
+  return quantityValue(sample?.quantity ?? sample);
+}
+
+function sampleTime(sample: any, field: 'startDate' | 'endDate' = 'startDate'): number {
+  const raw = sample?.[field];
+  const t = raw instanceof Date ? raw.getTime() : new Date(raw).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+/** Інтервали сну з категорійних семплів HealthKit (inBed відкидається). */
+export function hkSleepIntervals(samples: readonly any[]): SleepInterval[] {
+  const out: SleepInterval[] = [];
+  for (const s of samples) {
+    const stage = hkSleepStage(s?.value ?? s?.categoryValue);
+    if (!stage) continue;
+    const start = sampleTime(s, 'startDate');
+    const end = sampleTime(s, 'endDate');
+    if (Number.isFinite(start) && Number.isFinite(end) && end > start) out.push({ start, end, stage });
+  }
+  return out;
+}
+
+export interface HKDayReadResult {
+  read: AutoDayRead;
+  outcome: HKReadOutcome;
+}
+
+/**
+ * Одна доба з HealthKit: суми за [00:00, 23:59] (або до «зараз»), пульс
+ * спокою — останній семпл ЦІЄЇ доби, SpO2 — медіана доби, сон — вікно ночі
+ * [D-1 18:00, D 12:00] з об'єднанням інтервалів (ВАДА-1).
+ */
+export async function readHealthKitDay(day: Date, now: Date = new Date()): Promise<HKDayReadResult> {
+  const read: AutoDayRead = {
+    day: localDateKey(day), steps: null, activeCalories: null, heartRateAvg: null,
+    heartRateMin: null, heartRateMax: null, restingHeartRate: null, spo2: null, distanceKm: null, sleep: null,
+  };
+  const sdk = getSDK();
+  if (!sdk) return { read, outcome: { ok: false, queries: 0, failures: 0 } };
+
+  const from = startOfDay(day);
+  const dayEnd = endOfDay(day);
+  const to = dayEnd.getTime() > now.getTime() ? now : dayEnd;
+  const win = sleepWindow(day, now);
+  const stats = newStats();
+
+  const [steps, cal, hrSamples, restSamples, spo2Samples, dist, sleepSamples] = await Promise.all([
+    querySum(sdk, HK_QUANTITY.steps, from, to, 'count', stats),
+    queryEnergySum(sdk, HK_QUANTITY.activeEnergy, from, to, stats),
+    queryQuantitySamples(sdk, HK_QUANTITY.heartRate, from, to, 1000, 'count/min', stats),
+    queryQuantitySamples(sdk, HK_QUANTITY.restingHeartRate, from, to, 20, 'count/min', stats),
+    queryQuantitySamples(sdk, HK_QUANTITY.oxygenSaturation, from, to, 500, '%', stats),
+    queryDistance(sdk, from, to, stats),
+    queryCategorySamples(sdk, HK_SLEEP, win.from, win.to, 500, stats),
+  ]);
+
+  const hrValues = hrSamples
+    .map((sample: any) => Math.round(sampleValue(sample)))
+    .filter((value: number) => value > 30 && value < 300);
+  if (hrValues.length) {
+    read.heartRateAvg = Math.round(hrValues.reduce((a: number, b: number) => a + b, 0) / hrValues.length);
+    read.heartRateMin = Math.min(...hrValues);
+    read.heartRateMax = Math.max(...hrValues);
+  }
+
+  // Останній семпл ДОБИ, а не «останній узагалі».
+  const rest = restSamples
+    .map((s: any) => ({ t: sampleTime(s), v: Math.round(sampleValue(s)) }))
+    .filter((x: { t: number; v: number }) => x.v > 20 && x.v < 250)
+    .sort((a: { t: number }, b: { t: number }) => (b.t || 0) - (a.t || 0));
+  read.restingHeartRate = rest.length ? rest[0].v : null;
+
+  read.spo2 = spo2Percent(median(spo2Samples.map((s: any) => sampleValue(s)).filter((v: number) => v > 0)));
+  read.steps = steps > 0 ? steps : 0;
+  read.activeCalories = cal > 0 ? cal : 0;
+  read.distanceKm = dist;
+  read.sleep = aggregateSleep(hkSleepIntervals(sleepSamples), win);
+
+  return { read, outcome: outcomeOf(stats) };
+}
+
+/**
+ * Заміри ваги за період — КОЖЕН семпл зі своєю датою (ВАДА-2). Раніше
+ * брався «останній будь-коли» і щодня писався сьогоднішньою датою.
+ */
+export async function readHealthKitWeights(from: Date, to: Date): Promise<{ samples: WeightSample[]; outcome: HKReadOutcome }> {
+  const sdk = getSDK();
+  if (!sdk) return { samples: [], outcome: { ok: false, queries: 0, failures: 0 } };
+  const stats = newStats();
+  const raw = await queryQuantitySamples(sdk, HK_QUANTITY.bodyMass, from, to, 200, 'kg', stats);
+  const samples: WeightSample[] = [];
+  for (const s of raw) {
+    const t = sampleTime(s);
+    const value = sampleValue(s);
+    if (!Number.isFinite(t) || !(value > 0)) continue;
+    const measuredAt = new Date(t).toISOString();
+    samples.push({
+      value,
+      measuredAt,
+      sourceKey: typeof s?.uuid === 'string' && s.uuid ? s.uuid : `${measuredAt}:${Math.round(value * 10)}`,
+    });
+  }
+  return { samples, outcome: outcomeOf(stats) };
+}
+
+/**
+ * Фонова доставка HealthKit (§9.1): кроки, сон, вага — раз на годину.
+ * Колбек викликається, коли в Health зʼявились нові дані; він сам вирішує,
+ * чи варто синкати (м'ютекс і тротлінг — у хуку). Гарантій від iOS немає.
+ */
+export async function enableHealthKitBackground(onChange: () => void): Promise<boolean> {
+  const sdk = getSDK();
+  if (!sdk) return false;
+  const HealthKit = (sdk as any).default ?? sdk;
+  const types = [HK_QUANTITY.steps, HK_QUANTITY.bodyMass, HK_SLEEP];
+  let any = false;
+  for (const id of types) {
+    try {
+      if (typeof HealthKit.enableBackgroundDelivery === 'function') {
+        // 2 = HKUpdateFrequency.hourly
+        await HealthKit.enableBackgroundDelivery(id, 2);
+      }
+      if (typeof HealthKit.subscribeToChanges === 'function') {
+        HealthKit.subscribeToChanges(id, () => { onChange(); });
+        any = true;
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('[HealthKit] background delivery failed:', id, e);
+    }
+  }
+  return any;
+}
+
 // ─── Today ────────────────────────────────────────────────────────────────────
 
 /**
  * Дані за сьогодні РАЗОМ із підсумком, чи вдалися запити (ERR-14).
  * Екран мусить малювати нулі лише тоді, коли `outcome.ok` — інакше це не
  * «нуль кроків», а «ми нічого не знаємо».
+ *
+ * Сон — лише ніч, що закінчилась сьогодні (вікно з sleepWindow), вага —
+ * останній замір РАЗОМ з його датою (`weightAt`): екран показує, коли саме
+ * зважувались, а в журнал вона йде лише через readHealthKitWeights.
  */
 export async function fetchTodayDataResult(): Promise<HKTodayResult> {
   const empty: HKDayData = {
@@ -323,61 +483,33 @@ export async function fetchTodayDataResult(): Promise<HKTodayResult> {
   const sdk = getSDK();
   if (!sdk) return { data: empty, outcome: { ok: false, queries: 0, failures: 0 } };
 
-  const from = startOfDay();
-  const to = new Date();
+  const now = new Date();
   const stats = newStats();
+  const [day, weightSample, flights] = await Promise.all([
+    readHealthKitDay(now, now),
+    queryMostRecent(sdk, HK_QUANTITY.bodyMass, 'kg', stats),
+    querySum(sdk, HK_QUANTITY.flights, startOfDay(now), now, 'count', stats),
+  ]);
+  stats.queries += day.outcome.queries;
+  stats.failures += day.outcome.failures;
 
-  const [steps, cal, hrSamples, restHRSample, weightSample, dist, sleepSamples] =
-    await Promise.all([
-      querySum(sdk, HK_QUANTITY.steps, from, to, 'count', stats),
-      queryEnergySum(sdk, HK_QUANTITY.activeEnergy, from, to, stats),
-      queryQuantitySamples(sdk, HK_QUANTITY.heartRate, from, to, 500, 'count/min', stats),
-      queryMostRecent(sdk, HK_QUANTITY.restingHeartRate, 'count/min', stats),
-      queryMostRecent(sdk, HK_QUANTITY.bodyMass, 'kg', stats),
-      queryDistance(sdk, from, to, stats),
-      queryCategorySamples(sdk, HK_SLEEP, startOfDay(new Date(Date.now() - 86400000)), to, 500, stats),
-    ]);
-
-  const hrValues = hrSamples
-    .map((sample: any) => Math.round(quantityValue(sample?.quantity)))
-    .filter((value: number) => value > 30 && value < 300);
-
-  const hrAvg = hrValues.length ? Math.round(hrValues.reduce((a: number, b: number) => a + b, 0) / hrValues.length) : null;
-  const hrMin = hrValues.length ? Math.min(...hrValues) : null;
-  const hrMax = hrValues.length ? Math.max(...hrValues) : null;
-
-  let restHR: number | null = null;
-  if (restHRSample) {
-    restHR = Math.round(quantityValue(restHRSample.quantity));
-  }
-
-  let weight: number | null = null;
-  if (weightSample) {
-    weight = Math.round(quantityValue(weightSample.quantity) * 10) / 10;
-  }
-
-  // Sleep — sum ASLEEP categories
-  const sleepMins = sleepSamples
-    .filter((s: any) => {
-      const v = s.value ?? s.categoryValue;
-      return v === 1 || v === 3 || v === 4 || v === 5;
-    })
-    .reduce((sum: number, s: any) => {
-      const ms = new Date(s.endDate).getTime() - new Date(s.startDate).getTime();
-      return sum + ms / 60000;
-    }, 0);
-
+  const r = day.read;
+  const weightTime = weightSample ? sampleTime(weightSample) : NaN;
   return {
     data: {
-      steps,
-      activeCalories: cal,
-      heartRateAvg: hrAvg,
-      heartRateMin: hrMin,
-      heartRateMax: hrMax,
-      restingHeartRate: restHR,
-      weight,
-      distanceKm: dist,
-      sleepMinutes: sleepMins > 0 ? Math.round(sleepMins) : null,
+      steps: r.steps ?? 0,
+      activeCalories: r.activeCalories ?? 0,
+      heartRateAvg: r.heartRateAvg,
+      heartRateMin: r.heartRateMin ?? null,
+      heartRateMax: r.heartRateMax ?? null,
+      restingHeartRate: r.restingHeartRate,
+      weight: weightSample ? Math.round(sampleValue(weightSample) * 10) / 10 : null,
+      weightAt: Number.isFinite(weightTime) ? new Date(weightTime).toISOString() : null,
+      distanceKm: r.distanceKm,
+      sleepMinutes: r.sleep?.total ?? null,
+      sleep: r.sleep,
+      flightsClimbed: flights > 0 ? flights : null,
+      spo2: r.spo2,
     },
     outcome: outcomeOf(stats),
   };
@@ -412,7 +544,7 @@ export async function fetchWeekData(): Promise<HKWeekDay[]> {
       .filter((value: number) => value > 30 && value < 300);
 
     return {
-      date: day.toISOString().slice(0, 10),
+      date: localDateKey(day),
       steps,
       activeCalories: cal,
       heartRateAvg: hrValues.length
@@ -465,3 +597,15 @@ export async function fetchWorkouts(limit = 20): Promise<HKWorkout[]> {
     return [];
   }
 }
+
+// ─── Реалізація спільного контракту ─────────────────────────────────────────
+
+export const healthKitSource: HealthSourceApi = {
+  source: 'healthkit',
+  label: 'Apple Health',
+  isAvailable: HK_AVAILABLE,
+  requestAccess: initHealthKit,
+  getAccess: getHealthKitAccess,
+  readDay: readHealthKitDay,
+  readWeights: readHealthKitWeights,
+};

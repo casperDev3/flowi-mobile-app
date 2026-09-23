@@ -618,7 +618,7 @@ Namespacing ключів **немає**: один workspace і один кори
 `sync_pending_conflicts`, `auth_user`, `data_owner`, `workspace_projects`,
 `project_sync_state_v1`, `project_members_v1`, `recent_projects`,
 `projects_migrated_v1`, `push_token_registered`, `pending_registration`,
-`gcal_refresh_token`, `gcal_last_sync`, `agent_config`, `banks_last_source`,
+`gcal_refresh_token`, `gcal_last_sync`, `banks_last_source`,
 `timer_dials`, `pref_task_reminders`; SecureStore `flowi_access`, `flowi_refresh`,
 `flowi_registration_token`; усі заплановані локальні нотифікації
 (`cancelAllScheduledNotificationsAsync`).
@@ -628,8 +628,13 @@ Namespacing ключів **немає**: один workspace і один кори
 `nav_collapsed_groups`, `health_chart_types`, `auto_backup_enabled`,
 `last_backup_at`, `storage_migrations_applied`. Файли авто-бекапів лишаються;
 відновлення бекапу в інший workspace — лише з явним підтвердженням.
-Веб: `flowi_access`, `flowi_refresh`, `agent_config`, `flowi_recent_projects`,
+Веб: `flowi_access`, `flowi_refresh`, `flowi_recent_projects`,
 (`flowi_workspace` — лише при зміні), дані в пам'яті скидаються перезавантаженням.
+
+> **Історичне.** У списку був ще `agent_config` (хост/порт/токен LLM-шлюзу)
+> модуля «Агент». Модуль видалено з обох платформ; ключ ніхто не пише, а
+> старі копії одноразово прибирає прибирання на старті —
+> `store/legacy-cleanup.ts` (mobile) і `lib/legacy-storage.ts` (web).
 
 ### 9.4 Вихід із проєкту / видалення / відкликання доступу
 Стерти локально всі записи з `projectId == P` у колекціях `project_collections`,

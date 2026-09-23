@@ -26,7 +26,6 @@ import {
   FlatList,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   type ListRenderItemInfo,
 } from 'react-native';
@@ -39,8 +38,8 @@ import { useContentWidth } from '@/hooks/use-content-width';
 import { useAllProjectMembers } from '@/hooks/use-project-members';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useToday } from '@/hooks/use-today';
-import { useTopInset } from '@/hooks/use-top-inset';
 import { useAuth } from '@/store/auth';
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { useI18n } from '@/store/i18n';
 import type { MemberOut } from '@/store/project-team';
 import { loadData } from '@/store/storage';
@@ -65,7 +64,6 @@ interface ProjectLite {
 }
 
 const STORAGE_KEYS = ['tasks', 'projects', 'sprints', 'task_statuses'] as const;
-const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
 /** Стабільне посилання для проєктів без кешу команди (соло). */
 const EMPTY_MEMBERS_LIST: MemberOut[] = [];
 
@@ -80,7 +78,6 @@ export default function TaskGroupScreen() {
   const { tr, lang } = useI18n();
   const { user } = useAuth();
   const today = useToday();
-  const topInset = useTopInset();
   const contentWidth = useContentWidth();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { show: showToast, element: toastElement } = useUndoToast(false);
@@ -231,27 +228,34 @@ export default function TaskGroupScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
-      <View style={[st.header, { paddingTop: topInset + 14 }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel={tr.back}
-          hitSlop={HIT}
-          style={[st.backBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-          <IconSymbol name="chevron.left" size={18} color={c.accent} />
-        </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text numberOfLines={1} accessibilityRole="header" style={[st.title, { color: c.text }]}>{title}</Text>
-          {group?.subtitle ? (
-            <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{group.subtitle}</Text>
-          ) : null}
-        </View>
-        {loaded ? (
+      {/* Екрана немає в сайдбарі — стрілка «Назад» тут не рудимент і
+          лишається на планшеті, а поруч із нею шлях «Завдання → добірка».
+          Підзаголовок добірки переїхав під заголовок (children хедера). */}
+      <ScreenHeader
+        title={title}
+        color={c.text}
+        titleStyle={st.title}
+        paddingBottom={14}
+        back={{
+          onPress: () => router.back(),
+          label: tr.back,
+          color: c.accent,
+          style: { backgroundColor: c.dim, borderColor: c.border },
+        }}
+        crumbs={[
+          { label: tr.tabTasks, onPress: () => router.push('/(tabs)') },
+          { label: title },
+        ]}
+        crumbColor={c.sub}
+        actions={loaded ? (
           <View style={[st.countBadge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50' }]}>
             <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{data.length}</Text>
           </View>
+        ) : undefined}>
+        {group?.subtitle ? (
+          <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12 }}>{group.subtitle}</Text>
         ) : null}
-      </View>
+      </ScreenHeader>
 
       <FlatList
         data={data}
@@ -276,9 +280,7 @@ export default function TaskGroupScreen() {
 }
 
 const st = StyleSheet.create({
-  header:     { paddingHorizontal: 20, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' },
   title:      { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  backBtn:    { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   countBadge: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4, marginLeft: 8 },
   separator:  { height: 6 },
 });

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -20,6 +20,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 
 import { MeetingFormSheet, MeetingFormData } from '@/components/shared/MeetingFormSheet';
 
@@ -42,7 +44,7 @@ import { MeetingDetailBody, MeetingDetailHeader } from '@/components/meetings/Me
 import { MeetingProjectChip, type MeetingChipProject } from '@/components/meetings/MeetingProjectChip';
 import { formatDuration } from '@/utils/durationFormat';
 import {
-  expandMeetings, findTimerForMeeting, meetingProject, resolveOriginalMeeting, withMeetingProject, withMeetingRecording, type Meeting,
+  expandMeetings, findTimerForMeeting, meetingProject, pickMeetingInstanceToOpen, resolveOriginalMeeting, withMeetingProject, withMeetingRecording, type Meeting,
 } from '@/utils/meetings';
 
 /** Мінімум проєкту для чипа й поля «Проєкт» форми. */
@@ -347,6 +349,9 @@ export default function MeetingsScreen() {
   const sheetSurface = useSheetSurface();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  // `?open=<id>` — deep link `ftrackingapp://meeting/{id}` / тап по сповіщенню
+  // (як `?open=` на нарадах проєкту).
+  const { open: openParam } = useLocalSearchParams<{ open?: string }>();
   const c = useColors(isDark);
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
@@ -946,6 +951,29 @@ export default function MeetingsScreen() {
   const handleCardDelete = useCallback((m: Meeting) => deleteMeeting(resolveOrig(m).id), [resolveOrig, deleteMeeting]);
   const handleCardRecord = useCallback((m: Meeting) => setRecordingMtgId(resolveOrig(m).id), [resolveOrig]);
 
+  // `?open=<id>`: щойно наради завантажились — переводимо календар на дату
+  // наради й відкриваємо її деталь. Параметр одразу скидаємо, щоб повернення
+  // на екран не відкривало її вдруге.
+  useEffect(() => {
+    if (!openParam || !initialized) return;
+    const target = pickMeetingInstanceToOpen(expandedMeetings, String(openParam), toDateStr(today));
+    if (target) {
+      const [y, mo, d] = target.date.split('-').map(Number);
+      const date = new Date(y, (mo || 1) - 1, d || 1);
+      if (!Number.isNaN(date.getTime())) {
+        setSelectedDay(target.date);
+        setWeekStart(getWeekStart(date));
+        setViewYear(date.getFullYear());
+        setViewMonth(date.getMonth());
+      }
+      setSelectedKey(target.id);
+    }
+    router.setParams({ open: '' });
+    // expandedMeetings/today навмисно поза deps: реагуємо лише на прихід
+    // параметра після завантаження.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openParam, initialized, router]);
+
   // Якщо зустріч видалили (або вона випала з розгорнутого діапазону) — вибір
   // сам зникає, і колонка повертається до підказки.
   const selectedMtg = useMemo(
@@ -1073,7 +1101,10 @@ export default function MeetingsScreen() {
           лишається модальним листом поверх списку. */}
       <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
       <View style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
+      {/* Без верхнього краю: інсет зверху тепер дає ScreenHeader через
+          useTopInset() (CLAUDE.md), і два джерела відступу разом зсували
+          шапку вниз на висоту статус-бара двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
 
         {/* Шапка, перемикачі та підсумки тримаються тієї самої колонки, що й
             список: інакше на планшеті вони розтягуються на всю ширину, поки
@@ -1081,30 +1112,43 @@ export default function MeetingsScreen() {
             змінюється. */}
         <View style={contentWidth}>
 
-          {/* ── Header ── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, gap: 10 }}>
-            <TouchableOpacity onPress={() => router.back()}
-              style={[s.hBtn, { borderColor: c.border, backgroundColor: c.dim }]}>
-              <IconSymbol name="chevron.left" size={18} color={c.sub} />
-            </TouchableOpacity>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>Зустрічі</Text>
-            </View>
-            <TouchableOpacity onPress={goToday}
-              style={[s.hBtn, { borderColor: isCurrentPeriod ? ACCENT + '50' : c.border, backgroundColor: isCurrentPeriod ? ACCENT + '14' : c.dim }]}>
-              <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? ACCENT : c.sub} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowGcalSheet(true)}
-              style={[s.hBtn, { borderColor: gcalToken ? '#34A853' + '50' : c.border, backgroundColor: gcalToken ? '#34A853' + '15' : c.dim }]}>
-              {gcalImporting
-                ? <ActivityIndicator size="small" color="#34A853" />
-                : <IconSymbol name={gcalToken ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={17} color={gcalToken ? '#34A853' : c.sub} />}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => openAdd()}
-              style={[s.hBtn, { borderColor: ACCENT + '50', backgroundColor: ACCENT + '14' }]}>
-              <IconSymbol name="plus" size={18} color={ACCENT} />
-            </TouchableOpacity>
-          </View>
+          {/* Заголовок був вшитий рядком «Зустрічі» — тепер зі словника.
+              Розділ є в сайдбарі, тож на планшеті ScreenHeader сам ховає
+              стрілку «Назад», а кнопки дій лишаються на місці. */}
+          <ScreenHeader
+            title={tr.meetings}
+            color={c.text}
+            back={{
+              onPress: () => router.back(),
+              label: tr.back,
+              color: c.sub,
+              style: { backgroundColor: c.dim, borderColor: c.border },
+            }}
+            actions={
+              <>
+                <HeaderButton
+                  onPress={goToday}
+                  accessibilityLabel={tr.today}
+                  style={{ borderColor: isCurrentPeriod ? ACCENT + '50' : c.border, backgroundColor: isCurrentPeriod ? ACCENT + '14' : c.dim }}>
+                  <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? ACCENT : c.sub} />
+                </HeaderButton>
+                <HeaderButton
+                  onPress={() => setShowGcalSheet(true)}
+                  accessibilityLabel="Google Calendar"
+                  style={{ borderColor: gcalToken ? '#34A853' + '50' : c.border, backgroundColor: gcalToken ? '#34A853' + '15' : c.dim }}>
+                  {gcalImporting
+                    ? <ActivityIndicator size="small" color="#34A853" />
+                    : <IconSymbol name={gcalToken ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={17} color={gcalToken ? '#34A853' : c.sub} />}
+                </HeaderButton>
+                <HeaderButton
+                  onPress={() => openAdd()}
+                  accessibilityLabel={tr.add}
+                  style={{ borderColor: ACCENT + '50', backgroundColor: ACCENT + '14' }}>
+                  <IconSymbol name="plus" size={18} color={ACCENT} />
+                </HeaderButton>
+              </>
+            }
+          />
 
           {/* ── Span tabs ── */}
           <View style={{ flexDirection: 'row', marginHorizontal: 16, marginBottom: 14, backgroundColor: c.dim, borderRadius: 13, padding: 3 }}>

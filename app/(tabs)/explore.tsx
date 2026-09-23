@@ -24,7 +24,6 @@ import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
 import { createSheetHandoff, openAfterModalExit } from '@/components/finance/sheetHandoff';
 import { UpcomingPaymentsCard, useUpcomingPayments } from '@/components/finance/UpcomingPaymentsCard';
 import { TransactionGroup } from '@/components/finance/TransactionGroup';
-import { MonthPicker } from '@/components/shared/MonthPicker';
 import { PickerField, type PickerOption } from '@/components/shared/PickerField';
 import { PressableScale } from '@/components/shared/PressableScale';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
@@ -43,8 +42,8 @@ import {
 } from '@/store/migrations';
 import { saveSynced, saveSyncedValue, updateSynced } from '@/store/synced-storage';
 import {
-  filterByMonth, groupTransactions, mergeTransactionsForSave, resolveAccountFilter,
-  calcTotalsByCurrency, formatCurrency,
+  groupTransactions, mergeTransactionsForSave, resolveAccountFilter,
+  formatCurrency,
   appendTransactionHistory, BUILTIN_CURRENCIES,
   type Currency, type Transaction, type TxHistoryEvent,
 } from '@/utils/financeUtils';
@@ -68,6 +67,25 @@ import {
 } from '@/utils/financeCategories';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { DetailPane } from '@/components/shared/DetailPane';
+import { categoryGroupLabel, costKindLabel, type FinColors } from '@/components/finance/financeLabels';
+import { AccountsTab } from '@/components/finance/AccountsTab';
+import { CategoryMetaEditor } from '@/components/finance/CategoryMetaEditor';
+import { FinanceFilterBar, FinanceTabBar } from '@/components/finance/FinanceSectionBar';
+import { OverviewTab } from '@/components/finance/OverviewTab';
+import { ReportsTab } from '@/components/finance/ReportsTab';
+import { useFinanceExtras } from '@/components/finance/useFinanceExtras';
+import { useFinanceFilter } from '@/components/finance/useFinanceFilter';
+import { useUiModules } from '@/store/ui-preferences';
+import { BudgetPanel } from '@/app/budget';
+import { SubscriptionsPanel } from '@/app/subscriptions';
+import { matchesMoneyScope } from '@/utils/budgetScope';
+import {
+  categoryMeta, isCategoryGroup, isCostKind, subscriptionCategoryNames, type CategoryGroup, type CostKind,
+} from '@/utils/finance/classify';
+import { inRange, monthsOf } from '@/utils/finance/period';
+import { calcPeriodTotalsByCurrency } from '@/utils/financePeriod';
+import { parseFinanceTab, visibleFinanceTabs, type FinanceTab } from '@/utils/financeTabs';
+import { formatSubscriptionMoney, parseDateKey } from '@/utils/subscriptions';
 
 /**
  * Категорії існують лише для доходів і витрат. Переказ категорії не має: він
@@ -130,6 +148,26 @@ export default function FinanceScreen() {
   const isDark = useColorScheme() === 'dark';
   useScreenView('finance');
   const insets = useSafeAreaInsets();
+  /**
+   * Вкладка розділу (finance-revamp.md §2). Живе в параметрі `?tab=`: сайдбар,
+   * deep link і «Змінити підписки» з попередження відкривають потрібну
+   * вкладку адресою. Прихована (вимкнений підмодуль) чи невідома → «Огляд».
+   */
+  const searchParams = useLocalSearchParams<{ create?: string; tab?: string }>();
+  const { disabledModules } = useUiModules();
+  const visibleTabs = useMemo(() => visibleFinanceTabs(disabledModules), [disabledModules]);
+  const [tab, setTab] = useState<FinanceTab>(() => parseFinanceTab(searchParams.tab, visibleTabs));
+  useEffect(() => {
+    setTab(prev => {
+      const next = searchParams.tab ? parseFinanceTab(searchParams.tab, visibleTabs) : prev;
+      return visibleTabs.includes(next) ? next : parseFinanceTab(undefined, visibleTabs);
+    });
+  }, [searchParams.tab, visibleTabs]);
+  const changeTab = useCallback((next: FinanceTab) => {
+    haptic.light();
+    setTab(next);
+    router.setParams({ tab: next });
+  }, []);
   const { tr, lang } = useI18n();
   // Найближчі й прострочені оплати підписок — блок під зведенням рахунків.
   const upcomingPayments = useUpcomingPayments();
@@ -159,7 +197,6 @@ export default function FinanceScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [filter, setFilter] = useState<'all' | CatType>('all');
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
-  const [activeMonth, setActiveMonth] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
   const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [selected, setSelected] = useState<Transaction | null>(null);
@@ -202,6 +239,15 @@ export default function FinanceScreen() {
   const [showCats, setShowCats] = useState(false);
   const [catTab, setCatTab] = useState<CatType>('expense');
   const [showAddCat, setShowAddCat] = useState(false);
+  /**
+   * Явні `group`/`cost` рядків `categories` за id (`${type}:${name}`). Мапа
+   * категорій екрана знає лише назву й іконку; без цієї пам'яті перший же
+   * запис категорій стер би групи, розставлені на вебі (§4.1: поля
+   * необов'язкові, і записувач зобов'язаний їх зберегти).
+   */
+  const [catMeta, setCatMeta] = useState<Record<string, { group?: CategoryGroup; cost?: CostKind }>>({});
+  /** Рядок категорії, у якого розгорнуто редактор групи/ознаки. */
+  const [metaOpenId, setMetaOpenId] = useState<string | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState<IconSymbolName>('ellipsis.circle.fill');
 
@@ -233,6 +279,17 @@ export default function FinanceScreen() {
   const [primaryCurrency, setPrimaryCurrency] = useState<string>('UAH');
   const [primaryCurrencyInitialized, setPrimaryCurrencyInitialized] = useState(false);
   const [showPrimaryPicker, setShowPrimaryPicker] = useState(false);
+  /** Спільний фільтр розділу: період · валюта · ракурс (§3). */
+  const finFilter = useFinanceFilter(primaryCurrency);
+  const { period, scope } = finFilter.filter;
+  /** Перший місяць періоду — для календаря-фільтра стрічки. */
+  const activeMonth = useMemo(() => {
+    const p = parseDateKey(period.from);
+    if (p) return new Date(p.y, p.m - 1, 1);
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  }, [period.from]);
+  const extras = useFinanceExtras();
 
   const allCurrencies = useMemo<Currency[]>(
     () => [...BUILTIN_CURRENCIES, ...customCurrencies],
@@ -330,7 +387,7 @@ export default function FinanceScreen() {
    */
   const trackWrite = useStorageRefresh(REFRESH_KEYS, reloadFromStorage, txsInitialized);
 
-  const { create: createParam } = useLocalSearchParams<{ create?: string }>();
+  const { create: createParam } = searchParams;
 
   /**
    * Операції записуємо, доливши те, що з'явилось у сховищі повз екран.
@@ -372,7 +429,17 @@ export default function FinanceScreen() {
       // Провал читання НЕ вмикає catsInitialized: інакше наступний ефект
       // записав би дефолтні категорії поверх власних (ERR-01).
       if (!r.ok) return;
-      setCats(categoryRowsToMap(Array.isArray(r.value) ? r.value : [], DEFAULT_CATEGORIES));
+      const rows = Array.isArray(r.value) ? r.value : [];
+      setCats(categoryRowsToMap(rows, DEFAULT_CATEGORIES));
+      const meta: Record<string, { group?: CategoryGroup; cost?: CostKind }> = {};
+      for (const row of rows as (CategoryRow & { group?: unknown; cost?: unknown })[]) {
+        if (!row || typeof row.id !== 'string') continue;
+        const entry: { group?: CategoryGroup; cost?: CostKind } = {};
+        if (isCategoryGroup(row.group)) entry.group = row.group;
+        if (isCostKind(row.cost)) entry.cost = row.cost;
+        if (entry.group || entry.cost) meta[row.id] = entry;
+      }
+      setCatMeta(meta);
       setCatsInitialized(true);
     });
   }, []);
@@ -380,10 +447,11 @@ export default function FinanceScreen() {
   // Save categories
   useEffect(() => {
     if (catsInitialized) {
-      void saveSynced('categories', categoryMapToRows(cats))
+      const rows = categoryMapToRows(cats).map(row => ({ ...row, ...(catMeta[row.id] ?? {}) }));
+      void saveSynced('categories', rows)
         .catch(e => { if (__DEV__) console.warn('[finance] запис категорій не вдався:', e); });
     }
-  }, [cats, catsInitialized]);
+  }, [cats, catsInitialized, catMeta]);
 
   // Load custom currencies
   useEffect(() => {
@@ -528,19 +596,27 @@ export default function FinanceScreen() {
     [],
   );
 
-  const monthTxs = useMemo(() => filterByMonth(txs, activeMonth), [txs, activeMonth]);
+  // Стрічка — за ПЕРІОДОМ і РАКУРСОМ спільного фільтра (§3.2): ракурс звужує
+  // оборот, але не баланси рахунків.
+  const monthTxs = useMemo(
+    () => txs.filter(t => inRange(t.date, period) && matchesMoneyScope(t, scope)),
+    [txs, period, scope],
+  );
   const monthHasTransfers = useMemo(() => monthTxs.some(t => t.type === 'transfer'), [monthTxs]);
 
   // Оборот рахуємо по тому самому зрізу, який видно у стрічці: інакше вибраний
   // рахунок фільтрував би операції, а цифри згори лишалися б від усіх разом.
   const totalsSource = useMemo(
-    () => (accountFilter ? txs.filter(t => touchesAccount(t, accountFilter)) : txs),
-    [txs, accountFilter, touchesAccount],
+    () => {
+      const scoped = scope === 'all' ? txs : txs.filter(t => matchesMoneyScope(t, scope));
+      return accountFilter ? scoped.filter(t => touchesAccount(t, accountFilter)) : scoped;
+    },
+    [txs, accountFilter, touchesAccount, scope],
   );
   const totalsByCurrency = useMemo(
     // Валюта — за РАХУНКОМ (resolveTxCurrency), як і на плитці «Сьогодні».
-    () => calcTotalsByCurrency(totalsSource, activeMonth, t => resolveTxCurrency(t, accounts)),
-    [totalsSource, activeMonth, accounts],
+    () => calcPeriodTotalsByCurrency(totalsSource, period, t => resolveTxCurrency(t, accounts)),
+    [totalsSource, period, accounts],
   );
 
   const filtered = useMemo(() => monthTxs.filter(t => {
@@ -1018,6 +1094,27 @@ export default function FinanceScreen() {
 
   const txDetailScrollRef = useRef<ScrollView>(null);
 
+  /** Палітра вкладок розділу — з тих самих кольорів екрана. */
+  const finColors = useMemo<FinColors>(
+    () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: c.card, accent: c.accent, green: c.green, red: c.red, sheet: c.sheet }),
+    [c.text, c.sub, c.border, c.dim, c.card, c.accent, c.green, c.red, c.sheet],
+  );
+  /** Суми у вкладках: копійки не відкидаються, невідомий код — через символ. */
+  const money = useCallback(
+    (n: number, code: string) => formatSubscriptionMoney(n, code, allCurrencies, locale),
+    [allCurrencies, locale],
+  );
+  /** Валюти для фільтра: основна першою, далі ті, у яких є рахунки чи операції. */
+  const filterCurrencies = useMemo(() => {
+    const set = new Set<string>([primaryCurrency, finFilter.filter.currency]);
+    for (const a of accounts) if (!a.archived) set.add(a.currency || 'UAH');
+    for (const t of txs) if (t.type !== 'transfer') set.add(resolveTxCurrency(t, accounts));
+    return [...set].filter(Boolean);
+  }, [primaryCurrency, finFilter.filter.currency, accounts, txs]);
+  const budgetMonths = useMemo(() => monthsOf(period), [period]);
+  /** Правило «категорія підписки → fixed» — щоб редактор категорій показував ту саму ознаку, що звіти. */
+  const subscriptionFixedNames = useMemo(() => subscriptionCategoryNames(extras.subscriptions), [extras.subscriptions]);
+
   const groupColors = useMemo(
     () => ({ sub: c.sub, text: c.text, green: c.green, red: c.red, border: c.border, dim: c.dim, neutral: c.neutral }),
     [c.sub, c.text, c.green, c.red, c.border, c.dim, c.neutral],
@@ -1408,7 +1505,7 @@ export default function FinanceScreen() {
         <ScreenHeader
           title={tr.finance}
           color={c.text}
-          actions={
+          actions={tab !== 'transactions' ? undefined :
             <>
               <HeaderButton
                 onPress={() => setCompact(v => !v)}
@@ -1424,20 +1521,84 @@ export default function FinanceScreen() {
               </HeaderButton>
             </>
           }>
-          <MonthPicker
-            month={activeMonth}
-            onChange={m => { setActiveMonth(m); setDateFilter(null); }}
-            months={tr.months}
-            monthsShort={tr.monthsShort}
-            monthsGenitive={tr.monthsGenitive}
-            accentColor={c.accent}
-            textColor={c.text}
-            subColor={c.sub}
-            dimColor={c.dim}
-            borderColor={c.border}
+          <FinanceTabBar tabs={visibleTabs} active={tab} onChange={changeTab} c={finColors} tr={tr} />
+          <FinanceFilterBar
+            filter={finFilter.filter}
+            currencies={filterCurrencies}
+            onPeriod={p => { finFilter.setPeriod(p); setDateFilter(null); }}
+            onCurrency={code => finFilter.setCurrency(code === primaryCurrency ? null : code)}
+            onScope={finFilter.setScope}
+            showScope={tab !== 'accounts' && tab !== 'subscriptions'}
+            c={finColors}
+            tr={tr}
+            locale={locale}
+            isDark={isDark}
           />
         </ScreenHeader>
 
+        {tab === 'overview' ? (
+          <OverviewTab
+            transactions={txs}
+            accounts={accounts}
+            categoryRows={extras.categoryRows}
+            subscriptions={extras.subscriptions}
+            recurringIncomes={extras.recurringIncomes}
+            filter={finFilter.filter}
+            primary={primaryCurrency}
+            overview={overview}
+            money={money}
+            c={finColors}
+            tr={tr}
+            locale={locale}
+            isWide={isWide}
+            bottomInset={tabBarInset + 64}
+            onOpenUnassigned={() => { setUnassignedOnly(true); changeTab('transactions'); }}
+            onOpenSubscriptions={() => changeTab(visibleTabs.includes('subscriptions') ? 'subscriptions' : 'overview')}
+            onOpenAccount={showBreakdown}
+          />
+        ) : tab === 'reports' ? (
+          <ReportsTab
+            transactions={txs}
+            accounts={accounts}
+            categoryRows={extras.categoryRows}
+            subscriptions={extras.subscriptions}
+            filter={finFilter.filter}
+            primary={primaryCurrency}
+            money={money}
+            c={finColors}
+            tr={tr}
+            locale={locale}
+            isWide={isWide}
+            bottomInset={tabBarInset + 64}
+            onAssignCategories={() => { setCatTab('expense'); setShowCats(true); }}
+          />
+        ) : tab === 'budget' ? (
+          <BudgetPanel
+            embedded={{
+              month: activeMonth,
+              months: budgetMonths,
+              scope,
+              bottomInset: tabBarInset,
+            }}
+          />
+        ) : tab === 'subscriptions' ? (
+          <SubscriptionsPanel embedded={{ bottomInset: tabBarInset }} />
+        ) : tab === 'accounts' ? (
+          <AccountsTab
+            accounts={accounts}
+            overview={overview}
+            money={money}
+            kindLabel={kindLabel}
+            c={finColors}
+            tr={tr}
+            isWide={isWide}
+            bottomInset={tabBarInset + 64}
+            onOpenAccount={showBreakdown}
+            onEditAccount={account => openAccountForm(account)}
+            onNewAccount={() => openAccountForm(null)}
+            onOpenBanks={() => router.push('/banks' as never)}
+          />
+        ) : (
         <FlatList
           data={groups}
           keyExtractor={group => group.dateStr}
@@ -1447,9 +1608,12 @@ export default function FinanceScreen() {
           ListHeaderComponent={listHeader}
           renderItem={renderGroup}
         />
+        )}
       </View>
 
-      {/* FAB */}
+      {/* FAB «+ Операція». На «Бюджеті» й «Підписках» у вкладки своя дія
+          «додати», і друга кнопка поверх неї лише заступала б список. */}
+      {tab !== 'budget' && tab !== 'subscriptions' ? (
       <PressableScale
         onPress={() => { haptic.medium(); openAdd(); }}
         accessibilityRole="button"
@@ -1458,6 +1622,7 @@ export default function FinanceScreen() {
         style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
         <IconSymbol name="plus" size={26} color="#fff" />
       </PressableScale>
+      ) : null}
       </View>
 
       <DetailPane
@@ -2003,17 +2168,30 @@ export default function FinanceScreen() {
                     {cats[catTab].map((cat, idx) => {
                       const isLast = idx === cats[catTab].length - 1;
                       const isDefault = DEFAULT_CATEGORIES[catTab].some(d => d.name === cat.name);
+                      const rowId = `${catTab}:${cat.name}`;
+                      const explicit = catMeta[rowId] ?? {};
+                      const meta = categoryMeta({ type: catTab, name: cat.name, ...explicit }, { fixedByReference: subscriptionFixedNames });
+                      const metaOpen = metaOpenId === rowId;
                       return (
                         <View
                           key={cat.name}
-                          style={[
-                            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7 },
-                            !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
-                          ]}>
+                          style={!isLast ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border } : undefined}>
+                        <View
+                          style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7 }}>
                           <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.accent + '18', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
                             <IconSymbol name={cat.icon} size={13} color={c.accent} />
                           </View>
-                          <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{cat.name}</Text>
+                          <TouchableOpacity
+                            onPress={() => setMetaOpenId(metaOpen ? null : rowId)}
+                            accessibilityRole="button"
+                            accessibilityState={{ expanded: metaOpen }}
+                            accessibilityLabel={`${cat.name}: ${categoryGroupLabel(meta.group, tr)}${catTab === 'expense' ? `, ${costKindLabel(meta.cost, tr)}` : ''}`}
+                            style={{ flex: 1, minHeight: 36, justifyContent: 'center' }}>
+                            <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{cat.name}</Text>
+                            <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>
+                              {categoryGroupLabel(meta.group, tr)}{catTab === 'expense' ? ` · ${costKindLabel(meta.cost, tr)}` : ''}
+                            </Text>
+                          </TouchableOpacity>
                           {isDefault
                             ? <View style={{ backgroundColor: c.dim, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
                                 <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600' }}>{tr.defaultCategory}</Text>
@@ -2027,9 +2205,22 @@ export default function FinanceScreen() {
                               </TouchableOpacity>
                           }
                         </View>
+                        {metaOpen ? (
+                          <CategoryMetaEditor
+                            type={catTab}
+                            group={meta.group}
+                            cost={meta.cost}
+                            onGroup={group => setCatMeta(prev => ({ ...prev, [rowId]: { ...prev[rowId], group } }))}
+                            onCost={cost => setCatMeta(prev => ({ ...prev, [rowId]: { ...prev[rowId], cost } }))}
+                            c={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent }}
+                            tr={tr}
+                          />
+                        ) : null}
+                        </View>
                       );
                     })}
                   </View>
+                  <Text style={{ color: c.sub, fontSize: 11, marginTop: -6, marginBottom: 14 }}>{tr.finCatMetaHint}</Text>
 
                   {/* Add new category */}
                   {showAddCat ? (

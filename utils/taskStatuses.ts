@@ -424,7 +424,53 @@ export function boardColumnForTask(
   const direct = findScopedColumn(task.kanbanColumnId, boardColumns, allColumns);
   // Зведений особистий id не має права суперечити верхньорівневому status.
   if (direct && (direct.isDone === (task.status === 'done') || direct.id === task.kanbanColumnId)) return direct;
-  return boardColumns.find(column => column.isDone === (task.status === 'done')) ?? boardColumns[0];
+  const byDone = boardColumns.find(column => column.isDone === (task.status === 'done'));
+  if (byDone) return byDone;
+  // ЯВНИЙ останній запобіжник, а не мовчазне «хай буде перша».
+  //
+  // Саме мовчазність тут і ховала справжні помилки запису: задача, якій ніхто
+  // не проставив `kanbanColumnId` (швидке додавання в проєкті без власних
+  // колонок), виглядала на дошці точнісінько як задача, свідомо покладена в
+  // «До роботи», — і промах було видно лише тоді, коли колонки проєкту
+  // з'являлись і задача «перестрибувала». Тепер у dev це чути в консолі, а
+  // місця запису зобов'язані ставити колонку самі (див.
+  // `ensureProjectColumns` в `app/project/[id]/tasks.tsx`).
+  if (__DEV__) {
+    console.warn(
+      `[taskStatuses] boardColumnForTask: колонка «${task.kanbanColumnId ?? '—'}» ` +
+      `не зводиться ні до чого в цьому наборі (status=${task.status}) — ` +
+      `показуємо в «${boardColumns[0].name}»`,
+    );
+  }
+  return boardColumns[0];
+}
+
+/**
+ * Особистий id статусу для СПІЛЬНОЇ форми завдання.
+ *
+ * Пікер «Статус» у повній формі (`app/(tabs)/index.tsx`) пропонує ЛИШЕ
+ * особисті колонки (§3.7) — навіть коли у формі обрано проєкт. Тому колонка
+ * проєкту, з якої форму відкрили («+» у шапці колонки дошки), мусить спершу
+ * звестись до «тієї самої за змістом» особистої, інакше `draft.statusId` не
+ * знаходиться серед варіантів і форма мовчки падає на перший з них.
+ *
+ * Зворотний хід робить `projectEquivalentColumn()` при збереженні — саме він
+ * повертає задачу в колонку потрібного проєкту.
+ */
+export function personalStatusIdFor(
+  columnId: string | undefined,
+  allColumns: readonly TaskStatusColumn[],
+  fallbackId: string = ACTIVE_COLUMN_ID,
+): string {
+  const personal = mergeTaskStatusColumns([...allColumns]);
+  const fallback = personal.find(column => column.id === fallbackId)?.id ?? personal[0]?.id ?? fallbackId;
+  if (!columnId) return fallback;
+  if (personal.some(column => column.id === columnId)) return columnId;
+  const projectColumn = allColumns.find(column => column.id === columnId && column.projectId);
+  if (!projectColumn) return fallback;
+  const scoped = mergeTaskStatusColumns([...allColumns], projectColumn.projectId);
+  const resolved = scoped.find(column => column.id === columnId) ?? projectColumn;
+  return (personalForProjectColumn(resolved, personal) ?? displayFallbackPersonal(resolved, personal))?.id ?? fallback;
 }
 
 /**

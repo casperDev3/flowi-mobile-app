@@ -1,12 +1,33 @@
+/**
+ * app/(tabs)/health.tsx — розділ «Здоровʼя» однією сторінкою з вкладками.
+ *
+ * Було: хаб із дев'ятьма плитками, вісім окремих екранів `app/health-*.tsx` і
+ * ще три пункти сайдбара («Зведення здоровʼя», «Профіль здоровʼя»,
+ * «Профілактика»). Один розділ жив у чотирьох місцях меню, а щоб порівняти сон
+ * із кроками, треба було двічі повернутись назад через хаб.
+ *
+ * Стало: один пункт меню й шість вкладок — Огляд · Харчування · Активність і
+ * тренування · Сон · Тіло і вітальні · Профілактика. Старі маршрути лишились
+ * живими редиректами (`app/health-summary.tsx` і решта), бо на них ведуть
+ * нагадування, закладки й нотифікації.
+ *
+ * Профіль і джерела даних (Apple Health) — НЕ вкладка, а налаштування розділу
+ * за шестернею: туди ходять раз на місяць, а вкладка коштує стільки ж місця,
+ * скільки щоденна.
+ *
+ * Тренування лишились ОКРЕМИМ розділом: це майбутній модуль із групами й
+ * програмами, тож вкладка «Активність і тренування» показує їхнє зведення і
+ * веде туди, а не втягує його в себе.
+ */
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Modal,
   Platform,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,50 +35,63 @@ import {
   View,
 } from 'react-native';
 
+import { HealthTabBar, type HealthTabId, parseHealthTab } from '@/components/health/HealthTabs';
 import { QuickAddSheet, QuickRecord } from '@/components/health/QuickAddSheet';
-import { HubTile } from '@/components/health/HubTile';
-import { RingCell } from '@/components/health/RingCell';
+import { ActivityTab } from '@/components/health/tabs/ActivityTab';
+import { BodyTab } from '@/components/health/tabs/BodyTab';
+import { NutritionTab } from '@/components/health/tabs/NutritionTab';
+import { OverviewTab } from '@/components/health/tabs/OverviewTab';
+import { PreventionTab } from '@/components/health/tabs/PreventionTab';
+import { SleepTab } from '@/components/health/tabs/SleepTab';
 import { MonthPicker } from '@/components/shared/MonthPicker';
-import { ScreenHeader } from '@/components/shared/ScreenHeader';
-import { SkeletonCard } from '@/components/shared/Skeleton';
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { sheetSurfaceStyle } from '@/hooks/use-content-width';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useScreenView } from '@/hooks/use-screen-view';
-import { loadData } from '@/store/storage';
+import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
+import { loadData } from '@/store/storage';
 import { isSameDay } from '@/utils/dateUtils';
 import {
-  ACCENT, ACCENT_CAL, ACCENT_MOOD, ACCENT_PROT, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
-  HEALTH_ACCENTS, fmtSleep, getHealthColors,
+  ACCENT, ACCENT_CAL, ACCENT_MOOD, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
+  fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
-import { HealthEntry, getMonthEntries, getWeeklyInsights } from '@/utils/healthUtils';
-import { useResponsive } from '@/hooks/use-responsive';
-import { sheetSurfaceStyle } from '@/hooks/use-content-width';
-import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
-import { LoadErrorNotice } from '@/components/health/HealthNotices';
+import { HealthEntry, getMonthEntries } from '@/utils/healthUtils';
 
 export default function HealthHubScreen() {
-  const { sizeClass } = useResponsive();
-  // Дві колонки на телефоні, три на середньому вікні, чотири на широкому.
-  const tileColumns = sizeClass === 'expanded' ? 4 : sizeClass === 'medium' ? 3 : 2;
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const c = getHealthColors(isDark);
-  useScreenView('health_hub');
+
+  /**
+   * Вкладка живе у стані, а параметр адреси лише СТАВИТЬ її.
+   *
+   * Так працюють обидва входи: тап по смузі перемикає миттєво й не залежить
+   * від навігатора, а глибоке посилання (`?tab=sleep` із нагадування або з
+   * редиректу старого маршруту) доїжджає ефектом нижче.
+   */
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<HealthTabId>(() => parseHealthTab(tabParam));
+  useEffect(() => {
+    if (tabParam === undefined) return;
+    setTab(parseHealthTab(tabParam));
+  }, [tabParam]);
+
+  useScreenView(`health_${tab}`);
 
   const h = useHealthEntries();
-  const { today, goals, cal, latestWeight, bmi, bmiCategory, profile } = h;
 
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeMonth, setActiveMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [historyOpen, setHistoryOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [activeMonth, setActiveMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
 
-  // Лічильник «на сьогодні» для плитки Профілактики (невипиті ліки)
+  // Лічильник «на сьогодні» для бейджа вкладки Профілактики (невипиті ліки).
   const [medsDue, setMedsDue] = useState(0);
   const loadMedsDue = useCallback(async () => {
     const meds = await loadData<any[]>('health_meds', []);
@@ -70,185 +104,40 @@ export default function HealthHubScreen() {
     });
     setMedsDue(due);
   }, []);
-  useEffect(() => { loadMedsDue(); }, [loadMedsDue]);
-
-  // Лічильник звичок «сьогодні» для плитки Звичок
-  const [habitsTotal, setHabitsTotal] = useState(0);
-  const [habitsDone, setHabitsDone] = useState(0);
-  const loadHabits = useCallback(async () => {
-    const habits = await loadData<any[]>('health_habits', []);
-    const todayDate = new Date();
-    const done = habits.filter(h =>
-      (h.log ?? []).some((l: string) => isSameDay(new Date(l), todayDate))
-    ).length;
-    setHabitsTotal(habits.length);
-    setHabitsDone(done);
-  }, []);
-  useEffect(() => { loadHabits(); }, [loadHabits]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([h.reload(), loadMedsDue(), loadHabits()]);
-    setRefreshing(false);
-  }, [h, loadMedsDue, loadHabits]);
+  useEffect(() => { void loadMedsDue(); }, [loadMedsDue, tab]);
 
   const onQuickSubmit = (records: QuickRecord[]) => records.forEach(r => h.addEntry({ type: r.type, value: r.value }));
-
-  const bmiColor = (b: number) => {
-    const cat = bmiCategory(b);
-    return cat === 'normal' ? ACCENT : cat === 'underweight' ? ACCENT_STEPS : cat === 'overweight' ? ACCENT_MOOD : ACCENT_PULSE;
-  };
-
-  const stepsStat = today.steps >= 1000 ? `${(today.steps / 1000).toFixed(1)}т кр` : `${today.steps} кр`;
-
-  const insights = useMemo(() => getWeeklyInsights(h.entries).slice(0, 2), [h.entries]);
-  const insightLabel: Record<string, string> = { steps: tr.steps, sleep: tr.sleep, water: tr.water, calories: tr.calories };
-
-  // Розділи здоровʼя одним списком: до цього вони були вшиті парами в
-  // рядки, тож змінити кількість колонок означало переписати розмітку.
-  const tiles = useMemo(() => [
-    { route: '/workouts',         title: tr.workoutsLabel,     icon: 'figure.run'      as const, color: ACCENT_STEPS,
-      hint: tr.workoutsSub },
-    { route: '/health-nutrition', title: tr.nutrition,         icon: 'flame.fill'      as const, color: ACCENT_CAL,
-      stat: `${cal.net} / ${goals.calories} ${tr.unitKcal}` },
-    { route: '/health-activity',  title: tr.activity,          icon: 'figure.walk'     as const, color: ACCENT_STEPS,
-      stat: stepsStat },
-    { route: '/health-sleep',     title: tr.sleepRecovery,     icon: 'moon.fill'       as const, color: ACCENT_SLEEP,
-      stat: today.sleep ? fmtSleep(today.sleep) : tr.noData },
-    { route: '/health-vitals',    title: tr.bodyMetrics,       icon: 'heart.fill'      as const, color: ACCENT_PULSE,
-      stat: latestWeight ? `${latestWeight} ${tr.unitKg} · ${bmi ? bmi.toFixed(1) : '—'}` : tr.noData },
-    { route: '/health-prevention',title: tr.prevention,        icon: 'cross.case.fill' as const, color: HEALTH_ACCENTS.prevention,
-      hint: tr.medsSub, badge: medsDue },
-    { route: '/health-body',      title: tr.bodyMeasurements,  icon: 'ruler.fill'      as const, color: ACCENT_WEIGHT,
-      stat: latestWeight ? `${latestWeight} ${tr.unitKg}` : tr.bodyMeasurementsSub },
-    { route: '/health-profile',   title: tr.healthProfile,     icon: 'person.fill'     as const, color: ACCENT_PROT,
-      hint: profile ? `${goals.calories} ${tr.unitKcal} · ${goals.protein} ${tr.unitGram}` : tr.profileHint },
-    { route: '/health-habits',    title: tr.habits,            icon: 'star.fill'       as const, color: '#F59E0B',
-      stat: habitsTotal > 0 ? `${habitsDone}/${habitsTotal}` : undefined,
-      hint: habitsTotal === 0 ? tr.habitsSub : undefined },
-  ], [tr, cal.net, goals, stepsStat, today.sleep, latestWeight, bmi, medsDue, profile, habitsDone, habitsTotal]);
 
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <View style={{ flex: 1 }}>
 
-        <ScreenHeader title={tr.health} color={c.text} />
-
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset + 32 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
-
-          {/* ERR-01: якщо читання провалилось, initialized НЕ вмикається —
-              без цієї гілки екран крутив би скелетони нескінченно, а людина
-              думала б, що дані «ще вантажаться». */}
-          {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
-
-          {/* Skeleton — перший завантаження */}
-          {!h.initialized && !h.loadFailed && (
+        <ScreenHeader
+          title={tr.health}
+          color={c.text}
+          actions={
             <>
-              <SkeletonCard style={{ marginTop: 4 }} />
-              <SkeletonCard />
-              <SkeletonCard />
+              <HeaderButton onPress={() => setHistoryOpen(true)} accessibilityLabel={tr.history}
+                style={{ borderColor: c.border, backgroundColor: c.dim }}>
+                <IconSymbol name="clock.arrow.circlepath" size={17} color={c.text} />
+              </HeaderButton>
+              {/* Налаштування розділу: профіль здоровʼя і джерела даних. */}
+              <HeaderButton onPress={() => router.push('/health-profile')} accessibilityLabel={tr.settings}
+                style={{ borderColor: c.border, backgroundColor: c.dim }}>
+                <IconSymbol name="gearshape.fill" size={17} color={c.text} />
+              </HeaderButton>
             </>
-          )}
+          }>
+          <HealthTabBar value={tab} onChange={setTab} tr={tr} c={c} preventionBadge={medsDue} />
+        </ScreenHeader>
 
-          {/* Профіль-підказка */}
-          {h.initialized && !profile && (
-            <TouchableOpacity onPress={() => router.push('/health-profile')} activeOpacity={0.85} style={{ marginBottom: 14 }}>
-              <LinearGradient colors={isDark ? ['#0c1a14', '#10241c'] : ['#e9fbf3', '#d8f5e8']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.banner, { borderColor: ACCENT + '40' }]}>
-                <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="person.fill" size={18} color={ACCENT} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '800' }}>{tr.healthProfile}</Text>
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.profileHint}</Text>
-                </View>
-                <IconSymbol name="chevron.right" size={13} color={c.sub} />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          {/* Зведена статистика → окрема сторінка з графіками */}
-          <TouchableOpacity onPress={() => router.push('/health-summary')} activeOpacity={0.85}
-            accessibilityRole="button" accessibilityLabel={tr.healthSummary}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <Text style={[s.kicker, { color: c.sub, marginBottom: 0 }]}>{tr.summary}</Text>
-            <View style={{ flex: 1 }} />
-            <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700', marginRight: 2 }}>{tr.dynamics}</Text>
-            <IconSymbol name="chevron.right" size={12} color={ACCENT} />
-          </View>
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 16 }]}>
-            <View style={{ flexDirection: 'row', gap: 4 }}>
-              <RingCell pct={goals.calories ? Math.max(0, cal.net) / goals.calories : 0} color={ACCENT_CAL} label={tr.calories} value={`${cal.net}кк`} />
-              <RingCell pct={today.steps / goals.steps} color={ACCENT_STEPS} label={tr.steps}
-                value={today.steps >= 1000 ? `${(today.steps / 1000).toFixed(1)}т` : `${today.steps}`} />
-              <RingCell pct={today.water / goals.water} color={ACCENT} label={tr.water}
-                value={today.water >= 1000 ? `${(today.water / 1000).toFixed(1)}л` : `${today.water}мл`} />
-              <RingCell pct={today.sleep ? today.sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep}
-                value={today.sleep ? fmtSleep(today.sleep) : '—'} />
-            </View>
-            <View style={{ flexDirection: 'row', marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }}>
-              <VitalMini label={tr.weight} value={latestWeight ? `${latestWeight} кг` : '—'} color={ACCENT_WEIGHT} sub={c.sub} text={c.text} />
-              <VitalMini label={tr.bmi} value={bmi ? bmi.toFixed(1) : '—'} color={bmi ? bmiColor(bmi) : c.sub} sub={c.sub} text={c.text} />
-              <VitalMini label={tr.pulse} value={today.pulse ? `${today.pulse}` : '—'} color={ACCENT_PULSE} sub={c.sub} text={c.text} />
-              <VitalMini label={tr.protein} value={`${Math.round(today.protein)}г`} color={ACCENT_PROT} sub={c.sub} text={c.text} />
-            </View>
-          </BlurView>
-          </TouchableOpacity>
-
-          {/* Інсайти тижня */}
-          {insights.length > 0 && (
-            <>
-              <Text style={[s.kicker, { color: c.sub }]}>{tr.insights}</Text>
-              <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 16, paddingVertical: 6 }]}>
-                {insights.map((ins, i) => {
-                  const up = ins.deltaPct > 0;
-                  const col = ins.good ? ACCENT : ACCENT_PULSE;
-                  return (
-                    <View key={ins.type} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 9,
-                      borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth, borderTopColor: c.border }}>
-                      <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: col + '20', alignItems: 'center', justifyContent: 'center' }}>
-                        <IconSymbol name={up ? 'arrow.up.right' : 'arrow.down.right'} size={13} color={col} />
-                      </View>
-                      <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginLeft: 10, flex: 1 }}>{insightLabel[ins.type]}</Text>
-                      <Text style={{ color: col, fontSize: 13, fontWeight: '800' }}>{up ? '+' : ''}{ins.deltaPct}%</Text>
-                      <Text style={{ color: c.sub, fontSize: 11, marginLeft: 6 }}>{tr.thisWeek}</Text>
-                    </View>
-                  );
-                })}
-              </BlurView>
-            </>
-          )}
-
-          {/* Розділи */}
-          <Text style={[s.kicker, { color: c.sub }]}>{tr.sections}</Text>
-          {/* Плитки розділів. Кількість колонок від ширини вікна: на
-              планшеті два стовпці дали б плитки завширшки з пів екрана
-              при висоті 112pt — смуги, а не картки. */}
-          <View style={s.tileGrid}>
-            {tiles.map(tile => (
-              <View key={tile.route} style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
-                <HubTile
-                  title={tile.title}
-                  icon={tile.icon}
-                  color={tile.color}
-                  stat={tile.stat}
-                  hint={tile.hint}
-                  badge={tile.badge}
-                  onPress={() => router.push(tile.route as never)}
-                  isDark={isDark}
-                  border={c.border}
-                  text={c.text}
-                  sub={c.sub}
-                />
-              </View>
-            ))}
-          </View>
-
-        </ScrollView>
+        {tab === 'overview'   && <OverviewTab h={h} />}
+        {tab === 'nutrition'  && <NutritionTab h={h} />}
+        {tab === 'activity'   && <ActivityTab h={h} />}
+        {tab === 'sleep'      && <SleepTab h={h} />}
+        {tab === 'body'       && <BodyTab h={h} />}
+        {tab === 'prevention' && <PreventionTab h={h} />}
       </View>
 
       {/* FAB → нижній попап швидкого вводу */}
@@ -269,23 +158,17 @@ export default function HealthHubScreen() {
 
       <HistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)}
         entries={h.entries} activeMonth={activeMonth} setActiveMonth={setActiveMonth}
+        onDelete={h.deleteEntry}
         isDark={isDark} c={c} tr={tr} locale={locale} />
     </View>
   );
 }
 
-function VitalMini({ label, value, color, sub, text }: { label: string; value: string; color: string; sub: string; text: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ color, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>{value}</Text>
-      <Text style={{ color: sub, fontSize: 10, fontWeight: '600', marginTop: 2 }}>{label}</Text>
-    </View>
-  );
-}
-
-function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, isDark, c, tr, locale }: {
+function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onDelete, isDark, c, tr, locale }: {
   open: boolean; onClose: () => void; entries: HealthEntry[];
   activeMonth: Date; setActiveMonth: (d: Date) => void;
+  /** h.deleteEntry: автоматичний запис ще й потрапляє в тумбстоуни, щоб синк його не повернув. */
+  onDelete: (id: string) => void;
   isDark: boolean; c: any; tr: any; locale: string;
 }) {
   const { height } = useResponsive();
@@ -337,6 +220,16 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, isD
                         <View style={[s.badge, { backgroundColor: cfg.color + '18', borderColor: cfg.color + '35' }]}>
                           <Text style={{ color: cfg.color, fontSize: 10, fontWeight: '700' }}>{cfg.typeLabel}</Text>
                         </View>
+                        <TouchableOpacity
+                          onPress={() => Alert.alert(tr.tlHealthDeleteEntryTitle, tr.tlHealthDeleteEntryMsg, [
+                            { text: tr.cancel, style: 'cancel' },
+                            { text: tr.delete, style: 'destructive', onPress: () => onDelete(entry.id) },
+                          ])}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${tr.delete}: ${cfg.typeLabel} ${cfg.valueStr}`}
+                          style={s.deleteBtn}>
+                          <IconSymbol name="trash" size={15} color={c.sub} />
+                        </TouchableOpacity>
                       </View>
                     );
                   })}
@@ -359,20 +252,22 @@ function getEntryCfg(entry: HealthEntry, tr: any) {
     case 'sleep':        return { icon: 'moon.fill',         color: ACCENT_SLEEP,  typeLabel: tr.sleep,    valueStr: fmtSleep(entry.value) };
     case 'steps':        return { icon: 'figure.walk',       color: ACCENT_STEPS,  typeLabel: tr.steps,    valueStr: `${entry.value.toLocaleString()} кр` };
     case 'pulse':        return { icon: 'waveform.path.ecg', color: ACCENT_PULSE,  typeLabel: tr.pulse,    valueStr: `${entry.value} уд/хв` };
+    // Автодані (health-auto-data.md): без цих гілок записи падали в default і показували «—».
+    case 'pulse_rest':   return { icon: 'heart.fill',        color: ACCENT_PULSE,  typeLabel: tr.hautoPulseRest, valueStr: `${entry.value} ${tr.hautoBpm}` };
+    case 'spo2':         return { icon: 'lungs.fill',        color: ACCENT_PULSE,  typeLabel: tr.hautoSpo2,      valueStr: `${Math.round(entry.value)}%` };
+    case 'distance':     return { icon: 'figure.walk',       color: ACCENT_STEPS,  typeLabel: tr.hautoDistance,  valueStr: `${Number(entry.value).toFixed(1)} ${tr.hautoKm}` };
+    case 'sleep_deep':   return { icon: 'moon.fill',         color: ACCENT_SLEEP,  typeLabel: tr.hautoSleepDeep,  valueStr: fmtSleep(entry.value) };
+    case 'sleep_rem':    return { icon: 'moon.fill',         color: ACCENT_SLEEP,  typeLabel: tr.hautoSleepRem,   valueStr: fmtSleep(entry.value) };
+    case 'sleep_light':  return { icon: 'moon.fill',         color: ACCENT_SLEEP,  typeLabel: tr.hautoSleepLight, valueStr: fmtSleep(entry.value) };
+    case 'sleep_awake':  return { icon: 'moon.fill',         color: ACCENT_SLEEP,  typeLabel: tr.hautoSleepAwake, valueStr: fmtSleep(entry.value) };
     default:             return { icon: 'heart.fill',        color: ACCENT_MOOD,   typeLabel: '—',         valueStr: String(entry.value) };
   }
 }
 
 const s = StyleSheet.create({
-  // Проміжок робиться внутрішнім відступом, а не gap: відсоткова ширина
-  // не віднімає gap, і на чотирьох колонках рядок переповнювався б.
-  tileGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6 },
-  tileCell: { padding: 6 },
-  kicker:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginLeft: 2 },
-  card:         { borderRadius: 18, borderWidth: 1, padding: 16, overflow: 'hidden' },
-  iconBtnSm:    { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   badge:        { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  banner:       { borderRadius: 16, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center' },
+  // 44×44 — мінімальна ціль дотику (HIG); іконка маленька, ціль — ні.
+  deleteBtn:    { width: 44, height: 44, marginLeft: 4, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
   historyCard:  { borderRadius: 14, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' },
   fabContainer: { position: 'absolute', right: 20, alignItems: 'center', justifyContent: 'center' },
   fab:          { width: 58, height: 58, borderRadius: 29, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },

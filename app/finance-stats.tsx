@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
@@ -538,29 +540,40 @@ export default function FinanceStatsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
+          useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={[]}>
 
-        {/* Header */}
-        <View style={s.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel={tr.back}
-            style={[s.backBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-            <IconSymbol name="chevron.left" size={17} color={c.sub} />
-          </TouchableOpacity>
-          <Text style={[s.title, { color: c.text }]}>Статистика</Text>
-          <TouchableOpacity
-            onPress={openCal}
-            accessibilityRole="button"
-            accessibilityLabel={tr.calendar}
-            style={[s.backBtn, {
-              backgroundColor: hasCustomRange ? c.accent + '22' : c.dim,
-              borderColor:     hasCustomRange ? c.accent        : c.border,
-            }]}>
-            <IconSymbol name="calendar" size={17} color={hasCustomRange ? c.accent : c.sub} />
-          </TouchableOpacity>
-        </View>
+        {/* Заголовок був вшитий рядком — тепер зі словника. Екрана немає в
+            сайдбарі, тож стрілка лишається й на планшеті, а поруч —
+            шлях «Фінанси → Статистика». */}
+        <ScreenHeader
+          title={tr.statistics}
+          color={c.text}
+          titleStyle={s.title}
+          back={{
+            onPress: () => router.back(),
+            label: tr.back,
+            color: c.sub,
+            style: { backgroundColor: c.dim, borderColor: c.border },
+          }}
+          crumbs={[
+            { label: tr.tabFinance, onPress: () => router.push('/(tabs)/explore') },
+            { label: tr.statistics },
+          ]}
+          crumbColor={c.sub}
+          actions={
+            <HeaderButton
+              onPress={openCal}
+              accessibilityLabel={tr.calendar}
+              style={{
+                backgroundColor: hasCustomRange ? c.accent + '22' : c.dim,
+                borderColor:     hasCustomRange ? c.accent        : c.border,
+              }}>
+              <IconSymbol name="calendar" size={17} color={hasCustomRange ? c.accent : c.sub} />
+            </HeaderButton>
+          }
+        />
 
         <ScrollView
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
@@ -1114,9 +1127,9 @@ const LegendDot = React.memo(function LegendDot({ color, label, sub }: { color: 
 });
 
 const s = StyleSheet.create({
-  header:       { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' },
-  backBtn:      { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  title:        { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, flex: 1, textAlign: 'center' },
+  // Заголовок 20pt, не спільні 32: у шапці поруч живуть лічильники
+  // періоду, і більший кегль лишав би їм пів рядка.
+  title:        { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
   segRow:       { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
   segBtn:       { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   segLabel:     { fontSize: 11, fontWeight: '600' },

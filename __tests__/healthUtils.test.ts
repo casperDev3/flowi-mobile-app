@@ -1,8 +1,8 @@
 import {
-  HealthEntry, HealthProfile,
-  bmiCategory, calcBMI, calcBMR, calcCalorieTarget, calcNetCalories, calcProteinTarget, calcTDEE, calcWaterTarget,
-  clampProfileRanges, computeGoals, estimateBodyFatNavy, getWeeklyInsights, lastForDay, latestValue,
-  leanMass, maxHR, stepsToKm, sumForDay,
+  HealthEntry, HealthProfile, WorkoutCalorieRecord,
+  bmiCategory, burnedForDay, calcBMI, calcBMR, calcCalorieDay, calcCalorieTarget, calcProteinTarget, calcTDEE, calcWaterTarget,
+  clampProfileRanges, computeGoals, estimateBodyFatNavy, getWeeklyInsights, hasHealthKitBurn, lastForDay, latestValue,
+  leanMass, maxHR, stepsToKm, sumForDay, workoutCaloriesForDay,
   waistToHeightRatio, waistToHipRatio, whrHealthy, whtrCategory,
 } from '@/utils/healthUtils';
 
@@ -145,38 +145,144 @@ describe('healthUtils — заміри тіла', () => {
   });
 });
 
-// ─── Чисті калорії ───────────────────────────────────────────────────────────
+// ─── Калорії доби ────────────────────────────────────────────────────────────
+//
+// Замінили `calcNetCalories` (|з'їдено − спалене| проти ліміту ЇЖІ). Модуль
+// ховав знак: день без жодного запису їжі й із 500 спаленими показував «500
+// з'їдених» і з'їдав чверть кільця. Тепер три незалежні числа, і саме це
+// нижче й перевіряється — спалене НЕ підмішується в кільце прогресу.
 
-describe('calcNetCalories', () => {
-  // Спалені калорії приходять з Apple Health автоматично, а їжу користувач
-  // вносить руками, тож різниця часто відʼємна. Показуємо МОДУЛЬ — свідоме
-  // рішення: екран показує розмір розбіжності з нормою, а не «скільки з'їдено».
+describe('burnedForDay — два джерела спаленого без подвійного рахунку', () => {
+  const DAY = new Date(2026, 8, 3, 12, 0, 0);
+  const at = (hour: number, dayOffset = 0) => new Date(2026, 8, 3 + dayOffset, hour, 0, 0).toISOString();
 
-  test('спожито більше за спалене — звичайна різниця', () => {
-    expect(calcNetCalories(1800, 400)).toBe(1400);
+  const out = (over: Partial<HealthEntry> & { id: string; value: number }): HealthEntry =>
+    ({ type: 'calories_out', date: at(10), ...over });
+  const workout = (calories: number | undefined, dayOffset = 0): WorkoutCalorieRecord =>
+    ({ calories, date: at(9, dayOffset) });
+
+  test('без HealthKit джерела незалежні — ручний запис і тренування СКЛАДАЮТЬСЯ', () => {
+    // Ручний ввід «спалив 300» і журнал тренувань — різні події: людина
+    // записала пробіжку в трекер і окремо відмітила активність.
+    const entries = [out({ id: 'm', value: 300, source: 'manual' })];
+    expect(burnedForDay(entries, [workout(250)], DAY)).toBe(550);
   });
 
-  test('спалено більше за спожите — модуль, а не нуль і не мінус', () => {
-    expect(calcNetCalories(400, 444)).toBe(44);
-    expect(calcNetCalories(0, 437)).toBe(437);
+  test('HealthKit-запис + тренування — МАКСИМУМ, а не сума', () => {
+    // Apple Health віддає повний добовий агрегат активних калорій, і та сама
+    // пробіжка вже сидить у ньому. Сума порахувала б її двічі й роздула
+    // «залишок» на пів вечері.
+    const entries = [out({ id: 'hk', value: 600, source: 'healthkit' })];
+    expect(burnedForDay(entries, [workout(250)], DAY)).toBe(600);
   });
 
-  test('рівність дає нуль', () => {
-    expect(calcNetCalories(500, 500)).toBe(0);
+  test('максимум береться в обидва боки: тренування більше за агрегат HealthKit', () => {
+    const entries = [out({ id: 'hk', value: 180, source: 'healthkit' })];
+    expect(burnedForDay(entries, [workout(400)], DAY)).toBe(400);
   });
 
-  test('дефіцит і профіцит однакового розміру виглядають однаково', () => {
-    // Наслідок модуля, прийнятий свідомо: знак втрачається.
-    expect(calcNetCalories(456, 500)).toBe(calcNetCalories(544, 500));
+  test('легасі-запис HealthKit упізнається за нотаткою __hk__, а не лише за source', () => {
+    // Записи, створені до появи поля `source`, мають тільки нотатку. Якби
+    // вони рахувались «ручними», тренування додалось би згори — подвоєння.
+    const entries = [out({ id: 'old', value: 500, note: '__hk__' })];
+    expect(hasHealthKitBurn(entries, DAY)).toBe(true);
+    expect(burnedForDay(entries, [workout(300)], DAY)).toBe(500);
   });
 
-  test('нечислові значення не дають NaN', () => {
-    expect(calcNetCalories(Number.NaN, 100)).toBe(100);
-    expect(calcNetCalories(500, Number.NaN)).toBe(500);
+  test('без тренувань — просто сума записів дня, HealthKit там чи ні', () => {
+    expect(burnedForDay([out({ id: 'hk', value: 600, source: 'healthkit' })], [], DAY)).toBe(600);
+    expect(burnedForDay([out({ id: 'm', value: 120, source: 'manual' })], [], DAY)).toBe(120);
   });
 
-  test('результат цілий', () => {
-    expect(Number.isInteger(calcNetCalories(1800.6, 400.2))).toBe(true);
+  test('без жодного джерела — нуль, а не NaN', () => {
+    expect(burnedForDay([], [], DAY)).toBe(0);
+    expect(hasHealthKitBurn([], DAY)).toBe(false);
+  });
+
+  test('тренування без калорій і тренування ІНШОГО дня в зачіт не йдуть', () => {
+    const entries = [out({ id: 'm', value: 100, source: 'manual' })];
+    const workouts = [workout(undefined), workout(0), workout(Number.NaN), workout(500, 1)];
+    expect(workoutCaloriesForDay(workouts, DAY)).toBe(0);
+    // Жодних калорій із тренувань → шлях «максимум/сума» не вмикається взагалі.
+    expect(burnedForDay(entries, workouts, DAY)).toBe(100);
+  });
+
+  test('тренування дня підсумовуються між собою', () => {
+    expect(workoutCaloriesForDay([workout(200), workout(150), workout(999, -1)], DAY)).toBe(350);
+  });
+
+  test('записи calories_out іншого дня не течуть у сьогодні', () => {
+    const entries = [out({ id: 'y', value: 900, source: 'manual', date: at(10, -1) })];
+    expect(burnedForDay(entries, [], DAY)).toBe(0);
+  });
+});
+
+describe('calcCalorieDay — кільце міряє ЇЖУ, спалене живе окремо', () => {
+  test('залишок = ліміт − з\'їдено + спалено', () => {
+    const day = calcCalorieDay(2000, 1800, 400);
+    expect(day).toMatchObject({ limit: 2000, consumed: 1800, burned: 400, remaining: 600, over: false });
+  });
+
+  test('спалене НЕ впливає на кільце прогресу — лише з\'їдене', () => {
+    // Рівно той дефект, через який знято calcNetCalories: 500 спалених і
+    // жодного запису їжі давали чверть заповненого кільця.
+    const empty = calcCalorieDay(2000, 0, 500);
+    expect(empty.pct).toBe(0);
+    expect(empty.over).toBe(false);
+    expect(empty.remaining).toBe(2500);
+    // І навпаки: те саме з'їдене дає ту саму частку за будь-якого спаленого.
+    expect(calcCalorieDay(2000, 1000, 0).pct).toBe(calcCalorieDay(2000, 1000, 900).pct);
+  });
+
+  test('перевищення ліміту: pct упирається в 1, over вмикається, залишок відʼємний', () => {
+    const day = calcCalorieDay(2000, 2600, 100);
+    expect(day.pct).toBe(1);
+    expect(day.over).toBe(true);
+    expect(day.remaining).toBe(-500);
+  });
+
+  test('рівно ліміт — ще не перевищення', () => {
+    const day = calcCalorieDay(2000, 2000, 0);
+    expect(day.pct).toBe(1);
+    expect(day.over).toBe(false);
+    expect(day.remaining).toBe(0);
+  });
+
+  test('ліміту немає (профіль не заповнено) — pct 0, over false, а не ділення на нуль', () => {
+    for (const limit of [0, -100, Number.NaN]) {
+      const day = calcCalorieDay(limit, 1500, 200);
+      expect(day.limit).toBe(0);
+      expect(day.pct).toBe(0);
+      expect(day.over).toBe(false);
+      expect(day.remaining).toBe(-1300);
+    }
+  });
+
+  test('сміття на вході не протікає в числа екрана', () => {
+    const day = calcCalorieDay(2000, Number.NaN, -300);
+    expect(day.consumed).toBe(0);
+    expect(day.burned).toBe(0); // відʼємне спалене — це не «борг», це помилка запису
+    expect(day.remaining).toBe(2000);
+  });
+
+  test('усі числа цілі — дробові калорії не течуть у підпис', () => {
+    const day = calcCalorieDay(2000.4, 1800.6, 400.2);
+    expect(Number.isInteger(day.limit)).toBe(true);
+    expect(Number.isInteger(day.consumed)).toBe(true);
+    expect(Number.isInteger(day.burned)).toBe(true);
+    expect(Number.isInteger(day.remaining)).toBe(true);
+  });
+
+  test('зв\'язка з burnedForDay: тренування видно в залишку, але не в кільці', () => {
+    const DAY = new Date(2026, 8, 3, 12, 0, 0);
+    const entries: HealthEntry[] = [
+      { id: 'f', type: 'calories', value: 1500, date: new Date(2026, 8, 3, 13).toISOString() },
+    ];
+    const burned = burnedForDay(entries, [{ calories: 450, date: new Date(2026, 8, 3, 9).toISOString() }], DAY);
+    const day = calcCalorieDay(2000, sumForDay(entries, 'calories', DAY), burned);
+    expect(day.burned).toBe(450);
+    expect(day.remaining).toBe(950);   // 2000 − 1500 + 450
+    expect(day.pct).toBeCloseTo(0.75); // 1500 / 2000 — тренування сюди не лізе
   });
 });
 

@@ -128,7 +128,9 @@ describe('flushPendingUnregister через registerPushToken', () => {
     seed(PENDING_KEY, [{ token: 'stale-a', origin: 'https://a.example.com/api' }]);
     const order: string[] = [];
     mockApiFetch.mockImplementation(async (_path, opts) => {
-      order.push(opts?.method ?? '');
+      // GET можливостей workspace (серверні нагадування) до порядку
+      // зняття/реєстрації токена не належить.
+      if (opts?.method === 'DELETE' || opts?.method === 'POST') order.push(opts.method);
       return {};
     });
 

@@ -63,7 +63,7 @@ const { ApiError } = mockActualApi as {
   ApiError: new (status: number, code: string, message: string, details?: unknown) => Error;
 };
 
-import { SYNC_ARRAY_KEYS, SYNC_SINGLETON_KEYS } from '@/store/sync-contract';
+import { SYNC_ARRAY_KEYS, SYNC_SERVER_OWNED_KEYS, SYNC_SINGLETON_KEYS } from '@/store/sync-contract';
 
 // ─── Хелпери ─────────────────────────────────────────────────────────────────
 
@@ -171,7 +171,7 @@ beforeEach(() => {
   // Пристрій уже синхронізувала поточна збірка: одноразове довантаження нових
   // колекцій (catchUpAddedCollections) тут не мета тесту й додавало б запити.
   // Покрито окремо в __tests__/sync-upgrade-catchup.test.ts.
-  seed('sync_known_collections_v2', [...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS]);
+  seed('sync_known_collections_v2', [...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS, ...SYNC_SERVER_OWNED_KEYS]);
   // Власника локальних даних уже визначено (§9.2, store/data-ownership.ts) —
   // інакше doSync() з курсором 0 свідомо НЕ генерує full outbox (retry_later
   // gate), і тести нижче, де це саме мета (перший синк / застаріла форма

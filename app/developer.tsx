@@ -9,14 +9,16 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
+
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useI18n } from '@/store/i18n';
 
 const SOCIALS: {
   key: string;
@@ -66,6 +68,7 @@ const SOCIALS: {
 ];
 
 export default function DeveloperScreen() {
+  const { tr } = useI18n();
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -84,18 +87,29 @@ export default function DeveloperScreen() {
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
 
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
+          useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={[]}>
 
-        {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[st.backBtn, { backgroundColor: c.dim, borderColor: c.border }]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={18} color={c.sub} />
-          </TouchableOpacity>
-          <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 12 }]}>Розробник</Text>
-        </View>
+        {/* Заголовок був вшитий рядком — тепер зі словника. Розділу немає
+            в сайдбарі, тож на планшеті стрілку заступає шлях згори. */}
+        <ScreenHeader
+          title={tr.developer}
+          color={c.text}
+          titleStyle={st.pageTitle}
+          paddingBottom={14}
+          back={{
+            onPress: () => router.back(),
+            label: tr.back,
+            color: c.sub,
+            style: { backgroundColor: c.dim, borderColor: c.border },
+          }}
+          crumbs={[
+            { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
+            { label: tr.developer },
+          ]}
+          crumbColor={c.sub}
+        />
 
         <ScrollView
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
@@ -162,7 +176,6 @@ export default function DeveloperScreen() {
 
 const st = StyleSheet.create({
   pageTitle:      { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  backBtn:        { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   sectionLabel:   { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 4, marginLeft: 4 },
   devCard: {
     borderRadius: 20,

@@ -134,6 +134,11 @@ export function ProjectAnalytics({
         />
       </Panel>
 
+      {/* «Виконано по тижнях» для ВСЬОГО списку стоїть нагорі, у блоці
+          «Портфель» (PortfolioKpi, специфікація projects-analytics §8.3).
+          Тут він лишається лише для вибраного ОДНОГО проєкту — інакше на
+          одному екрані стояли б два однакові графіки. */}
+      {selected && scopeIds.includes(selected) ? (
       <Panel title={tr.chartDoneWeeks} hint={`${focusLabel} · ${tr.projectDone}: ${done.total}`} palette={palette}>
         <WeekBars
           weeks={done.weeks}
@@ -150,6 +155,7 @@ export function ProjectAnalytics({
           ]}
         />
       </Panel>
+      ) : null}
 
       <Panel
         title={tr.chartDeadlinesAhead}
@@ -211,7 +217,7 @@ function Panel({
  * роботи, і користувач бачить «цього місяця нічого не зроблено» там, де
  * насправді просто немає дат.
  */
-function Footnotes({ items, palette }: { items: string[]; palette: AnalyticsPalette }) {
+export function Footnotes({ items, palette }: { items: string[]; palette: AnalyticsPalette }) {
   const visible = items.filter(Boolean);
   if (!visible.length) return null;
   return (
@@ -273,7 +279,7 @@ function CategoryBars({
  * неї весь ряд озвучується одним підписом для читалки: без нього графік
  * лишається чисто візуальним, тобто недоступним.
  */
-function WeekBars({
+export function WeekBars({
   weeks, months, color, label, palette,
 }: {
   weeks: WeekPoint[];

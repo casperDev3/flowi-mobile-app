@@ -1,14 +1,9 @@
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -17,711 +12,453 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useI18n } from '@/store/i18n';
-import { loadData } from '@/store/storage';
-import { saveSynced } from '@/store/synced-storage';
-import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
-import { CONTENT_MAX_WIDTH, useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
+import { ContainerDetail } from '@/components/containers/ContainerDetail';
+import { ContainerFormSheet, type ContainerFormRequest } from '@/components/containers/ContainerFormSheet';
+import { ContainerTile } from '@/components/containers/ContainerTile';
+import { fill } from '@/components/containers/i18n';
+import { ItemFormSheet, type ItemFormRequest } from '@/components/containers/ItemFormSheet';
+import type { ItemRowActions } from '@/components/containers/ItemRow';
+import { createPhotoAsset, type PhotoSource, useUploadQueueRunner } from '@/components/containers/media';
+import { PlaceFormSheet, type PlaceFormRequest } from '@/components/containers/PlaceFormSheet';
+import { NO_PLACE, PlaceTreeList } from '@/components/containers/PlaceTreeList';
+import { PrintLabelsSheet } from '@/components/containers/PrintLabelsSheet';
+import { qrContext } from '@/components/containers/qr';
+import { QrScannerModal } from '@/components/containers/QrScannerModal';
+import { QrSheet } from '@/components/containers/QrSheet';
+import { SearchHitRow } from '@/components/containers/SearchHitRow';
+import { CONTAINERS_ACCENT as ACCENT, useContainersColors } from '@/components/containers/theme';
+import { useContainersData, type PhotoTarget } from '@/components/containers/useContainersData';
 import { DETAIL_COLUMN_WIDTH, DetailPane } from '@/components/shared/DetailPane';
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { sizeClassFor } from '@/constants/tokens';
-
-interface ContainerItem {
-  id: string;
-  name: string;
-  tags: string[];
-  note?: string;
-}
-
-interface Container {
-  id: string;
-  name: string;
-  location: string;
-  color: string;
-  items: ContainerItem[];
-  createdAt: string;
-}
-
-const ACCENT = '#F97316';
-const STORAGE_KEY = 'containers';
-const PALETTE = [
-  '#F97316', '#EF4444', '#EC4899', '#8B5CF6',
-  '#6366F1', '#0EA5E9', '#10B981', '#F59E0B',
-];
+import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
+import { useI18n } from '@/store/i18n';
+import { loadData, saveData } from '@/store/storage';
+import {
+  asCover,
+  containerPlaceLabel,
+  containerStats,
+  descendantPlaceIds,
+  parseQrPayload,
+  resolveQrScan,
+  selectContainers,
+  withoutPhoto,
+  withPhoto,
+  type Container,
+  type ContainerItem,
+  type ContainerStats,
+} from '@/utils/containers';
 
 /** Відступ між плитками сітки — і по горизонталі, і між рядами. */
 const GRID_GAP = 12;
+/** Ліва колонка дерева місць на широкому планшеті (§8.2). */
+const TREE_COLUMN_WIDTH = 260;
+/** Локальний (не синхронізований) лічильник відкриттів — ранжування пошуку (§7.1). */
+const OPEN_COUNTS_KEY = 'containers_open_counts';
+/** Пауза між закриттям одного модального шару й відкриттям наступного (NEW-02). */
+const SHEET_HANDOFF_MS = 350;
 
-/** Українське відмінювання лічильника речей: 1 річ / 2 речі / 5 речей. */
-function itemsWord(n: number): string {
-  return n === 1 ? 'річ' : n < 5 ? 'речі' : 'речей';
-}
+const EMPTY_STATS: ContainerStats = { count: 0, units: 0, lent: 0, discarded: 0 };
 
-// ─── Плитка контейнера ────────────────────────────────────────────────────────
-
-interface ContainerCardProps {
-  container: Container;
-  cardWidth: number;
-  /** Обрана коробка — та, вміст якої показано в колонці деталі. */
-  selected: boolean;
-  isDark: boolean;
-  textColor: string;
-  subColor: string;
-  onPress: (id: string) => void;
-}
-
-/**
- * Плитка мемоізована: у сітці на сотні контейнерів кожен набір символу
- * в пошуку інакше переганяв би всі градієнти заново.
- */
-const ContainerCard = React.memo(function ContainerCard({
-  container: con, cardWidth, selected, isDark, textColor, subColor, onPress,
-}: ContainerCardProps) {
-  return (
-    <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(con.id)}>
-      {/* Товщина рамки НЕ змінюється від вибору: інакше вміст плитки
-          сіпався б на піксель щоразу, коли обирають іншу коробку. */}
-      <View style={{
-        width: cardWidth, borderRadius: 18, overflow: 'hidden',
-        borderWidth: 1, borderColor: selected ? con.color : con.color + '35',
-      }}>
-        {/* Colored top band */}
-        <LinearGradient
-          colors={[con.color + '30', con.color + '10']}
-          style={{ paddingTop: 16, paddingHorizontal: 14, paddingBottom: 12 }}>
-          <View style={{ width: 40, height: 40, borderRadius: 13,
-            backgroundColor: con.color + '30', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-            <IconSymbol name="shippingbox.fill" size={20} color={con.color} />
-          </View>
-          <Text style={{ color: textColor, fontSize: 15, fontWeight: '800', letterSpacing: -0.3 }} numberOfLines={2}>
-            {con.name}
-          </Text>
-          {con.location ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
-              <IconSymbol name="location.fill" size={10} color={subColor} />
-              <Text style={{ color: subColor, fontSize: 11, fontWeight: '500' }} numberOfLines={1}>{con.location}</Text>
-            </View>
-          ) : null}
-        </LinearGradient>
-
-        {/* Item count row */}
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          paddingHorizontal: 14, paddingVertical: 10,
-          backgroundColor: selected
-            ? con.color + '22'
-            : isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.6)',
-        }}>
-          <Text style={{ color: subColor, fontSize: 12, fontWeight: '500' }}>
-            {con.items.length > 0
-              ? `${con.items.length} ${itemsWord(con.items.length)}`
-              : 'Порожньо'}
-          </Text>
-          <View style={{ width: 22, height: 22, borderRadius: 7,
-            backgroundColor: con.color + '25', alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name="chevron.right" size={11} color={con.color} />
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-// ─── Знайдена річ ─────────────────────────────────────────────────────────────
-
-interface SearchHit { item: ContainerItem; container: Container }
-
-interface SearchRowProps {
-  hit: SearchHit;
-  /** Коробка цієї речі зараз відкрита в деталі. */
-  selected: boolean;
-  isDark: boolean;
-  textColor: string;
-  subColor: string;
-  onPress: (containerId: string) => void;
-}
-
-const SearchRow = React.memo(function SearchRow({
-  hit, selected, isDark, textColor, subColor, onPress,
-}: SearchRowProps) {
-  const { item, container } = hit;
-  return (
-    <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(container.id)}>
-      <BlurView intensity={isDark ? 20 : 38} tint={isDark ? 'dark' : 'light'}
-        style={{ borderRadius: 14, borderWidth: 1, borderColor: selected ? container.color : container.color + '40',
-          padding: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' }}>
-        <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: container.color, borderRadius: 2, marginRight: 12 }} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: textColor, fontSize: 14, fontWeight: '700' }}>{item.name}</Text>
-          {item.note ? (
-            <Text style={{ color: subColor, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{item.note}</Text>
-          ) : null}
-          {item.tags.length > 0 && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-              {item.tags.map(tag => (
-                <View key={tag} style={{ backgroundColor: container.color + '20', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                  <Text style={{ color: container.color, fontSize: 10, fontWeight: '600' }}>#{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4,
-          backgroundColor: container.color + '20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: container.color }} />
-          <Text style={{ color: container.color, fontSize: 11, fontWeight: '700' }}>{container.name}</Text>
-        </View>
-      </BlurView>
-    </TouchableOpacity>
-  );
-});
-
-// ─── Річ усередині контейнера ─────────────────────────────────────────────────
-
-interface ItemRowProps {
-  item: ContainerItem;
-  accent: string;
-  isDark: boolean;
-  textColor: string;
-  subColor: string;
-  borderColor: string;
-  onEdit: (item: ContainerItem) => void;
-  onDelete: (item: ContainerItem) => void;
-}
-
-const ItemRow = React.memo(function ItemRow({
-  item, accent, isDark, textColor, subColor, borderColor, onEdit, onDelete,
-}: ItemRowProps) {
-  return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'flex-start',
-      paddingHorizontal: 14, paddingVertical: 13,
-      borderRadius: 14,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.75)',
-      borderWidth: 1, borderColor,
-    }}>
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: accent, marginTop: 5, marginRight: 12 }} />
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: textColor, fontSize: 14, fontWeight: '700' }}>{item.name}</Text>
-        {item.note ? (
-          <Text style={{ color: subColor, fontSize: 12, marginTop: 3, lineHeight: 17 }}>{item.note}</Text>
-        ) : null}
-        {item.tags.length > 0 && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
-            {item.tags.map(tag => (
-              <View key={tag} style={{ backgroundColor: accent + '20', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                <Text style={{ color: accent, fontSize: 11, fontWeight: '600' }}>#{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-      <View style={{ flexDirection: 'row', gap: 6, marginLeft: 8 }}>
-        <TouchableOpacity
-          onPress={() => onEdit(item)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <IconSymbol name="pencil" size={13} color={subColor} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => onDelete(item)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <IconSymbol name="xmark" size={13} color={subColor} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-});
-
-// ─── Екран ────────────────────────────────────────────────────────────────────
+type ViewMode = 'grid' | 'places';
 
 export default function ContainersScreen() {
-  const contentWidth = useContentWidth();
-  const { width, height, isWide, isExpanded } = useResponsive();
-  const sheetSurface = useSheetSurface();
-  const isDark = useColorScheme() === 'dark';
+  const c = useContainersColors();
   const { tr } = useI18n();
   const router = useRouter();
-
-  /**
-   * Ширина, що дістається САМОМУ екрану. На широкому екрані сайдбар стоїть
-   * ліворуч від Stack (app/_layout.tsx), в одному рядку з ним, тож 232pt
-   * ширини вікна екранові не належать зовсім.
-   */
+  const params = useLocalSearchParams<{ open?: string; slug?: string; qr?: string; scan?: string; q?: string }>();
+  const contentWidth = useContentWidth();
+  const { width, height, isWide, isExpanded } = useResponsive();
   const screenWidth = useScreenWidth();
+  const data = useContainersData();
+  useUploadQueueRunner();
+
+  const [view, setView] = useState<ViewMode>('grid');
+  const [search, setSearch] = useState(typeof params.q === 'string' ? params.q : '');
+  const [showDiscarded, setShowDiscarded] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<string | null>(null);
+  const [containerForm, setContainerForm] = useState<ContainerFormRequest | null>(null);
+  const [itemForm, setItemForm] = useState<ItemFormRequest | null>(null);
+  const [placeForm, setPlaceForm] = useState<PlaceFormRequest | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanPayload, setScanPayload] = useState<string | null>(null);
+  const [printIds, setPrintIds] = useState<string[] | null>(null);
+  const [qrBoxId, setQrBoxId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [openCounts, setOpenCounts] = useState<Record<string, number>>({});
+  const detailScrollRef = useRef<ScrollView | null>(null);
+
+  useEffect(() => {
+    void loadData<Record<string, number>>(OPEN_COUNTS_KEY, {}).then(v => setOpenCounts(v && typeof v === 'object' ? v : {}));
+  }, []);
+
+  const placesMode = view === 'places';
+  const treeColumn = placesMode && isExpanded;
 
   /**
-   * Місце, яке лишається сітці коробок. На expanded праворуч постійно
-   * стоїть колонка деталі, тож сітка живе НЕ на всю ширину вікна — інакше
-   * плитки рахувалися б по простору, якого в них немає.
+   * Ширина, що лишається сітці: мінус колонка деталі на expanded і мінус
+   * колонка дерева в режимі «За місцями» (§8.2).
    */
-  const listWidth = isExpanded ? Math.max(screenWidth - DETAIL_COLUMN_WIDTH, 0) : screenWidth;
-
-  /**
-   * Скільки плиток у ряд. На телефоні — дві, як було; ширше екран —
-   * більше колонок, інакше на планшеті сітка з двох плиток виглядає як
-   * два величезні прямокутники з порожнечею довкола. Клас рахується від
-   * ширини самої сітки, а не вікна: із колонкою деталі 840pt вікна дають
-   * список завширшки як у телефона.
-   */
+  const listWidth = Math.max(
+    screenWidth - (isExpanded ? DETAIL_COLUMN_WIDTH : 0) - (treeColumn ? TREE_COLUMN_WIDTH : 0),
+    0,
+  );
   const listClass = sizeClassFor(listWidth);
   const columns = listClass === 'expanded' ? 4 : listClass === 'medium' ? 3 : 2;
-
-  /**
-   * Ширина плитки. Рахується при рендері, а не при імпорті: у Split View
-   * ширина змінюється без перезапуску екрана. На широкому екрані колонка
-   * контенту обмежена стелею useContentWidth — від неї й рахуємо.
-   */
   const cardWidth = useMemo(() => {
-    // Телефон: формула лишається дослівно тією, що була, — нуль регресії.
+    // Телефон: формула дослівно та сама, що була, — нуль регресії.
     if (!isWide) return (width - 48) / 2;
     const available = Math.min(listWidth, CONTENT_MAX_WIDTH) - 32;
     return (available - GRID_GAP * (columns - 1)) / columns;
   }, [width, listWidth, isWide, columns]);
 
-  const [containers, setContainers] = useState<Container[]>([]);
-  const [initialized, setInitialized] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
+  const statsById = useMemo(() => {
+    const out = new Map<string, ContainerStats>();
+    for (const [id, list] of data.itemsMap) out.set(id, containerStats(list));
+    return out;
+  }, [data.itemsMap]);
+  const statsFor = useCallback((id: string) => statsById.get(id) ?? EMPTY_STATS, [statsById]);
+  const discardedTotal = useMemo(() => {
+    let n = 0;
+    for (const stats of statsById.values()) n += stats.discarded;
+    return n;
+  }, [statsById]);
 
-  // Container form modal
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [cName, setCName] = useState('');
-  const [cLocation, setCLocation] = useState('');
-  const [cColor, setCColor] = useState(PALETTE[0]);
+  const detail = useMemo(() => data.containers.find(box => box.id === detailId) ?? null, [data.containers, detailId]);
+  const qrBox = useMemo(() => data.containers.find(box => box.id === qrBoxId) ?? null, [data.containers, qrBoxId]);
 
-  // Деталь: модальний лист на телефоні, колонка праворуч на широкому екрані
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const detailScrollRef = useRef<ScrollView | null>(null);
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemTags, setNewItemTags] = useState('');
-  const [newItemNote, setNewItemNote] = useState('');
-
-  // Item edit modal
-  const [editItem, setEditItem] = useState<ContainerItem | null>(null);
-  const [editItemContainerId, setEditItemContainerId] = useState<string | null>(null);
-  const [editItemName, setEditItemName] = useState('');
-  const [editItemTags, setEditItemTags] = useState('');
-  const [editItemNote, setEditItemNote] = useState('');
-
-  const loadContainers = useCallback(async () => {
-    const data = await loadData<Container[]>(STORAGE_KEY, []);
-    setContainers(data);
+  const openBox = useCallback((id: string) => {
+    setDetailId(id);
+    setOpenCounts(prev => {
+      const next = { ...prev, [id]: (prev[id] ?? 0) + 1 };
+      void saveData(OPEN_COUNTS_KEY, next);
+      return next;
+    });
   }, []);
 
-  useEffect(() => { loadContainers().then(() => setInitialized(true)); }, []);
-  useEffect(() => { if (initialized) void saveSynced(STORAGE_KEY, containers); }, [containers, initialized]);
+  // ── Вхід за посиланням: ?open=<id>, ?slug=<qrSlug>, ?qr=<вміст>, ?scan=1 ──
+  const handledParams = useRef<string | null>(null);
+  useEffect(() => {
+    if (data.status !== 'ready') return;
+    const key = JSON.stringify([params.open, params.slug, params.qr, params.scan]);
+    if (handledParams.current === key) return;
+    handledParams.current = key;
+    if (params.scan) { setScanning(true); return; }
+    if (typeof params.open === 'string' && params.open) {
+      if (data.containers.some(box => box.id === params.open)) openBox(params.open);
+      return;
+    }
+    const raw = typeof params.qr === 'string' && params.qr ? params.qr
+      : typeof params.slug === 'string' && params.slug ? params.slug : null;
+    if (!raw) return;
+    const result = resolveQrScan(parseQrPayload(raw), qrContext().workspaceId, data.containers);
+    if (result.status === 'found') openBox(result.container.id);
+    else if (result.status === 'other_workspace') Alert.alert(tr.ctrScanOtherWorkspace);
+    else if (result.status === 'not_found') {
+      // Локально немає — сканер покаже чесне «перевіряємо на сервері» / «немає мережі».
+      setScanPayload(raw);
+      setScanning(true);
+    }
+  }, [data.status, data.containers, params.open, params.slug, params.qr, params.scan, openBox, tr]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadContainers();
+    await data.reload();
     setRefreshing(false);
-  }, [loadContainers]);
+  }, [data]);
 
-  const c = useMemo(() => ({
-    bg1:    isDark ? '#100A00' : '#FFF7ED',
-    bg2:    isDark ? '#1A1200' : '#FFEDD5',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    dim:    isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
-    sheet:  isDark ? 'rgba(18,15,30,0.97)' : 'rgba(252,250,255,0.97)',
-  }), [isDark]);
-
-  // Search
+  // ── Видача ────────────────────────────────────────────────────────────
   const isSearching = search.trim().length > 0;
-  const searchResults = useMemo(() => {
-    if (!search.trim()) return [];
-    const q = search.toLowerCase();
-    const res: SearchHit[] = [];
-    containers.forEach(con => con.items.forEach(item => {
-      if (
-        item.name.toLowerCase().includes(q) ||
-        item.tags.some(t => t.toLowerCase().includes(q)) ||
-        (item.note && item.note.toLowerCase().includes(q))
-      )
-        res.push({ item, container: con });
-    }));
-    return res;
-  }, [containers, search]);
+  const placeFilter = useMemo(() => {
+    if (!treeColumn || selectedPlace === null || selectedPlace === NO_PLACE) return null;
+    return descendantPlaceIds(selectedPlace, data.places);
+  }, [treeColumn, selectedPlace, data.places]);
 
-  // Detail container (live reference from containers array)
-  const detail = useMemo(
-    () => containers.find(con => con.id === detailId) ?? null,
-    [containers, detailId]
-  );
-
-  // ── CRUD containers ────────────────────────────────────────────────────────
-  const openNew = useCallback(() => {
-    setEditingId(null); setCName(''); setCLocation(''); setCColor(PALETTE[0]);
-    setShowForm(true);
-  }, []);
-
-  const openEdit = useCallback((con: Container) => {
-    setEditingId(con.id); setCName(con.name); setCLocation(con.location); setCColor(con.color);
-    setShowForm(true);
-  }, []);
-
-  const saveContainer = () => {
-    const name = cName.trim();
-    if (!name) return;
-    if (editingId) {
-      setContainers(p => p.map(con => con.id === editingId
-        ? { ...con, name, location: cLocation.trim(), color: cColor }
-        : con));
-    } else {
-      setContainers(p => [{
-        id: Date.now().toString(), name, location: cLocation.trim(),
-        color: cColor, items: [], createdAt: new Date().toISOString(),
-      }, ...p]);
+  const matches = useMemo(() => {
+    const all = selectContainers(data.containers, search, {
+      items: data.items, places: data.places, showDiscarded, openCounts, placeIds: placeFilter,
+    });
+    if (treeColumn && selectedPlace === NO_PLACE) {
+      const known = new Set(data.places.map(p => p.id));
+      return all.filter(m => !m.container.placeId || !known.has(m.container.placeId));
     }
-    setShowForm(false);
-  };
+    return all;
+  }, [data.containers, data.items, data.places, search, showDiscarded, openCounts, placeFilter, treeColumn, selectedPlace]);
 
-  const deleteContainer = useCallback((id: string) => {
+  /**
+   * Тап по знайденому. Телефон: деталь перекриває список — пошук чиститься.
+   * Широкий екран: пошук ЛИШАЄТЬСЯ, праворуч відкривається коробка — так
+   * результати можна перебирати, не набираючи запит заново.
+   */
+  const openSearchHit = useCallback((id: string) => {
+    if (!isExpanded) setSearch('');
+    openBox(id);
+  }, [isExpanded, openBox]);
+
+  // ── Дії ───────────────────────────────────────────────────────────────
+  const confirmDeleteContainer = useCallback((box: Container) => {
     Alert.alert(tr.deleteContainer, tr.cannotUndo, [
       { text: tr.cancel, style: 'cancel' },
-      { text: tr.delete, style: 'destructive', onPress: () => {
-        setContainers(p => p.filter(con => con.id !== id));
-        setDetailId(null);
-      }},
+      { text: tr.delete, style: 'destructive', onPress: () => { data.deleteContainer(box.id); setDetailId(null); } },
     ]);
-  }, [tr]);
+  }, [data, tr]);
 
-  // ── CRUD items ─────────────────────────────────────────────────────────────
-  const addItem = useCallback((containerId: string) => {
-    const name = newItemName.trim();
-    if (!name) return;
-    const item: ContainerItem = {
-      id: Date.now().toString(), name,
-      tags: newItemTags.split(',').map(t => t.trim()).filter(Boolean),
-      note: newItemNote.trim() || undefined,
-    };
-    setContainers(p => p.map(con =>
-      con.id === containerId ? { ...con, items: [...con.items, item] } : con
-    ));
-    setNewItemName('');
-    setNewItemTags('');
-    setNewItemNote('');
-  }, [newItemName, newItemTags, newItemNote]);
+  const itemActions: ItemRowActions = useMemo(() => ({
+    onEdit: item => setItemForm({ containerId: item.containerId, item }),
+    onDelete: item => Alert.alert(tr.ctrDeleteItem, tr.ctrDeleteItemMsg, [
+      { text: tr.cancel, style: 'cancel' },
+      { text: tr.ctrDiscard, onPress: () => data.setItemStatus(item, 'discarded') },
+      { text: tr.delete, style: 'destructive', onPress: () => data.deleteItem(item) },
+    ]),
+    onQty: (item, delta) => data.changeQty(item, delta),
+    onLend: item => setItemForm({ containerId: item.containerId, item, status: 'lent' }),
+    onReturn: item => data.setItemStatus(item, 'in_box'),
+    onDiscard: item => data.setItemStatus(item, 'discarded'),
+  }), [data, tr]);
 
-  const saveItemEdit = () => {
-    if (!editItem || !editItemContainerId) return;
-    const name = editItemName.trim();
-    if (!name) return;
-    setContainers(p => p.map(con =>
-      con.id === editItemContainerId
-        ? {
-            ...con,
-            items: con.items.map(i =>
-              i.id === editItem.id
-                ? {
-                    ...i,
-                    name,
-                    tags: editItemTags.split(',').map(t => t.trim()).filter(Boolean),
-                    note: editItemNote.trim() || undefined,
-                  }
-                : i
-            ),
-          }
-        : con
-    ));
-    setEditItem(null);
-    setEditItemContainerId(null);
-  };
+  const addPhoto = useCallback(async (target: PhotoTarget, source: PhotoSource) => {
+    const asset = await createPhotoAsset(source, data.media);
+    if (!asset) return;
+    data.addMediaAsset(asset);
+    data.setPhotos(target, ids => withPhoto(ids, asset.id));
+  }, [data]);
 
-  // Колбеки приймають елемент аргументом, а не замикають його в інлайн-стрілці:
-  // інакше React.memo на рядках списку не мав би сенсу.
-  const openDetail = useCallback((id: string) => setDetailId(id), []);
+  const handoff = (fn: () => void) => setTimeout(fn, SHEET_HANDOFF_MS);
 
-  /**
-   * Тап по знайденій речі.
-   *
-   * На телефоні деталь перекриває список, тож тримати пошук під нею немає
-   * сенсу — рядок очищається, і користувач опиняється в коробці, як і раніше.
-   *
-   * На широкому екрані список і деталь видно одночасно: пошук ЛИШАЄТЬСЯ,
-   * а праворуч відкривається коробка знайденої речі. Так результати по всіх
-   * коробках можна перебирати один за одним, не набираючи запит заново.
-   */
-  const openSearchHit = useCallback((containerId: string) => {
-    if (!isExpanded) setSearch('');
-    setDetailId(containerId);
-  }, [isExpanded]);
+  const openNew = useCallback(() => {
+    setContainerForm({ mode: 'new', placeId: treeColumn && selectedPlace && selectedPlace !== NO_PLACE ? selectedPlace : null });
+  }, [treeColumn, selectedPlace]);
 
-  const handleItemEdit = useCallback((item: ContainerItem) => {
-    if (!detailId) return;
-    setEditItem(item);
-    setEditItemContainerId(detailId);
-    setEditItemName(item.name);
-    setEditItemTags(item.tags.join(', '));
-    setEditItemNote(item.note ?? '');
-  }, [detailId]);
+  const renderDetail = (box: Container) => (
+    <ContainerDetail
+      container={box}
+      items={data.itemsMap.get(box.id) ?? []}
+      places={data.places}
+      mediaById={data.mediaById}
+      c={c}
+      actions={itemActions}
+      onClose={() => setDetailId(null)}
+      onEdit={() => setContainerForm({ mode: 'edit', container: box })}
+      onDelete={() => confirmDeleteContainer(box)}
+      onQr={() => setQrBoxId(box.id)}
+      onQuickAdd={fields => data.addItem(box.id, fields)}
+      onAddPhoto={source => addPhoto({ kind: 'container', id: box.id }, source)}
+      onRemovePhoto={id => data.setPhotos({ kind: 'container', id: box.id }, ids => withoutPhoto(ids, id))}
+      onCoverPhoto={id => data.setPhotos({ kind: 'container', id: box.id }, ids => asCover(ids, id))}
+    />
+  );
 
-  const handleItemDelete = useCallback((item: ContainerItem) => {
-    if (!detailId) return;
-    setContainers(p => p.map(con =>
-      con.id === detailId
-        ? { ...con, items: con.items.filter(i => i.id !== item.id) }
-        : con
-    ));
-  }, [detailId]);
+  const emptyState = (
+    <View style={{ alignItems: 'center', paddingVertical: 60 }}>
+      <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+        <IconSymbol name="shippingbox.fill" size={32} color={ACCENT} />
+      </View>
+      <Text style={{ color: c.text, fontSize: 17, fontWeight: '700', marginBottom: 6 }}>
+        {data.containers.length ? tr.ctrNoBoxesHere : tr.noContainers}
+      </Text>
+      {!data.containers.length ? (
+        <>
+          <Text style={{ color: c.sub, fontSize: 14, textAlign: 'center', marginBottom: 24 }}>{tr.ctrEmptyHint}</Text>
+          <TouchableOpacity onPress={openNew} accessibilityRole="button"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, minHeight: 48,
+              borderRadius: 13, borderWidth: 1, borderColor: ACCENT + '50', backgroundColor: ACCENT + '12' }}>
+            <IconSymbol name="plus" size={15} color={ACCENT} />
+            <Text style={{ color: ACCENT, fontWeight: '700' }}>{tr.newContainer}</Text>
+          </TouchableOpacity>
+        </>
+      ) : null}
+    </View>
+  );
 
-  /**
-   * Вміст коробки. Той самий у колонці й у модальному листі — DetailPane
-   * відповідає лише за обрамлення.
-   *
-   * Речі виводяться звичайним map, а не FlatList: DetailPane уже загорнув
-   * дітей у ScrollView, а вкладати віртуалізований список у ScrollView того
-   * ж напрямку не можна — RN на це лається й ламає віртуалізацію.
-   */
-  const renderDetail = useCallback((con: Container) => (
-    <View>
-      {/* Шапка деталі */}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{con.name}</Text>
-          {con.location ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-              <IconSymbol name="location.fill" size={12} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 13 }}>{con.location}</Text>
-            </View>
+  const grid = (
+    /* key прив'язаний до кількості колонок: FlatList не вміє міняти numColumns на льоту. */
+    <FlatList
+      key={`grid-${columns}`}
+      data={matches}
+      numColumns={columns}
+      keyExtractor={m => m.container.id}
+      contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
+      columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
+      renderItem={({ item: m }) => (
+        <ContainerTile
+          container={m.container}
+          stats={statsFor(m.container.id)}
+          placeLabel={containerPlaceLabel(m.container, data.places)}
+          cover={m.container.photoIds?.[0] ? data.mediaById.get(m.container.photoIds[0]) : undefined}
+          width={cardWidth}
+          selected={m.container.id === detailId}
+          c={c}
+          onPress={openBox}
+        />
+      )}
+      ListEmptyComponent={emptyState}
+    />
+  );
+
+  const searchList = (
+    /* Пошук іде по ВСІХ речах усіх коробок — результатів можуть бути сотні. */
+    <FlatList
+      data={matches}
+      keyExtractor={m => m.container.id}
+      contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+      ListHeaderComponent={
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}
+            accessibilityLiveRegion="polite">
+            {matches.length > 0 ? fill(tr.ctrFound, { n: matches.length }) : tr.ctrNothingFound}
+          </Text>
+          {discardedTotal ? (
+            <TouchableOpacity onPress={() => setShowDiscarded(v => !v)} accessibilityRole="switch"
+              accessibilityState={{ checked: showDiscarded }} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <Text style={{ color: ACCENT, fontSize: 12, fontWeight: '700' }}>
+                {showDiscarded ? tr.ctrHideDiscarded : fill(tr.ctrShowDiscarded, { n: discardedTotal })}
+              </Text>
+            </TouchableOpacity>
           ) : null}
         </View>
-        <View style={{ flexDirection: 'row', gap: 8, marginLeft: 12 }}>
-          <TouchableOpacity onPress={() => openEdit(con)}
-            accessibilityRole="button" accessibilityLabel={tr.editContainer}
-            style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: c.border, backgroundColor: c.dim }}>
-            <IconSymbol name="pencil" size={14} color={c.sub} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => deleteContainer(con.id)}
-            accessibilityRole="button" accessibilityLabel={tr.deleteContainer}
-            style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: 'rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.08)' }}>
-            <IconSymbol name="trash" size={14} color="#EF4444" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setDetailId(null)}
-            accessibilityRole="button" accessibilityLabel={tr.close}
-            style={{ width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', borderColor: c.border, backgroundColor: c.dim }}>
-            <IconSymbol name="xmark" size={14} color={c.sub} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Додавання речі — так само прямо в деталі */}
-      <View style={{ marginTop: 16 }}>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-            backgroundColor: c.dim, borderRadius: 12, borderWidth: 1, borderColor: c.border,
-            paddingHorizontal: 12, paddingVertical: 10 }}>
-            <IconSymbol name="plus" size={14} color={c.sub} />
-            <TextInput
-              placeholder="Нова річ..."
-              placeholderTextColor={c.sub}
-              value={newItemName}
-              onChangeText={setNewItemName}
-              onSubmitEditing={() => addItem(con.id)}
-              returnKeyType="done"
-              style={{ flex: 1, fontSize: 14, color: c.text }}
-            />
-            {newItemName.length > 0 && (
-              <TouchableOpacity onPress={() => setNewItemName('')} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <IconSymbol name="xmark.circle.fill" size={15} color={c.sub} />
-              </TouchableOpacity>
-            )}
-          </View>
-          <TouchableOpacity
-            onPress={() => addItem(con.id)}
-            disabled={!newItemName.trim()}
-            accessibilityRole="button"
-            accessibilityLabel={tr.addItem}
-            style={{
-              width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: newItemName.trim() ? con.color : c.dim,
-            }}>
-            <IconSymbol name="arrow.up" size={18} color={newItemName.trim() ? '#fff' : c.sub} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Теги й нотатка з'являються лише коли є що додавати */}
-        {newItemName.length > 0 && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8,
-            backgroundColor: c.dim, borderRadius: 10, borderWidth: 1, borderColor: c.border,
-            paddingHorizontal: 12, paddingVertical: 8 }}>
-            <IconSymbol name="tag" size={12} color={c.sub} />
-            <TextInput
-              placeholder="Теги через кому: зима, одяг"
-              placeholderTextColor={c.sub}
-              value={newItemTags}
-              onChangeText={setNewItemTags}
-              onSubmitEditing={() => addItem(con.id)}
-              returnKeyType="done"
-              style={{ flex: 1, fontSize: 13, color: c.text }}
-            />
-          </View>
-        )}
-        {newItemName.length > 0 && (
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 6,
-            backgroundColor: c.dim, borderRadius: 10, borderWidth: 1, borderColor: c.border,
-            paddingHorizontal: 12, paddingVertical: 8 }}>
-            <IconSymbol name="text.alignleft" size={12} color={c.sub} style={{ marginTop: 2 }} />
-            <TextInput
-              placeholder="Нотатка: де лежить, стан, розмір..."
-              placeholderTextColor={c.sub}
-              value={newItemNote}
-              onChangeText={setNewItemNote}
-              multiline
-              style={{ flex: 1, fontSize: 13, color: c.text }}
-            />
-          </View>
-        )}
-      </View>
-
-      {/* Речі */}
-      {con.items.length > 0 ? (
-        <View style={{ marginTop: 18, gap: 8 }}>
-          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
-            {con.items.length} {itemsWord(con.items.length)}
-          </Text>
-          {con.items.map(item => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              accent={con.color}
-              isDark={isDark}
-              textColor={c.text}
-              subColor={c.sub}
-              borderColor={c.border}
-              onEdit={handleItemEdit}
-              onDelete={handleItemDelete}
-            />
-          ))}
-        </View>
-      ) : (
-        <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: con.color + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-            <IconSymbol name="archivebox" size={26} color={con.color} />
-          </View>
-          <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>{tr.noItems}</Text>
-          <Text style={{ color: c.sub, fontSize: 13 }}>Введи назву вище і натисни ↑</Text>
-        </View>
+      }
+      renderItem={({ item: m }) => (
+        <SearchHitRow match={m} search={search} placeLabel={containerPlaceLabel(m.container, data.places)}
+          selected={m.container.id === detailId} c={c} onPress={openSearchHit} />
       )}
-    </View>
-  ), [c, isDark, tr, newItemName, newItemTags, newItemNote, addItem, deleteContainer, openEdit, handleItemEdit, handleItemDelete]);
+    />
+  );
+
+  const treeProps = {
+    places: data.places,
+    containers: data.containers,
+    statsFor,
+    c,
+    accent: ACCENT,
+    onOpenBox: openBox,
+    onEditPlace: (place: (typeof data.places)[number]) => setPlaceForm({ mode: 'edit', place }),
+    onAddPlace: (parentId: string | null) => setPlaceForm({ mode: 'new', parentId }),
+  };
+
+  let body: React.ReactNode;
+  if (data.status === 'failed') {
+    // ERR-01: «не прочиталось» ≠ «порожньо»; запис вимкнено, доки не прочитаємо.
+    body = (
+      <View style={{ alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24, gap: 14 }}>
+        <IconSymbol name="exclamationmark.triangle" size={28} color={ACCENT} />
+        <Text style={{ color: c.text, fontSize: 15, textAlign: 'center' }}>{tr.ctrReadFailed}</Text>
+        <TouchableOpacity onPress={() => void data.retry()} accessibilityRole="button"
+          style={{ minHeight: 48, paddingHorizontal: 20, borderRadius: 12, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.ctrRetry}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  } else if (isSearching) {
+    body = searchList;
+  } else if (placesMode && !treeColumn) {
+    body = (
+      <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 8, paddingBottom: 100 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+        <PlaceTreeList {...treeProps} mode="nested" />
+      </ScrollView>
+    );
+  } else if (treeColumn) {
+    body = (
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+        <ScrollView style={{ width: TREE_COLUMN_WIDTH, flexGrow: 0, borderRightWidth: 1, borderRightColor: c.border }}
+          contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 100 }}>
+          <PlaceTreeList {...treeProps} mode="column" selected={selectedPlace} onSelect={setSelectedPlace} />
+        </ScrollView>
+        <View style={{ flex: 1 }}>{grid}</View>
+      </View>
+    );
+  } else {
+    body = grid;
+  }
+
+  const segment = (value: ViewMode, label: string, icon: 'square.grid.2x2' | 'folder') => {
+    const active = view === value;
+    return (
+      <TouchableOpacity onPress={() => setView(value)} accessibilityRole="tab" accessibilityState={{ selected: active }}
+        style={{ flex: 1, flexDirection: 'row', gap: 6, minHeight: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: active ? (c.isDark ? 'rgba(255,255,255,0.12)' : '#fff') : 'transparent' }}>
+        <IconSymbol name={icon} size={13} color={active ? ACCENT : c.sub} />
+        <Text style={{ color: active ? c.text : c.sub, fontSize: 13, fontWeight: active ? '700' : '600' }}>{label}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        {/* Широкий екран: коробки зліва, вміст обраної — праворуч.
-            Вузький: деталь лишається модальним листом поверх списку. */}
-        <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
+      {/* Широкий екран: коробки зліва, вміст обраної — праворуч. Вузький:
+          деталь — модальний лист поверх списку. Верхній інсет дає ScreenHeader. */}
+      <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
         <View style={{ flex: 1 }}>
-
-        {/* Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={() => router.back()}
-            style={{ width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.dim, borderColor: c.border }}>
-            <IconSymbol name="chevron.left" size={17} color={c.sub} />
-          </TouchableOpacity>
-          <Text style={{ fontSize: 32, fontWeight: '800', letterSpacing: -0.8, color: c.text, flex: 1 }}>{tr.containers}</Text>
-          <TouchableOpacity onPress={openNew}
-            style={{ width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.dim, borderColor: c.border }}>
-            <IconSymbol name="plus" size={17} color={c.sub} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Search */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1,
-          paddingHorizontal: 12, paddingVertical: 9, gap: 8, marginHorizontal: 20, marginBottom: 16,
-          backgroundColor: c.dim, borderColor: c.border }}>
-          <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
-          <TextInput placeholder={tr.searchItems} placeholderTextColor={c.sub}
-            value={search} onChangeText={setSearch}
-            style={{ flex: 1, fontSize: 14, fontWeight: '500', color: c.text }} />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {isSearching ? (
-          /* Пошук іде по ВСІХ речах усіх контейнерів — результатів можуть бути
-             сотні, тому список віртуалізований. */
-          <FlatList
-            data={searchResults}
-            keyExtractor={hit => `${hit.container.id}:${hit.item.id}`}
-            contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-            ListHeaderComponent={
-              <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
-                {searchResults.length > 0 ? `Знайдено: ${searchResults.length}` : 'Нічого не знайдено'}
-              </Text>
-            }
-            renderItem={({ item }) => (
-              <SearchRow
-                hit={item}
-                selected={item.container.id === detailId}
-                isDark={isDark}
-                textColor={c.text}
-                subColor={c.sub}
-                onPress={openSearchHit}
-              />
-            )}
-          />
-        ) : (
-          /* key прив'язаний до кількості колонок: FlatList не вміє міняти
-             numColumns на льоту, а в Split View вона змінюється. */
-          <FlatList
-            key={`grid-${columns}`}
-            data={containers}
-            numColumns={columns}
-            keyExtractor={con => con.id}
-            contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
-            columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
-            renderItem={({ item }) => (
-              <ContainerCard
-                container={item}
-                cardWidth={cardWidth}
-                selected={item.id === detailId}
-                isDark={isDark}
-                textColor={c.text}
-                subColor={c.sub}
-                onPress={openDetail}
-              />
-            )}
-            ListEmptyComponent={
-              <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                  <IconSymbol name="shippingbox.fill" size={32} color={ACCENT} />
-                </View>
-                <Text style={{ color: c.text, fontSize: 17, fontWeight: '700', marginBottom: 6 }}>{tr.noContainers}</Text>
-                <Text style={{ color: c.sub, fontSize: 14, textAlign: 'center', marginBottom: 24 }}>Додай коробку, шафу або місце зберігання</Text>
-                <TouchableOpacity onPress={openNew}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 12,
-                    borderRadius: 13, borderWidth: 1, borderColor: ACCENT + '50', backgroundColor: ACCENT + '12' }}>
-                  <IconSymbol name="plus" size={15} color={ACCENT} />
-                  <Text style={{ color: ACCENT, fontWeight: '700' }}>{tr.newContainer}</Text>
-                </TouchableOpacity>
+          <ScreenHeader
+            title={tr.containers}
+            color={c.text}
+            paddingBottom={14}
+            back={{
+              onPress: () => router.back(),
+              label: tr.back,
+              color: c.sub,
+              style: { backgroundColor: c.dim, borderColor: c.border },
+            }}
+            actions={
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <HeaderButton onPress={() => setScanning(true)} accessibilityLabel={tr.ctrScan}
+                  style={{ backgroundColor: c.dim, borderColor: c.border }}>
+                  <IconSymbol name="viewfinder" size={17} color={c.sub} />
+                </HeaderButton>
+                <HeaderButton onPress={() => setPrintIds([])} accessibilityLabel={tr.ctrPrint}
+                  style={{ backgroundColor: c.dim, borderColor: c.border }}>
+                  <IconSymbol name="doc.text" size={16} color={c.sub} />
+                </HeaderButton>
+                <HeaderButton onPress={openNew} accessibilityLabel={tr.add}
+                  style={{ backgroundColor: c.dim, borderColor: c.border }}>
+                  <IconSymbol name="plus" size={17} color={c.sub} />
+                </HeaderButton>
               </View>
             }
           />
-        )}
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1,
+            paddingHorizontal: 12, gap: 8, marginHorizontal: 20, marginBottom: 10, minHeight: 44,
+            backgroundColor: c.dim, borderColor: c.border }}>
+            <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
+            <TextInput placeholder={tr.searchItems} placeholderTextColor={c.sub} value={search} onChangeText={setSearch}
+              accessibilityLabel={tr.searchItems} returnKeyType="search"
+              style={{ flex: 1, fontSize: 14, fontWeight: '500', color: c.text, paddingVertical: 10 }} />
+            {search.length > 0 ? (
+              <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel={tr.close}
+                style={{ width: 36, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {!isSearching && data.status !== 'failed' ? (
+            <View accessibilityRole="tablist" style={{ flexDirection: 'row', marginHorizontal: 20, marginBottom: 14, padding: 3,
+              borderRadius: 12, backgroundColor: c.dim }}>
+              {segment('grid', tr.ctrViewGrid, 'square.grid.2x2')}
+              {segment('places', tr.ctrViewPlaces, 'folder')}
+            </View>
+          ) : null}
+
+          {body}
         </View>
 
         <DetailPane
           open={!!detail}
           wide={isExpanded}
           onClose={() => setDetailId(null)}
-          isDark={isDark}
+          isDark={c.isDark}
           sheetColor={c.sheet}
           borderColor={c.border}
           maxHeight={height * 0.86}
@@ -733,145 +470,74 @@ export default function ContainersScreen() {
           }>
           {detail ? renderDetail(detail) : null}
         </DetailPane>
-        </View>
-      </SafeAreaView>
+      </View>
 
-      {/* ── Container Form Modal ─────────────────────────────────────────────── */}
-      <Modal visible={showForm} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowForm(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setShowForm(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-                style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
-                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-                  <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, marginRight: 'auto', marginLeft: 'auto' }} />
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-                  <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', flex: 1 }}>
-                    {editingId ? tr.editContainer : tr.newContainer}
-                  </Text>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.cancel} onPress={() => setShowForm(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <IconSymbol name="xmark" size={17} color={c.sub} />
-                  </TouchableOpacity>
-                </View>
+      <ContainerFormSheet
+        request={containerForm}
+        places={data.places}
+        c={c}
+        onClose={() => setContainerForm(null)}
+        onSubmit={fields => {
+          if (containerForm?.mode === 'edit') data.updateContainer(containerForm.container.id, fields);
+          else data.createContainer(fields);
+        }}
+        onCreatePlace={(name, parentId) => data.createPlace({ name, kind: parentId ? 'furniture' : 'room', parentId })}
+      />
 
-                <Text style={[s.label, { color: c.sub }]}>{tr.containerName.toUpperCase()}</Text>
-                <TextInput placeholder={tr.containerNamePlaceholder} placeholderTextColor={c.sub}
-                  value={cName} onChangeText={setCName} autoFocus
-                  style={[s.input, { backgroundColor: c.dim, color: c.text }]} />
+      <ItemFormSheet
+        request={itemForm}
+        c={c}
+        accent={detail ? detail.color : ACCENT}
+        mediaById={data.mediaById}
+        livePhotoIds={itemForm?.item ? data.items.find(i => i.id === itemForm.item?.id)?.photoIds : undefined}
+        onClose={() => setItemForm(null)}
+        onSave={(item: ContainerItem) => data.saveItem(item, itemForm?.item?.containerId)}
+        onAddPhoto={(itemId, source) => addPhoto({ kind: 'item', id: itemId }, source)}
+        onRemovePhoto={(itemId, photoId) => data.setPhotos({ kind: 'item', id: itemId }, ids => withoutPhoto(ids, photoId))}
+        onCoverPhoto={(itemId, photoId) => data.setPhotos({ kind: 'item', id: itemId }, ids => asCover(ids, photoId))}
+      />
 
-                <Text style={[s.label, { color: c.sub }]}>{tr.containerLocation.toUpperCase()}</Text>
-                <TextInput placeholder={tr.containerLocationPlaceholder} placeholderTextColor={c.sub}
-                  value={cLocation} onChangeText={setCLocation}
-                  style={[s.input, { backgroundColor: c.dim, color: c.text }]} />
+      <PlaceFormSheet
+        request={placeForm}
+        places={data.places}
+        c={c}
+        onClose={() => setPlaceForm(null)}
+        onSubmit={fields => (placeForm?.mode === 'edit'
+          ? data.updatePlace(placeForm.place.id, fields)
+          : !!data.createPlace(fields))}
+        onDelete={place => {
+          data.deletePlace(place.id);
+          if (selectedPlace === place.id) setSelectedPlace(null);
+        }}
+      />
 
-                <Text style={[s.label, { color: c.sub, marginBottom: 10 }]}>КОЛІР</Text>
-                <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginBottom: 22 }}>
-                  {PALETTE.map(color => (
-                    <TouchableOpacity key={color} onPress={() => setCColor(color)}
-                      style={{
-                        width: 36, height: 36, borderRadius: 18, backgroundColor: color,
-                        borderWidth: cColor === color ? 3 : 0, borderColor: '#fff',
-                        shadowColor: cColor === color ? color : 'transparent',
-                        shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.5, shadowRadius: 4,
-                      }} />
-                  ))}
-                </View>
+      <QrSheet
+        container={qrBox}
+        c={c}
+        onClose={() => setQrBoxId(null)}
+        onCreate={id => { data.ensureSlugs([id]); }}
+        onPrint={id => { setQrBoxId(null); handoff(() => setPrintIds([id])); }}
+      />
 
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity onPress={() => setShowForm(false)}
-                    style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={saveContainer} disabled={!cName.trim()}
-                    style={[s.btn, { flex: 2, backgroundColor: !cName.trim() ? c.dim : cColor }]}>
-                    <Text style={{ color: !cName.trim() ? c.sub : '#fff', fontWeight: '700' }}>{tr.save}</Text>
-                  </TouchableOpacity>
-                </View>
-                </ScrollView>
-              </BlurView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
+      <PrintLabelsSheet
+        visible={printIds !== null}
+        containers={data.containers}
+        places={data.places}
+        statsFor={statsFor}
+        preselected={printIds ?? []}
+        c={c}
+        onClose={() => setPrintIds(null)}
+        ensureSlugs={data.ensureSlugs}
+      />
 
-      {/* ── Item Edit Modal ───────────────────────────────────────────────────── */}
-      <Modal visible={!!editItem} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditItem(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setEditItem(null)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetOuter} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-                style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
-                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-                  <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, marginRight: 'auto', marginLeft: 'auto' }} />
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-                  <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', flex: 1 }}>Редагувати річ</Text>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.cancel} onPress={() => setEditItem(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <IconSymbol name="xmark" size={17} color={c.sub} />
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={[s.label, { color: c.sub }]}>НАЗВА</Text>
-                <TextInput
-                  placeholder="Назва речі"
-                  placeholderTextColor={c.sub}
-                  value={editItemName}
-                  onChangeText={setEditItemName}
-                  autoFocus
-                  style={[s.input, { backgroundColor: c.dim, color: c.text }]}
-                />
-
-                <Text style={[s.label, { color: c.sub }]}>ТЕГИ</Text>
-                <TextInput
-                  placeholder="зима, одяг, кухня"
-                  placeholderTextColor={c.sub}
-                  value={editItemTags}
-                  onChangeText={setEditItemTags}
-                  style={[s.input, { backgroundColor: c.dim, color: c.text }]}
-                />
-
-                <Text style={[s.label, { color: c.sub }]}>НОТАТКА</Text>
-                <TextInput
-                  placeholder="Де саме лежить, стан, розмір..."
-                  placeholderTextColor={c.sub}
-                  value={editItemNote}
-                  onChangeText={setEditItemNote}
-                  multiline
-                  numberOfLines={3}
-                  style={[s.input, { backgroundColor: c.dim, color: c.text, minHeight: 72, textAlignVertical: 'top' }]}
-                />
-
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                  <TouchableOpacity onPress={() => setEditItem(null)}
-                    style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={saveItemEdit} disabled={!editItemName.trim()}
-                    style={[s.btn, { flex: 2, backgroundColor: !editItemName.trim() ? c.dim : ACCENT }]}>
-                    <Text style={{ color: !editItemName.trim() ? c.sub : '#fff', fontWeight: '700' }}>{tr.save}</Text>
-                  </TouchableOpacity>
-                </View>
-                </ScrollView>
-              </BlurView>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
+      <QrScannerModal
+        visible={scanning}
+        containers={data.containers}
+        initialPayload={scanPayload}
+        onClose={() => { setScanning(false); setScanPayload(null); }}
+        onFound={openBox}
+        onSearch={setSearch}
+      />
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheetOuter: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
-  // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
-  // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
-  // ScrollView усередині нічого не гортав (NAT-01).
-  sheet:      { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  label:      { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input:      { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500', marginBottom: 2 },
-  btn:        { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-});

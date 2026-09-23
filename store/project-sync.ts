@@ -65,7 +65,7 @@ import {
   pushRecentProject,
   removeFromRecentProjects,
   resolveOutboxStream,
-  socketProjectIds,
+  socketProjectIdsWithActive,
   streamProjectId,
   type ProjectSyncStateEntry,
   type ProjectSyncStateMap,
@@ -117,6 +117,143 @@ export async function addRecentProject(projectId: string): Promise<void> {
 export async function forgetRecentProject(projectId: string): Promise<void> {
   const current = await getRecentProjects();
   await saveData(RECENT_PROJECTS_KEY, removeFromRecentProjects(current, projectId));
+}
+
+// ─── Відкритий зараз проєкт (пріоритет сокета + негайний обмін) ──────────────
+
+/**
+ * Проєкт, у просторі якого користувач ЗАРАЗ (`app/project/[id]/_layout.tsx`).
+ *
+ * Модульний стан, а не React-контекст: його читає `ProjectSyncProvider`, що
+ * стоїть у корені дерева ВИЩЕ за layout проєкту, тож знизу вгору контекстом
+ * це не передати, а піднімати весь стан проєкту в корінь заради одного id —
+ * забагато.
+ */
+let _activeProjectId: string | null = null;
+const _activeProjectListeners = new Set<(id: string | null) => void>();
+
+export function getActiveProjectId(): string | null {
+  return _activeProjectId;
+}
+
+export function subscribeActiveProject(listener: (id: string | null) => void): () => void {
+  _activeProjectListeners.add(listener);
+  return () => { _activeProjectListeners.delete(listener); };
+}
+
+function notifyActiveProject(): void {
+  for (const listener of [..._activeProjectListeners]) {
+    try {
+      listener(_activeProjectId);
+    } catch (e) {
+      if (__DEV__) console.warn('[project-sync] слухач активного проєкту впав:', e);
+    }
+  }
+}
+
+/**
+ * Вхід у простір проєкту: зробити його «нещодавнім», підняти йому сокет
+ * першим у черзі (`socketProjectIdsWithActive`) і ОДРАЗУ обміняти дані.
+ *
+ * До цього вхід у проєкт лише дописував id у `recent_projects` — жодного
+ * обміну не відбувалось, і відкритий проєкт показував рівно те, що лежало в
+ * AsyncStorage з минулого разу, доки не спрацює 60-секундний поллінг (а якщо
+ * своїх проєктів більше за `MAX_PROJECT_SOCKETS` — і сокета в нього могло не
+ * бути взагалі). Веб робить повний pull кожного приєднаного проєкту на вхід і
+ * на повернення вкладки — це його мобільний відповідник.
+ *
+ * Офлайн (`isOnlineMode()` false) — тихо нічого не робить: `syncProject`
+ * однаково вийде на першій же перевірці, а локальні дані лишаються, як були.
+ */
+export async function enterProject(projectId: string): Promise<void> {
+  _activeProjectId = projectId;
+  notifyActiveProject();
+  await addRecentProject(projectId);
+  await primeProjectSyncStatus(projectId);
+  await syncProject(projectId);
+  // Ще раз, уже ПІСЛЯ обміну: перший прохід міг застати проєкт ще не
+  // підтвердженим сервером (кеш `workspace_projects` порожній — щойно
+  // створений проєкт), а такому id сокет не відкривають навмисно. Обмін це
+  // якраз і виправляє (`ensureProjectOnServer`), тож список сокетів варто
+  // перерахувати ще раз, а не чекати наступного такту поллінгу.
+  if (_activeProjectId === projectId) notifyActiveProject();
+}
+
+/** Вихід зі простору проєкту — знімає пріоритет сокета, якщо він ще за цим id. */
+export function leaveProject(projectId: string): void {
+  if (_activeProjectId !== projectId) return;
+  _activeProjectId = null;
+  notifyActiveProject();
+}
+
+// ─── Стан обміну для UI (індикатор у шапці розділів проєкту) ────────────────
+
+export interface ProjectSyncStatus {
+  phase: 'idle' | 'syncing';
+  /** Момент останнього УСПІШНОГО обміну цього проєкту, або null. */
+  lastSyncedAt: number | null;
+}
+
+/**
+ * Зріз стану на проєкт для `useSyncExternalStore`: об'єкт заміняється лише
+ * коли справді змінився, інакше React крутив би рендер по колу (getSnapshot
+ * мусить повертати стабільне посилання).
+ */
+const IDLE_UNKNOWN: ProjectSyncStatus = { phase: 'idle', lastSyncedAt: null };
+const _statusByProject = new Map<string, ProjectSyncStatus>();
+const _statusListeners = new Set<() => void>();
+
+export function getProjectSyncStatus(projectId: string): ProjectSyncStatus {
+  return _statusByProject.get(projectId) ?? IDLE_UNKNOWN;
+}
+
+export function subscribeProjectSyncStatus(listener: () => void): () => void {
+  _statusListeners.add(listener);
+  return () => { _statusListeners.delete(listener); };
+}
+
+function setProjectSyncStatus(projectId: string, patch: Partial<ProjectSyncStatus>): void {
+  const current = getProjectSyncStatus(projectId);
+  const next: ProjectSyncStatus = { ...current, ...patch };
+  if (next.phase === current.phase && next.lastSyncedAt === current.lastSyncedAt) return;
+  _statusByProject.set(projectId, next);
+  for (const listener of [..._statusListeners]) {
+    try {
+      listener();
+    } catch (e) {
+      if (__DEV__) console.warn('[project-sync] слухач стану обміну впав:', e);
+    }
+  }
+}
+
+/**
+ * Підтягує `lastSyncedAt` зі сховища в модульний кеш — щоб індикатор показав
+ * «оновлено о…» ще до першого обміну в цьому сеансі (після перезапуску
+ * застосунку кеш порожній, а стан у `project_sync_state_v1` лишається).
+ */
+export async function primeProjectSyncStatus(projectId: string): Promise<void> {
+  if (getProjectSyncStatus(projectId).lastSyncedAt != null) return;
+  const entry = (await getProjectSyncState())[projectId];
+  if (entry?.lastSyncedAt != null) setProjectSyncStatus(projectId, { lastSyncedAt: entry.lastSyncedAt });
+}
+
+/**
+ * Pull-to-refresh на екрані проєкту: піти НА СЕРВЕР, а не перечитати
+ * AsyncStorage (саме це й робили `onRefresh` Огляду й Завдань — спінер
+ * крутився, дані лишались ті самі).
+ *
+ * `fetchWorkspaceProjects()` перед обміном — щоб жест заразом підхоплював
+ * зміну ролі/назви й підтверджував проєкт, якому ще не підняли сокет.
+ * Офлайн — просто виходить: показувати помилку на свідомий офлайн-режим нема
+ * за що.
+ */
+export async function refreshProjectNow(projectId: string): Promise<void> {
+  if (!isOnlineMode()) return;
+  await fetchWorkspaceProjects();
+  await syncProject(projectId);
+  // Той самий перерахунок сокетів, що й у `enterProject`: жест міг бути
+  // першим моментом, коли сервер узагалі підтвердив цей проєкт.
+  if (_activeProjectId === projectId) notifyActiveProject();
 }
 
 /**
@@ -702,11 +839,12 @@ async function wipeLocalProject(projectId: string): Promise<void> {
   }
 
   await forgetRecentProject(projectId);
+  _statusByProject.delete(projectId);
 }
 
 /** Стирає лише бюджетні колекції проєкту — даунгрейд з owner (§3.4), доступ до решти лишається. */
 async function wipeProjectBudgetData(projectId: string): Promise<void> {
-  for (const collection of ['transactions', 'subscriptions'] as const) {
+  for (const collection of ['transactions', 'subscriptions', 'recurring_incomes'] as const) {
     await withStorageLock(collection, async () => {
       const rows = await loadData<{ id: string; projectId?: string }[]>(collection, []);
       if (!Array.isArray(rows)) return;
@@ -732,12 +870,29 @@ async function wipeProjectBudgetData(projectId: string): Promise<void> {
  * а не лише стан синку — інакше рядки лишались би в outbox назавжди
  * (нескінченний повтор того самого 404) і в лічильнику pending.
  */
-export async function syncProject(projectId: string): Promise<void> {
+const _projectSyncPromises = new Map<string, Promise<void>>();
+
+/**
+ * Обмін одного проєкту. Паралельні виклики (жест pull-to-refresh поверх
+ * WS-сигналу, вхід у проєкт поверх поллінгу) СКЛЕЮЮТЬСЯ в один обмін і
+ * чекають на нього разом — раніше другий виклик просто виходив, і
+ * pull-to-refresh знімав би спінер, поки обмін ще триває.
+ */
+export function syncProject(projectId: string): Promise<void> {
+  const running = _projectSyncPromises.get(projectId);
+  if (running) return running;
+  const started = runProjectSync(projectId).finally(() => { _projectSyncPromises.delete(projectId); });
+  _projectSyncPromises.set(projectId, started);
+  return started;
+}
+
+async function runProjectSync(projectId: string): Promise<void> {
   // Мінор із ревʼю (той самий, що й у store/sync-engine.tsx currentGate):
   // workspace_changed/несумісна версія лишень редиректили UI на /workspace —
   // проєктний обмін проти старих токенів того самого origin продовжував іти.
   if (!isOnlineMode() || getWorkspaceIncompatibility() || _projectSyncing.has(projectId)) return;
   _projectSyncing.add(projectId);
+  setProjectSyncStatus(projectId, { phase: 'syncing' });
   // Винесено з try — потрібне і в catch (нижче), щоб розрізнити «доступу
   // більше нема» від «сервер ще не бачив цей проєкт» на 404 (blocker з ревʼю).
   let hadPriorSync = false;
@@ -825,14 +980,16 @@ export async function syncProject(projectId: string): Promise<void> {
       console.warn(`[project-sync] ${projectId}: forbidden-відхилення — повний pull наступного разу для відкату локальних змін`);
     }
 
+    const syncedAt = Date.now();
     const nextMap = await getProjectSyncState();
     nextMap[projectId] = {
       cursor: needsFullResync ? 0 : result.cursor,
       revisions: needsFullResync ? {} : result.revisions,
       role: result.role,
-      lastSyncedAt: Date.now(),
+      lastSyncedAt: syncedAt,
     };
     await setProjectSyncState(nextMap);
+    setProjectSyncStatus(projectId, { lastSyncedAt: syncedAt });
 
     if (result.conflicts.length) {
       const needsUser: SyncConflict[] = [];
@@ -889,6 +1046,7 @@ export async function syncProject(projectId: string): Promise<void> {
     }
   } finally {
     _projectSyncing.delete(projectId);
+    setProjectSyncStatus(projectId, { phase: 'idle' });
     if (_projectSyncing.size === 0) {
       for (const resolve of [..._projectSyncIdleWaiters]) resolve();
       _projectSyncIdleWaiters.clear();
@@ -1173,7 +1331,23 @@ export function ProjectSyncProvider({ children, isAuthed }: { children: React.Re
     const confirmed = new Set(workspaceProjects.map(p => p.id));
     const confirmedRecent = recent.filter(id => confirmed.has(id));
     const confirmedKnown = [...myIds].filter(id => confirmed.has(id));
-    setSocketIds(socketProjectIds(confirmedRecent, confirmedKnown, MAX_PROJECT_SOCKETS));
+    // Відкритий зараз проєкт — першим і завжди (навіть якщо `recent` ще не
+    // перезаписався, а своїх проєктів більше за ліміт сокетів): саме він
+    // мусить оновлюватись наживо, поки на нього дивляться.
+    const activeId = getActiveProjectId();
+    const selected = socketProjectIdsWithActive(
+      activeId && confirmed.has(activeId) ? activeId : null,
+      confirmedRecent,
+      confirmedKnown,
+      MAX_PROJECT_SOCKETS,
+    );
+    // Порядок для сокетів не значить нічого (він лише вирішив, КОГО взяти в
+    // ліміт), а `useProjectSockets` перевідкриває геть усі сокети на будь-яку
+    // зміну свого списку — тож зріз сортуємо: інакше вхід у проєкт, який і
+    // так уже був у списку, лише переставляв би id і рвав живі з'єднання
+    // решти проєктів на рівному місці.
+    const next = [...selected].sort();
+    setSocketIds(prev => (prev.length === next.length && prev.every((id, i) => id === next[i]) ? prev : next));
   }, []);
 
   /**
@@ -1267,7 +1441,11 @@ export function ProjectSyncProvider({ children, isAuthed }: { children: React.Re
     let cancelled = false;
     void (async () => { if (!cancelled) await refreshSocketIds(); })();
     const unsubscribe = subscribeOnlineMode(online => { if (online) void refreshSocketIds(); });
-    return () => { cancelled = true; unsubscribe(); };
+    // Вхід/вихід зі простору проєкту — перерахувати список НЕГАЙНО, а не
+    // чекати наступного `syncAllMyProjects` (до 60 с): інакше щойно відкритий
+    // проєкт лишався без живого сокета рівно тоді, коли він найпотрібніший.
+    const unsubscribeActive = subscribeActiveProject(() => { void refreshSocketIds(); });
+    return () => { cancelled = true; unsubscribe(); unsubscribeActive(); };
   }, [isAuthed, refreshSocketIds]);
 
   useProjectSockets(isAuthed, socketIds);

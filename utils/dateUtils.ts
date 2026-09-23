@@ -20,6 +20,54 @@ export function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Збережена дата (ISO-момент або вже `YYYY-MM-DD`) → `YYYY-MM-DD` ЛОКАЛЬНОЇ
+ * доби для текстового поля дати. Порожньо, якщо дати немає чи вона бита.
+ *
+ * Не `iso.slice(0, 10)`: це доба в UTC. Локальна північ 5 червня в Києві —
+ * `2026-06-04T21:00Z`, і поле показувало б 4 червня (а «Зберегти» без правки
+ * тихо переписувало б дату на добу раніше). Рядок-дату без часу повертаємо
+ * як є: `new Date('YYYY-MM-DD')` прочитав би його як UTC-північ.
+ */
+export function isoToLocalDateInput(value: string | null | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (DATE_ONLY_RE.test(trimmed)) return trimmed;
+  const d = new Date(trimmed);
+  return Number.isNaN(d.getTime()) ? '' : localDateKey(d);
+}
+
+/**
+ * Текстове поле `YYYY-MM-DD` → ISO ЛОКАЛЬНОГО ПОЛУДНЯ цієї доби.
+ *
+ * Не `new Date(value).toISOString()`: рядок-дату без часу JS читає як
+ * UTC-північ, і на захід від Гринвіча доба зсувається на вчора. Полудень
+ * лишає запас ±12 год, тож і інший пристрій в іншому поясі побачить ту саму
+ * добу (так само пише веб: `isoFromDateInput` у lib/sprints.ts).
+ *
+ * `originalIso` — значення, з якого поле наповнили: якщо людина поле не
+ * чіпала, повертаємо його без змін (старі записи з UTC-північчю не
+ * «переїжджають» на полудень від одного «Зберегти»).
+ *
+ * Порожнє поле → `undefined`. Нестрогий формат (напр. `2026/06/05`) —
+ * як і раніше через `new Date(...)`; нерозбірне → `undefined`.
+ */
+export function localDateInputToIso(value: string, originalIso?: string | null): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (originalIso && isoToLocalDateInput(originalIso) === trimmed) return originalIso;
+  const day = parseLocalDateInput(trimmed);
+  if (day) {
+    day.setHours(12, 0, 0, 0);
+    return day.toISOString();
+  }
+  if (DATE_ONLY_RE.test(trimmed)) return undefined; // формат вірний, а доба неіснуюча (2026-02-30)
+  const loose = new Date(trimmed);
+  return Number.isNaN(loose.getTime()) ? undefined : loose.toISOString();
+}
+
 export function isSameMonth(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }

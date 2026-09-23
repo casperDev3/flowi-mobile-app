@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
+
 import { SyncDiagnosticsPanel } from '@/components/shared/SyncDiagnosticsPanel';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -181,15 +183,22 @@ export default function SyncScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
+          useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={[]}>
 
-        <View style={st.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <IconSymbol name="chevron.left" size={22} color={c.accent} />
-          </TouchableOpacity>
-          <Text style={[st.headerTitle, { color: c.text }]}>Синхронізація</Text>
-          <View style={{ width: 28 }} />
-        </View>
+        {/* Заголовок був вшитий рядком — тепер зі словника; на планшеті
+            замість стрілки — шлях «Налаштування → Синхронізація». */}
+        <ScreenHeader
+          title={tr.sync}
+          color={c.text}
+          back={{ onPress: () => router.back(), label: tr.back, color: c.accent }}
+          crumbs={[
+            { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
+            { label: tr.sync },
+          ]}
+          crumbColor={c.sub}
+        />
 
         <ScrollView
           contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: 48 }]}
@@ -512,8 +521,6 @@ function fmtSyncTime(ms: number): string {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  headerTitle:   { fontSize: 17, fontWeight: '700' },
   card:          { borderRadius: 20, borderWidth: 1, overflow: 'hidden', padding: 20, marginBottom: 16 },
   statusRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, marginBottom: 14 },
   statusDot:     { width: 7, height: 7, borderRadius: 4, marginRight: 7 },

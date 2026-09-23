@@ -32,6 +32,7 @@ import {
   normalizeSubscription,
   normalizeSubscriptions,
   parseAmountInput,
+  paySubscription,
   rebaseSubscriptionDraft,
   renewSubscription,
   restoreSubscription,
@@ -171,6 +172,38 @@ describe('renew / archive / restore', () => {
   it('якір billingDay береться з підписки', () => {
     const next = renewSubscription(sub({ nextPaymentDate: '2026-02-28', billingDay: 31 }), { now });
     expect(next.nextPaymentDate).toBe('2026-03-31');
+  });
+
+  it('оплата: витрата з підписки і той самий цикл, що й продовження', () => {
+    const at = new Date('2026-09-22T14:30:00');
+    const s = sub({ nextPaymentDate: '2026-09-20', category: 'Розваги', accountId: 'acc-1', projectId: 'p1' });
+    const { subscription, transaction } = paySubscription(s, {
+      id: 'tx-1', accountId: 'acc-1', currency: 'USD', amount: 12.5, fallbackCategory: 'Інше', now: at,
+    });
+
+    // Цикл рахується рівно так само, як без операції (дзеркало web-тесту).
+    expect(subscription.nextPaymentDate).toBe(renewSubscription(s, { amount: 12.5, now: at }).nextPaymentDate);
+    expect(subscription.history).toHaveLength(1);
+    expect(subscription.history[0]).toMatchObject({ date: '2026-09-20', amount: 12.5, currency: 'USD' });
+
+    expect(transaction).toMatchObject({
+      id: 'tx-1', type: 'expense', category: 'Розваги', amount: 12.5,
+      accountId: 'acc-1', currency: 'USD', note: 'Netflix', projectId: 'p1',
+    });
+    // Датується днем ЦИКЛУ, за який заплатили, а час доби — поточний.
+    const when = new Date(transaction.date);
+    expect([when.getFullYear(), when.getMonth(), when.getDate()]).toEqual([2026, 8, 20]);
+    expect(when.getHours()).toBe(14);
+  });
+
+  it('оплата без категорії й суми бере запасні значення', () => {
+    const { transaction } = paySubscription(sub({ category: '  ' }), {
+      id: 'tx-2', fallbackCategory: 'Інше', now,
+    });
+    expect(transaction.category).toBe('Інше');
+    expect(transaction.amount).toBe(10);
+    expect(transaction.currency).toBe('USD');
+    expect(transaction.accountId).toBe('');
   });
 
   it('архівування і відновлення', () => {

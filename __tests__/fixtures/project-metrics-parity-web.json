@@ -1,0 +1,1114 @@
+{
+  "now": [
+    2026,
+    9,
+    23,
+    12,
+    0
+  ],
+  "projects": [
+    {
+      "id": "p1",
+      "name": "Альфа",
+      "color": "#7C3AED",
+      "createdAt": "2026-07-01T12:00:00"
+    },
+    {
+      "id": "p2",
+      "name": "Бета",
+      "color": "#06B6D4",
+      "createdAt": "2026-07-01T12:00:00"
+    },
+    {
+      "id": "p3",
+      "name": "Порожній",
+      "color": "#10B981",
+      "createdAt": "2026-07-01T12:00:00"
+    }
+  ],
+  "columns": [
+    {
+      "id": "st-todo",
+      "name": "До роботи",
+      "color": "#6366F1",
+      "position": 0,
+      "isDone": false,
+      "type": "todo",
+      "projectId": "p1",
+      "sourceStatusId": "status-active"
+    },
+    {
+      "id": "st-prog",
+      "name": "У процесі",
+      "color": "#F59E0B",
+      "position": 1,
+      "isDone": false,
+      "type": "in_progress",
+      "projectId": "p1",
+      "sourceStatusId": "status-in-progress"
+    },
+    {
+      "id": "st-review",
+      "name": "На перевірці",
+      "color": "#0EA5E9",
+      "position": 2,
+      "isDone": false,
+      "projectId": "p1",
+      "sourceStatusId": "status-review"
+    },
+    {
+      "id": "st-done",
+      "name": "Готово",
+      "color": "#10B981",
+      "position": 3,
+      "isDone": true,
+      "type": "done",
+      "projectId": "p1",
+      "sourceStatusId": "status-done"
+    }
+  ],
+  "sprints": [
+    {
+      "id": "s-over",
+      "projectId": "p1",
+      "name": "Тиждень 10",
+      "createdAt": "2026-09-07T12:00:00",
+      "startDate": "2026-09-07T12:00:00",
+      "endDate": "2026-09-20T12:00:00"
+    },
+    {
+      "id": "s-cur",
+      "projectId": "p1",
+      "name": "Тиждень 12",
+      "createdAt": "2026-09-21T12:00:00",
+      "startDate": "2026-09-21T12:00:00",
+      "endDate": "2026-09-27T12:00:00"
+    },
+    {
+      "id": "s-c1",
+      "projectId": "p1",
+      "name": "Тиждень 8",
+      "createdAt": "2026-09-01T12:00:00",
+      "closedAt": "2026-09-14T18:00:00",
+      "startDate": "2026-09-01T12:00:00",
+      "endDate": "2026-09-14T12:00:00"
+    },
+    {
+      "id": "s-c2",
+      "projectId": "p1",
+      "name": "Одноденний",
+      "createdAt": "2026-08-31T12:00:00",
+      "closedAt": "2026-08-31T18:00:00",
+      "startDate": "2026-08-31T12:00:00",
+      "endDate": "2026-08-31T12:00:00"
+    },
+    {
+      "id": "s-c3",
+      "projectId": "p1",
+      "name": "Тиждень 6",
+      "createdAt": "2026-08-17T12:00:00",
+      "closedAt": "2026-08-30T18:00:00",
+      "startDate": "2026-08-17T12:00:00",
+      "endDate": "2026-08-30T12:00:00"
+    },
+    {
+      "id": "s-c4",
+      "projectId": "p1",
+      "name": "Тиждень 4",
+      "createdAt": "2026-08-03T12:00:00",
+      "closedAt": "2026-08-16T18:00:00",
+      "startDate": "2026-08-03T12:00:00",
+      "endDate": "2026-08-16T12:00:00"
+    },
+    {
+      "id": "s-undated-closed",
+      "projectId": "p1",
+      "name": "Старий",
+      "createdAt": "2026-07-01T12:00:00",
+      "closedAt": "2026-07-20T18:00:00"
+    },
+    {
+      "id": "s-p2",
+      "projectId": "p2",
+      "name": "Без дат",
+      "createdAt": "2026-09-10T12:00:00"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "title": "t1",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-c1",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-09-10T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "title": "t2",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-c1"
+    },
+    {
+      "id": "t3",
+      "title": "t3",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-c2",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-08-31T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "t4",
+      "title": "t4",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-c3",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-08-20T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "t5",
+      "title": "t5",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-c3",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-08-25T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "t6",
+      "title": "t6",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-c4",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-08-10T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "t7",
+      "title": "t7",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-todo",
+      "sprintId": "s-cur",
+      "assigneeId": "u1",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-09-22T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "t8",
+      "title": "t8",
+      "priority": "medium",
+      "status": "active",
+      "projectId": "p1",
+      "kanbanColumnId": "st-prog",
+      "sprintId": "s-cur",
+      "assigneeId": "u1",
+      "deadline": "2026-09-22T12:00:00"
+    },
+    {
+      "id": "t9",
+      "title": "t9",
+      "priority": "medium",
+      "status": "active",
+      "projectId": "p1",
+      "kanbanColumnId": "st-review",
+      "sprintId": "s-cur",
+      "assigneeId": null,
+      "deadline": "2026-09-23T09:00:00"
+    },
+    {
+      "id": "t10",
+      "title": "t10",
+      "priority": "medium",
+      "status": "active",
+      "projectId": "p1",
+      "kanbanColumnId": "status-in-progress",
+      "assigneeId": ""
+    },
+    {
+      "id": "t11",
+      "title": "t11",
+      "priority": "medium",
+      "status": "active",
+      "projectId": "p1",
+      "kanbanColumnId": "st-todo",
+      "sprintId": "ghost",
+      "assigneeId": "u2",
+      "deadline": "nope"
+    },
+    {
+      "id": "t12",
+      "title": "t12",
+      "priority": "medium",
+      "status": "active",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-over",
+      "deadline": "2026-09-01T12:00:00"
+    },
+    {
+      "id": "t13",
+      "title": "t13",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-over",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-09-05T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "t14",
+      "title": "t14",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-cur",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-09-19T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "t15",
+      "title": "t15",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p1",
+      "kanbanColumnId": "st-done",
+      "sprintId": "s-cur"
+    },
+    {
+      "id": "u1",
+      "title": "u1",
+      "priority": "medium",
+      "status": "active",
+      "projectId": "p2",
+      "kanbanColumnId": "status-in-progress",
+      "assigneeId": "x",
+      "sprintId": "s-p2"
+    },
+    {
+      "id": "u2",
+      "title": "u2",
+      "priority": "medium",
+      "status": "in_progress",
+      "projectId": "p2"
+    },
+    {
+      "id": "u3",
+      "title": "u3",
+      "priority": "medium",
+      "status": "todo",
+      "projectId": "p2",
+      "kanbanColumnId": "status-review",
+      "deadline": "2026-09-20T12:00:00"
+    },
+    {
+      "id": "u4",
+      "title": "u4",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p2",
+      "kanbanColumnId": "status-done",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-07-01T12:00:00",
+          "type": "done"
+        },
+        {
+          "id": "h1",
+          "at": "2026-07-02T12:00:00",
+          "type": "active"
+        },
+        {
+          "id": "h2",
+          "at": "2026-09-16T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "u5",
+      "title": "u5",
+      "priority": "medium",
+      "status": "done",
+      "projectId": "p2",
+      "kanbanColumnId": "status-done",
+      "history": [
+        {
+          "id": "h0",
+          "at": "2026-06-01T12:00:00",
+          "type": "done"
+        }
+      ]
+    },
+    {
+      "id": "z1",
+      "title": "z1",
+      "priority": "medium",
+      "status": "active",
+      "deadline": "2026-09-01T12:00:00"
+    }
+  ],
+  "expected": {
+    "counters": {
+      "p1": {
+        "total": 15,
+        "done": 10,
+        "inProgress": 2,
+        "todo": 3,
+        "open": 5,
+        "assigned": 2,
+        "unassigned": 3,
+        "backlog": 2,
+        "overdue": 2
+      },
+      "p2": {
+        "total": 5,
+        "done": 2,
+        "inProgress": 2,
+        "todo": 1,
+        "open": 3,
+        "assigned": 1,
+        "unassigned": 2,
+        "backlog": 2,
+        "overdue": 1
+      },
+      "p3": {
+        "total": 0,
+        "done": 0,
+        "inProgress": 0,
+        "todo": 0,
+        "open": 0,
+        "assigned": 0,
+        "unassigned": 0,
+        "backlog": 0,
+        "overdue": 0
+      }
+    },
+    "currentSprint": {
+      "p1": {
+        "sprintId": "s-over",
+        "name": "Тиждень 10",
+        "done": 1,
+        "total": 2,
+        "pct": 50,
+        "daysLeft": null,
+        "overdue": true,
+        "daysOverdue": 3,
+        "dated": true
+      },
+      "p2": {
+        "sprintId": "s-p2",
+        "name": "Без дат",
+        "done": 0,
+        "total": 1,
+        "pct": 0,
+        "daysLeft": null,
+        "overdue": false,
+        "daysOverdue": 0,
+        "dated": false
+      },
+      "p3": null
+    },
+    "sprints": {
+      "s-over": {
+        "overdue": true,
+        "days": 14,
+        "velocity": 1,
+        "burndown": {
+          "days": 14,
+          "scope": 2,
+          "todayIndex": 14,
+          "undated": 0,
+          "carriedIn": 1,
+          "sparse": false,
+          "points": [
+            {
+              "index": 0,
+              "day": "2026-09-07",
+              "ideal": 2,
+              "actual": 2
+            },
+            {
+              "index": 1,
+              "day": "2026-09-07",
+              "ideal": 1.857143,
+              "actual": 1
+            },
+            {
+              "index": 2,
+              "day": "2026-09-08",
+              "ideal": 1.714286,
+              "actual": 1
+            },
+            {
+              "index": 3,
+              "day": "2026-09-09",
+              "ideal": 1.571429,
+              "actual": 1
+            },
+            {
+              "index": 4,
+              "day": "2026-09-10",
+              "ideal": 1.428571,
+              "actual": 1
+            },
+            {
+              "index": 5,
+              "day": "2026-09-11",
+              "ideal": 1.285714,
+              "actual": 1
+            },
+            {
+              "index": 6,
+              "day": "2026-09-12",
+              "ideal": 1.142857,
+              "actual": 1
+            },
+            {
+              "index": 7,
+              "day": "2026-09-13",
+              "ideal": 1,
+              "actual": 1
+            },
+            {
+              "index": 8,
+              "day": "2026-09-14",
+              "ideal": 0.857143,
+              "actual": 1
+            },
+            {
+              "index": 9,
+              "day": "2026-09-15",
+              "ideal": 0.714286,
+              "actual": 1
+            },
+            {
+              "index": 10,
+              "day": "2026-09-16",
+              "ideal": 0.571429,
+              "actual": 1
+            },
+            {
+              "index": 11,
+              "day": "2026-09-17",
+              "ideal": 0.428571,
+              "actual": 1
+            },
+            {
+              "index": 12,
+              "day": "2026-09-18",
+              "ideal": 0.285714,
+              "actual": 1
+            },
+            {
+              "index": 13,
+              "day": "2026-09-19",
+              "ideal": 0.142857,
+              "actual": 1
+            },
+            {
+              "index": 14,
+              "day": "2026-09-20",
+              "ideal": 0,
+              "actual": 1
+            }
+          ]
+        }
+      },
+      "s-cur": {
+        "overdue": false,
+        "days": 7,
+        "velocity": 3,
+        "burndown": {
+          "days": 7,
+          "scope": 5,
+          "todayIndex": 3,
+          "undated": 1,
+          "carriedIn": 1,
+          "sparse": false,
+          "points": [
+            {
+              "index": 0,
+              "day": "2026-09-21",
+              "ideal": 5,
+              "actual": 5
+            },
+            {
+              "index": 1,
+              "day": "2026-09-21",
+              "ideal": 4.285714,
+              "actual": 4
+            },
+            {
+              "index": 2,
+              "day": "2026-09-22",
+              "ideal": 3.571429,
+              "actual": 3
+            },
+            {
+              "index": 3,
+              "day": "2026-09-23",
+              "ideal": 2.857143,
+              "actual": 3
+            },
+            {
+              "index": 4,
+              "day": "2026-09-24",
+              "ideal": 2.142857,
+              "actual": null
+            },
+            {
+              "index": 5,
+              "day": "2026-09-25",
+              "ideal": 1.428571,
+              "actual": null
+            },
+            {
+              "index": 6,
+              "day": "2026-09-26",
+              "ideal": 0.714286,
+              "actual": null
+            },
+            {
+              "index": 7,
+              "day": "2026-09-27",
+              "ideal": 0,
+              "actual": null
+            }
+          ]
+        }
+      },
+      "s-c1": {
+        "overdue": false,
+        "days": 14,
+        "velocity": 2,
+        "burndown": {
+          "days": 14,
+          "scope": 2,
+          "todayIndex": 14,
+          "undated": 1,
+          "carriedIn": 0,
+          "sparse": false,
+          "points": [
+            {
+              "index": 0,
+              "day": "2026-09-01",
+              "ideal": 2,
+              "actual": 2
+            },
+            {
+              "index": 1,
+              "day": "2026-09-01",
+              "ideal": 1.857143,
+              "actual": 2
+            },
+            {
+              "index": 2,
+              "day": "2026-09-02",
+              "ideal": 1.714286,
+              "actual": 2
+            },
+            {
+              "index": 3,
+              "day": "2026-09-03",
+              "ideal": 1.571429,
+              "actual": 2
+            },
+            {
+              "index": 4,
+              "day": "2026-09-04",
+              "ideal": 1.428571,
+              "actual": 2
+            },
+            {
+              "index": 5,
+              "day": "2026-09-05",
+              "ideal": 1.285714,
+              "actual": 2
+            },
+            {
+              "index": 6,
+              "day": "2026-09-06",
+              "ideal": 1.142857,
+              "actual": 2
+            },
+            {
+              "index": 7,
+              "day": "2026-09-07",
+              "ideal": 1,
+              "actual": 2
+            },
+            {
+              "index": 8,
+              "day": "2026-09-08",
+              "ideal": 0.857143,
+              "actual": 2
+            },
+            {
+              "index": 9,
+              "day": "2026-09-09",
+              "ideal": 0.714286,
+              "actual": 2
+            },
+            {
+              "index": 10,
+              "day": "2026-09-10",
+              "ideal": 0.571429,
+              "actual": 1
+            },
+            {
+              "index": 11,
+              "day": "2026-09-11",
+              "ideal": 0.428571,
+              "actual": 1
+            },
+            {
+              "index": 12,
+              "day": "2026-09-12",
+              "ideal": 0.285714,
+              "actual": 1
+            },
+            {
+              "index": 13,
+              "day": "2026-09-13",
+              "ideal": 0.142857,
+              "actual": 1
+            },
+            {
+              "index": 14,
+              "day": "2026-09-14",
+              "ideal": 0,
+              "actual": 1
+            }
+          ]
+        }
+      },
+      "s-c2": {
+        "overdue": false,
+        "days": 1,
+        "velocity": 1,
+        "burndown": {
+          "days": 1,
+          "scope": 1,
+          "todayIndex": 1,
+          "undated": 0,
+          "carriedIn": 0,
+          "sparse": false,
+          "points": [
+            {
+              "index": 0,
+              "day": "2026-08-31",
+              "ideal": 1,
+              "actual": 1
+            },
+            {
+              "index": 1,
+              "day": "2026-08-31",
+              "ideal": 0,
+              "actual": 0
+            }
+          ]
+        }
+      },
+      "s-c3": {
+        "overdue": false,
+        "days": 14,
+        "velocity": 2,
+        "burndown": {
+          "days": 14,
+          "scope": 2,
+          "todayIndex": 14,
+          "undated": 0,
+          "carriedIn": 0,
+          "sparse": false,
+          "points": [
+            {
+              "index": 0,
+              "day": "2026-08-17",
+              "ideal": 2,
+              "actual": 2
+            },
+            {
+              "index": 1,
+              "day": "2026-08-17",
+              "ideal": 1.857143,
+              "actual": 2
+            },
+            {
+              "index": 2,
+              "day": "2026-08-18",
+              "ideal": 1.714286,
+              "actual": 2
+            },
+            {
+              "index": 3,
+              "day": "2026-08-19",
+              "ideal": 1.571429,
+              "actual": 2
+            },
+            {
+              "index": 4,
+              "day": "2026-08-20",
+              "ideal": 1.428571,
+              "actual": 1
+            },
+            {
+              "index": 5,
+              "day": "2026-08-21",
+              "ideal": 1.285714,
+              "actual": 1
+            },
+            {
+              "index": 6,
+              "day": "2026-08-22",
+              "ideal": 1.142857,
+              "actual": 1
+            },
+            {
+              "index": 7,
+              "day": "2026-08-23",
+              "ideal": 1,
+              "actual": 1
+            },
+            {
+              "index": 8,
+              "day": "2026-08-24",
+              "ideal": 0.857143,
+              "actual": 1
+            },
+            {
+              "index": 9,
+              "day": "2026-08-25",
+              "ideal": 0.714286,
+              "actual": 0
+            },
+            {
+              "index": 10,
+              "day": "2026-08-26",
+              "ideal": 0.571429,
+              "actual": 0
+            },
+            {
+              "index": 11,
+              "day": "2026-08-27",
+              "ideal": 0.428571,
+              "actual": 0
+            },
+            {
+              "index": 12,
+              "day": "2026-08-28",
+              "ideal": 0.285714,
+              "actual": 0
+            },
+            {
+              "index": 13,
+              "day": "2026-08-29",
+              "ideal": 0.142857,
+              "actual": 0
+            },
+            {
+              "index": 14,
+              "day": "2026-08-30",
+              "ideal": 0,
+              "actual": 0
+            }
+          ]
+        }
+      },
+      "s-c4": {
+        "overdue": false,
+        "days": 14,
+        "velocity": 1,
+        "burndown": {
+          "days": 14,
+          "scope": 1,
+          "todayIndex": 14,
+          "undated": 0,
+          "carriedIn": 0,
+          "sparse": false,
+          "points": [
+            {
+              "index": 0,
+              "day": "2026-08-03",
+              "ideal": 1,
+              "actual": 1
+            },
+            {
+              "index": 1,
+              "day": "2026-08-03",
+              "ideal": 0.928571,
+              "actual": 1
+            },
+            {
+              "index": 2,
+              "day": "2026-08-04",
+              "ideal": 0.857143,
+              "actual": 1
+            },
+            {
+              "index": 3,
+              "day": "2026-08-05",
+              "ideal": 0.785714,
+              "actual": 1
+            },
+            {
+              "index": 4,
+              "day": "2026-08-06",
+              "ideal": 0.714286,
+              "actual": 1
+            },
+            {
+              "index": 5,
+              "day": "2026-08-07",
+              "ideal": 0.642857,
+              "actual": 1
+            },
+            {
+              "index": 6,
+              "day": "2026-08-08",
+              "ideal": 0.571429,
+              "actual": 1
+            },
+            {
+              "index": 7,
+              "day": "2026-08-09",
+              "ideal": 0.5,
+              "actual": 1
+            },
+            {
+              "index": 8,
+              "day": "2026-08-10",
+              "ideal": 0.428571,
+              "actual": 0
+            },
+            {
+              "index": 9,
+              "day": "2026-08-11",
+              "ideal": 0.357143,
+              "actual": 0
+            },
+            {
+              "index": 10,
+              "day": "2026-08-12",
+              "ideal": 0.285714,
+              "actual": 0
+            },
+            {
+              "index": 11,
+              "day": "2026-08-13",
+              "ideal": 0.214286,
+              "actual": 0
+            },
+            {
+              "index": 12,
+              "day": "2026-08-14",
+              "ideal": 0.142857,
+              "actual": 0
+            },
+            {
+              "index": 13,
+              "day": "2026-08-15",
+              "ideal": 0.071429,
+              "actual": 0
+            },
+            {
+              "index": 14,
+              "day": "2026-08-16",
+              "ideal": 0,
+              "actual": 0
+            }
+          ]
+        }
+      },
+      "s-undated-closed": {
+        "overdue": false,
+        "days": 1,
+        "velocity": 0,
+        "burndown": null
+      },
+      "s-p2": {
+        "overdue": false,
+        "days": 1,
+        "velocity": 0,
+        "burndown": null
+      }
+    },
+    "velocity": {
+      "p1": {
+        "rows": [
+          {
+            "sprintId": "s-c1",
+            "velocity": 2,
+            "days": 14,
+            "weeklyVelocity": 1,
+            "inWindow": true
+          },
+          {
+            "sprintId": "s-c2",
+            "velocity": 1,
+            "days": 1,
+            "weeklyVelocity": 7,
+            "inWindow": true
+          },
+          {
+            "sprintId": "s-c3",
+            "velocity": 2,
+            "days": 14,
+            "weeklyVelocity": 1,
+            "inWindow": true
+          },
+          {
+            "sprintId": "s-c4",
+            "velocity": 1,
+            "days": 14,
+            "weeklyVelocity": 0.5,
+            "inWindow": false
+          }
+        ],
+        "count": 3,
+        "avgVelocity": 1.666667,
+        "avgWeeklyVelocity": 3,
+        "enough": true,
+        "undatedClosed": 1,
+        "forecastWeeks": 2
+      },
+      "p2": {
+        "rows": [],
+        "count": 0,
+        "avgVelocity": null,
+        "avgWeeklyVelocity": null,
+        "enough": false,
+        "undatedClosed": 0,
+        "forecastWeeks": null
+      },
+      "p3": {
+        "rows": [],
+        "count": 0,
+        "avgVelocity": null,
+        "avgWeeklyVelocity": null,
+        "enough": false,
+        "undatedClosed": 0,
+        "forecastWeeks": null
+      }
+    },
+    "portfolio": {
+      "projects": 3,
+      "total": 20,
+      "done": 12,
+      "pct": 60,
+      "inProgress": 4,
+      "open": 8,
+      "overdue": 3,
+      "unassigned": 5,
+      "backlog": 4,
+      "weekly": {
+        "weeks": [
+          {
+            "weekStart": "2026-08-03",
+            "count": 0,
+            "current": false
+          },
+          {
+            "weekStart": "2026-08-10",
+            "count": 1,
+            "current": false
+          },
+          {
+            "weekStart": "2026-08-17",
+            "count": 1,
+            "current": false
+          },
+          {
+            "weekStart": "2026-08-24",
+            "count": 1,
+            "current": false
+          },
+          {
+            "weekStart": "2026-08-31",
+            "count": 2,
+            "current": false
+          },
+          {
+            "weekStart": "2026-09-07",
+            "count": 1,
+            "current": false
+          },
+          {
+            "weekStart": "2026-09-14",
+            "count": 2,
+            "current": false
+          },
+          {
+            "weekStart": "2026-09-21",
+            "count": 1,
+            "current": true
+          }
+        ],
+        "total": 9,
+        "earlier": 1,
+        "undated": 2
+      },
+      "avgWeekly": 1.125
+    }
+  }
+}

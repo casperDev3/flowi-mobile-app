@@ -12,10 +12,11 @@
  * `loadData` + `useStorageRefresh` замість `useSyncedList`.
  */
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
+import { ProjectSyncIndicator } from '@/components/projects/ProjectSyncIndicator';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { projectRoute } from '@/constants/projectNav';
 import { useContentWidth } from '@/hooks/use-content-width';
@@ -26,6 +27,7 @@ import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { fetchProjectActivity, type ActivityEntry } from '@/store/project-activity';
+import { refreshProjectNow } from '@/store/project-sync';
 import { loadData } from '@/store/storage';
 import { useTimerContext } from '@/store/timer-context';
 import type { Account } from '@/utils/accounts';
@@ -35,11 +37,16 @@ import { formatSubscriptionMoney } from '@/utils/subscriptions';
 import { projectMeetingSections, type Meeting } from '@/utils/meetings';
 import { activityIcon, formatActivityMessage } from '@/utils/projectActivity';
 import { projectStats } from '@/utils/projectStats';
-import { budgetSpentThisMonth, currentSprintStats, hoursThisWeekSeconds, type ProjectTimeEntryLike } from '@/utils/projectOverview';
+import { budgetSpentTotal, hoursThisWeekSeconds, type ProjectTimeEntryLike } from '@/utils/projectOverview';
+import { currentSprintCard, projectCounters } from '@/utils/projectStatsMetrics';
 import type { Sprint, SprintTaskLike } from '@/utils/sprintUtils';
+import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
 
 interface OverviewTask extends SprintTaskLike {
+  kanbanColumnId?: string;
+  assigneeId?: string | null;
+  history?: { at: string; type: string }[];
   deadline?: string;
   timeEntries?: { startedAt: string; endedAt?: string; duration: number }[];
 }
@@ -76,6 +83,7 @@ export default function ProjectOverviewScreen() {
   const [tasks, setTasks] = useState<OverviewTask[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [statusColumns, setStatusColumns] = useState<TaskStatusColumn[]>([]);
   const [timeEntries, setTimeEntries] = useState<ProjectTimeEntryLike[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -87,19 +95,29 @@ export default function ProjectOverviewScreen() {
   const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
 
+  // Остання ЗАПИТАНА активність: відповідь попереднього проєкту (перемкнули
+  // свічер, поки запит летів) не має лягати поверх нового.
+  const activityRequestRef = useRef<string | null>(null);
+  const loadActivity = useCallback(async (projectId: string) => {
+    activityRequestRef.current = projectId;
+    setActivityLoading(true);
+    try {
+      const page = await fetchProjectActivity(projectId, { limit: 5 });
+      if (activityRequestRef.current === projectId) setRecentActivity(page.results);
+    } catch {
+      /* активність — не критично: лишаємо попередню стрічку */
+    } finally {
+      if (activityRequestRef.current === projectId) setActivityLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!project?.id) return;
-    let mounted = true;
-    setActivityLoading(true);
-    void fetchProjectActivity(project.id, { limit: 5 })
-      .then(page => { if (mounted) setRecentActivity(page.results); })
-      .catch(() => {})
-      .finally(() => { if (mounted) setActivityLoading(false); });
-    return () => { mounted = false; };
-  }, [project?.id]);
+    void loadActivity(project.id);
+  }, [project?.id, loadActivity]);
 
   const loadAll = useCallback(async () => {
-    const [t, m, s, te, tx, acc, pb, cur] = await Promise.all([
+    const [t, m, s, te, tx, acc, pb, cur, cols] = await Promise.all([
       loadData<OverviewTask[]>('tasks', []),
       loadData<Meeting[]>('meetings', []),
       loadData<Sprint[]>('sprints', []),
@@ -108,15 +126,39 @@ export default function ProjectOverviewScreen() {
       loadData<Account[]>('accounts', []),
       loadData<ProjectBudgetRecord[]>('project_budgets', []),
       loadData<Currency[]>('finance_currencies', []),
+      // Колонки — для лічильника «в роботі» (тип етапу береться з колонки).
+      loadData<TaskStatusColumn[]>('task_statuses', []),
     ]);
+    setStatusColumns(cols);
     setTasks(t); setMeetings(m); setSprints(s); setTimeEntries(te);
     setTransactions(tx); setAccounts(acc); setBudgets(pb); setCurrencies(cur);
   }, []);
 
   useFocusEffect(useCallback(() => { void loadAll(); }, [loadAll]));
-  useStorageRefresh(['tasks', 'meetings', 'sprints', 'time_entries', 'transactions', 'accounts', 'project_budgets', 'finance_currencies'], loadAll);
+  useStorageRefresh(['tasks', 'meetings', 'sprints', 'time_entries', 'transactions', 'accounts', 'project_budgets', 'finance_currencies', 'task_statuses'], loadAll);
 
-  const onRefresh = useCallback(() => { setRefreshing(true); loadAll().finally(() => setRefreshing(false)); }, [loadAll]);
+  /**
+   * Pull-to-refresh іде НА СЕРВЕР (`refreshProjectNow`), а не лише перечитує
+   * AsyncStorage, як було: жест давав спінер і ті самі дані, бо ніхто в
+   * межах проєкту не робив обміну взагалі. Офлайн `refreshProjectNow` тихо
+   * виходить — лишається звичайне перечитування локальних даних.
+   */
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void (async () => {
+      try {
+        if (id) {
+          await refreshProjectNow(id);
+          await loadActivity(id);
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('[project/overview] оновлення не вдалося:', e);
+      } finally {
+        await loadAll();
+        setRefreshing(false);
+      }
+    })();
+  }, [id, loadAll, loadActivity]);
 
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
   const modules = project ? projectModules(project) : MODULES_BY_TEMPLATE.work;
@@ -132,17 +174,58 @@ export default function ProjectOverviewScreen() {
   // modules.sprints — інакше картка поточного спринту показувалась би навіть
   // з вимкненим розділом Спринти (review finding; Наради й Бюджет нижче вже
   // правильно перевіряють свій modules.*).
+  //
+  // Той самий currentSprintCard, що й на картці проєкту (utils/projectStatsMetrics):
+  // «Огляд» і картка мусять показувати ОДИН поточний спринт і ті самі дні.
+  const minute = Math.floor(Date.now() / 60_000);
+  const now = useMemo(() => new Date(minute * 60_000), [minute]);
   const sprintStats = useMemo(
-    () => (project && modules.sprints ? currentSprintStats(sprints, tasks, project.id) : null),
-    [project, modules.sprints, sprints, tasks],
+    () => (project && modules.sprints ? currentSprintCard(project, sprints, tasks, now) : null),
+    [project, modules.sprints, sprints, tasks, now],
   );
+  // Лічильники картки проєкту (воронка й ознаки) — ті самі числа, що в списку.
+  const counters = useMemo(
+    () => (project ? projectCounters(project, tasks, sprints, statusColumns, now) : null),
+    [project, tasks, sprints, statusColumns, now],
+  );
+  const counterLine = counters
+    ? [
+        counters.inProgress ? `${counters.inProgress} ${tr.projectInProgress}` : '',
+        counters.unassigned ? `${counters.unassigned} ${tr.projectUnassigned}` : '',
+        modules.sprints && counters.backlog ? `${counters.backlog} ${tr.projectBacklog}` : '',
+      ].filter(Boolean).join(' · ')
+    : '';
+  const sprintHint = sprintStats
+    ? sprintStats.overdue
+      ? tr.sprintOverdueDays.replace('{n}', String(sprintStats.overdueDays))
+      : !sprintStats.dated
+        ? tr.sprintUndated
+        : sprintStats.daysLeft === 0
+          ? tr.sprintLastDay
+          : tr.sprintDaysLeft.replace('{n}', String(sprintStats.daysLeft ?? 0))
+    : '';
   const weekSeconds = useMemo(
     () => (project ? hoursThisWeekSeconds(timeEntries, project.id) : 0),
     [project, timeEntries],
   );
   const budget = project ? budgets.find(b => b.id === project.id) : undefined;
+  /**
+   * Витрачено з бюджету — ЗА ВЕСЬ ЧАС (`budgetSpentTotal`), як у розділі
+   * «Бюджет» і у вебі.
+   *
+   * Тут стояв `budgetSpentThisMonth`, і плитка «Витрачено» рахувала лише
+   * поточний місяць, хоча ділила це число на `budget.amount` — ліміт, який
+   * задають на ПРОЄКТ цілком, а не на місяць. Виходило «3 000 / 200 000» у
+   * грудні й «0 / 200 000» у січні під тим самим підписом, причому сусідній
+   * розділ «Бюджет» на тому самому проєкті показував інше число. Дріб має
+   * порівнювати те саме з тим самим, інакше він не означає нічого.
+   *
+   * Темпу за місяць тут навмисно НЕ додаємо: окрема цифра потребує власного
+   * підпису («Цього місяця»), а вигадувати його поруч із наявним «Витрачено»
+   * означало б дві нез'ясовні суми в одному рядку плиток.
+   */
   const spent = useMemo(
-    () => (project && budget ? budgetSpentThisMonth(transactions, accounts, project.id, budget.currency) : 0),
+    () => (project && budget ? budgetSpentTotal(transactions, accounts, project.id, budget.currency) : 0),
     [project, budget, transactions, accounts],
   );
 
@@ -159,7 +242,11 @@ export default function ProjectOverviewScreen() {
   }
 
   return (
-    <ProjectScreenShell project={project} isDark={isDark} title={tr.projectNavOverview}>
+    <ProjectScreenShell
+      project={project}
+      isDark={isDark}
+      title={tr.projectNavOverview}
+      actions={<ProjectSyncIndicator projectId={project.id} accent={c.accent} subColor={c.sub} dimColor={c.dim} />}>
       <ScrollView
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
         showsVerticalScrollIndicator={false}
@@ -186,10 +273,13 @@ export default function ProjectOverviewScreen() {
           </View>
           <Text style={{ color: c.text, fontSize: 13, fontWeight: '800' }}>{stats?.pct ?? 0}%</Text>
         </View>
-        <Text style={{ color: c.sub, fontSize: 12, marginBottom: 16 }}>
+        <Text style={{ color: c.sub, fontSize: 12, marginBottom: counterLine ? 4 : 16 }}>
           {stats?.done ?? 0}/{stats?.total ?? 0} {tr.projectDone}
           {project.deadline ? ` · ${tr.projectDeadline}: ${new Date(project.deadline).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}` : ''}
         </Text>
+        {counterLine ? (
+          <Text style={{ color: c.sub, fontSize: 11, marginBottom: 16 }}>{counterLine}</Text>
+        ) : null}
 
         {/* Плитки статистики */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
@@ -206,9 +296,10 @@ export default function ProjectOverviewScreen() {
           ) : null}
           {sprintStats ? (
             <StatCard
-              label={sprintStats.sprint.name}
+              label={`${sprintStats.sprint.name} · ${sprintHint}`}
               value={`${sprintStats.done}/${sprintStats.total}`}
-              color={project.color}
+              // Протермінований спринт — бурштиновий, не червоний (§4).
+              color={sprintStats.overdue ? '#F59E0B' : project.color}
               sub={c.sub}
             />
           ) : null}

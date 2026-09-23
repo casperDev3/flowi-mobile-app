@@ -1,5 +1,11 @@
 /**
- * store/push.ts — реєстрація Expo push-токена на сервері (контракт §2.8).
+ * store/push.ts — реєстрація пристрою для push на сервері (контракт §2.8,
+ * docs/specs/notifications-module.md §6.4, §10.1).
+ *
+ * Пристрій реєструється в `DeviceRegistration` (`POST /notifications/devices/`)
+ * разом із версією збірки, мовою й часовим поясом — сервер за версією
+ * вирішує, чи слати сюди серверні нагадування (§10.3), а за поясом рахує тихі
+ * години. Старий сервер без модуля сповіщень (404) — легасі `POST /push/tokens/`.
  *
  * Дозволу на нотифікації тут НЕ просимо: перший запит permission-діалогу
  * одразу після входу, коли користувач ще нічого не налаштував, — це саме
@@ -14,11 +20,23 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
 
+import {
+  type DeviceRegistrationBody,
+  deleteDevice,
+  fetchNotificationsCapability,
+  isModuleMissing,
+  markNotificationsRead,
+  postDevice,
+  resetNotificationCenter,
+  saveServerRemindersRecord,
+  serverReminderEvents,
+} from '@/api/notifications';
+import { notificationRoute, type PushLinkData } from '@/utils/pushLink';
+
 import { apiFetch } from './api';
-import { getApiBase } from './api-config';
+import { CLIENT_VERSION, getApiBase } from './api-config';
 import { loadData, saveData } from './storage';
 import { cachedWorkspaceConfig } from './workspace';
-import { pushTapUrl } from '@/utils/pushLink';
 
 const REGISTERED_KEY = 'push_token_registered';
 /** Токени, чиє `DELETE /push/tokens/` не вдалося (офлайн вихід) — дожимаємо при наступній реєстрації. */
@@ -45,10 +63,39 @@ interface PendingUnregisterEntry {
  */
 const AUTH_USER_CACHE_KEY = 'auth_user';
 
+/** Той самий ключ, у який пише `I18nProvider` (`store/i18n.tsx`). */
+const LANG_STORAGE_KEY = 'lang_option_v1';
+
 interface RegisteredPush {
   token: string;
   userId: string;
   workspaceId: string;
+  /**
+   * Куди зареєстровано: `devices` — `DeviceRegistration` (§6.4), `legacy` —
+   * старий `/push/tokens/`. Запис без поля — з легасі-збірки: такий пристрій
+   * сервер переніс у `DeviceRegistration` без версії, і серверних нагадувань
+   * на нього не шле, доки клієнт не перереєструється з `app_version`.
+   */
+  endpoint?: 'devices' | 'legacy';
+  appVersion?: string;
+  lang?: string;
+  timezone?: string;
+}
+
+function deviceTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  } catch {
+    return '';
+  }
+}
+
+function deviceName(): string {
+  try {
+    return String(Device.deviceName || Device.modelName || '').slice(0, 100);
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -126,7 +173,7 @@ async function flushPendingUnregister(skipToken?: string): Promise<void> {
       continue;
     }
     try {
-      await apiFetch('/push/tokens/', { method: 'DELETE', body: { token: entry.token } });
+      await removeDeviceOnServer(entry.token);
     } catch (e) {
       if (__DEV__) console.warn('[push] відкладене зняття токена не вдалося:', e);
       remaining.push(entry);
@@ -136,9 +183,51 @@ async function flushPendingUnregister(skipToken?: string): Promise<void> {
 }
 
 /**
- * Реєструє токен пристрою на сервері після входу/старту (контракт §2.8) —
- * ідемпотентно: якщо токен/користувач/workspace не змінились із минулого
- * разу, повторний мережевий виклик не робиться.
+ * `DELETE /notifications/devices/`; на сервері без модуля — легасі
+ * `/push/tokens/`. Новий ендпоінт знімає і легасі-рядок `PushToken`.
+ */
+async function removeDeviceOnServer(token: string): Promise<void> {
+  try {
+    await deleteDevice(token);
+  } catch (e) {
+    if (!isModuleMissing(e)) throw e;
+    await apiFetch('/push/tokens/', { method: 'DELETE', body: { token } });
+  }
+}
+
+/**
+ * Які нагадування вже шле сервер — рішення для `store/notifications.ts`
+ * (§10.3). Пишеться лише для пристрою, зареєстрованого в `DeviceRegistration`
+ * з версією збірки: інакше сервер фізично не надішле сюди нагадування, і
+ * локальне лишається єдиним. Мережева помилка рішення НЕ змінює — вчорашнє
+ * рішення надійніше за «не знаю».
+ */
+async function syncServerReminders(userId: string, deviceRegistered: boolean): Promise<void> {
+  if (!deviceRegistered) {
+    await saveServerRemindersRecord(null);
+    return;
+  }
+  try {
+    const capability = await fetchNotificationsCapability();
+    const events = serverReminderEvents({ capability, appVersion: CLIENT_VERSION, deviceRegistered });
+    await saveServerRemindersRecord(events.length ? {
+      origin: getApiBase(),
+      userId,
+      events,
+      appVersion: CLIENT_VERSION,
+      at: new Date().toISOString(),
+    } : null);
+  } catch (e) {
+    if (__DEV__) console.warn('[push] можливості сповіщень не прочитались:', e);
+  }
+}
+
+/**
+ * Реєструє пристрій на сервері після входу/старту (контракт §2.8, модуль
+ * сповіщень §6.4) — ідемпотентно: якщо токен/користувач/workspace, версія
+ * збірки, мова й пояс не змінились із минулого разу, повторний POST не
+ * робиться. Можливості сервера (`server_reminders`) перечитуються щоразу —
+ * сервер міг почати слати нове нагадування.
  */
 export async function registerPushToken(userId: string, workspaceId: string): Promise<void> {
   try {
@@ -158,16 +247,50 @@ export async function registerPushToken(userId: string, workspaceId: string): Pr
     // той токен, який ця функція от-от (пере)зареєструє.
     await flushPendingUnregister(local?.token);
 
-    if (!local) return;
+    if (!local) {
+      await syncServerReminders(userId, false);
+      return;
+    }
     const { token, platform } = local;
+    const lang = (await loadData<string>(LANG_STORAGE_KEY, 'uk')) === 'en' ? 'en' : 'uk';
+    const timezone = deviceTimezone();
 
     const prev = await loadData<RegisteredPush | null>(REGISTERED_KEY, null);
-    if (prev && prev.token === token && prev.userId === userId && prev.workspaceId === workspaceId) {
+    const unchanged = !!prev && prev.token === token && prev.userId === userId && prev.workspaceId === workspaceId
+      && prev.endpoint === 'devices' && prev.appVersion === CLIENT_VERSION
+      && prev.lang === lang && prev.timezone === timezone;
+    if (unchanged) {
+      await syncServerReminders(userId, true);
+      return;
+    }
+    // Той самий токен, але зареєстрований на ЛЕГАСІ-ендпоінті сервера без
+    // модуля, — не повторюємо даремний POST на кожному старті.
+    if (prev && prev.endpoint === 'legacy' && prev.token === token && prev.userId === userId
+      && prev.workspaceId === workspaceId && prev.appVersion === CLIENT_VERSION) {
       return;
     }
 
-    await apiFetch('/push/tokens/', { method: 'POST', body: { token, platform } });
-    await saveData(REGISTERED_KEY, { token, userId, workspaceId } satisfies RegisteredPush);
+    const body: DeviceRegistrationBody = {
+      kind: 'expo',
+      token,
+      platform,
+      device_name: deviceName(),
+      app_version: CLIENT_VERSION,
+      lang,
+      timezone,
+    };
+    let endpoint: 'devices' | 'legacy' = 'devices';
+    try {
+      await postDevice(body);
+    } catch (e) {
+      if (!isModuleMissing(e)) throw e;
+      endpoint = 'legacy';
+      await apiFetch('/push/tokens/', { method: 'POST', body: { token, platform } });
+    }
+    await saveData(REGISTERED_KEY, {
+      token, userId, workspaceId, endpoint, appVersion: CLIENT_VERSION, lang, timezone,
+    } satisfies RegisteredPush);
+    await syncServerReminders(userId, endpoint === 'devices');
   } catch (e) {
     // Помилку відправки глушимо: контракт покладає ретраї на наступний вхід,
     // а користувача блокувати заради пуша не варто.
@@ -210,13 +333,23 @@ export async function getRegistrationPushToken(): Promise<{ token: string; platf
   return getLocalPushToken();
 }
 
-/** Знімає токен із сервера перед виходом/зміною workspace (контракт §2.3, §2.8). */
+/**
+ * Знімає пристрій із сервера перед виходом/зміною workspace (контракт §2.3,
+ * §2.8) і прибирає все, що належало цьому акаунту в центрі сповіщень: кеш
+ * інбоксу, налаштувань і рішення «нагадування шле сервер» — після виходу
+ * локальні нагадування знову плануються як раніше.
+ */
 export async function unregisterPushToken(): Promise<void> {
   const prev = await loadData<RegisteredPush | null>(REGISTERED_KEY, null);
   await saveData(REGISTERED_KEY, null);
+  try {
+    await resetNotificationCenter();
+  } catch (e) {
+    if (__DEV__) console.warn('[push] кеш центру сповіщень не очистився:', e);
+  }
   if (!prev) return;
   try {
-    await apiFetch('/push/tokens/', { method: 'DELETE', body: { token: prev.token } });
+    await removeDeviceOnServer(prev.token);
   } catch (e) {
     // Офлайн вихід (чи мережева помилка посеред нього) — DELETE не дійшов,
     // сервер і далі лінкує токен на щойно вийшлого користувача. Ставимо в
@@ -234,16 +367,14 @@ export async function unregisterPushToken(): Promise<void> {
   }
 }
 
-export interface PushPayloadData {
-  type?: 'assigned' | 'mentioned' | 'status_changed' | 'project_invite' | 'registration_request' | 'registration_decision';
+/**
+ * `data` push-сповіщення. Легасі-поля (`type`, `project_id`, `collection`,
+ * `local_id`, `url`) сервер модуля сповіщень лишає як були
+ * (`channels/expo.py::build_message`), нові — `event_type`, `notification_id`.
+ */
+export interface PushPayloadData extends PushLinkData {
   workspace_id?: string;
-  /** Контракт §7 — присутнє для всіх типів, крім registration_*. */
-  project_id?: string | null;
-  /** `tasks` для assigned/status_changed; сервер шле `'comments'` для mentioned (§7). */
-  collection?: 'tasks' | 'meetings' | 'comments' | null;
-  local_id?: string | null;
-  /** `ftrackingapp://…` — джерело істини для типу цілі `mentioned` (`utils/pushLink.ts`). */
-  url?: string | null;
+  request_id?: string | null;
 }
 
 /** `false`, якщо push належить ІНШОМУ workspace, ніж активний зараз (контракт §7). */
@@ -255,6 +386,9 @@ export function isForCurrentWorkspace(data: PushPayloadData): boolean {
 /** Спільна навігація для обох джерел тапу — рантайм і холодний старт. */
 function handlePushTap(data: PushPayloadData): void {
   if (!isForCurrentWorkspace(data)) return;
+  // Відкрив пуш — отже, побачив: запис інбоксу стає прочитаним і на інших
+  // пристроях (сервер розішле `notifications_changed`).
+  if (data.notification_id) void markNotificationsRead([data.notification_id]).catch(() => {});
   if (data.type === 'registration_request') {
     router.push('/admin-workspace');
     return;
@@ -263,8 +397,14 @@ function handlePushTap(data: PushPayloadData): void {
     router.push('/register-pending');
     return;
   }
-  const url = pushTapUrl(data);
-  if (url) router.push(url as never);
+  const url = notificationRoute(data);
+  if (url) {
+    router.push(url as never);
+    return;
+  }
+  // Подія без власного екрана (системна, чи ціль невідома цій збірці) —
+  // хоча б центр сповіщень, де видно її текст.
+  if (data.event_type) router.push('/notifications' as never);
 }
 
 /**

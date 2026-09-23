@@ -40,7 +40,6 @@
 - Тема, мова, посилання на інструменти (Containers, Banks, Notes, Archive, Budget).
 
 ### Hidden tabs
-- `agent.tsx` — `href: null`, не відображається.
 - `time.tsx` — теж прихований, відкривається через router.push з Tasks (`setPendingTask`).
 
 ## Stack-екрани (`app/*.tsx`)

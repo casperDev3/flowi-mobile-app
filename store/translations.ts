@@ -60,6 +60,118 @@ export interface Translations {
   donate: string;
   developer: string;
   bugList: string;
+  // ── Ідеї та баги (app/feedback.tsx, feedback-inbox.md §10) ──
+  fbTitle: string;
+  fbTypeIdea: string;
+  fbTypeBug: string;
+  fbTabIdeas: string;
+  fbTabBugs: string;
+  fbNewIdea: string;
+  fbNewBug: string;
+  fbEditIdea: string;
+  fbEditBug: string;
+  fbFieldTitle: string;
+  fbTitlePhIdea: string;
+  fbTitlePhBug: string;
+  fbFieldModule: string;
+  fbModuleNone: string;
+  fbModuleOther: string;
+  fbModuleSync: string;
+  fbModuleAuth: string;
+  fbFieldPriority: string;
+  fbFieldSeverity: string;
+  fbPrioHigh: string;
+  fbPrioMedium: string;
+  fbPrioLow: string;
+  fbSevCritical: string;
+  fbSevMajor: string;
+  fbSevMinor: string;
+  fbFieldDescription: string;
+  fbOptional: string;
+  fbDescPhIdea: string;
+  fbDescPhBug: string;
+  fbFieldSteps: string;
+  fbStepsPh: string;
+  fbFieldExpected: string;
+  fbExpectedPh: string;
+  fbFieldActual: string;
+  fbActualPh: string;
+  fbFieldAttachments: string;
+  fbAttachHint: string;
+  fbAttachLocked: string;
+  fbAddAttachment: string;
+  fbRemoveAttachment: string;
+  fbAttachTooMany: string;
+  fbAttachBadType: string;
+  fbAttachTooBig: string;
+  fbAttachTotal: string;
+  fbAttachCacheEvicted: string;
+  fbAttachLocal: string;
+  fbAttachUploaded: string;
+  fbAttachFailed: string;
+  fbAttachElsewhere: string;
+  fbUnitMb: string;
+  fbUnitKb: string;
+  fbContext: string;
+  fbContextHint: string;
+  fbCtxPlatform: string;
+  fbCtxDevice: string;
+  fbCtxVersion: string;
+  fbCtxOs: string;
+  fbCtxScreen: string;
+  fbCtxWorkspace: string;
+  fbPlatformMobile: string;
+  fbPlatformWeb: string;
+  fbDevicePhone: string;
+  fbDeviceTablet: string;
+  fbDeviceDesktop: string;
+  fbSave: string;
+  fbSaveDraft: string;
+  fbSaveAndSend: string;
+  fbSend: string;
+  fbRetry: string;
+  fbEditAfterSent: string;
+  fbRequiredMissing: string;
+  fbSaveFailed: string;
+  fbSendError: string;
+  fbStateDraft: string;
+  fbStateQueued: string;
+  fbQueuedHint: string;
+  fbStateSent: string;
+  fbStateSentNew: string;
+  fbStateInProgress: string;
+  fbStateDone: string;
+  fbStateRejected: string;
+  fbStateFailed: string;
+  fbStateUndelivered: string;
+  fbStateLocalOnly: string;
+  fbStateLegacy: string;
+  fbStateDuplicate: string;
+  fbOwnerComment: string;
+  fbTaskLinked: string;
+  fbForwardingOff: string;
+  fbFilterAll: string;
+  fbFilterOpen: string;
+  fbFilterDone: string;
+  fbFilterSent: string;
+  fbSortNewest: string;
+  fbSortOldest: string;
+  fbStatOpen: string;
+  fbStatDone: string;
+  fbStatSent: string;
+  fbEmptyIdeas: string;
+  fbEmptyBugs: string;
+  fbEmptyHint: string;
+  fbLoadFailed: string;
+  fbSelectHint: string;
+  fbDoneIdea: string;
+  fbDoneBug: string;
+  fbMarkImplemented: string;
+  fbMarkFixed: string;
+  fbReopen: string;
+  fbDeleteTitle: string;
+  fbDeleteBody: string;
+  fbCopied: string;
   bugsValue: string;
   ideas: string;
   features: string;
@@ -793,6 +905,119 @@ export interface Translations {
   itemTags: string;
   itemNote: string;
   containerPickHint: string;
+  // Containers v2 (ctr* — flowi-web-app/docs/specs/containers.md)
+  ctrViewGrid: string;
+  ctrViewPlaces: string;
+  ctrAllBoxes: string;
+  ctrNoPlace: string;
+  ctrPlaces: string;
+  ctrPlaceNew: string;
+  ctrPlaceEdit: string;
+  ctrPlaceName: string;
+  ctrPlaceNamePlaceholder: string;
+  ctrPlaceKind: string;
+  ctrPlaceKindRoom: string;
+  ctrPlaceKindFurniture: string;
+  ctrPlaceKindShelf: string;
+  ctrPlaceKindOther: string;
+  ctrPlaceParent: string;
+  ctrPlaceTopLevel: string;
+  ctrPlaceDelete: string;
+  ctrPlaceDeleteMsg: string;
+  ctrPlaceTooDeep: string;
+  ctrPlaceCreateHere: string;
+  ctrPlacesEmpty: string;
+  ctrLegacyLocation: string;
+  ctrItemQty: string;
+  ctrItemStatus: string;
+  ctrStatusInBox: string;
+  ctrStatusLent: string;
+  ctrStatusDiscarded: string;
+  ctrLentTo: string;
+  ctrLentToPlaceholder: string;
+  ctrLentAt: string;
+  ctrLentCount: string;
+  ctrLend: string;
+  ctrReturned: string;
+  ctrDiscard: string;
+  ctrRestore: string;
+  ctrShowDiscarded: string;
+  ctrHideDiscarded: string;
+  ctrEditItem: string;
+  ctrNewItem: string;
+  ctrLentNeedsName: string;
+  ctrQtyLess: string;
+  ctrQtyMore: string;
+  ctrUnits: string;
+  ctrItemsOne: string;
+  ctrItemsFew: string;
+  ctrItemsMany: string;
+  ctrEmptyBox: string;
+  ctrAddItemHint: string;
+  ctrNewItemPlaceholder: string;
+  ctrTagsPlaceholder: string;
+  ctrNotePlaceholder: string;
+  ctrDeleteItem: string;
+  ctrDeleteItemMsg: string;
+  ctrColor: string;
+  ctrEmptyHint: string;
+  ctrFound: string;
+  ctrNothingFound: string;
+  ctrNoBoxesHere: string;
+  ctrReadFailed: string;
+  ctrRetry: string;
+  ctrPhotos: string;
+  ctrPhotoAdd: string;
+  ctrPhotoCamera: string;
+  ctrPhotoLibrary: string;
+  ctrPhotoRemove: string;
+  ctrPhotoCover: string;
+  ctrPhotoCoverBadge: string;
+  ctrPhotoLimit: string;
+  ctrPhotoPending: string;
+  ctrPhotoFailed: string;
+  ctrPhotoPermission: string;
+  ctrPhotoUnavailable: string;
+  ctrPhotoQueued: string;
+  ctrScan: string;
+  ctrScanHint: string;
+  ctrScanTorch: string;
+  ctrScanManual: string;
+  ctrScanManualPlaceholder: string;
+  ctrScanManualGo: string;
+  ctrScanInvalidCode: string;
+  ctrScanOtherWorkspace: string;
+  ctrScanNotFoundOffline: string;
+  ctrScanNotFound: string;
+  ctrScanChecking: string;
+  ctrScanForeign: string;
+  ctrScanSearchAs: string;
+  ctrScanPermission: string;
+  ctrScanGrant: string;
+  ctrScanNoCamera: string;
+  ctrPrint: string;
+  ctrPrintPreset: string;
+  ctrPrintSmall: string;
+  ctrPrintSmallHint: string;
+  ctrPrintMedium: string;
+  ctrPrintMediumHint: string;
+  ctrPrintLarge: string;
+  ctrPrintLargeHint: string;
+  ctrPrintSelect: string;
+  ctrPrintSelectAll: string;
+  ctrPrintSelectNone: string;
+  ctrPrintGo: string;
+  ctrPrintNoCode: string;
+  ctrPrintNoWorkspace: string;
+  ctrPrintFailed: string;
+  ctrPrintUnavailable: string;
+  ctrQr: string;
+  ctrQrCreate: string;
+  ctrQrNone: string;
+  ctrQrHint: string;
+  ctrQrPrintOne: string;
+  ctrQuickSearchPlaceholder: string;
+  ctrQuickSearchOpen: string;
 
   // Undo toast
   undo: string;
@@ -982,11 +1207,9 @@ export interface Translations {
   navGroupDev: string;
   navTimeTracker: string;
   navBudget: string;
-  navAgent: string;
   navMeetings: string;
   navTime: string;
   navHealthSummary: string;
-  navAgentLabel: string;
 
   // Порожня колонка деталі (master-detail)
   detailEmptyTitle: string;
@@ -1076,7 +1299,8 @@ export interface Translations {
 
   /**
    * Спринти — іменовані пачки задач усередині проєкту (utils/sprintUtils.ts).
-   * Дат у спринта немає, тож і підписів про час тут теж немає.
+   * Дати (startDate/endDate) — необовʼязкові; їхні підписи — у блоці
+   * статистики проєктів нижче.
    */
   sprints: string;
   sprintNew: string;
@@ -1101,6 +1325,60 @@ export interface Translations {
   /** Плейсхолдер рядка додавання задачі у конкретний спринт; {name} — назва спринта. */
   sprintAddTaskIn: string;
   sprintAddTaskA11y: string;
+  /**
+   * Статистика проєктів і спринтів (docs/specs/projects-analytics.md §8.1):
+   * лічильники картки, портфель, дати спринтів, велосіті, burndown. Числа рахує
+   * utils/projectStatsMetrics.ts; число завжди ПІСЛЯ двокрапки чи в {n} —
+   * без форм множини.
+   */
+  projectInProgress: string;
+  projectAssigned: string;
+  projectUnassigned: string;
+  projectBacklog: string;
+  projectFunnelA11y: string;
+  projectFlagA11y: string;
+  sprintCurrent: string;
+  sprintDaysLeft: string;
+  sprintLastDay: string;
+  sprintOverdue: string;
+  sprintOverdueDays: string;
+  sprintUndated: string;
+  sprintProgressA11y: string;
+  sprintStartDate: string;
+  sprintEndDate: string;
+  sprintDatesHint: string;
+  sprintDatesPartial: string;
+  sprintDatesInvalid: string;
+  sprintDatesOrder: string;
+  sprintDatesOverlap: string;
+  sprintNotDated: string;
+  velocityTitle: string;
+  velocityNotEnough: string;
+  velocityAverage: string;
+  velocityDays: string;
+  velocityTasks: string;
+  velocityForecast: string;
+  velocitySample: string;
+  velocityUndated: string;
+  velocityEmpty: string;
+  burndownTitle: string;
+  burndownIdeal: string;
+  burndownActual: string;
+  burndownScope: string;
+  burndownNoDoneDate: string;
+  burndownCarriedIn: string;
+  burndownInsufficient: string;
+  burndownShow: string;
+  burndownHide: string;
+  portfolioKpi: string;
+  portfolioProjects: string;
+  portfolioTasks: string;
+  portfolioCollapse: string;
+  portfolioExpand: string;
+  doneByWeekTitle: string;
+  portfolioWeeksTotal: string;
+  portfolioAvgWeekly: string;
+  portfolioEarlier: string;
   openFullTaskForm: string;
   /** Секція «Зустрічі» деталі проєкту. */
   projectMeetingsPast: string;      // "Минулі ({count})"
@@ -1419,6 +1697,636 @@ export interface Translations {
 
   // Роль-обмежений режим перегляду (viewer, контракт §4.1)
   viewerReadOnlyNotice: string;
+
+  // ─── Бюджет (було utils/budgetStrings.ts) ────────────────────────────────────
+  budgetSpentCaps: string;
+  budgetBudgetCaps: string;
+  budgetLeft: string;
+  budgetOutsideLimits: string;
+  budgetScopeAll: string;
+  budgetScopePersonal: string;
+  budgetScopeProject: string;
+  budgetScopeLabel: string;
+  budgetEmptyTitle: string;
+  budgetEmptyBody: string;
+  budgetAddManually: string;
+  budgetTapHint: string;
+  budgetTapRowHint: string;
+  budgetMonthlyForecast: string;
+  budgetActuallySpent: string;
+  budgetPlannedFor: string;
+  budgetNewCategory: string;
+  budgetName: string;
+  budgetNamePlaceholder: string;
+  budgetIcon: string;
+  budgetAddCategory: string;
+  budgetDeleteTitle: string;
+  budgetDeleteMsg: string;
+  budgetDeleteAction: string;
+  budgetErrorExists: string;
+  /** `{max}` — MAX_BUDGET_ID_LENGTH; підставляє екран, щоб словник не залежав від utils. */
+  budgetErrorTooLong: string;
+  budgetUnsyncableRow: string;
+
+  // ─── Нотатки (було utils/notesStrings.ts) ────────────────────────────────────
+  notesPreview: string;
+  notesEditText: string;
+  notesPin: string;
+  notesUnpin: string;
+  notesPinned: string;
+  notesTagsLabel: string;
+  notesTagsPlaceholder: string;
+  notesTagsAll: string;
+  notesLinkTask: string;
+  notesLinkMeeting: string;
+  notesLinkNone: string;
+  notesLinkLost: string;
+  notesCreateTask: string;
+  notesTaskCreated: string;
+  notesTaskCreateError: string;
+  notesChecklist: string;
+  notesEmptyBody: string;
+  notesMarkdownHint: string;
+
+  // ─── Оплата підписки (було PAY_LABELS в UpcomingPaymentsCard) ────────────────
+  payAction: string;
+  payTitle: string;
+  payAmount: string;
+  payHint: string;
+  payNoAccount: string;
+  payConfirm: string;
+  payStale: string;
+  payTxFailed: string;
+
+  // ─── Модулі інтерфейсу (було moduleText() в store/ui-preferences.ts) ─────────
+  modulesTitle: string;
+  modulesSubtitle: string;
+  modulesSystemNote: string;
+  modulesDisabledTitle: string;
+  modulesDisabledBody: string;
+  modulesOpenSettings: string;
+  modulesSettingsRow: string;
+  modulesDashboardEmptyTitle: string;
+  modulesDashboardEmptyBody: string;
+
+  // ─── «Дані не прочитались» (було TEXT в components/finance/LoadErrorNotice) ──
+  loadErrorTitle: string;
+  loadErrorBody: string;
+  loadErrorRetry: string;
+  healthReminderOff: string;
+  healthReminderOffSub: string;
+  healthNoticeSettings: string;
+  hkSyncing: string;
+  hkManual: string;
+  hkDenied: string;
+  hkGrant: string;
+  hkFailed: string;
+
+  // ─── Екран «Час» ─────────────────────────────────────────────────────────────
+  timeAverageTask: string;
+  timeProjectBreakdown: string;
+  timeMoreProjects: string;
+  timePeriodGroup: string;
+  timeModeGroup: string;
+  timeGroupingList: string;
+  timeGroupingProject: string;
+  timeSortDateDesc: string;
+  timeSortDateAsc: string;
+  timeSortDurationDesc: string;
+  timeSortDurationAsc: string;
+  timeByProjectSuffix: string;
+  timeEmptyHint: string;
+  timeAddEntry: string;
+  timeEditEntry: string;
+  timeNewEntry: string;
+  timeEntryTaskLabel: string;
+  timeEntryTaskPlaceholder: string;
+  timeEntryDateLabel: string;
+  timeEntryDatePlaceholder: string;
+  timeEntryNotePlaceholder: string;
+  timeEntryErrorTask: string;
+  timeEntryErrorDuration: string;
+  timeEntryErrorDate: string;
+  timeDeleteEntryA11y: string;
+
+  // ─── Черга «Перевір N записів» (було ANOMALY_LABEL в utils/timeAnomalies.ts) ─
+  anomalyLong: string;
+  anomalyMidnight: string;
+  anomalyOutlier: string;
+  anomalyShort: string;
+  anomalyCheckTitle: string;
+  anomalyRecordOne: string;
+  anomalyRecordFew: string;
+  anomalyRecordMany: string;
+  anomalyTrimTo: string;
+  anomalyMarkNormal: string;
+  anomalyShowMore: string;
+
+  // ─── Вкладки розділу «Здоровʼя» ──────────────────────────────────────────────
+  healthTabOverview: string;
+  healthTabActivity: string;
+  healthTabBody: string;
+  healthReadFailed: string;
+  healthUpdatedAt: string;
+  /** Третя метрика калорій — той самий підпис, що у вебі (не «дефіцит/профіцит»). */
+  calRemaining: string;
+  // ─── Центр сповіщень (app/notifications.tsx, app/settings-notifications.tsx) ─
+  ncTabInbox: string;
+  ncTabReminders: string;
+  ncFilterAll: string;
+  ncFilterUnread: string;
+  ncMarkAllRead: string;
+  ncMarkRead: string;
+  ncArchive: string;
+  ncOpenSettings: string;
+  ncEmptyTitle: string;
+  ncEmptySub: string;
+  ncEmptyUnreadTitle: string;
+  ncOffline: string;
+  ncUnavailable: string;
+  ncLoadFailed: string;
+  ncRetry: string;
+  ncLoadMore: string;
+  ncUnreadCount: string;
+  ncBadgeA11y: string;
+  ncUnreadA11y: string;
+  ncJustNow: string;
+  ncMinutesAgo: string;
+  ncHoursAgo: string;
+  ncYesterday: string;
+  ncCollapsedMore: string;
+  ncHiddenByModules: string;
+  ncLocalRemindersToggle: string;
+  ncLocalRemindersHint: string;
+  ncServerRemindersHint: string;
+  ncSettingsTitle: string;
+  ncSettingsIntro: string;
+  ncMaster: string;
+  ncMasterSub: string;
+  ncPushMaster: string;
+  ncPushMasterSub: string;
+  ncEmailMaster: string;
+  ncChannelInApp: string;
+  ncChannelPush: string;
+  ncChannelEmail: string;
+  ncMatrixTitle: string;
+  ncShowEvents: string;
+  ncHideEvents: string;
+  ncCustomized: string;
+  ncResetEvent: string;
+  ncChannelA11y: string;
+  ncQuietHours: string;
+  ncQuietHoursSub: string;
+  ncQuietFrom: string;
+  ncQuietTo: string;
+  ncEarlier: string;
+  ncLater: string;
+  ncTimezone: string;
+  ncMeetingLead: string;
+  ncMinutesBefore: string;
+  ncSaveFailed: string;
+  ncSettingsOffline: string;
+  ncNoEvents: string;
+  ncCatTasksProjects: string;
+  ncCatMeetingsFinance: string;
+  ncCatTrainingHealth: string;
+  ncCatSystem: string;
+  ncEvTaskAssigned: string;
+  ncEvTaskStatusChanged: string;
+  ncEvTaskMentioned: string;
+  ncEvTaskCommented: string;
+  ncEvTaskDeadlineSoon: string;
+  ncEvTaskOverdue: string;
+  ncEvTaskReminder: string;
+  ncEvSprintStarted: string;
+  ncEvSprintClosed: string;
+  ncEvProjectInvite: string;
+  ncEvMeetingReminder: string;
+  ncEvSubscriptionDue: string;
+  ncEvBudgetExceeded: string;
+  ncEvBalanceForecast: string;
+  ncEvWorkoutAssigned: string;
+  ncEvWorkoutToday: string;
+  ncEvQuestClosed: string;
+  ncEvStreakAtRisk: string;
+  ncEvMeasurement: string;
+  ncEvFeedback: string;
+  ncEvRegistration: string;
+  // ── Групи тренувань (training-module.md, мобільний клієнт) — префікс tg ──
+  tgNavLabel: string;
+  tgTitle: string;
+  tgGroupsButton: string;
+  tgPersonalProgramsTab: string;
+  tgEmptyTitle: string;
+  tgEmptyBody: string;
+  tgCreateGroup: string;
+  tgJoinGroup: string;
+  tgRoleCoach: string;
+  tgRoleMember: string;
+  tgMembersCount: string;
+  tgGroupName: string;
+  tgGroupNamePlaceholder: string;
+  tgGroupDescription: string;
+  tgGroupDescriptionPlaceholder: string;
+  tgColor: string;
+  tgTimezone: string;
+  tgWeekStart: string;
+  tgWeekStartMon: string;
+  tgWeekStartSun: string;
+  tgCreate: string;
+  tgOfflineNotice: string;
+  tgOnlineOnly: string;
+  tgErrorGeneric: string;
+  tgGroupGone: string;
+  tgInviteCodeLabel: string;
+  tgInviteCodePlaceholder: string;
+  tgInviteCheck: string;
+  tgInviteJoin: string;
+  tgInviteInvalid: string;
+  tgInviteExpired: string;
+  tgInviteTo: string;
+  tgInviteAs: string;
+  tgInviteFrom: string;
+  tgAlreadyMember: string;
+  tgInviteOtherWorkspace: string;
+  tgJoined: string;
+  tgOpenGroup: string;
+  tgTodaySession: string;
+  tgRestDay: string;
+  tgNextSession: string;
+  tgNoPlan: string;
+  tgNoPlanCoach: string;
+  tgStart: string;
+  tgContinue: string;
+  tgView: string;
+  tgExercisesCount: string;
+  tgStatusPlanned: string;
+  tgStatusCompleted: string;
+  tgStatusPartial: string;
+  tgStatusSkipped: string;
+  tgStatusMissed: string;
+  tgThisWeek: string;
+  tgStreak: string;
+  tgStreakDays: string;
+  tgXpTotal: string;
+  tgMultiplier: string;
+  tgLeaderboard: string;
+  tgSeeAll: string;
+  tgQuests: string;
+  tgActiveQuests: string;
+  tgNoQuests: string;
+  tgPrograms: string;
+  tgMembers: string;
+  tgExercises: string;
+  tgInvite: string;
+  tgLeaveGroup: string;
+  tgLeaveConfirm: string;
+  tgDeleteGroup: string;
+  tgDeleteGroupConfirm: string;
+  tgLastCoach: string;
+  tgSyncPending: string;
+  tgRejected: string;
+  tgNewProgram: string;
+  tgNoPrograms: string;
+  tgNoProgramsMember: string;
+  tgImportProgram: string;
+  tgImportExercises: string;
+  tgImportedExercises: string;
+  tgNothingToImport: string;
+  tgWeeks: string;
+  tgDaysPerWeek: string;
+  tgProgramName: string;
+  tgWeekCount: string;
+  tgNotes: string;
+  tgWeekTemplate: string;
+  tgRestDayShort: string;
+  tgDayTitle: string;
+  tgDayTitlePlaceholder: string;
+  tgEstimatedMin: string;
+  tgAddExercise: string;
+  tgSets: string;
+  tgReps: string;
+  tgWeightKg: string;
+  tgRestSec: string;
+  tgRpe: string;
+  tgProgression: string;
+  tgProgNone: string;
+  tgProgLinearWeight: string;
+  tgProgLinearReps: string;
+  tgProgPercent: string;
+  tgStepKg: string;
+  tgStepReps: string;
+  tgPercent: string;
+  tgEveryWeeks: string;
+  tgCapKg: string;
+  tgCapReps: string;
+  tgPreview: string;
+  tgWeekN: string;
+  tgRemoveDay: string;
+  tgMoveUp: string;
+  tgMoveDown: string;
+  tgRemove: string;
+  tgProgramInvalidName: string;
+  tgProgramInvalidDays: string;
+  tgAssign: string;
+  tgAssignTitle: string;
+  tgStartDate: string;
+  tgSelectMembers: string;
+  tgSelectAll: string;
+  tgAssignDone: string;
+  tgAssignAlready: string;
+  tgAssignSessions: string;
+  tgAssignments: string;
+  tgRevoke: string;
+  tgRevokeConfirm: string;
+  tgReexpand: string;
+  tgReexpandHint: string;
+  tgSaveFirst: string;
+  tgDeleteProgram: string;
+  tgDeleteProgramConfirm: string;
+  tgExerciseName: string;
+  tgMuscleGroup: string;
+  tgNewExercise: string;
+  tgNoExercises: string;
+  tgPickExercise: string;
+  tgDateInvalid: string;
+  tgSetN: string;
+  tgRestTimer: string;
+  tgSkipRest: string;
+  tgAddRest: string;
+  tgFinish: string;
+  tgSkipSession: string;
+  tgSkipConfirm: string;
+  tgFinishTitle: string;
+  tgDurationMin: string;
+  tgCalories: string;
+  tgMemberNote: string;
+  tgFinishPartial: string;
+  tgXpEstimate: string;
+  tgSessionNotFound: string;
+  tgSetDone: string;
+  tgSetNotDone: string;
+  tgVolume: string;
+  tgElapsed: string;
+  tgCoachNote: string;
+  tgNewQuest: string;
+  tgQuestTitle: string;
+  tgQuestMeasurable: string;
+  tgQuestCheckbox: string;
+  tgMetric: string;
+  tgTarget: string;
+  tgDueDate: string;
+  tgXpReward: string;
+  tgPhotoRequired: string;
+  tgHealthMetricHint: string;
+  tgMarkDone: string;
+  tgUndo: string;
+  tgAddPhoto: string;
+  tgPhotoAttached: string;
+  tgPhotoLocalHint: string;
+  tgPhotoUnavailable: string;
+  tgRecompute: string;
+  tgAllMembers: string;
+  tgQuestAuto: string;
+  tgArchive: string;
+  tgMetricSessionCount: string;
+  tgMetricWorkoutMinutes: string;
+  tgMetricDistance: string;
+  tgMetricVolume: string;
+  tgMetricSteps: string;
+  tgMetricSleep: string;
+  tgMetricWeightDelta: string;
+  tgUnitSessions: string;
+  tgUnitMinutes: string;
+  tgUnitKm: string;
+  tgUnitKg: string;
+  tgUnitSteps: string;
+  tgUnitHours: string;
+  tgQuestInvalid: string;
+  tgDoneCount: string;
+  tgPeriodWeek: string;
+  tgPeriodAll: string;
+  tgYou: string;
+  tgYourPlace: string;
+  tgSessionsShort: string;
+  tgNoLeaderboard: string;
+  tgPrevWeek: string;
+  tgNextWeek: string;
+  tgInviteLink: string;
+  tgInviteByEmail: string;
+  tgEmail: string;
+  tgCreateLink: string;
+  tgLinkCreated: string;
+  tgShare: string;
+  tgCopy: string;
+  tgCopied: string;
+  tgExpiresIn: string;
+  tgHours24: string;
+  tgDays7: string;
+  tgDays30: string;
+  tgActiveInvites: string;
+  tgInviteUses: string;
+  tgUserNotFound: string;
+  tgMemberAdded: string;
+  tgAlreadyInGroup: string;
+  tgMakeCoach: string;
+  tgMakeMember: string;
+  tgRemoveMember: string;
+  tgRemoveMemberConfirm: string;
+  tgWeekXp: string;
+  tgNoMembers: string;
+  tgMemberHistory: string;
+  tgNoLogs: string;
+  tgQuestProgress: string;
+  tgSaveNote: string;
+  tgNotePlaceholder: string;
+  tgPrivacyNote: string;
+  tgSelectMember: string;
+  tgMemberNoteLabel: string;
+  tgMinutesShort: string;
+  tgOpenSession: string;
+  tgGroupBadge: string;
+  // ── Фінанси: розділ із вкладками (finance-revamp.md) — префікс fin ──
+  finTabOverview: string;
+  finTabTransactions: string;
+  finTabReports: string;
+  finTabBudget: string;
+  finTabSubscriptions: string;
+  finTabAccounts: string;
+  finTabsLabel: string;
+  finFilterPeriod: string;
+  finFilterCurrency: string;
+  finFilterButton: string;
+  finPeriodPrev: string;
+  finPeriodNext: string;
+  finPresetMonth: string;
+  finPresetPrevMonth: string;
+  finPresetQuarter: string;
+  finPresetYear: string;
+  finPresetCustom: string;
+  finCustomFrom: string;
+  finCustomTo: string;
+  finApply: string;
+  finFactTitle: string;
+  finInflow: string;
+  finOutflow: string;
+  finOpening: string;
+  finClosing: string;
+  finBalanceAllScopes: string;
+  finForecastTitle: string;
+  finForecast30: string;
+  finForecast90: string;
+  finForecastOn: string;
+  finAvgVariable: string;
+  finForecastThin: string;
+  finForecastAllScope: string;
+  finForecastEvents: string;
+  finSourceSubscription: string;
+  finSourceIncome: string;
+  finSourcePlanned: string;
+  finEventVariable: string;
+  finOverdue: string;
+  finShortfallTitle: string;
+  finShortfallBiggest: string;
+  finViewForecast: string;
+  finEditSubscriptions: string;
+  finOnAccounts: string;
+  finNoAccountsInCurrency: string;
+  finUnassignedHint: string;
+  finPlannedHint: string;
+  finNoData: string;
+  finPnlTitle: string;
+  finIncome: string;
+  finFixed: string;
+  finVariable: string;
+  finNet: string;
+  finSavingsRate: string;
+  finPp: string;
+  finVsPrev: string;
+  finVsAvg: string;
+  finTransfersExcluded: string;
+  finOtherCurrencies: string;
+  finStructure: string;
+  finCostAll: string;
+  finCostFixed: string;
+  finCostVariable: string;
+  finNoCategory: string;
+  finUnclassified: string;
+  finAssign: string;
+  finGroupHousing: string;
+  finGroupFood: string;
+  finGroupTransport: string;
+  finGroupHealth: string;
+  finGroupEntertainment: string;
+  finGroupServices: string;
+  finGroupEducation: string;
+  finGroupClothing: string;
+  finGroupPets: string;
+  finGroupTaxes: string;
+  finGroupDebt: string;
+  finGroupSalary: string;
+  finGroupBusiness: string;
+  finGroupInvestments: string;
+  finGroupGifts: string;
+  finGroupOther: string;
+  finCatGroup: string;
+  finCatCost: string;
+  finCatMetaHint: string;
+  finArchivedAccounts: string;
+  finOpenBanks: string;
+  finRecurringPayments: string;
+  finRecurringIncomes: string;
+  finRiNew: string;
+  finRiEdit: string;
+  finRiEmpty: string;
+  finRiName: string;
+  finRiNamePlaceholder: string;
+  finRiEvery: string;
+  finRiNext: string;
+  finRiNoAccount: string;
+  finRiInvalid: string;
+  finRiArchive: string;
+  finRiRestore: string;
+  finRiDelete: string;
+  finRiDeleteConfirm: string;
+  finRiSaveFailed: string;
+  finRiReceived: string;
+  finRiReceiveTitle: string;
+  finRiReceiveHint: string;
+  finRiDefaultCategory: string;
+  finRiStale: string;
+  finBudgetByMonth: string;
+  finBudgetMonthsHint: string;
+  finProjectAddTx: string;
+  finProjectTxTitle: string;
+  finProjectIncomeTitle: string;
+  finProjectNoIncome: string;
+  finProjectNet: string;
+  finProjectNeedAccount: string;
+  finProjectSaveFailed: string;
+  finProjectUncounted: string;
+  finProjectInvalid: string;
+  // ─── hauto*: автоматичні дані здоровʼя (HealthKit / Health Connect) ───
+  hautoPulseRest: string;
+  hautoPulseRestNote: string;
+  hautoPulseRestNoteManual: string;
+  hautoPulseRestEmpty: string;
+  hautoPulseAvg: string;
+  hautoPulseAvgNote: string;
+  hautoSleepQuality: string;
+  hautoSleepQualityByDuration: string;
+  hautoSleepQualityByPhases: string;
+  hautoSleepNoPhases: string;
+  hautoSleepPhases: string;
+  hautoSleepDeep: string;
+  hautoSleepRem: string;
+  hautoSleepLight: string;
+  hautoSleepAwake: string;
+  hautoSpo2: string;
+  hautoDistance: string;
+  hautoBpm: string;
+  hautoKm: string;
+  hautoKg: string;
+  hautoKcal: string;
+  hautoMin: string;
+  hautoActiveKcal: string;
+  hautoActiveCalories: string;
+  hautoFlights: string;
+  hautoHrAvgShort: string;
+  hautoHrMin: string;
+  hautoHrMax: string;
+  hautoHrRest: string;
+  hautoLast24h: string;
+  hautoWeek: string;
+  hautoWorkouts30: string;
+  hautoWeightMeasuredAt: string;
+  hautoWeightCleanup: string;
+  hautoReadFailedBody: string;
+  hautoNotAvailable: string;
+  hautoNotAvailableIos: string;
+  hautoNotAvailableAndroid: string;
+  hautoNotAvailableOther: string;
+  hautoInstallHc: string;
+  hautoConnectTitle: string;
+  hautoConnectBody: string;
+  hautoOpenSettings: string;
+  hautoWip: string;
+  hautoSyncing: string;
+  hautoDenied: string;
+  hautoFailed: string;
+  // ── Хвости хвиль: події сповіщень тренувань/звернень, історія здоров'я, нагадування тренувань (tl*) ──
+  tlEvTrainingInvite: string;
+  tlEvTrainingProgramAssigned: string;
+  tlEvTrainingSessionCompleted: string;
+  tlEvTrainingQuestAssigned: string;
+  tlEvTrainingQuestCompleted: string;
+  tlEvTrainingComment: string;
+  tlEvTrainingLeaderboardWeekly: string;
+  tlEvFeedbackIncoming: string;
+  tlHealthDeleteEntryTitle: string;
+  tlHealthDeleteEntryMsg: string;
+  tlTrainingStreakTitle: string;
+  tlTrainingStreakBody: string;
 }
 
 const uk: Translations = {
@@ -1430,11 +2338,9 @@ const uk: Translations = {
   navGroupDev: 'Розробка',
   navTimeTracker: 'Трекер часу',
   navBudget: 'Бюджет',
-  navAgent: 'OpenClaw Agent',
   navMeetings: 'Наради',
   navTime: 'Час',
   navHealthSummary: "Зведення здоров'я",
-  navAgentLabel: 'Агент',
   detailEmptyTitle: 'Оберіть завдання',
   detailEmptyHint: 'Деталі, підзавдання й таймер зʼявляться тут.',
   noTasksMatchFilters: 'Під фільтри нічого не підходить',
@@ -1519,6 +2425,118 @@ const uk: Translations = {
   donate: 'Задонатити',
   developer: 'Розробник',
   bugList: 'Список багів',
+  // ── Ідеї та баги (app/feedback.tsx) ──
+  fbTitle: 'Ідеї та баги',
+  fbTypeIdea: 'Ідея',
+  fbTypeBug: 'Баг',
+  fbTabIdeas: 'Ідеї',
+  fbTabBugs: 'Баги',
+  fbNewIdea: 'Нова ідея',
+  fbNewBug: 'Новий баг',
+  fbEditIdea: 'Редагувати ідею',
+  fbEditBug: 'Редагувати баг',
+  fbFieldTitle: 'Назва',
+  fbTitlePhIdea: 'Ідея або функція…',
+  fbTitlePhBug: 'Що не так?',
+  fbFieldModule: 'Модуль',
+  fbModuleNone: 'Не вказано',
+  fbModuleOther: 'Інше',
+  fbModuleSync: 'Синхронізація',
+  fbModuleAuth: 'Вхід і акаунт',
+  fbFieldPriority: 'Пріоритет',
+  fbFieldSeverity: 'Критичність',
+  fbPrioHigh: 'Важлива',
+  fbPrioMedium: 'Звичайна',
+  fbPrioLow: 'Колись',
+  fbSevCritical: 'Критичний',
+  fbSevMajor: 'Важливий',
+  fbSevMinor: 'Незначний',
+  fbFieldDescription: 'Опис',
+  fbOptional: 'необовʼязково',
+  fbDescPhIdea: 'Опис, мотивація, приклади…',
+  fbDescPhBug: 'Будь-які додаткові деталі…',
+  fbFieldSteps: 'Кроки відтворення',
+  fbStepsPh: '1. Відкрити…\n2. Натиснути…',
+  fbFieldExpected: 'Очікувалось',
+  fbExpectedPh: 'Що мало статися',
+  fbFieldActual: 'Сталось',
+  fbActualPh: 'Що сталося насправді',
+  fbFieldAttachments: 'Скріншоти й відео',
+  fbAttachHint: 'До {max} файлів: зображення до 10 МБ, відео до 50 МБ, разом до 60 МБ.',
+  fbAttachLocked: 'Звернення вже надіслане — вкладення змінити не можна.',
+  fbAddAttachment: 'Додати файл',
+  fbRemoveAttachment: 'Прибрати вкладення',
+  fbAttachTooMany: 'Не більше {max} вкладень.',
+  fbAttachBadType: 'Цей тип файлу не приймається: {name}',
+  fbAttachTooBig: 'Файл завеликий: {name}',
+  fbAttachTotal: 'Разом вкладення перевищують 60 МБ.',
+  fbAttachCacheEvicted: 'Памʼять для ненадісланих вкладень переповнена — найстаріші файли видалено з пристрою.',
+  fbAttachLocal: 'на пристрої',
+  fbAttachUploaded: 'завантажено',
+  fbAttachFailed: 'не прийнято',
+  fbAttachElsewhere: 'на іншому пристрої',
+  fbUnitMb: '{n} МБ',
+  fbUnitKb: '{n} КБ',
+  fbContext: 'Автоматичний контекст',
+  fbContextHint: 'Додається під час надсилання. Лише технічні параметри — жодних ваших даних.',
+  fbCtxPlatform: 'Платформа',
+  fbCtxDevice: 'Пристрій',
+  fbCtxVersion: 'Версія',
+  fbCtxOs: 'Система',
+  fbCtxScreen: 'Екран',
+  fbCtxWorkspace: 'Воркспейс',
+  fbPlatformMobile: 'Мобільний застосунок',
+  fbPlatformWeb: 'Веб',
+  fbDevicePhone: 'Телефон',
+  fbDeviceTablet: 'Планшет',
+  fbDeviceDesktop: 'Компʼютер',
+  fbSave: 'Зберегти',
+  fbSaveDraft: 'Зберегти чернетку',
+  fbSaveAndSend: 'Зберегти й надіслати',
+  fbSend: 'Надіслати розробнику',
+  fbRetry: 'Спробувати ще',
+  fbEditAfterSent: 'Зміни лишаються у вашому списку — надіслане звернення не оновлюється.',
+  fbRequiredMissing: 'Щоб надіслати, заповніть: {fields}',
+  fbSaveFailed: 'Не вдалося зберегти. Спробуйте ще раз.',
+  fbSendError: 'Не вдалося надіслати: {reason}',
+  fbStateDraft: 'Не надіслано',
+  fbStateQueued: 'Очікує мережі',
+  fbQueuedHint: 'Буде надіслано, коли зʼявиться мережа.',
+  fbStateSent: 'Надіслано',
+  fbStateSentNew: 'Надіслано · Нове',
+  fbStateInProgress: 'В роботі',
+  fbStateDone: 'Виконано',
+  fbStateRejected: 'Відхилено',
+  fbStateFailed: 'Сервер не прийняв',
+  fbStateUndelivered: 'Не доставлено',
+  fbStateLocalOnly: 'Надсилання не налаштоване',
+  fbStateLegacy: 'Надіслано старим способом, статус недоступний',
+  fbStateDuplicate: 'Позначено як дублікат іншого звернення.',
+  fbOwnerComment: 'Коментар розробника',
+  fbTaskLinked: 'Для звернення створено задачу розробки.',
+  fbForwardingOff: 'Надсилання розробнику не налаштоване на цьому сервері — звернення зберігаються тут.',
+  fbFilterAll: 'Усі',
+  fbFilterOpen: 'Відкриті',
+  fbFilterDone: 'Готові',
+  fbFilterSent: 'Надіслані',
+  fbSortNewest: 'Нові',
+  fbSortOldest: 'Старі',
+  fbStatOpen: 'Відкриті',
+  fbStatDone: 'Готово',
+  fbStatSent: 'Надіслано',
+  fbEmptyIdeas: 'Поки немає ідей',
+  fbEmptyBugs: 'Багів немає',
+  fbEmptyHint: 'Натисніть +, щоб додати',
+  fbLoadFailed: 'Не вдалося прочитати ідеї та баги з памʼяті пристрою.',
+  fbSelectHint: 'Виберіть звернення, щоб побачити деталі',
+  fbDoneIdea: 'Реалізовано',
+  fbDoneBug: 'Виправлено',
+  fbMarkImplemented: 'Позначити реалізованою',
+  fbMarkFixed: 'Позначити виправленим',
+  fbReopen: 'Відкрити знову',
+  fbDeleteTitle: 'Видалити звернення?',
+  fbDeleteBody: 'Цю дію не можна скасувати.',
+  fbCopied: 'Скопійовано',
   bugsValue: 'Помилки',
   ideas: 'Ідеї',
   features: 'Функції',
@@ -2210,6 +3228,119 @@ const uk: Translations = {
   itemTags: 'Теги (через кому)',
   itemNote: 'Нотатка (необов\'язково)',
   containerPickHint: 'Оберіть коробку, щоб побачити її вміст',
+  // Containers v2 (ctr*)
+  ctrViewGrid: 'Сітка',
+  ctrViewPlaces: 'За місцями',
+  ctrAllBoxes: 'Усі коробки',
+  ctrNoPlace: 'Без місця',
+  ctrPlaces: 'Місця',
+  ctrPlaceNew: 'Нове місце',
+  ctrPlaceEdit: 'Редагувати місце',
+  ctrPlaceName: 'Назва місця',
+  ctrPlaceNamePlaceholder: 'Наприклад, Спальня',
+  ctrPlaceKind: 'Тип',
+  ctrPlaceKindRoom: 'Кімната',
+  ctrPlaceKindFurniture: 'Меблі',
+  ctrPlaceKindShelf: 'Полиця',
+  ctrPlaceKindOther: 'Інше',
+  ctrPlaceParent: 'Усередині',
+  ctrPlaceTopLevel: 'Верхній рівень',
+  ctrPlaceDelete: 'Видалити місце?',
+  ctrPlaceDeleteMsg: 'Вкладені місця й коробки перейдуть на рівень вище. Самі коробки не видаляються.',
+  ctrPlaceTooDeep: 'Не більше 4 рівнів і не всередину самого себе',
+  ctrPlaceCreateHere: 'Нове місце тут',
+  ctrPlacesEmpty: 'Місць ще немає. Кімната → шафа → полиця — і коробки по місцях.',
+  ctrLegacyLocation: 'Зараз записано рядком: «{loc}»',
+  ctrItemQty: 'Кількість',
+  ctrItemStatus: 'Статус',
+  ctrStatusInBox: 'У коробці',
+  ctrStatusLent: 'Позичено',
+  ctrStatusDiscarded: 'Викинуто',
+  ctrLentTo: 'Кому позичено',
+  ctrLentToPlaceholder: 'Наприклад, Петро',
+  ctrLentAt: 'У {name}',
+  ctrLentCount: '{n} позичено',
+  ctrLend: 'Позичити',
+  ctrReturned: 'Повернули',
+  ctrDiscard: 'Викинути',
+  ctrRestore: 'Повернути в коробку',
+  ctrShowDiscarded: 'Показати викинуті ({n})',
+  ctrHideDiscarded: 'Сховати викинуті',
+  ctrEditItem: 'Редагувати річ',
+  ctrNewItem: 'Нова річ',
+  ctrLentNeedsName: 'Вкажіть, кому позичено',
+  ctrQtyLess: 'Менше',
+  ctrQtyMore: 'Більше',
+  ctrUnits: '{n} шт.',
+  ctrItemsOne: 'річ',
+  ctrItemsFew: 'речі',
+  ctrItemsMany: 'речей',
+  ctrEmptyBox: 'Порожньо',
+  ctrAddItemHint: 'Введи назву вище і натисни ↑',
+  ctrNewItemPlaceholder: 'Нова річ...',
+  ctrTagsPlaceholder: 'Теги через кому: зима, одяг',
+  ctrNotePlaceholder: 'Нотатка: де лежить, стан, розмір...',
+  ctrDeleteItem: 'Видалити річ?',
+  ctrDeleteItemMsg: 'Якщо її просто немає — краще позначити «Викинуто».',
+  ctrColor: 'Колір',
+  ctrEmptyHint: 'Додай коробку, шафу або місце зберігання',
+  ctrFound: 'Знайдено: {n}',
+  ctrNothingFound: 'Нічого не знайдено',
+  ctrNoBoxesHere: 'Тут коробок немає',
+  ctrReadFailed: 'Не вдалося прочитати контейнери. Дані не змінено.',
+  ctrRetry: 'Спробувати ще',
+  ctrPhotos: 'Фото',
+  ctrPhotoAdd: 'Додати фото',
+  ctrPhotoCamera: 'Зняти',
+  ctrPhotoLibrary: 'З галереї',
+  ctrPhotoRemove: 'Прибрати фото',
+  ctrPhotoCover: 'Зробити обкладинкою',
+  ctrPhotoCoverBadge: 'Обкладинка',
+  ctrPhotoLimit: 'Не більше 3 фото',
+  ctrPhotoPending: 'Фото ще вивантажується',
+  ctrPhotoFailed: 'Не вдалося додати фото',
+  ctrPhotoPermission: 'Немає доступу до камери чи галереї. Дозвольте його в налаштуваннях.',
+  ctrPhotoUnavailable: 'Ця збірка ще не вміє знімати фото — оновіть застосунок.',
+  ctrPhotoQueued: 'Фото збережено на пристрої й вивантажиться, щойно буде мережа',
+  ctrScan: 'Сканувати QR',
+  ctrScanHint: 'Наведіть камеру на наліпку коробки',
+  ctrScanTorch: 'Ліхтарик',
+  ctrScanManual: 'Ввести код',
+  ctrScanManualPlaceholder: 'Код з наліпки, 10 символів',
+  ctrScanManualGo: 'Відкрити',
+  ctrScanInvalidCode: 'Код має 10 символів — цифри й латинські літери',
+  ctrScanOtherWorkspace: 'Ця наліпка з іншого робочого простору',
+  ctrScanNotFoundOffline: 'Коробка не знайдена локально. Підключіться до мережі, щоб перевірити.',
+  ctrScanNotFound: 'Коробки з цим кодом немає в цьому просторі.',
+  ctrScanChecking: 'Перевіряємо на сервері…',
+  ctrScanForeign: 'Це не наліпка Flowi',
+  ctrScanSearchAs: 'Шукати як запит',
+  ctrScanPermission: 'Щоб сканувати, дозвольте доступ до камери.',
+  ctrScanGrant: 'Дозволити',
+  ctrScanNoCamera: 'Камера недоступна в цій збірці — введіть код руками.',
+  ctrPrint: 'Друк наліпок',
+  ctrPrintPreset: 'Формат',
+  ctrPrintSmall: 'Мала · 38×21 мм',
+  ctrPrintSmallHint: '65 на аркуш; QR і код',
+  ctrPrintMedium: 'Середня · 63×34 мм',
+  ctrPrintMediumHint: '24 на аркуш; QR, назва, місце',
+  ctrPrintLarge: 'Велика · 99×67 мм',
+  ctrPrintLargeHint: '8 на аркуш; ще й кількість речей',
+  ctrPrintSelect: 'Коробки · обрано {n}',
+  ctrPrintSelectAll: 'Обрати всі',
+  ctrPrintSelectNone: 'Зняти вибір',
+  ctrPrintGo: 'Створити PDF',
+  ctrPrintNoCode: 'без коду',
+  ctrPrintNoWorkspace: 'Невідомий робочий простір — перезайдіть, щоб друкувати наліпки.',
+  ctrPrintFailed: 'Не вдалося створити PDF',
+  ctrPrintUnavailable: 'Друк недоступний у цій збірці — оновіть застосунок.',
+  ctrQr: 'QR-наліпка',
+  ctrQrCreate: 'Створити QR-код',
+  ctrQrNone: 'У коробки ще немає наліпки. Код створюється один раз і більше не змінюється.',
+  ctrQrHint: 'Скан відкриває вміст лише тим, хто увійшов у цей простір.',
+  ctrQrPrintOne: 'Друкувати наліпку',
+  ctrQuickSearchPlaceholder: 'Де лежить…? Пошук речей',
+  ctrQuickSearchOpen: 'Відкрити в контейнерах',
 
   undo: 'Скасувати',
   taskMarkedDone: 'Завдання виконано',
@@ -2407,7 +3538,7 @@ const uk: Translations = {
   sprintClosedLabel: 'закритий',
   sprintBacklog: 'Беклог',
   sprintNoSprints: 'Спринтів ще немає',
-  sprintNoSprintsHint: 'Спринт — іменована пачка задач проєкту. Дат у нього немає: у «Сьогодні» задачу тягне лише її власний дедлайн',
+  sprintNoSprintsHint: 'Спринт — іменована пачка задач проєкту. Дати в нього необовʼязкові й потрібні лише для статистики: у «Сьогодні» задачу тягне її власний дедлайн',
   sprintEmpty: 'Порожній',
   sprintMoveTitle: 'Куди перенести незавершені?',
   sprintMoveHint: 'Завершені лишаються в закритому спринті як є',
@@ -2419,6 +3550,55 @@ const uk: Translations = {
   sprintForeignProject: 'Інший проєкт',
   sprintAddTaskIn: 'Нова задача у «{name}»',
   sprintAddTaskA11y: 'Додати задачу',
+  // ── Статистика проєктів і спринтів (projects-analytics §8.1) ──
+  projectInProgress: 'в роботі',
+  projectAssigned: 'призначено',
+  projectUnassigned: 'без виконавця',
+  projectBacklog: 'без спринту',
+  projectFunnelA11y: '{n} із {total} задач: {label}',
+  projectFlagA11y: '{n} із {open} відкритих задач: {label}',
+  sprintCurrent: 'Поточний спринт',
+  sprintDaysLeft: 'лишилось днів: {n}',
+  sprintLastDay: 'останній день',
+  sprintOverdue: 'термін спринта минув',
+  sprintOverdueDays: 'термін минув, днів тому: {n}',
+  sprintUndated: 'без дат',
+  sprintProgressA11y: 'Прогрес спринта «{name}»: {done} із {total}',
+  sprintStartDate: 'З (РРРР-ММ-ДД)',
+  sprintEndDate: 'По, включно (РРРР-ММ-ДД)',
+  sprintDatesHint: 'Дати необовʼязкові: обидві або жодної. Потрібні для велосіті й згоряння спринта',
+  sprintDatesPartial: 'Вкажіть обидві дати або очистьте обидві',
+  sprintDatesInvalid: 'Дата має бути у форматі РРРР-ММ-ДД',
+  sprintDatesOrder: 'Кінець не може бути раніше за початок',
+  sprintDatesOverlap: 'Перетинається зі спринтами: {names}',
+  sprintNotDated: 'Дати не вказано — велосіті й згоряння для цього спринта недоступні',
+  velocityTitle: 'Велосіті',
+  velocityNotEnough: 'Замало даних для прогнозу',
+  velocityAverage: 'середня: {n} (≈{w} за тиждень)',
+  velocityDays: 'днів: {n}',
+  velocityTasks: 'задач: {n}',
+  velocityForecast: 'Прогноз: ≈{weeks} тиж. · відкритих задач: {open} · спринтів у вибірці: {n}',
+  velocitySample: 'спринтів у вибірці: {n}',
+  velocityUndated: 'Закритих спринтів без дат: {n} — у велосіті не враховані',
+  velocityEmpty: 'Ще немає закритих спринтів із датами',
+  burndownTitle: 'Згоряння спринта',
+  burndownIdeal: 'ідеал',
+  burndownActual: 'факт',
+  burndownScope: 'обсяг (поточний): {n}',
+  burndownNoDoneDate: 'без дати завершення: {n}',
+  burndownCarriedIn: 'закрито до старту: {n}',
+  burndownInsufficient: 'Недостатньо історії для згоряння: {n} із {total} задач без дати завершення',
+  burndownShow: 'Показати згоряння спринта',
+  burndownHide: 'Сховати згоряння спринта',
+  portfolioKpi: 'Портфель',
+  portfolioProjects: 'проєктів',
+  portfolioTasks: 'задач',
+  portfolioCollapse: 'Згорнути портфель',
+  portfolioExpand: 'Розгорнути портфель',
+  doneByWeekTitle: 'Виконано за тиждень',
+  portfolioWeeksTotal: 'усього за {n} тиж.: {count}',
+  portfolioAvgWeekly: 'в середньому за календарний тиждень: {n}',
+  portfolioEarlier: 'раніше: {n}',
   openFullTaskForm: 'Відкрити повну форму',
   projectMeetingsPast: 'Минулі ({count})',
   projectMeetingsEmpty: 'Зустрічей у проєкті немає',
@@ -2713,6 +3893,634 @@ const uk: Translations = {
   taskAssigneeMe: 'Я',
 
   viewerReadOnlyNotice: 'Лише перегляд — роль «Глядач»',
+
+  // Бюджет (було utils/budgetStrings.ts)
+  budgetSpentCaps: 'ВИТРАЧЕНО',
+  budgetBudgetCaps: 'БЮДЖЕТ',
+  budgetLeft: 'Залишилось',
+  budgetOutsideLimits: 'Поза лімітами',
+  budgetScopeAll: 'Всі',
+  budgetScopePersonal: 'Особисті',
+  budgetScopeProject: 'Проєктні',
+  budgetScopeLabel: 'Чиї гроші показувати',
+  budgetEmptyTitle: 'Бюджет не налаштовано',
+  budgetEmptyBody: 'Категорії зʼявляться автоматично\nпісля додавання витрат у Фінансах',
+  budgetAddManually: 'Додати вручну',
+  budgetTapHint: 'Натисніть на категорію щоб встановити прогноз витрат',
+  budgetTapRowHint: 'Натисніть щоб встановити прогноз',
+  budgetMonthlyForecast: 'Прогноз витрат на місяць',
+  budgetActuallySpent: 'Фактично витрачено:',
+  budgetPlannedFor: 'Заплановано на місяць ({currency})',
+  budgetNewCategory: 'Нова категорія бюджету',
+  budgetName: 'Назва',
+  budgetNamePlaceholder: 'Назва категорії',
+  budgetIcon: 'Іконка',
+  budgetAddCategory: 'Додати категорію',
+  budgetDeleteTitle: 'Видалити категорію?',
+  budgetDeleteMsg: '«{name}» буде видалено з бюджету.',
+  budgetDeleteAction: 'Видалити категорію',
+  budgetErrorExists: 'Така категорія вже є',
+  budgetErrorTooLong: 'Назва задовга: максимум {max} символи — вона ж є ключем запису',
+  budgetUnsyncableRow: 'Не синхронізується: назва довша за межу сервера',
+
+  // Нотатки (було utils/notesStrings.ts)
+  notesPreview: 'Перегляд',
+  notesEditText: 'Текст',
+  notesPin: 'Закріпити',
+  notesUnpin: 'Відкріпити',
+  notesPinned: 'Закріплено',
+  notesTagsLabel: 'Теги',
+  notesTagsPlaceholder: 'Теги через кому',
+  notesTagsAll: 'Усі теги',
+  notesLinkTask: 'Задача',
+  notesLinkMeeting: 'Зустріч',
+  notesLinkNone: 'Без звʼязку',
+  notesLinkLost: 'Звʼязок втрачено',
+  notesCreateTask: 'Створити задачу з рядка',
+  notesTaskCreated: 'Задачу створено',
+  notesTaskCreateError: 'Не вдалося створити задачу. Спробуйте ще раз.',
+  notesChecklist: 'Чек-лист',
+  notesEmptyBody: 'Без тексту.',
+  notesMarkdownHint: 'Markdown: # заголовок, - пункт, - [ ] чек-лист, #тег',
+
+  // Оплата підписки (було PAY_LABELS)
+  payAction: 'Оплачено',
+  payTitle: 'Оплата підписки',
+  payAmount: 'Сплачено',
+  payHint: 'Створимо витрату «{category}» на {account} і перенесемо оплату на {date}.',
+  payNoAccount: 'без рахунку',
+  payConfirm: 'Створити витрату',
+  payStale: 'Цей цикл уже оплачено на іншому пристрої. Перевірте дату наступної оплати.',
+  payTxFailed: 'Оплату зараховано, але витрату у Фінансах не створено. Додайте її вручну.',
+
+  // Модулі інтерфейсу (було moduleText())
+  modulesTitle: 'Модулі',
+  modulesSubtitle: 'Вимкнені модулі зникають із меню, дашборда і сповіщень. Дані лишаються на місці — увімкніть назад, і все повернеться.',
+  modulesSystemNote: 'Налаштування і профіль вимкнути не можна.',
+  modulesDisabledTitle: 'Ви вимкнули цю функцію',
+  modulesDisabledBody: 'Дані нікуди не зникли. Увімкніть модуль у налаштуваннях — і розділ повернеться таким, яким був.',
+  modulesOpenSettings: 'Відкрити налаштування',
+  modulesSettingsRow: 'Модулі інтерфейсу',
+  modulesDashboardEmptyTitle: 'Усі модулі вимкнено',
+  modulesDashboardEmptyBody: 'Дані нікуди не зникли. Увімкніть потрібні модулі — і «Сьогодні» повернеться таким, яким було.',
+
+  // «Дані не прочитались» (було LoadErrorNotice)
+  loadErrorTitle: 'Дані не прочитались',
+  loadErrorBody: 'Сховище повернуло помилку. Це НЕ порожній список — щоб не втратити записи, зміни поки не зберігаються.',
+  loadErrorRetry: 'Повторити',
+  healthReminderOff: 'Нагадування не увімкнено',
+  healthReminderOffSub: 'Система не дала дозволу на сповіщення (або їх вимкнено в налаштуваннях застосунку). Запис збережено без нагадування.',
+  healthNoticeSettings: 'Налаштування',
+  hkSyncing: 'Синхронізується з HealthKit',
+  hkManual: 'Додавайте активність вручну або через тренування',
+  hkDenied: 'Немає доступу до HealthKit — показані числа введені вручну',
+  hkGrant: 'Надати доступ',
+  hkFailed: 'HealthKit не відповів: це не «нуль», а відсутність даних',
+
+  // Екран «Час»
+  timeAverageTask: 'Середня задача',
+  timeProjectBreakdown: 'Розподіл за проєктами',
+  timeMoreProjects: '+ ще {count}',
+  timePeriodGroup: 'Період',
+  timeModeGroup: 'Режим',
+  timeGroupingList: 'Список',
+  timeGroupingProject: 'Групи за проєктом',
+  timeSortDateDesc: 'Спершу нові',
+  timeSortDateAsc: 'Спершу старі',
+  timeSortDurationDesc: 'Спершу довгі',
+  timeSortDurationAsc: 'Спершу короткі',
+  timeByProjectSuffix: ' · за проєктами',
+  timeEmptyHint: 'Запустіть таймер із задачі або додайте запис кнопкою +',
+  timeAddEntry: 'Додати запис',
+  timeEditEntry: 'Редагувати запис',
+  timeNewEntry: 'Новий запис',
+  timeEntryTaskLabel: 'Завдання',
+  timeEntryTaskPlaceholder: 'Назва завдання',
+  timeEntryDateLabel: 'Дата',
+  timeEntryDatePlaceholder: 'РРРР-ММ-ДД',
+  timeEntryNotePlaceholder: 'Необовʼязково',
+  timeEntryErrorTask: 'Вкажіть назву завдання',
+  timeEntryErrorDuration: 'Вкажіть тривалість',
+  timeEntryErrorDate: 'Дата у форматі РРРР-ММ-ДД',
+  timeDeleteEntryA11y: 'Видалити запис: {task}',
+
+  // Черга «Перевір N записів» (було ANOMALY_LABEL)
+  anomalyLong: 'Довше за 8 год',
+  anomalyMidnight: 'Перетинає північ',
+  anomalyOutlier: 'Утричі більше за звичне',
+  anomalyShort: 'Коротше за 1 хв',
+  anomalyCheckTitle: 'Перевір {count} {noun}',
+  anomalyRecordOne: 'запис',
+  anomalyRecordFew: 'записи',
+  anomalyRecordMany: 'записів',
+  anomalyTrimTo: 'Обрізати до {duration}',
+  anomalyMarkNormal: 'Нормально',
+  anomalyShowMore: 'Показати ще {count}',
+
+  // Вкладки розділу «Здоровʼя»
+  healthTabOverview: 'Огляд',
+  healthTabActivity: 'Активність і тренування',
+  healthTabBody: 'Тіло і вітальні',
+  healthReadFailed: 'Дані не вдалося прочитати',
+  healthUpdatedAt: 'Оновлено {time}',
+  calRemaining: 'Залишок',
+  // Центр сповіщень
+  ncTabInbox: 'Сповіщення',
+  ncTabReminders: 'Нагадування',
+  ncFilterAll: 'Усі',
+  ncFilterUnread: 'Непрочитані',
+  ncMarkAllRead: 'Прочитати всі',
+  ncMarkRead: 'Позначити прочитаним',
+  ncArchive: 'Прибрати зі списку',
+  ncOpenSettings: 'Налаштування сповіщень',
+  ncEmptyTitle: 'Поки що тихо',
+  ncEmptySub: 'Тут з’являться призначення, згадки, нагадування про дедлайни, зустрічі й оплати.',
+  ncEmptyUnreadTitle: 'Усе прочитано',
+  ncOffline: 'Сповіщення з сервера доступні в онлайн-режимі з акаунтом.',
+  ncUnavailable: 'Цей сервер ще не підтримує центр сповіщень.',
+  ncLoadFailed: 'Не вдалося оновити сповіщення.',
+  ncRetry: 'Повторити',
+  ncLoadMore: 'Показати ще',
+  ncUnreadCount: 'Непрочитаних: {count}',
+  ncBadgeA11y: 'Непрочитаних сповіщень: {count}',
+  ncUnreadA11y: 'непрочитане',
+  ncJustNow: 'щойно',
+  ncMinutesAgo: '{n} хв тому',
+  ncHoursAgo: '{n} год тому',
+  ncYesterday: 'вчора',
+  ncCollapsedMore: '+{count} схожих',
+  ncHiddenByModules: 'Сповіщення вимкнених розділів сховано.',
+  ncLocalRemindersToggle: 'Нагадування на цьому пристрої',
+  ncLocalRemindersHint: 'Ліки, звички та здоров’я нагадують без інтернету — ці нагадування плануються на самому телефоні.',
+  ncServerRemindersHint: 'Нагадування про завдання, зустрічі й дні оплати тепер надсилає сервер — вони у вкладці «Сповіщення».',
+  ncSettingsTitle: 'Налаштування сповіщень',
+  ncSettingsIntro: 'Налаштування спільні для всіх ваших пристроїв і вебу.',
+  ncMaster: 'Надсилати сповіщення',
+  ncMasterSub: 'Вимкнене — нічого не надходить назовні, список у застосунку лишається.',
+  ncPushMaster: 'Push на пристрої',
+  ncPushMasterSub: 'Телефони, планшети й браузери, де ви увійшли.',
+  ncEmailMaster: 'Email-дайджест',
+  ncChannelInApp: 'У застосунку',
+  ncChannelPush: 'Push',
+  ncChannelEmail: 'Email',
+  ncMatrixTitle: 'Що й куди надсилати',
+  ncShowEvents: 'Окремі події',
+  ncHideEvents: 'Згорнути',
+  ncCustomized: 'змінено',
+  ncResetEvent: 'Як у категорії',
+  ncChannelA11y: '{event} — {channel}',
+  ncQuietHours: 'Тихі години',
+  ncQuietHoursSub: 'Push відкладаються до кінця тихих годин; у застосунку сповіщення з’являються одразу.',
+  ncQuietFrom: 'З',
+  ncQuietTo: 'До',
+  ncEarlier: 'Раніше',
+  ncLater: 'Пізніше',
+  ncTimezone: 'Часовий пояс: {tz}',
+  ncMeetingLead: 'Нагадування про зустріч',
+  ncMinutesBefore: 'за {n} хв',
+  ncSaveFailed: 'Не вдалося зберегти. Спробуйте ще раз.',
+  ncSettingsOffline: 'Налаштування сповіщень доступні в онлайн-режимі з акаунтом.',
+  ncNoEvents: 'Для цього розділу подій поки немає.',
+  ncCatTasksProjects: 'Задачі та проєкти',
+  ncCatMeetingsFinance: 'Зустрічі та фінанси',
+  ncCatTrainingHealth: 'Тренування та здоров’я',
+  ncCatSystem: 'Ідеї/баги та системні',
+  ncEvTaskAssigned: 'Призначення завдання',
+  ncEvTaskStatusChanged: 'Зміна статусу',
+  ncEvTaskMentioned: 'Згадка в коментарі',
+  ncEvTaskCommented: 'Новий коментар',
+  ncEvTaskDeadlineSoon: 'Дедлайн наближається',
+  ncEvTaskOverdue: 'Прострочені завдання',
+  ncEvTaskReminder: 'Нагадування про завдання',
+  ncEvSprintStarted: 'Спринт розпочато',
+  ncEvSprintClosed: 'Спринт закрито',
+  ncEvProjectInvite: 'Додано до проєкту',
+  ncEvMeetingReminder: 'Нагадування про зустріч',
+  ncEvSubscriptionDue: 'Оплата підписки',
+  ncEvBudgetExceeded: 'Перевищення бюджету',
+  ncEvBalanceForecast: 'Прогноз балансу',
+  ncEvWorkoutAssigned: 'Призначена програма',
+  ncEvWorkoutToday: 'Тренування сьогодні',
+  ncEvQuestClosed: 'Квест закрито',
+  ncEvStreakAtRisk: 'Серія під загрозою',
+  ncEvMeasurement: 'Нагадування про заміри',
+  ncEvFeedback: 'Статус звернення',
+  ncEvRegistration: 'Нова заявка на реєстрацію',
+  // ── Групи тренувань (training-module.md, мобільний клієнт) — префікс tg ──
+  tgNavLabel: 'Тренування (групи)',
+  tgTitle: 'Групи тренувань',
+  tgGroupsButton: 'Групи тренувань',
+  tgPersonalProgramsTab: 'Мої програми',
+  tgEmptyTitle: 'Ще немає груп',
+  tgEmptyBody: 'Створіть групу як тренер або приєднайтесь за запрошенням.',
+  tgCreateGroup: 'Створити групу',
+  tgJoinGroup: 'Приєднатись за запрошенням',
+  tgRoleCoach: 'Тренер',
+  tgRoleMember: 'Учасник',
+  tgMembersCount: 'Учасників: {n}',
+  tgGroupName: 'Назва групи',
+  tgGroupNamePlaceholder: 'Напр. Ранкова група',
+  tgGroupDescription: 'Опис',
+  tgGroupDescriptionPlaceholder: 'Пн/Ср/Пт 07:00',
+  tgColor: 'Колір',
+  tgTimezone: 'Часовий пояс',
+  tgWeekStart: 'Початок тижня',
+  tgWeekStartMon: 'Понеділок',
+  tgWeekStartSun: 'Неділя',
+  tgCreate: 'Створити',
+  tgOfflineNotice: 'Немає звʼязку з сервером — показано збережене на пристрої.',
+  tgOnlineOnly: 'Групи тренувань працюють лише з акаунтом в онлайн-режимі.',
+  tgErrorGeneric: 'Не вдалося виконати дію. Спробуйте ще раз.',
+  tgGroupGone: 'Групу видалено або вас у ній більше немає.',
+  tgInviteCodeLabel: 'Посилання або код запрошення',
+  tgInviteCodePlaceholder: 'Вставте посилання-запрошення',
+  tgInviteCheck: 'Перевірити',
+  tgInviteJoin: 'Приєднатись',
+  tgInviteInvalid: 'Запрошення недійсне.',
+  tgInviteExpired: 'Термін дії запрошення сплив.',
+  tgInviteTo: 'Вас запрошують до групи',
+  tgInviteAs: 'Роль: {role}',
+  tgInviteFrom: 'Запрошує: {name}',
+  tgAlreadyMember: 'Ви вже в цій групі.',
+  tgInviteOtherWorkspace: 'Це запрошення з іншого сервера ({ws}). Перейдіть на нього в налаштуваннях акаунта й відкрийте посилання ще раз.',
+  tgJoined: 'Ви приєднались до групи.',
+  tgOpenGroup: 'Відкрити групу',
+  tgTodaySession: 'Тренування на сьогодні',
+  tgRestDay: 'Сьогодні відпочинок',
+  tgNextSession: 'Наступне: {date}',
+  tgNoPlan: 'Програму ще не призначено',
+  tgNoPlanCoach: 'Створіть програму й призначте її учасникам.',
+  tgStart: 'Почати',
+  tgContinue: 'Продовжити',
+  tgView: 'Переглянути',
+  tgExercisesCount: 'Вправ: {n}',
+  tgStatusPlanned: 'Заплановано',
+  tgStatusCompleted: 'Виконано',
+  tgStatusPartial: 'Частково',
+  tgStatusSkipped: 'Пропущено',
+  tgStatusMissed: 'Не виконано',
+  tgThisWeek: 'Цей тиждень',
+  tgStreak: 'Стрік',
+  tgStreakDays: '{n} дн.',
+  tgXpTotal: 'XP загалом',
+  tgMultiplier: 'Множник ×{x}',
+  tgLeaderboard: 'Лідерборд',
+  tgSeeAll: 'Усі',
+  tgQuests: 'Квести',
+  tgActiveQuests: 'Активні квести',
+  tgNoQuests: 'Активних квестів немає',
+  tgPrograms: 'Програми',
+  tgMembers: 'Учасники',
+  tgExercises: 'Вправи групи',
+  tgInvite: 'Запросити',
+  tgLeaveGroup: 'Вийти з групи',
+  tgLeaveConfirm: 'Вийти з групи «{name}»? Виконані тренування лишаться у вашому журналі.',
+  tgDeleteGroup: 'Видалити групу',
+  tgDeleteGroupConfirm: 'Видалити групу «{name}» для всіх учасників?',
+  tgLastCoach: 'У групі має лишитися хоча б один тренер.',
+  tgSyncPending: 'Очікує синхронізації',
+  tgRejected: 'Сервер не прийняв зміну ({reason}).',
+  tgNewProgram: 'Нова програма',
+  tgNoPrograms: 'Програм ще немає',
+  tgNoProgramsMember: 'Тренер ще не створив програм.',
+  tgImportProgram: 'Імпортувати мою програму',
+  tgImportExercises: 'Імпортувати мої вправи',
+  tgImportedExercises: 'Імпортовано вправ: {n}',
+  tgNothingToImport: 'Немає нових особистих вправ для імпорту.',
+  tgWeeks: '{n} тиж.',
+  tgDaysPerWeek: '{n} дн./тиж.',
+  tgProgramName: 'Назва програми',
+  tgWeekCount: 'Тижнів',
+  tgNotes: 'Нотатки',
+  tgWeekTemplate: 'Тижневий шаблон',
+  tgRestDayShort: 'Відпочинок',
+  tgDayTitle: 'Назва дня',
+  tgDayTitlePlaceholder: 'День A — верх',
+  tgEstimatedMin: 'Тривалість, хв',
+  tgAddExercise: 'Додати вправу',
+  tgSets: 'Підходи',
+  tgReps: 'Повтори',
+  tgWeightKg: 'Вага, кг',
+  tgRestSec: 'Відпочинок, с',
+  tgRpe: 'RPE',
+  tgProgression: 'Прогресія',
+  tgProgNone: 'Без прогресії',
+  tgProgLinearWeight: '+ вага',
+  tgProgLinearReps: '+ повтори',
+  tgProgPercent: '+ %',
+  tgStepKg: 'Крок, кг',
+  tgStepReps: 'Крок, повторів',
+  tgPercent: 'Відсоток',
+  tgEveryWeeks: 'Кожні N тижнів',
+  tgCapKg: 'Стеля, кг',
+  tgCapReps: 'Стеля повторів',
+  tgPreview: 'Прев\'ю навантаження',
+  tgWeekN: 'Тиждень {n}',
+  tgRemoveDay: 'Зробити днем відпочинку',
+  tgMoveUp: 'Вище',
+  tgMoveDown: 'Нижче',
+  tgRemove: 'Прибрати',
+  tgProgramInvalidName: 'Вкажіть назву програми.',
+  tgProgramInvalidDays: 'Додайте хоча б один день із вправами.',
+  tgAssign: 'Призначити',
+  tgAssignTitle: 'Призначити програму',
+  tgStartDate: 'Дата старту (РРРР-ММ-ДД)',
+  tgSelectMembers: 'Учасники',
+  tgSelectAll: 'Усі',
+  tgAssignDone: 'Призначено учасникам: {n}',
+  tgAssignAlready: 'вже призначено',
+  tgAssignSessions: 'Буде створено {n} сесій на учасника.',
+  tgAssignments: 'Призначення',
+  tgRevoke: 'Відкликати',
+  tgRevokeConfirm: 'Відкликати призначення? Майбутні заплановані сесії зникнуть в учасника, виконані лишаться.',
+  tgReexpand: 'Оновити в учасників',
+  tgReexpandHint: 'Програму змінено після призначення.',
+  tgSaveFirst: 'Спершу збережіть програму — сервер має її побачити.',
+  tgDeleteProgram: 'Видалити програму',
+  tgDeleteProgramConfirm: 'Видалити програму «{name}»? Уже розгорнуті сесії лишаться в учасників.',
+  tgExerciseName: 'Назва вправи',
+  tgMuscleGroup: 'Група мʼязів',
+  tgNewExercise: 'Нова вправа',
+  tgNoExercises: 'Бібліотека вправ групи порожня',
+  tgPickExercise: 'Оберіть вправу',
+  tgDateInvalid: 'Дата у форматі РРРР-ММ-ДД, не раніше ніж 14 днів тому.',
+  tgSetN: 'Підхід {n}',
+  tgRestTimer: 'Відпочинок',
+  tgSkipRest: 'Пропустити',
+  tgAddRest: '+30 с',
+  tgFinish: 'Завершити',
+  tgSkipSession: 'Пропустити тренування',
+  tgSkipConfirm: 'Позначити тренування як пропущене?',
+  tgFinishTitle: 'Завершити тренування',
+  tgDurationMin: 'Тривалість, хв',
+  tgCalories: 'Калорії (необовʼязково)',
+  tgMemberNote: 'Нотатка для тренера',
+  tgFinishPartial: 'Виконано {done} з {total} підходів — буде зараховано як «частково», без XP.',
+  tgXpEstimate: '≈ +{n} XP',
+  tgSessionNotFound: 'Сесію не знайдено. Можливо, призначення відкликано.',
+  tgSetDone: 'Підхід {n} виконано',
+  tgSetNotDone: 'Позначити підхід {n} виконаним',
+  tgVolume: 'Обʼєм: {kg} кг',
+  tgElapsed: 'Минуло',
+  tgCoachNote: 'Нотатка тренера',
+  tgNewQuest: 'Новий квест',
+  tgQuestTitle: 'Назва',
+  tgQuestMeasurable: 'Вимірювана ціль',
+  tgQuestCheckbox: 'Чек-завдання',
+  tgMetric: 'Метрика',
+  tgTarget: 'Ціль',
+  tgDueDate: 'Дедлайн (РРРР-ММ-ДД)',
+  tgXpReward: 'Нагорода XP',
+  tgPhotoRequired: 'Потрібне фото',
+  tgHealthMetricHint: 'Рахується з даних здоровʼя учасника. Тренер бачить лише підсумок.',
+  tgMarkDone: 'Відмітити виконаним',
+  tgUndo: 'Скасувати відмітку',
+  tgAddPhoto: 'Додати фото',
+  tgPhotoAttached: 'Фото додано',
+  tgPhotoLocalHint: 'Фото лишається лише на вашому пристрої.',
+  tgPhotoUnavailable: 'Вибір фото недоступний у цій збірці.',
+  tgRecompute: 'Перерахувати',
+  tgAllMembers: 'Усім учасникам',
+  tgQuestAuto: 'Прогрес рахується автоматично',
+  tgArchive: 'В архів',
+  tgMetricSessionCount: 'Кількість тренувань',
+  tgMetricWorkoutMinutes: 'Хвилини тренувань',
+  tgMetricDistance: 'Дистанція',
+  tgMetricVolume: 'Обʼєм',
+  tgMetricSteps: 'Кроки',
+  tgMetricSleep: 'Сон',
+  tgMetricWeightDelta: 'Зміна ваги',
+  tgUnitSessions: 'трен.',
+  tgUnitMinutes: 'хв',
+  tgUnitKm: 'км',
+  tgUnitKg: 'кг',
+  tgUnitSteps: 'кроків',
+  tgUnitHours: 'год',
+  tgQuestInvalid: 'Заповніть назву, метрику й ціль; дедлайн не раніше старту.',
+  tgDoneCount: 'Виконали: {n}',
+  tgPeriodWeek: 'Тиждень',
+  tgPeriodAll: 'За весь час',
+  tgYou: 'Ви',
+  tgYourPlace: 'Ваше місце: {rank} · {xp} XP',
+  tgSessionsShort: '{n} трен.',
+  tgNoLeaderboard: 'Поки ніхто не набрав XP',
+  tgPrevWeek: 'Попередній тиждень',
+  tgNextWeek: 'Наступний тиждень',
+  tgInviteLink: 'Посилання',
+  tgInviteByEmail: 'За email',
+  tgEmail: 'Email',
+  tgCreateLink: 'Створити посилання',
+  tgLinkCreated: 'Посилання готове. Поділіться ним зараз — повторно його не показати.',
+  tgShare: 'Поділитись',
+  tgCopy: 'Копіювати',
+  tgCopied: 'Скопійовано',
+  tgExpiresIn: 'Діє',
+  tgHours24: '24 год',
+  tgDays7: '7 днів',
+  tgDays30: '30 днів',
+  tgActiveInvites: 'Активні запрошення',
+  tgInviteUses: 'Використано: {uses}',
+  tgUserNotFound: 'Користувача з таким email не знайдено.',
+  tgMemberAdded: 'Учасника додано.',
+  tgAlreadyInGroup: 'Цей користувач уже в групі.',
+  tgMakeCoach: 'Зробити тренером',
+  tgMakeMember: 'Зробити учасником',
+  tgRemoveMember: 'Прибрати з групи',
+  tgRemoveMemberConfirm: 'Прибрати {name} з групи?',
+  tgWeekXp: 'XP тижня',
+  tgNoMembers: 'Учасників ще немає',
+  tgMemberHistory: 'Історія виконання',
+  tgNoLogs: 'Ще немає виконаних тренувань',
+  tgQuestProgress: 'Прогрес квестів',
+  tgSaveNote: 'Зберегти нотатку',
+  tgNotePlaceholder: 'Коментар до тренування',
+  tgPrivacyNote: 'Дані здоровʼя учасника (вага, сон, харчування) приватні й тут не показуються.',
+  tgSelectMember: 'Оберіть учасника зі списку',
+  tgMemberNoteLabel: 'Нотатка учасника',
+  tgMinutesShort: '{n} хв',
+  tgOpenSession: 'Відкрити тренування',
+  tgGroupBadge: 'Група',
+  // ── Фінанси: розділ із вкладками (finance-revamp.md) — префікс fin ──
+  finTabOverview: 'Огляд',
+  finTabTransactions: 'Операції',
+  finTabReports: 'Звіти',
+  finTabBudget: 'Бюджет',
+  finTabSubscriptions: 'Підписки',
+  finTabAccounts: 'Рахунки',
+  finTabsLabel: 'Розділи фінансів',
+  finFilterPeriod: 'Період',
+  finFilterCurrency: 'Валюта',
+  finFilterButton: 'Валюта і ракурс',
+  finPeriodPrev: 'Попередній період',
+  finPeriodNext: 'Наступний період',
+  finPresetMonth: 'Цей місяць',
+  finPresetPrevMonth: 'Минулий місяць',
+  finPresetQuarter: 'Цей квартал',
+  finPresetYear: 'Цей рік',
+  finPresetCustom: 'Свій період',
+  finCustomFrom: 'Початок періоду, РРРР-ММ-ДД',
+  finCustomTo: 'Кінець періоду, РРРР-ММ-ДД',
+  finApply: 'Застосувати',
+  finFactTitle: 'Cash Flow — факт',
+  finInflow: 'Приплив',
+  finOutflow: 'Відплив',
+  finOpening: 'На початок',
+  finClosing: 'На кінець',
+  finBalanceAllScopes: 'Баланс рахується з усіх операцій: ракурс звужує лише приплив і відплив',
+  finForecastTitle: 'Прогноз',
+  finForecast30: '30 днів',
+  finForecast90: '90 днів',
+  finForecastOn: 'На {date}: {amount}',
+  finAvgVariable: 'Середні змінні витрати: {amount} на день',
+  finForecastThin: 'Мало даних: історії менше 30 днів, оцінка приблизна',
+  finForecastAllScope: 'Прогноз рахується з усіх грошей, ракурс на нього не впливає',
+  finForecastEvents: 'Події прогнозу',
+  finSourceSubscription: 'підписка',
+  finSourceIncome: 'регулярний дохід',
+  finSourcePlanned: 'запланована операція',
+  finEventVariable: 'змінні витрати (оцінка)',
+  finOverdue: 'прострочено',
+  finShortfallTitle: 'Баланс іде в мінус {date}: {amount}',
+  finShortfallBiggest: 'Найбільші списання до того дня: {list}',
+  finViewForecast: 'Переглянути прогноз',
+  finEditSubscriptions: 'Змінити підписки',
+  finOnAccounts: 'На рахунках · {currency}',
+  finNoAccountsInCurrency: 'Немає рахунків у {currency}',
+  finUnassignedHint: 'Операцій без рахунку: {n} — призначити',
+  finPlannedHint: 'Заплановано операцій: {n}, {amount}',
+  finNoData: 'Немає операцій за період',
+  finPnlTitle: 'P&L',
+  finIncome: 'Доходи',
+  finFixed: 'Фіксовані витрати',
+  finVariable: 'Змінні витрати',
+  finNet: 'Чистий результат',
+  finSavingsRate: 'Норма заощаджень',
+  finPp: 'п.п.',
+  finVsPrev: 'до попереднього ({period})',
+  finVsAvg: 'до середнього за {n} попер. пер.',
+  finTransfersExcluded: 'Перекази між своїми рахунками не враховано',
+  finOtherCurrencies: 'Не враховано (інші валюти): {list}',
+  finStructure: 'Структура витрат',
+  finCostAll: 'Усі',
+  finCostFixed: 'Фіксовані',
+  finCostVariable: 'Змінні',
+  finNoCategory: 'Без категорії',
+  finUnclassified: 'Операцій без ознаки фікс/змінна: {n} — пораховані як змінні',
+  finAssign: 'Розставити',
+  finGroupHousing: 'Житло',
+  finGroupFood: 'Їжа',
+  finGroupTransport: 'Транспорт',
+  finGroupHealth: 'Здоров\'я',
+  finGroupEntertainment: 'Розваги',
+  finGroupServices: 'Сервіси й зв\'язок',
+  finGroupEducation: 'Навчання',
+  finGroupClothing: 'Одяг',
+  finGroupPets: 'Тварини',
+  finGroupTaxes: 'Податки',
+  finGroupDebt: 'Борги й кредити',
+  finGroupSalary: 'Зарплата',
+  finGroupBusiness: 'Бізнес і фріланс',
+  finGroupInvestments: 'Інвестиції',
+  finGroupGifts: 'Подарунки',
+  finGroupOther: 'Інше',
+  finCatGroup: 'Група',
+  finCatCost: 'Ознака',
+  finCatMetaHint: 'Група й ознака фікс/змінна потрібні звітам і прогнозу',
+  finArchivedAccounts: 'Архівні рахунки',
+  finOpenBanks: 'Скарбнички',
+  finRecurringPayments: 'Регулярні платежі',
+  finRecurringIncomes: 'Регулярні доходи',
+  finRiNew: 'Новий регулярний дохід',
+  finRiEdit: 'Регулярний дохід',
+  finRiEmpty: 'Регулярних доходів ще немає',
+  finRiName: 'Назва',
+  finRiNamePlaceholder: 'Зарплата',
+  finRiEvery: 'Кожні',
+  finRiNext: 'Наступне надходження, РРРР-ММ-ДД',
+  finRiNoAccount: 'без рахунку',
+  finRiInvalid: 'Перевірте назву, суму й дату',
+  finRiArchive: 'В архів',
+  finRiRestore: 'Відновити',
+  finRiDelete: 'Видалити дохід',
+  finRiDeleteConfirm: 'Видалити регулярний дохід «{name}»? Отримані операції лишаться у Фінансах.',
+  finRiSaveFailed: 'Не вдалося зберегти. Спробуйте ще раз.',
+  finRiReceived: 'Отримано',
+  finRiReceiveTitle: 'Надходження',
+  finRiReceiveHint: 'Буде створено дохід «{category}» на {account}. Наступне надходження — {date}.',
+  finRiDefaultCategory: 'Інше',
+  finRiStale: 'Цей цикл уже отримано на іншому пристрої',
+  finBudgetByMonth: 'Ліміти по місяцях',
+  finBudgetMonthsHint: 'Місячні ліміти не складаються: кожен місяць — окремо',
+  finProjectAddTx: 'Додати операцію',
+  finProjectTxTitle: 'Операція проєкту',
+  finProjectIncomeTitle: 'Доходи проєкту',
+  finProjectNoIncome: 'Ще немає доходів',
+  finProjectNet: 'Доходи − витрати',
+  finProjectNeedAccount: 'Спершу створіть рахунок у «Фінансах»: операція без рахунку не входить у жоден баланс',
+  finProjectSaveFailed: 'Не вдалося зберегти операцію',
+  finProjectUncounted: 'Не враховано (інші валюти): {list}',
+  finProjectInvalid: 'Вкажіть суму більше нуля',
+  // ─── hauto*: автоматичні дані здоровʼя (HealthKit / Health Connect) ───
+  hautoPulseRest: 'Пульс спокою',
+  hautoPulseRestNote: 'Пульс спокою за добу — з {source} або ручного запису.',
+  hautoPulseRestNoteManual: 'Пульс спокою за добу — з ручного запису.',
+  hautoPulseRestEmpty: 'Пульсу спокою за сьогодні ще немає',
+  hautoPulseAvg: 'Середній пульс',
+  hautoPulseAvgNote: 'Середній за добу — це не пульс спокою.',
+  hautoSleepQuality: 'Якість сну',
+  hautoSleepQualityByDuration: 'за тривалістю',
+  hautoSleepQualityByPhases: 'за фазами',
+  hautoSleepNoPhases: 'Джерело не дало фаз сну — оцінка лише за тривалістю.',
+  hautoSleepPhases: 'Фази сну',
+  hautoSleepDeep: 'Глибокий',
+  hautoSleepRem: 'REM',
+  hautoSleepLight: 'Поверхневий',
+  hautoSleepAwake: 'Пробудження',
+  hautoSpo2: 'Сатурація (SpO₂)',
+  hautoDistance: 'Дистанція',
+  hautoBpm: 'уд/хв',
+  hautoKm: 'км',
+  hautoKg: 'кг',
+  hautoKcal: 'кк',
+  hautoMin: 'хв',
+  hautoActiveKcal: 'Активні кк',
+  hautoActiveCalories: 'Активні калорії',
+  hautoFlights: 'Поверхи',
+  hautoHrAvgShort: 'Середній',
+  hautoHrMin: 'Мін',
+  hautoHrMax: 'Макс',
+  hautoHrRest: 'Спокій',
+  hautoLast24h: 'За останні 24 год ({n} вимірів)',
+  hautoWeek: '7 днів',
+  hautoWorkouts30: 'Тренування (30 днів)',
+  hautoWeightMeasuredAt: 'замір {date}',
+  hautoWeightCleanup: 'Прибрано {n} повторів ваги — історія стала точнішою',
+  hautoReadFailedBody: 'Запити до {source} не вдались. Показані числа — не ваші дані; перевірте доступ.',
+  hautoNotAvailable: 'Недоступно',
+  hautoNotAvailableIos: 'Apple Health доступний лише на iPhone',
+  hautoNotAvailableAndroid: 'Health Connect не встановлено або він застарів. Встановіть його з Google Play, щоб Flowi міг читати дані.',
+  hautoNotAvailableOther: 'Автоматичні дані здоровʼя доступні лише в застосунку на телефоні',
+  hautoInstallHc: 'Встановити Health Connect',
+  hautoConnectTitle: 'Підключити {source}',
+  hautoConnectBody: 'Flowi лише читає дані: кроки, пульс, сон, вагу, SpO₂. Нічого не записує.',
+  hautoOpenSettings: 'Відкрити налаштування',
+  hautoWip: 'Цей функціонал наразі знаходиться в розробці',
+  hautoSyncing: 'Синхронізується з {source}',
+  hautoDenied: 'Немає доступу до {source} — показані числа введені вручну',
+  hautoFailed: '{source} не відповів: це не «нуль», а відсутність даних',
+  // ── Хвости хвиль (tl*) ──
+  tlEvTrainingInvite: 'Запрошення до групи тренувань',
+  tlEvTrainingProgramAssigned: 'Призначено програму тренувань',
+  tlEvTrainingSessionCompleted: 'Учасник виконав тренування',
+  tlEvTrainingQuestAssigned: 'Новий квест',
+  tlEvTrainingQuestCompleted: 'Квест виконано',
+  tlEvTrainingComment: 'Коментар тренера',
+  tlEvTrainingLeaderboardWeekly: 'Підсумки тижня в лідерборді',
+  tlEvFeedbackIncoming: 'Нове звернення у вхідних',
+  tlHealthDeleteEntryTitle: 'Видалити запис?',
+  tlHealthDeleteEntryMsg: 'Запис зникне з історії на всіх пристроях. Автоматичний запис із Health більше не повернеться синком.',
+  tlTrainingStreakTitle: 'Тренування ще попереду',
+  tlTrainingStreakBody: '{title} заплановано на сьогодні — ще встигаєте, щоб не перервати серію.',
 };
 
 const en: Translations = {
@@ -2724,11 +4532,9 @@ const en: Translations = {
   navGroupDev: 'Development',
   navTimeTracker: 'Time Tracker',
   navBudget: 'Budget',
-  navAgent: 'OpenClaw Agent',
   navMeetings: 'Meetings',
   navTime: 'Time',
   navHealthSummary: 'Health summary',
-  navAgentLabel: 'Agent',
   detailEmptyTitle: 'Select a task',
   detailEmptyHint: 'Details, subtasks and timer will appear here.',
   noTasksMatchFilters: 'Nothing matches the filters',
@@ -2813,6 +4619,118 @@ const en: Translations = {
   donate: 'Donate',
   developer: 'Developer',
   bugList: 'Bug List',
+  // ── Ideas & bugs (app/feedback.tsx) ──
+  fbTitle: 'Ideas & bugs',
+  fbTypeIdea: 'Idea',
+  fbTypeBug: 'Bug',
+  fbTabIdeas: 'Ideas',
+  fbTabBugs: 'Bugs',
+  fbNewIdea: 'New idea',
+  fbNewBug: 'New bug',
+  fbEditIdea: 'Edit idea',
+  fbEditBug: 'Edit bug',
+  fbFieldTitle: 'Title',
+  fbTitlePhIdea: 'Idea or feature…',
+  fbTitlePhBug: 'What went wrong?',
+  fbFieldModule: 'Module',
+  fbModuleNone: 'Not set',
+  fbModuleOther: 'Other',
+  fbModuleSync: 'Sync',
+  fbModuleAuth: 'Sign-in & account',
+  fbFieldPriority: 'Priority',
+  fbFieldSeverity: 'Severity',
+  fbPrioHigh: 'Important',
+  fbPrioMedium: 'Normal',
+  fbPrioLow: 'Someday',
+  fbSevCritical: 'Critical',
+  fbSevMajor: 'Major',
+  fbSevMinor: 'Minor',
+  fbFieldDescription: 'Description',
+  fbOptional: 'optional',
+  fbDescPhIdea: 'Description, motivation, examples…',
+  fbDescPhBug: 'Any extra details…',
+  fbFieldSteps: 'Steps to reproduce',
+  fbStepsPh: '1. Open…\n2. Tap…',
+  fbFieldExpected: 'Expected',
+  fbExpectedPh: 'What should have happened',
+  fbFieldActual: 'Actual',
+  fbActualPh: 'What actually happened',
+  fbFieldAttachments: 'Screenshots & videos',
+  fbAttachHint: 'Up to {max} files: images up to 10 MB, videos up to 50 MB, 60 MB in total.',
+  fbAttachLocked: 'Already sent — attachments can no longer be changed.',
+  fbAddAttachment: 'Add file',
+  fbRemoveAttachment: 'Remove attachment',
+  fbAttachTooMany: 'No more than {max} attachments.',
+  fbAttachBadType: 'This file type is not accepted: {name}',
+  fbAttachTooBig: 'File is too large: {name}',
+  fbAttachTotal: 'Attachments exceed 60 MB in total.',
+  fbAttachCacheEvicted: 'Storage for unsent attachments is full — the oldest files were removed from the device.',
+  fbAttachLocal: 'on this device',
+  fbAttachUploaded: 'uploaded',
+  fbAttachFailed: 'not accepted',
+  fbAttachElsewhere: 'on another device',
+  fbUnitMb: '{n} MB',
+  fbUnitKb: '{n} KB',
+  fbContext: 'Automatic context',
+  fbContextHint: 'Added when you send. Technical details only — none of your data.',
+  fbCtxPlatform: 'Platform',
+  fbCtxDevice: 'Device',
+  fbCtxVersion: 'Version',
+  fbCtxOs: 'System',
+  fbCtxScreen: 'Screen',
+  fbCtxWorkspace: 'Workspace',
+  fbPlatformMobile: 'Mobile app',
+  fbPlatformWeb: 'Web',
+  fbDevicePhone: 'Phone',
+  fbDeviceTablet: 'Tablet',
+  fbDeviceDesktop: 'Desktop',
+  fbSave: 'Save',
+  fbSaveDraft: 'Save draft',
+  fbSaveAndSend: 'Save and send',
+  fbSend: 'Send to developer',
+  fbRetry: 'Try again',
+  fbEditAfterSent: 'Changes stay in your list — the submitted report is not updated.',
+  fbRequiredMissing: 'To send, fill in: {fields}',
+  fbSaveFailed: 'Could not save. Please try again.',
+  fbSendError: 'Could not send: {reason}',
+  fbStateDraft: 'Not sent',
+  fbStateQueued: 'Waiting for network',
+  fbQueuedHint: 'Will be sent when the network is available.',
+  fbStateSent: 'Sent',
+  fbStateSentNew: 'Sent · New',
+  fbStateInProgress: 'In progress',
+  fbStateDone: 'Done',
+  fbStateRejected: 'Rejected',
+  fbStateFailed: 'Not accepted by server',
+  fbStateUndelivered: 'Not delivered',
+  fbStateLocalOnly: 'Sending not configured',
+  fbStateLegacy: 'Sent the old way, status unavailable',
+  fbStateDuplicate: 'Marked as a duplicate of another report.',
+  fbOwnerComment: 'Developer comment',
+  fbTaskLinked: 'A development task was created for this report.',
+  fbForwardingOff: 'Sending to the developer is not configured on this server — reports are kept here.',
+  fbFilterAll: 'All',
+  fbFilterOpen: 'Open',
+  fbFilterDone: 'Done',
+  fbFilterSent: 'Sent',
+  fbSortNewest: 'Newest',
+  fbSortOldest: 'Oldest',
+  fbStatOpen: 'Open',
+  fbStatDone: 'Done',
+  fbStatSent: 'Sent',
+  fbEmptyIdeas: 'No ideas yet',
+  fbEmptyBugs: 'No bugs',
+  fbEmptyHint: 'Tap + to add one',
+  fbLoadFailed: 'Could not read ideas and bugs from device storage.',
+  fbSelectHint: 'Select a report to see details',
+  fbDoneIdea: 'Implemented',
+  fbDoneBug: 'Fixed',
+  fbMarkImplemented: 'Mark implemented',
+  fbMarkFixed: 'Mark fixed',
+  fbReopen: 'Reopen',
+  fbDeleteTitle: 'Delete this report?',
+  fbDeleteBody: 'This cannot be undone.',
+  fbCopied: 'Copied',
   bugsValue: 'Errors',
   ideas: 'Ideas',
   features: 'Features',
@@ -3501,6 +5419,119 @@ const en: Translations = {
   itemTags: 'Tags (comma separated)',
   itemNote: 'Note (optional)',
   containerPickHint: 'Pick a box to see what is inside',
+  // Containers v2 (ctr*)
+  ctrViewGrid: 'Grid',
+  ctrViewPlaces: 'By place',
+  ctrAllBoxes: 'All boxes',
+  ctrNoPlace: 'No place',
+  ctrPlaces: 'Places',
+  ctrPlaceNew: 'New place',
+  ctrPlaceEdit: 'Edit place',
+  ctrPlaceName: 'Place name',
+  ctrPlaceNamePlaceholder: 'e.g. Bedroom',
+  ctrPlaceKind: 'Type',
+  ctrPlaceKindRoom: 'Room',
+  ctrPlaceKindFurniture: 'Furniture',
+  ctrPlaceKindShelf: 'Shelf',
+  ctrPlaceKindOther: 'Other',
+  ctrPlaceParent: 'Inside',
+  ctrPlaceTopLevel: 'Top level',
+  ctrPlaceDelete: 'Delete place?',
+  ctrPlaceDeleteMsg: 'Nested places and boxes move one level up. Boxes themselves are not deleted.',
+  ctrPlaceTooDeep: 'At most 4 levels, and not inside itself',
+  ctrPlaceCreateHere: 'New place here',
+  ctrPlacesEmpty: 'No places yet. Room → wardrobe → shelf — and boxes in their places.',
+  ctrLegacyLocation: 'Currently saved as text: “{loc}”',
+  ctrItemQty: 'Quantity',
+  ctrItemStatus: 'Status',
+  ctrStatusInBox: 'In the box',
+  ctrStatusLent: 'Lent',
+  ctrStatusDiscarded: 'Discarded',
+  ctrLentTo: 'Lent to',
+  ctrLentToPlaceholder: 'e.g. Peter',
+  ctrLentAt: 'With {name}',
+  ctrLentCount: '{n} lent',
+  ctrLend: 'Lend',
+  ctrReturned: 'Returned',
+  ctrDiscard: 'Discard',
+  ctrRestore: 'Back in the box',
+  ctrShowDiscarded: 'Show discarded ({n})',
+  ctrHideDiscarded: 'Hide discarded',
+  ctrEditItem: 'Edit item',
+  ctrNewItem: 'New item',
+  ctrLentNeedsName: 'Say who has it',
+  ctrQtyLess: 'Less',
+  ctrQtyMore: 'More',
+  ctrUnits: '{n} pcs',
+  ctrItemsOne: 'item',
+  ctrItemsFew: 'items',
+  ctrItemsMany: 'items',
+  ctrEmptyBox: 'Empty',
+  ctrAddItemHint: 'Type a name above and tap ↑',
+  ctrNewItemPlaceholder: 'New item...',
+  ctrTagsPlaceholder: 'Tags, comma-separated: winter, clothes',
+  ctrNotePlaceholder: 'Note: where exactly, condition, size...',
+  ctrDeleteItem: 'Delete item?',
+  ctrDeleteItemMsg: 'If it is simply gone, mark it “Discarded” instead.',
+  ctrColor: 'Color',
+  ctrEmptyHint: 'Add a box, a wardrobe or any storage spot',
+  ctrFound: 'Found: {n}',
+  ctrNothingFound: 'Nothing found',
+  ctrNoBoxesHere: 'No boxes here',
+  ctrReadFailed: 'Could not read containers. Nothing was changed.',
+  ctrRetry: 'Try again',
+  ctrPhotos: 'Photos',
+  ctrPhotoAdd: 'Add photo',
+  ctrPhotoCamera: 'Take photo',
+  ctrPhotoLibrary: 'From library',
+  ctrPhotoRemove: 'Remove photo',
+  ctrPhotoCover: 'Make cover',
+  ctrPhotoCoverBadge: 'Cover',
+  ctrPhotoLimit: 'Up to 3 photos',
+  ctrPhotoPending: 'Photo is still uploading',
+  ctrPhotoFailed: 'Could not add the photo',
+  ctrPhotoPermission: 'No access to the camera or library. Allow it in Settings.',
+  ctrPhotoUnavailable: 'This build cannot take photos yet — update the app.',
+  ctrPhotoQueued: 'Photo saved on this device; it uploads as soon as you are online',
+  ctrScan: 'Scan QR',
+  ctrScanHint: 'Point the camera at a box label',
+  ctrScanTorch: 'Torch',
+  ctrScanManual: 'Enter code',
+  ctrScanManualPlaceholder: 'Label code, 10 characters',
+  ctrScanManualGo: 'Open',
+  ctrScanInvalidCode: 'The code has 10 characters — digits and Latin letters',
+  ctrScanOtherWorkspace: 'This label belongs to another workspace',
+  ctrScanNotFoundOffline: 'Box not found on this device. Connect to the network to check.',
+  ctrScanNotFound: 'No box with this code in this workspace.',
+  ctrScanChecking: 'Checking with the server…',
+  ctrScanForeign: 'This is not a Flowi label',
+  ctrScanSearchAs: 'Search for it',
+  ctrScanPermission: 'Allow camera access to scan.',
+  ctrScanGrant: 'Allow',
+  ctrScanNoCamera: 'Camera is not available in this build — enter the code by hand.',
+  ctrPrint: 'Print labels',
+  ctrPrintPreset: 'Format',
+  ctrPrintSmall: 'Small · 38×21 mm',
+  ctrPrintSmallHint: '65 per sheet; QR and code',
+  ctrPrintMedium: 'Medium · 63×34 mm',
+  ctrPrintMediumHint: '24 per sheet; QR, name, place',
+  ctrPrintLarge: 'Large · 99×67 mm',
+  ctrPrintLargeHint: '8 per sheet; plus item count',
+  ctrPrintSelect: 'Boxes · {n} selected',
+  ctrPrintSelectAll: 'Select all',
+  ctrPrintSelectNone: 'Clear',
+  ctrPrintGo: 'Create PDF',
+  ctrPrintNoCode: 'no code',
+  ctrPrintNoWorkspace: 'Unknown workspace — sign in again to print labels.',
+  ctrPrintFailed: 'Could not create the PDF',
+  ctrPrintUnavailable: 'Printing is not available in this build — update the app.',
+  ctrQr: 'QR label',
+  ctrQrCreate: 'Create QR code',
+  ctrQrNone: 'This box has no label yet. The code is created once and never changes.',
+  ctrQrHint: 'A scan shows the contents only to members of this workspace.',
+  ctrQrPrintOne: 'Print label',
+  ctrQuickSearchPlaceholder: 'Where is…? Search items',
+  ctrQuickSearchOpen: 'Open in Containers',
 
   undo: 'Undo',
   taskMarkedDone: 'Task completed',
@@ -3698,7 +5729,7 @@ const en: Translations = {
   sprintClosedLabel: 'closed',
   sprintBacklog: 'Backlog',
   sprintNoSprints: 'No sprints yet',
-  sprintNoSprintsHint: 'A sprint is just a named batch of the project tasks. It has no dates: Today still follows the task deadline alone',
+  sprintNoSprintsHint: 'A sprint is a named batch of the project tasks. Its dates are optional and only feed the analytics: Today still follows the task deadline alone',
   sprintEmpty: 'Empty',
   sprintMoveTitle: 'Where do the unfinished ones go?',
   sprintMoveHint: 'Finished tasks stay in the closed sprint as they are',
@@ -3710,6 +5741,55 @@ const en: Translations = {
   sprintForeignProject: 'Other project',
   sprintAddTaskIn: 'New task in “{name}”',
   sprintAddTaskA11y: 'Add task',
+  // ── Project & sprint analytics (projects-analytics §8.1) ──
+  projectInProgress: 'in progress',
+  projectAssigned: 'assigned',
+  projectUnassigned: 'unassigned',
+  projectBacklog: 'no sprint',
+  projectFunnelA11y: '{n} of {total} tasks: {label}',
+  projectFlagA11y: '{n} of {open} open tasks: {label}',
+  sprintCurrent: 'Current sprint',
+  sprintDaysLeft: 'days left: {n}',
+  sprintLastDay: 'last day',
+  sprintOverdue: 'sprint end date passed',
+  sprintOverdueDays: 'ended, days ago: {n}',
+  sprintUndated: 'no dates',
+  sprintProgressA11y: 'Sprint “{name}” progress: {done} of {total}',
+  sprintStartDate: 'From (YYYY-MM-DD)',
+  sprintEndDate: 'To, inclusive (YYYY-MM-DD)',
+  sprintDatesHint: 'Dates are optional: both or none. They power velocity and the burndown',
+  sprintDatesPartial: 'Enter both dates or clear both',
+  sprintDatesInvalid: 'Dates must be YYYY-MM-DD',
+  sprintDatesOrder: 'The end cannot be before the start',
+  sprintDatesOverlap: 'Overlaps with sprints: {names}',
+  sprintNotDated: 'No dates set — velocity and burndown are unavailable for this sprint',
+  velocityTitle: 'Velocity',
+  velocityNotEnough: 'Not enough data for a forecast',
+  velocityAverage: 'average: {n} (≈{w} per week)',
+  velocityDays: 'days: {n}',
+  velocityTasks: 'tasks: {n}',
+  velocityForecast: 'Forecast: ≈{weeks} wk · open tasks: {open} · sprints in sample: {n}',
+  velocitySample: 'sprints in sample: {n}',
+  velocityUndated: 'Closed sprints without dates: {n} — left out of velocity',
+  velocityEmpty: 'No closed sprints with dates yet',
+  burndownTitle: 'Sprint burndown',
+  burndownIdeal: 'ideal',
+  burndownActual: 'actual',
+  burndownScope: 'scope (current): {n}',
+  burndownNoDoneDate: 'no completion date: {n}',
+  burndownCarriedIn: 'done before start: {n}',
+  burndownInsufficient: 'Not enough history for a burndown: {n} of {total} tasks have no completion date',
+  burndownShow: 'Show sprint burndown',
+  burndownHide: 'Hide sprint burndown',
+  portfolioKpi: 'Portfolio',
+  portfolioProjects: 'projects',
+  portfolioTasks: 'tasks',
+  portfolioCollapse: 'Collapse portfolio',
+  portfolioExpand: 'Expand portfolio',
+  doneByWeekTitle: 'Done per week',
+  portfolioWeeksTotal: 'total over {n} wk: {count}',
+  portfolioAvgWeekly: 'average per calendar week: {n}',
+  portfolioEarlier: 'earlier: {n}',
   openFullTaskForm: 'Open full form',
   projectMeetingsPast: 'Past ({count})',
   projectMeetingsEmpty: 'No meetings in this project',
@@ -4004,6 +6084,634 @@ const en: Translations = {
   taskAssigneeMe: 'Me',
 
   viewerReadOnlyNotice: 'View only — Viewer role',
+
+  // Budget (was utils/budgetStrings.ts)
+  budgetSpentCaps: 'SPENT',
+  budgetBudgetCaps: 'BUDGET',
+  budgetLeft: 'Left',
+  budgetOutsideLimits: 'Outside limits',
+  budgetScopeAll: 'All',
+  budgetScopePersonal: 'Personal',
+  budgetScopeProject: 'Project',
+  budgetScopeLabel: 'Whose money to show',
+  budgetEmptyTitle: 'No budget set up',
+  budgetEmptyBody: 'Categories appear automatically\nonce you add expenses in Finance',
+  budgetAddManually: 'Add manually',
+  budgetTapHint: 'Tap a category to set a monthly forecast',
+  budgetTapRowHint: 'Tap to set a forecast',
+  budgetMonthlyForecast: 'Monthly spending forecast',
+  budgetActuallySpent: 'Actually spent:',
+  budgetPlannedFor: 'Planned for the month ({currency})',
+  budgetNewCategory: 'New budget category',
+  budgetName: 'Name',
+  budgetNamePlaceholder: 'Category name',
+  budgetIcon: 'Icon',
+  budgetAddCategory: 'Add category',
+  budgetDeleteTitle: 'Delete category?',
+  budgetDeleteMsg: '"{name}" will be removed from the budget.',
+  budgetDeleteAction: 'Delete category',
+  budgetErrorExists: 'This category already exists',
+  budgetErrorTooLong: 'Name too long: at most {max} characters — it is also the record key',
+  budgetUnsyncableRow: 'Not syncing: the name is longer than the server limit',
+
+  // Notes (was utils/notesStrings.ts)
+  notesPreview: 'Preview',
+  notesEditText: 'Text',
+  notesPin: 'Pin',
+  notesUnpin: 'Unpin',
+  notesPinned: 'Pinned',
+  notesTagsLabel: 'Tags',
+  notesTagsPlaceholder: 'Comma-separated tags',
+  notesTagsAll: 'All tags',
+  notesLinkTask: 'Task',
+  notesLinkMeeting: 'Meeting',
+  notesLinkNone: 'No link',
+  notesLinkLost: 'Link lost',
+  notesCreateTask: 'Create task from line',
+  notesTaskCreated: 'Task created',
+  notesTaskCreateError: 'Could not create the task. Please retry.',
+  notesChecklist: 'Checklist',
+  notesEmptyBody: 'No text.',
+  notesMarkdownHint: 'Markdown: # heading, - item, - [ ] checklist, #tag',
+
+  // Subscription payment (was PAY_LABELS)
+  payAction: 'Paid',
+  payTitle: 'Subscription payment',
+  payAmount: 'Paid amount',
+  payHint: 'We will add a «{category}» expense on {account} and move the payment to {date}.',
+  payNoAccount: 'no account',
+  payConfirm: 'Create expense',
+  payStale: 'This cycle was already paid on another device. Check the next payment date.',
+  payTxFailed: 'The payment was recorded, but the expense was not created. Add it manually.',
+
+  // Interface modules (was moduleText())
+  modulesTitle: 'Modules',
+  modulesSubtitle: 'Disabled modules disappear from the menu, dashboard and notifications. The data stays — turn a module back on and everything returns.',
+  modulesSystemNote: 'Settings and profile cannot be disabled.',
+  modulesDisabledTitle: 'You turned this feature off',
+  modulesDisabledBody: 'Nothing was deleted. Turn the module back on in settings and the section returns exactly as it was.',
+  modulesOpenSettings: 'Open settings',
+  modulesSettingsRow: 'Interface modules',
+  modulesDashboardEmptyTitle: 'All modules are off',
+  modulesDashboardEmptyBody: 'Nothing was deleted. Turn the modules you need back on and Today returns exactly as it was.',
+
+  // Storage read failure (was LoadErrorNotice)
+  loadErrorTitle: 'Could not read your data',
+  loadErrorBody: 'Storage returned an error. This is NOT an empty list — changes are not being saved so nothing gets overwritten.',
+  loadErrorRetry: 'Try again',
+  healthReminderOff: 'Reminder is not set',
+  healthReminderOffSub: 'The system did not grant notification permission (or notifications are off in app settings). The entry was saved without a reminder.',
+  healthNoticeSettings: 'Settings',
+  hkSyncing: 'Syncing with HealthKit',
+  hkManual: 'Add activity manually or via workouts',
+  hkDenied: 'No HealthKit access — the numbers below are your manual entries',
+  hkGrant: 'Grant access',
+  hkFailed: 'HealthKit did not answer: this is missing data, not a zero',
+
+  // Time screen
+  timeAverageTask: 'Average task',
+  timeProjectBreakdown: 'Breakdown by project',
+  timeMoreProjects: '+ {count} more',
+  timePeriodGroup: 'Period',
+  timeModeGroup: 'View',
+  timeGroupingList: 'List',
+  timeGroupingProject: 'Grouped by project',
+  timeSortDateDesc: 'Newest first',
+  timeSortDateAsc: 'Oldest first',
+  timeSortDurationDesc: 'Longest first',
+  timeSortDurationAsc: 'Shortest first',
+  timeByProjectSuffix: ' · by project',
+  timeEmptyHint: 'Start a timer from a task or add a record with +',
+  timeAddEntry: 'Add record',
+  timeEditEntry: 'Edit record',
+  timeNewEntry: 'New record',
+  timeEntryTaskLabel: 'Task',
+  timeEntryTaskPlaceholder: 'Task name',
+  timeEntryDateLabel: 'Date',
+  timeEntryDatePlaceholder: 'YYYY-MM-DD',
+  timeEntryNotePlaceholder: 'Optional',
+  timeEntryErrorTask: 'Enter a task name',
+  timeEntryErrorDuration: 'Enter a duration',
+  timeEntryErrorDate: 'Use the YYYY-MM-DD date format',
+  timeDeleteEntryA11y: 'Delete record: {task}',
+
+  // Review queue (was ANOMALY_LABEL)
+  anomalyLong: 'Longer than 8 h',
+  anomalyMidnight: 'Crosses midnight',
+  anomalyOutlier: 'Three times the usual',
+  anomalyShort: 'Shorter than 1 min',
+  anomalyCheckTitle: 'Check {count} {noun}',
+  anomalyRecordOne: 'record',
+  anomalyRecordFew: 'records',
+  anomalyRecordMany: 'records',
+  anomalyTrimTo: 'Trim to {duration}',
+  anomalyMarkNormal: 'Normal',
+  anomalyShowMore: 'Show {count} more',
+
+  // Health tabs
+  healthTabOverview: 'Overview',
+  healthTabActivity: 'Activity & workouts',
+  healthTabBody: 'Body & vitals',
+  healthReadFailed: 'Could not read the data',
+  healthUpdatedAt: 'Updated {time}',
+  calRemaining: 'Left',
+  // Notification center
+  ncTabInbox: 'Notifications',
+  ncTabReminders: 'Reminders',
+  ncFilterAll: 'All',
+  ncFilterUnread: 'Unread',
+  ncMarkAllRead: 'Mark all as read',
+  ncMarkRead: 'Mark as read',
+  ncArchive: 'Remove from list',
+  ncOpenSettings: 'Notification settings',
+  ncEmptyTitle: 'All quiet for now',
+  ncEmptySub: 'Assignments, mentions and reminders about deadlines, meetings and payments will appear here.',
+  ncEmptyUnreadTitle: 'You are all caught up',
+  ncOffline: 'Server notifications are available in online mode with an account.',
+  ncUnavailable: 'This server does not support the notification center yet.',
+  ncLoadFailed: 'Could not refresh notifications.',
+  ncRetry: 'Retry',
+  ncLoadMore: 'Show more',
+  ncUnreadCount: 'Unread: {count}',
+  ncBadgeA11y: 'Unread notifications: {count}',
+  ncUnreadA11y: 'unread',
+  ncJustNow: 'just now',
+  ncMinutesAgo: '{n} min ago',
+  ncHoursAgo: '{n} h ago',
+  ncYesterday: 'yesterday',
+  ncCollapsedMore: '+{count} similar',
+  ncHiddenByModules: 'Notifications from disabled sections are hidden.',
+  ncLocalRemindersToggle: 'Reminders on this device',
+  ncLocalRemindersHint: 'Medication, habit and health reminders work offline — they are scheduled on the phone itself.',
+  ncServerRemindersHint: 'Task, meeting and payment-day reminders now come from the server — see the Notifications tab.',
+  ncSettingsTitle: 'Notification settings',
+  ncSettingsIntro: 'These settings are shared across all your devices and the web.',
+  ncMaster: 'Send notifications',
+  ncMasterSub: 'When off, nothing is sent out; the in-app list stays.',
+  ncPushMaster: 'Push to devices',
+  ncPushMasterSub: 'Phones, tablets and browsers where you are signed in.',
+  ncEmailMaster: 'Email digest',
+  ncChannelInApp: 'In app',
+  ncChannelPush: 'Push',
+  ncChannelEmail: 'Email',
+  ncMatrixTitle: 'What to send and where',
+  ncShowEvents: 'Individual events',
+  ncHideEvents: 'Collapse',
+  ncCustomized: 'customized',
+  ncResetEvent: 'Same as category',
+  ncChannelA11y: '{event} — {channel}',
+  ncQuietHours: 'Quiet hours',
+  ncQuietHoursSub: 'Push is held until quiet hours end; in-app notifications still appear right away.',
+  ncQuietFrom: 'From',
+  ncQuietTo: 'To',
+  ncEarlier: 'Earlier',
+  ncLater: 'Later',
+  ncTimezone: 'Time zone: {tz}',
+  ncMeetingLead: 'Meeting reminder',
+  ncMinutesBefore: '{n} min before',
+  ncSaveFailed: 'Could not save. Please try again.',
+  ncSettingsOffline: 'Notification settings are available in online mode with an account.',
+  ncNoEvents: 'No events for this section yet.',
+  ncCatTasksProjects: 'Tasks and projects',
+  ncCatMeetingsFinance: 'Meetings and finance',
+  ncCatTrainingHealth: 'Training and health',
+  ncCatSystem: 'Feedback and system',
+  ncEvTaskAssigned: 'Task assigned',
+  ncEvTaskStatusChanged: 'Status changed',
+  ncEvTaskMentioned: 'Mentioned in a comment',
+  ncEvTaskCommented: 'New comment',
+  ncEvTaskDeadlineSoon: 'Deadline approaching',
+  ncEvTaskOverdue: 'Overdue tasks',
+  ncEvTaskReminder: 'Task reminder',
+  ncEvSprintStarted: 'Sprint started',
+  ncEvSprintClosed: 'Sprint closed',
+  ncEvProjectInvite: 'Added to a project',
+  ncEvMeetingReminder: 'Meeting reminder',
+  ncEvSubscriptionDue: 'Subscription payment',
+  ncEvBudgetExceeded: 'Budget exceeded',
+  ncEvBalanceForecast: 'Balance forecast',
+  ncEvWorkoutAssigned: 'Program assigned',
+  ncEvWorkoutToday: 'Workout today',
+  ncEvQuestClosed: 'Quest closed',
+  ncEvStreakAtRisk: 'Streak at risk',
+  ncEvMeasurement: 'Measurement reminder',
+  ncEvFeedback: 'Feedback status',
+  ncEvRegistration: 'New registration request',
+  // ── Групи тренувань (training-module.md, мобільний клієнт) — префікс tg ──
+  tgNavLabel: 'Training groups',
+  tgTitle: 'Training groups',
+  tgGroupsButton: 'Training groups',
+  tgPersonalProgramsTab: 'My programs',
+  tgEmptyTitle: 'No groups yet',
+  tgEmptyBody: 'Create a group as a coach or join one with an invite.',
+  tgCreateGroup: 'Create group',
+  tgJoinGroup: 'Join with invite',
+  tgRoleCoach: 'Coach',
+  tgRoleMember: 'Member',
+  tgMembersCount: 'Members: {n}',
+  tgGroupName: 'Group name',
+  tgGroupNamePlaceholder: 'e.g. Morning group',
+  tgGroupDescription: 'Description',
+  tgGroupDescriptionPlaceholder: 'Mon/Wed/Fri 07:00',
+  tgColor: 'Color',
+  tgTimezone: 'Time zone',
+  tgWeekStart: 'Week starts on',
+  tgWeekStartMon: 'Monday',
+  tgWeekStartSun: 'Sunday',
+  tgCreate: 'Create',
+  tgOfflineNotice: 'No connection to the server — showing what is saved on this device.',
+  tgOnlineOnly: 'Training groups need an account in online mode.',
+  tgErrorGeneric: 'Something went wrong. Please try again.',
+  tgGroupGone: 'The group was deleted or you are no longer in it.',
+  tgInviteCodeLabel: 'Invite link or code',
+  tgInviteCodePlaceholder: 'Paste the invite link',
+  tgInviteCheck: 'Check',
+  tgInviteJoin: 'Join',
+  tgInviteInvalid: 'This invite is not valid.',
+  tgInviteExpired: 'This invite has expired.',
+  tgInviteTo: 'You are invited to the group',
+  tgInviteAs: 'Role: {role}',
+  tgInviteFrom: 'Invited by: {name}',
+  tgAlreadyMember: 'You are already in this group.',
+  tgInviteOtherWorkspace: 'This invite is for another server ({ws}). Switch to it in account settings and open the link again.',
+  tgJoined: 'You joined the group.',
+  tgOpenGroup: 'Open group',
+  tgTodaySession: 'Today\'s workout',
+  tgRestDay: 'Rest day today',
+  tgNextSession: 'Next: {date}',
+  tgNoPlan: 'No program assigned yet',
+  tgNoPlanCoach: 'Create a program and assign it to members.',
+  tgStart: 'Start',
+  tgContinue: 'Continue',
+  tgView: 'View',
+  tgExercisesCount: 'Exercises: {n}',
+  tgStatusPlanned: 'Planned',
+  tgStatusCompleted: 'Completed',
+  tgStatusPartial: 'Partial',
+  tgStatusSkipped: 'Skipped',
+  tgStatusMissed: 'Missed',
+  tgThisWeek: 'This week',
+  tgStreak: 'Streak',
+  tgStreakDays: '{n} d',
+  tgXpTotal: 'Total XP',
+  tgMultiplier: 'Multiplier ×{x}',
+  tgLeaderboard: 'Leaderboard',
+  tgSeeAll: 'See all',
+  tgQuests: 'Quests',
+  tgActiveQuests: 'Active quests',
+  tgNoQuests: 'No active quests',
+  tgPrograms: 'Programs',
+  tgMembers: 'Members',
+  tgExercises: 'Group exercises',
+  tgInvite: 'Invite',
+  tgLeaveGroup: 'Leave group',
+  tgLeaveConfirm: 'Leave “{name}”? Completed workouts stay in your log.',
+  tgDeleteGroup: 'Delete group',
+  tgDeleteGroupConfirm: 'Delete “{name}” for all members?',
+  tgLastCoach: 'The group must keep at least one coach.',
+  tgSyncPending: 'Waiting to sync',
+  tgRejected: 'The server did not accept a change ({reason}).',
+  tgNewProgram: 'New program',
+  tgNoPrograms: 'No programs yet',
+  tgNoProgramsMember: 'The coach has not created programs yet.',
+  tgImportProgram: 'Import my program',
+  tgImportExercises: 'Import my exercises',
+  tgImportedExercises: 'Exercises imported: {n}',
+  tgNothingToImport: 'No new personal exercises to import.',
+  tgWeeks: '{n} wk',
+  tgDaysPerWeek: '{n} days/wk',
+  tgProgramName: 'Program name',
+  tgWeekCount: 'Weeks',
+  tgNotes: 'Notes',
+  tgWeekTemplate: 'Weekly template',
+  tgRestDayShort: 'Rest',
+  tgDayTitle: 'Day title',
+  tgDayTitlePlaceholder: 'Day A — upper',
+  tgEstimatedMin: 'Duration, min',
+  tgAddExercise: 'Add exercise',
+  tgSets: 'Sets',
+  tgReps: 'Reps',
+  tgWeightKg: 'Weight, kg',
+  tgRestSec: 'Rest, s',
+  tgRpe: 'RPE',
+  tgProgression: 'Progression',
+  tgProgNone: 'None',
+  tgProgLinearWeight: '+ weight',
+  tgProgLinearReps: '+ reps',
+  tgProgPercent: '+ %',
+  tgStepKg: 'Step, kg',
+  tgStepReps: 'Step, reps',
+  tgPercent: 'Percent',
+  tgEveryWeeks: 'Every N weeks',
+  tgCapKg: 'Cap, kg',
+  tgCapReps: 'Cap, reps',
+  tgPreview: 'Load preview',
+  tgWeekN: 'Week {n}',
+  tgRemoveDay: 'Make it a rest day',
+  tgMoveUp: 'Move up',
+  tgMoveDown: 'Move down',
+  tgRemove: 'Remove',
+  tgProgramInvalidName: 'Enter a program name.',
+  tgProgramInvalidDays: 'Add at least one day with exercises.',
+  tgAssign: 'Assign',
+  tgAssignTitle: 'Assign program',
+  tgStartDate: 'Start date (YYYY-MM-DD)',
+  tgSelectMembers: 'Members',
+  tgSelectAll: 'All',
+  tgAssignDone: 'Assigned to members: {n}',
+  tgAssignAlready: 'already assigned',
+  tgAssignSessions: '{n} sessions will be created per member.',
+  tgAssignments: 'Assignments',
+  tgRevoke: 'Revoke',
+  tgRevokeConfirm: 'Revoke this assignment? Future planned sessions disappear for the member; completed ones stay.',
+  tgReexpand: 'Update for members',
+  tgReexpandHint: 'The program changed after it was assigned.',
+  tgSaveFirst: 'Save the program first so the server can see it.',
+  tgDeleteProgram: 'Delete program',
+  tgDeleteProgramConfirm: 'Delete “{name}”? Sessions already assigned stay with members.',
+  tgExerciseName: 'Exercise name',
+  tgMuscleGroup: 'Muscle group',
+  tgNewExercise: 'New exercise',
+  tgNoExercises: 'The group exercise library is empty',
+  tgPickExercise: 'Pick an exercise',
+  tgDateInvalid: 'Use YYYY-MM-DD, no earlier than 14 days ago.',
+  tgSetN: 'Set {n}',
+  tgRestTimer: 'Rest',
+  tgSkipRest: 'Skip',
+  tgAddRest: '+30 s',
+  tgFinish: 'Finish',
+  tgSkipSession: 'Skip workout',
+  tgSkipConfirm: 'Mark this workout as skipped?',
+  tgFinishTitle: 'Finish workout',
+  tgDurationMin: 'Duration, min',
+  tgCalories: 'Calories (optional)',
+  tgMemberNote: 'Note for the coach',
+  tgFinishPartial: '{done} of {total} sets done — it will count as partial, without XP.',
+  tgXpEstimate: '≈ +{n} XP',
+  tgSessionNotFound: 'Session not found. The assignment may have been revoked.',
+  tgSetDone: 'Set {n} done',
+  tgSetNotDone: 'Mark set {n} done',
+  tgVolume: 'Volume: {kg} kg',
+  tgElapsed: 'Elapsed',
+  tgCoachNote: 'Coach note',
+  tgNewQuest: 'New quest',
+  tgQuestTitle: 'Title',
+  tgQuestMeasurable: 'Measurable goal',
+  tgQuestCheckbox: 'Checklist task',
+  tgMetric: 'Metric',
+  tgTarget: 'Target',
+  tgDueDate: 'Due date (YYYY-MM-DD)',
+  tgXpReward: 'XP reward',
+  tgPhotoRequired: 'Photo required',
+  tgHealthMetricHint: 'Calculated from the member\'s health data. The coach sees only the total.',
+  tgMarkDone: 'Mark done',
+  tgUndo: 'Undo',
+  tgAddPhoto: 'Add photo',
+  tgPhotoAttached: 'Photo attached',
+  tgPhotoLocalHint: 'The photo stays on your device only.',
+  tgPhotoUnavailable: 'Photo picking is not available in this build.',
+  tgRecompute: 'Recalculate',
+  tgAllMembers: 'All members',
+  tgQuestAuto: 'Progress is tracked automatically',
+  tgArchive: 'Archive',
+  tgMetricSessionCount: 'Workouts count',
+  tgMetricWorkoutMinutes: 'Workout minutes',
+  tgMetricDistance: 'Distance',
+  tgMetricVolume: 'Volume',
+  tgMetricSteps: 'Steps',
+  tgMetricSleep: 'Sleep',
+  tgMetricWeightDelta: 'Weight change',
+  tgUnitSessions: 'workouts',
+  tgUnitMinutes: 'min',
+  tgUnitKm: 'km',
+  tgUnitKg: 'kg',
+  tgUnitSteps: 'steps',
+  tgUnitHours: 'h',
+  tgQuestInvalid: 'Fill in title, metric and target; the due date must not be before the start.',
+  tgDoneCount: 'Completed: {n}',
+  tgPeriodWeek: 'Week',
+  tgPeriodAll: 'All time',
+  tgYou: 'You',
+  tgYourPlace: 'Your place: {rank} · {xp} XP',
+  tgSessionsShort: '{n} workouts',
+  tgNoLeaderboard: 'Nobody has earned XP yet',
+  tgPrevWeek: 'Previous week',
+  tgNextWeek: 'Next week',
+  tgInviteLink: 'Link',
+  tgInviteByEmail: 'By email',
+  tgEmail: 'Email',
+  tgCreateLink: 'Create link',
+  tgLinkCreated: 'The link is ready. Share it now — it cannot be shown again.',
+  tgShare: 'Share',
+  tgCopy: 'Copy',
+  tgCopied: 'Copied',
+  tgExpiresIn: 'Valid for',
+  tgHours24: '24 h',
+  tgDays7: '7 days',
+  tgDays30: '30 days',
+  tgActiveInvites: 'Active invites',
+  tgInviteUses: 'Used: {uses}',
+  tgUserNotFound: 'No user with this email.',
+  tgMemberAdded: 'Member added.',
+  tgAlreadyInGroup: 'This user is already in the group.',
+  tgMakeCoach: 'Make coach',
+  tgMakeMember: 'Make member',
+  tgRemoveMember: 'Remove from group',
+  tgRemoveMemberConfirm: 'Remove {name} from the group?',
+  tgWeekXp: 'Week XP',
+  tgNoMembers: 'No members yet',
+  tgMemberHistory: 'Workout history',
+  tgNoLogs: 'No completed workouts yet',
+  tgQuestProgress: 'Quest progress',
+  tgSaveNote: 'Save note',
+  tgNotePlaceholder: 'Comment on this workout',
+  tgPrivacyNote: 'The member\'s health data (weight, sleep, nutrition) is private and not shown here.',
+  tgSelectMember: 'Select a member from the list',
+  tgMemberNoteLabel: 'Member note',
+  tgMinutesShort: '{n} min',
+  tgOpenSession: 'Open workout',
+  tgGroupBadge: 'Group',
+  // ── Finance: tabbed section (finance-revamp.md) — prefix fin ──
+  finTabOverview: 'Overview',
+  finTabTransactions: 'Transactions',
+  finTabReports: 'Reports',
+  finTabBudget: 'Budget',
+  finTabSubscriptions: 'Subscriptions',
+  finTabAccounts: 'Accounts',
+  finTabsLabel: 'Finance sections',
+  finFilterPeriod: 'Period',
+  finFilterCurrency: 'Currency',
+  finFilterButton: 'Currency and scope',
+  finPeriodPrev: 'Previous period',
+  finPeriodNext: 'Next period',
+  finPresetMonth: 'This month',
+  finPresetPrevMonth: 'Last month',
+  finPresetQuarter: 'This quarter',
+  finPresetYear: 'This year',
+  finPresetCustom: 'Custom period',
+  finCustomFrom: 'Period start, YYYY-MM-DD',
+  finCustomTo: 'Period end, YYYY-MM-DD',
+  finApply: 'Apply',
+  finFactTitle: 'Cash flow — actual',
+  finInflow: 'Inflow',
+  finOutflow: 'Outflow',
+  finOpening: 'Opening',
+  finClosing: 'Closing',
+  finBalanceAllScopes: 'Balance includes all transactions: the scope narrows inflow and outflow only',
+  finForecastTitle: 'Forecast',
+  finForecast30: '30 days',
+  finForecast90: '90 days',
+  finForecastOn: 'On {date}: {amount}',
+  finAvgVariable: 'Average variable spending: {amount} per day',
+  finForecastThin: 'Not much data: less than 30 days of history, the estimate is rough',
+  finForecastAllScope: 'The forecast uses all money; the scope does not affect it',
+  finForecastEvents: 'Forecast events',
+  finSourceSubscription: 'subscription',
+  finSourceIncome: 'recurring income',
+  finSourcePlanned: 'planned transaction',
+  finEventVariable: 'variable spending (estimate)',
+  finOverdue: 'overdue',
+  finShortfallTitle: 'Balance goes negative on {date}: {amount}',
+  finShortfallBiggest: 'Largest payments before that day: {list}',
+  finViewForecast: 'View forecast',
+  finEditSubscriptions: 'Edit subscriptions',
+  finOnAccounts: 'On accounts · {currency}',
+  finNoAccountsInCurrency: 'No accounts in {currency}',
+  finUnassignedHint: 'Transactions without an account: {n} — assign',
+  finPlannedHint: 'Planned transactions: {n}, {amount}',
+  finNoData: 'No transactions in this period',
+  finPnlTitle: 'P&L',
+  finIncome: 'Income',
+  finFixed: 'Fixed expenses',
+  finVariable: 'Variable expenses',
+  finNet: 'Net result',
+  finSavingsRate: 'Savings rate',
+  finPp: 'pp',
+  finVsPrev: 'vs previous ({period})',
+  finVsAvg: 'vs {n}-period average',
+  finTransfersExcluded: 'Transfers between your accounts are not counted',
+  finOtherCurrencies: 'Not counted (other currencies): {list}',
+  finStructure: 'Spending structure',
+  finCostAll: 'All',
+  finCostFixed: 'Fixed',
+  finCostVariable: 'Variable',
+  finNoCategory: 'No category',
+  finUnclassified: 'Transactions without a fixed/variable mark: {n} — counted as variable',
+  finAssign: 'Assign',
+  finGroupHousing: 'Housing',
+  finGroupFood: 'Food',
+  finGroupTransport: 'Transport',
+  finGroupHealth: 'Health',
+  finGroupEntertainment: 'Entertainment',
+  finGroupServices: 'Services',
+  finGroupEducation: 'Education',
+  finGroupClothing: 'Clothing',
+  finGroupPets: 'Pets',
+  finGroupTaxes: 'Taxes',
+  finGroupDebt: 'Debt',
+  finGroupSalary: 'Salary',
+  finGroupBusiness: 'Business',
+  finGroupInvestments: 'Investments',
+  finGroupGifts: 'Gifts',
+  finGroupOther: 'Other',
+  finCatGroup: 'Group',
+  finCatCost: 'Kind',
+  finCatMetaHint: 'Group and fixed/variable kind feed reports and the forecast',
+  finArchivedAccounts: 'Archived accounts',
+  finOpenBanks: 'Savings jars',
+  finRecurringPayments: 'Recurring payments',
+  finRecurringIncomes: 'Recurring income',
+  finRiNew: 'New recurring income',
+  finRiEdit: 'Recurring income',
+  finRiEmpty: 'No recurring income yet',
+  finRiName: 'Name',
+  finRiNamePlaceholder: 'Salary',
+  finRiEvery: 'Every',
+  finRiNext: 'Next payment, YYYY-MM-DD',
+  finRiNoAccount: 'no account',
+  finRiInvalid: 'Check the name, amount and date',
+  finRiArchive: 'Archive',
+  finRiRestore: 'Restore',
+  finRiDelete: 'Delete income',
+  finRiDeleteConfirm: 'Delete recurring income "{name}"? Received transactions stay in Finance.',
+  finRiSaveFailed: 'Could not save. Please try again.',
+  finRiReceived: 'Received',
+  finRiReceiveTitle: 'Income received',
+  finRiReceiveHint: 'An income "{category}" will be added to {account}. Next payment — {date}.',
+  finRiDefaultCategory: 'Other',
+  finRiStale: 'This cycle was already received on another device',
+  finBudgetByMonth: 'Limits by month',
+  finBudgetMonthsHint: 'Monthly limits are not added up: each month is shown separately',
+  finProjectAddTx: 'Add transaction',
+  finProjectTxTitle: 'Project transaction',
+  finProjectIncomeTitle: 'Project income',
+  finProjectNoIncome: 'No income yet',
+  finProjectNet: 'Income − expenses',
+  finProjectNeedAccount: 'Create an account in Finance first: a transaction without an account is not part of any balance',
+  finProjectSaveFailed: 'Could not save the transaction',
+  finProjectUncounted: 'Not counted (other currencies): {list}',
+  finProjectInvalid: 'Enter an amount greater than zero',
+  // ─── hauto*: automatic health data (HealthKit / Health Connect) ───
+  hautoPulseRest: 'Resting heart rate',
+  hautoPulseRestNote: 'Resting heart rate for the day — from {source} or a manual entry.',
+  hautoPulseRestNoteManual: 'Resting heart rate for the day — from a manual entry.',
+  hautoPulseRestEmpty: 'No resting heart rate for today yet',
+  hautoPulseAvg: 'Average heart rate',
+  hautoPulseAvgNote: 'Daily average — not the resting heart rate.',
+  hautoSleepQuality: 'Sleep quality',
+  hautoSleepQualityByDuration: 'by duration',
+  hautoSleepQualityByPhases: 'by stages',
+  hautoSleepNoPhases: 'The source gave no sleep stages — the score reflects duration only.',
+  hautoSleepPhases: 'Sleep stages',
+  hautoSleepDeep: 'Deep',
+  hautoSleepRem: 'REM',
+  hautoSleepLight: 'Light',
+  hautoSleepAwake: 'Awake',
+  hautoSpo2: 'Blood oxygen (SpO₂)',
+  hautoDistance: 'Distance',
+  hautoBpm: 'bpm',
+  hautoKm: 'km',
+  hautoKg: 'kg',
+  hautoKcal: 'kcal',
+  hautoMin: 'min',
+  hautoActiveKcal: 'Active kcal',
+  hautoActiveCalories: 'Active calories',
+  hautoFlights: 'Floors',
+  hautoHrAvgShort: 'Avg',
+  hautoHrMin: 'Min',
+  hautoHrMax: 'Max',
+  hautoHrRest: 'Resting',
+  hautoLast24h: 'Last 24 h ({n} readings)',
+  hautoWeek: '7 days',
+  hautoWorkouts30: 'Workouts (30 days)',
+  hautoWeightMeasuredAt: 'measured {date}',
+  hautoWeightCleanup: 'Removed {n} repeated weight entries — your history is now accurate',
+  hautoReadFailedBody: 'Requests to {source} failed. These numbers are not your data; check the access settings.',
+  hautoNotAvailable: 'Not available',
+  hautoNotAvailableIos: 'Apple Health is only available on iPhone',
+  hautoNotAvailableAndroid: 'Health Connect is not installed or is out of date. Install it from Google Play so Flowi can read your data.',
+  hautoNotAvailableOther: 'Automatic health data is only available in the phone app',
+  hautoInstallHc: 'Install Health Connect',
+  hautoConnectTitle: 'Connect {source}',
+  hautoConnectBody: 'Flowi only reads data: steps, heart rate, sleep, weight, SpO₂. It never writes anything.',
+  hautoOpenSettings: 'Open settings',
+  hautoWip: 'This feature is still in development',
+  hautoSyncing: 'Syncing with {source}',
+  hautoDenied: 'No {source} access — the numbers below are your manual entries',
+  hautoFailed: '{source} did not answer: this is missing data, not a zero',
+  // ── Wave tails (tl*) ──
+  tlEvTrainingInvite: 'Training group invitation',
+  tlEvTrainingProgramAssigned: 'Training program assigned',
+  tlEvTrainingSessionCompleted: 'Member completed a workout',
+  tlEvTrainingQuestAssigned: 'New quest',
+  tlEvTrainingQuestCompleted: 'Quest completed',
+  tlEvTrainingComment: 'Coach comment',
+  tlEvTrainingLeaderboardWeekly: 'Weekly leaderboard summary',
+  tlEvFeedbackIncoming: 'New report in the inbox',
+  tlHealthDeleteEntryTitle: 'Delete entry?',
+  tlHealthDeleteEntryMsg: 'The entry will disappear from history on all devices. An automatic Health entry will not come back through sync.',
+  tlTrainingStreakTitle: 'Workout still ahead',
+  tlTrainingStreakBody: '{title} is planned for today — there is still time to keep your streak.',
 };
 
 export const allTranslations: Record<Lang, Translations> = { uk, en };

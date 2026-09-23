@@ -14,9 +14,13 @@ import {
   type Subscription,
 } from '@/utils/subscriptions';
 
-import { loadData } from './storage';
+import type { ModuleId } from '@/constants/nav';
+import { modulesForEvent } from '@/utils/pushLink';
+
+import { loadData, saveData, subscribeToStorage } from './storage';
 import { allTranslations, type Lang, type Translations } from './translations';
 import { ensurePushTokenRegistered, isForCurrentWorkspace, type PushPayloadData } from './push';
+import { UI_PREFERENCES_KEY, isModuleEnabled, loadDisabledModules } from './ui-preferences';
 
 const SUPPRESSED = {
   shouldShowAlert: false,
@@ -33,6 +37,16 @@ Notifications.setNotificationHandler({
     // workspace (§2.3/§2.8), тож пуш звідти теоретично ще може долетіти.
     const data = (notification.request.content.data ?? {}) as PushPayloadData;
     if (!isForCurrentWorkspace(data)) return SUPPRESSED;
+    // Подія вимкненого модуля (ui_preferences) не показується поверх
+    // відкритого застосунку — так само, як її немає і в центрі сповіщень.
+    if (typeof data.event_type === 'string' && data.event_type) {
+      try {
+        const disabled = await loadDisabledModules();
+        if (!modulesForEvent(data.event_type).every(module => isModuleEnabled(disabled, module))) return SUPPRESSED;
+      } catch {
+        // Налаштування не прочитались — показуємо: зайве краще за втрачене.
+      }
+    }
     return {
       shouldShowAlert: true,
       shouldPlaySound: true,
@@ -104,6 +118,103 @@ async function isNotificationsEnabled(): Promise<boolean> {
   return loadData<boolean>('notificationsEnabled', true);
 }
 
+// ─── Серверні нагадування замість локальних (notifications-module.md §10.3) ──
+//
+// Дедлайни/нагадування задач, зустрічі й день оплати підписки тепер шле
+// сервер. Щоб не було подвійних сповіщень, відповідні локальні нагадування
+// більше не плануються, а вже заплановані скасовуються один раз при переході.
+// Рішення «які саме» ухвалює `store/push.ts` після реєстрації пристрою (сервер
+// оголосив подію в `server_reminders`, збірка не нижча за поріг сервера,
+// пристрій справді зареєстрований для push) і кладе у сховище; тут його лише
+// читають. Нема рішення (офлайн-режим, гість, старий сервер, немає дозволу
+// на push) — усе планується локально, як раніше.
+//
+// Ліки й звички лишаються локальними назавжди — це вимога роботи офлайн.
+
+/** Той самий літерал, що `SERVER_REMINDERS_KEY` в `api/notifications.ts` (імпорт звідти тягнув би HTTP-клієнт). */
+export const SERVER_REMINDERS_KEY = 'notifications_server_reminders_v1';
+/** Які події вже прибрано з локального розкладу — щоб скасування йшло один раз на подію. */
+export const LOCAL_REMINDERS_MIGRATED_KEY = 'local_reminders_migrated_v1';
+
+export type ServerReminderEvent = 'task.reminder' | 'meeting.reminder' | 'subscription.due_today';
+
+/** Події, які зараз шле сервер. Помилка читання — «жодних»: краще дубль, ніж тиша. */
+export async function loadServerHandledReminders(): Promise<Set<string>> {
+  try {
+    const record = await loadData<{ events?: unknown } | null>(SERVER_REMINDERS_KEY, null);
+    const events = Array.isArray(record?.events) ? record.events : [];
+    return new Set(events.filter((e): e is string => typeof e === 'string'));
+  } catch {
+    return new Set();
+  }
+}
+
+interface ScheduledLike {
+  identifier?: unknown;
+  content?: { data?: Record<string, unknown> | null } | null;
+}
+
+/**
+ * Чи є заплановане локальне нагадування дублем серверного. Чиста функція від
+ * ідентифікатора і `data`, щоб її можна було перевірити без ОС.
+ *
+ * - `reminder_<taskId>` — нагадування ЗАВДАННЯ; нагадування ПІДЗАВДАННЯ
+ *   (`data.subtaskId`) сервер не індексує, тож воно лишається локальним;
+ * - `meeting_<id>` — нагадування про зустріч;
+ * - `sub_<id>_due` — лише день оплати: «за N днів», «прострочено» і «кінець»
+ *   у першій фазі лишаються локальними (§5.2).
+ */
+export function isServerReplacedReminder(item: ScheduledLike, events: ReadonlySet<string>): boolean {
+  const id = typeof item.identifier === 'string' ? item.identifier : '';
+  if (!id) return false;
+  const data = item.content?.data ?? {};
+  if (events.has('task.reminder') && id.startsWith('reminder_')) {
+    return !data.subtaskId;
+  }
+  if (events.has('meeting.reminder') && id.startsWith('meeting_')) return true;
+  if (events.has('subscription.due_today') && id.startsWith(SUBSCRIPTION_NOTIFICATION_PREFIX)) {
+    return data.kind === 'due' || /_due$/.test(id);
+  }
+  return false;
+}
+
+let serverMigrationQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Одноразовий перехід: скасувати вже заплановані локальні дублі серверних
+ * нагадувань. `local_reminders_migrated_v1` пам'ятає, для яких подій це вже
+ * зроблено; коли рішення знято (вихід з акаунта), позначку теж знято —
+ * наступний перехід знову прибере дублі.
+ */
+export function migrateLocalRemindersToServer(): Promise<void> {
+  const run = async () => {
+    const events = await loadServerHandledReminders();
+    const done = await loadData<{ events?: string[] } | null>(LOCAL_REMINDERS_MIGRATED_KEY, null);
+    const doneEvents = new Set(Array.isArray(done?.events) ? done.events : []);
+    if (!events.size) {
+      if (done) await saveData(LOCAL_REMINDERS_MIGRATED_KEY, null);
+      return;
+    }
+    const pending = new Set([...events].filter(e => !doneEvents.has(e)));
+    if (!pending.size) return;
+    let scheduled: ScheduledLike[] = [];
+    try {
+      scheduled = await Notifications.getAllScheduledNotificationsAsync() as unknown as ScheduledLike[];
+    } catch {
+      return;
+    }
+    const stale = scheduled.filter(item => isServerReplacedReminder(item, pending));
+    await Promise.all(stale.map(item =>
+      Notifications.cancelScheduledNotificationAsync(item.identifier as string).catch(() => {})));
+    await saveData(LOCAL_REMINDERS_MIGRATED_KEY, {
+      events: [...events],
+      at: new Date().toISOString(),
+    });
+  };
+  serverMigrationQueue = serverMigrationQueue.then(run, run);
+  return serverMigrationQueue;
+}
+
 export async function scheduleReminder(
   meta: ReminderMeta,
   date: Date,
@@ -121,10 +232,21 @@ export async function scheduleReminder(
     return false;
   }
 
+  const id = reminderId(meta.taskId, meta.subtaskId);
+  if (!(await moduleAllowsReminder(id))) {
+    if (__DEV__) console.warn('[notifications] scheduleReminder: module disabled');
+    return false;
+  }
+  // Нагадування ЗАВДАННЯ шле сервер (`task.reminder`, з `reminderAt`, що
+  // приїде синком); підзавдання сервер не індексує — лишається локальним.
+  if (!meta.subtaskId && (await loadServerHandledReminders()).has('task.reminder')) {
+    await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+    return false;
+  }
+
   const granted = await requestNotificationPermissions();
   if (!granted) return false;
 
-  const id = reminderId(meta.taskId, meta.subtaskId);
   // Cancel existing before re-scheduling
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
 
@@ -178,10 +300,14 @@ export async function scheduleDailyReminder(
     if (__DEV__) console.warn('[notifications] scheduleDailyReminder: globally disabled');
     return false;
   }
+  const id = dailyReminderId(key);
+  if (!(await moduleAllowsReminder(id))) {
+    if (__DEV__) console.warn('[notifications] scheduleDailyReminder: module disabled', key);
+    return false;
+  }
   const granted = await requestNotificationPermissions();
   if (!granted) return false;
 
-  const id = dailyReminderId(key);
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
 
   await Notifications.scheduleNotificationAsync({
@@ -217,9 +343,13 @@ export async function scheduleWeeklyReminder(
     if (__DEV__) console.warn('[notifications] scheduleWeeklyReminder: globally disabled');
     return false;
   }
+  const id = dailyReminderId(key);
+  if (!(await moduleAllowsReminder(id))) {
+    if (__DEV__) console.warn('[notifications] scheduleWeeklyReminder: module disabled', key);
+    return false;
+  }
   const granted = await requestNotificationPermissions();
   if (!granted) return false;
-  const id = dailyReminderId(key);
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
   await Notifications.scheduleNotificationAsync({
     identifier: id,
@@ -244,6 +374,11 @@ export async function scheduleMedReminders(
   const globalEnabled = await isNotificationsEnabled();
   if (!globalEnabled) {
     if (__DEV__) console.warn('[notifications] scheduleMedReminders: globally disabled');
+    return [];
+  }
+  // Усі часи одного запису мають спільний префікс id, тож модуль питаємо раз.
+  if (!(await moduleAllowsReminder(medReminderId(medId, 0)))) {
+    if (__DEV__) console.warn('[notifications] scheduleMedReminders: module disabled');
     return [];
   }
   const granted = await requestNotificationPermissions();
@@ -282,6 +417,10 @@ export async function scheduleDateReminder(
   const globalEnabled = await isNotificationsEnabled();
   if (!globalEnabled) {
     if (__DEV__) console.warn('[notifications] scheduleDateReminder: globally disabled');
+    return null;
+  }
+  if (!(await moduleAllowsReminder(id))) {
+    if (__DEV__) console.warn('[notifications] scheduleDateReminder: module disabled', id);
     return null;
   }
   const granted = await requestNotificationPermissions();
@@ -328,10 +467,21 @@ export async function scheduleMeetingNotification(
     return false;
   }
 
+  const id = meetingNotifId(meetingId);
+  if (!(await moduleAllowsReminder(id))) {
+    if (__DEV__) console.warn('[notifications] scheduleMeetingNotification: module disabled');
+    return false;
+  }
+  // Нагадування про зустріч шле сервер (`meeting.reminder`, з урахуванням
+  // повторів і «за скільки хвилин» із налаштувань сповіщень).
+  if ((await loadServerHandledReminders()).has('meeting.reminder')) {
+    await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+    return false;
+  }
+
   const granted = await requestNotificationPermissions();
   if (!granted) return false;
 
-  const id = meetingNotifId(meetingId);
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
   const tr = await notificationTr();
   await Notifications.scheduleNotificationAsync({
@@ -433,8 +583,11 @@ export function syncSubscriptionReminders(
     }
 
     const enabled = await isNotificationsEnabled();
-    if (!enabled) {
-      // Нотифікації вимкнено глобально — прибираємо вже заплановані нагадування підписок.
+    // Вимкнений модуль «Підписки» діє тут рівно як глобальне вимкнення
+    // нотифікацій: план порожній, а все вже заплановане — скасовується.
+    // Самі підписки при цьому лишаються у сховищі недоторканими.
+    const moduleOn = isModuleEnabled(await loadDisabledModules(), 'subscriptions');
+    if (!enabled || !moduleOn) {
       await Promise.all(scheduledIds.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
       return;
     }
@@ -450,7 +603,11 @@ export function syncSubscriptionReminders(
     for (const sub of subs) {
       for (const spec of subscriptionReminderPlan(sub, now)) all.push({ ...spec, sub });
     }
-    const limited = limitSubscriptionReminders(all, now, {
+    // День оплати шле сервер (`subscription.due_today`) — локальний `due` не
+    // плануємо, а вже запланований піде в `stale` нижче і скасується.
+    const serverEvents = await loadServerHandledReminders();
+    const localOnly = serverEvents.has('subscription.due_today') ? all.filter(spec => spec.kind !== 'due') : all;
+    const limited = limitSubscriptionReminders(localOnly, now, {
       max: subscriptionReminderBudget(Platform.OS, othersPending),
     });
 
@@ -664,7 +821,12 @@ export function rescheduleHealthRemindersFromStorage(
       return;
     }
 
-    const plan = healthReminderPlan(meds, habits, tr);
+    // Фільтр модулів — ДО звірки, тож нагадування вимкненого модуля просто
+    // не потрапляє в план і тим самим потрапляє в `stale`: скасування
+    // вже запланованого виходить із того самого проходу, без окремої гілки.
+    const disabledModules = await loadDisabledModules();
+    const plan = healthReminderPlan(meds, habits, tr)
+      .filter(spec => reminderAllowed(spec.id, disabledModules));
     const stale = ours.filter(id => !plan.some(spec => spec.id === id));
     await Promise.all(stale.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
 
@@ -695,3 +857,258 @@ export function rescheduleHealthRemindersFromStorage(
   healthRemindersQueue = healthRemindersQueue.then(run, run);
   return healthRemindersQueue;
 }
+
+// ─── Тренування: «серія під загрозою» (training-module.md §9) ────────────────
+//
+// `training_streak_at_risk` на мобільному — ЛОКАЛЬНЕ сповіщення: плановий день,
+// за 3 години до кінця доби, сесія ще `planned`. План будується з
+// персонального ключа `training_sessions` (його розгортає сервер), звірка —
+// за детермінованими id, як у здоров'я: запис, що приїхав синком, отримує
+// нагадування, а виконана/видалена сесія — втрачає.
+//
+// `training_session_reminder` («за reminderOffsetMin до сесії») тут НЕ
+// плануємо: у сесії немає ні часу початку, ні зсуву — лише дата. Потрібне
+// рішення власника, о котрій нагадувати (див. followups).
+
+export const TRAINING_STREAK_PREFIX = 'training_streak_';
+/** 3 години до кінця доби (§9): 21:00 місцевого часу. */
+export const TRAINING_STREAK_HOUR = 21;
+/** Не більше двох тижнів наперед: iOS тримає лише 64 заплановані сповіщення на застосунок. */
+const TRAINING_STREAK_HORIZON_DAYS = 14;
+
+export function trainingStreakReminderId(sessionId: string): string {
+  return `${TRAINING_STREAK_PREFIX}${sessionId}`;
+}
+
+interface TrainingSessionLike { id?: unknown; date?: unknown; status?: unknown; title?: unknown; programName?: unknown }
+
+export interface TrainingReminderSpec {
+  id: string;
+  date: Date;
+  title: string;
+  body: string;
+  data: Record<string, string>;
+}
+
+function localDateFromKey(key: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(key);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** План «серії під загрозою» — чиста функція (перевіряється без expo-notifications). */
+export function trainingReminderPlan(
+  sessions: readonly unknown[],
+  now: Date,
+  tr: Pick<Translations, 'tlTrainingStreakTitle' | 'tlTrainingStreakBody'>,
+): TrainingReminderSpec[] {
+  const horizon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + TRAINING_STREAK_HORIZON_DAYS);
+  const out: TrainingReminderSpec[] = [];
+  for (const raw of sessions) {
+    if (!raw || typeof raw !== 'object') continue;
+    const s = raw as TrainingSessionLike;
+    if (typeof s.id !== 'string' || !s.id || s.status !== 'planned' || typeof s.date !== 'string') continue;
+    const day = localDateFromKey(s.date);
+    if (!day) continue;
+    const fireAt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), TRAINING_STREAK_HOUR, 0, 0, 0);
+    if (fireAt.getTime() <= now.getTime() || fireAt.getTime() > horizon.getTime()) continue;
+    const name = (typeof s.title === 'string' && s.title.trim())
+      || (typeof s.programName === 'string' && s.programName.trim())
+      || '';
+    out.push({
+      id: trainingStreakReminderId(s.id),
+      date: fireAt,
+      title: tr.tlTrainingStreakTitle,
+      body: fillTemplate(tr.tlTrainingStreakBody, { title: name || tr.tlTrainingStreakTitle }),
+      data: { sessionId: s.id, url: `ftrackingapp://training/session/${encodeURIComponent(s.id)}` },
+    });
+  }
+  return out;
+}
+
+let trainingRemindersQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Звірити заплановані «серія під загрозою» з `training_sessions`. Ідемпотентно;
+ * дозвіл питає лише за `requestPermission` (фоновий старт діалогів не показує).
+ */
+export function rescheduleTrainingRemindersFromStorage(
+  tr: Pick<Translations, 'tlTrainingStreakTitle' | 'tlTrainingStreakBody'>,
+  opts: { requestPermission?: boolean; now?: Date } = {},
+): Promise<void> {
+  const run = async () => {
+    const raw = await loadData<unknown[]>('training_sessions', []);
+    const sessions = Array.isArray(raw) ? raw : [];
+
+    let ours: string[] = [];
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      ours = scheduled
+        .map(n => n.identifier)
+        .filter((id): id is string => typeof id === 'string' && id.startsWith(TRAINING_STREAK_PREFIX));
+    } catch {
+      ours = [];
+    }
+
+    const enabled = await isNotificationsEnabled();
+    const disabledModules = await loadDisabledModules();
+    const plan = enabled
+      ? trainingReminderPlan(sessions, opts.now ?? new Date(), tr).filter(spec => reminderAllowed(spec.id, disabledModules))
+      : [];
+    const stale = ours.filter(id => !plan.some(spec => spec.id === id));
+    await Promise.all(stale.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+
+    const missing = plan.filter(spec => !ours.includes(spec.id));
+    if (!missing.length) return;
+    const granted = await hasNotificationPermission(!!opts.requestPermission);
+    if (!granted) return;
+
+    for (const spec of missing) {
+      try {
+        await Notifications.scheduleNotificationAsync({
+          identifier: spec.id,
+          content: { title: spec.title, body: spec.body, sound: true, data: spec.data },
+          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: spec.date },
+        });
+      } catch (e) {
+        if (__DEV__) console.warn('[notifications] training reminder failed:', spec.id, e);
+      }
+    }
+  };
+  trainingRemindersQueue = trainingRemindersQueue.then(run, run);
+  return trainingRemindersQueue;
+}
+
+// ─── Вимкнені модулі: чого не планувати взагалі ──────────────────────────────
+//
+// Вимкнення модуля (store/ui-preferences.ts) ховає ВХІД: пункт меню, вкладку,
+// секцію дашборда. Нагадування — теж вхід, ба навіть настирливіший: розділ,
+// якого користувач у себе вимкнув, не має будити його телефон о восьмій ранку.
+//
+// Звірка йде за ІДЕНТИФІКАТОРОМ нотифікації, а не за місцем виклику, і це
+// свідомо. По-перше, планувальників багато (шість екранів плюс два фонові
+// переплановувачі), і правило, розкладене по них, розійшлося б на першому ж
+// новому. По-друге, тільки id відомий про ВЖЕ ЗАПЛАНОВАНЕ: коли модуль
+// вимикають, у системі вже лежать нагадування, і скасувати треба саме їх, а
+// код, що їх створив, давно відпрацював. Ідентифікатори й так детерміновані
+// (`med_<id>_<i>`, `daily_habit_<id>`, `reminder_<taskId>`) — тут це просто
+// використано вдруге.
+
+/**
+ * Префікс ідентифікатора → модулі, БЕЗ яких нагадування не існує.
+ *
+ * Порядок важливий: перше збіжне правило виграє, тож `daily_habit_` мусить
+ * стояти вище за `daily_` — інакше звички потрапили б у загальне «Здоров'я»
+ * і переживали б вимкнення «Профілактики».
+ *
+ * Ліки, огляди, щеплення і звички вимагають ДВОХ модулів: на вебі
+ * «Профілактика» — окремий розділ із власним перемикачем, а на мобільному це
+ * вкладка хаба «Здоров'я». Вимкнули будь-який із двох — нагадувань немає, бо
+ * немає жодного екрана, де їх було б видно.
+ *
+ * Чого тут НЕМАЄ — те не фільтрується: нагадування тренувань
+ * (`app/workouts.tsx`) планує сам expo без сталого identifier, тож зіставити
+ * його з модулем за id неможливо (див. followups).
+ */
+const REMINDER_MODULE_RULES: { prefix: string; modules: readonly ModuleId[] }[] = [
+  { prefix: 'reminder_',                    modules: ['tasks'] },
+  { prefix: 'meeting_',                     modules: ['meetings'] },
+  { prefix: SUBSCRIPTION_NOTIFICATION_PREFIX, modules: ['subscriptions'] },
+  { prefix: HABIT_NOTIFICATION_PREFIX,      modules: ['health', 'prevention'] },
+  { prefix: MED_NOTIFICATION_PREFIX,        modules: ['health', 'prevention'] },
+  { prefix: 'checkup_',                     modules: ['health', 'prevention'] },
+  { prefix: 'vaccine_',                     modules: ['health', 'prevention'] },
+  { prefix: TRAINING_STREAK_PREFIX,         modules: ['training'] },
+  // Решта щоденних/тижневих (вода, сон, вага, виміри — hooks/use-health-entries).
+  { prefix: 'daily_',                       modules: ['health'] },
+];
+
+/**
+ * Модулі, від яких залежить нагадування з таким id. Порожній список — id не
+ * наш або нічого не вимагає, тобто нагадування лишається за будь-яких
+ * налаштувань: мовчки скасувати чуже нагадування гірше, ніж показати зайве.
+ */
+export function reminderModulesFor(id: string): readonly ModuleId[] {
+  const rule = REMINDER_MODULE_RULES.find(candidate => id.startsWith(candidate.prefix));
+  return rule ? rule.modules : [];
+}
+
+/** Чи дозволяють поточні налаштування модулів мати таке нагадування. */
+export function reminderAllowed(id: string, disabled: readonly string[]): boolean {
+  return reminderModulesFor(id).every(module => isModuleEnabled(disabled, module));
+}
+
+/**
+ * Те саме, але зі сховища. Помилка читання трактується як «дозволено»:
+ * зіпсований ключ налаштувань не має тихо залишити користувача без
+ * нагадувань про ліки — це рівно той бік помилки, який коштує дорожче.
+ */
+async function moduleAllowsReminder(id: string): Promise<boolean> {
+  try {
+    return reminderAllowed(id, await loadDisabledModules());
+  } catch {
+    return true;
+  }
+}
+
+let moduleSyncQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Привести вже заплановане у відповідність до вимкнених модулів.
+ *
+ * Скасовує нагадування вимкнених модулів і — дзеркально — повертає те, що
+ * можна відновити зі сховища, коли модуль увімкнули назад (здоров'я й
+ * підписки мають повні переплановувачі; задачі, зустрічі, огляди та щеплення
+ * лежать датами в самих записах і відновлюються при наступному їх
+ * редагуванні — див. followups).
+ *
+ * Викликається з підписки на ключ налаштувань нижче, тож спрацьовує і на
+ * перемикач у цьому застосунку, і на вибір, що приїхав синком з іншого
+ * пристрою. Виклики серіалізуються: перемикнути два модулі поспіль — звичайна
+ * справа, а два одночасні проходи по списку запланованого гасили б одне одного.
+ */
+export function syncRemindersWithModules(): Promise<void> {
+  const run = async () => {
+    const disabled = await loadDisabledModules();
+
+    let scheduledIds: string[] = [];
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      scheduledIds = scheduled
+        .map(n => n.identifier)
+        .filter((id): id is string => typeof id === 'string');
+    } catch {
+      scheduledIds = [];
+    }
+    const stale = scheduledIds.filter(id => !reminderAllowed(id, disabled));
+    await Promise.all(stale.map(id => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+
+    // Увімкнули назад — повертаємо те, що вміємо відбудувати зі сховища.
+    // Обидва переплановувачі ідемпотентні (звіряють ОС зі сховищем за
+    // детермінованими id), тож зайвий виклик нічого не дублює.
+    const tr = await notificationTr();
+    const lang = await loadData<Lang>(LANG_STORAGE_KEY, 'uk');
+    if (isModuleEnabled(disabled, 'health') && isModuleEnabled(disabled, 'prevention')) {
+      await rescheduleHealthRemindersFromStorage(tr);
+    }
+    if (isModuleEnabled(disabled, 'subscriptions')) {
+      await rescheduleSubscriptionRemindersFromStorage(tr, lang === 'en' ? 'en' : 'uk');
+    }
+    if (isModuleEnabled(disabled, 'training')) {
+      await rescheduleTrainingRemindersFromStorage(tr);
+    }
+  };
+  moduleSyncQueue = moduleSyncQueue.then(run, run);
+  return moduleSyncQueue;
+}
+
+// Ключ налаштувань пишуть у трьох місцях: екран модулів, pull синку з іншого
+// пристрою і «очистити всі дані». Підписка тут — єдина точка, що бачить усі
+// три; окремий виклик з екрана модулів пропустив би два інші.
+subscribeToStorage(key => {
+  if (key === UI_PREFERENCES_KEY) void syncRemindersWithModules();
+  // Рішення «нагадування шле сервер» пише `store/push.ts` після реєстрації
+  // пристрою — підписка тут ловить і перший перехід, і появу нової події.
+  if (key === SERVER_REMINDERS_KEY) void migrateLocalRemindersToServer();
+});

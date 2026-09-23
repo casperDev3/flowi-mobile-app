@@ -14,6 +14,7 @@ import {
   removeFromRecentProjects,
   resolveOutboxStream,
   socketProjectIds,
+  socketProjectIdsWithActive,
   streamProjectId,
 } from '../utils/projectStream';
 
@@ -147,5 +148,45 @@ describe('socketProjectIds', () => {
   it('never exceeds the contract cap of 10', () => {
     const many = Array.from({ length: 20 }, (_, i) => `p-${i}`);
     expect(socketProjectIds([], many).length).toBe(MAX_PROJECT_SOCKETS);
+  });
+});
+
+describe('socketProjectIdsWithActive — відкритий проєкт завжди має сокет', () => {
+  // Дефект, який це закриває: у користувача більше проєктів, ніж ліміт
+  // сокетів. `recent` перечитується не миттєво, тож щойно відкритий проєкт
+  // міг не потрапити у зріз узагалі — екран жив на 60-секундному поллінгу, і
+  // це виглядало як «на мобільному в задачах проєкту старі дані».
+  const many = Array.from({ length: 20 }, (_, i) => `p-${i}`);
+
+  it('ставить активний ПЕРШИМ, навіть коли він у самому хвості відомих', () => {
+    const ids = socketProjectIdsWithActive('p-19', [], many);
+    expect(ids[0]).toBe('p-19');
+    expect(ids).toHaveLength(MAX_PROJECT_SOCKETS);
+  });
+
+  it('витісняє найменш свіжий хвіст, а не додається понад ліміт (§5.1)', () => {
+    // Без активного зріз — ['p-0','p-1','p-2']; активний 'p-9' виганяє 'p-2'.
+    expect(socketProjectIdsWithActive('p-9', [], many, 3)).toEqual(['p-9', 'p-0', 'p-1']);
+  });
+
+  it('активний, що вже був у зрізі, лише піднімається — дублікатів немає', () => {
+    const ids = socketProjectIdsWithActive('p-1', ['p-0', 'p-1', 'p-2'], many, 3);
+    expect(ids).toEqual(['p-1', 'p-0', 'p-2']);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('без активного проєкту поводиться рівно як socketProjectIds', () => {
+    expect(socketProjectIdsWithActive(null, ['p-2', 'p-1'], many, 3))
+      .toEqual(socketProjectIds(['p-2', 'p-1'], many, 3));
+  });
+
+  it('активний проєкт, якого немає серед відомих, усе одно отримує сокет', () => {
+    // Викликач передає лише id, підтверджений сервером; кеш `workspace_projects`
+    // міг ще не доїхати, і це не привід лишити відкритий екран без потоку.
+    expect(socketProjectIdsWithActive('p-new', ['p-0'], ['p-0', 'p-1'], 2)).toEqual(['p-new', 'p-0']);
+  });
+
+  it('нульовий ліміт не пропихає активного повз заборону', () => {
+    expect(socketProjectIdsWithActive('p-1', ['p-1'], many, 0)).toEqual([]);
   });
 });

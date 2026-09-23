@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { PriorityFilterChips } from '@/components/tasks/PriorityFilterChips';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -293,32 +294,37 @@ export default function ArchiveScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
+          useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={[]}>
 
-        {/* Fixed Header */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[ar.backBtn, { backgroundColor: c.dim, borderColor: c.border }]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={18} color={c.accent} />
-          </TouchableOpacity>
-          <Text style={[ar.pageTitle, { color: c.text, flex: 1, marginLeft: 12 }]}>Архів</Text>
-          {done.length > 0 && (
+        {/* Заголовок жорстко українською був єдиним у шапці — тепер із
+            словника, як решта рядків. «Архів» є в сайдбарі, тож на планшеті
+            стрілку «Назад» ScreenHeader ховає сам. */}
+        <ScreenHeader
+          title={tr.archive}
+          color={c.text}
+          paddingBottom={14}
+          back={{
+            onPress: () => router.back(),
+            label: tr.back,
+            color: c.accent,
+            style: { backgroundColor: c.dim, borderColor: c.border },
+          }}
+          actions={done.length > 0 ? (
             <>
               <View style={[ar.countBadge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50' }]}>
                 <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700' }}>{done.length}</Text>
               </View>
-              <TouchableOpacity
+              <HeaderButton
                 onPress={clearAll}
-                accessibilityRole="button"
                 accessibilityLabel={tr.clearArchive}
-                style={[ar.clearBtn, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', marginLeft: 8 }]}>
+                style={{ backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)' }}>
                 <IconSymbol name="trash" size={14} color="#EF4444" />
-              </TouchableOpacity>
+              </HeaderButton>
             </>
-          )}
-        </View>
+          ) : undefined}
+        />
 
         {/* Filter by priority */}
         <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
@@ -377,10 +383,7 @@ export default function ArchiveScreen() {
 }
 
 const ar = StyleSheet.create({
-  pageTitle:  { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
-  backBtn:    { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   countBadge: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
-  clearBtn:   { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   chip:       { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
   emptyIcon:  { width: 80, height: 80, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   card:       { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },

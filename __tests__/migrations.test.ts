@@ -145,9 +145,11 @@ describe('categories: вкладений Record → пласкі рядки', ()
 
     await runStorageMigrations();
 
+    // Наступний крок (categories:group_cost, finance-revamp.md §4.5.2) дописує
+    // групу й ознаку — форма рядка й id від цього не змінюються.
     expect(read('categories', [])).toEqual([
-      { id: 'expense:Кава', type: 'expense', name: 'Кава', icon: 'cup' },
-      { id: 'income:Фріланс', type: 'income', name: 'Фріланс', icon: 'laptop' },
+      expect.objectContaining({ id: 'expense:Кава', type: 'expense', name: 'Кава', icon: 'cup', group: 'other', cost: 'variable' }),
+      expect.objectContaining({ id: 'income:Фріланс', type: 'income', name: 'Фріланс', icon: 'laptop', group: 'business' }),
     ]);
   });
 

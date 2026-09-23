@@ -19,18 +19,29 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { HEADER_BUTTON_HIT_SLOP, useHeaderLead } from '@/components/shared/ScreenHeader';
+
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
+import { isoToLocalDateInput, localDateInputToIso } from '@/utils/dateUtils';
 import { PROJECT_COLORS } from '@/utils/projectColors';
 import { projectRoute } from '@/constants/projectNav';
 import type { LegacyPriority, TaskPriority } from '@/utils/taskUtils';
 import {
-  MODULES_BY_TEMPLATE, setProjectArchived, type ProjectModules, type ProjectTemplate,
+  MODULES_BY_TEMPLATE, projectModules, setProjectArchived, type ProjectModules, type ProjectTemplate,
 } from '@/utils/projectUtils';
-import { removeProjectSprints, type Sprint } from '@/utils/sprintUtils';
+import { openSprintsForProject, removeProjectSprints, type Sprint } from '@/utils/sprintUtils';
+import {
+  currentSprintCard,
+  portfolioKpi,
+  projectCountersMap,
+  type ProjectCounters,
+  type SprintCard,
+} from '@/utils/projectStatsMetrics';
+import type { Translations } from '@/store/translations';
 import {
   compareArchived,
   compareLive,
@@ -40,6 +51,7 @@ import {
   type TimelineBucket,
 } from '@/utils/projectStats';
 import { ProjectAnalytics } from '@/components/projects/ProjectAnalytics';
+import { PortfolioKpi } from '@/components/projects/PortfolioKpi';
 import { ProjectTimeline } from '@/components/projects/ProjectTimeline';
 import { useTimerContext } from '@/store/timer-context';
 import { mergeTaskStatusColumns, seedProjectStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
@@ -115,9 +127,10 @@ interface Task {
    * задачу в тиждень останнього перейменування.
    */
   history?: { at: string; type: string }[];
+  /** Виконавець: null/undefined/'' — «без виконавця» (лічильник картки). */
+  assigneeId?: string | null;
 }
 
-/** Скільки задач у проєкті — всього, активних, виконаних. */
 /** Коротка дата без року, коли рік поточний — рік у списку лише шумить. */
 function shortDate(iso: string, locale: string): string {
   const d = new Date(iso);
@@ -130,19 +143,66 @@ function shortDate(iso: string, locale: string): string {
 
 /** Стала «немає шкали»: новий [] на кожному рендері ламав би React.memo. */
 const EMPTY_BUCKETS: TimelineBucket[] = [];
+/** Та сама причина: картка без лічильників отримує одну сталу, а не новий {}. */
+const EMPTY_COUNTERS: ProjectCounters = {
+  total: 0, done: 0, inProgress: 0, todo: 0, open: 0, assigned: 0, unassigned: 0, backlog: 0, overdue: 0,
+};
+
+/** Протермінований спринт — бурштиновий: червоний зайнятий простроченими задачами (§4). */
+const SPRINT_OVERDUE_COLOR = '#F59E0B';
+const OVERDUE_COLOR = '#EF4444';
+
+type CardTr = Pick<Translations,
+  | 'projectOverdueTasks' | 'projectDone' | 'projectNoTasks' | 'projectDeadline' | 'projectNearest'
+  | 'projectTasks' | 'edit' | 'delete' | 'projectMembersLeave'
+  | 'projectInProgress' | 'projectUnassigned' | 'projectBacklog' | 'projectFunnelA11y' | 'projectFlagA11y'
+  | 'sprintCurrent' | 'sprintDaysLeft' | 'sprintLastDay' | 'sprintOverdueDays' | 'sprintUndated'
+  | 'sprintProgressA11y' | 'sprintClose'>;
+
+interface CounterItem { key: string; text: string; a11y: string; color?: string; bold?: boolean }
+
+/**
+ * Рядок лічильників через « · ». Кожне число — окремий Text зі своїм
+ * accessibilityLabel, який договорює БАЗУ повністю («5 із 47 відкритих задач:
+ * без виконавця»): воронка й ознаки рахуються від різних множин (§8.2).
+ */
+function CounterRow({ items, subColor, fontSize, marginTop }: {
+  items: CounterItem[]; subColor: string; fontSize: number; marginTop: number;
+}) {
+  if (!items.length) return null;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop }}>
+      {items.map((item, index) => (
+        <Text key={item.key} style={{ color: subColor, fontSize }}>
+          {index > 0 ? ' · ' : ''}
+          <Text
+            accessibilityLabel={item.a11y}
+            style={{ color: item.color ?? subColor, fontWeight: item.bold ? '700' : '400', fontVariant: ['tabular-nums'] }}>
+            {item.text}
+          </Text>
+        </Text>
+      ))}
+    </View>
+  );
+}
 
 interface ProjectCardProps {
   project: Project;
   stats: ProjectStats;
+  /** Лічильники воронки й ознак — рахуються списком, одним проходом (§9.2). */
+  counters: ProjectCounters;
+  /** Поточний спринт; null — немає відкритих або модуль «Спринти» вимкнено. */
+  sprintCard: SprintCard | null;
+  /** Беклог «без спринту» має сенс лише з увімкненими спринтами. */
+  sprintsEnabled: boolean;
+  /** Роль може закривати спринти (не глядач). */
+  canEditContent: boolean;
+  onOpenSprints: (project: Project) => void;
   /** Шкала рахується списком, а не карткою: див. timelines у екрані. */
   buckets: TimelineBucket[];
   selected: boolean;
   locale: string;
-  tr: {
-    projectOverdueTasks: string; projectDone: string; projectNoTasks: string;
-    projectDeadline: string; projectNearest: string; active: string;
-    edit: string; delete: string; projectMembersLeave: string;
-  };
+  tr: CardTr;
   isDark: boolean;
   borderColor: string;
   textColor: string;
@@ -171,12 +231,38 @@ interface ProjectCardProps {
  * Картка мемоізована: без цього кожен рендер екрана (наприклад, набір
  * тексту в модалці) перемальовує BlurView для всіх проєктів.
  */
-const ProjectCard = React.memo(function ProjectCard({
-  project, stats, buckets, selected, locale, tr, isDark,
+export const ProjectCard = React.memo(function ProjectCard({
+  project, stats, counters, sprintCard, sprintsEnabled, canEditContent, onOpenSprints,
+  buckets, selected, locale, tr, isDark,
   borderColor, textColor, subColor, surfaceColor, accentColor, canManage, onPress, onEdit, onDelete, onLeave,
 }: ProjectCardProps) {
   const pct = stats.pct;
-  const overdueColor = '#EF4444';
+  const overdueColor = OVERDUE_COLOR;
+  const fill = (template: string, values: Record<string, string | number>) =>
+    Object.entries(values).reduce((acc, [key, value]) => acc.split(`{${key}}`).join(String(value)), template);
+
+  // Ряд 4 — воронка (частки total). «Виконано» є завжди, решта — лише не нуль.
+  const funnel: CounterItem[] = [
+    {
+      key: 'done', text: `${counters.done}/${counters.total} ${tr.projectDone}`,
+      a11y: fill(tr.projectFunnelA11y, { n: counters.done, total: counters.total, label: tr.projectDone }),
+    },
+  ];
+  if (counters.inProgress > 0) {
+    funnel.push({
+      key: 'inProgress', text: `${counters.inProgress} ${tr.projectInProgress}`,
+      a11y: fill(tr.projectFunnelA11y, { n: counters.inProgress, total: counters.total, label: tr.projectInProgress }),
+    });
+  }
+  // Ряд 5 — ознаки ВІДКРИТИХ задач; нулі не показуються.
+  const flag = (key: string, n: number, label: string, color?: string): CounterItem => ({
+    key, text: `${n} ${label}`, color, bold: !!color,
+    a11y: fill(tr.projectFlagA11y, { n, open: counters.open, label }),
+  });
+  const flags: CounterItem[] = [];
+  if (counters.overdue > 0) flags.push(flag('overdue', counters.overdue, tr.projectOverdueTasks, overdueColor));
+  if (counters.unassigned > 0) flags.push(flag('unassigned', counters.unassigned, tr.projectUnassigned));
+  if (sprintsEnabled && counters.backlog > 0) flags.push(flag('backlog', counters.backlog, tr.projectBacklog));
   return (
     <TouchableOpacity
       activeOpacity={0.75}
@@ -197,25 +283,10 @@ const ProjectCard = React.memo(function ProjectCard({
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text numberOfLines={1} style={{ color: textColor, fontSize: 15, fontWeight: '700' }}>{project.name}</Text>
-            {/* Прострочене — попереду й червоним, як у вебі: це єдине число,
-                заради якого картку взагалі відкривають. */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
-              {stats.empty ? (
-                <Text style={{ color: subColor, fontSize: 12 }}>{tr.projectNoTasks}</Text>
-              ) : (
-                <>
-                  {stats.overdue > 0 && (
-                    <Text style={{ color: overdueColor, fontSize: 12, fontWeight: '700' }}>
-                      {stats.overdue} {tr.projectOverdueTasks}
-                      <Text style={{ color: subColor, fontWeight: '400' }}>{' · '}</Text>
-                    </Text>
-                  )}
-                  <Text style={{ color: subColor, fontSize: 12 }}>
-                    {stats.active} {tr.active} · {stats.done}/{stats.total} {tr.projectDone}
-                  </Text>
-                </>
-              )}
-            </View>
+            {/* Порожній проєкт — одним рядком замість усієї статистики (§8.2). */}
+            <Text style={{ color: subColor, fontSize: 12, marginTop: 2 }}>
+              {stats.empty ? tr.projectNoTasks : `${tr.projectTasks}: ${stats.total}`}
+            </Text>
           </View>
           {canManage ? (
             <>
@@ -292,6 +363,58 @@ const ProjectCard = React.memo(function ProjectCard({
               <Text style={{ color: subColor, fontSize: 10, fontWeight: '700' }}>{pct}%</Text>
             </View>
 
+            {/* Ряд 4 (воронка) і ряд 5 (ознаки відкритих) — різні бази, тож
+                різна вага шрифту й відступ між ними. */}
+            <CounterRow items={funnel} subColor={subColor} fontSize={12} marginTop={6} />
+            <CounterRow items={flags} subColor={subColor} fontSize={11} marginTop={8} />
+
+            {sprintCard ? (
+              <View style={{ marginTop: 12 }}>
+                <Text numberOfLines={1} style={{ color: subColor, fontSize: 11 }}>
+                  {tr.sprintCurrent}{' · '}
+                  <Text style={{ color: textColor, fontWeight: '700' }}>{sprintCard.name}</Text>
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <View
+                    accessible
+                    accessibilityRole="progressbar"
+                    // Друга шкала на картці — зі своїм підписом, інакше дві
+                    // шкали неможливо розрізнити на слух.
+                    accessibilityLabel={fill(tr.sprintProgressA11y, { name: sprintCard.name, done: sprintCard.done, total: sprintCard.total })}
+                    accessibilityValue={{ min: 0, max: 100, now: sprintCard.pct }}
+                    style={[st.progressBg, { flex: 1 }]}>
+                    <View style={[st.progressFill, {
+                      width: `${sprintCard.pct}%`,
+                      backgroundColor: sprintCard.overdue ? SPRINT_OVERDUE_COLOR : project.color,
+                    }]} />
+                  </View>
+                  <Text style={{ color: sprintCard.overdue ? SPRINT_OVERDUE_COLOR : subColor, fontSize: 11, fontWeight: sprintCard.overdue ? '700' : '400' }}>
+                    {sprintCard.done}/{sprintCard.total}{' · '}
+                    {sprintCard.overdue
+                      ? fill(tr.sprintOverdueDays, { n: sprintCard.overdueDays })
+                      : !sprintCard.dated
+                        ? tr.sprintUndated
+                        : sprintCard.daysLeft === 0
+                          ? tr.sprintLastDay
+                          : fill(tr.sprintDaysLeft, { n: sprintCard.daysLeft ?? 0 })}
+                  </Text>
+                  {sprintCard.overdue && canEditContent ? (
+                    // Система нагадує, а натискає людина: кнопка веде в розділ
+                    // «Спринти», де живе звичайний діалог закриття з вибором
+                    // цілі переносу. Автозакриття немає (§4).
+                    <TouchableOpacity
+                      onPress={() => onOpenSprints(project)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${tr.sprintClose}: ${sprintCard.name}`}
+                      hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+                      style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: SPRINT_OVERDUE_COLOR }}>
+                      <Text style={{ color: SPRINT_OVERDUE_COLOR, fontSize: 11, fontWeight: '700' }}>{tr.sprintClose}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+
             <View style={{ marginTop: 12 }}>
               <ProjectTimeline
                 buckets={buckets}
@@ -333,6 +456,9 @@ export default function ProjectsScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [statusColumns, setStatusColumns] = useState<TaskStatusColumn[]>([]);
+  // Спринти потрібні лише для показу (лічильник «без спринту», поточний
+  // спринт картки); пише їх розділ «Спринти» проєкту.
+  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -346,17 +472,19 @@ export default function ProjectsScreen() {
   const [description, setDescription] = useState('');
 
   const loadAll = useCallback(async () => {
-    const [p, t, columns] = await Promise.all([
+    const [p, t, columns, sp] = await Promise.all([
       loadData<Project[]>('projects', []),
       loadData<Task[]>('tasks', []),
       // Колонки дошки потрібні графіку «Де стоять задачі». Читаємо збережені й
       // зливаємо з типовими тим самим mergeTaskStatusColumns, що й дошка: своя
       // копія правила «яка колонка існує» розійшлася б із канбаном.
       loadData<TaskStatusColumn[]>('task_statuses', []),
+      loadData<Sprint[]>('sprints', []),
     ]);
     setProjects(p);
     setTasks(t);
     setStatusColumns(columns);
+    setSprints(sp);
   }, []);
 
   // Архівні ховаються зі списку, але лишаються в даних: стан явний
@@ -387,12 +515,51 @@ export default function ProjectsScreen() {
 
   const columns = useMemo(() => mergeTaskStatusColumns(statusColumns), [statusColumns]);
 
+  /**
+   * «Зараз» — одне значення на всю панель і стабільне в межах хвилини (§9.2
+   * п.5): інакше дві картки на межі доби порахували б різне «сьогодні», а
+   * memo перераховував би все на кожен рендер.
+   */
+  const minute = Math.floor(Date.now() / 60_000);
+  const now = useMemo(() => new Date(minute * 60_000), [minute]);
+
+  // Лічильники всіх карток — ОДИН прохід по задачах на всю панель (§9.2).
+  // Колонки — сирі збережені: проєктні st-<uuid> теж потрібні для типу етапу.
+  const counters = useMemo(
+    () => projectCountersMap(projects, tasks, sprints, statusColumns, now),
+    [projects, tasks, sprints, statusColumns, now],
+  );
+
+  // Поточний спринт картки — лише для проєктів з увімкненим модулем «Спринти».
+  const sprintCards = useMemo(() => {
+    const bySprint = new Map<string, Task[]>();
+    for (const task of tasks) {
+      if (!task.sprintId) continue;
+      const bucket = bySprint.get(task.sprintId);
+      if (bucket) bucket.push(task);
+      else bySprint.set(task.sprintId, [task]);
+    }
+    const result = new Map<string, SprintCard | null>();
+    for (const project of projects) {
+      if (!projectModules(project).sprints) continue;
+      const open = openSprintsForProject(sprints, project.id)[0];
+      result.set(project.id, open ? currentSprintCard(project, sprints, bySprint.get(open.id) ?? [], now) : null);
+    }
+    return result;
+  }, [projects, tasks, sprints, now]);
+
   // Аналітика дивиться на ТОЙ САМИЙ зріз, що й список карток: перемикач
   // «Живі / Архів» має міняти і графіки теж, інакше цифри під списком
   // описують не те, що над ними.
   const analyticsProjects = useMemo(
     () => visibleStats.map(stat => stat.project),
     [visibleStats],
+  );
+
+  // KPI портфеля — по тому самому видимому набору, сумою тих самих лічильників.
+  const kpi = useMemo(
+    () => portfolioKpi(analyticsProjects, tasks, sprints, statusColumns, now, counters),
+    [analyticsProjects, tasks, sprints, statusColumns, now, counters],
   );
 
   const liveProjects = useMemo(() => projects.filter(p => !p.archivedAt), [projects]);
@@ -420,7 +587,7 @@ export default function ProjectsScreen() {
       .catch(e => { if (__DEV__) console.warn('[projects] завантаження не вдалося:', e); });
   }, [loadAll]));
 
-  const trackWrite = useStorageRefresh(['tasks', 'projects', 'task_statuses'], loadAll);
+  const trackWrite = useStorageRefresh(['tasks', 'projects', 'task_statuses', 'sprints'], loadAll);
 
   useEffect(() => {
     if (!initialized || tasksRevision === 0) return;
@@ -472,7 +639,7 @@ export default function ProjectsScreen() {
     setEditing(p);
     setName(p.name);
     setColor(p.color);
-    setDeadline(p.deadline ? p.deadline.slice(0, 10) : '');
+    setDeadline(isoToLocalDateInput(p.deadline));
     setDescription(p.description ?? '');
     setShowModal(true);
   }, [isProjectOwner]);
@@ -501,8 +668,9 @@ export default function ProjectsScreen() {
     if (!name.trim()) return;
     // Порожнє поле означає «терміну немає», а не «зберегти порожній рядок»:
     // інакше projectStats побачив би рядок і спробував його розібрати.
-    const parsed = deadline.trim() ? new Date(deadline.trim()) : null;
-    const deadlineIso = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : undefined;
+    // Локальна доба поля, а не UTC-північ `new Date('YYYY-MM-DD')`; незмінене
+    // поле лишає збережене значення як є.
+    const deadlineIso = localDateInputToIso(deadline, editing?.deadline);
     const descr = description.trim() || undefined;
 
     if (editing) {
@@ -696,6 +864,12 @@ export default function ProjectsScreen() {
     [c],
   );
 
+  /** «Закрити спринт» на картці — у розділ «Спринти», де діалог закриття. */
+  const openSprints = useCallback((project: Project) => {
+    haptic.light();
+    router.push(projectRoute(project.id, 'sprints') as never);
+  }, [router]);
+
   /** Тап по картці — повна зміна контексту (план §3): вхід у простір проєкту. */
   const selectProject = useCallback((project: Project) => {
     haptic.light();
@@ -704,18 +878,29 @@ export default function ProjectsScreen() {
 
   // Шапка їде разом зі списком, як і раніше, — тому вона ListHeaderComponent,
   // а не окремий фіксований блок над FlatList.
+  const lead = useHeaderLead({ hasBack: true });
+
   const listHeader = (
     <>
-      {/* Header */}
+      {/*
+        Шапка тут НЕ ScreenHeader навмисно: вона їде разом зі списком
+        (ListHeaderComponent), а спільний хедер — фіксований і сам додає
+        верхній інсет, який у цього екрана вже дає SafeAreaView. Спільним
+        лишається саме рішення про стрілку: useHeaderLead ховає її на
+        планшеті, де «Проєкти» відкриваються прямо з сайдбара.
+      */}
       <View style={{ marginTop: 14, marginBottom: 28, flexDirection: 'row', alignItems: 'center' }}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel={tr.back}
-          style={[st.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-          <IconSymbol name="chevron.left" size={17} color={c.sub} />
-        </TouchableOpacity>
-        <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: 12 }]}>{tr.projects}</Text>
+        {lead === 'back' ? (
+          <TouchableOpacity
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel={tr.back}
+            hitSlop={HEADER_BUTTON_HIT_SLOP}
+            style={[st.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
+            <IconSymbol name="chevron.left" size={17} color={c.sub} />
+          </TouchableOpacity>
+        ) : null}
+        <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: lead === 'back' ? 12 : 0 }]}>{tr.projects}</Text>
         <TouchableOpacity
           onPress={openAdd}
           accessibilityRole="button"
@@ -752,6 +937,10 @@ export default function ProjectsScreen() {
           ))}
         </View>
       )}
+
+      {/* Портфель — над списком: KPI і «виконано за тиждень» по видимому
+          набору (§8.3). Детальні графіки лишаються в підвалі. */}
+      <PortfolioKpi kpi={kpi} palette={analyticsPalette} />
     </>
   );
 
@@ -784,6 +973,11 @@ export default function ProjectsScreen() {
             <ProjectCard
               project={item.project}
               stats={item}
+              counters={counters.get(item.project.id) ?? EMPTY_COUNTERS}
+              sprintCard={sprintCards.get(item.project.id) ?? null}
+              sprintsEnabled={projectModules(item.project as Project).sprints}
+              canEditContent={(projectRoles[item.project.id] ?? 'owner') !== 'viewer'}
+              onOpenSprints={openSprints}
               buckets={timelines.get(item.project.id) ?? EMPTY_BUCKETS}
               selected={false}
               locale={locale}

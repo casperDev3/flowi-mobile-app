@@ -18,6 +18,8 @@ import {
 } from 'react-native';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
+import { MODULE_SETTINGS_ROUTE } from '@/constants/nav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useAppMode } from '@/store/app-mode';
@@ -27,6 +29,7 @@ import { pullAllFromServer, pushAllToServer, useSync } from '@/store/sync-engine
 import { getAllScheduledNotifications } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
+import { useUiModules } from '@/store/ui-preferences';
 import { Lang } from '@/store/translations';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
@@ -57,6 +60,9 @@ export default function SettingsScreen() {
   const { online } = useAppMode();
   const { user, status, logout } = useAuth();
   const { syncNow, state: syncState, lastSyncAt, pendingCount } = useSync();
+  // Лічильник біля рядка «Модулі інтерфейсу»: скільки розділів зараз
+  // приховано. Без нього вимкнений місяць тому модуль просто «зник».
+  const { disabledModules } = useUiModules();
 
   const [taskReminders, setTaskReminders] = useState(true);
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -353,24 +359,13 @@ export default function SettingsScreen() {
             <View style={colStyle}>
               <SectionLabel label={tr.sectionDev} color={c.sub} />
               <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <SettingRow
-                  icon="ladybug.fill"
-                  iconColor="#EF4444"
-                  label={tr.bugList}
-                  value={tr.bugsValue}
-                  route="/bugs"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
+                {/* Ідеї й баги — один екран (feedback-inbox.md §10.1);
+                    /bugs і /ideas лишились редиректами на один реліз. */}
                 <SettingRow
                   icon="lightbulb.fill"
                   iconColor="#8B5CF6"
-                  label={tr.ideas}
-                  value={tr.features}
-                  route="/ideas"
+                  label={tr.fbTitle}
+                  route={'/feedback' as Href}
                   onPress={go}
                   text={c.text}
                   sub={c.sub}
@@ -404,6 +399,20 @@ export default function SettingsScreen() {
                   text={c.text}
                   sub={c.sub}
                   border={c.border}
+                  last={false}
+                />
+                {/* Модулі стоять у «Вигляді», а не в «Даних», свідомо:
+                    вимкнення нічого не видаляє — воно змінює те, що видно. */}
+                <SettingRow
+                  icon="square.grid.2x2"
+                  iconColor="#10B981"
+                  label={tr.modulesSettingsRow}
+                  value={disabledModules.length ? String(disabledModules.length) : undefined}
+                  route={MODULE_SETTINGS_ROUTE as Href}
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
                   last
                 />
               </BlurView>
@@ -422,6 +431,17 @@ export default function SettingsScreen() {
                   sub={c.sub}
                   border={c.border}
                   accent={c.accent}
+                  last={false}
+                />
+                <SettingRow
+                  icon="slider.horizontal.3"
+                  iconColor="#F59E0B"
+                  label={tr.ncSettingsTitle}
+                  route={'/settings-notifications' as Href}
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
                   last={false}
                 />
                 <ToggleRow
@@ -490,17 +510,6 @@ export default function SettingsScreen() {
                   iconColor="#F97316"
                   label={tr.containers}
                   route="/containers"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="brain"
-                  iconColor="#8B5CF6"
-                  label={tr.navAgent}
-                  route="/(tabs)/agent"
                   onPress={go}
                   text={c.text}
                   sub={c.sub}
@@ -847,6 +856,9 @@ const NotifRow = React.memo(function NotifRow(
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {/* Непрочитані з серверного інбоксу (§11) — окремо від лічильника
+            локально запланованих нагадувань праворуч. */}
+        <NotificationBadge />
         {scheduledCount > 0 && (
           <View style={{ backgroundColor: accent, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
             <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{scheduledCount}</Text>

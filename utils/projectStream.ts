@@ -19,6 +19,9 @@ export const PROJECT_COLLECTIONS = [
   'sprints',
   'transactions',
   'subscriptions',
+  // Регулярний дохід проєкту (finance-revamp.md §4.3) — бюджетна колекція,
+  // як транзакції й підписки; той самий перелік, що й core/sync_contract.py.
+  'recurring_incomes',
   'comments',
 ] as const;
 export type ProjectCollection = (typeof PROJECT_COLLECTIONS)[number];
@@ -196,4 +199,32 @@ export function socketProjectIds(
 ): string[] {
   const ordered = [...recent, ...allKnown.filter(id => !recent.includes(id))];
   return ordered.slice(0, max);
+}
+
+/**
+ * Те саме, але ВІДКРИТИЙ ЗАРАЗ проєкт (`activeId`) отримує сокет завжди —
+ * першим у списку.
+ *
+ * Без цього проєкт, у який користувач щойно зайшов, міг лишитись зовсім без
+ * живого сокета: `recent` перечитується не миттєво, а коли своїх проєктів
+ * більше за `MAX_PROJECT_SOCKETS`, «нещодавній» з хвоста списку взагалі не
+ * потрапляв у зріз — екран оновлювався лише 60-секундним поллінгом. Саме це
+ * й виглядало як «на мобільному в задачах проєкту старі дані, на вебі все
+ * добре» (веб тримає один потік на всі проєкти, ліміту сокетів там немає).
+ *
+ * `activeId` витісняє САМИЙ ХВІСТ (найменш свіжий), а не додається понад
+ * ліміт — контракт §5.1 обмежує кількість сокетів, а не їхній порядок.
+ * Викликач передає сюди лише id, підтверджений сервером (кеш
+ * `workspace_projects`): сокет на ще не створений проєкт сервер одразу
+ * закриває 4404.
+ */
+export function socketProjectIdsWithActive(
+  activeId: string | null,
+  recent: readonly string[],
+  allKnown: readonly string[],
+  max: number = MAX_PROJECT_SOCKETS,
+): string[] {
+  const base = socketProjectIds(recent, allKnown, max);
+  if (!activeId || max <= 0) return base;
+  return [activeId, ...base.filter(id => id !== activeId)].slice(0, max);
 }

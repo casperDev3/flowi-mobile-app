@@ -61,6 +61,7 @@
   Налаштування внизу. «Спільне» після §4 з сайдбара прибрано.
 - `store/translations.ts`: нові ключі `navGroupWork/Personal/Dev`,
   `navMeetings`, `navTime`, `navHealthSummary`, `navAgentLabel` (uk/en).
+  *(історичне: `navAgentLabel` згодом видалено разом з модулем «Агент»)*
 - `__tests__/nav.test.ts` оновлено; `nav-routes-exist.test.ts` перевіряє, що
   кожен пункт веде на наявний екран.
 - **Частково:** веб має одну сторінку «Ідеї та баги», а на мобільному це два

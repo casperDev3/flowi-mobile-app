@@ -77,8 +77,8 @@ describe('згортання груп сайдбара', () => {
   });
 
   it('група з поточним розділом розгортається попри згорнутість', () => {
-    // Інакше на екрані «Баги» жоден пункт не підсвічений, і незрозуміло, де ви.
-    expect(isGroupCollapsed(dev, ['dev'], '/bugs')).toBe(false);
+    // Інакше на екрані «Ідеї та баги» жоден пункт не підсвічений, і незрозуміло, де ви.
+    expect(isGroupCollapsed(dev, ['dev'], '/feedback')).toBe(false);
     expect(isGroupCollapsed(more, ['more'], '/containers')).toBe(false);
     // Розділ із СУСІДНЬОЇ групи такої поблажки не дає.
     expect(isGroupCollapsed(more, ['more'], '/projects')).toBe(true);

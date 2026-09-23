@@ -131,7 +131,6 @@ const MAPPING: Record<string, MaterialIconName> = {
   // AI / Agent
   'sparkles': 'auto-awesome',
   'brain': 'psychology',
-  'network': 'hub',
   // Notifications
   'bell.fill': 'notifications-none',
   'bell': 'notifications-none',

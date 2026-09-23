@@ -113,5 +113,39 @@ export function budgetSpentThisMonth(
   }, 0);
 }
 
+/**
+ * Витрачено з бюджету проєкту ЗА ВЕСЬ ЧАС — те саме число, що показує веб
+ * (`components/projects/project-budget.tsx`).
+ *
+ * Розділ «Бюджет» проєкту порівнює витрати з ЛІМІТОМ ПРОЄКТУ, а ліміт проєкту
+ * — не місячний: його задають на проєкт цілком. Місячне «витрачено» поруч із
+ * ним означало «ви витратили 3 000 із 200 000» у грудні й «0 із 200 000» у
+ * січні, хоча гроші нікуди не поділись. Телефон рахував саме так
+ * (`budgetSpentThisMonth`), браузер — за весь час, і два клієнти показували
+ * різні цифри під однаковим підписом.
+ *
+ * Валютний фільтр лишається (на відміну від вебу, який просто додає всі суми):
+ * курсів у застосунку немає, а складати 100 $ із 100 ₴ в одне число — це не
+ * «приблизно», це неправда. Розбіжність свідома й названа тут явно.
+ *
+ * Місячна функція вище НЕ видаляється: дашборд «Огляд» показує темп за
+ * поточний місяць, і це інше питання, ніж «скільки з'їдено з ліміту».
+ */
+export function budgetSpentTotal(
+  transactions: readonly Transaction[],
+  accounts: readonly Account[],
+  projectId: string,
+  budgetCurrency: string,
+): number {
+  const accountList = [...accounts];
+  return transactions.reduce((acc, tx) => {
+    if (tx.type !== 'expense' || tx.projectId !== projectId) return acc;
+    if (budgetTxCurrency(tx, accountList, budgetCurrency) !== budgetCurrency) return acc;
+    const amount = Number(tx.amount);
+    // Один NaN отруїв би весь підсумок розділу, а не лише свій рядок.
+    return Number.isFinite(amount) ? acc + amount : acc;
+  }, 0);
+}
+
 /** Рахунок за id — реекспорт зручності для екрана (не тягнути ще один імпорт). */
 export { accountById };

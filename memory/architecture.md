@@ -22,8 +22,7 @@ flowi-mobile-app/
 │   │   ├── explore.tsx     # Фінанси
 │   │   ├── health.tsx      # Здоров'я
 │   │   ├── settings.tsx    # Налаштування
-│   │   ├── time.tsx        # Час (hidden, href:null)
-│   │   └── agent.tsx       # Агент (hidden)
+│   │   └── time.tsx        # Час (hidden, href:null)
 │   └── *.tsx               # Stack-екрани (notes, archive, …)
 ├── components/
 │   ├── shared/             # MonthPicker

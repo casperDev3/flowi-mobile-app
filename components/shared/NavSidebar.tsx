@@ -18,24 +18,34 @@
  * зовсім, а на 13″ iPad усе влазить і без згортання — синхронізувати такий
  * вибір між пристроями означало б нав'язувати вибір, зроблений для іншої
  * діагоналі.
+ *
+ * Вимкнені модулі — протилежний випадок і тому інше сховище: це вибір про
+ * склад продукту, а не про розмір екрана, тож він лежить у синхронізованому
+ * 'ui_preferences' (store/ui-preferences.ts) і діє на всіх пристроях. Пункт
+ * вимкненого модуля зникає зі списку (visibleNavGroups); дані модуля при
+ * цьому не видаляються — ховається лише вхід.
  */
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 import { ActiveTimersSidebarCard } from '@/components/time/ActiveTimersSidebarCard';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   DEFAULT_COLLAPSED_GROUP_IDS,
   SIDEBAR_WIDTH,
   isGroupCollapsed,
-  isRouteActive,
+  isNavItemActive,
+  menuNavGroups,
   navGroupsFor,
+  visibleNavGroups,
 } from '@/constants/nav';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
+import { useUiModules } from '@/store/ui-preferences';
 
 // Ширина живе в constants/nav.ts: її читають і хуки компонування, а імпорт
 // звідси тягнув би в них i18n і AsyncStorage.
@@ -49,9 +59,19 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
   const { tr } = useI18n();
   const { user } = useAuth();
 
+  // Вимкнені модулі — з акаунта (синхронізований 'ui_preferences'), а не з
+  // цього пристрою: користувач вимкнув розділ на телефоні, і на планшеті його
+  // теж немає. Дані модуля лишаються — ховається тільки вхід.
+  const { disabledModules } = useUiModules();
+
   // «Адміністрування workspace» — лише адміну, у групі «Особисте» (та сама
   // умова й те саме місце, що на вебі — див. constants/nav.ts).
-  const navGroups = useMemo(() => navGroupsFor(!!user?.isAdmin), [user?.isAdmin]);
+  const navGroups = useMemo(
+    // menuNavGroups — без пунктів-вкладок «Фінансів» (бюджет, підписки,
+    // рахунки): вони живуть на екрані Фінансів як вкладки (§2.3).
+    () => menuNavGroups(visibleNavGroups(navGroupsFor(!!user?.isAdmin), disabledModules)),
+    [user?.isAdmin, disabledModules],
+  );
 
   const [collapsed, setCollapsed] = useState<readonly string[]>(DEFAULT_COLLAPSED_GROUP_IDS);
 
@@ -128,7 +148,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
               )}
 
               {!hidden && group.items.map(item => {
-                const active = isRouteActive(item.route, pathname);
+                const active = isNavItemActive(item, pathname);
                 return (
                   <TouchableOpacity
                     key={item.route}
@@ -143,6 +163,9 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
                       style={[st.label, { color: active ? c.accent : c.text, fontWeight: active ? '700' : '500' }]}>
                       {String(tr[item.labelKey])}
                     </Text>
+                    {/* Непрочитані сповіщення — на пункті «Налаштування», звідки
+                        ведуть і центр сповіщень, і їхні налаштування (§11). */}
+                    {item.route === '/(tabs)/settings' && <NotificationBadge />}
                   </TouchableOpacity>
                 );
               })}

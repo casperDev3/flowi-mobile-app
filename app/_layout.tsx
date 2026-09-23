@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AppState, View } from 'react-native';
 import 'react-native-reanimated';
 
+import { startFeedbackQueue } from '@/api/feedback';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { NavSidebar } from '@/components/shared/NavSidebar';
 import { ProjectSidebar } from '@/components/shared/ProjectSidebar';
@@ -23,7 +24,11 @@ import { ensureStorageMigrations } from '@/store/migrations';
 import { SyncProvider } from '@/store/sync-engine';
 import { ProjectSyncProvider } from '@/store/project-sync';
 import { I18nProvider, useI18n } from '@/store/i18n';
-import { rescheduleHealthRemindersFromStorage, rescheduleSubscriptionRemindersFromStorage } from '@/store/notifications';
+import {
+  rescheduleHealthRemindersFromStorage,
+  rescheduleSubscriptionRemindersFromStorage,
+  rescheduleTrainingRemindersFromStorage,
+} from '@/store/notifications';
 import { setupPushInteractionHandlers } from '@/store/push';
 import { getPendingRegistration, type PendingRegistration } from '@/store/registration';
 import { clearPendingInvite, getPendingInvite } from '@/store/invite-link';
@@ -190,6 +195,14 @@ function SubscriptionReminders() {
       } catch (e) {
         if (__DEV__) console.warn('[health] планування нагадувань не вдалося:', e);
       }
+      if (cancelled) return;
+      // «Серія під загрозою» (training-module.md §9) — сесії розгортає сервер,
+      // вони приїжджають синком у `training_sessions`.
+      try {
+        await rescheduleTrainingRemindersFromStorage(trRef.current);
+      } catch (e) {
+        if (__DEV__) console.warn('[training] планування нагадувань не вдалося:', e);
+      }
     };
     // Дебаунс: синк пише ключ пачками, а мова/валюти теж можуть змінитися разом.
     const schedule = () => {
@@ -200,7 +213,7 @@ function SubscriptionReminders() {
     schedule();
     const unsubscribe = subscribeToStorage(key => {
       if (key === 'subscriptions' || key === 'finance_currencies' || key === 'notificationsEnabled'
-        || key === 'health_meds' || key === 'health_habits') schedule();
+        || key === 'health_meds' || key === 'health_habits' || key === 'training_sessions') schedule();
     });
     const appState = AppState.addEventListener('change', state => {
       if (state === 'active') schedule();
@@ -224,6 +237,20 @@ function SubscriptionReminders() {
  */
 function PushInteractions() {
   useEffect(() => setupPushInteractionHandlers(), []);
+  return null;
+}
+
+/**
+ * Черга звернень «Ідеї та баги» (feedback-inbox.md §11.2) — стартує після
+ * входу, а не з екрана: звернення, створене офлайн, мусить дійти на сервер,
+ * навіть якщо людина більше не відкриє екран «Ідеї та баги».
+ * `startFeedbackQueue` ідемпотентна: повторний виклик лише ще раз проганяє чергу.
+ */
+function FeedbackQueueRunner() {
+  const { status } = useAuth();
+  useEffect(() => {
+    if (status === 'authed') startFeedbackQueue();
+  }, [status]);
   return null;
 }
 
@@ -342,6 +369,8 @@ function RootLayoutContent() {
           <Stack.Screen name="projects" options={{ headerShown: false }} />
           <Stack.Screen name="notes" options={{ headerShown: false }} />
           <Stack.Screen name="archive" options={{ headerShown: false }} />
+          <Stack.Screen name="feedback" options={{ headerShown: false }} />
+          {/* Редиректи на /feedback — лишаються на один реліз (закладки, старі push). */}
           <Stack.Screen name="bugs" options={{ headerShown: false }} />
           <Stack.Screen name="ideas" options={{ headerShown: false }} />
           <Stack.Screen name="subtasks" options={{ headerShown: false }} />
@@ -373,6 +402,11 @@ function RootLayoutContent() {
           <Stack.Screen name="health-vaccines" options={SHEET_OPTIONS} />
           <Stack.Screen name="health-habits" options={SHEET_OPTIONS} />
           <Stack.Screen name="notifications" options={{ headerShown: false }} />
+          <Stack.Screen name="settings-notifications" options={{ headerShown: false }} />
+          <Stack.Screen name="settings-modules" options={{ headerShown: false }} />
+          <Stack.Screen name="training" options={{ headerShown: false }} />
+          <Stack.Screen name="training-invite" options={{ headerShown: false }} />
+          <Stack.Screen name="c/[workspaceId]/[slug]" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         </View>
@@ -380,6 +414,7 @@ function RootLayoutContent() {
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <SubscriptionReminders />
         <PushInteractions />
+        <FeedbackQueueRunner />
         <PendingInviteAutoJoin />
       </AuthGate>
     </NavigationThemeProvider>

@@ -1,0 +1,1641 @@
+{
+  "now": "2026-12-15",
+  "primary": "UAH",
+  "filter": {
+    "period": "month:2026-12",
+    "currency": "UAH",
+    "scope": "all"
+  },
+  "accounts": [
+    {
+      "id": "acc-card",
+      "name": "Картка",
+      "kind": "card",
+      "currency": "UAH",
+      "openingBalance": 10000,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "acc-cash",
+      "name": "Готівка",
+      "kind": "cash",
+      "currency": "UAH",
+      "openingBalance": 500,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "acc-save",
+      "name": "Відпустка",
+      "kind": "savings",
+      "currency": "UAH",
+      "openingBalance": 0,
+      "goal": 20000,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "acc-usd",
+      "name": "USD",
+      "kind": "card",
+      "currency": "USD",
+      "openingBalance": 200,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "acc-old",
+      "name": "Стара картка",
+      "kind": "card",
+      "currency": "UAH",
+      "openingBalance": 1000,
+      "archived": true,
+      "createdAt": "2025-01-01T00:00:00.000Z"
+    }
+  ],
+  "categories": [
+    {
+      "id": "expense:Оренда",
+      "type": "expense",
+      "name": "Оренда",
+      "icon": "house.fill",
+      "group": "housing",
+      "cost": "fixed"
+    },
+    {
+      "id": "expense:Їжа",
+      "type": "expense",
+      "name": "Їжа",
+      "icon": "fork.knife"
+    },
+    {
+      "id": "expense:Кава",
+      "type": "expense",
+      "name": "Кава",
+      "icon": "cup.and.saucer.fill"
+    },
+    {
+      "id": "expense:Сервери",
+      "type": "expense",
+      "name": "Сервери",
+      "icon": "server.rack"
+    },
+    {
+      "id": "income:Зарплата",
+      "type": "income",
+      "name": "Зарплата",
+      "icon": "briefcase.fill"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "sub-host",
+      "name": "Hosting",
+      "amount": 300,
+      "currency": "UAH",
+      "period": {
+        "every": 1,
+        "unit": "month"
+      },
+      "nextPaymentDate": "2026-12-05",
+      "billingDay": 5,
+      "reminderDaysBefore": 1,
+      "icon": "server.rack",
+      "color": "#8B5CF6",
+      "category": "Сервери",
+      "history": [],
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "sub-nf",
+      "name": "Netflix",
+      "amount": 299,
+      "currency": "UAH",
+      "period": {
+        "every": 1,
+        "unit": "month"
+      },
+      "nextPaymentDate": "2026-12-19",
+      "billingDay": 19,
+      "reminderDaysBefore": 1,
+      "icon": "tv",
+      "color": "#EF4444",
+      "history": [],
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "sub-course",
+      "name": "Курс",
+      "amount": 1000,
+      "currency": "UAH",
+      "period": {
+        "every": 1,
+        "unit": "month"
+      },
+      "nextPaymentDate": "2026-12-20",
+      "endDate": "2027-02-01",
+      "reminderDaysBefore": 1,
+      "icon": "book.fill",
+      "color": "#0EA5E9",
+      "history": [],
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "sub-ins",
+      "name": "Страховка",
+      "amount": 500,
+      "currency": "UAH",
+      "period": {
+        "every": 1,
+        "unit": "month"
+      },
+      "nextPaymentDate": "2026-12-31",
+      "billingDay": 31,
+      "reminderDaysBefore": 1,
+      "icon": "shield.fill",
+      "color": "#10B981",
+      "history": [],
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "sub-vpn",
+      "name": "VPN",
+      "amount": 5,
+      "currency": "USD",
+      "period": {
+        "every": 1,
+        "unit": "month"
+      },
+      "nextPaymentDate": "2026-12-20",
+      "reminderDaysBefore": 1,
+      "icon": "lock.fill",
+      "color": "#6366F1",
+      "history": [],
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "sub-arch",
+      "name": "Кавовий клуб",
+      "amount": 100,
+      "currency": "UAH",
+      "period": {
+        "every": 1,
+        "unit": "month"
+      },
+      "nextPaymentDate": "2026-12-16",
+      "reminderDaysBefore": 1,
+      "icon": "cup.and.saucer.fill",
+      "color": "#F59E0B",
+      "category": "Кава",
+      "history": [],
+      "archivedAt": "2026-10-01T00:00:00.000Z",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "recurring_incomes": [
+    {
+      "id": "ri-salary",
+      "name": "Зарплата",
+      "amount": 30000,
+      "currency": "UAH",
+      "period": {
+        "every": 1,
+        "unit": "month"
+      },
+      "nextPaymentDate": "2026-12-25",
+      "billingDay": 25,
+      "accountId": "acc-card",
+      "category": "Зарплата",
+      "icon": "briefcase.fill",
+      "color": "#10B981",
+      "history": [],
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "ri-usd",
+      "name": "Клієнт США",
+      "amount": 500,
+      "currency": "USD",
+      "period": {
+        "every": 1,
+        "unit": "month"
+      },
+      "nextPaymentDate": "2027-01-10",
+      "accountId": "acc-usd",
+      "icon": "laptopcomputer",
+      "color": "#10B981",
+      "history": [],
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "t-sep-sal",
+      "type": "income",
+      "category": "Зарплата",
+      "amount": 28000,
+      "date": "2026-09-25T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-sep-rent",
+      "type": "expense",
+      "category": "Оренда",
+      "amount": 12000,
+      "date": "2026-09-05T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-sep-food",
+      "type": "expense",
+      "category": "Їжа",
+      "amount": 3000,
+      "date": "2026-09-12T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-oct-sal",
+      "type": "income",
+      "category": "Зарплата",
+      "amount": 30000,
+      "date": "2026-10-25T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-oct-rent",
+      "type": "expense",
+      "category": "Оренда",
+      "amount": 12000,
+      "date": "2026-10-05T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-oct-food",
+      "type": "expense",
+      "category": "Їжа",
+      "amount": 4500,
+      "date": "2026-10-14T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-oct-coffee",
+      "type": "expense",
+      "category": "Кава",
+      "amount": 600,
+      "date": "2026-10-20T12:00:00.000Z",
+      "accountId": "acc-cash"
+    },
+    {
+      "id": "t-nov-sal",
+      "type": "income",
+      "category": "Зарплата",
+      "amount": 30000,
+      "date": "2026-11-25T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-nov-rent",
+      "type": "expense",
+      "category": "Оренда",
+      "amount": 12000,
+      "date": "2026-11-05T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-nov-food",
+      "type": "expense",
+      "category": "Їжа",
+      "amount": -3200,
+      "date": "2026-11-18T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-nov-host",
+      "type": "expense",
+      "category": "Сервери",
+      "amount": 300,
+      "date": "2026-11-05T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-dec-rent",
+      "type": "expense",
+      "category": "Оренда",
+      "amount": 12000,
+      "date": "2026-12-05T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-dec-food",
+      "type": "expense",
+      "category": "Їжа",
+      "amount": 1500,
+      "date": "2026-12-03T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-dec-noacc",
+      "type": "expense",
+      "category": "Кава",
+      "amount": 250,
+      "currency": "UAH",
+      "date": "2026-12-07T12:00:00.000Z"
+    },
+    {
+      "id": "t-dec-arch",
+      "type": "expense",
+      "category": "Їжа",
+      "amount": 400,
+      "date": "2026-12-08T12:00:00.000Z",
+      "accountId": "acc-old"
+    },
+    {
+      "id": "t-dec-tr-same",
+      "type": "transfer",
+      "category": "",
+      "amount": 2000,
+      "date": "2026-12-09T12:00:00.000Z",
+      "accountId": "acc-card",
+      "toAccountId": "acc-save"
+    },
+    {
+      "id": "t-dec-tr-cross",
+      "type": "transfer",
+      "category": "",
+      "amount": 100,
+      "toAmount": 4100,
+      "date": "2026-12-10T12:00:00.000Z",
+      "accountId": "acc-usd",
+      "toAccountId": "acc-card"
+    },
+    {
+      "id": "t-dec-planned",
+      "type": "expense",
+      "category": "Ремонт",
+      "amount": 5000,
+      "date": "2026-12-28T12:00:00.000Z",
+      "accountId": "acc-card"
+    },
+    {
+      "id": "t-dec-proj",
+      "type": "expense",
+      "category": "Сервери",
+      "amount": 800,
+      "date": "2026-12-11T12:00:00.000Z",
+      "accountId": "acc-card",
+      "projectId": "p-1"
+    },
+    {
+      "id": "t-dec-proj-inc",
+      "type": "income",
+      "category": "Фріланс",
+      "amount": 2000,
+      "date": "2026-12-12T12:00:00.000Z",
+      "accountId": "acc-card",
+      "projectId": "p-1"
+    },
+    {
+      "id": "t-dec-usd",
+      "type": "income",
+      "category": "Фріланс",
+      "amount": 50,
+      "date": "2026-12-12T12:00:00.000Z",
+      "accountId": "acc-usd"
+    },
+    {
+      "id": "t-dec-nocat",
+      "type": "expense",
+      "category": "",
+      "amount": 100,
+      "date": "2026-12-13T12:00:00.000Z",
+      "accountId": "acc-cash"
+    },
+    {
+      "id": "t-dec-broken",
+      "type": "transfer",
+      "category": "",
+      "amount": 300,
+      "date": "2026-12-14T12:00:00.000Z",
+      "accountId": "acc-cash"
+    }
+  ],
+  "expected": {
+    "period": {
+      "from": "2026-12-01",
+      "to": "2026-12-31",
+      "key": "month:2026-12",
+      "preset": "month"
+    },
+    "pnl": {
+      "totals": {
+        "currency": "UAH",
+        "income": 2000,
+        "fixedExpense": 12800,
+        "variableExpense": 7250,
+        "expense": 20050,
+        "net": -18050,
+        "savingsRate": -9.025,
+        "unclassifiedExpense": 5350,
+        "unclassifiedCount": 3
+      },
+      "groups": [
+        {
+          "group": "housing",
+          "cost": "fixed",
+          "value": 12000,
+          "share": 0.59850374,
+          "categories": [
+            {
+              "name": "Оренда",
+              "value": 12000
+            }
+          ]
+        },
+        {
+          "group": "other",
+          "cost": "variable",
+          "value": 5350,
+          "share": 0.26683292,
+          "categories": [
+            {
+              "name": "Ремонт",
+              "value": 5000
+            },
+            {
+              "name": "Кава",
+              "value": 250
+            },
+            {
+              "name": "Без категорії",
+              "value": 100
+            }
+          ]
+        },
+        {
+          "group": "food",
+          "cost": "variable",
+          "value": 1900,
+          "share": 0.09476309,
+          "categories": [
+            {
+              "name": "Їжа",
+              "value": 1900
+            }
+          ]
+        },
+        {
+          "group": "other",
+          "cost": "fixed",
+          "value": 800,
+          "share": 0.03990025,
+          "categories": [
+            {
+              "name": "Сервери",
+              "value": 800
+            }
+          ]
+        }
+      ],
+      "unclassifiedCategories": [
+        "Кава",
+        "Ремонт"
+      ],
+      "uncounted": [
+        {
+          "currency": "USD",
+          "income": 50,
+          "expense": 0,
+          "count": 1
+        }
+      ]
+    },
+    "pnlByScope": {
+      "all": {
+        "currency": "UAH",
+        "income": 2000,
+        "fixedExpense": 12800,
+        "variableExpense": 7250,
+        "expense": 20050,
+        "net": -18050,
+        "savingsRate": -9.025,
+        "unclassifiedExpense": 5350,
+        "unclassifiedCount": 3
+      },
+      "personal": {
+        "currency": "UAH",
+        "income": 0,
+        "fixedExpense": 12000,
+        "variableExpense": 7250,
+        "expense": 19250,
+        "net": -19250,
+        "savingsRate": null,
+        "unclassifiedExpense": 5350,
+        "unclassifiedCount": 3
+      },
+      "project": {
+        "currency": "UAH",
+        "income": 2000,
+        "fixedExpense": 800,
+        "variableExpense": 0,
+        "expense": 800,
+        "net": 1200,
+        "savingsRate": 0.6,
+        "unclassifiedExpense": 0,
+        "unclassifiedCount": 0
+      }
+    },
+    "comparison": {
+      "current": {
+        "currency": "UAH",
+        "income": 2000,
+        "fixedExpense": 12800,
+        "variableExpense": 7250,
+        "expense": 20050,
+        "net": -18050,
+        "savingsRate": -9.025,
+        "unclassifiedExpense": 5350,
+        "unclassifiedCount": 3
+      },
+      "previous": {
+        "currency": "UAH",
+        "income": 30000,
+        "fixedExpense": 12300,
+        "variableExpense": 3200,
+        "expense": 15500,
+        "net": 14500,
+        "savingsRate": 0.48333333,
+        "unclassifiedExpense": 0,
+        "unclassifiedCount": 0
+      },
+      "average3": {
+        "currency": "UAH",
+        "income": 29333.33333333,
+        "fixedExpense": 12100,
+        "variableExpense": 3766.66666667,
+        "expense": 15866.66666667,
+        "net": 13466.66666667,
+        "savingsRate": 0.45909091,
+        "unclassifiedExpense": 200,
+        "unclassifiedCount": 0.33333333
+      },
+      "basis": 3,
+      "delta": [
+        {
+          "field": "income",
+          "abs": -28000,
+          "pct": -0.93333333
+        },
+        {
+          "field": "fixedExpense",
+          "abs": 500,
+          "pct": 0.04065041
+        },
+        {
+          "field": "variableExpense",
+          "abs": 4050,
+          "pct": 1.265625
+        },
+        {
+          "field": "expense",
+          "abs": 4550,
+          "pct": 0.29354839
+        },
+        {
+          "field": "net",
+          "abs": -32550,
+          "pct": -2.24482759
+        },
+        {
+          "field": "savingsRate",
+          "abs": -9.50833333,
+          "pct": null
+        }
+      ],
+      "deltaAverage": [
+        {
+          "field": "income",
+          "abs": -27333.33333333,
+          "pct": -0.93181818
+        },
+        {
+          "field": "fixedExpense",
+          "abs": 700,
+          "pct": 0.05785124
+        },
+        {
+          "field": "variableExpense",
+          "abs": 3483.33333333,
+          "pct": 0.92477876
+        },
+        {
+          "field": "expense",
+          "abs": 4183.33333333,
+          "pct": 0.26365546
+        },
+        {
+          "field": "net",
+          "abs": -31516.66666667,
+          "pct": -2.34034653
+        },
+        {
+          "field": "savingsRate",
+          "abs": -9.48409091,
+          "pct": null
+        }
+      ]
+    },
+    "comparisonProject": {
+      "current": {
+        "currency": "UAH",
+        "income": 2000,
+        "fixedExpense": 800,
+        "variableExpense": 0,
+        "expense": 800,
+        "net": 1200,
+        "savingsRate": 0.6,
+        "unclassifiedExpense": 0,
+        "unclassifiedCount": 0
+      },
+      "previous": {
+        "currency": "UAH",
+        "income": 0,
+        "fixedExpense": 0,
+        "variableExpense": 0,
+        "expense": 0,
+        "net": 0,
+        "savingsRate": null,
+        "unclassifiedExpense": 0,
+        "unclassifiedCount": 0
+      },
+      "average3": {
+        "currency": "UAH",
+        "income": 0,
+        "fixedExpense": 0,
+        "variableExpense": 0,
+        "expense": 0,
+        "net": 0,
+        "savingsRate": null,
+        "unclassifiedExpense": 0,
+        "unclassifiedCount": 0
+      },
+      "basis": 3,
+      "delta": [
+        {
+          "field": "income",
+          "abs": 2000,
+          "pct": null
+        },
+        {
+          "field": "fixedExpense",
+          "abs": 800,
+          "pct": null
+        },
+        {
+          "field": "variableExpense",
+          "abs": 0,
+          "pct": null
+        },
+        {
+          "field": "expense",
+          "abs": 800,
+          "pct": null
+        },
+        {
+          "field": "net",
+          "abs": 1200,
+          "pct": null
+        },
+        {
+          "field": "savingsRate",
+          "abs": null,
+          "pct": null
+        }
+      ],
+      "deltaAverage": [
+        {
+          "field": "income",
+          "abs": 2000,
+          "pct": null
+        },
+        {
+          "field": "fixedExpense",
+          "abs": 800,
+          "pct": null
+        },
+        {
+          "field": "variableExpense",
+          "abs": 0,
+          "pct": null
+        },
+        {
+          "field": "expense",
+          "abs": 800,
+          "pct": null
+        },
+        {
+          "field": "net",
+          "abs": 1200,
+          "pct": null
+        },
+        {
+          "field": "savingsRate",
+          "abs": null,
+          "pct": null
+        }
+      ]
+    },
+    "cashflow": {
+      "opening": 50900,
+      "inflow": 2000,
+      "outflow": 15050,
+      "count": 15,
+      "first": [
+        {
+          "day": "2026-12-01",
+          "inflow": 0,
+          "outflow": 0,
+          "balance": 50900
+        },
+        {
+          "day": "2026-12-02",
+          "inflow": 0,
+          "outflow": 0,
+          "balance": 50900
+        },
+        {
+          "day": "2026-12-03",
+          "inflow": 0,
+          "outflow": 1500,
+          "balance": 49400
+        },
+        {
+          "day": "2026-12-04",
+          "inflow": 0,
+          "outflow": 0,
+          "balance": 49400
+        },
+        {
+          "day": "2026-12-05",
+          "inflow": 0,
+          "outflow": 12000,
+          "balance": 37400
+        }
+      ],
+      "last": [
+        {
+          "day": "2026-12-11",
+          "inflow": 0,
+          "outflow": 800,
+          "balance": 40700
+        },
+        {
+          "day": "2026-12-12",
+          "inflow": 2000,
+          "outflow": 0,
+          "balance": 42700
+        },
+        {
+          "day": "2026-12-13",
+          "inflow": 0,
+          "outflow": 100,
+          "balance": 42600
+        },
+        {
+          "day": "2026-12-14",
+          "inflow": 0,
+          "outflow": 0,
+          "balance": 42600
+        },
+        {
+          "day": "2026-12-15",
+          "inflow": 0,
+          "outflow": 0,
+          "balance": 42600
+        }
+      ]
+    },
+    "forecast30": {
+      "horizonDays": 30,
+      "currency": "UAH",
+      "opening": 42600,
+      "points": [
+        {
+          "day": "2026-12-15",
+          "balance": 42300,
+          "events": [
+            {
+              "day": "2026-12-15",
+              "kind": "subscription",
+              "amount": -300,
+              "label": "Hosting",
+              "sourceId": "sub-host",
+              "overdue": true
+            }
+          ]
+        },
+        {
+          "day": "2026-12-16",
+          "balance": 42182.77777778,
+          "events": []
+        },
+        {
+          "day": "2026-12-17",
+          "balance": 42065.55555556,
+          "events": []
+        },
+        {
+          "day": "2026-12-18",
+          "balance": 41948.33333334,
+          "events": []
+        },
+        {
+          "day": "2026-12-19",
+          "balance": 41532.11111112,
+          "events": [
+            {
+              "day": "2026-12-19",
+              "kind": "subscription",
+              "amount": -299,
+              "label": "Netflix",
+              "sourceId": "sub-nf"
+            }
+          ]
+        },
+        {
+          "day": "2026-12-20",
+          "balance": 40414.8888889,
+          "events": [
+            {
+              "day": "2026-12-20",
+              "kind": "subscription",
+              "amount": -1000,
+              "label": "Курс",
+              "sourceId": "sub-course"
+            }
+          ]
+        },
+        {
+          "day": "2026-12-21",
+          "balance": 40297.66666668,
+          "events": []
+        },
+        {
+          "day": "2026-12-22",
+          "balance": 40180.44444446,
+          "events": []
+        },
+        {
+          "day": "2026-12-23",
+          "balance": 40063.22222224,
+          "events": []
+        },
+        {
+          "day": "2026-12-24",
+          "balance": 39946.00000002,
+          "events": []
+        },
+        {
+          "day": "2026-12-25",
+          "balance": 69828.7777778,
+          "events": [
+            {
+              "day": "2026-12-25",
+              "kind": "recurring_income",
+              "amount": 30000,
+              "label": "Зарплата",
+              "sourceId": "ri-salary"
+            }
+          ]
+        },
+        {
+          "day": "2026-12-26",
+          "balance": 69711.55555558,
+          "events": []
+        },
+        {
+          "day": "2026-12-27",
+          "balance": 69594.33333336,
+          "events": []
+        },
+        {
+          "day": "2026-12-28",
+          "balance": 64477.11111114,
+          "events": [
+            {
+              "day": "2026-12-28",
+              "kind": "planned_tx",
+              "amount": -5000,
+              "label": "Ремонт",
+              "sourceId": "t-dec-planned"
+            }
+          ]
+        },
+        {
+          "day": "2026-12-29",
+          "balance": 64359.88888892,
+          "events": []
+        },
+        {
+          "day": "2026-12-30",
+          "balance": 64242.6666667,
+          "events": []
+        },
+        {
+          "day": "2026-12-31",
+          "balance": 63625.44444448,
+          "events": [
+            {
+              "day": "2026-12-31",
+              "kind": "subscription",
+              "amount": -500,
+              "label": "Страховка",
+              "sourceId": "sub-ins"
+            }
+          ]
+        },
+        {
+          "day": "2027-01-01",
+          "balance": 63508.22222226,
+          "events": []
+        },
+        {
+          "day": "2027-01-02",
+          "balance": 63391.00000004,
+          "events": []
+        },
+        {
+          "day": "2027-01-03",
+          "balance": 63273.77777782,
+          "events": []
+        },
+        {
+          "day": "2027-01-04",
+          "balance": 63156.5555556,
+          "events": []
+        },
+        {
+          "day": "2027-01-05",
+          "balance": 62739.33333338,
+          "events": [
+            {
+              "day": "2027-01-05",
+              "kind": "subscription",
+              "amount": -300,
+              "label": "Hosting",
+              "sourceId": "sub-host"
+            }
+          ]
+        },
+        {
+          "day": "2027-01-06",
+          "balance": 62622.11111116,
+          "events": []
+        },
+        {
+          "day": "2027-01-07",
+          "balance": 62504.88888894,
+          "events": []
+        },
+        {
+          "day": "2027-01-08",
+          "balance": 62387.66666672,
+          "events": []
+        },
+        {
+          "day": "2027-01-09",
+          "balance": 62270.4444445,
+          "events": []
+        },
+        {
+          "day": "2027-01-10",
+          "balance": 62153.22222228,
+          "events": []
+        },
+        {
+          "day": "2027-01-11",
+          "balance": 62036.00000006,
+          "events": []
+        },
+        {
+          "day": "2027-01-12",
+          "balance": 61918.77777784,
+          "events": []
+        },
+        {
+          "day": "2027-01-13",
+          "balance": 61801.55555562,
+          "events": []
+        },
+        {
+          "day": "2027-01-14",
+          "balance": 61684.3333334,
+          "events": []
+        }
+      ],
+      "closing": 61684.3333334,
+      "avgDailyVariable": 117.22222222,
+      "basis": "ok",
+      "shortfall": null,
+      "lowest": {
+        "day": "2026-12-24",
+        "balance": 39946.00000002
+      }
+    },
+    "forecast90": {
+      "horizonDays": 90,
+      "currency": "UAH",
+      "opening": 42600,
+      "points": [
+        {
+          "day": "2026-12-15",
+          "balance": 42300,
+          "events": [
+            {
+              "day": "2026-12-15",
+              "kind": "subscription",
+              "amount": -300,
+              "label": "Hosting",
+              "sourceId": "sub-host",
+              "overdue": true
+            }
+          ]
+        },
+        {
+          "day": "2026-12-16",
+          "balance": 42182.77777778,
+          "events": []
+        },
+        {
+          "day": "2026-12-17",
+          "balance": 42065.55555556,
+          "events": []
+        },
+        {
+          "day": "2026-12-18",
+          "balance": 41948.33333334,
+          "events": []
+        },
+        {
+          "day": "2026-12-19",
+          "balance": 41532.11111112,
+          "events": [
+            {
+              "day": "2026-12-19",
+              "kind": "subscription",
+              "amount": -299,
+              "label": "Netflix",
+              "sourceId": "sub-nf"
+            }
+          ]
+        },
+        {
+          "day": "2026-12-20",
+          "balance": 40414.8888889,
+          "events": [
+            {
+              "day": "2026-12-20",
+              "kind": "subscription",
+              "amount": -1000,
+              "label": "Курс",
+              "sourceId": "sub-course"
+            }
+          ]
+        },
+        {
+          "day": "2026-12-21",
+          "balance": 40297.66666668,
+          "events": []
+        },
+        {
+          "day": "2026-12-22",
+          "balance": 40180.44444446,
+          "events": []
+        },
+        {
+          "day": "2026-12-23",
+          "balance": 40063.22222224,
+          "events": []
+        },
+        {
+          "day": "2026-12-24",
+          "balance": 39946.00000002,
+          "events": []
+        },
+        {
+          "day": "2026-12-25",
+          "balance": 69828.7777778,
+          "events": [
+            {
+              "day": "2026-12-25",
+              "kind": "recurring_income",
+              "amount": 30000,
+              "label": "Зарплата",
+              "sourceId": "ri-salary"
+            }
+          ]
+        },
+        {
+          "day": "2026-12-26",
+          "balance": 69711.55555558,
+          "events": []
+        },
+        {
+          "day": "2026-12-27",
+          "balance": 69594.33333336,
+          "events": []
+        },
+        {
+          "day": "2026-12-28",
+          "balance": 64477.11111114,
+          "events": [
+            {
+              "day": "2026-12-28",
+              "kind": "planned_tx",
+              "amount": -5000,
+              "label": "Ремонт",
+              "sourceId": "t-dec-planned"
+            }
+          ]
+        },
+        {
+          "day": "2026-12-29",
+          "balance": 64359.88888892,
+          "events": []
+        },
+        {
+          "day": "2026-12-30",
+          "balance": 64242.6666667,
+          "events": []
+        },
+        {
+          "day": "2026-12-31",
+          "balance": 63625.44444448,
+          "events": [
+            {
+              "day": "2026-12-31",
+              "kind": "subscription",
+              "amount": -500,
+              "label": "Страховка",
+              "sourceId": "sub-ins"
+            }
+          ]
+        },
+        {
+          "day": "2027-01-01",
+          "balance": 63508.22222226,
+          "events": []
+        },
+        {
+          "day": "2027-01-02",
+          "balance": 63391.00000004,
+          "events": []
+        },
+        {
+          "day": "2027-01-03",
+          "balance": 63273.77777782,
+          "events": []
+        },
+        {
+          "day": "2027-01-04",
+          "balance": 63156.5555556,
+          "events": []
+        },
+        {
+          "day": "2027-01-05",
+          "balance": 62739.33333338,
+          "events": [
+            {
+              "day": "2027-01-05",
+              "kind": "subscription",
+              "amount": -300,
+              "label": "Hosting",
+              "sourceId": "sub-host"
+            }
+          ]
+        },
+        {
+          "day": "2027-01-06",
+          "balance": 62622.11111116,
+          "events": []
+        },
+        {
+          "day": "2027-01-07",
+          "balance": 62504.88888894,
+          "events": []
+        },
+        {
+          "day": "2027-01-08",
+          "balance": 62387.66666672,
+          "events": []
+        },
+        {
+          "day": "2027-01-09",
+          "balance": 62270.4444445,
+          "events": []
+        },
+        {
+          "day": "2027-01-10",
+          "balance": 62153.22222228,
+          "events": []
+        },
+        {
+          "day": "2027-01-11",
+          "balance": 62036.00000006,
+          "events": []
+        },
+        {
+          "day": "2027-01-12",
+          "balance": 61918.77777784,
+          "events": []
+        },
+        {
+          "day": "2027-01-13",
+          "balance": 61801.55555562,
+          "events": []
+        },
+        {
+          "day": "2027-01-14",
+          "balance": 61684.3333334,
+          "events": []
+        },
+        {
+          "day": "2027-01-15",
+          "balance": 61567.11111118,
+          "events": []
+        },
+        {
+          "day": "2027-01-16",
+          "balance": 61449.88888896,
+          "events": []
+        },
+        {
+          "day": "2027-01-17",
+          "balance": 61332.66666674,
+          "events": []
+        },
+        {
+          "day": "2027-01-18",
+          "balance": 61215.44444452,
+          "events": []
+        },
+        {
+          "day": "2027-01-19",
+          "balance": 60799.2222223,
+          "events": [
+            {
+              "day": "2027-01-19",
+              "kind": "subscription",
+              "amount": -299,
+              "label": "Netflix",
+              "sourceId": "sub-nf"
+            }
+          ]
+        },
+        {
+          "day": "2027-01-20",
+          "balance": 59682.00000008,
+          "events": [
+            {
+              "day": "2027-01-20",
+              "kind": "subscription",
+              "amount": -1000,
+              "label": "Курс",
+              "sourceId": "sub-course"
+            }
+          ]
+        },
+        {
+          "day": "2027-01-21",
+          "balance": 59564.77777786,
+          "events": []
+        },
+        {
+          "day": "2027-01-22",
+          "balance": 59447.55555564,
+          "events": []
+        },
+        {
+          "day": "2027-01-23",
+          "balance": 59330.33333342,
+          "events": []
+        },
+        {
+          "day": "2027-01-24",
+          "balance": 59213.1111112,
+          "events": []
+        },
+        {
+          "day": "2027-01-25",
+          "balance": 89095.88888898,
+          "events": [
+            {
+              "day": "2027-01-25",
+              "kind": "recurring_income",
+              "amount": 30000,
+              "label": "Зарплата",
+              "sourceId": "ri-salary"
+            }
+          ]
+        },
+        {
+          "day": "2027-01-26",
+          "balance": 88978.66666676,
+          "events": []
+        },
+        {
+          "day": "2027-01-27",
+          "balance": 88861.44444454,
+          "events": []
+        },
+        {
+          "day": "2027-01-28",
+          "balance": 88744.22222232,
+          "events": []
+        },
+        {
+          "day": "2027-01-29",
+          "balance": 88627.0000001,
+          "events": []
+        },
+        {
+          "day": "2027-01-30",
+          "balance": 88509.77777788,
+          "events": []
+        },
+        {
+          "day": "2027-01-31",
+          "balance": 87892.55555566,
+          "events": [
+            {
+              "day": "2027-01-31",
+              "kind": "subscription",
+              "amount": -500,
+              "label": "Страховка",
+              "sourceId": "sub-ins"
+            }
+          ]
+        },
+        {
+          "day": "2027-02-01",
+          "balance": 87775.33333344,
+          "events": []
+        },
+        {
+          "day": "2027-02-02",
+          "balance": 87658.11111122,
+          "events": []
+        },
+        {
+          "day": "2027-02-03",
+          "balance": 87540.888889,
+          "events": []
+        },
+        {
+          "day": "2027-02-04",
+          "balance": 87423.66666678,
+          "events": []
+        },
+        {
+          "day": "2027-02-05",
+          "balance": 87006.44444456,
+          "events": [
+            {
+              "day": "2027-02-05",
+              "kind": "subscription",
+              "amount": -300,
+              "label": "Hosting",
+              "sourceId": "sub-host"
+            }
+          ]
+        },
+        {
+          "day": "2027-02-06",
+          "balance": 86889.22222234,
+          "events": []
+        },
+        {
+          "day": "2027-02-07",
+          "balance": 86772.00000012,
+          "events": []
+        },
+        {
+          "day": "2027-02-08",
+          "balance": 86654.7777779,
+          "events": []
+        },
+        {
+          "day": "2027-02-09",
+          "balance": 86537.55555568,
+          "events": []
+        },
+        {
+          "day": "2027-02-10",
+          "balance": 86420.33333346,
+          "events": []
+        },
+        {
+          "day": "2027-02-11",
+          "balance": 86303.11111124,
+          "events": []
+        },
+        {
+          "day": "2027-02-12",
+          "balance": 86185.88888902,
+          "events": []
+        },
+        {
+          "day": "2027-02-13",
+          "balance": 86068.6666668,
+          "events": []
+        },
+        {
+          "day": "2027-02-14",
+          "balance": 85951.44444458,
+          "events": []
+        },
+        {
+          "day": "2027-02-15",
+          "balance": 85834.22222236,
+          "events": []
+        },
+        {
+          "day": "2027-02-16",
+          "balance": 85717.00000014,
+          "events": []
+        },
+        {
+          "day": "2027-02-17",
+          "balance": 85599.77777792,
+          "events": []
+        },
+        {
+          "day": "2027-02-18",
+          "balance": 85482.5555557,
+          "events": []
+        },
+        {
+          "day": "2027-02-19",
+          "balance": 85066.33333348,
+          "events": [
+            {
+              "day": "2027-02-19",
+              "kind": "subscription",
+              "amount": -299,
+              "label": "Netflix",
+              "sourceId": "sub-nf"
+            }
+          ]
+        },
+        {
+          "day": "2027-02-20",
+          "balance": 84949.11111126,
+          "events": []
+        },
+        {
+          "day": "2027-02-21",
+          "balance": 84831.88888904,
+          "events": []
+        },
+        {
+          "day": "2027-02-22",
+          "balance": 84714.66666682,
+          "events": []
+        },
+        {
+          "day": "2027-02-23",
+          "balance": 84597.4444446,
+          "events": []
+        },
+        {
+          "day": "2027-02-24",
+          "balance": 84480.22222238,
+          "events": []
+        },
+        {
+          "day": "2027-02-25",
+          "balance": 114363.00000016,
+          "events": [
+            {
+              "day": "2027-02-25",
+              "kind": "recurring_income",
+              "amount": 30000,
+              "label": "Зарплата",
+              "sourceId": "ri-salary"
+            }
+          ]
+        },
+        {
+          "day": "2027-02-26",
+          "balance": 114245.77777794,
+          "events": []
+        },
+        {
+          "day": "2027-02-27",
+          "balance": 114128.55555572,
+          "events": []
+        },
+        {
+          "day": "2027-02-28",
+          "balance": 113511.3333335,
+          "events": [
+            {
+              "day": "2027-02-28",
+              "kind": "subscription",
+              "amount": -500,
+              "label": "Страховка",
+              "sourceId": "sub-ins"
+            }
+          ]
+        },
+        {
+          "day": "2027-03-01",
+          "balance": 113394.11111128,
+          "events": []
+        },
+        {
+          "day": "2027-03-02",
+          "balance": 113276.88888906,
+          "events": []
+        },
+        {
+          "day": "2027-03-03",
+          "balance": 113159.66666684,
+          "events": []
+        },
+        {
+          "day": "2027-03-04",
+          "balance": 113042.44444462,
+          "events": []
+        },
+        {
+          "day": "2027-03-05",
+          "balance": 112625.2222224,
+          "events": [
+            {
+              "day": "2027-03-05",
+              "kind": "subscription",
+              "amount": -300,
+              "label": "Hosting",
+              "sourceId": "sub-host"
+            }
+          ]
+        },
+        {
+          "day": "2027-03-06",
+          "balance": 112508.00000018,
+          "events": []
+        },
+        {
+          "day": "2027-03-07",
+          "balance": 112390.77777796,
+          "events": []
+        },
+        {
+          "day": "2027-03-08",
+          "balance": 112273.55555574,
+          "events": []
+        },
+        {
+          "day": "2027-03-09",
+          "balance": 112156.33333352,
+          "events": []
+        },
+        {
+          "day": "2027-03-10",
+          "balance": 112039.1111113,
+          "events": []
+        },
+        {
+          "day": "2027-03-11",
+          "balance": 111921.88888908,
+          "events": []
+        },
+        {
+          "day": "2027-03-12",
+          "balance": 111804.66666686,
+          "events": []
+        },
+        {
+          "day": "2027-03-13",
+          "balance": 111687.44444464,
+          "events": []
+        },
+        {
+          "day": "2027-03-14",
+          "balance": 111570.22222242,
+          "events": []
+        },
+        {
+          "day": "2027-03-15",
+          "balance": 111453.0000002,
+          "events": []
+        }
+      ],
+      "closing": 111453.0000002,
+      "avgDailyVariable": 117.22222222,
+      "basis": "ok",
+      "shortfall": null,
+      "lowest": {
+        "day": "2026-12-24",
+        "balance": 39946.00000002
+      }
+    }
+  }
+}

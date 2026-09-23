@@ -49,13 +49,18 @@ app/
   projects.tsx             — Проєкти (Stack)
   meetings.tsx             — Наради (Stack)
   subtasks.tsx             — Підзавдання (Stack)
-  notifications.tsx        — Нотифікації (Stack)
+  notifications.tsx        — Центр сповіщень (Stack): вкладки «Сповіщення» (серверний інбокс) і «Нагадування» (локальні)
+  settings-notifications.tsx — Налаштування сповіщень: матриця категорія × канал, тихі години (GET/PATCH /notifications/preferences/)
+  settings-modules.tsx     — Які модулі показувати (ui_preferences)
+  feedback.tsx             — «Ідеї та баги» — ОДИН екран із перемикачем Ідеї | Баги (feedback-inbox.md §10.1)
+  training/                — Групи тренувань (Stack): index, [groupId]/…, session/[sessionId], invite
+  training-invite.tsx      — редирект deep link ftrackingapp://training-invite?ws=&g=&t= → /training/invite
+  c/[workspaceId]/[slug].tsx — редирект QR-наліпки ftrackingapp://c/<ws>/<slug> → /containers?qr=
   finance-stats.tsx        — Статистика фінансів (Stack)
   banks.tsx                — Скарбнички (Stack)
   time-records.tsx         — Записи часу (Stack)
   time-stats.tsx           — Статистика часу (Stack)
-  ideas.tsx                — Ідеї (Stack)
-  bugs.tsx                 — Баги (Stack)
+  ideas.tsx / bugs.tsx     — РЕДИРЕКТИ на /feedback?kind=idea|bug (лишаються на один реліз)
   data.tsx                 — Управління даними (Stack)
   sync.tsx                 — Синхронізація (Stack)
   developer.tsx            — Developer panel (Stack)
@@ -125,8 +130,19 @@ store/
   project-team.ts          — REST-обгортка §4.2–§4.3: учасники, ролі, запрошення (лінк/email),
                              transferProjectOwnership
   project-activity.ts      — REST GET /projects/{id}/activity/ (§4.6), без синку
+  training-socket.ts       — ws/training-group/{id}/ (сигнали групи) + training_groups_changed з ws/user/
+
+api/
+  feedback.ts              — подання звернень (POST /feedback/reports/ + PUT вкладень), черга з повторами
+                             (startFeedbackQueue стартує з app/_layout.tsx після входу), кеш статусів
+  notifications.ts         — центр сповіщень: інбокс, лічильник, налаштування (If-Match/409), WS-сигнал
+                             notifications_changed (handleNotificationsSignal з store/sync-engine.tsx)
 
 components/
+  feedback/                — FeedbackForm/Card/Detail, model.ts (стани звернення, resolveState)
+  notifications/           — NotificationBadge (таб «Налаштування», сайдбар), рядки інбоксу, матриця
+  containers/              — модуль контейнерів v2 (місця, речі, фото, QR, ContainerSearchPanel на «Сьогодні»)
+  training/                — екрани груп тренувань
   shared/
     MonthPicker.tsx        — навігація по місяцях (← Квітень 2025 →)
     NavSidebar.tsx         — сайдбар планшета/веба (NAV_GROUPS з constants/nav.ts), перемикається
@@ -245,6 +261,21 @@ constants/
 | `'push_token_registered'` | `{token,userId,workspaceId}` | чи треба перереєструвати push-токен |
 | `'comments'` | `Comment[]` | коментарі+@згадки задач/нарад (лише проєктний потік) |
 | `'project_budgets'` | `ProjectBudget[]` | бюджет проєкту (owner-only, `local_id == projectId`) |
+
+### Нові колекції й локальні ключі (хвилі модулів, 09.2026)
+| Ключ | Тип | Опис |
+|------|-----|------|
+| `'container_places'` / `'container_items'` | синхр. масиви | Контейнери v2: ієрархія місць і речі окремою колекцією (`containerId`) |
+| `'media_assets'` | синхр. масив | Метадані фото коробок/речей (байти — окремо, `POST /api/media/`); у файловий експорт не йде |
+| `'recurring_incomes'` | синхр. масив | Регулярні доходи (може мати `projectId` → потік проєкту) |
+| `'training_sessions'` | синхр. масив | Персональні сесії тренувань, розгорнуті сервером; у файловий експорт не йде |
+| `'feedback_status'` | серверна (лише pull) | Статуси звернень `<kind>:<id>` — `SYNC_SERVER_OWNED_KEYS`, у outbox і бекапи НЕ потрапляє |
+| `'media_upload_queue'` | локальний | Черга вивантаження фото (стирається при виході) |
+| `'containers_migrated_v2'` / `'containers_backup_v1'` | локальні | Прапорець міграції контейнерів v1→v2 і резервна копія ДО міграції (копію не стирати) |
+| `'containers_open_counts'` | локальний | Лічильники відкриттів коробок (сортування пошуку) |
+| `'feedback_queue_v1'` / `'feedback_files_v1'` / `'feedback_status_cache_v1'` | локальні | Черга подання, шляхи файлів вкладень, кеш статусів — у бекапи не йдуть |
+| `'training_group_v1:*'` / `'training_groups_cache_v1:*'` / `'training_session_draft_v1:*'` | локальні | Кеші груп тренувань і чернетки сесій (стираються при виході за префіксом) |
+| `'health_auto_state'` / `'health_auto_suppressed'` / `'health_weight_cleanup_v1'` | локальні | Стан автоданих здоровʼя пристрою — не синхронізуються й не бекапляться |
 
 SecureStore (не AsyncStorage): `flowi_access`, `flowi_refresh`, `flowi_registration_token`.
 

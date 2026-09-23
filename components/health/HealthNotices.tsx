@@ -12,11 +12,9 @@
  *    стверджував протилежне: перемикач ставав ON, картка показувала годину, а
  *    в ОС не було заплановано нічого.
  *
- * Про рядки. Ключів під ці два стани в `store/translations.ts` немає, а сам
- * словник — чужа зона цього проходу (паралельно його правлять). Щоб не лишати
- * англомовному користувачеві українську плашку, тексти лежать тут двомовною
- * табличкою за `lang`. Це тимчасовий прихисток: рядки треба перенести в
- * `Translations` і замінити на `tr.*` (винесено в needsOtherZone).
+ * Про рядки. Вони живуть у `store/translations.ts` — двомовної таблички тут
+ * більше немає. Плашки беруть мову прямо зі словника за пропом `lang`, а не
+ * через `tr`: їх малює десяток екранів, і всі вони передають саме `lang`.
  */
 import { BlurView } from 'expo-blur';
 import React from 'react';
@@ -24,45 +22,8 @@ import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { HKAccess } from '@/store/healthkit';
-import type { Lang } from '@/store/translations';
+import { allTranslations, type Lang } from '@/store/translations';
 import type { HealthColors } from '@/utils/healthTheme';
-
-const TEXT = {
-  uk: {
-    loadFailed: 'Дані не прочитались',
-    loadFailedSub: 'Сховище повернуло помилку. Це НЕ порожній список — щоб не втратити записи, зміни поки не зберігаються.',
-    retry: 'Повторити',
-    reminderOff: 'Нагадування не увімкнено',
-    reminderOffSub: 'Система не дала дозволу на сповіщення (або їх вимкнено в налаштуваннях застосунку). Запис збережено без нагадування.',
-    openSettings: 'Налаштування',
-    hkSyncing: 'Синхронізується з HealthKit',
-    hkManual: 'Додавайте активність вручну або через тренування',
-    hkDenied: 'Немає доступу до HealthKit — показані числа введені вручну',
-    hkGrant: 'Надати доступ',
-    hkFailed: 'HealthKit не відповів: це не «нуль», а відсутність даних',
-    hkRetry: 'Повторити',
-    appleHealth: 'Apple Health',
-  },
-  en: {
-    loadFailed: 'Could not read your data',
-    loadFailedSub: 'Storage returned an error. This is NOT an empty list — changes are not being saved so nothing gets overwritten.',
-    retry: 'Try again',
-    reminderOff: 'Reminder is not set',
-    reminderOffSub: 'The system did not grant notification permission (or notifications are off in app settings). The entry was saved without a reminder.',
-    openSettings: 'Settings',
-    hkSyncing: 'Syncing with HealthKit',
-    hkManual: 'Add activity manually or via workouts',
-    hkDenied: 'No HealthKit access — the numbers below are your manual entries',
-    hkGrant: 'Grant access',
-    hkFailed: 'HealthKit did not answer: this is missing data, not a zero',
-    hkRetry: 'Try again',
-    appleHealth: 'Apple Health',
-  },
-} as const;
-
-export function healthNoticeText(lang: Lang) {
-  return TEXT[lang] ?? TEXT.uk;
-}
 
 const WARN = '#F59E0B';
 const ERR = '#EF4444';
@@ -74,21 +35,21 @@ export function LoadErrorNotice({ lang, c, isDark, onRetry }: {
   isDark: boolean;
   onRetry: () => void;
 }) {
-  const t = healthNoticeText(lang);
+  const t = allTranslations[lang] ?? allTranslations.uk;
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
       style={{ borderRadius: 16, borderWidth: 1, borderColor: ERR + '55', overflow: 'hidden', padding: 14, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <IconSymbol name="exclamationmark.triangle.fill" size={16} color={ERR} />
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: '800', marginLeft: 8, flex: 1 }}>{t.loadFailed}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontWeight: '800', marginLeft: 8, flex: 1 }}>{t.loadErrorTitle}</Text>
       </View>
-      <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{t.loadFailedSub}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{t.loadErrorBody}</Text>
       <TouchableOpacity
         onPress={onRetry}
         accessibilityRole="button"
-        accessibilityLabel={t.retry}
+        accessibilityLabel={t.loadErrorRetry}
         style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: ERR }}>
-        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.retry}</Text>
+        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.loadErrorRetry}</Text>
       </TouchableOpacity>
     </BlurView>
   );
@@ -102,28 +63,28 @@ export function ReminderBlockedNotice({ lang, c, isDark, onOpenSettings, onDismi
   onOpenSettings?: () => void;
   onDismiss?: () => void;
 }) {
-  const t = healthNoticeText(lang);
+  const t = allTranslations[lang] ?? allTranslations.uk;
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
       style={{ borderRadius: 16, borderWidth: 1, borderColor: WARN + '55', overflow: 'hidden', padding: 14, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <IconSymbol name="bell.slash" size={16} color={WARN} />
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: '800', marginLeft: 8, flex: 1 }}>{t.reminderOff}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontWeight: '800', marginLeft: 8, flex: 1 }}>{t.healthReminderOff}</Text>
         {onDismiss ? (
-          <TouchableOpacity onPress={onDismiss} accessibilityRole="button" accessibilityLabel={t.reminderOff}
+          <TouchableOpacity onPress={onDismiss} accessibilityRole="button" accessibilityLabel={t.healthReminderOff}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <IconSymbol name="xmark" size={14} color={c.sub} />
           </TouchableOpacity>
         ) : null}
       </View>
-      <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{t.reminderOffSub}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{t.healthReminderOffSub}</Text>
       {onOpenSettings ? (
         <TouchableOpacity
           onPress={onOpenSettings}
           accessibilityRole="button"
-          accessibilityLabel={t.openSettings}
+          accessibilityLabel={t.healthNoticeSettings}
           style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: WARN }}>
-          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.openSettings}</Text>
+          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.healthNoticeSettings}</Text>
         </TouchableOpacity>
       ) : null}
     </BlurView>
@@ -155,23 +116,27 @@ export function useSheetScreenMinHeight(): number {
  */
 export function healthKitStatusText(
   lang: Lang,
-  hk: { available: boolean; access: HKAccess; failed: boolean },
+  hk: { available: boolean; access: HKAccess; failed: boolean; label?: string | null },
 ): { text: string; action: 'grant' | 'retry' | null } {
-  const t = healthNoticeText(lang);
+  const t = allTranslations[lang] ?? allTranslations.uk;
+  // Назва джерела — з хука («Apple Health» / «Health Connect»): на Android
+  // підпис «Синхронізується з HealthKit» був би неправдою.
+  const label = hk.label ?? null;
+  const withSource = (tpl: string) => tpl.replace('{source}', label ?? '');
   if (!hk.available || hk.access === 'unavailable') return { text: t.hkManual, action: null };
-  if (hk.access === 'denied') return { text: t.hkDenied, action: 'grant' };
-  if (hk.failed) return { text: t.hkFailed, action: 'retry' };
-  return { text: t.hkSyncing, action: null };
+  if (hk.access === 'denied') return { text: label ? withSource(t.hautoDenied) : t.hkDenied, action: 'grant' };
+  if (hk.failed) return { text: label ? withSource(t.hautoFailed) : t.hkFailed, action: 'retry' };
+  return { text: label ? withSource(t.hautoSyncing) : t.hkSyncing, action: null };
 }
 
 export function HealthKitStatus({ lang, c, hk, onGrant, onRetry }: {
   lang: Lang;
   c: HealthColors;
-  hk: { available: boolean; access: HKAccess; failed: boolean };
+  hk: { available: boolean; access: HKAccess; failed: boolean; label?: string | null };
   onGrant: () => void;
   onRetry: () => void;
 }) {
-  const t = healthNoticeText(lang);
+  const t = allTranslations[lang] ?? allTranslations.uk;
   const { text, action } = healthKitStatusText(lang, hk);
   return (
     <View>
@@ -180,9 +145,9 @@ export function HealthKitStatus({ lang, c, hk, onGrant, onRetry }: {
         <TouchableOpacity
           onPress={action === 'grant' ? onGrant : onRetry}
           accessibilityRole="button"
-          accessibilityLabel={action === 'grant' ? t.hkGrant : t.hkRetry}
+          accessibilityLabel={action === 'grant' ? t.hkGrant : t.loadErrorRetry}
           style={{ marginTop: 8, alignSelf: 'flex-start', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: WARN }}>
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{action === 'grant' ? t.hkGrant : t.hkRetry}</Text>
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{action === 'grant' ? t.hkGrant : t.loadErrorRetry}</Text>
         </TouchableOpacity>
       ) : null}
     </View>

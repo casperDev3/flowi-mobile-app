@@ -35,7 +35,7 @@ jest.mock('@/store/api', () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
-import { SYNC_ARRAY_KEYS, SYNC_SINGLETON_KEYS } from '@/store/sync-contract';
+import { SYNC_ARRAY_KEYS, SYNC_SERVER_OWNED_KEYS, SYNC_SINGLETON_KEYS } from '@/store/sync-contract';
 
 type Engine = typeof import('@/store/sync-engine');
 
@@ -148,7 +148,7 @@ describe('collectionsAddedSince', () => {
 
   test('маркер поточної збірки — нічого не додано', () => {
     const engine = loadEngine();
-    expect(engine.collectionsAddedSince([...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS])).toEqual([]);
+    expect(engine.collectionsAddedSince([...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS, ...SYNC_SERVER_OWNED_KEYS])).toEqual([]);
   });
 
   test('майбутня адитивна колекція теж підхоплюється', () => {
@@ -182,7 +182,7 @@ describe('doSync після оновлення з 1.0.1', () => {
     expect(revisions['tasks:t1']).toBe(2);
     expect(revisions['subscriptions:web-sub-1']).toBe(1);
     expect(read<string[]>('sync_known_collections_v2', []).sort())
-      .toEqual([...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS].sort());
+      .toEqual([...SYNC_ARRAY_KEYS, ...SYNC_SINGLETON_KEYS, ...SYNC_SERVER_OWNED_KEYS].sort());
     // Перший запит — довантаження з курсора 0 без мутацій, далі звичайний обмін.
     expect(mockApiFetch.mock.calls[0][1].body).toEqual({ cursor: 0, mutations: [] });
     expect(mockApiFetch.mock.calls[1][1].body.cursor).toBe(50);
@@ -241,6 +241,6 @@ describe('doSync після оновлення з 1.0.1', () => {
     expect(mockApiFetch).toHaveBeenCalledTimes(1);
     expect(read<any[]>('subscriptions', [])).toEqual([WEB_SUB.data]);
     expect(read<string[]>('sync_known_collections_v2', []).length)
-      .toBe(SYNC_ARRAY_KEYS.length + SYNC_SINGLETON_KEYS.length);
+      .toBe(SYNC_ARRAY_KEYS.length + SYNC_SINGLETON_KEYS.length + SYNC_SERVER_OWNED_KEYS.length);
   });
 });

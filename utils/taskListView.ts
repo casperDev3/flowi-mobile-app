@@ -11,7 +11,7 @@
  * Тут же ліміт групи (15) і перетворення фільтрів у параметри маршруту й
  * назад: екран групи перечитує завдання зі сховища сам, а не бере знімок.
  */
-import { taskVisibleInList, type TaskStatusColumn } from './taskStatuses';
+import { mergeTaskStatusColumns, orderColumnsForList, taskVisibleInList, type TaskStatusColumn } from './taskStatuses';
 import { buildStatusListSections, type TaskListScope } from './taskListSections';
 import { inTaskScope, isTodayTask } from './taskToday';
 import {
@@ -429,6 +429,24 @@ export interface ProjectListGroupLabels {
   sprintBacklog: string;
 }
 
+export interface ProjectListGroupOptions {
+  /**
+   * Лишити ПОРОЖНІ групи «за статусом» і «за спринтом».
+   *
+   * За замовчуванням порожні групи прибираються — у списку, який лише
+   * читають, заголовок без жодної задачі є шумом. Але в розділі «Завдання»
+   * проєкту секція статусу — це ще й МІСЦЕ, куди задачу кладуть: тап по
+   * порожній секції відкриває інлайн-поле зі статусом цієї колонки (паритет
+   * з дошкою вебу). Прибрана порожня секція забирає разом із собою єдиний
+   * спосіб створити першу задачу в цій колонці — і порожній проєкт
+   * показував би лише напис «Задач ще немає» замість власних колонок.
+   *
+   * Групи «за пріоритетом» це не зачіпає: пріоритет не місце, а ознака —
+   * покласти задачу «в P3» не можна, її можна лише такою створити.
+   */
+  includeEmpty?: boolean;
+}
+
 /**
  * `buildTaskGroups` вище рахує групи екрана «Завдання» — денний скоуп,
  * секції «сьогодні/учора/завтра». Список проєкту такого режиму не має:
@@ -437,8 +455,9 @@ export interface ProjectListGroupLabels {
  *
  * «за пріоритетом» і «за спринтом» — нові розрізи, яких у buildTaskGroups
  * немає взагалі (там лише «за дедлайном/датою створення», бо це вже задає
- * сортування SortBy). Порожні групи прибираються скрізь однаково — порожня
- * секція «P5» чи закритий спринт без задач лише плутають список.
+ * сортування SortBy). Порожні групи за замовчуванням прибираються — порожня
+ * секція «P5» чи закритий спринт без задач лише плутають список; виняток
+ * робить `options.includeEmpty` (див. ProjectListGroupOptions).
  */
 export function buildProjectListGroups<T extends ListViewTask & SprintTaskLike>(
   tasks: readonly T[],
@@ -447,12 +466,28 @@ export function buildProjectListGroups<T extends ListViewTask & SprintTaskLike>(
   sprints: readonly Sprint[],
   projectId: string,
   labels: ProjectListGroupLabels,
+  options: ProjectListGroupOptions = {},
 ): TaskListGroup<T>[] {
   if (groupBy === 'none') return [];
 
   if (groupBy === 'status') {
-    return buildStatusListSections(tasks, columns, new Date(), 'all')
+    const sections = buildStatusListSections(tasks, columns, new Date(), 'all')
       .map(section => ({ key: section.key, label: section.label, tasks: section.tasks }));
+    const scoped = options.includeEmpty
+      ? orderColumnsForList(mergeTaskStatusColumns([...columns], projectId))
+      : [];
+    // Легасі-проєкт без власних колонок дописувати нема чим — лишаємо рівно
+    // те, що дали задачі (дошка в такому разі теж падає на особисті колонки).
+    if (!scoped.length) return sections;
+    // Порожні колонки дописуються В ПОРЯДКУ ДОШКИ, а не в кінець: секції
+    // статусів і колонки дошки — той самий робочий процес, і різний порядок
+    // у двох виглядах того самого екрана читався б як різні набори. Секції,
+    // яких серед колонок проєкту немає (задача з «чужим» статусом, що не
+    // звівся), лишаються після них, а не зникають.
+    const byKey = new Map(sections.map(section => [section.key, section]));
+    const ordered = scoped.map(column => byKey.get(column.id) ?? { key: column.id, label: column.name, tasks: [] as T[] });
+    const known = new Set(scoped.map(column => column.id));
+    return [...ordered, ...sections.filter(section => !known.has(section.key))];
   }
 
   if (groupBy === 'priority') {
@@ -472,7 +507,7 @@ export function buildProjectListGroups<T extends ListViewTask & SprintTaskLike>(
 
   // 'sprint' — та сама розкладка, що й на екрані «Всі (N)» (mode=project),
   // лише без обмеження TASK_GROUP_LIMIT: список проєкту вже й так короткий.
-  return projectTaskGroups(tasks, sprints, projectId)
-    .map(g => ({ key: g.sprint?.id ?? BACKLOG_GROUP_KEY, label: g.sprint?.name ?? labels.sprintBacklog, tasks: g.tasks }))
-    .filter(g => g.tasks.length > 0);
+  const sprintGroups = projectTaskGroups(tasks, sprints, projectId)
+    .map(g => ({ key: g.sprint?.id ?? BACKLOG_GROUP_KEY, label: g.sprint?.name ?? labels.sprintBacklog, tasks: g.tasks }));
+  return options.includeEmpty ? sprintGroups : sprintGroups.filter(g => g.tasks.length > 0);
 }

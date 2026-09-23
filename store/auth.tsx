@@ -44,10 +44,11 @@ import { useI18n } from './i18n';
 import { getRegistrationPushToken, registerPushToken, unregisterPushToken } from './push';
 import { clearPendingRegistration, savePendingRegistration, type PendingRegistration } from './registration';
 import { clearPendingInvite, getPendingInvite } from './invite-link';
+import { clearRemovedModuleStorage } from './legacy-cleanup';
 import { syncAllMyProjects, waitForAllProjectSyncsIdle } from './project-sync';
 import { loadOutbox, OUTBOX_KEY, type OutboxItem } from './synced-storage';
 import { hasSyncedBefore, resetPersonalSyncState, setIsAuthed, syncNow, triggerFullSync, waitForSyncIdle } from './sync-engine';
-import { SYNC_ARRAY_KEYS, SYNC_SINGLETON_KEYS } from './sync-contract';
+import { SYNC_ARRAY_KEYS, SYNC_SERVER_OWNED_KEYS, SYNC_SINGLETON_KEYS } from './sync-contract';
 import { notifyStorageChanged } from './storage';
 import type { Translations } from './translations';
 import {
@@ -246,7 +247,9 @@ const WORKSPACE_SWITCH_STORAGE_KEYS = [
   'push_token_registered',
   'gcal_refresh_token',
   'gcal_last_sync',
-  'agent_config',
+  // Колишній `agent_config` (токен LLM-шлюзу) звідси прибрано разом із модулем
+  // «Агент»: ключ ніхто не пише, а старі копії стирає `clearRemovedModuleStorage()`
+  // на старті (store/legacy-cleanup.ts) — не чекаючи виходу з акаунта.
   'banks_last_source',
   'timer_dials',
   'pref_task_reminders',
@@ -270,7 +273,41 @@ const WORKSPACE_SWITCH_STORAGE_KEYS = [
   // проштовхувати їх від імені нового акаунта (чи взагалі мовчки прибрати
   // на 403 not_a_member — flushPendingProjectDeletes) сенсу нема.
   'pending_project_deletes',
+  // Серверна колекція статусів звернень (feedback-inbox.md §3.2) і її кеш —
+  // дані акаунта, а не пристрою; у SYNC_ARRAY_KEYS їх немає (клієнт їх лише
+  // тягне, див. SYNC_SERVER_OWNED_KEYS).
+  ...SYNC_SERVER_OWNED_KEYS,
+  'feedback_status_cache_v1',
+  // Контейнери v2 (containers.md §5): черга вивантаження фото тримає шляхи
+  // файлів і id записів попереднього акаунта; лічильники відкриттів і прапорець
+  // міграції — теж його. `containers_backup_v1` свідомо НЕ тут: це резервна
+  // копія даних до міграції, її не стираємо.
+  'media_upload_queue',
+  'containers_migrated_v2',
+  'containers_open_counts',
 ] as const;
+
+/**
+ * Префікси локальних кешів груп тренувань (training-module.md §10): ключі
+ * містять id групи/сесії, тож перелічити їх заздалегідь неможливо.
+ */
+const WORKSPACE_SWITCH_STORAGE_PREFIXES = [
+  'training_group_v1:',
+  'training_groups_cache_v1:',
+  'training_session_draft_v1:',
+] as const;
+
+async function removeKeysWithPrefixes(prefixes: readonly string[]): Promise<void> {
+  try {
+    const all = await AsyncStorage.getAllKeys();
+    const doomed = all.filter(key => prefixes.some(prefix => key.startsWith(prefix)));
+    if (!doomed.length) return;
+    await AsyncStorage.multiRemove(doomed);
+    for (const key of doomed) notifyStorageChanged(key);
+  } catch (e) {
+    if (__DEV__) console.warn('[auth] прибирання кешів за префіксом не вдалося:', e);
+  }
+}
 
 /**
  * Закриває поточну сесію синку ПЕРЕД витиранням локальних даних — major з
@@ -316,6 +353,7 @@ async function clearLocalDataForWorkspaceSwitch(): Promise<void> {
   // Слухачі (useStorageRefresh) чекають сигналу на кожен ключ, а
   // multiRemove такого сигналу сам не шле.
   for (const key of WORKSPACE_SWITCH_STORAGE_KEYS) notifyStorageChanged(key);
+  await removeKeysWithPrefixes(WORKSPACE_SWITCH_STORAGE_PREFIXES);
   // Курсор/ревізії — не null, а «ще нічого не тягнули» (0 / {}), інакше
   // getServerCursor()/getRevisionMap() читають чужий тип назад.
   await resetPersonalSyncState();
@@ -340,6 +378,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const trRef = useRef(tr);
   useEffect(() => { trRef.current = tr; }, [tr]);
   const alertShownRef = useRef(false);
+
+  // ── Прибирання ключів видалених модулів ─────────────────────────────────────
+  // Окремим ефектом і без залежностей: це не частина життєвого циклу сесії,
+  // воно мусить відпрацювати і в гостя, який узагалі не логінився, — тобто
+  // рівно один раз на запуск застосунку. Нічого не чекає й нічого не блокує.
+  useEffect(() => {
+    void clearRemovedModuleStorage();
+  }, []);
 
   // ── Початкова ініціалізація ─────────────────────────────────────────────────
   useEffect(() => {

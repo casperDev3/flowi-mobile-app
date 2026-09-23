@@ -5,16 +5,22 @@
  * куди переносити незакінчене) — з `utils/sprintUtils.ts`, тим самим
  * дзеркалом веб-логіки, що й раніше в інлайн-деталі `app/projects.tsx`.
  *
+ * Дати спринта (необовʼязкові, обидві або жодної), burndown відкритого
+ * датованого спринта й таблиця велосіті — за docs/specs/projects-analytics.md
+ * §8.4; формули — utils/projectStatsMetrics.ts, екран лише малює.
+ *
  * Призначення завдання конкретному спринту (поле «Спринт») лишається на
  * повному редакторі завдання (екран «Завдання») — тут керування самими
  * спринтами (створення/перейменування/закриття) і швидке додавання нового
  * завдання просто в цей спринт.
  */
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
+import { SprintBurndown } from '@/components/projects/SprintBurndown';
+import { SprintVelocity } from '@/components/projects/SprintVelocity';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
@@ -30,18 +36,29 @@ import { haptic } from '@/utils/haptics';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
 import { priorityFields, DEFAULT_PRIORITY_LEVEL, type Task } from '@/utils/taskUtils';
 import {
-  assignTaskToSprint, createSprint, isSprintClosed, moveOpenSprintTasks, renameSprint,
-  setSprintClosed, sortSprints, sprintMoveTargets, sprintProgress, sprintTasks, sprintsForProject,
-  type Sprint,
+  assignTaskToSprint, createSprint, isSprintClosed, isSprintDated, moveOpenSprintTasks, overlappingSprints,
+  parseSprintDatesInput, renameSprint, setSprintClosed, setSprintDates, sortSprints, sprintDateInput,
+  sprintMoveTargets, sprintProgress, sprintTasks, sprintsForProject,
+  type Sprint, type SprintDatesError,
 } from '@/utils/sprintUtils';
+import { isSprintOverdue, sprintBurndown, velocityWindow } from '@/utils/projectStatsMetrics';
+
+/** Протермінований спринт — бурштиновий: червоний зайнятий простроченими задачами. */
+const SPRINT_OVERDUE_COLOR = '#F59E0B';
+const TABLET_MIN_WIDTH = 600;
 
 export default function ProjectSprintsScreen() {
-  const { id: projectId } = useLocalSearchParams<{ id: string }>();
+  // `?sprint=<id>` — тап по сповіщенню sprint.started / sprint.closed.
+  const { id: projectId, sprint: sprintParam } = useLocalSearchParams<{ id: string; sprint?: string }>();
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+  const { width } = useWindowDimensions();
+  // Burndown розгорнутий за замовчуванням на планшеті, згорнутий на телефоні.
+  const burndownDefaultOpen = width >= TABLET_MIN_WIDTH;
   const { project } = useProject(projectId);
   // Contract §4.1: спринти — командний CRUD (owner/member), глядач лише читає.
   const canEdit = useProjectRole(projectId) !== 'viewer';
@@ -59,6 +76,10 @@ export default function ProjectSprintsScreen() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState<{ sprint: Sprint | null } | null>(null);
   const [draftName, setDraftName] = useState('');
+  const [draftStart, setDraftStart] = useState('');
+  const [draftEnd, setDraftEnd] = useState('');
+  const [draftError, setDraftError] = useState<SprintDatesError | null>(null);
+  const [burndownOpen, setBurndownOpen] = useState<Record<string, boolean>>({});
   const [closing, setClosing] = useState<Sprint | null>(null);
   const [addToId, setAddToId] = useState<string | null>(null);
   const [addTitle, setAddTitle] = useState('');
@@ -68,20 +89,152 @@ export default function ProjectSprintsScreen() {
     [allSprints, projectId],
   );
 
-  const openCreate = () => { setDraft({ sprint: null }); setDraftName(''); };
-  const openRename = (sprint: Sprint) => { setDraft({ sprint }); setDraftName(sprint.name); };
+  // `?sprint=<id>`: розгортаємо картку спринту й прокручуємо до неї, щойно
+  // вона з'явилась у списку та отримала позицію. Параметр скидаємо, щоб
+  // повернення на екран не стрибало вдруге.
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView> | null>(null);
+  const rowY = useRef<Record<string, number>>({});
+  const [focusSprintId, setFocusSprintId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sprintParam) return;
+    const id = String(sprintParam);
+    if (!projectSprints.some(sp => sp.id === id)) return;
+    setExpanded(prev => ({ ...prev, [id]: true }));
+    setFocusSprintId(id);
+    router.setParams({ sprint: '' });
+  }, [sprintParam, projectSprints, router]);
+  // Картка вже мала позицію (відкритий спринт не змінює розміру) — onLayout
+  // вдруге не прийде, тож прокручуємо за вже відомою позицією.
+  useEffect(() => {
+    if (!focusSprintId) return;
+    const y = rowY.current[focusSprintId];
+    if (y === undefined) return;
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+      setFocusSprintId(null);
+    }, 50);
+    return () => clearTimeout(t);
+  }, [focusSprintId]);
+  const onRowLayout = useCallback((id: string, y: number) => {
+    rowY.current[id] = y;
+    if (focusSprintId === id) {
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+      setFocusSprintId(null);
+    }
+  }, [focusSprintId]);
+
+  // «Зараз» стабільне в межах хвилини: burndown і «протерміновано» не
+  // перераховуються на кожен рендер (специфікація §9.2 п.5).
+  const minute = Math.floor(Date.now() / 60_000);
+  const now = useMemo(() => new Date(minute * 60_000), [minute]);
+
+  const velocity = useMemo(
+    () => (projectId ? velocityWindow(projectSprints, tasks, { projectId }) : null),
+    [projectSprints, tasks, projectId],
+  );
+  const hasClosed = projectSprints.some(isSprintClosed);
+
+  const resetDraft = () => {
+    setDraft(null); setDraftName(''); setDraftStart(''); setDraftEnd(''); setDraftError(null);
+  };
+  const openCreate = () => {
+    setDraft({ sprint: null }); setDraftName(''); setDraftStart(''); setDraftEnd(''); setDraftError(null);
+  };
+  const openRename = (sprint: Sprint) => {
+    setDraft({ sprint });
+    setDraftName(sprint.name);
+    // Поля форми — ЛОКАЛЬНА доба ISO-дати, а не slice(0, 10): той дав би добу за UTC.
+    setDraftStart(isSprintDated(sprint) ? sprintDateInput(sprint.startDate) : '');
+    setDraftEnd(isSprintDated(sprint) ? sprintDateInput(sprint.endDate) : '');
+    setDraftError(null);
+  };
+
+  const parsedDraftDates = parseSprintDatesInput(draftStart, draftEnd);
+  // Перетин НЕ блокує збереження — лише попереджає (§3.1).
+  const draftOverlap = draft && projectId && parsedDraftDates.ok && parsedDraftDates.dates
+    ? overlappingSprints(projectSprints, projectId, parsedDraftDates.dates, draft.sprint?.id)
+    : [];
 
   const saveDraft = () => {
     const name = draftName.trim();
     if (!name || !draft) return;
-    if (draft.sprint) {
-      setSprints(prev => prev.map(s => (s.id === draft.sprint!.id ? renameSprint(s, name) : s)));
-    } else if (projectId) {
-      setSprints(prev => [...prev, createSprint(projectId, name)]);
+    const parsed = parseSprintDatesInput(draftStart, draftEnd);
+    if (!parsed.ok) {
+      setDraftError(parsed.error);
+      haptic.error();
+      return;
     }
-    setDraft(null); setDraftName('');
+    // Правка йде ПОВЕРХ наявного запису ({ ...sprint, … }), а не перезбирає
+    // обʼєкт із полів форми: інакше невідомі цьому клієнту поля зникли б.
+    if (draft.sprint) {
+      const id = draft.sprint.id;
+      setSprints(prev => prev.map(s => (s.id === id ? setSprintDates(renameSprint(s, name), parsed.dates) : s)));
+    } else if (projectId) {
+      setSprints(prev => [...prev, setSprintDates(createSprint(projectId, name), parsed.dates)]);
+    }
+    resetDraft();
     haptic.success();
   };
+
+  const dateErrorText = (error: SprintDatesError) =>
+    error === 'partial' ? tr.sprintDatesPartial : error === 'order' ? tr.sprintDatesOrder : tr.sprintDatesInvalid;
+
+  const shortDate = (iso: string | undefined) =>
+    iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
+
+  const inputStyle = { borderRadius: 10, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 8, color: c.text } as const;
+
+  /** Спільна форма: назва + дати «з»/«по» + помилка/попередження. */
+  const renderDraftForm = (submitLabel: string) => (
+    <>
+      <TextInput
+        autoFocus
+        value={draftName}
+        onChangeText={setDraftName}
+        onSubmitEditing={saveDraft}
+        placeholder={tr.sprintNamePlaceholder}
+        accessibilityLabel={tr.sprintNamePlaceholder}
+        placeholderTextColor={c.sub}
+        style={inputStyle}
+      />
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TextInput
+          value={draftStart}
+          onChangeText={text => { setDraftStart(text); setDraftError(null); }}
+          placeholder={tr.sprintStartDate}
+          accessibilityLabel={tr.sprintStartDate}
+          placeholderTextColor={c.sub}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="numbers-and-punctuation"
+          style={[inputStyle, { flex: 1, fontSize: 13 }]}
+        />
+        <TextInput
+          value={draftEnd}
+          onChangeText={text => { setDraftEnd(text); setDraftError(null); }}
+          placeholder={tr.sprintEndDate}
+          accessibilityLabel={tr.sprintEndDate}
+          placeholderTextColor={c.sub}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="numbers-and-punctuation"
+          style={[inputStyle, { flex: 1, fontSize: 13 }]}
+        />
+      </View>
+      {draftError ? (
+        <Text accessibilityRole="alert" style={{ color: '#EF4444', fontSize: 12 }}>{dateErrorText(draftError)}</Text>
+      ) : draftOverlap.length ? (
+        <Text style={{ color: SPRINT_OVERDUE_COLOR, fontSize: 12 }}>
+          {tr.sprintDatesOverlap.replace('{names}', draftOverlap.map(s => s.name).join(', '))}
+        </Text>
+      ) : (
+        <Text style={{ color: c.sub, fontSize: 11 }}>{tr.sprintDatesHint}</Text>
+      )}
+      <TouchableOpacity onPress={saveDraft} style={{ backgroundColor: c.accent, borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}>
+        <Text style={{ color: '#fff', fontWeight: '700' }}>{submitLabel}</Text>
+      </TouchableOpacity>
+    </>
+  );
 
   const reopen = (sprint: Sprint) => {
     setSprints(prev => prev.map(s => (s.id === sprint.id ? setSprintClosed(s, false) : s)));
@@ -132,8 +285,16 @@ export default function ProjectSprintsScreen() {
     const open = expanded[sprint.id] ?? !closed;
     const own = sprintTasks(tasks, sprint.id);
     const progress = sprintProgress(tasks, sprint.id);
+    const dated = isSprintDated(sprint);
+    const overdue = isSprintOverdue(sprint, now);
+    const showBurndown = !closed && dated && (burndownOpen[sprint.id] ?? burndownDefaultOpen);
+    // Рахується ЛИШЕ для розгорнутого спринта (§9.2 п.6).
+    const burndown = showBurndown ? sprintBurndown(sprint, tasks, now) : null;
     return (
-      <View key={sprint.id} style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginBottom: 10 }}>
+      <View
+        key={sprint.id}
+        onLayout={e => onRowLayout(sprint.id, e.nativeEvent.layout.y)}
+        style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginBottom: 10 }}>
         {/* Звичайний View, а не TouchableOpacity: пенал/закриття — окремі
             дотикові цілі, і вкладені TouchableOpacity в RN ненадійно
             передають дотик у дочірні — рядок і кнопки мають бути сиблінгами. */}
@@ -169,21 +330,38 @@ export default function ProjectSprintsScreen() {
           )}
         </View>
 
+        {/* Підпис дат: «12 вер – 26 вер» або «без дат»; протермінований —
+            бурштинова мітка. Спринт лишається відкритим: автозакриття немає. */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 4, marginLeft: 20 }}>
+          <Text style={{ color: c.sub, fontSize: 11 }}>
+            {dated ? `${shortDate(sprint.startDate)} – ${shortDate(sprint.endDate)}` : tr.sprintUndated}
+          </Text>
+          {overdue ? (
+            <View style={{ borderRadius: 6, borderWidth: 1, borderColor: SPRINT_OVERDUE_COLOR, paddingHorizontal: 6, paddingVertical: 1 }}>
+              <Text style={{ color: SPRINT_OVERDUE_COLOR, fontSize: 10, fontWeight: '700' }}>{tr.sprintOverdue}</Text>
+            </View>
+          ) : null}
+          {!closed && dated ? (
+            <TouchableOpacity
+              onPress={() => setBurndownOpen(prev => ({ ...prev, [sprint.id]: !showBurndown }))}
+              accessibilityRole="button"
+              accessibilityLabel={showBurndown ? tr.burndownHide : tr.burndownShow}
+              accessibilityState={{ expanded: showBurndown }}
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <IconSymbol name={showBurndown ? 'chevron.up' : 'chevron.down'} size={10} color={c.accent} />
+              <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>{tr.burndownTitle}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {burndown ? (
+          <SprintBurndown burndown={burndown} color={project?.color ?? c.accent} palette={{ text: c.text, sub: c.sub, border: c.border }} />
+        ) : null}
+
         {draft?.sprint?.id === sprint.id && (
           <View style={{ marginTop: 10, gap: 8 }}>
-            <TextInput
-              autoFocus
-              value={draftName}
-              onChangeText={setDraftName}
-              onSubmitEditing={saveDraft}
-              placeholder={tr.sprintNamePlaceholder}
-              accessibilityLabel={tr.sprintNamePlaceholder}
-              placeholderTextColor={c.sub}
-              style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 8, color: c.text }}
-            />
-            <TouchableOpacity onPress={saveDraft} style={{ backgroundColor: c.accent, borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
-            </TouchableOpacity>
+            {renderDraftForm(tr.save)}
           </View>
         )}
 
@@ -205,6 +383,10 @@ export default function ProjectSprintsScreen() {
 
         {open && (
           <View style={{ marginTop: 10, gap: 6 }}>
+            {!closed && !dated ? (
+              // Відкритий недатований — явним рядком, чому немає burndown (§3.3).
+              <Text style={{ color: c.sub, fontSize: 11, opacity: 0.8 }}>{tr.sprintNotDated}</Text>
+            ) : null}
             {own.length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 12, opacity: 0.7 }}>{tr.sprintEmpty}</Text>
             ) : own.map(task => (
@@ -277,6 +459,7 @@ export default function ProjectSprintsScreen() {
         </TouchableOpacity>
       ) : undefined}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
         showsVerticalScrollIndicator={false}
         // L3: дефолтний keyboardShouldPersistTaps='never' означає, що перший
@@ -285,24 +468,17 @@ export default function ProjectSprintsScreen() {
         keyboardShouldPersistTaps="handled">
         {draft && !draft.sprint && (
           <View style={{ borderRadius: 14, borderWidth: 1, borderColor: c.accent, backgroundColor: c.dim, padding: 12, marginBottom: 12, gap: 8 }}>
-            <TextInput
-              autoFocus
-              value={draftName}
-              onChangeText={setDraftName}
-              onSubmitEditing={saveDraft}
-              placeholder={tr.sprintNamePlaceholder}
-              accessibilityLabel={tr.sprintNamePlaceholder}
-              placeholderTextColor={c.sub}
-              style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 8, color: c.text }}
-            />
-            <TouchableOpacity onPress={saveDraft} style={{ backgroundColor: c.accent, borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.create}</Text>
-            </TouchableOpacity>
+            {renderDraftForm(tr.create)}
           </View>
         )}
         {projectSprints.length === 0 && !draft ? (
           <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 30 }}>{tr.sprintNoSprintsHint}</Text>
         ) : sortSprints(projectSprints).map(renderSprintRow)}
+
+        {/* Велосіті — внизу, під закритими спринтами (§8.4). */}
+        {velocity && hasClosed ? (
+          <SprintVelocity velocity={velocity} locale={locale} palette={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }} />
+        ) : null}
       </ScrollView>
     </ProjectScreenShell>
   );

@@ -267,10 +267,23 @@ describe('NAT-13 / L9 — плитка розділу Здоровʼя', () => {
 
 describe('NAT-18 — «назад» у Тренуваннях дотягує до 44×44', () => {
   const src = fs.readFileSync(path.join(ROOT, 'app/workouts.tsx'), 'utf8');
+  const header = fs.readFileSync(path.join(ROOT, 'components/shared/ScreenHeader.tsx'), 'utf8');
 
-  it('рамка 36×36 плюс hitSlop, а не гола іконка 20pt', () => {
-    expect(src).toMatch(/accessibilityLabel=\{tr\.back\}[\s\S]{0,200}?width: 36, height: 36/);
-    expect(src).toMatch(/hitSlop=\{\{ top: 10, bottom: 10, left: 4, right: 4 \}\}/);
+  /*
+   * Раніше рамка 36×36 і hitSlop стояли просто в цьому екрані. Тепер стрілку
+   * малює спільний ScreenHeader — і 44×44 гарантує вже він, для всіх екранів
+   * одразу. Перевіряємо обидві половини: що екран справді віддав стрілку
+   * хедеру (з підписом зі словника), і що в хедера рамка з hitSlop на місці.
+   */
+  it('екран віддав стрілку спільному хедеру', () => {
+    expect(src).toMatch(/back=\{\{[\s\S]{0,160}?label: tr\.back/);
+    // Голої іконки 20pt без рамки в шапці більше немає.
+    expect(src).not.toMatch(/router\.back\(\)[\s\S]{0,200}?chevron\.left" size=\{20\}/);
+  });
+
+  it('рамка 36×36 плюс hitSlop живуть у ScreenHeader', () => {
+    expect(header).toMatch(/width: 36,\s*\n?\s*height: 36/);
+    expect(header).toMatch(/\{ top: 10, bottom: 10, left: 4, right: 4 \}/);
   });
 });
 

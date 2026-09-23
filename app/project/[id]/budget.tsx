@@ -16,6 +16,9 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { ProjectTransactionForm } from '@/components/finance/ProjectTransactionForm';
+import { RecurringIncomesSection } from '@/components/finance/RecurringIncomesSection';
+
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -34,7 +37,9 @@ import {
   formatSubscriptionMoney, formatTotalsLine, normalizeSubscriptions, subscriptionStatus,
   subscriptionsForProject, totalsByCurrency, type Subscription,
 } from '@/utils/subscriptions';
-import { budgetSpentThisMonth } from '@/utils/projectOverview';
+import { projectMoneyTotals, projectTransactions } from '@/utils/budgetProject';
+import { categoryOptions } from '@/utils/financeCategories';
+import type { CategoryRowLike } from '@/utils/financeCategories';
 import { haptic } from '@/utils/haptics';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
 
@@ -64,33 +69,93 @@ export default function ProjectBudgetScreen() {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [amountDraft, setAmountDraft] = useState('');
+  const [categoryRows, setCategoryRows] = useState<CategoryRowLike[]>([]);
+  /** Форма «+ операція» (П3): витрата чи дохід проєкту з рахунком. */
+  const [txFormOpen, setTxFormOpen] = useState(false);
+  const [txBusy, setTxBusy] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
-    const [b, tx, acc, cur, subs] = await Promise.all([
+    const [b, tx, acc, cur, subs, cats] = await Promise.all([
       loadData<ProjectBudgetRecord[]>('project_budgets', []),
       loadData<Transaction[]>('transactions', []),
       loadData<Account[]>('accounts', []),
       loadData<Currency[]>('finance_currencies', []),
       loadData<unknown>('subscriptions', []),
+      loadData<unknown>('categories', []),
     ]);
     setBudgets(b); setTransactions(tx); setAccounts(acc); setCurrencies(cur);
     setSubscriptions(normalizeSubscriptions(subs));
+    setCategoryRows(Array.isArray(cats) ? (cats as CategoryRowLike[]).filter(r => !!r && typeof r === 'object') : []);
   }, []);
   useFocusEffect(useCallback(() => { void loadAll(); }, [loadAll]));
-  const trackWrite = useStorageRefresh(['project_budgets', 'transactions', 'accounts', 'finance_currencies', 'subscriptions'], loadAll);
+  const trackWrite = useStorageRefresh(['project_budgets', 'transactions', 'accounts', 'finance_currencies', 'subscriptions', 'categories'], loadAll);
 
   const budget = projectId ? budgets.find(b => b.id === projectId) : undefined;
   const currency = budget?.currency ?? 'UAH';
   const allCurrencies = useMemo(() => [...BUILTIN_CURRENCIES, ...currencies], [currencies]);
 
-  const spent = useMemo(
-    () => (projectId ? budgetSpentThisMonth(transactions, accounts, projectId, currency) : 0),
+  /**
+   * «Витрачено» — ЗА ВЕСЬ ЧАС проєкту, як і у вебі.
+   *
+   * Було `budgetSpentThisMonth`, і поруч із лімітом, заданим на проєкт цілком,
+   * воно означало дурницю: 1 січня цифра оберталась на нуль, хоча гроші
+   * нікуди не поділись, а браузер на тих самих даних показував інше число.
+   */
+  const totals = useMemo(
+    () => (projectId ? projectMoneyTotals(transactions, accounts, projectId, currency) : null),
     [projectId, transactions, accounts, currency],
   );
+  const spent = totals?.spent ?? 0;
   const projectTx = useMemo(
-    () => (projectId ? transactions.filter(t => t.projectId === projectId && t.type === 'expense').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30) : []),
+    () => (projectId ? projectTransactions(transactions, projectId, 'expense') : []),
     [transactions, projectId],
   );
+  /** Доходи проєкту (П4) — так само, як їх показує веб, окремим списком. */
+  const projectIncome = useMemo(
+    () => (projectId ? projectTransactions(transactions, projectId, 'income') : []),
+    [transactions, projectId],
+  );
+  const uncountedLine = useMemo(() => {
+    if (!totals) return '';
+    return Object.entries(totals.uncounted)
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([code, v]) => {
+        const parts: string[] = [];
+        if (v.income) parts.push(`+${formatSubscriptionMoney(v.income, code, allCurrencies, locale)}`);
+        if (v.expense) parts.push(`−${formatSubscriptionMoney(v.expense, code, allCurrencies, locale)}`);
+        return parts.join(' ');
+      })
+      .filter(Boolean)
+      .join(', ');
+  }, [totals, allCurrencies, locale]);
+  const formCategories = useMemo(() => ({
+    income: categoryOptions(categoryRows, transactions, 'income', lang).map(cat => cat.name),
+    expense: categoryOptions(categoryRows, transactions, 'expense', lang).map(cat => cat.name),
+  }), [categoryRows, transactions, lang]);
+
+  /**
+   * Нова операція проєкту: read-modify-write свіжого сховища, щоб операції,
+   * що приїхали синком, пережили запис. Маршрутизацію в потік проєкту робить
+   * шар синку за `projectId` (utils/projectStream.ts).
+   */
+  const addTransaction = useCallback(async (tx: Transaction) => {
+    setTxBusy(true);
+    setTxError(null);
+    try {
+      await trackWrite(async () => {
+        const next = await updateSynced<Transaction>('transactions', fresh => [...fresh, tx]);
+        setTransactions(next);
+      });
+      haptic.success();
+      setTxFormOpen(false);
+    } catch (e) {
+      if (__DEV__) console.warn('[project/budget] операція не записалась:', e);
+      setTxError(tr.finProjectSaveFailed);
+    } finally {
+      setTxBusy(false);
+    }
+  }, [trackWrite, tr]);
 
   /** Підписки проєкту: живі (без архівних) + сума за місяць по кожній валюті. */
   const projectSubscriptions = useMemo(() => {
@@ -188,7 +253,30 @@ export default function ProjectBudgetScreen() {
               {tr.overviewBudgetSpent}: {formatSubscriptionMoney(spent, currency, allCurrencies, locale)} / {formatSubscriptionMoney(budget.amount, currency, allCurrencies, locale)}
             </Text>
           ) : null}
+          {totals && (totals.income > 0 || projectIncome.length > 0) ? (
+            <>
+              <Text style={{ color: '#10B981', fontSize: 14, fontWeight: '700', marginTop: 6 }}>
+                {tr.finProjectIncomeTitle}: {formatSubscriptionMoney(totals.income, currency, allCurrencies, locale)}
+              </Text>
+              <Text style={{ color: totals.net < 0 ? '#EF4444' : c.text, fontSize: 13, fontWeight: '600', marginTop: 4 }}>
+                {tr.finProjectNet}: {totals.net < 0 ? '−' : ''}{formatSubscriptionMoney(Math.abs(totals.net), currency, allCurrencies, locale)}
+              </Text>
+            </>
+          ) : null}
+          {uncountedLine ? (
+            <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{tr.finProjectUncounted.replace('{list}', uncountedLine)}</Text>
+          ) : null}
         </View>
+
+        {/* П3: операція проєкту з телефона — з рахунком (П2). */}
+        <TouchableOpacity
+          onPress={() => { setTxError(null); setTxFormOpen(true); }}
+          accessibilityRole="button"
+          accessibilityLabel={tr.finProjectAddTx}
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: c.accent + '55', backgroundColor: c.accent + '14', marginBottom: 20 }}>
+          <IconSymbol name="plus" size={15} color={c.accent} />
+          <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.finProjectAddTx}</Text>
+        </TouchableOpacity>
 
         {/* Підписки проєкту: та сама секція, що раніше жила в деталі
             (app/projects.tsx) — тепер тут, поруч із рештою бюджету, бо й
@@ -246,7 +334,49 @@ export default function ProjectBudgetScreen() {
             <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '700' }}>-{tx.amount.toLocaleString(locale)}</Text>
           </View>
         ))}
+
+        {/* П4: доходи проєкту окремим списком — як на вебі. */}
+        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 8, marginTop: 20 }}>{tr.finProjectIncomeTitle}</Text>
+        {projectIncome.length === 0 ? (
+          <Text style={{ color: c.sub, fontSize: 13, opacity: 0.8 }}>{tr.finProjectNoIncome}</Text>
+        ) : projectIncome.map(tx => (
+          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{tx.category || tx.note || '—'}</Text>
+              <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                {new Date(tx.date).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+              </Text>
+            </View>
+            <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '700' }}>+{Number(tx.amount).toLocaleString(locale)}</Text>
+          </View>
+        ))}
+
+        {/* Регулярні доходи проєкту — та сама секція, що у вкладці «Підписки». */}
+        {projectId ? (
+          <RecurringIncomesSection
+            c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: c.dim, accent: c.accent, green: '#10B981', red: '#EF4444', sheet: isDark ? 'rgba(12,12,20,0.98)' : 'rgba(248,246,255,0.98)' }}
+            tr={tr}
+            lang={lang === 'en' ? 'en' : 'uk'}
+            isDark={isDark}
+            projectId={projectId}
+          />
+        ) : null}
       </ScrollView>
+      {projectId ? (
+        <ProjectTransactionForm
+          visible={txFormOpen}
+          onClose={() => setTxFormOpen(false)}
+          onSubmit={tx => { void addTransaction(tx); }}
+          projectId={projectId}
+          accounts={accounts}
+          categories={formCategories}
+          c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: isDark ? 'rgba(12,12,20,0.98)' : 'rgba(248,246,255,0.98)' }}
+          tr={tr}
+          isDark={isDark}
+          busy={txBusy}
+          error={txError}
+        />
+      ) : null}
     </ProjectScreenShell>
   );
 }

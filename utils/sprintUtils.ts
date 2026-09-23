@@ -5,10 +5,12 @@
  * app/projects.tsx тягне за собою AsyncStorage і все дерево компонентів, тож
  * правило, зашите в екран, неможливо перевірити тестом.
  *
- * Що спринт РОБИТЬ: групує завдання проєкту в іменовану пачку («Тиждень 1»).
- * Що спринт НЕ робить: нічого не планує в часі. Дат (start / end / deadline)
- * у нього немає й не буде — у денний список завдання тягне виключно власний
- * task.deadline, і utils/taskToday.ts про спринти взагалі не знає.
+ * Що спринт РОБИТЬ: групує завдання проєкту в іменовану пачку («Тиждень 1»)
+ * і, НЕОБОВ'ЯЗКОВО, має межі в часі — startDate/endDate (специфікація
+ * docs/specs/projects-analytics.md §3). Дати потрібні лише для статистики
+ * (велосіті, burndown, «лишилось днів») і нічого не планують: у денний
+ * список завдання тягне виключно власний task.deadline, і utils/taskToday.ts
+ * про спринти взагалі не знає. Спринт без дат — легальний «недатований» стан.
  *
  * Належність тримає ЗАВДАННЯ (task.sprintId), а не масив taskIds тут. Масив —
  * це один запис синку: два офлайн-пристрої, що поклали в один спринт різні
@@ -43,6 +45,14 @@ export interface Sprint {
   closedAt?: string;
   /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
   updatedAt?: string;
+  /**
+   * Перший день спринта, повний ISO (як Project.deadline). АДИТИВНЕ поле:
+   * старі записи його не мають, і це «недатований» спринт. Ставиться лише
+   * разом з endDate — див. setSprintDates().
+   */
+  startDate?: string;
+  /** ОСТАННІЙ день спринта ВКЛЮЧНО, повний ISO. Пара до startDate. */
+  endDate?: string;
 }
 
 /**
@@ -113,6 +123,106 @@ export function setSprintClosed<T extends Sprint>(sprint: T, closed: boolean, no
   const { closedAt: _removed, ...rest } = sprint;
   void _removed;
   return rest as T;
+}
+
+// ─── Дати спринта (§3.1 специфікації) ────────────────────────────────────────
+
+export interface SprintDates {
+  startDate: string;
+  endDate: string;
+}
+
+/** Обидві межі є й парсяться. Половинчастий запис вважається недатованим. */
+export function isSprintDated(sprint: Pick<Sprint, 'startDate' | 'endDate'>): boolean {
+  return !!sprint.startDate && !!sprint.endDate
+    && !Number.isNaN(Date.parse(sprint.startDate)) && !Number.isNaN(Date.parse(sprint.endDate));
+}
+
+/**
+ * Поставити або прибрати дати. `null` — спринт стає недатованим: обидва
+ * ключі саме ВИДАЛЯЮТЬСЯ, а не ставляться в undefined (та сама конвенція,
+ * що в setSprintClosed). Решта полів запису, включно з тими, яких цей клієнт
+ * не знає, лишається як була — правка йде поверх канонічного запису.
+ */
+export function setSprintDates<T extends Sprint>(sprint: T, dates: SprintDates | null): T {
+  if (dates) return { ...sprint, startDate: dates.startDate, endDate: dates.endDate };
+  if (!('startDate' in sprint) && !('endDate' in sprint)) return sprint;
+  const { startDate: _start, endDate: _end, ...rest } = sprint;
+  void _start;
+  void _end;
+  return rest as T;
+}
+
+/** Локальна доба ISO-дати як 'YYYY-MM-DD' — значення поля форми. Бите — ''. */
+export function sprintDateInput(iso: string | undefined): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function parseDateInput(text: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text.trim());
+  if (!match) return null;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  // Локальна північ; 2026-02-31 не мусить тихо стати 3 березня.
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return date;
+}
+
+export type SprintDatesError = 'partial' | 'invalid' | 'order';
+
+export type SprintDatesResult =
+  | { ok: true; dates: SprintDates | null }
+  | { ok: false; error: SprintDatesError };
+
+/**
+ * Інваріанти форми (перевіряє КЛІЄНТ, не сервер):
+ *   - обидва поля порожні → дат немає (`dates: null`);
+ *   - заповнене одне → 'partial' (напівдатований спринт не зберігається);
+ *   - не 'YYYY-MM-DD' або неіснуюча дата → 'invalid';
+ *   - кінець раніше за початок → 'order' (рівність — одноденний спринт, можна).
+ * Дати пишуться повним ISO локальної півночі — як Project.deadline.
+ */
+export function parseSprintDatesInput(startText: string, endText: string): SprintDatesResult {
+  const startRaw = startText.trim();
+  const endRaw = endText.trim();
+  if (!startRaw && !endRaw) return { ok: true, dates: null };
+  if (!startRaw || !endRaw) return { ok: false, error: 'partial' };
+  const start = parseDateInput(startRaw);
+  const end = parseDateInput(endRaw);
+  if (!start || !end) return { ok: false, error: 'invalid' };
+  if (end.getTime() < start.getTime()) return { ok: false, error: 'order' };
+  return { ok: true, dates: { startDate: start.toISOString(), endDate: end.toISOString() } };
+}
+
+function localDay(iso: string): number {
+  const date = new Date(iso);
+  return date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+}
+
+/**
+ * Датовані спринти ТОГО САМОГО проєкту, що перетинаються з `dates` (межі
+ * включно). Перетин НЕ заборонений — паралельні потоки робіт реальні, — форма
+ * лише попереджає. `excludeId` — сам спринт, який редагують.
+ */
+export function overlappingSprints<T extends Sprint>(
+  sprints: readonly T[],
+  projectId: string,
+  dates: SprintDates,
+  excludeId?: string,
+): T[] {
+  const from = localDay(dates.startDate);
+  const to = localDay(dates.endDate);
+  return sprints.filter(sprint =>
+    sprint.projectId === projectId
+    && sprint.id !== excludeId
+    && isSprintDated(sprint)
+    && localDay(sprint.startDate as string) <= to
+    && localDay(sprint.endDate as string) >= from);
 }
 
 /** Перейменування. Порожня назва відкидається: спринт без імені не знайти. */

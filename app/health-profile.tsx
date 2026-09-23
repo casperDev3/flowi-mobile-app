@@ -1,3 +1,16 @@
+/**
+ * app/health-profile.tsx — налаштування розділу «Здоровʼя».
+ *
+ * Профіль (стать, вік, зріст, активність, ціль) і джерела даних (Apple Health)
+ * перестали бути пунктами сайдбара й плитками хабу: розділ тепер один, із
+ * вкладками, а це — його налаштування за шестернею в шапці. Ходять сюди раз на
+ * місяць, тож вкладки вони не варті; а місце в меню коштувало стільки ж,
+ * скільки «Харчування», куди заходять щодня.
+ *
+ * Маршрут лишився тим самим навмисно: на `/health-profile` ведуть закладки,
+ * підказка «заповніть профіль» і старі посилання — і всі вони мусять і далі
+ * приводити саме до профілю, а не в довільну вкладку.
+ */
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -14,9 +27,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
+
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
+import { HK_AVAILABLE } from '@/store/healthkit';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { saveSyncedValue } from '@/store/synced-storage';
@@ -43,8 +59,8 @@ export default function HealthProfileScreen() {
   const contentWidth = useContentWidth();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const { tr } = useI18n();
-  useScreenView('health_profile');
+  const { tr, lang } = useI18n();
+  useScreenView('health_settings');
 
   const [profile, setProfile] = useState<HealthProfile>(DEFAULT_PROFILE);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
@@ -109,16 +125,24 @@ export default function HealthProfileScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }}>
-          <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={tr.back} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={20} color={c.text} />
-          </TouchableOpacity>
-          <Text style={[s.pageTitle, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.healthProfile}</Text>
-        </View>
+      {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
+          useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={[]}>
+        {/* Налаштування розділу пунктом сайдбара НЕ є (і не були задумані ним):
+            сюди заходять із шестерні в шапці «Здоровʼя», тож «Назад» лишається
+            і на планшеті — інакше шляху нагору звідси не буде взагалі. */}
+        <ScreenHeader
+          title={tr.settings}
+          color={c.text}
+          titleStyle={s.pageTitle}
+          back={{ onPress: () => router.back(), label: tr.back, color: c.text }}
+        />
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 120 }]} showsVerticalScrollIndicator={false}>
+
+            {/* Профіль — перша з двох налаштовок розділу */}
+            <Text style={[s.sectionTitle, { color: c.text }]}>{tr.healthProfile}</Text>
 
             {/* Стать */}
             <Text style={[s.label, { color: c.sub }]}>{tr.sexLabel}</Text>
@@ -195,6 +219,41 @@ export default function HealthProfileScreen() {
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{tr.saveProfile}</Text>
             </TouchableOpacity>
 
+            {/*
+              Джерела даних — друга налаштовка розділу.
+
+              Тут не обіцяється те, чого немає: рядок Apple Health зʼявляється
+              лише там, де модуль справді є у збірці (iOS), а на решті пристроїв
+              стоїть чесний підпис, що автоматичних джерел поки нема. Health
+              Connect (Android) ще не підключено — рядка під нього теж немає,
+              бо неактивний пункт меню читається як зламаний, а не як «скоро».
+            */}
+            <Text style={[s.sectionTitle, { color: c.text, marginTop: 28 }]}>
+              {lang === 'uk' ? 'Джерела даних' : 'Data sources'}
+            </Text>
+            {HK_AVAILABLE ? (
+              <TouchableOpacity onPress={() => router.push('/apple-health')} activeOpacity={0.85}
+                accessibilityRole="button" accessibilityLabel="Apple Health"
+                style={[s.sourceRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+                <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconSymbol name="heart.fill" size={16} color={ACCENT} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>Apple Health</Text>
+                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>
+                    {lang === 'uk' ? 'Кроки, калорії, сон і пульс із HealthKit' : 'Steps, calories, sleep and pulse from HealthKit'}
+                  </Text>
+                </View>
+                <IconSymbol name="chevron.right" size={13} color={c.sub} />
+              </TouchableOpacity>
+            ) : (
+              <Text style={{ color: c.sub, fontSize: 12, marginTop: 10 }}>
+                {lang === 'uk'
+                  ? 'На цьому пристрої автоматичних джерел немає — показники вводяться вручну.'
+                  : 'No automatic sources on this device — metrics are entered manually.'}
+              </Text>
+            )}
+
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -234,6 +293,8 @@ function clampInt(text: string, max: number, fallback: number): number {
 
 const s = StyleSheet.create({
   pageTitle: { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
+  sectionTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3, marginTop: 6 },
+  sourceRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 12 },
   label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 18 },
   input:     { fontSize: 18, fontWeight: '700', borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
   segBtn:    { flex: 1, borderRadius: 14, borderWidth: 1.5, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },

@@ -1,0 +1,1165 @@
+{
+ "_comment": "Спільна фікстура паритету формул модуля тренувань (docs/specs/training-module.md §6, §10.3). Еталон — core/training_xp.py; ті самі випадки мусять давати ті самі числа в flowi-mobile-app/utils/trainingXp.ts і flowi-web-app/lib/training-xp.ts. Згенеровано з еталона; ключові випадки звірені вручну в core/test_training.py.",
+ "constants": {
+  "XP_SESSION_BASE": 50,
+  "XP_QUEST_MIN": 10,
+  "XP_QUEST_MAX": 300,
+  "BASE_BP": 10000,
+  "STREAK_STEP_DAYS": 3,
+  "STREAK_STEP_BP": 1000,
+  "STREAK_MAX_BP": 20000,
+  "ROUND_G": 500
+ },
+ "xp": [
+  {
+   "base_xp": 50,
+   "streak_days_before": 0,
+   "multiplier_bp": 10000,
+   "xp": 50
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 1,
+   "multiplier_bp": 10000,
+   "xp": 50
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 2,
+   "multiplier_bp": 10000,
+   "xp": 50
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 3,
+   "multiplier_bp": 11000,
+   "xp": 55
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 5,
+   "multiplier_bp": 11000,
+   "xp": 55
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 6,
+   "multiplier_bp": 12000,
+   "xp": 60
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 9,
+   "multiplier_bp": 13000,
+   "xp": 65
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 12,
+   "multiplier_bp": 14000,
+   "xp": 70
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 29,
+   "multiplier_bp": 19000,
+   "xp": 95
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 30,
+   "multiplier_bp": 20000,
+   "xp": 100
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 31,
+   "multiplier_bp": 20000,
+   "xp": 100
+  },
+  {
+   "base_xp": 50,
+   "streak_days_before": 100,
+   "multiplier_bp": 20000,
+   "xp": 100
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 0,
+   "multiplier_bp": 10000,
+   "xp": 10
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 1,
+   "multiplier_bp": 10000,
+   "xp": 10
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 2,
+   "multiplier_bp": 10000,
+   "xp": 10
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 3,
+   "multiplier_bp": 11000,
+   "xp": 11
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 5,
+   "multiplier_bp": 11000,
+   "xp": 11
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 6,
+   "multiplier_bp": 12000,
+   "xp": 12
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 9,
+   "multiplier_bp": 13000,
+   "xp": 13
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 12,
+   "multiplier_bp": 14000,
+   "xp": 14
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 29,
+   "multiplier_bp": 19000,
+   "xp": 19
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 30,
+   "multiplier_bp": 20000,
+   "xp": 20
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 31,
+   "multiplier_bp": 20000,
+   "xp": 20
+  },
+  {
+   "base_xp": 10,
+   "streak_days_before": 100,
+   "multiplier_bp": 20000,
+   "xp": 20
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 0,
+   "multiplier_bp": 10000,
+   "xp": 200
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 1,
+   "multiplier_bp": 10000,
+   "xp": 200
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 2,
+   "multiplier_bp": 10000,
+   "xp": 200
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 3,
+   "multiplier_bp": 11000,
+   "xp": 220
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 5,
+   "multiplier_bp": 11000,
+   "xp": 220
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 6,
+   "multiplier_bp": 12000,
+   "xp": 240
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 9,
+   "multiplier_bp": 13000,
+   "xp": 260
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 12,
+   "multiplier_bp": 14000,
+   "xp": 280
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 29,
+   "multiplier_bp": 19000,
+   "xp": 380
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 30,
+   "multiplier_bp": 20000,
+   "xp": 400
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 31,
+   "multiplier_bp": 20000,
+   "xp": 400
+  },
+  {
+   "base_xp": 200,
+   "streak_days_before": 100,
+   "multiplier_bp": 20000,
+   "xp": 400
+  },
+  {
+   "base_xp": 300,
+   "streak_days_before": 0,
+   "multiplier_bp": 10000,
+   "xp": 300
+  },
+  {
+   "base_xp": 300,
+   "streak_days_before": 1,
+   "multiplier_bp": 10000,
+   "xp": 300
+  },
+  {
+   "base_xp": 300,
+   "streak_days_before": 2,
+   "multiplier_bp": 10000,
+   "xp": 300
+  },
+  {
+   "base_xp": 300,
+   "streak_days_before": 3,
+   "multiplier_bp": 11000,
+   "xp": 330
+  }
+ ],
+ "progression": [
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 1,
+     "capG": 100000
+    }
+   },
+   "week": 0,
+   "weightG": 70000,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 1,
+     "capG": 100000
+    }
+   },
+   "week": 1,
+   "weightG": 72500,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 1,
+     "capG": 100000
+    }
+   },
+   "week": 2,
+   "weightG": 75000,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 1,
+     "capG": 100000
+    }
+   },
+   "week": 3,
+   "weightG": 77500,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 1,
+     "capG": 100000
+    }
+   },
+   "week": 7,
+   "weightG": 87500,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 1,
+     "capG": 100000
+    }
+   },
+   "week": 11,
+   "weightG": 97500,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 2
+    }
+   },
+   "week": 0,
+   "weightG": 70000,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 2
+    }
+   },
+   "week": 1,
+   "weightG": 70000,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 2
+    }
+   },
+   "week": 2,
+   "weightG": 72500,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 2
+    }
+   },
+   "week": 3,
+   "weightG": 72500,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 2
+    }
+   },
+   "week": 7,
+   "weightG": 77500,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 70000,
+    "reps": 8,
+    "progression": {
+     "mode": "linear_weight",
+     "stepG": 2500,
+     "everyWeeks": 2
+    }
+   },
+   "week": 11,
+   "weightG": 82500,
+   "reps": 8
+  },
+  {
+   "block": {
+    "weightG": 20000,
+    "reps": 10,
+    "progression": {
+     "mode": "linear_reps",
+     "stepReps": 1,
+     "everyWeeks": 1,
+     "capReps": 15
+    }
+   },
+   "week": 0,
+   "weightG": 20000,
+   "reps": 10
+  },
+  {
+   "block": {
+    "weightG": 20000,
+    "reps": 10,
+    "progression": {
+     "mode": "linear_reps",
+     "stepReps": 1,
+     "everyWeeks": 1,
+     "capReps": 15
+    }
+   },
+   "week": 1,
+   "weightG": 20000,
+   "reps": 11
+  },
+  {
+   "block": {
+    "weightG": 20000,
+    "reps": 10,
+    "progression": {
+     "mode": "linear_reps",
+     "stepReps": 1,
+     "everyWeeks": 1,
+     "capReps": 15
+    }
+   },
+   "week": 2,
+   "weightG": 20000,
+   "reps": 12
+  },
+  {
+   "block": {
+    "weightG": 20000,
+    "reps": 10,
+    "progression": {
+     "mode": "linear_reps",
+     "stepReps": 1,
+     "everyWeeks": 1,
+     "capReps": 15
+    }
+   },
+   "week": 3,
+   "weightG": 20000,
+   "reps": 13
+  },
+  {
+   "block": {
+    "weightG": 20000,
+    "reps": 10,
+    "progression": {
+     "mode": "linear_reps",
+     "stepReps": 1,
+     "everyWeeks": 1,
+     "capReps": 15
+    }
+   },
+   "week": 7,
+   "weightG": 20000,
+   "reps": 15
+  },
+  {
+   "block": {
+    "weightG": 20000,
+    "reps": 10,
+    "progression": {
+     "mode": "linear_reps",
+     "stepReps": 1,
+     "everyWeeks": 1,
+     "capReps": 15
+    }
+   },
+   "week": 11,
+   "weightG": 20000,
+   "reps": 15
+  },
+  {
+   "block": {
+    "weightG": 60000,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 250,
+     "everyWeeks": 1
+    }
+   },
+   "week": 0,
+   "weightG": 60000,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 60000,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 250,
+     "everyWeeks": 1
+    }
+   },
+   "week": 1,
+   "weightG": 61500,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 60000,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 250,
+     "everyWeeks": 1
+    }
+   },
+   "week": 2,
+   "weightG": 63000,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 60000,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 250,
+     "everyWeeks": 1
+    }
+   },
+   "week": 3,
+   "weightG": 64500,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 60000,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 250,
+     "everyWeeks": 1
+    }
+   },
+   "week": 7,
+   "weightG": 70500,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 60000,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 250,
+     "everyWeeks": 1
+    }
+   },
+   "week": 11,
+   "weightG": 78500,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 61300,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 333,
+     "everyWeeks": 1,
+     "capG": 80000
+    }
+   },
+   "week": 0,
+   "weightG": 61300,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 61300,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 333,
+     "everyWeeks": 1,
+     "capG": 80000
+    }
+   },
+   "week": 1,
+   "weightG": 63500,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 61300,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 333,
+     "everyWeeks": 1,
+     "capG": 80000
+    }
+   },
+   "week": 2,
+   "weightG": 65500,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 61300,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 333,
+     "everyWeeks": 1,
+     "capG": 80000
+    }
+   },
+   "week": 3,
+   "weightG": 67500,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 61300,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 333,
+     "everyWeeks": 1,
+     "capG": 80000
+    }
+   },
+   "week": 7,
+   "weightG": 77000,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 61300,
+    "reps": 5,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 333,
+     "everyWeeks": 1,
+     "capG": 80000
+    }
+   },
+   "week": 11,
+   "weightG": 80000,
+   "reps": 5
+  },
+  {
+   "block": {
+    "weightG": 50000,
+    "reps": 0,
+    "progression": {
+     "mode": "none"
+    }
+   },
+   "week": 0,
+   "weightG": 50000,
+   "reps": 1
+  },
+  {
+   "block": {
+    "weightG": 50000,
+    "reps": 0,
+    "progression": {
+     "mode": "none"
+    }
+   },
+   "week": 1,
+   "weightG": 50000,
+   "reps": 1
+  },
+  {
+   "block": {
+    "weightG": 50000,
+    "reps": 0,
+    "progression": {
+     "mode": "none"
+    }
+   },
+   "week": 2,
+   "weightG": 50000,
+   "reps": 1
+  },
+  {
+   "block": {
+    "weightG": 50000,
+    "reps": 0,
+    "progression": {
+     "mode": "none"
+    }
+   },
+   "week": 3,
+   "weightG": 50000,
+   "reps": 1
+  },
+  {
+   "block": {
+    "weightG": 50000,
+    "reps": 0,
+    "progression": {
+     "mode": "none"
+    }
+   },
+   "week": 7,
+   "weightG": 50000,
+   "reps": 1
+  },
+  {
+   "block": {
+    "weightG": 50000,
+    "reps": 0,
+    "progression": {
+     "mode": "none"
+    }
+   },
+   "week": 11,
+   "weightG": 50000,
+   "reps": 1
+  },
+  {
+   "block": {
+    "weightG": null,
+    "reps": 12,
+    "progression": null
+   },
+   "week": 0,
+   "weightG": 0,
+   "reps": 12
+  },
+  {
+   "block": {
+    "weightG": null,
+    "reps": 12,
+    "progression": null
+   },
+   "week": 1,
+   "weightG": 0,
+   "reps": 12
+  },
+  {
+   "block": {
+    "weightG": null,
+    "reps": 12,
+    "progression": null
+   },
+   "week": 2,
+   "weightG": 0,
+   "reps": 12
+  },
+  {
+   "block": {
+    "weightG": null,
+    "reps": 12,
+    "progression": null
+   },
+   "week": 3,
+   "weightG": 0,
+   "reps": 12
+  },
+  {
+   "block": {
+    "weightG": null,
+    "reps": 12,
+    "progression": null
+   },
+   "week": 7,
+   "weightG": 0,
+   "reps": 12
+  },
+  {
+   "block": {
+    "weightG": null,
+    "reps": 12,
+    "progression": null
+   },
+   "week": 11,
+   "weightG": 0,
+   "reps": 12
+  },
+  {
+   "block": {
+    "weightG": 40000,
+    "reps": 6,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 500,
+     "everyWeeks": 3
+    }
+   },
+   "week": 0,
+   "weightG": 40000,
+   "reps": 6
+  },
+  {
+   "block": {
+    "weightG": 40000,
+    "reps": 6,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 500,
+     "everyWeeks": 3
+    }
+   },
+   "week": 1,
+   "weightG": 40000,
+   "reps": 6
+  },
+  {
+   "block": {
+    "weightG": 40000,
+    "reps": 6,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 500,
+     "everyWeeks": 3
+    }
+   },
+   "week": 2,
+   "weightG": 40000,
+   "reps": 6
+  },
+  {
+   "block": {
+    "weightG": 40000,
+    "reps": 6,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 500,
+     "everyWeeks": 3
+    }
+   },
+   "week": 3,
+   "weightG": 42000,
+   "reps": 6
+  },
+  {
+   "block": {
+    "weightG": 40000,
+    "reps": 6,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 500,
+     "everyWeeks": 3
+    }
+   },
+   "week": 7,
+   "weightG": 44000,
+   "reps": 6
+  },
+  {
+   "block": {
+    "weightG": 40000,
+    "reps": 6,
+    "progression": {
+     "mode": "percent",
+     "percentBp": 500,
+     "everyWeeks": 3
+    }
+   },
+   "week": 11,
+   "weightG": 46000,
+   "reps": 6
+  }
+ ],
+ "session_dates": [
+  {
+   "start_date": "2026-10-05",
+   "week": 0,
+   "day_of_week": 1,
+   "date": "2026-10-05"
+  },
+  {
+   "start_date": "2026-10-05",
+   "week": 0,
+   "day_of_week": 3,
+   "date": "2026-10-07"
+  },
+  {
+   "start_date": "2026-10-05",
+   "week": 0,
+   "day_of_week": 0,
+   "date": "2026-10-11"
+  },
+  {
+   "start_date": "2026-10-05",
+   "week": 1,
+   "day_of_week": 1,
+   "date": "2026-10-12"
+  },
+  {
+   "start_date": "2026-10-05",
+   "week": 3,
+   "day_of_week": 6,
+   "date": "2026-10-31"
+  },
+  {
+   "start_date": "2026-10-05",
+   "week": 7,
+   "day_of_week": 5,
+   "date": "2026-11-27"
+  },
+  {
+   "start_date": "2026-10-07",
+   "week": 0,
+   "day_of_week": 1,
+   "date": "2026-10-12"
+  },
+  {
+   "start_date": "2026-10-07",
+   "week": 0,
+   "day_of_week": 3,
+   "date": "2026-10-07"
+  },
+  {
+   "start_date": "2026-10-07",
+   "week": 0,
+   "day_of_week": 0,
+   "date": "2026-10-11"
+  },
+  {
+   "start_date": "2026-10-07",
+   "week": 1,
+   "day_of_week": 1,
+   "date": "2026-10-19"
+  },
+  {
+   "start_date": "2026-10-07",
+   "week": 3,
+   "day_of_week": 6,
+   "date": "2026-10-31"
+  },
+  {
+   "start_date": "2026-10-07",
+   "week": 7,
+   "day_of_week": 5,
+   "date": "2026-11-27"
+  },
+  {
+   "start_date": "2026-10-11",
+   "week": 0,
+   "day_of_week": 1,
+   "date": "2026-10-12"
+  },
+  {
+   "start_date": "2026-10-11",
+   "week": 0,
+   "day_of_week": 3,
+   "date": "2026-10-14"
+  },
+  {
+   "start_date": "2026-10-11",
+   "week": 0,
+   "day_of_week": 0,
+   "date": "2026-10-11"
+  },
+  {
+   "start_date": "2026-10-11",
+   "week": 1,
+   "day_of_week": 1,
+   "date": "2026-10-19"
+  },
+  {
+   "start_date": "2026-10-11",
+   "week": 3,
+   "day_of_week": 6,
+   "date": "2026-11-07"
+  },
+  {
+   "start_date": "2026-10-11",
+   "week": 7,
+   "day_of_week": 5,
+   "date": "2026-12-04"
+  },
+  {
+   "start_date": "2026-12-28",
+   "week": 0,
+   "day_of_week": 1,
+   "date": "2026-12-28"
+  },
+  {
+   "start_date": "2026-12-28",
+   "week": 0,
+   "day_of_week": 3,
+   "date": "2026-12-30"
+  },
+  {
+   "start_date": "2026-12-28",
+   "week": 0,
+   "day_of_week": 0,
+   "date": "2027-01-03"
+  },
+  {
+   "start_date": "2026-12-28",
+   "week": 1,
+   "day_of_week": 1,
+   "date": "2027-01-04"
+  },
+  {
+   "start_date": "2026-12-28",
+   "week": 3,
+   "day_of_week": 6,
+   "date": "2027-01-23"
+  },
+  {
+   "start_date": "2026-12-28",
+   "week": 7,
+   "day_of_week": 5,
+   "date": "2027-02-19"
+  },
+  {
+   "start_date": "2027-02-26",
+   "week": 0,
+   "day_of_week": 1,
+   "date": "2027-03-01"
+  },
+  {
+   "start_date": "2027-02-26",
+   "week": 0,
+   "day_of_week": 3,
+   "date": "2027-03-03"
+  },
+  {
+   "start_date": "2027-02-26",
+   "week": 0,
+   "day_of_week": 0,
+   "date": "2027-02-28"
+  },
+  {
+   "start_date": "2027-02-26",
+   "week": 1,
+   "day_of_week": 1,
+   "date": "2027-03-08"
+  },
+  {
+   "start_date": "2027-02-26",
+   "week": 3,
+   "day_of_week": 6,
+   "date": "2027-03-20"
+  },
+  {
+   "start_date": "2027-02-26",
+   "week": 7,
+   "day_of_week": 5,
+   "date": "2027-04-16"
+  }
+ ],
+ "quest_base": [
+  {
+   "xp_reward": 200,
+   "xp_rules": null,
+   "base_xp": 200
+  },
+  {
+   "xp_reward": 5,
+   "xp_rules": null,
+   "base_xp": 10
+  },
+  {
+   "xp_reward": 1000,
+   "xp_rules": null,
+   "base_xp": 300
+  },
+  {
+   "xp_reward": null,
+   "xp_rules": null,
+   "base_xp": 10
+  },
+  {
+   "xp_reward": 150,
+   "xp_rules": {
+    "questMin": 50,
+    "questMax": 100
+   },
+   "base_xp": 100
+  },
+  {
+   "xp_reward": 20,
+   "xp_rules": {
+    "questMin": 50,
+    "questMax": 100
+   },
+   "base_xp": 50
+  }
+ ],
+ "session_base": [
+  {
+   "xp_rules": null,
+   "base_xp": 50
+  },
+  {
+   "xp_rules": {},
+   "base_xp": 50
+  },
+  {
+   "xp_rules": {
+    "sessionBase": 75
+   },
+   "base_xp": 75
+  },
+  {
+   "xp_rules": {
+    "sessionBase": 5
+   },
+   "base_xp": 10
+  },
+  {
+   "xp_rules": {
+    "sessionBase": 10000
+   },
+   "base_xp": 200
+  },
+  {
+   "xp_rules": {
+    "sessionBase": "80"
+   },
+   "base_xp": 80
+  }
+ ]
+}

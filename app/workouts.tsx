@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, type Href } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { requestNotificationPermissions } from '@/store/notifications';
 import { loadDataResult, retryStorageRead } from '@/store/storage';
@@ -44,6 +45,14 @@ interface Workout {
   note?: string;
   date: string;
   programId?: string;
+  /**
+   * Групові тренування (training-module.md §4.3, §7.2): закрита сесія групи
+   * пише сюди звичайний Workout із посиланням на сесію й групу. Поля
+   * опційні — старі записи читаються як були, а цей екран їх лише показує.
+   */
+  sessionId?: string;
+  groupId?: string;
+  distanceKm?: number;
 }
 
 interface Exercise {
@@ -583,6 +592,7 @@ const WorkoutRow = React.memo(function WorkoutRow({ w, c, isDark, lastInGroup, o
         <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{w.title}</Text>
         <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
           {fmtDuration(w.durationMin)}{w.calories ? ` · ${w.calories} ккал` : ''}
+          {w.groupId ? ` · ${tr.tgGroupBadge}` : ''}
         </Text>
       </View>
       <TouchableOpacity onPress={() => onDelete(w.id)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${w.title}`}
@@ -1103,41 +1113,47 @@ export default function WorkoutsScreen() {
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Без edges={['top']}: верхній інсет тепер рахує ScreenHeader через
+          useTopInset() (CLAUDE.md), і разом із нативним краєм шапка з'їжджала
+          б униз двічі — на висоту статус-бара. */}
+      <SafeAreaView style={{ flex: 1 }} edges={[]}>
 
         {/* Шапка й вкладки живуть у тій самій колонці, що й список: інакше на
             планшеті вони розтягуються на всю ширину, а картки стоять по центру. */}
         <View style={contentWidth}>
-          {/* Header */}
-          <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
-            {/* NAT-18: у дереві доступності кнопка була 20×20 (з hitSlop 8 —
-                36×36), найменша ціль у застосунку при нормі Apple 44×44, ще й
-                без імені («Back» англійською). Рамка 36×36 + hitSlop {10,4},
-                як у спільному ScreenHeader, дає рівно 44×44. */}
-            <TouchableOpacity
-              onPress={() => router.back()}
-              accessibilityRole="button"
-              accessibilityLabel={tr.back}
-              style={{ width: 36, height: 36, marginRight: 8, alignItems: 'center', justifyContent: 'center' }}
-              hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}>
-              <IconSymbol name="chevron.left" size={20} color={c.text} />
-            </TouchableOpacity>
-            <Text style={{ fontSize: 24, fontWeight: '800', color: c.text, letterSpacing: -0.5, flex: 1 }}>
-              Тренування
-            </Text>
-            <TouchableOpacity
-              onPress={() => setShowStats(true)}
-              accessibilityRole="button"
-              accessibilityLabel={tr.statistics}
-              style={{
-                width: 36, height: 36, borderRadius: 12,
-                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                alignItems: 'center', justifyContent: 'center',
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <IconSymbol name="chart.bar.fill" size={17} color={c.text} />
-            </TouchableOpacity>
-          </View>
+          {/* NAT-18: кнопка «Назад» була 20×20 у дереві доступності (з hitSlop
+              8 — 36×36), найменша ціль у застосунку при нормі Apple 44×44, ще
+              й без імені («Back» англійською). Спільний ScreenHeader дає й
+              44×44, і переклад, і — головне — ховає стрілку на планшеті, де
+              «Тренування» відкриваються прямо з сайдбара. */}
+          <ScreenHeader
+            title={tr.workoutsLabel}
+            color={c.text}
+            back={{ onPress: () => router.back(), label: tr.back, color: c.text }}
+            actions={
+              <>
+                {/* Групи тренувань (training-module.md §10.1): вхід у модуль груп. */}
+                <HeaderButton
+                  onPress={() => router.push('/training' as Href)}
+                  accessibilityLabel={tr.tgGroupsButton}
+                  style={{
+                    borderColor: 'transparent',
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                  }}>
+                  <IconSymbol name="person.2.fill" size={17} color={c.text} />
+                </HeaderButton>
+                <HeaderButton
+                  onPress={() => setShowStats(true)}
+                  accessibilityLabel={tr.statistics}
+                  style={{
+                    borderColor: 'transparent',
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                  }}>
+                  <IconSymbol name="chart.bar.fill" size={17} color={c.text} />
+                </HeaderButton>
+              </>
+            }
+          />
 
           {/* Tab bar */}
           <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12, gap: 6 }}>
@@ -1150,8 +1166,9 @@ export default function WorkoutsScreen() {
                   backgroundColor: tab === t.key ? ACCENT : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
                   borderWidth: 1, borderColor: tab === t.key ? ACCENT + '80' : c.border,
                 }}>
-                <Text style={{ color: tab === t.key ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }}>
-                  {t.label}
+                <Text style={{ color: tab === t.key ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
+                  {/* «Мої програми» — щоб не плутались із груповими (§10.1). */}
+                  {t.key === 'programs' ? tr.tgPersonalProgramsTab : t.label}
                 </Text>
               </TouchableOpacity>
             ))}

@@ -83,7 +83,10 @@ describe('PERF-5: журнал застосованих міграцій не г
 
     // Журнал MIGRATIONS_KEY прочитано — але нічого не пропущено.
     expect(firstRun).toContain('storage_migrations_applied');
-    expect(secondRun.length).toBe(15); // сталий стан: 15 звернень до сховища на КОЖНОМУ старті
+    // сталий стан: 16 звернень до сховища на КОЖНОМУ старті (16-те — 'categories'
+    // кроку categories:group_cost: без рядків він не позначається виконаним,
+    // щоб категорії з першого pull-у теж отримали групи).
+    expect(secondRun.length).toBe(16);
     console.log('ЧИТАНЬ 1-й старт:', firstRun.length, firstRun.join(','));
     console.log('ЧИТАНЬ 2-й старт:', secondRun.length, secondRun.join(','));
     // 'tasks' парситься двічі за один прохід (migrateOpenTaskTimers + backfill)

@@ -22,7 +22,18 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.casper3.ftrackingapp",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_DISTANCE",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_OXYGEN_SATURATION",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_WEIGHT"
+      ]
     },
     "web": {
       "output": "static",
@@ -53,12 +64,25 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Flowi читає дані зі здоров'я для відображення пульсу, кроків та інших метрик.",
-          "NSHealthUpdateUsageDescription": "Flowi зберігає дані здоров'я для персональних звітів.",
+          "NSHealthShareUsageDescription": "Flowi читає з Здоровʼя кроки, пульс і пульс спокою, сон і його фази, вагу, SpO₂ та дистанцію, щоб показувати їх у розділі «Здоровʼя».",
+          "NSHealthUpdateUsageDescription": "Flowi не записує дані в Здоровʼя — лише читає.",
           "background": true
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Flowi сканує QR-наліпки коробок"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Flowi додає фото коробок і речей",
+          "cameraPermission": "Flowi знімає фото коробок і речей"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

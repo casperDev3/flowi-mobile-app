@@ -11,13 +11,13 @@
  *
  * Розділи для показу — `visibleProjectNavItems()` з `constants/projectNav.ts`,
  * той самий список, що читає ProjectSidebar: приховані розділи отримують
- * `href: null` (як `agent`/`time` у (tabs)/_layout) — файл лишається на
+ * `href: null` (як `time` у (tabs)/_layout) — файл лишається на
  * місці, просто не показаний у таб-барі й недосяжний з нього.
  */
 import { BlurView } from 'expo-blur';
 import { Tabs, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { AppState, type AppStateStatus, StyleSheet, Text, View } from 'react-native';
 
 import { ActiveTimersBar } from '@/components/time/ActiveTimersBar';
 import { HapticTab } from '@/components/haptic-tab';
@@ -40,7 +40,7 @@ import { useProject } from '@/hooks/use-project';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
-import { addRecentProject } from '@/store/project-sync';
+import { enterProject, leaveProject, syncProject } from '@/store/project-sync';
 import { MODULES_BY_TEMPLATE, projectModules, readableTint } from '@/utils/projectUtils';
 
 export const unstable_settings = { initialRouteName: 'overview' };
@@ -84,8 +84,34 @@ export default function ProjectLayout() {
 
   // Вхід у проєкт — одразу «нещодавній» (свічер §3: «свічер памʼятає
   // нещодавні проєкти»), незалежно від того, звідки увійшли (список, Today,
-  // сам свічер).
-  useEffect(() => { if (id) void addRecentProject(id); }, [id]);
+  // сам свічер) — І ОДРАЗУ обмін даними цього проєкту.
+  //
+  // Раніше тут був лише `addRecentProject(id)`: жодного `syncProject(id)` не
+  // викликав ніхто, тож відкритий проєкт показував дані з AsyncStorage і
+  // чекав або на WS-сигнал (якого могло не бути — ліміт `MAX_PROJECT_SOCKETS`
+  // і список сокетів, що перебудовувався раз на 60 с), або на поллінг. Саме
+  // це й виглядало як «у вкладці задач проєкту не підвантажуються актуальні
+  // дані, на вебі все добре» — веб робить повний pull проєкту на вхід.
+  //
+  // `enterProject` заразом піднімає цьому проєкту сокет першим у черзі, а
+  // `leaveProject` на виході знімає пріоритет.
+  useEffect(() => {
+    if (!id) return;
+    void enterProject(id);
+    return () => leaveProject(id);
+  }, [id]);
+
+  // Повернення з фону — ще один обмін: поки застосунок був у фоні, сокет
+  // проєкту міг померти мовчки, а 60-секундний поллінг на передньому плані
+  // повернеться не раніше ніж через хвилину. Той самий такт, що й у
+  // особистого синку (`store/sync-engine.tsx`).
+  useEffect(() => {
+    if (!id) return;
+    const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') void syncProject(id);
+    });
+    return () => subscription.remove();
+  }, [id]);
 
   // §9.4 «якщо користувач зараз у цьому проєкті — повернути в Особисте»:
   // спрацьовує і на добровільне видалення/вихід (locale-запис `projects`
@@ -211,7 +237,7 @@ export default function ProjectLayout() {
           Учасники й Активність (§4) — не розділи проєкту з `constants/projectNav.ts`,
           тому не в мапі вище: досяжні через «Налаштування → Учасники»/Огляд →
           «Уся активність» (router.push), той самий прихований-таб трюк, що й
-          `time`/`agent` у (tabs)/_layout — файл лишається на місці, просто
+          `time` у (tabs)/_layout — файл лишається на місці, просто
           без кнопки в барі.
         */}
         <Tabs.Screen name="members" options={{ href: null, headerShown: false }} />

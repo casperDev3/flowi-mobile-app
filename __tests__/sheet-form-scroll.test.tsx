@@ -100,7 +100,9 @@ const SHEETS: { file: string; sheet: RegExp; wrapper: RegExp }[] = [
   { file: 'app/projects.tsx',      sheet: /^\s*sheet:\s*\{.*$/m, wrapper: /^\s*sheetWrapper:\s*\{.*$/m },
   { file: 'app/health-habits.tsx', sheet: /^\s*sheet:\s*\{.*$/m, wrapper: /^\s*sheetWrap:\s*\{.*$/m },
   { file: 'app/health-meds.tsx',   sheet: /^\s*sheet:\s*\{.*$/m, wrapper: /^\s*sheetWrap:\s*\{.*$/m },
-  { file: 'app/containers.tsx',    sheet: /^\s*sheet:\s*\{.*$/m, wrapper: /^\s*sheetOuter:\s*\{.*$/m },
+  // app/containers.tsx прибрано: інлайнових Modal-аркушів там більше немає —
+  // усі аркуші йдуть через components/containers/ContainersSheet.tsx
+  // (SheetModal + useSheetSurface + ScrollView), як і TrainingSheet.
   { file: 'app/budget.tsx',        sheet: /^\s*sheet:\s*\{.*$/m, wrapper: /^\s*sheetWrapper:\s*\{.*$/m },
   // Зона «Здоровʼя»: той самий механізм (відсоток від батька з height:auto).
   { file: 'app/health-vaccines.tsx', sheet: /^\s*sheet:\s*\{.*$/m, wrapper: /^\s*sheetWrap:\s*\{.*$/m },

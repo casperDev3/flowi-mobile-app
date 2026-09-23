@@ -13,10 +13,9 @@
  * мобільному (Архів, Записи часу), веб-аналога не мають, тож ідуть у «Ще» —
  * розділ, куди й на вебі складено рідше вживане.
  *
- * «Ідеї та баги» на вебі — один пункт (одна сторінка з двома вкладками); на
- * мобільному це два окремі екрани (`ideas.tsx`, `bugs.tsx`), тож у «Розробці»
- * вони йдуть двома пунктами підряд замість одного — це найближчий мобільний
- * відповідник без вигадування нового екрана.
+ * «Ідеї та баги» — один пункт на обох платформах: на мобільному це один
+ * екран `feedback.tsx` із перемикачем «Ідеї | Баги» (feedback-inbox.md §10.1);
+ * старі `/ideas` і `/bugs` лишились редиректами.
  *
  * «Під рукою» — не те саме, що «усі одночасно на екрані». Повний перелік
  * вищий за альбомний 11″ iPad, тож рідше вживані групи згортаються (див.
@@ -32,12 +31,56 @@ import { Platform } from 'react-native';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 
+/**
+ * Ідентифікатор модуля, який можна вимкнути.
+ *
+ * Значення — це те, що лежить у синхронізованому 'ui_preferences'
+ * (store/ui-preferences.ts) і мусить збігатися з вебом
+ * (`flowi-web-app/lib/nav-groups.ts`, `ModuleId`): вимкнули на телефоні —
+ * зникло і в сайдбарі веба. Саме тому ідентифікатори не прив'язані до
+ * маршрутів (вони на платформах різні), а названі за модулем.
+ *
+ * Частина ідентифікаторів є лише на одній платформі: `archive`, `time_records`
+ * і `bugs` — мобільні (веб таких сторінок не має), `health_summary`,
+ * `health_profile` і `prevention` — вебові (на мобільному це вкладки одного
+ * екрана «Здоров'я», а не окремі розділи меню). Це не розходження контракту:
+ * платформа, яка ідентифікатора не знає, просто не показує для нього
+ * перемикача і зберігає значення незмінним (parseUiPreferences копіює список
+ * як є).
+ */
+export type ModuleId =
+  | 'tasks' | 'projects' | 'meetings' | 'time' | 'notes'
+  | 'finance' | 'budget' | 'subscriptions' | 'banks' | 'health'
+  | 'health_summary' | 'health_profile' | 'prevention' | 'workouts' | 'training' | 'containers'
+  | 'archive' | 'time_records'
+  | 'ideas' | 'bugs';
+
 export interface NavItem {
   /** Шлях для router.push. Має збігатися з тим, що дає usePathname(). */
   route: string;
   icon: IconSymbolName;
   /** Ключ у словнику, а не готовий рядок: мова змінюється в рантаймі. */
   labelKey: keyof Translations;
+  /**
+   * Модуль, яким керує екран налаштувань модулів. Пункт БЕЗ нього —
+   * системний: «Сьогодні» (домівка, без неї застосунку нікуди приземлитись),
+   * «Налаштування» (звідти ж модулі й вмикають назад) і «Адміністрування
+   * workspace» (видимість дає роль, а не вибір користувача).
+   */
+  module?: ModuleId;
+  /**
+   * Пункт — ВКЛАДКА іншого розділу, а не окремий розділ меню
+   * (finance-revamp.md §2.3: «Бюджет», «Підписки», «Рахунки» стали вкладками
+   * «Фінансів»). Запис лишається в маніфесті, бо з нього виводяться перемикачі
+   * модулів (moduleSections) і підписи заглушок; сайдбар його не малює —
+   * {@link menuNavGroups}. Те саме поле, що й `NavEntry.tabOf` на вебі.
+   */
+  tabOf?: ModuleId;
+  /**
+   * Додаткові шляхи, на яких пункт теж підсвічується: підекрани без власного
+   * пункту меню (налаштування сповіщень і модулів → «Налаштування»).
+   */
+  activeOn?: readonly string[];
 }
 
 export interface NavGroup {
@@ -58,11 +101,11 @@ export const NAV_GROUPS: NavGroup[] = [
     titleKey: 'navGroupWork',
     items: [
       { route: '/(tabs)/today',   icon: 'house.fill',   labelKey: 'tabToday' },
-      { route: '/(tabs)',         icon: 'checklist',    labelKey: 'tabTasks' },
-      { route: '/projects',       icon: 'folder',       labelKey: 'projects' },
-      { route: '/meetings',       icon: 'calendar',     labelKey: 'navMeetings' },
-      { route: '/(tabs)/time',    icon: 'timer',        labelKey: 'navTime' },
-      { route: '/notes',          icon: 'note.text',    labelKey: 'notes' },
+      { route: '/(tabs)',         icon: 'checklist',    labelKey: 'tabTasks',     module: 'tasks' },
+      { route: '/projects',       icon: 'folder',       labelKey: 'projects',     module: 'projects' },
+      { route: '/meetings',       icon: 'calendar',     labelKey: 'navMeetings',  module: 'meetings' },
+      { route: '/(tabs)/time',    icon: 'timer',        labelKey: 'navTime',      module: 'time' },
+      { route: '/notes',          icon: 'note.text',    labelKey: 'notes',        module: 'notes' },
     ],
   },
   // Особисте — веб-група з id: збірна, як і на вебі, лишається розгорнутою за
@@ -71,42 +114,64 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'personal',
     titleKey: 'navGroupPersonal',
     items: [
-      { route: '/(tabs)/explore', icon: 'banknote',       labelKey: 'tabFinance' },
-      { route: '/budget',         icon: 'chart.pie.fill', labelKey: 'navBudget' },
-      { route: '/subscriptions',  icon: 'repeat',         labelKey: 'navSubscriptions' },
-      { route: '/banks',          icon: 'building.columns.fill', labelKey: 'piggyBanks' },
-      { route: '/(tabs)/health',  icon: 'figure.run',     labelKey: 'tabHealth' },
+      { route: '/(tabs)/explore', icon: 'banknote',       labelKey: 'tabFinance',        module: 'finance' },
+      // Бюджет, підписки і рахунки — вкладки «Фінансів» (explore?tab=…,
+      // finance-revamp.md §2.3): у сайдбарі їх немає (menuNavGroups), а записи
+      // лишаються заради перемикачів модулів — ModuleId не скорочуємо.
+      { route: '/budget',         icon: 'chart.pie.fill', labelKey: 'navBudget',         module: 'budget',        tabOf: 'finance' },
+      { route: '/subscriptions',  icon: 'repeat',         labelKey: 'navSubscriptions',  module: 'subscriptions', tabOf: 'finance' },
+      { route: '/banks',          icon: 'building.columns.fill', labelKey: 'piggyBanks', module: 'banks',         tabOf: 'finance' },
+      { route: '/(tabs)/health',  icon: 'figure.run',     labelKey: 'tabHealth',         module: 'health' },
     ],
   },
   {
     id: 'more',
     titleKey: 'navGroupMore',
     items: [
-      { route: '/health-summary',    icon: 'chart.bar.fill',  labelKey: 'navHealthSummary' },
-      { route: '/health-profile',    icon: 'person.fill',     labelKey: 'healthProfile' },
-      { route: '/health-prevention', icon: 'cross.case.fill', labelKey: 'prevention' },
-      { route: '/workouts',          icon: 'dumbbell.fill',   labelKey: 'workoutsLabel' },
-      { route: '/containers',        icon: 'shippingbox.fill',labelKey: 'containers' },
+      // «Зведення здоровʼя», «Профіль здоровʼя» і «Профілактика» прибрані з
+      // меню: розділ «Здоровʼя» тепер ОДИН екран із вкладками (Огляд ·
+      // Харчування · Активність і тренування · Сон · Тіло і вітальні ·
+      // Профілактика), а профіль і джерела даних — його налаштування за
+      // шестернею. Чотири пункти про один розділ читались як чотири розділи,
+      // і «де подивитись сон» залежало від того, який із них ви відкрили.
+      // Маршрути живі: старі шляхи редиректять кожен на свою вкладку.
+      //
+      // «Тренування» лишаються ОКРЕМИМ пунктом навмисно — це свій модуль із
+      // групами й програмами, а не вкладка здоровʼя; вкладка «Активність і
+      // тренування» лише показує їхнє зведення й веде сюди.
+      { route: '/workouts',          icon: 'dumbbell.fill',   labelKey: 'workoutsLabel',    module: 'workouts' },
+      // Групи тренувань (training-module.md §10): окремий модуль `training`,
+      // як і на вебі (`lib/nav-groups.ts`), — вимкнення особистого журналу
+      // не має ховати групу, де людина тренер.
+      { route: '/training',          icon: 'person.2.fill',   labelKey: 'tgNavLabel',       module: 'training' },
+      { route: '/containers',        icon: 'shippingbox.fill',labelKey: 'containers',       module: 'containers' },
       // Мобільні службові пункти без веб-аналога — теж сюди.
       // («Спільне» тут стояло раніше — прибрано разом з екраном: §4 плану,
       // «Спільне зливається в проєкти», жорсткий перехід.)
-      { route: '/archive',       icon: 'archivebox',    labelKey: 'archive' },
-      { route: '/time-records',  icon: 'list.bullet',   labelKey: 'timeRecords' },
+      { route: '/archive',       icon: 'archivebox',    labelKey: 'archive',    module: 'archive' },
+      { route: '/time-records',  icon: 'list.bullet',   labelKey: 'timeRecords', module: 'time_records' },
     ],
   },
   {
     id: 'dev',
     titleKey: 'navGroupDev',
     items: [
-      { route: '/ideas',        icon: 'lightbulb.fill', labelKey: 'ideas' },
-      { route: '/bugs',         icon: 'ladybug.fill',   labelKey: 'bugList' },
-      { route: '/(tabs)/agent', icon: 'brain',          labelKey: 'navAgentLabel' },
+      // ОДИН пункт «Ідеї та баги» під модулем 'ideas' — як і на вебі
+      // (feedback-inbox.md §10.1). ModuleId 'bugs' лишається в типі, бо лежить
+      // у синхронізованому ui_preferences.disabledModules, але більше НІЧИМ не
+      // керує: інакше той, хто колись сховав баги, втратив би й ідеї.
+      { route: '/feedback',     icon: 'lightbulb.fill', labelKey: 'fbTitle', module: 'ideas' },
     ],
   },
   {
     titleKey: null,
     items: [
-      { route: '/(tabs)/settings', icon: 'gearshape.fill', labelKey: 'tabOptions' },
+      {
+        route: '/(tabs)/settings',
+        icon: 'gearshape.fill',
+        labelKey: 'tabOptions',
+        activeOn: ['/notifications', '/settings-notifications', '/settings-modules'],
+      },
     ],
   },
 ];
@@ -144,6 +209,90 @@ export function navGroupsFor(isAdmin: boolean): NavGroup[] {
   );
 }
 
+// ─── Вимкнені модулі ─────────────────────────────────────────────────────────
+
+/** Екран, де модулі вмикають назад. Звідси ж веде кнопка заглушки на телефоні. */
+export const MODULE_SETTINGS_ROUTE = '/settings-modules';
+
+/**
+ * Ті самі групи без пунктів вимкнених модулів.
+ *
+ * Група, яка після фільтра лишилась порожньою, зникає цілком: заголовок
+ * «Розробка» з лічильником 0 і без жодного рядка читається як збій, а не як
+ * «ви це вимкнули».
+ *
+ * Системні пункти (без `module`) не фільтруються ніколи — інакше, вимкнувши
+ * все, користувач лишився б без входу в налаштування, тобто без способу
+ * увімкнути щось назад.
+ */
+export function visibleNavGroups(groups: NavGroup[], disabled: readonly string[]): NavGroup[] {
+  if (!disabled.length) return groups;
+  const result: NavGroup[] = [];
+  for (const group of groups) {
+    const items = group.items.filter(item => !item.module || !disabled.includes(item.module));
+    if (items.length) result.push(items.length === group.items.length ? group : { ...group, items });
+  }
+  return result;
+}
+
+/**
+ * Групи САЙДБАРА: без пунктів-вкладок ({@link NavItem.tabOf}). Застосовується
+ * поверх {@link visibleNavGroups}; група, що лишилась порожньою, зникає.
+ * Дзеркало `menuNavGroups` у `flowi-web-app/lib/nav-groups.ts`.
+ */
+export function menuNavGroups(groups: NavGroup[]): NavGroup[] {
+  const result: NavGroup[] = [];
+  for (const group of groups) {
+    const items = group.items.filter(item => !item.tabOf);
+    if (items.length) result.push(items.length === group.items.length ? group : { ...group, items });
+  }
+  return result;
+}
+
+/** Чи підсвічувати пункт: сам маршрут або один із його підекранів (`activeOn`). */
+export function isNavItemActive(item: Pick<NavItem, 'route' | 'activeOn'>, pathname: string): boolean {
+  return isRouteActive(item.route, pathname) || Boolean(item.activeOn?.includes(pathname));
+}
+
+export interface ModuleSection {
+  /** null — група без заголовка; у списку модулів таких немає. */
+  titleKey: keyof Translations;
+  items: (NavItem & { module: ModuleId })[];
+}
+
+/**
+ * Перелік модулів для екрана налаштувань — ВИВЕДЕНИЙ із NAV_GROUPS, а не
+ * записаний поруч другим списком.
+ *
+ * Інакше два переліки розійшлися б на першому ж новому розділі: сайдбар знав
+ * би про нього, а налаштування — ні, і вимкнути його було б нічим. Побічний
+ * наслідок того самого рішення — групування збігається з сайдбаром само
+ * собою, без окремої домовленості.
+ */
+/**
+ * Ключ підпису модуля — щоб заглушка вимкненої вкладки називала розділ тим
+ * самим словом, що й сайдбар зі списком модулів.
+ */
+export function moduleLabelKey(module: ModuleId): keyof Translations | undefined {
+  for (const group of NAV_GROUPS) {
+    const item = group.items.find(candidate => candidate.module === module);
+    if (item) return item.labelKey;
+  }
+  return undefined;
+}
+
+export function moduleSections(): ModuleSection[] {
+  const sections: ModuleSection[] = [];
+  for (const group of NAV_GROUPS) {
+    if (!group.titleKey) continue;
+    const items = group.items.filter(
+      (item): item is NavItem & { module: ModuleId } => Boolean(item.module),
+    );
+    if (items.length) sections.push({ titleKey: group.titleKey, items });
+  }
+  return sections;
+}
+
 /**
  * Чи згорнута група просто зараз.
  *
@@ -158,7 +307,7 @@ export function isGroupCollapsed(
 ): boolean {
   if (!group.id) return false;
   if (!collapsedIds.includes(group.id)) return false;
-  return !group.items.some(item => isRouteActive(item.route, pathname));
+  return !group.items.some(item => isNavItemActive(item, pathname));
 }
 
 /**

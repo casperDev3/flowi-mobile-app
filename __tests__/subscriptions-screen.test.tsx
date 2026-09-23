@@ -285,7 +285,64 @@ test('перехід ?open=<id>&renew=1 одразу відкриває підт
   expect(inputs[0].props.value).toBe('10');
 });
 
-test('блок «Найближчі оплати»: усі рядки, секції й «Продовжено» на кожному', async () => {
+const USD_ACCOUNT = {
+  id: 'acc-usd', name: 'Картка', kind: 'card', currency: 'USD', openingBalance: 0, createdAt: NOW,
+};
+
+test('«Оплачено»: створює витрату з підписки й зсуває цикл', async () => {
+  mockParams = { open: 'sub-a', pay: '1' };
+  seed({ subscriptions: [NETFLIX], transactions: TX, accounts: [USD_ACCOUNT] });
+  const tree = await mount();
+  await flush();
+
+  const input = tree.root.findAll((n: any) => n.props?.accessibilityLabel === tr.payAmount && typeof n.props.onChangeText === 'function')[0];
+  expect(input.props.value).toBe('10');
+  // Ціна зросла — суму правлять просто в підтвердженні.
+  await act(async () => { input.props.onChangeText('12,5'); });
+  await pressByLabel(tree, tr.payConfirm);
+  await flush();
+
+  const netflix = read<any[]>('subscriptions').find(s => s.id === 'sub-a');
+  expect(netflix.nextPaymentDate > NETFLIX.nextPaymentDate).toBe(true);
+  expect(netflix.history).toHaveLength(1);
+  expect(netflix.history[0]).toMatchObject({ date: NETFLIX.nextPaymentDate, amount: 12.5, currency: 'USD' });
+
+  const txs = read<any[]>('transactions');
+  expect(txs).toHaveLength(2);
+  const created = txs.find(t => t.id !== 'tx1');
+  expect(created).toMatchObject({
+    type: 'expense', amount: 12.5, accountId: 'acc-usd', currency: 'USD', note: 'Netflix',
+  });
+  // Операція датується днем ЦИКЛУ, за який заплатили, а не «сьогодні».
+  // Порівнюємо ЛОКАЛЬНИЙ день, а не префікс ISO: `dateKeyAtTime` кладе в
+  // `date` момент із поточним часом доби, тож у поясі UTC+3 між 00:00 і 03:00
+  // UTC-префікс рядка — це вчора. Фінанси теж групують за локальним днем
+  // (`new Date(t.date)` в utils/financeUtils.ts), тож перевіряємо так само.
+  expect(dateKeyOf(new Date(created.date))).toBe(NETFLIX.nextPaymentDate);
+  // Стара операція на місці — запис read-modify-write, а не перезапис масиву.
+  expect(txs.some(t => t.id === 'tx1')).toBe(true);
+});
+
+test('«Оплачено»: скасування створеної витрати не повертає дату оплати', async () => {
+  mockParams = { open: 'sub-a', pay: '1' };
+  seed({ subscriptions: [NETFLIX], transactions: [], accounts: [USD_ACCOUNT] });
+  const tree = await mount();
+  await flush();
+
+  await pressByLabel(tree, tr.payConfirm);
+  await flush();
+
+  const moved = read<any[]>('subscriptions').find(s => s.id === 'sub-a').nextPaymentDate;
+  expect(moved > NETFLIX.nextPaymentDate).toBe(true);
+
+  // Людина видалила операцію у Фінансах: підписка на неї не посилається, тож
+  // цикл лишається зсунутим — інакше «Оплачено» довелось би тиснути двічі.
+  mockStore.set('transactions', JSON.stringify([]));
+  await flush();
+  expect(read<any[]>('subscriptions').find(s => s.id === 'sub-a').nextPaymentDate).toBe(moved);
+});
+
+test('блок «Найближчі оплати»: усі рядки, секції й «Оплачено» на кожному', async () => {
   const LATER = { ...SPOTIFY, id: 'sub-c', name: 'iCloud', nextPaymentDate: addDaysKey(TODAY, 3) };
   const MORE = [1, 2, 4].map(n => ({ ...SPOTIFY, id: `sub-x${n}`, name: `Extra ${n}`, nextPaymentDate: addDaysKey(TODAY, n) }));
   const items = upcomingPayments([NETFLIX, SPOTIFY, LATER, ...MORE] as any, TODAY, 7);
@@ -309,6 +366,8 @@ test('блок «Найближчі оплати»: усі рядки, секц�
   expect(text).toContain(`${tr.subOverdue} · 1`);
   expect(text).toContain(tr.subUpcomingWithin.replace('{n}', '7'));
 
-  await pressByLabel(tree, `${tr.subRenew}: Netflix`);
-  expect(mockPush).toHaveBeenCalledWith({ pathname: '/subscriptions', params: { open: 'sub-a', renew: '1' } });
+  // «Оплачено» веде на екран підписок з pay=1: там живе підтвердження суми,
+  // запис витрати й захист від повторної оплати того самого циклу.
+  await pressByLabel(tree, `${tr.payAction}: Netflix`);
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/subscriptions', params: { open: 'sub-a', pay: '1' } });
 });

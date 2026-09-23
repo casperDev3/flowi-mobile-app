@@ -164,6 +164,25 @@ export function resolveOriginalMeeting<T extends Pick<Meeting, 'id' | '_origId'>
 }
 
 /**
+ * Який екземпляр відкрити за `?open=<id>` (deep link `ftrackingapp://meeting/{id}`,
+ * тап по сповіщенню). Точний збіг id — він і є; інакше це id повторюваної
+ * наради: беремо найближчий екземпляр від `todayStr` (включно), а коли всі в
+ * минулому — останній. `null` — такої наради в розгорнутому списку немає.
+ */
+export function pickMeetingInstanceToOpen<T extends Pick<Meeting, 'id' | '_origId' | 'date'>>(
+  expanded: readonly T[],
+  id: string,
+  todayStr: string,
+): T | null {
+  if (!id) return null;
+  const exact = expanded.find(m => m.id === id);
+  if (exact) return exact;
+  const instances = expanded.filter(m => m._origId === id).sort((a, b) => a.date.localeCompare(b.date));
+  if (!instances.length) return null;
+  return instances.find(m => m.date >= todayStr) ?? instances[instances.length - 1];
+}
+
+/**
  * Дописує аудіозапис до зустрічі з ТОЧНИМ id оригіналу.
  *
  * id не розбирається: у імпортованих з Google Calendar зустрічей він сам має

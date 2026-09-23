@@ -20,6 +20,7 @@ import type { Translations } from '@/store/translations';
 import { ACCENT_CAL, type HealthColors, getHealthColors } from '@/utils/healthTheme';
 import { VACCINES_KEY, Vaccine, genId } from '@/utils/preventionUtils';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
+import { localDateInputToIso, localDateKey } from '@/utils/dateUtils';
 import { LoadErrorNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
 
 export default function VaccinesScreen() {
@@ -42,7 +43,7 @@ export default function VaccinesScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [add, setAdd] = useState(false);
   const [name, setName] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localDateKey(new Date()));
   const [doseNo, setDoseNo] = useState('');
   const [nextDate, setNextDate] = useState('');
   const canCreate = name.trim().length > 0;
@@ -66,6 +67,11 @@ export default function VaccinesScreen() {
 
   const create = async () => {
     if (!name.trim()) return;
+    // Поле — локальна доба, не UTC (див. localDateInputToIso); нерозбірна
+    // дата раніше валила create через RangeError з toISOString.
+    const dateIso = localDateInputToIso(date);
+    const nextIso = nextDate.trim() ? localDateInputToIso(nextDate) : undefined;
+    if (!dateIso || (nextDate.trim() && !nextIso)) return;
     const id = genId();
     let notifId: string | undefined;
     if (nextDate) {
@@ -73,13 +79,13 @@ export default function VaccinesScreen() {
       notifId = r ?? undefined;
     }
     const item: Vaccine = {
-      id, name: name.trim(), date: new Date(date).toISOString(),
+      id, name: name.trim(), date: dateIso,
       doseNo: doseNo ? parseInt(doseNo, 10) : undefined,
-      nextDate: nextDate ? new Date(nextDate).toISOString() : undefined,
+      nextDate: nextIso,
       notifId, createdAt: new Date().toISOString(),
     };
     setItems(p => [item, ...p].sort((a, b) => +new Date(b.date) - +new Date(a.date)));
-    setName(''); setDate(new Date().toISOString().slice(0, 10)); setDoseNo(''); setNextDate(''); setAdd(false);
+    setName(''); setDate(localDateKey(new Date())); setDoseNo(''); setNextDate(''); setAdd(false);
   };
 
   // Колбек мусить бути стабільним і приймати елемент аргументом — інакше

@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
+
 import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useUndoToast } from '@/components/shared/UndoToast';
@@ -193,23 +195,35 @@ export default function SubtasksScreen() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
+          useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
+      <SafeAreaView style={{ flex: 1 }} edges={[]}>
 
-        {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 }}>
-          <TouchableOpacity onPress={() => router.back()} style={[st.backBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-            <IconSymbol name="chevron.left" size={18} color={c.accent} />
-          </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ flexShrink: 1, color: c.text, fontSize: 18, fontWeight: '800', letterSpacing: -0.4 }} numberOfLines={1}>
-                {task?.title ?? 'Підзавдання'}
-              </Text>
-              {task ? <PriorityBadge level={normalizePriority(task)} size="md" /> : null}
-            </View>
-            <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{doneCount}/{total} виконано</Text>
-          </View>
-        </View>
+        {/*
+          Екрана немає в сайдбарі, тож стрілка «Назад» тут не рудимент і
+          лишається й на планшеті — а поруч із нею шлях «Завдання → назва».
+          Мітка пріоритету переїхала в actions, лічильник виконаного — під
+          заголовок: у спільному хедері це саме ті два слоти.
+        */}
+        <ScreenHeader
+          title={task?.title ?? tr.subtasks}
+          color={c.text}
+          titleStyle={st.title}
+          paddingBottom={16}
+          back={{
+            onPress: () => router.back(),
+            label: tr.back,
+            color: c.accent,
+            style: { backgroundColor: c.dim, borderColor: c.border },
+          }}
+          crumbs={[
+            { label: tr.tabTasks, onPress: () => router.push('/(tabs)') },
+            { label: task?.title ?? tr.subtasks },
+          ]}
+          crumbColor={c.sub}
+          actions={task ? <PriorityBadge level={normalizePriority(task)} size="md" /> : undefined}>
+          <Text style={{ color: c.sub, fontSize: 12 }}>{doneCount}/{total} {tr.done}</Text>
+        </ScreenHeader>
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           {/* FlatList, а не ScrollView+map: зазвичай підзавдань одиниці, але
@@ -227,7 +241,7 @@ export default function SubtasksScreen() {
                 <View style={st.progressBg}>
                   <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: c.accent }]} />
                 </View>
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 5 }}>{pct}% виконано</Text>
+                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 5 }}>{pct}% {tr.done}</Text>
               </View>
             ) : null}
             ListFooterComponent={
@@ -258,7 +272,9 @@ export default function SubtasksScreen() {
 }
 
 const st = StyleSheet.create({
-  backBtn:     { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  // Кегль заголовка тут менший за спільні 32: у шапці стоїть назва
+  // завдання, і на телефоні довга назва інакше з'їдає весь рядок.
+  title:       { fontSize: 18, fontWeight: '800', letterSpacing: -0.4 },
   progressBg:  { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
   progressFill:{ height: '100%', borderRadius: 2 },
   subRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },

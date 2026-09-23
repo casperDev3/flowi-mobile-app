@@ -94,8 +94,8 @@ import { copyTextToClipboard } from '@/utils/clipboard';
 import { taskMarkdownLabels, taskToMarkdown } from '@/utils/taskMarkdown';
 import { inTaskScope, isWeekTask } from '@/utils/taskToday';
 import {
-  ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, personalDisplayColumn, projectEquivalentColumn,
-  projectEquivalentStrict,
+  ACTIVE_COLUMN_ID, DONE_COLUMN_ID, mergeTaskStatusColumns, personalDisplayColumn, personalStatusIdFor,
+  projectEquivalentColumn, projectEquivalentStrict,
   scopedColumnFor, scopedTaskStatusColumn, subtaskToggleTransition,
 } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
@@ -120,13 +120,14 @@ import { DetailPane } from '@/components/shared/DetailPane';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { PickerField, type PickerCreateOption } from '@/components/shared/PickerField';
-import { TaskHistoryTab, type HistoryEventType, type TaskHistoryEvent } from '@/components/tasks/TaskHistoryTab';
+import { TaskHistoryTab, type HistoryEventType } from '@/components/tasks/TaskHistoryTab';
 import { TaskTimerTab } from '@/components/tasks/TaskTimerTab';
 import { TaskEditForm } from '@/components/tasks/TaskEditForm';
 import { CalendarGrid } from '@/components/tasks/CalendarGrid';
 import { TaskReminderRow } from '@/components/tasks/TaskReminderRow';
 import { TaskSubtasks } from '@/components/tasks/TaskSubtasks';
 import { TaskCalendarView } from '@/components/tasks/TaskCalendarView';
+import { appendHistory, makeHistoryEvent } from '@/utils/taskHistory';
 import { totalSecondsIncludingActive } from '@/utils/taskTimer';
 import { monthGrid } from '@/utils/dateUtils';
 import { initialReminderDraft, resolveReminderMoment } from '@/utils/reminderTime';
@@ -170,13 +171,6 @@ function getProgress(t: Task) {
 }
 
 // ─── Timer helpers ────────────────────────────────────────────────────────────
-
-
-
-
-function makeHistoryEvent(type: HistoryEventType, note?: string): TaskHistoryEvent {
-  return { id: Date.now().toString() + Math.random().toString(36).slice(2), at: new Date().toISOString(), type, note };
-}
 
 function nextRecurrenceDate(fromDateStr: string, rule: RecurrenceRule): string | null {
   const d = new Date(fromDateStr + 'T00:00');
@@ -458,9 +452,19 @@ export default function TasksScreen() {
   // відкривається з уже обраними проєктом і спринтом (CONTRACT §D.3.6).
   const {
     create: createParam, open: openParam, projectId: projectParam, sprintId: sprintParam,
+    statusId: statusParam,
     meeting: meetingParam, meetingDate: meetingDateParam,
   } = useLocalSearchParams<{
     create?: string; open?: string; projectId?: string; sprintId?: string;
+    /**
+     * ?statusId=<id колонки> — створення З КОЛОНКИ дошки/секції статусу
+     * простору проєкту: задача мусить одразу лягти в ту саму колонку, з якої
+     * її завели, а не в типову «До роботи». Приходить id колонки ПРОЄКТУ
+     * (`st-<uuid4>`), тоді як пікер цієї форми показує особисті статуси
+     * (§3.7) — звідси мапінг в обидва боки (див. `personalStatusIdFor`
+     * нижче і `projectEquivalentColumn` у `addTask`).
+     */
+    statusId?: string;
     /** ?meeting=<id оригіналу>&meetingDate=YYYY-MM-DD — перегляд зустрічі (з «Сьогодні»). */
     meeting?: string; meetingDate?: string;
   }>();
@@ -483,15 +487,21 @@ export default function TasksScreen() {
   // від якого React Compiler переставав оптимізувати ВЕСЬ екран (PERF-2).
   const composerReset = composer.reset;
   useEffect(() => {
-    if (createParam === '1') {
-      if (projectParam) {
-        composerReset(ACTIVE_COLUMN_ID, { projectId: projectParam, sprintId: sprintParam || null });
-        setReturnToProject(projectParam);
-      }
-      setShowAdd(true);
-      router.setParams({ create: '', projectId: '', sprintId: '' });
+    if (createParam !== '1') return;
+    // Статус із маршруту мапиться по ЗАВАНТАЖЕНИХ колонках: поки
+    // `task_statuses` ще не прочитані, мапити нема по чому, і форма відкрилась
+    // би з типовим «До роботи» замість колонки, з якої її покликали.
+    if (statusParam && !initialized) return;
+    if (projectParam) {
+      const statusId = statusParam
+        ? personalStatusIdFor(statusParam, storedTaskStatuses)
+        : ACTIVE_COLUMN_ID;
+      composerReset(statusId, { projectId: projectParam, sprintId: sprintParam || null });
+      setReturnToProject(projectParam);
     }
-  }, [createParam, projectParam, sprintParam, router, composerReset]);
+    setShowAdd(true);
+    router.setParams({ create: '', projectId: '', sprintId: '', statusId: '' });
+  }, [createParam, projectParam, sprintParam, statusParam, initialized, storedTaskStatuses, router, composerReset]);
 
   // Open task details when navigated with ?open=<taskId> (e.g. from Today rows)
   useEffect(() => {
@@ -809,7 +819,7 @@ export default function TasksScreen() {
         kanbanColumnId: column.id,
         // Назва колонки в нотатці: інакше в історії видно лише «активне», без
         // того, КУДИ саме перенесли завдання.
-        history: [...(t.history ?? []), makeHistoryEvent(column.isDone ? 'done' : 'active', column.name)],
+        history: appendHistory(t, column.isDone ? 'done' : 'active', column.name),
       };
     }));
   }, [getTimerForTask, setTasks]);
@@ -872,7 +882,7 @@ export default function TasksScreen() {
       return {
         ...t, status, kanbanColumnId,
         subtasks: t.subtasks.map(s => ({ ...s, done: status === 'done' })),
-        history: [...(t.history ?? []), makeHistoryEvent(histType)],
+        history: appendHistory(t, histType),
       };
     };
 
@@ -923,7 +933,7 @@ export default function TasksScreen() {
           const before = snapshot.subtasks.find(x => x.id === sub.id);
           return before ? { ...sub, done: before.done } : sub;
         }),
-        history: [...(t.history ?? []), makeHistoryEvent('active')],
+        history: appendHistory(t, 'active'),
       };
       showUndo(tr.taskMarkedDone, () => {
         setTasks(prev => prev.map(restore));
@@ -938,7 +948,7 @@ export default function TasksScreen() {
     const patch = (t: Task): Task => t.id === taskId ? {
       ...t,
       subtasks: [...t.subtasks, sub],
-      history: [...(t.history ?? []), makeHistoryEvent('subtask_add', sub.title)],
+      history: appendHistory(t, 'subtask_add', sub.title),
     } : t;
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
@@ -969,7 +979,7 @@ export default function TasksScreen() {
         ...t,
         subtasks,
         ...(transition ?? {}),
-        history: [...(t.history ?? []), makeHistoryEvent(histType, targetSub?.title)],
+        history: appendHistory(t, histType, targetSub?.title),
       };
     };
     setTasks(p => p.map(patch));
@@ -1267,7 +1277,7 @@ export default function TasksScreen() {
       // §4.5 — null (у формі: «Без виконавця») пишемо явно, а не пропускаємо:
       // призначення треба вміти й ЗНЯТИ, а не лише поставити.
       if (edited.has('assignee')) next.assigneeId = draft.assigneeId ?? null;
-      next.history = [...(t.history ?? []), makeHistoryEvent('edited')];
+      next.history = appendHistory(t, 'edited');
       // Поле «Спринт»: без змін — задача лишається де була (навіть у закритому
       // спринті); інакше assignTaskToSprint або беклог (ключ видаляється).
       if (edited.has('project') || edited.has('sprint')) {

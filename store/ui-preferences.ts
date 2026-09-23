@@ -24,9 +24,12 @@
  *
  * Сам перелік модулів живе в constants/nav.ts поруч із маніфестом сайдбара —
  * тут ідентифікатор лишається звичайним рядком навмисно: сховище не мусить
- * знати, які модулі бувають, щоб коректно зберегти чужий.
+ * знати, які модулі бувають, щоб коректно зберегти чужий. Єдине, що звідти
+ * береться, — ALWAYS_ON_MODULES: модулі, вимкнення яких ігнорується.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { ALWAYS_ON_MODULES, isAlwaysOnModule } from '@/constants/nav';
 
 import { loadData, subscribeToStorage } from './storage';
 import { saveSyncedValue } from './synced-storage';
@@ -68,10 +71,35 @@ export function parseUiPreferences(raw: unknown): StoredUiPreferences {
   return { ...source, version, disabledModules };
 }
 
+/**
+ * Модулі, які вимкнути НЕ МОЖНА («Ідеї та баги»), — рішення власника продукту.
+ * Сам перелік живе в constants/nav.ts поруч із маніфестом (там його мусить
+ * знати і фільтр сайдбара, а той файл не може тягнути сховище); тут — правило:
+ * isModuleEnabled для них завжди true, НАВІТЬ якщо збережене значення каже
+ * інакше. Збережене при цьому не переписується — лише ігнорується: старіша
+ * збірка, що ще поважає вимкнення, не отримує від нас «увімкнення», про яке
+ * користувач не просив.
+ */
+export { ALWAYS_ON_MODULES, isAlwaysOnModule };
+
 /** Чи увімкнений модуль. Невідомий ідентифікатор — увімкнений (див. шапку). */
 export function isModuleEnabled(disabled: readonly string[], moduleId: string | undefined): boolean {
   if (!moduleId) return true;
+  if (isAlwaysOnModule(moduleId)) return true;
   return !disabled.includes(moduleId);
+}
+
+/**
+ * Список вимкнених, ЯКИЙ ДІЄ: збережений мінус {@link ALWAYS_ON_MODULES}.
+ *
+ * Саме його віддають хук і loadDisabledModules — інакше кожен викликач, що
+ * перевіряє `disabled.includes(...)` напряму (фільтри подій сповіщень,
+ * лічильники), мусив би знати про винятки сам. Запис при цьому завжди
+ * відштовхується від ЗБЕРЕЖЕНОГО стану (withModuleEnabled над loadData), тож
+ * проігнороване значення в сховищі лишається незмінним.
+ */
+export function effectiveDisabledModules(disabled: readonly string[]): string[] {
+  return disabled.filter(moduleId => !isAlwaysOnModule(moduleId));
 }
 
 /**
@@ -123,7 +151,7 @@ export function withModuleEnabled(
 export async function loadDisabledModules(): Promise<string[]> {
   const prefs = parseUiPreferences(await loadData<unknown>(UI_PREFERENCES_KEY, null));
   cache = prefs;
-  return prefs.disabledModules;
+  return effectiveDisabledModules(prefs.disabledModules);
 }
 
 /**
@@ -137,6 +165,7 @@ export async function loadDisabledModules(): Promise<string[]> {
 let cache: StoredUiPreferences | null = null;
 
 export interface UiModulesState {
+  /** Вимкнені, що ДІЮТЬ — без {@link ALWAYS_ON_MODULES}. */
   disabledModules: string[];
   /** false, доки сховище ще не прочитане хоч раз за запуск. */
   ready: boolean;
@@ -191,5 +220,9 @@ export function useUiModules(): UiModulesState {
       });
   }, []);
 
-  return { disabledModules: prefs.disabledModules, ready, setModuleEnabled };
+  const disabledModules = useMemo(
+    () => effectiveDisabledModules(prefs.disabledModules),
+    [prefs.disabledModules],
+  );
+  return { disabledModules, ready, setModuleEnabled };
 }

@@ -152,6 +152,11 @@ components/
     UndoToast.tsx          — тост «Скасувати» для деструктивних дій
     MasonryColumns.tsx     — розкладка карток у 2 колонки на планшеті
     RecordingClock.tsx     — годинник запису (Час)
+    ModuleGate.tsx         — заглушка вимкненого модуля ЗА МАРШРУТОМ (pathname): вкладки малює
+                             (tabs)/_layout, Stack-екрани — app/_layout; мапи TAB_ROUTE_MODULES /
+                             STACK_ROUTE_MODULES у constants/nav.ts. Новий Stack-екран модуля
+                             отримує заглушку, лише якщо його маршрут додано в STACK_ROUTE_MODULES
+                             (на вебі — NAV_MANIFEST або moduleForUrl)
   finance/
     FinanceSummary.tsx     — картка балансу/доходів/витрат
     TransactionGroup.tsx   — група транзакцій по даті
@@ -205,7 +210,8 @@ hooks/
 
 constants/
   theme.ts
-  nav.ts                   — NAV_GROUPS сайдбара (дзеркалить веб), SIDEBAR_HIDDEN_ON
+  nav.ts                   — NAV_GROUPS сайдбара (дзеркалить веб), SIDEBAR_HIDDEN_ON,
+                             TAB_ROUTE_MODULES / STACK_ROUTE_MODULES (гейт модулів, ModuleGate)
   projectNav.ts            — розділи навігації всередині проєкту (бюджет — owner-only)
 ```
 

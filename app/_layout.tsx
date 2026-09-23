@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import { startFeedbackQueue } from '@/api/feedback';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { NavSidebar } from '@/components/shared/NavSidebar';
+import { ModuleGate } from '@/components/shared/ModuleGate';
 import { ProjectSidebar } from '@/components/shared/ProjectSidebar';
 import { SIDEBAR_HIDDEN_ON, sidebarVisible } from '@/constants/nav';
 import { projectIdFromPathname } from '@/constants/projectNav';
@@ -409,6 +410,10 @@ function RootLayoutContent() {
           <Stack.Screen name="c/[workspaceId]/[slug]" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
+        {/* Заглушка вимкненого модуля для Stack-екранів (/meetings, /notes, …)
+            — централізовано за маршрутом, а не в кожному екрані: див.
+            components/shared/ModuleGate.tsx. Вкладки обслуговує (tabs)/_layout. */}
+        <ModuleGate pathname={pathname} scope="stack" />
         </View>
         </View>
         <StatusBar style={isDark ? 'light' : 'dark'} />

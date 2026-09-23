@@ -6,6 +6,9 @@ import {
   NAV_GROUPS,
   isGroupCollapsed,
   isRouteActive,
+  menuNavGroups,
+  moduleForPathname,
+  disabledModuleForPathname,
   navGroupsFor,
 } from '../constants/nav';
 
@@ -140,5 +143,51 @@ describe('ширина, доступна екрану', () => {
   it('ширина не буває відʼємною', () => {
     // Split View може дати вікно вужче за сам сайдбар.
     expect(screenContentWidth(180, true, '/containers', SIDEBAR_WIDTH)).toBe(0);
+  });
+});
+
+describe('«Записи часу» — не пункт меню (пункт 4/10)', () => {
+  it('у маніфесті й сайдбарі немає /time-records — це дубль «Часу»', () => {
+    const routes = NAV_GROUPS.flatMap(group => group.items).map(item => item.route);
+    expect(routes).not.toContain('/time-records');
+    const menu = menuNavGroups(NAV_GROUPS).flatMap(group => group.items).map(item => item.route);
+    expect(menu).not.toContain('/time-records');
+    expect(menu).toContain('/(tabs)/time');
+  });
+});
+
+describe('moduleForPathname — заглушка за маршрутом (пункт 10)', () => {
+  it('вкладки, включно з прихованою «Час»', () => {
+    expect(moduleForPathname('/')).toEqual({ module: 'tasks', tab: true });
+    expect(moduleForPathname('/explore')).toEqual({ module: 'finance', tab: true });
+    expect(moduleForPathname('/health')).toEqual({ module: 'health', tab: true });
+    expect(moduleForPathname('/time')).toEqual({ module: 'time', tab: true });
+  });
+
+  it('Stack-екрани модулів і їхні підекрани', () => {
+    for (const [path, module] of [
+      ['/meetings', 'meetings'], ['/notes', 'notes'], ['/projects', 'projects'],
+      ['/workouts', 'workouts'], ['/training', 'training'], ['/containers', 'containers'],
+      ['/budget', 'budget'], ['/subscriptions', 'subscriptions'],
+      ['/project/p1/board', 'projects'], ['/health-sleep', 'health'],
+    ] as const) {
+      expect(moduleForPathname(path)).toEqual({ module, tab: false });
+    }
+  });
+
+  it('системні маршрути — без модуля', () => {
+    for (const path of ['/today', '/settings', '/settings-modules', '/feedback', '/login', '/notifications']) {
+      expect(moduleForPathname(path)).toBeNull();
+    }
+  });
+
+  it('кожен гейт обслуговує лише свою частину маршрутів', () => {
+    expect(disabledModuleForPathname('/explore', ['finance'], 'tab')).toBe('finance');
+    expect(disabledModuleForPathname('/explore', ['finance'], 'stack')).toBeNull();
+    expect(disabledModuleForPathname('/meetings', ['meetings'], 'stack')).toBe('meetings');
+    expect(disabledModuleForPathname('/meetings', ['meetings'], 'tab')).toBeNull();
+    expect(disabledModuleForPathname('/explore', [], 'tab')).toBeNull();
+    // «Ідеї та баги» не вимикаються: навіть збережене вимкнення не дає заглушки.
+    expect(disabledModuleForPathname('/feedback', ['ideas'], 'stack')).toBeNull();
   });
 });

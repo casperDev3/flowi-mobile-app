@@ -19,7 +19,7 @@ import {
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { NotificationBadge } from '@/components/notifications/NotificationBadge';
-import { MODULE_SETTINGS_ROUTE } from '@/constants/nav';
+import { MODULE_SETTINGS_ROUTE, disabledModuleCount, type ModuleId } from '@/constants/nav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useAppMode } from '@/store/app-mode';
@@ -29,8 +29,8 @@ import { pullAllFromServer, pushAllToServer, useSync } from '@/store/sync-engine
 import { getAllScheduledNotifications } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
 import { ThemeOption, useTheme } from '@/store/theme-context';
-import { useUiModules } from '@/store/ui-preferences';
-import { Lang } from '@/store/translations';
+import { isModuleEnabled, useUiModules } from '@/store/ui-preferences';
+import { Lang, type Translations } from '@/store/translations';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
@@ -42,6 +42,25 @@ import { useResponsive } from '@/hooks/use-responsive';
  * рендері, і React.memo нижче не рятувала б від перерендеру всього списку.
  */
 type RowPress = (route?: Href) => void;
+
+/**
+ * «Інструменти» — входи в Stack-екрани модулів. Кожен рядок знає свій модуль:
+ * вимкнений модуль ховає вхід (сам екран за прямим посиланням показує
+ * заглушку — ModuleGate у app/_layout.tsx).
+ */
+const TOOL_ROWS: readonly {
+  route: Href;
+  icon: IconSymbolName;
+  iconColor: string;
+  labelKey: keyof Translations;
+  module: ModuleId;
+}[] = [
+  { route: '/meetings',      icon: 'calendar',         iconColor: '#6366F1', labelKey: 'meetings',         module: 'meetings' },
+  { route: '/(tabs)/time',   icon: 'timer',            iconColor: '#6366F1', labelKey: 'navTimeTracker',   module: 'time' },
+  { route: '/budget',        icon: 'chart.pie.fill',   iconColor: '#0EA5E9', labelKey: 'navBudget',        module: 'budget' },
+  { route: '/subscriptions', icon: 'repeat',           iconColor: '#8B5CF6', labelKey: 'navSubscriptions', module: 'subscriptions' },
+  { route: '/containers',    icon: 'shippingbox.fill', iconColor: '#F97316', labelKey: 'containers',       module: 'containers' },
+];
 
 export default function SettingsScreen() {
   const contentWidth = useContentWidth();
@@ -62,7 +81,15 @@ export default function SettingsScreen() {
   const { syncNow, state: syncState, lastSyncAt, pendingCount } = useSync();
   // Лічильник біля рядка «Модулі інтерфейсу»: скільки розділів зараз
   // приховано. Без нього вимкнений місяць тому модуль просто «зник».
+  // Рахується з moduleSections() (disabledModuleCount): у збереженому списку
+  // бувають модулі без перемикача на цій платформі, і лічильник «2» при
+  // жодному вимкненому перемикачі читався б як збій.
   const { disabledModules } = useUiModules();
+  const disabledCount = useMemo(() => disabledModuleCount(disabledModules), [disabledModules]);
+  const visibleTools = useMemo(
+    () => TOOL_ROWS.filter(tool => isModuleEnabled(disabledModules, tool.module)),
+    [disabledModules],
+  );
 
   const [taskReminders, setTaskReminders] = useState(true);
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -407,7 +434,7 @@ export default function SettingsScreen() {
                   icon="square.grid.2x2"
                   iconColor="#10B981"
                   label={tr.modulesSettingsRow}
-                  value={disabledModules.length ? String(disabledModules.length) : undefined}
+                  value={disabledCount ? String(disabledCount) : undefined}
                   route={MODULE_SETTINGS_ROUTE as Href}
                   onPress={go}
                   text={c.text}
@@ -457,67 +484,28 @@ export default function SettingsScreen() {
               </BlurView>
             </View>
 
-            {/* Tools */}
+            {/* Tools — лише входи в УВІМКНЕНІ модулі; усе вимкнено — секції немає. */}
+            {visibleTools.length ? (
             <View style={colStyle}>
               <SectionLabel label={tr.navGroupTools} color={c.sub} />
               <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <SettingRow
-                  icon="calendar"
-                  iconColor="#6366F1"
-                  label={tr.meetings}
-                  route="/meetings"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="timer"
-                  iconColor="#6366F1"
-                  label={tr.navTimeTracker}
-                  route="/(tabs)/time"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="chart.pie.fill"
-                  iconColor="#0EA5E9"
-                  label={tr.navBudget}
-                  route="/budget"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="repeat"
-                  iconColor="#8B5CF6"
-                  label={tr.navSubscriptions}
-                  route="/subscriptions"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="shippingbox.fill"
-                  iconColor="#F97316"
-                  label={tr.containers}
-                  route="/containers"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last
-                />
+                {visibleTools.map((tool, index) => (
+                  <SettingRow
+                    key={tool.module}
+                    icon={tool.icon}
+                    iconColor={tool.iconColor}
+                    label={String(tr[tool.labelKey])}
+                    route={tool.route}
+                    onPress={go}
+                    text={c.text}
+                    sub={c.sub}
+                    border={c.border}
+                    last={index === visibleTools.length - 1}
+                  />
+                ))}
               </BlurView>
             </View>
+            ) : null}
 
             {/* Data */}
             <View style={colStyle}>

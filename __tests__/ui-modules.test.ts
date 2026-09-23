@@ -14,8 +14,16 @@ jest.mock('@/store/synced-storage', () => ({
   saveSyncedValue: jest.fn(async () => {}),
 }));
 
-import { NAV_GROUPS, moduleSections, navGroupsFor, visibleNavGroups } from '../constants/nav';
 import {
+  NAV_GROUPS,
+  disabledModuleCount,
+  moduleSections,
+  navGroupsFor,
+  visibleNavGroups,
+} from '../constants/nav';
+import {
+  ALWAYS_ON_MODULES,
+  effectiveDisabledModules,
   emptyUiPreferences,
   isModuleEnabled,
   parseUiPreferences,
@@ -68,6 +76,23 @@ describe('withModuleEnabled', () => {
   });
 });
 
+describe('ALWAYS_ON_MODULES (пункт 10)', () => {
+  it('ideas і bugs увімкнені завжди, навіть якщо їх вимкнено в сховищі', () => {
+    expect(ALWAYS_ON_MODULES).toEqual(expect.arrayContaining(['ideas', 'bugs']));
+    expect(isModuleEnabled(['ideas', 'bugs'], 'ideas')).toBe(true);
+    expect(isModuleEnabled(['ideas', 'bugs'], 'bugs')).toBe(true);
+  });
+
+  it('діючий список не містить ALWAYS_ON, збережене не переписується', () => {
+    const stored = parseUiPreferences({ disabledModules: ['ideas', 'finance'] });
+    expect(effectiveDisabledModules(stored.disabledModules)).toEqual(['finance']);
+    // Перемикач іншого модуля пише від ЗБЕРЕЖЕНОГО стану: 'ideas' там лишається
+    // як є — ми його лише ігноруємо, а не «вмикаємо» за користувача.
+    expect(withModuleEnabled(stored, 'health', false).disabledModules)
+      .toEqual(['ideas', 'finance', 'health']);
+  });
+});
+
 describe('isModuleEnabled', () => {
   it('пункт без модуля — системний, вимкнути не можна', () => {
     expect(isModuleEnabled(['finance'], undefined)).toBe(true);
@@ -88,10 +113,20 @@ describe('visibleNavGroups', () => {
   });
 
   it('група без жодного видимого пункту зникає цілком', () => {
-    // Заголовок «Розробка» з лічильником 0 читається як збій, а не як
+    // Заголовок «Ще» з лічильником 0 читається як збій, а не як
     // «ви це вимкнули».
+    const more = NAV_GROUPS.find(group => group.id === 'more')!;
+    const modules = more.items.map(item => item.module!).filter(Boolean);
+    const groups = visibleNavGroups(NAV_GROUPS, modules);
+    expect(groups.some(group => group.id === 'more')).toBe(false);
+  });
+
+  it('«Ідеї та баги» лишаються в меню навіть зі збереженим вимкненням (пункт 10)', () => {
+    // Рішення власника: канал скарг вимкнути не можна. Старіша збірка чи веб
+    // могли записати 'ideas' у disabledModules — ми його ігноруємо.
     const groups = visibleNavGroups(NAV_GROUPS, ['ideas', 'bugs']);
-    expect(groups.some(group => group.id === 'dev')).toBe(false);
+    const routes = groups.flatMap(group => group.items).map(item => item.route);
+    expect(routes).toContain('/feedback');
   });
 
   it('системні пункти лишаються завжди', () => {
@@ -114,11 +149,12 @@ describe('visibleNavGroups', () => {
 });
 
 describe('moduleSections', () => {
-  it('перелічує рівно ті модулі, що є в сайдбарі', () => {
+  it('перелічує рівно ті модулі, що є в сайдбарі, крім ALWAYS_ON', () => {
     // Два окремі списки розійшлися б на першому ж новому розділі.
     const fromNav = NAV_GROUPS.flatMap(group => group.items)
       .map(item => item.module)
-      .filter(Boolean);
+      .filter((module): module is NonNullable<typeof module> => Boolean(module))
+      .filter(module => !ALWAYS_ON_MODULES.includes(module));
     const fromSections = moduleSections().flatMap(section => section.items).map(item => item.module);
     expect(fromSections.sort()).toEqual([...fromNav].sort());
   });
@@ -128,8 +164,26 @@ describe('moduleSections', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('групування збігається з сайдбаром', () => {
-    const navTitles = NAV_GROUPS.filter(group => group.titleKey).map(group => group.titleKey);
+  it('для «Ідей та багів» перемикача немає (пункт 10)', () => {
+    const ids = moduleSections().flatMap(section => section.items).map(item => item.module);
+    expect(ids).not.toContain('ideas');
+    expect(ids).not.toContain('bugs');
+  });
+
+  it('групування збігається з сайдбаром (група лише з ALWAYS_ON — без секції)', () => {
+    const navTitles = NAV_GROUPS
+      .filter(group => group.titleKey)
+      .filter(group => group.items.some(item => item.module && !ALWAYS_ON_MODULES.includes(item.module)))
+      .map(group => group.titleKey);
     expect(moduleSections().map(section => section.titleKey)).toEqual(navTitles);
+  });
+});
+
+describe('disabledModuleCount (пункт 10)', () => {
+  it('рахує лише вимкнені перемикачі цієї платформи', () => {
+    // 'health_summary' — вебовий, 'time_records' — без пункту меню,
+    // 'ideas' — ALWAYS_ON: жоден не має тут перемикача, лічильник — 1.
+    expect(disabledModuleCount(['finance', 'health_summary', 'time_records', 'ideas'])).toBe(1);
+    expect(disabledModuleCount([])).toBe(0);
   });
 });

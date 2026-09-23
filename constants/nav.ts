@@ -10,7 +10,7 @@
  * Маршрут для кожного пункту — мобільний відповідник; веб-пункт без
  * мобільного екрана (наприклад «Зведення здоров'я», що на мобільному —
  * частина хаба «Здоров'я») сюди не потрапляє. Пункти, які є тільки на
- * мобільному (Архів, Записи часу), веб-аналога не мають, тож ідуть у «Ще» —
+ * мобільному (Архів), веб-аналога не мають, тож ідуть у «Ще» —
  * розділ, куди й на вебі складено рідше вживане.
  *
  * «Ідеї та баги» — один пункт на обох платформах: на мобільному це один
@@ -54,6 +54,32 @@ export type ModuleId =
   | 'health_summary' | 'health_profile' | 'prevention' | 'workouts' | 'training' | 'containers'
   | 'archive' | 'time_records'
   | 'ideas' | 'bugs';
+
+/**
+ * Модулі, які вимкнути НЕ МОЖНА (рішення власника продукту, пункт 10):
+ * «Ідеї та баги» — канал, яким повідомляють про проблеми, зокрема «зник
+ * розділ». Вимкнений, він не дав би поскаржитись саме на це.
+ *
+ * Вимкнення, що вже лежить у синхронізованому ui_preferences (його могли
+ * записати старіша збірка чи веб), НЕ переписується — лише ігнорується
+ * (isModuleEnabled у store/ui-preferences.ts). Перемикача для них немає
+ * (moduleSections). Той самий список — у вебі (`lib/nav-groups.ts`).
+ *
+ * Живе тут, а не в store/ui-preferences.ts, бо його мусить знати фільтр
+ * сайдбара нижче, а цей файл не може тягнути сховище (його імпортують
+ * чисті тести й рендер-функції); ui-preferences реекспортує його.
+ */
+export const ALWAYS_ON_MODULES: readonly string[] = Object.freeze(['ideas', 'bugs']);
+
+/** Чи є модуль із тих, що вимкнути не можна. */
+export function isAlwaysOnModule(moduleId: string | undefined): boolean {
+  return Boolean(moduleId) && ALWAYS_ON_MODULES.includes(moduleId as string);
+}
+
+/** Те саме правило, що isModuleEnabled у store/ui-preferences.ts — без сховища. */
+function moduleOn(disabled: readonly string[], moduleId: string | undefined): boolean {
+  return !moduleId || isAlwaysOnModule(moduleId) || !disabled.includes(moduleId);
+}
 
 export interface NavItem {
   /** Шлях для router.push. Має збігатися з тим, що дає usePathname(). */
@@ -149,7 +175,10 @@ export const NAV_GROUPS: NavGroup[] = [
       // («Спільне» тут стояло раніше — прибрано разом з екраном: §4 плану,
       // «Спільне зливається в проєкти», жорсткий перехід.)
       { route: '/archive',       icon: 'archivebox',    labelKey: 'archive',    module: 'archive' },
-      { route: '/time-records',  icon: 'list.bullet',   labelKey: 'timeRecords', module: 'time_records' },
+      // «Записи часу» прибрано з меню: це дубль «Часу» (той самий журнал,
+      // лише інша вкладка). Маршрут /time-records лишається редиректом —
+      // на нього ведуть закладки й сповіщення, — а ModuleId 'time_records'
+      // лишається в типі, бо може лежати в синхронізованому списку вимкнених.
     ],
   },
   {
@@ -229,7 +258,9 @@ export function visibleNavGroups(groups: NavGroup[], disabled: readonly string[]
   if (!disabled.length) return groups;
   const result: NavGroup[] = [];
   for (const group of groups) {
-    const items = group.items.filter(item => !item.module || !disabled.includes(item.module));
+    // moduleOn, а не `disabled.includes`: модулі ALWAYS_ON («Ідеї та
+    // баги») лишаються в меню, навіть якщо їх вимкнено збереженим значенням.
+    const items = group.items.filter(item => moduleOn(disabled, item.module));
     if (items.length) result.push(items.length === group.items.length ? group : { ...group, items });
   }
   return result;
@@ -285,12 +316,121 @@ export function moduleSections(): ModuleSection[] {
   const sections: ModuleSection[] = [];
   for (const group of NAV_GROUPS) {
     if (!group.titleKey) continue;
+    // Модулі ALWAYS_ON («Ідеї та баги») перемикача не мають: вимкнути їх не
+    // можна, а рядок, що нічого не змінює, лише бреше. Група, де лишились
+    // тільки вони («Розробка»), зникає зі списку цілком.
     const items = group.items.filter(
-      (item): item is NavItem & { module: ModuleId } => Boolean(item.module),
+      (item): item is NavItem & { module: ModuleId } =>
+        Boolean(item.module) && !isAlwaysOnModule(item.module),
     );
     if (items.length) sections.push({ titleKey: group.titleKey, items });
   }
   return sections;
+}
+
+/**
+ * Скільки модулів ІЗ ПЕРЕМИКАЧЕМ зараз вимкнено — лічильник біля рядка
+ * «Модулі інтерфейсу».
+ *
+ * Рахується з moduleSections(), а не довжиною збереженого списку: там можуть
+ * лежати модулі, яких ця платформа не показує (вебові `health_summary`,
+ * `prevention`; прибраний із меню `time_records`) або які вимкнути не можна
+ * (`ideas`). Лічильник «2», а в списку жодного вимкненого перемикача —
+ * читається як збій.
+ */
+export function disabledModuleCount(disabled: readonly string[]): number {
+  return moduleSections()
+    .flatMap(section => section.items)
+    .filter(item => !moduleOn(disabled, item.module)).length;
+}
+
+// ─── Заглушка вимкненого розділу за маршрутом ────────────────────────────────
+
+/**
+ * Вкладки (app/(tabs)) → модуль. Ключ — те, що віддає usePathname() (групи в
+ * дужках з адреси зникають, корінь вкладок — '/').
+ *
+ * «Сьогодні» і «Налаштування» тут не стоять: вони системні. «Час» — стоїть,
+ * хоч панель його й не показує (`href: null`): у нього ведуть сайдбар,
+ * «Інструменти», ActiveTimersBar і сповіщення.
+ */
+export const TAB_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.freeze({
+  '/': 'tasks',
+  '/index': 'tasks',
+  '/explore': 'finance',
+  '/health': 'health',
+  '/time': 'time',
+});
+
+/**
+ * Stack-екрани → модуль. Заглушку для них малює ModuleGate у app/_layout.tsx,
+ * НЕ самі екрани: інакше кожен новий екран мусив би пам'ятати про гейт, і
+ * перший же забутий відкривався б за прямим посиланням (push, закладка,
+ * router.push з іншого розділу).
+ */
+export const STACK_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.freeze({
+  '/projects': 'projects',
+  '/meetings': 'meetings',
+  '/notes': 'notes',
+  '/workouts': 'workouts',
+  '/training': 'training',
+  '/containers': 'containers',
+  '/budget': 'budget',
+  '/subscriptions': 'subscriptions',
+  '/banks': 'banks',
+  '/archive': 'archive',
+  // Підекрани розділів, що самі є вкладками.
+  '/finance-stats': 'finance',
+  '/time-stats': 'time',
+  '/subtasks': 'tasks',
+  '/task-group': 'tasks',
+});
+
+/** Префікси Stack-маршрутів: простір проєкту і сторінки хаба «Здоров'я». */
+const STACK_PREFIX_MODULES: readonly (readonly [string, ModuleId])[] = [
+  ['/project/', 'projects'],
+  ['/health-', 'health'],
+];
+
+export interface RouteModule {
+  module: ModuleId;
+  /** true — вкладка з app/(tabs): заглушку малює (tabs)/_layout, а не корінь. */
+  tab: boolean;
+}
+
+/**
+ * Якому модулю належить поточний маршрут (null — системний або без модуля).
+ *
+ * Навмисно за pathname, а не за натисканням таба: у розділ потрапляють і
+ * напряму — router.replace('/(tabs)') після входу, push-посилання,
+ * ActiveTimersBar → /(tabs)/time, переходи з інших екранів, — і всі ці шляхи
+ * мусять упертися в ту саму заглушку.
+ */
+export function moduleForPathname(pathname: string): RouteModule | null {
+  const path = pathname.split(/[?#]/)[0] || '/';
+  const tabModule = TAB_ROUTE_MODULES[path];
+  if (tabModule) return { module: tabModule, tab: true };
+  const stackModule = STACK_ROUTE_MODULES[path];
+  if (stackModule) return { module: stackModule, tab: false };
+  for (const [prefix, module] of STACK_PREFIX_MODULES) {
+    if (path.startsWith(prefix)) return { module, tab: false };
+  }
+  return null;
+}
+
+/**
+ * Модуль, заглушку якого треба показати на цьому маршруті, або null.
+ * `scope` розводить двох малювальників: вкладки — (tabs)/_layout (там заглушка
+ * не закриває панель табів), решта — ModuleGate у корені.
+ */
+export function disabledModuleForPathname(
+  pathname: string,
+  disabled: readonly string[],
+  scope: 'tab' | 'stack',
+): ModuleId | null {
+  const match = moduleForPathname(pathname);
+  if (!match || match.tab !== (scope === 'tab')) return null;
+  return moduleOn(disabled, match.module) ? null : match.module;
 }
 
 /**

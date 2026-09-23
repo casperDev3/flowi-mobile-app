@@ -4025,7 +4025,8 @@ const uk: Translations = {
   // Модулі інтерфейсу (було moduleText())
   modulesTitle: 'Модулі',
   modulesSubtitle: 'Вимкнені модулі зникають із меню, дашборда і сповіщень. Дані лишаються на місці — увімкніть назад, і все повернеться.',
-  modulesSystemNote: 'Налаштування і профіль вимкнути не можна.',
+  // пункт 10: базові розділи, що не вимикаються (ALWAYS_ON у store/ui-preferences.ts)
+  modulesSystemNote: '«Сьогодні», «Налаштування» з профілем та «Ідеї та баги» вимкнути не можна: звідси модулі вмикають назад і повідомляють про проблеми.',
   modulesDisabledTitle: 'Ви вимкнули цю функцію',
   modulesDisabledBody: 'Дані нікуди не зникли. Увімкніть модуль у налаштуваннях — і розділ повернеться таким, яким був.',
   modulesOpenSettings: 'Відкрити налаштування',
@@ -6259,7 +6260,8 @@ const en: Translations = {
   // Interface modules (was moduleText())
   modulesTitle: 'Modules',
   modulesSubtitle: 'Disabled modules disappear from the menu, dashboard and notifications. The data stays — turn a module back on and everything returns.',
-  modulesSystemNote: 'Settings and profile cannot be disabled.',
+  // пункт 10: базові розділи, що не вимикаються (ALWAYS_ON у store/ui-preferences.ts)
+  modulesSystemNote: 'Today, Settings with your profile, and Ideas & bugs cannot be turned off: this is where you turn modules back on and report problems.',
   modulesDisabledTitle: 'You turned this feature off',
   modulesDisabledBody: 'Nothing was deleted. Turn the module back on in settings and the section returns exactly as it was.',
   modulesOpenSettings: 'Open settings',

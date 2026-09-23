@@ -298,7 +298,8 @@ export default function AppleHealthScreen() {
         {/*
           «Apple Health» — назва сервісу, не перекладається; у словник іде
           лише підпис кнопки. Розділу немає в сайдбарі (він відкривається зі
-          «Здоровʼя»), тож стрілка «Назад» тут лишається й на планшеті.
+          «Здоровʼя»): на телефоні шлях нагору — «Назад», на планшеті — крихти
+          «Здоровʼя → Налаштування → Apple Health» (ScreenHeaderNav.ts).
           Рядок стану переїхав із коробки заголовка під нього: у спільному
           хедері під заголовком стоїть саме children.
         */}
@@ -313,6 +314,12 @@ export default function AppleHealthScreen() {
             color: c.sub,
             style: { borderColor: c.border, backgroundColor: c.dim },
           }}
+          crumbs={[
+            { label: tr.tabHealth, onPress: () => router.push('/(tabs)/health') },
+            { label: tr.settings, onPress: () => router.push('/health-profile') },
+            { label: sourceLabel },
+          ]}
+          crumbColor={c.sub}
           actions={authorized ? (
             <HeaderButton
               onPress={load}

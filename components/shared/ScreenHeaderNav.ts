@@ -13,7 +13,8 @@
  *
  * ПРАВИЛО.
  *   compact                     → «Назад» (сайдбара немає, стек — єдина навігація)
- *   широкий + розділ є в сайдбарі → нічого (перехід уже в сайдбарі)
+ *   широкий + розділ є в сайдбарі → нічого (перехід уже в сайдбарі);
+ *                                  підекран пункту (`activeOn`) — крихти, якщо є
  *   широкий + розділу немає      → крихти, якщо екран їх дав, інакше «Назад»
  *
  * Третій рядок — це «Акаунт», «Сон», «Підзадачі»: у сайдбар вони не винесені,
@@ -23,15 +24,26 @@
  * Функції чисті й не знають про React: рішення перевіряється тестом без
  * рендера, а ScreenHeader лише виконує його.
  */
-import { ADMIN_NAV_ITEM, NAV_GROUPS, isRouteActive } from '@/constants/nav';
+import { ADMIN_NAV_ITEM, NAV_GROUPS, isNavItemActive, isRouteActive, type NavItem } from '@/constants/nav';
 import type { SizeClass } from '@/constants/tokens';
 
+/** Усі пункти сайдбара, включно з адмінкою (див. isSidebarRoute). */
+function sidebarItems(): NavItem[] {
+  return [ADMIN_NAV_ITEM, ...NAV_GROUPS.flatMap(group => group.items)];
+}
+
 /**
- * Чи є цей маршрут пунктом сайдбара.
+ * Чи належить маршрут розділу з сайдбара — сам пункт або його підекран.
  *
  * Джерело — той самий NAV_GROUPS, що малює сайдбар, тож новий пункт меню
  * автоматично втрачає «Назад» на планшеті; окремого списку, який розійдеться
  * з меню, ми не заводимо.
+ *
+ * Підекрани (`activeOn`) рахуються тим самим isNavItemActive, яким сайдбар
+ * вирішує, що підсвітити: «Модулі» й «Сповіщення» підсвічують пункт
+ * «Опції», тож шлях нагору вже видно в сайдбарі. Раніше тут стояло лише
+ * isRouteActive — і на планшеті ці екрани отримували стрілку «Назад», яка
+ * вела на випадковий попередній екран, а не в Налаштування.
  *
  * ADMIN_NAV_ITEM перевіряється окремо, бо в NAV_GROUPS його немає: сайдбар
  * додає його в рантаймі за `user.isAdmin`. Для шапки прапорець адміна не
@@ -39,8 +51,12 @@ import type { SizeClass } from '@/constants/tokens';
  * router.back()), тож усі, хто цю шапку бачить, мають пункт у сайдбарі.
  */
 export function isSidebarRoute(pathname: string): boolean {
-  if (isRouteActive(ADMIN_NAV_ITEM.route, pathname)) return true;
-  return NAV_GROUPS.some(group => group.items.some(item => isRouteActive(item.route, pathname)));
+  return sidebarItems().some(item => isNavItemActive(item, pathname));
+}
+
+/** Сам пункт сайдбара (не підекран з `activeOn`). */
+function isSidebarItemRoot(pathname: string): boolean {
+  return sidebarItems().some(item => isRouteActive(item.route, pathname));
 }
 
 /** Що стоїть ліворуч від заголовка. */
@@ -54,7 +70,12 @@ export function headerLead(
   // На телефоні крихти не показуємо НІКОЛИ: у рядку заголовка немає для них
   // місця, а стек там і є ієрархією — стрілка каже те саме коротше.
   if (sizeClass === 'compact') return opts.hasBack ? 'back' : 'none';
-  if (isSidebarRoute(pathname)) return 'none';
+  if (isSidebarRoute(pathname)) {
+    // Сам пункт сайдбара — ієрархії немає, нічого не малюємо. Підекран
+    // (`activeOn`, напр. «Опції → Модулі») ієрархію має, і крихти кажуть,
+    // звідки прийшов; стрілку — ніколи: її роль уже виконує підсвічений пункт.
+    return opts.hasCrumbs && !isSidebarItemRoot(pathname) ? 'crumbs' : 'none';
+  }
   if (opts.hasCrumbs) return 'crumbs';
   return opts.hasBack ? 'back' : 'none';
 }

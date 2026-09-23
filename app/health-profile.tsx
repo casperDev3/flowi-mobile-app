@@ -129,13 +129,20 @@ export default function HealthProfileScreen() {
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
       <SafeAreaView style={{ flex: 1 }} edges={[]}>
         {/* Налаштування розділу пунктом сайдбара НЕ є (і не були задумані ним):
-            сюди заходять із шестерні в шапці «Здоровʼя», тож «Назад» лишається
-            і на планшеті — інакше шляху нагору звідси не буде взагалі. */}
+            сюди заходять із шестерні в шапці «Здоровʼя». На телефоні шлях
+            нагору — «Назад», на планшеті — крихти «Здоровʼя → Налаштування»
+            (ScreenHeaderNav.ts): стрілка поруч із сайдбаром вела б на
+            випадковий попередній екран і не казала б, звідки прийшов. */}
         <ScreenHeader
           title={tr.settings}
           color={c.text}
           titleStyle={s.pageTitle}
           back={{ onPress: () => router.back(), label: tr.back, color: c.text }}
+          crumbs={[
+            { label: tr.tabHealth, onPress: () => router.push('/(tabs)/health') },
+            { label: tr.settings },
+          ]}
+          crumbColor={c.sub}
         />
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>

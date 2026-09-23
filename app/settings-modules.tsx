@@ -22,7 +22,7 @@ import { Stack, router } from 'expo-router';
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { moduleSections } from '@/constants/nav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -60,14 +60,19 @@ export default function SettingsModulesScreen() {
         <ScreenHeader
           title={tr.modulesTitle}
           color={c.text}
-          actions={
-            <HeaderButton
-              onPress={() => router.back()}
-              accessibilityLabel={tr.back}
-              style={{ backgroundColor: c.dim, borderColor: c.border }}>
-              <IconSymbol name="chevron.left" size={17} color={c.sub} />
-            </HeaderButton>
-          }
+          // «Назад» і крихти — через спільне правило ScreenHeader (ScreenHeaderNav.ts):
+          // на планшеті стрілка поруч із сайдбаром — рудимент, а шлях нагору дають крихти.
+          back={{
+            onPress: () => router.back(),
+            label: tr.back,
+            color: c.sub,
+            style: { backgroundColor: c.dim, borderColor: c.border },
+          }}
+          crumbs={[
+            { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
+            { label: tr.modulesTitle },
+          ]}
+          crumbColor={c.sub}
         />
       </View>
 

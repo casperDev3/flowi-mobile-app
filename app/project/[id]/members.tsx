@@ -21,7 +21,6 @@ import {
 import * as Clipboard from 'expo-clipboard';
 
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
-import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
@@ -381,14 +380,14 @@ export default function ProjectMembersScreen() {
       project={project}
       isDark={isDark}
       title={tr.projectMembersTitle}
-      actions={
-        <HeaderButton
-          onPress={() => router.back()}
-          accessibilityLabel={tr.back}
-          style={{ backgroundColor: c.dim, borderColor: c.border }}>
-          <IconSymbol name="chevron.left" size={19} color={c.text} />
-        </HeaderButton>
-      }>
+      // «Назад» — у проп back: ScreenHeader сам сховає стрілку на планшеті, де
+      // оболонка вже малює крихти «Проєкт → …» (ScreenHeaderNav.ts).
+      back={{
+        onPress: () => router.back(),
+        label: tr.back,
+        color: c.text,
+        style: { backgroundColor: c.dim, borderColor: c.border },
+      }}>
       <ScrollView
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
         showsVerticalScrollIndicator={false}

@@ -21,7 +21,7 @@ import { fillTemplate } from '@/components/notifications/labels';
 import { PreferencesMatrix } from '@/components/notifications/PreferencesMatrix';
 import { QuietHoursCard } from '@/components/notifications/QuietHoursCard';
 import { useNotificationPreferences } from '@/components/notifications/use-notification-center';
-import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
@@ -75,17 +75,20 @@ export default function NotificationSettingsScreen() {
         <ScreenHeader
           title={tr.ncSettingsTitle}
           color={c.text}
-          actions={
-            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              {prefs.saving ? <ActivityIndicator color={c.accent} /> : null}
-              <HeaderButton
-                onPress={() => router.back()}
-                accessibilityLabel={tr.back}
-                style={{ backgroundColor: c.dim, borderColor: c.border }}>
-                <IconSymbol name="chevron.left" size={17} color={c.sub} />
-              </HeaderButton>
-            </View>
-          }
+          // «Назад» і крихти — через спільне правило ScreenHeader (ScreenHeaderNav.ts):
+          // на планшеті стрілка поруч із сайдбаром — рудимент, а шлях нагору дають крихти.
+          back={{
+            onPress: () => router.back(),
+            label: tr.back,
+            color: c.sub,
+            style: { backgroundColor: c.dim, borderColor: c.border },
+          }}
+          crumbs={[
+            { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
+            { label: tr.ncSettingsTitle },
+          ]}
+          crumbColor={c.sub}
+          actions={prefs.saving ? <ActivityIndicator color={c.accent} /> : null}
         />
       </View>
 

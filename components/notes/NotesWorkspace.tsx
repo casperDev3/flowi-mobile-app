@@ -12,19 +12,26 @@ import { useI18n } from '@/store/i18n';
 import { loadData, loadDataResult, retryStorageRead, subscribeToStorage } from '@/store/storage';
 import { saveSyncedChanges } from '@/store/synced-storage';
 import {
+  canEditNote,
   checklistProgress,
   collectNoteTags,
+  filterNotesByScope,
   formatTagsInput,
+  groupNotesByProject,
+  isNoteDraftDirty,
+  noteLeaveDecision,
   noteTaskDraft,
   notePreview,
   noteTags,
   normalizeNotes,
   parseTagsInput,
+  patchNote,
   selectNotes,
   tagKey,
   toggleChecklistAt,
   writeNote,
   type Note,
+  type NoteScope,
 } from '@/utils/notes';
 import { uuidV4 } from '@/utils/uuid';
 
@@ -42,7 +49,13 @@ function linkOptions(items: readonly LinkTarget[]): PickerOption[] {
     .filter(option => option.id.length > 0);
 }
 
-/** Both routes edit the same collection. Filtering never becomes a replacement write. */
+/**
+ * Both routes edit the same collection. Filtering never becomes a replacement write.
+ *
+ * Наявна нотатка відкривається в РЕЖИМІ ЧИТАННЯ (як у вебі): розмітка, живий
+ * чек-бокс і закріплення зберігаються одразу (`patchNote` + `saveSyncedChanges`),
+ * а текст правиться лише після «Редагувати». Нова нотатка — одразу редактор.
+ */
 export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDark: boolean }) {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
@@ -64,10 +77,11 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
   const [ready, setReady] = useState(false);
   const [readError, setReadError] = useState(false);
   const [query, setQuery] = useState('');
-  const [scope, setScope] = useState<'all' | 'personal' | 'projects'>('all');
+  const [scope, setScope] = useState<NoteScope>('all');
   const [sort, setSort] = useState<'newest' | 'oldest' | 'title'>('newest');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<Note | null>(null);
+  const [mode, setMode] = useState<'read' | 'edit'>('read');
   const [isNew, setIsNew] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -80,17 +94,16 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
   const busy = useRef(false);
   const mounted = useRef(true);
   const readVersion = useRef(0);
-  const sameTags = (a: readonly string[], b: readonly string[]) =>
-    a.length === b.length && a.every((value, index) => value === b[index]);
-  const dirty = !!selected && (
-    title !== selected.title
-    || body !== selected.body
-    || !sameTags(parseTagsInput(tagsInput), selected.tags ?? [])
-    || pinned !== (selected.pinned === true)
-    || linkedTaskId !== (selected.linkedTaskId ?? null)
-    || linkedMeetingId !== (selected.linkedMeetingId ?? null)
-  );
-  const canEdit = canEditProjectItem(selected?.projectId ?? projectId, roles);
+  const reading = !!selected && mode === 'read';
+  // У читанні показуємо СВІЖИЙ запис зі сховища (синк міг його оновити), а не
+  // знімок, зроблений у момент відкриття; редактор тримає власну чернетку.
+  const current = reading ? notes.find(n => n.id === selected.id) ?? selected : selected;
+  const dirty = !!selected && mode === 'edit' && isNoteDraftDirty(selected, {
+    title, body, tags: parseTagsInput(tagsInput), pinned, linkedTaskId, linkedMeetingId,
+  });
+  const canEditProject = (id: string) => canEditProjectItem(id, roles);
+  const canEdit = canEditNote(current ?? (projectId ? { projectId } : null), canEditProject);
+  const canCreate = canEditNote(projectId ? { projectId } : null, canEditProject);
   const c = isDark
     ? { bg: '#15131D', panel: '#201D29', text: '#F4F1FA', sub: '#B8B1C6', border: '#494151', accent: '#C4AAFF', dim: '#2A2634' }
     : { bg: '#FAF8FF', panel: '#FFFFFF', text: '#241C32', sub: '#655B73', border: '#D3CBDD', accent: '#6034A8', dim: '#F0ECF8' };
@@ -140,8 +153,9 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
   }, [reload]);
 
   const confirmLeave = (next: () => void) => {
-    if (busy.current) return;
-    if (!dirty) { next(); return; }
+    const decision = noteLeaveDecision({ dirty, busy: busy.current });
+    if (decision === 'stay') return;
+    if (decision === 'leave') { next(); return; }
     Alert.alert(tr.notesUnsavedTitle, tr.notesUnsavedBody, [
       { text: tr.cancel, style: 'cancel' },
       { text: tr.discardChanges, style: 'destructive', onPress: next },
@@ -152,18 +166,36 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
   const closeEditor = () => {
     setSelected(null); setTitle(''); setBody(''); setTagsInput('');
     setPinned(false); setLinkedTaskId(null); setLinkedMeetingId(null); setPreview(false);
+    setMode('read');
   };
-  const open = (note: Note, fresh = false) => confirmLeave(() => {
-    setSelected(note); setIsNew(fresh);
+  const fillDraft = (note: Note) => {
     setTitle(note.title); setBody(note.body);
     setTagsInput(formatTagsInput(note.tags));
     setPinned(note.pinned === true);
     setLinkedTaskId(note.linkedTaskId ?? null);
     setLinkedMeetingId(note.linkedMeetingId ?? null);
     setPreview(false);
+  };
+  const open = (note: Note, fresh = false) => confirmLeave(() => {
+    setSelected(note); setIsNew(fresh);
+    setMode(fresh ? 'edit' : 'read');
+    fillDraft(note);
+  });
+  /** Читання → редактор: чернетка береться зі свіжого запису. */
+  const startEdit = () => {
+    if (!current || !canEdit || busy.current) return;
+    setSelected(current); setIsNew(false);
+    fillDraft(current);
+    setMode('edit');
+  };
+  /** «Скасувати» в редакторі наявної нотатки — назад до читання, з питанням. */
+  const cancelEdit = () => confirmLeave(() => {
+    if (isNew) { closeEditor(); return; }
+    if (selected) fillDraft(selected);
+    setMode('read');
   });
   const add = () => {
-    if (!canEditProjectItem(projectId, roles) || !ready || readError) return;
+    if (!canCreate || !ready || readError) return;
     const now = new Date().toISOString();
     open({ id: uuidV4(), title: '', body: '', createdAt: now, updatedAt: now, ...(projectId ? { projectId } : {}) }, true);
   };
@@ -180,7 +212,9 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
       const result = await saveSyncedChanges('notes', isNew ? [] : [selected], [next], { checked: true });
       if (mounted.current) {
         if (result) setNotes(normalizeNotes(result));
-        closeEditor();
+        // Як у вебі: після збереження — читання щойно збереженої нотатки.
+        setSelected(next); setIsNew(false); setPreview(false);
+        setMode('read');
       }
     } catch {
       Alert.alert(tr.error, tr.notesSaveError);
@@ -189,15 +223,42 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
       if (mounted.current) setSaving(false);
     }
   };
+  /**
+   * Тиха правка з читання (чек-бокс, закріплення) — одразу на диск і в синк,
+   * без «Зберегти», так само як `patch` у вебі.
+   */
+  const patchRead = async (change: { body?: string; pinned?: boolean }) => {
+    if (!current || mode !== 'read' || !canEdit || busy.current || readError || !ready) return;
+    const next = patchNote(current, change, new Date().toISOString());
+    busy.current = true; setSaving(true);
+    try {
+      const result = await saveSyncedChanges('notes', [current], [next], { checked: true });
+      if (mounted.current) {
+        if (result) setNotes(normalizeNotes(result));
+        setSelected(next);
+      }
+    } catch {
+      Alert.alert(tr.error, tr.notesSaveError);
+    } finally {
+      busy.current = false;
+      if (mounted.current) setSaving(false);
+    }
+  };
+  const toggleReadLine = (line: number) => {
+    if (!current) return;
+    const nextBody = toggleChecklistAt(current.body, line);
+    if (nextBody !== current.body) void patchRead({ body: nextBody });
+  };
   const remove = () => {
-    if (!selected || isNew || !canEdit || busy.current || readError) return;
+    const target = current;
+    if (!target || isNew || !canEdit || busy.current || readError) return;
     Alert.alert(tr.delete, tr.notesDeleteConfirm, [
       { text: tr.cancel, style: 'cancel' },
       { text: tr.delete, style: 'destructive', onPress: async () => {
         if (busy.current) return;
         busy.current = true; setSaving(true);
         try {
-          const result = await saveSyncedChanges('notes', [selected], [], { checked: true });
+          const result = await saveSyncedChanges('notes', [target], [], { checked: true });
           if (mounted.current) { if (result) setNotes(normalizeNotes(result)); closeEditor(); }
         } catch { Alert.alert(tr.error, tr.notesSaveError); }
         finally { busy.current = false; if (mounted.current) setSaving(false); }
@@ -210,10 +271,12 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
    * людиною. Текст задачі береться з ЧЕРНЕТКИ, тобто з того, що людина бачить.
    */
   const createTaskFromLine = async (line: number) => {
-    if (!canEdit || busy.current || !selected) return;
+    if (!canEdit || busy.current || !current) return;
+    // У читанні джерело — збережений текст, у редакторі — чернетка, яку людина бачить.
+    const source = mode === 'read' ? current.body : body;
     const draft = noteTaskDraft(
-      { projectId: selected.projectId ?? projectId },
-      body.split('\n')[line] ?? '',
+      { projectId: current.projectId ?? projectId },
+      source.split('\n')[line] ?? '',
       { id: uuidV4(), now: new Date().toISOString() },
     );
     if (!draft) return;
@@ -230,17 +293,17 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
     }
   };
 
-  const scoped = useMemo(() => notes.filter(n => (!projectId || n.projectId === projectId)
-    && (projectId || scope === 'all' || (scope === 'personal' ? !n.projectId : !!n.projectId))),
+  const scoped = useMemo(() => (projectId
+    ? notes.filter(n => n.projectId === projectId)
+    : filterNotesByScope(notes, scope)),
   [notes, projectId, scope]);
   const tagChips = useMemo(() => collectNoteTags(scoped, locale), [scoped, locale]);
-  const sections = useMemo(() => {
-    const grouped = new Map<string, Note[]>();
-    selectNotes(scoped, { search: query, sort, tag: tagFilter, locale })
-      .forEach(n => { const key = n.projectId ?? ''; grouped.set(key, [...(grouped.get(key) ?? []), n]); });
-    return [...grouped].sort(([a], [b]) => a === '' ? -1 : b === '' ? 1 : (projects[a] ?? a).localeCompare(projects[b] ?? b, locale))
-      .map(([key, data]) => ({ key, title: key ? projects[key] ?? `${tr.project} · ${key.slice(0, 8)}` : tr.notesPersonal, data }));
-  }, [scoped, query, sort, tagFilter, projects, tr, locale]);
+  const sections = useMemo(() => groupNotesByProject(selectNotes(scoped, { search: query, sort, tag: tagFilter, locale }), projects, locale)
+    .map(group => ({
+      key: group.projectId ?? '',
+      title: group.projectId ? group.name ?? `${tr.project} · ${group.projectId.slice(0, 8)}` : tr.notesPersonal,
+      data: group.notes,
+    })), [scoped, query, sort, tagFilter, projects, tr, locale]);
 
   // Обраний тег міг зникнути разом з останньою нотаткою, що його несла —
   // інакше список лишився б порожнім без жодного видимого фільтра.
@@ -258,16 +321,53 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
   const missingLink = (value: string | null, options: PickerOption[]) =>
     value && !options.some(option => option.id === value) ? tr.notesLinkLost : null;
 
-  const editor = selected ? (
+  const projectLabel = (note: Note) => note.projectId ? projects[note.projectId] ?? tr.project : tr.notesPersonal;
+  const linkLabel = (id: string | undefined, options: PickerOption[]) =>
+    id ? options.find(option => option.id === id)?.label ?? tr.notesLinkLost : null;
+  const readTags = current ? noteTags(current) : [];
+  const readTask = current ? linkLabel(current.linkedTaskId, tasks) : null;
+  const readMeeting = current ? linkLabel(current.linkedMeetingId, meetings) : null;
+
+  const reader = reading && current ? (
+    <View testID="notes-reader" style={[s.editor, { backgroundColor: c.panel, borderColor: c.border }]}>
+      <View style={s.toolbar}>
+        {button(tr.close, () => confirmLeave(closeEditor), 'notes-close', saving)}
+        {canEdit && button(tr.edit, startEdit, 'notes-edit', saving || readError)}
+        {canEdit && button(current.pinned ? tr.notesUnpin : tr.notesPin, () => { void patchRead({ pinned: !current.pinned }); },
+          'notes-pin', saving || readError, current.pinned === true)}
+        {canEdit && button(tr.delete, remove, 'notes-delete', saving || readError)}
+      </View>
+      <Text style={[s.context, { color: c.sub }]}>{projectLabel(current)}</Text>
+      {!canEdit && <Text style={{ color: c.sub, paddingBottom: 8 }}>{tr.notesReadOnly}</Text>}
+      <Text testID="notes-read-title" accessibilityRole="header" style={[s.readTitle, { color: c.text }]}>
+        {current.title || tr.untitled}
+      </Text>
+      {readTags.length > 0 && <Text style={{ color: c.accent, fontSize: 13, paddingTop: 6 }}>
+        {readTags.map(tag => `#${tag}`).join(' ')}
+      </Text>}
+      {(readTask || readMeeting) && <Text style={{ color: c.sub, fontSize: 13, paddingTop: 6 }}>
+        {[readTask && `${tr.notesLinkTask}: ${readTask}`, readMeeting && `${tr.notesLinkMeeting}: ${readMeeting}`].filter(Boolean).join(' · ')}
+      </Text>}
+      <ScrollView style={s.previewPane} contentContainerStyle={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
+        <NoteMarkdown body={current.body} colors={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent, panel: c.panel }}
+          emptyLabel={tr.notesEmptyBody} createTaskLabel={tr.notesCreateTask}
+          onToggle={canEdit && !saving && !readError ? toggleReadLine : undefined}
+          onCreateTask={canEdit && !saving ? line => { void createTaskFromLine(line); } : undefined} />
+      </ScrollView>
+    </View>
+  ) : null;
+
+  const editor = selected && !reading ? (
     <View testID="notes-editor" style={[s.editor, { backgroundColor: c.panel, borderColor: c.border }]}>
       <View style={s.toolbar}>
         {button(tr.close, () => confirmLeave(closeEditor), 'notes-close', saving)}
+        {!isNew && button(tr.cancel, cancelEdit, 'notes-cancel-edit', saving)}
         {button(preview ? tr.notesEditText : tr.notesPreview, () => setPreview(v => !v), 'notes-preview-toggle', false, preview)}
         {canEdit && button(pinned ? tr.notesUnpin : tr.notesPin, () => setPinned(v => !v), 'notes-pin', saving, pinned)}
         {canEdit && !isNew && button(tr.delete, remove, 'notes-delete', saving || readError)}
         {canEdit && button(saving ? tr.loading : tr.save, () => { void save(); }, 'notes-save', saving || readError)}
       </View>
-      <Text style={[s.context, { color: c.sub }]}>{selected.projectId ? projects[selected.projectId] ?? tr.project : tr.notesPersonal}</Text>
+      <Text style={[s.context, { color: c.sub }]}>{projectLabel(selected)}</Text>
       {!canEdit && <Text style={{ color: c.sub, paddingBottom: 8 }}>{tr.notesReadOnly}</Text>}
       <TextInput testID="notes-title" accessibilityLabel={tr.titlePlaceholder} placeholder={tr.titlePlaceholder}
         placeholderTextColor={c.sub} value={title} onChangeText={setTitle} editable={canEdit && !saving}
@@ -303,7 +403,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
       )}
       <Text style={[s.hint, { color: c.sub }]}>{tr.notesMarkdownHint}</Text>
     </View>
-  ) : isExpanded ? <View style={s.empty}><Text style={{ color: c.sub }}>{tr.notesSelectHint}</Text></View> : null;
+  ) : reader ?? (isExpanded ? <View style={s.empty}><Text style={{ color: c.sub }}>{tr.notesSelectHint}</Text></View> : null);
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -315,7 +415,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
       <View style={[s.panes, { flexDirection: isExpanded ? 'row' : 'column', paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
         {(isExpanded || !selected) && <View testID="notes-list" style={isExpanded ? s.listWide : s.list}>
           <View style={s.toolbar}>
-            {canEditProjectItem(projectId, roles) && button(tr.addNote, add, 'notes-add', !ready || readError || saving)}
+            {canCreate && button(tr.addNote, add, 'notes-add', !ready || readError || saving)}
             {button(sort === 'title' ? tr.notesSortTitle : sort === 'oldest' ? tr.sortOldest : tr.sortNewest, () => setSort(v => v === 'newest' ? 'oldest' : v === 'oldest' ? 'title' : 'newest'), 'notes-sort')}
           </View>
           <TextInput testID="notes-search" accessibilityLabel={tr.notesSearch} placeholder={tr.notesSearch}
@@ -380,7 +480,8 @@ const s = StyleSheet.create({
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cardFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 8 },
   editor: { flex: 1, minWidth: 0, padding: 16, borderWidth: 1, borderRadius: 16 },
-  context: { fontSize: 13, paddingVertical: 8 }, title: { fontSize: 24, fontWeight: '700', minHeight: 52, borderBottomWidth: 1 },
+  context: { fontSize: 13, paddingVertical: 8 },
+  readTitle: { fontSize: 24, fontWeight: '700' }, title: { fontSize: 24, fontWeight: '700', minHeight: 52, borderBottomWidth: 1 },
   tagsInput: { minHeight: 44, fontSize: 15, borderBottomWidth: 1, paddingVertical: 8 },
   links: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 10 },
   link: { flexGrow: 1, flexShrink: 1, minWidth: 140 },

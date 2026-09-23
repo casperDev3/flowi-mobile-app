@@ -44,6 +44,7 @@ test('project editing preserves personal notes and notes that arrived while edit
   await mount('p1');
   expect(find('note-personal')).toBeUndefined();
   await press('note-mine');
+  await press('notes-edit');
   await input('notes-title', 'Updated title');
   const remote = note('mine', 'p1'); remote.body = 'Remote body';
   mockStore.set('notes', JSON.stringify([remote, note('personal'), note('other', 'p2'), note('arrived')]));
@@ -58,7 +59,8 @@ test('viewer has no mutations from aggregate screen, including closing a note', 
   mockRoles = { p1: 'viewer' };
   const before = JSON.stringify([note('mine', 'p1')]); mockStore.set('notes', before);
   await mount(); await press('note-mine');
-  expect(find('notes-title').props.editable).toBe(false);
+  expect(find('notes-reader')).toBeDefined(); expect(find('notes-title')).toBeUndefined();
+  expect(find('notes-edit')).toBeUndefined(); expect(find('notes-pin')).toBeUndefined();
   expect(find('notes-save')).toBeUndefined(); expect(find('notes-delete')).toBeUndefined();
   await press('notes-close');
   expect(mockStore.get('notes')).toBe(before); expect(mockStore.get('sync_outbox')).toBeUndefined();
@@ -100,7 +102,7 @@ test('corrupt storage shows recovery instead of allowing replacement with an emp
 });
 
 test('external storage updates refresh the list without replacing an active draft', async () => {
-  mockStore.set('notes', JSON.stringify([note('a')])); await mount(); await press('note-a'); await input('notes-body', 'local draft');
+  mockStore.set('notes', JSON.stringify([note('a')])); await mount(); await press('note-a'); await press('notes-edit'); await input('notes-body', 'local draft');
   mockStore.set('notes', JSON.stringify([note('a'), note('b')]));
   await act(async () => notifyStorageChanged('notes'));
   expect(find('note-b')).toBeDefined(); expect(find('notes-body').props.value).toBe('local draft');
@@ -121,7 +123,7 @@ test('delete retry queues tombstone when local deletion succeeded before outbox 
   mockStore.set('notes', JSON.stringify([note('a')])); await mount(); await press('note-a');
   mockFailOutbox = true; await press('notes-delete');
   await act(async () => { await alert.mock.calls[alert.mock.calls.length - 1][2].find((b: any) => b.style === 'destructive').onPress(); });
-  expect(stored()).toEqual([]); expect(find('notes-body')).toBeDefined();
+  expect(stored()).toEqual([]); expect(find('notes-reader')).toBeDefined();
   mockFailOutbox = false; await press('notes-delete');
   await act(async () => { await alert.mock.calls[alert.mock.calls.length - 1][2].find((b: any) => b.style === 'destructive').onPress(); });
   const outbox = JSON.parse(mockStore.get('sync_outbox') ?? '[]');

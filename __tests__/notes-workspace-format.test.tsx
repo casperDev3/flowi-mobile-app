@@ -58,6 +58,7 @@ test('одна стара нотатка більше не гасить екра
   expect(find('note-fresh')).toBeDefined();
 
   await press('note-legacy');
+  await press('notes-edit');
   expect(find('notes-body').props.value).toBe('створено у вебі');
   expect(find('notes-title').props.value).toBe('');
 });
@@ -83,7 +84,7 @@ test('теги фільтрують список, закріплена нота�
   expect(find('note-plain')).toBeDefined();
 });
 
-test('чек-лист: прогрес у списку, перемикання в перегляді править текст', async () => {
+test('чек-лист: прогрес у списку, перемикання в перегляді РЕДАКТОРА править чернетку', async () => {
   mockStore.set('notes', JSON.stringify([{
     id: 'plan', title: 'План', body: '- [ ] перше\n- [x] друге',
     createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
@@ -92,6 +93,7 @@ test('чек-лист: прогрес у списку, перемикання в
   expect(find('note-checklist-plan')).toBeDefined();
 
   await press('note-plan');
+  await press('notes-edit');
   await press('notes-preview-toggle');
   await press('note-check-0');
   await press('notes-preview-toggle');
@@ -110,7 +112,6 @@ test('задача з рядка нотатки лягає в tasks і не пе
   await mount('p1');
 
   await press('note-plan');
-  await press('notes-preview-toggle');
   await press('note-line-task-0');
 
   const tasks = stored<{ title: string; projectId?: string; status: string }>('tasks');
@@ -126,6 +127,7 @@ test('закріплення й теги зберігаються, а прибр
   }]));
   await mount();
   await press('note-a');
+  await press('notes-edit');
   expect(find('notes-tags').props.value).toBe('сайт');
 
   await input('notes-tags', 'звіт, план');
@@ -135,4 +137,67 @@ test('закріплення й теги зберігаються, а прибр
   const saved = stored<Note>('notes')[0];
   expect(saved.tags).toEqual(['звіт', 'план']);
   expect(saved.pinned).toBeUndefined();
+});
+
+// ─── Пункт 2: режим читання (паритет з вебом) ────────────────────────────────
+
+const planNote = {
+  id: 'plan', title: 'План', body: '- [ ] перше\n- [x] друге',
+  createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+};
+
+test('наявна нотатка відкривається в читанні, нова — одразу в редакторі', async () => {
+  mockStore.set('notes', JSON.stringify([planNote]));
+  await mount();
+  await press('note-plan');
+  expect(find('notes-reader')).toBeDefined();
+  expect(find('notes-body')).toBeUndefined();
+  expect(find('notes-read-title').props.children).toBe('План');
+
+  await press('notes-close');
+  await press('notes-add');
+  expect(find('notes-reader')).toBeUndefined();
+  expect(find('notes-body')).toBeDefined();
+});
+
+test('у читанні тап чек-бокса ОДРАЗУ зберігає нотатку й ставить її в синк', async () => {
+  mockStore.set('notes', JSON.stringify([planNote]));
+  await mount();
+  await press('note-plan');
+  expect(find('notes-save')).toBeUndefined();
+
+  await press('note-check-0');
+
+  expect(stored<Note>('notes')[0].body).toBe('- [x] перше\n- [x] друге');
+  expect(stored<Note>('notes')[0].title).toBe('План');
+  const outbox = stored<{ local_id: string; deleted: boolean }>('sync_outbox');
+  expect(outbox).toHaveLength(1);
+  expect(outbox[0]).toMatchObject({ local_id: 'plan', deleted: false });
+  // Лишаємось у читанні, а показаний текст — уже збережений.
+  expect(find('notes-reader')).toBeDefined();
+  expect(find('note-check-0')).toBeDefined();
+});
+
+test('у читанні закріплення зберігається одразу, «Редагувати» бере свіжий запис', async () => {
+  mockStore.set('notes', JSON.stringify([planNote]));
+  await mount();
+  await press('note-plan');
+  await press('notes-pin');
+  expect(stored<Note>('notes')[0].pinned).toBe(true);
+
+  await press('notes-edit');
+  expect(find('notes-body').props.value).toBe('- [ ] перше\n- [x] друге');
+  await press('notes-cancel-edit');
+  expect(find('notes-reader')).toBeDefined();
+});
+
+test('«Скасувати» з брудним редактором питає, а не губить правку мовчки', async () => {
+  mockStore.set('notes', JSON.stringify([planNote]));
+  await mount();
+  await press('note-plan');
+  await press('notes-edit');
+  await input('notes-body', 'нова правка');
+  await press('notes-cancel-edit');
+  expect(find('notes-body').props.value).toBe('нова правка');
+  expect(alert).toHaveBeenCalled();
 });

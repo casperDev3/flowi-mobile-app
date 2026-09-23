@@ -459,3 +459,123 @@ export function writeNote(base: NoteInput | null, fields: NoteFields): Note {
     linkedMeetingId,
   };
 }
+
+// ─── Паритет екранів (пункт 2) ────────────────────────────────────────────────
+//
+// Однакові назви й правила з вебом (`lib/notes.ts`). Спільна фікстура —
+// `__tests__/notes-parity.json` тут і `lib/notes-parity.json` у вебі
+// (побайтова копія): якщо правило розійдеться, впаде тест на обох платформах.
+
+/** Фільтр агрегованого екрана: усі, лише особисті (без проєкту) чи лише проєктні. */
+export type NoteScope = 'all' | 'personal' | 'projects';
+
+export function filterNotesByScope<T extends NoteInput>(notes: readonly T[], scope: NoteScope): T[] {
+  if (scope === 'personal') return notes.filter((note) => !note.projectId);
+  if (scope === 'projects') return notes.filter((note) => Boolean(note.projectId));
+  return [...notes];
+}
+
+export interface NoteGroup<T> {
+  /** null — особисті нотатки. */
+  projectId: string | null;
+  /** Назва проєкту; null — особисті або проєкт, назви якого ще не знаємо. */
+  name: string | null;
+  notes: T[];
+}
+
+/**
+ * Групи списку: спершу особисті, далі проєкти за абеткою назв. Порядок
+ * усередині групи — той, що прийшов (тобто результат `selectNotes`).
+ */
+export function groupNotesByProject<T extends NoteInput>(
+  notes: readonly T[],
+  projectNames: Readonly<Record<string, string>>,
+  locale = 'uk-UA',
+): NoteGroup<T>[] {
+  const grouped = new Map<string, T[]>();
+  for (const note of notes) {
+    const key = note.projectId ?? '';
+    const bucket = grouped.get(key);
+    if (bucket) bucket.push(note);
+    else grouped.set(key, [note]);
+  }
+  const label = (key: string) => projectNames[key] ?? key;
+  return [...grouped.entries()]
+    .sort(([a], [b]) => (a === '' ? -1 : b === '' ? 1 : label(a).localeCompare(label(b), locale)))
+    .map(([key, items]) => ({
+      projectId: key || null,
+      name: key ? projectNames[key] ?? null : null,
+      notes: items,
+    }));
+}
+
+/**
+ * Чи може людина правити саме цю нотатку. Особиста — так; проєктна — за роллю
+ * в її проєкті (`canEditProject`, платформний хелпер ролей). `limit` —
+ * верхня межа від екрана (простір проєкту вже знає роль і передає її).
+ */
+export function canEditNote(
+  note: Pick<NoteInput, 'projectId'> | null | undefined,
+  canEditProject: (projectId: string) => boolean,
+  limit = true,
+): boolean {
+  if (!limit) return false;
+  const projectId = note?.projectId;
+  return projectId ? canEditProject(projectId) : true;
+}
+
+/** Поля редактора в тому вигляді, в якому їх тримає форма. */
+export interface NoteDraftState {
+  title: string;
+  body: string;
+  tags: readonly string[];
+  pinned: boolean;
+  linkedTaskId: string | null;
+  linkedMeetingId: string | null;
+}
+
+/**
+ * Чи відрізняється редактор від збереженої нотатки. Порівнюється те, що
+ * реально ляже на диск через `writeNote`: назва без країв, теги без регістру
+ * й дублів, порожній звʼязок = відсутній.
+ */
+export function isNoteDraftDirty(note: NoteInput, draft: NoteDraftState): boolean {
+  const savedTags = normalizeTagList(note.tags).map(tagKey);
+  const draftTags = mergeTags(draft.tags).map(tagKey);
+  return (
+    draft.title.trim() !== noteTitle(note) ||
+    draft.body !== noteBody(note) ||
+    savedTags.length !== draftTags.length ||
+    savedTags.some((tag, index) => tag !== draftTags[index]) ||
+    draft.pinned !== (note.pinned === true) ||
+    (asFilled(draft.linkedTaskId) ?? null) !== (asFilled(note.linkedTaskId) ?? null) ||
+    (asFilled(draft.linkedMeetingId) ?? null) !== (asFilled(note.linkedMeetingId) ?? null)
+  );
+}
+
+/**
+ * Що робити, коли людина йде з редактора (інша нотатка, «Скасувати», «Назад»,
+ * закриття вкладки): під час збереження — лишитись, з незбереженими змінами —
+ * спитати, інакше — просто піти.
+ */
+export function noteLeaveDecision(state: { dirty: boolean; busy?: boolean }): 'stay' | 'leave' | 'confirm' {
+  if (state.busy) return 'stay';
+  return state.dirty ? 'confirm' : 'leave';
+}
+
+/**
+ * Тиха правка з режиму читання: чек-бокс і закріплення зберігаються одразу,
+ * без редактора. Назва, теги й звʼязки лишаються як були.
+ */
+export function patchNote(
+  note: NoteInput,
+  change: { body?: string; pinned?: boolean },
+  now: string,
+): Note {
+  return writeNote(note, {
+    title: noteTitle(note),
+    body: change.body ?? noteBody(note),
+    pinned: change.pinned ?? note.pinned === true,
+    now,
+  });
+}

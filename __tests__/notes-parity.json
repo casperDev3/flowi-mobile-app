@@ -1,0 +1,68 @@
+{
+  "about": "Паритет правил екрана нотаток (пункт 2). Побайтова копія: web lib/notes-parity.json == mobile __tests__/notes-parity.json.",
+  "notes": [
+    { "id": "personal-a", "title": "A", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z" },
+    { "id": "beta-1", "title": "B1", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z", "projectId": "p1" },
+    { "id": "alpha-1", "title": "C1", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z", "projectId": "p2" },
+    { "id": "personal-b", "title": "D", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z" },
+    { "id": "unknown-1", "title": "E", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z", "projectId": "zeta-id" },
+    { "id": "beta-2", "title": "F", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z", "projectId": "p1" }
+  ],
+  "projectNames": { "p1": "Beta", "p2": "Alpha" },
+  "scope": {
+    "all": ["personal-a", "beta-1", "alpha-1", "personal-b", "unknown-1", "beta-2"],
+    "personal": ["personal-a", "personal-b"],
+    "projects": ["beta-1", "alpha-1", "unknown-1", "beta-2"]
+  },
+  "groups": [
+    { "projectId": null, "name": null, "ids": ["personal-a", "personal-b"] },
+    { "projectId": "p2", "name": "Alpha", "ids": ["alpha-1"] },
+    { "projectId": "p1", "name": "Beta", "ids": ["beta-1", "beta-2"] },
+    { "projectId": "zeta-id", "name": null, "ids": ["unknown-1"] }
+  ],
+  "roles": { "p1": "viewer", "p2": "member", "p3": "owner" },
+  "canEdit": [
+    { "why": "особиста нотатка — завжди своя", "projectId": null, "limit": true, "expected": true },
+    { "why": "глядач проєкту не править", "projectId": "p1", "limit": true, "expected": false },
+    { "why": "учасник править", "projectId": "p2", "limit": true, "expected": true },
+    { "why": "власник править", "projectId": "p3", "limit": true, "expected": true },
+    { "why": "проєкт без відомої ролі (соло-фаза) — як власник", "projectId": "p9", "limit": true, "expected": true },
+    { "why": "верхня межа екрана перекриває все", "projectId": null, "limit": false, "expected": false }
+  ],
+  "dirtyBase": {
+    "id": "d1", "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true,
+    "linkedTaskId": "t1", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z"
+  },
+  "dirty": [
+    { "why": "без змін", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": false },
+    { "why": "пробіли по краях назви не зберігаються", "draft": { "title": " Назва ", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": false },
+    { "why": "регістр і решітка тега — той самий тег", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["#сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": false },
+    { "why": "змінено текст", "draft": { "title": "Назва", "body": "- [x] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": true },
+    { "why": "додано тег", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт", "звіт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": true },
+    { "why": "відкріплено", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": false, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": true },
+    { "why": "прибрано зв'язок із задачею", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": null, "linkedMeetingId": null }, "expected": true },
+    { "why": "додано зустріч", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": "m1" }, "expected": true }
+  ],
+  "leave": [
+    { "state": { "dirty": false, "busy": false }, "expected": "leave" },
+    { "state": { "dirty": true, "busy": false }, "expected": "confirm" },
+    { "state": { "dirty": true, "busy": true }, "expected": "stay" },
+    { "state": { "dirty": false, "busy": true }, "expected": "stay" }
+  ],
+  "patch": {
+    "now": "2026-09-23T12:00:00.000Z",
+    "change": { "body": "- [x] пункт" },
+    "expected": {
+      "id": "d1", "title": "Назва", "body": "- [x] пункт", "tags": ["Сайт"], "pinned": true,
+      "linkedTaskId": "t1", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-23T12:00:00.000Z"
+    }
+  },
+  "patchPin": {
+    "now": "2026-09-23T12:00:00.000Z",
+    "change": { "pinned": false },
+    "expected": {
+      "id": "d1", "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"],
+      "linkedTaskId": "t1", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-23T12:00:00.000Z"
+    }
+  }
+}

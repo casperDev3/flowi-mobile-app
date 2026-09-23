@@ -14,17 +14,22 @@ env:
     visible:
       id: note-${PROJECT_NOTE_ID}
     timeout: 30000
+# Tapping a note opens the reader; the editor only opens via notes-edit.
 - tapOn:
     id: note-${PROJECT_NOTE_ID}
 - assertVisible:
-    id: notes-editor
+    id: notes-reader
 - takeScreenshot: ${EVIDENCE_DIR}/project-portrait
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible:
     id: notes-list
 - assertVisible:
-    id: notes-editor
+    id: notes-reader
 - takeScreenshot: ${EVIDENCE_DIR}/project-landscape
+- tapOn:
+    id: notes-edit
+- assertVisible:
+    id: notes-editor
 - tapOn:
     id: notes-body
 - eraseText: 1000
@@ -47,7 +52,7 @@ env:
 - tapOn:
     id: note-${PROJECT_NOTE_ID}
 - assertVisible:
-    id: notes-editor
+    id: notes-reader
 - assertVisible:
     id: notes-list
 - takeScreenshot: ${EVIDENCE_DIR}/aggregate-landscape

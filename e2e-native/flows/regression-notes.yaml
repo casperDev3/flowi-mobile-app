@@ -25,18 +25,28 @@ appId: com.casper3.f-tracking-app
 - inputText: Draft survives save and reopen
 - tapOn:
     id: notes-save
+# After save the note stays open in read mode (notes-reader), not in the editor.
 - extendedWaitUntil:
-    visible: ${NOTE_TITLE}
+    visible:
+      id: notes-reader
     timeout: 10000
+- assertVisible: ${NOTE_TITLE}
+- tapOn:
+    id: notes-close
 - tapOn:
     id: notes-search
 - eraseText
 - inputText: ${NOTE_TITLE}
+# Tapping a note opens the reader; the editor only opens via notes-edit.
 - tapOn:
     id: "note-.*"
 - assertVisible:
-    id: notes-editor
+    id: notes-reader
 - assertVisible: Draft survives save and reopen
+- tapOn:
+    id: notes-edit
+- assertVisible:
+    id: notes-editor
 - tapOn:
     id: notes-close
 - tapOn:

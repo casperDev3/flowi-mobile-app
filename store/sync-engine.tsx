@@ -72,6 +72,42 @@ export function setProjectsChangedHandler(handler: (() => void) | null): void {
 }
 
 /**
+ * Очікування обмінів проєктів, що вже йдуть (`waitForAllProjectSyncsIdle` з
+ * `store/project-sync.ts`). Реєструється звідти ж, а не імпортується, — той
+ * самий цикл-імпорт, що й у `setProjectsChangedHandler`.
+ *
+ * Потрібне `pullAllFromServer`: `syncProject`, що стартував ДО скидання
+ * курсорів, наприкінці пише в `project_sync_state_v1` свій старий курсор — і
+ * без очікування цей запис лягав би поверх щойно скинутого нуля.
+ */
+let _projectSyncsIdleWaiter: (() => Promise<void>) | null = null;
+export function setProjectSyncsIdleWaiter(waiter: (() => Promise<void>) | null): void {
+  _projectSyncsIdleWaiter = waiter;
+}
+
+/**
+ * Стеля очікування: обмін проєкту, що завис на мережі, не мусить тримати
+ * «витягнути все» нескінченно. Після стелі скидаємо курсори однаково — гірше
+ * не стане, ніж було без очікування, а обробник нижче все одно запускає
+ * новий синк проєктів.
+ */
+const PROJECT_SYNCS_IDLE_TIMEOUT_MS = 15_000;
+
+async function waitForProjectSyncsIdleBounded(): Promise<void> {
+  const waiter = _projectSyncsIdleWaiter;
+  if (!waiter) return;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    await Promise.race([
+      waiter(),
+      new Promise<void>(resolve => { timer = setTimeout(resolve, PROJECT_SYNCS_IDLE_TIMEOUT_MS); }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
  * «Мої проєкти» для перевірки §3.5 нижче (`foreignStreamIds`) — той самий
  * розрахунок, що й `getMyProjectIds()` у `store/project-sync.ts`, продубльований
  * тут напряму через `loadData`, а не імпортом того модуля: `project-sync.ts`
@@ -1331,6 +1367,15 @@ export async function pushAllToServer(): Promise<void> {
  * і обнуління зламало б дефолти в UI.
  */
 async function pruneRecordsMissingOnServer(seenKeys: Set<string>): Promise<void> {
+  // Пункт 7: особистий потік (`/sync/user/v2/`) НЕ несе записів проєктів —
+  // вони живуть у `/projects/{id}/sync/`. Без цього винятку «витягнути все»
+  // стирало кожну задачу/зустріч проєкту як «відсутню на сервері», а курсори
+  // проєктів лишались попереду — і ті записи більше ніколи не поверталися.
+  // Критерій той самий, що й у маршрутизації outbox (`resolveOutboxStream`):
+  // рядок, який пішов би в `project:*`, особистому pull не належить.
+  const myProjectIds = await loadMyProjectIdsForPull();
+  const conflictedRaw = await loadData<unknown>(PROJECT_ID_CONFLICTS_KEY, []);
+  const conflicted = new Set(Array.isArray(conflictedRaw) ? (conflictedRaw as string[]) : []);
   for (const collection of PULLED_ARRAY_KEYS) {
     const storedLocal = await loadData<unknown>(collection, []);
     if (!Array.isArray(storedLocal)) continue;
@@ -1338,10 +1383,30 @@ async function pruneRecordsMissingOnServer(seenKeys: Set<string>): Promise<void>
     if (!local.length) continue;
     const kept = local.filter(item => {
       const id = normalizeSyncLocalId(item.id);
-      return id != null && seenKeys.has(syncRecordKey(collection, id));
+      if (id == null) return false;
+      if (seenKeys.has(syncRecordKey(collection, id))) return true;
+      const stream = resolveOutboxStream(collection, id, item as unknown as Record<string, unknown>, myProjectIds, conflicted);
+      return isProjectStream(stream);
     });
     if (kept.length !== local.length) await saveData(collection, kept);
   }
+}
+
+/**
+ * Ключ стану проєктного синку (`store/project-sync.ts` PROJECT_SYNC_STATE_KEY).
+ * Продубльований, а не імпортований — той самий цикл-імпорт, що й у
+ * `loadMyProjectIdsForPull` вище.
+ */
+const PROJECT_SYNC_STATE_KEY = 'project_sync_state_v1';
+
+async function resetProjectSyncCursors(): Promise<void> {
+  const raw = await loadData<unknown>(PROJECT_SYNC_STATE_KEY, {});
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+  const next: Record<string, unknown> = {};
+  for (const [id, entry] of Object.entries(raw as Record<string, Record<string, unknown>>)) {
+    next[id] = { ...(entry ?? {}), cursor: 0, revisions: {} };
+  }
+  await saveData(PROJECT_SYNC_STATE_KEY, next);
 }
 
 /**
@@ -1372,6 +1437,15 @@ export async function pullAllFromServer(): Promise<void> {
     await setRevisionMap(result.revisions);
     await setServerCursor(result.cursor);
     await saveKnownCollections();
+    // Пункт 7: «витягнути все» — це й проєкти. Курсори/ревізії проєктів
+    // скидаємо в 0 (роль і lastSyncedAt лишаємо — від них залежить §9.4
+    // «доступ відкликано» в syncAllMyProjects), і штовхаємо їхній повний
+    // обмін тим самим обробником, що й WS `projects_changed`. Перед скиданням
+    // чекаємо обміни проєктів, що вже йдуть: інакше їхній фінальний запис
+    // стану повернув би старий курсор поверх нуля.
+    await waitForProjectSyncsIdleBounded();
+    await resetProjectSyncCursors();
+    _projectsChangedHandler?.();
     const completedAt = Date.now();
     await saveData(LAST_SYNC_AT_KEY, completedAt);
     updateLastSyncAt(completedAt);

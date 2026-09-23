@@ -28,7 +28,7 @@ import { apiFetch, ApiError, getFreshAccessToken, OfflineError, refreshSession }
 import { getWsBase } from './api-config';
 import { isOnlineMode, subscribeOnlineMode } from './app-mode';
 import { useAuth } from './auth';
-import { loadData, saveData } from './storage';
+import { loadData, saveData, saveDataChecked } from './storage';
 import { withStorageLock } from './storage-lock';
 import { appendConflicts, type SyncConflict } from './sync-conflicts';
 import {
@@ -37,6 +37,7 @@ import {
   quarantineRejections,
   resolveConflictSide,
   setProjectsChangedHandler,
+  setProjectSyncsIdleWaiter,
   syncRecordKey,
   type SyncRevisionMap,
 } from './sync-engine';
@@ -682,7 +683,11 @@ async function applyProjectPull(
         const key = syncRecordKey(collection, row.local_id);
         if (freshDirty.has(key)) skipped.add(key);
       }
-      await saveData(collection, applyPullItems(local as { id: string }[], rows, freshDirty, collection));
+      // Пункт 7: `saveData` ковтає помилку `setItem` (переповнене сховище,
+      // збій нативного модуля) — а курсор проєкту після цього все одно
+      // зсувався, і ці рядки вже ніколи не приїхали б повторно. `Checked`
+      // прокидає помилку: обмін падає, курсор лишається там, де був.
+      await saveDataChecked(collection, applyPullItems(local as { id: string }[], rows, freshDirty, collection));
     });
   }
   return skipped;
@@ -787,6 +792,11 @@ export function waitForAllProjectSyncsIdle(): Promise<void> {
   if (_projectSyncing.size === 0) return Promise.resolve();
   return new Promise(resolve => { _projectSyncIdleWaiters.add(resolve); });
 }
+
+// «Витягнути все з сервера» (sync-engine.pullAllFromServer) скидає курсори
+// проєктів і мусить спершу дочекатись обмінів, що вже йдуть. Реєстрація, а не
+// імпорт, — sync-engine не може імпортувати цей модуль (цикл).
+setProjectSyncsIdleWaiter(waitForAllProjectSyncsIdle);
 
 /**
  * Повне локальне видалення проєкту (§9.4): усі записи `projectId == P` з
@@ -952,7 +962,22 @@ async function runProjectSync(projectId: string): Promise<void> {
     }
     if (staleIds.size) await removeMutationsFromOutbox(staleIds);
 
-    const result = await exchangeProject(projectId, state.cursor, mutations, state.revisions);
+    let result = await exchangeProject(projectId, state.cursor, mutations, state.revisions);
+
+    // Пункт 7 (симетрично до особистого `doSync`): курсор сервера, менший за
+    // мій, означає, що потік проєкту на сервері перезібрано/відновлено. З
+    // моїм старим курсором сервер віддавав би «змін нема» назавжди, і нові
+    // записи (задачі з інших пристроїв) до цього пристрою не доходили б.
+    // Обнуляємо курсор і ревізії й одразу повторюємо обмін з 0.
+    if (state.cursor > 0 && result.serverCursor < state.cursor) {
+      if (__DEV__) console.log(`[project-sync] ${projectId}: курсор сервера ${result.serverCursor} < мого ${state.cursor} — повний pull`);
+      const retry = await exchangeProject(projectId, 0, [], {});
+      result = {
+        ...retry,
+        conflicts: [...result.conflicts, ...retry.conflicts],
+        hadForbiddenRejection: result.hadForbiddenRejection || retry.hadForbiddenRejection,
+      };
+    }
 
     // §3.4: роль у відповіді ≠ кешованої (і це НЕ перший синк цього проєкту —
     // щойно створений/приєднаний проєкт завжди «змінює» роль із дефолтного

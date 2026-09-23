@@ -33,6 +33,10 @@ jest.mock('@/store/storage', () => ({
   saveData: jest.fn(async (key: string, data: unknown) => {
     mockStore.set(key, JSON.stringify(data));
   }),
+  // applyProjectPull пише через варіант, що прокидає помилку (пункт 7).
+  saveDataChecked: jest.fn(async (key: string, data: unknown) => {
+    mockStore.set(key, JSON.stringify(data));
+  }),
   // Нікому з коду під тестом підписка на зміни не потрібна — заглушка,
   // аби модулі, що її імпортують (store/storage-lock.ts і т.д.), не впали.
   notifyStorageChanged: jest.fn(),

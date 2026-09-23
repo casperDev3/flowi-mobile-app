@@ -168,8 +168,11 @@ export function emptyProjectSyncState(role: ProjectSyncStateEntry['role'] = 'own
 
 /**
  * Проєкти, які варто синкати просто зараз: серверний курсор (з
- * `ProjectSummary`) пішов далі за локальний, АБО в outbox лежить хоч один
- * запис цього потоку (контракт §3.5 «коли синкати»).
+ * `ProjectSummary`) пішов далі за локальний, АБО став МЕНШИМ за локальний
+ * (потік на сервері перезібрано/відновлено — syncProject сам зробить повний
+ * pull з 0), АБО в outbox лежить хоч один запис цього потоку (контракт §3.5
+ * «коли синкати»). Без гілки «менший» відкочений проєкт через поллінг не
+ * синкався ніколи: лише на WS-сигнал, вхід у проєкт чи власну правку.
  */
 export function projectsNeedingSync(
   summaries: readonly { id: string; cursor: number }[],
@@ -180,7 +183,8 @@ export function projectsNeedingSync(
   for (const summary of summaries) {
     const local = state[summary.id]?.cursor ?? 0;
     const dirty = outboxStreams.has(projectStreamId(summary.id));
-    if (summary.cursor > local || dirty) result.push(summary.id);
+    const rolledBack = local > 0 && summary.cursor < local;
+    if (summary.cursor > local || rolledBack || dirty) result.push(summary.id);
   }
   return result;
 }

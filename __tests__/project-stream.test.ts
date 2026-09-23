@@ -132,6 +132,12 @@ describe('projectsNeedingSync', () => {
     expect(due).toEqual(['p-1']);
   });
 
+  it('flags a project whose server cursor fell behind the local one (server rollback)', () => {
+    const state = { 'p-1': emptyProjectSyncState() };
+    state['p-1'].cursor = 10;
+    expect(projectsNeedingSync([{ id: 'p-1', cursor: 4 }], state, new Set())).toEqual(['p-1']);
+  });
+
   it('skips an up-to-date, clean project', () => {
     const state = { 'p-1': emptyProjectSyncState() };
     state['p-1'].cursor = 10;

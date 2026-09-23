@@ -17,7 +17,7 @@ import { Platform } from 'react-native';
 export const DEFAULT_WORKSPACE_ORIGIN = 'https://api.flowi.casperdev.site';
 
 export const CLIENT_VERSION: string =
-  (Constants.expoConfig?.version as string | undefined) ?? '1.1.0';
+  (Constants.expoConfig?.version as string | undefined) ?? '1.2.0';
 
 /** Контракт §0.4 знає лише 'ios' | 'android' для мобільного заголовка. */
 export const CLIENT_PLATFORM: 'ios' | 'android' = Platform.OS === 'ios' ? 'ios' : 'android';

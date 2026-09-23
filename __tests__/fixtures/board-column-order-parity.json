@@ -1,0 +1,102 @@
+{
+  "_comment": "Паритет порядку колонки дошки (пункт 7+8): щойно створені — першими. Побайтова копія: web lib/__fixtures__/board-column-order-parity.json і mobile __tests__/fixtures/board-column-order-parity.json. limit null = без ліміту (Infinity). Очікування записані вручну, не знімком коду.",
+  "now": 1790164800000,
+  "windowMs": 600000,
+  "items": [
+    {
+      "id": "a-old",
+      "createdAt": "2026-09-22T12:00:00.000Z"
+    },
+    {
+      "id": "b-2min",
+      "createdAt": "2026-09-23T11:58:00.000Z"
+    },
+    {
+      "id": "c-old",
+      "createdAt": "2026-09-23T11:00:00.000Z"
+    },
+    {
+      "id": "d-5min",
+      "createdAt": "2026-09-23T11:55:00.000Z"
+    },
+    {
+      "id": "e-11min",
+      "createdAt": "2026-09-23T11:49:00.000Z"
+    },
+    {
+      "id": "f-future-1min",
+      "createdAt": "2026-09-23T12:01:00.000Z"
+    },
+    {
+      "id": "g-garbage",
+      "createdAt": "not-a-date"
+    },
+    {
+      "id": "h-no-date"
+    },
+    {
+      "id": "i-future-20min",
+      "createdAt": "2026-09-23T12:20:00.000Z"
+    },
+    {
+      "id": "j-null",
+      "createdAt": null
+    }
+  ],
+  "recent": {
+    "a-old": false,
+    "b-2min": true,
+    "c-old": false,
+    "d-5min": true,
+    "e-11min": false,
+    "f-future-1min": true,
+    "g-garbage": false,
+    "h-no-date": false,
+    "i-future-20min": false,
+    "j-null": false
+  },
+  "cases": [
+    {
+      "name": "без ліміту (мобільна дошка, панель «Всі (N)»)",
+      "limit": null,
+      "visible": [
+        "f-future-1min",
+        "b-2min",
+        "d-5min",
+        "a-old",
+        "c-old",
+        "e-11min",
+        "g-garbage",
+        "h-no-date",
+        "i-future-20min",
+        "j-null"
+      ],
+      "total": 10,
+      "truncated": false
+    },
+    {
+      "name": "ліміт 5: хвіст обрізається лише серед старих",
+      "limit": 5,
+      "visible": [
+        "f-future-1min",
+        "b-2min",
+        "d-5min",
+        "a-old",
+        "c-old"
+      ],
+      "total": 10,
+      "truncated": true
+    },
+    {
+      "name": "ліміт 2 менший за кількість щойно створених: вони все одно всі видимі",
+      "limit": 2,
+      "visible": [
+        "f-future-1min",
+        "b-2min",
+        "d-5min"
+      ],
+      "total": 10,
+      "truncated": true
+    }
+  ]
+}

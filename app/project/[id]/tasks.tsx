@@ -43,7 +43,7 @@
  * редактора.
  */
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { MonthPicker } from '@/components/shared/MonthPicker';
@@ -89,6 +89,7 @@ import {
   normalizePriority, type Filter, type Task,
 } from '@/utils/taskUtils';
 import { applyFormSprint, BACKLOG_GROUP_KEY, type Sprint } from '@/utils/sprintUtils';
+import { limitBoardColumn } from '@/utils/taskGroupLimit';
 
 type ViewMode = 'list' | 'board' | 'calendar' | 'timeline';
 
@@ -209,6 +210,17 @@ export default function ProjectTasksScreen() {
     () => ownTasks.filter(t => filter === 'all' || t.status === filter),
     [ownTasks, filter],
   );
+
+  // Годинник «щойно створених» для дошки (як на вебі, kanban-board.tsx):
+  // хвилинний такт, щоб задача сама сходила з верху колонки, коли минає вікно
+  // RECENTLY_CREATED_WINDOW_MS, а не лише на наступній зміні даних.
+  const [boardNow, setBoardNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (view !== 'board') return;
+    setBoardNow(Date.now());
+    const timer = setInterval(() => setBoardNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, [view]);
 
   // Проєкт копіює власні статуси при створенні (contract §3.3); поки їх
   // немає (легасі-проєкт до цієї фази), дошка падає на особисті/типові —
@@ -761,7 +773,12 @@ export default function ProjectTasksScreen() {
               // з висячим/відсутнім kanbanColumnId (статус видалили в
               // налаштуваннях проєкту) завжди опинялась у ПЕРШІЙ колонці,
               // навіть якщо вона вже виконана (review finding).
-              const colTasks = filtered.filter(t => boardColumnForTask(t, boardColumns, columns)?.id === col.id);
+              // Рішення власника (пункт 7+8, паритет з вебом): щойно створені —
+              // першими в колонці. Ліміту карток тут немає, тож лише порядок.
+              const colTasks = limitBoardColumn(
+                filtered.filter(t => boardColumnForTask(t, boardColumns, columns)?.id === col.id),
+                boardNow,
+              ).visible;
               return (
                 <View key={col.id} style={[st.boardColumn, { borderColor: c.border, backgroundColor: c.dim }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>

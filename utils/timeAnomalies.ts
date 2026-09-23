@@ -10,19 +10,35 @@
  * Запис аномальний, якщо виконується БУДЬ-ЩО з:
  *   • довший за 8 год;
  *   • перетинає північ;
- *   • більший ніж утричі за медіану записів цієї задачі АБО цього проєкту;
- *   • коротший за 1 хв.
+ *   • коротший за 1 хв;
+ *   • довший ніж утричі за ТИПОВУ сесію І водночас щонайменше на 30 хв
+ *     довший за неї (рішення власника, пункт 4).
+ *
+ * Типова сесія — медіана сесій цієї задачі (коли їх ≥ 3), інакше медіана
+ * сесій проєкту за `recordProjectId(entry, taskProjects)` (≥ 3). Задача
+ * важливіша за проєкт: «довго» для огляду коду і для стендапу — різні числа.
+ *
+ * Навіщо друга умова (+30 хв): для п'ятихвилинної задачі «утричі» — це 15 хв,
+ * і черга «перевір» заповнювалась звичайними сесіями, у яких нема чого правити.
+ *
+ * Проєкт — через `recordProjectId`, а не лише `entry.projectId`: таймер у
+ * вебі довго писав записи БЕЗ проєкту, і такі сесії випадали з медіани
+ * проєкту, хоча сторінка показує їх у ньому.
  *
  * Позначка «це нормально» (`markedNormal`) живе в самому записі, тож вона
  * переживає перезапуск і синхронізується на інші пристрої разом із записом.
  */
 
+import { recordProjectId, type TaskProjects } from './timeEntries';
+
 /** Довше за це — аномалія. */
 export const ANOMALY_MAX_SECONDS = 8 * 3600;
 /** Коротше за це — аномалія. */
 export const ANOMALY_MIN_SECONDS = 60;
-/** У скільки разів перевищення медіани вважається викидом. */
+/** У скільки разів перевищення типової сесії вважається викидом. */
 export const ANOMALY_OUTLIER_FACTOR = 3;
+/** І водночас щонайменше на стільки секунд довше за типову. */
+export const ANOMALY_OUTLIER_MIN_EXCESS = 30 * 60;
 /**
  * Менше записів у групі — медіани не рахуємо.
  *
@@ -51,6 +67,8 @@ export interface AnomalyEntry {
 export interface AnomalyReport<T extends AnomalyEntry = AnomalyEntry> {
   entry: T;
   kinds: AnomalyKind[];
+  /** Типова сесія, з якою порівнювали, секунди; `null` — порівнювати не було з чим. */
+  typicalSeconds: number | null;
 }
 
 function parseMs(value: string | undefined): number | null {
@@ -119,17 +137,22 @@ export function taskGroupKey(entry: AnomalyEntry): string | null {
   return title ? `title:${title}` : null;
 }
 
-export function projectGroupKey(entry: AnomalyEntry): string | null {
-  return entry?.projectId ? `project:${entry.projectId}` : null;
+/** Ключ «той самий проєкт» — власний `projectId` запису, інакше проєкт його задачі. */
+export function projectGroupKey(entry: AnomalyEntry, taskProjects?: TaskProjects): string | null {
+  const projectId = recordProjectId(entry, taskProjects);
+  return projectId ? `project:${projectId}` : null;
 }
 
 /** Медіани тривалості за задачами й за проєктами — один прохід по набору. */
-export function groupMedians(entries: readonly AnomalyEntry[]): Map<string, number> {
+export function groupMedians(
+  entries: readonly AnomalyEntry[],
+  taskProjects?: TaskProjects,
+): Map<string, number> {
   const buckets = new Map<string, number[]>();
   for (const entry of entries ?? []) {
     const seconds = entrySeconds(entry);
     if (!seconds) continue;
-    for (const key of [taskGroupKey(entry), projectGroupKey(entry)]) {
+    for (const key of [taskGroupKey(entry), projectGroupKey(entry, taskProjects)]) {
       if (!key) continue;
       const bucket = buckets.get(key);
       if (bucket) bucket.push(seconds);
@@ -146,25 +169,57 @@ export function groupMedians(entries: readonly AnomalyEntry[]): Map<string, numb
 }
 
 /**
+ * Типова сесія запису: медіана його задачі, інакше медіана його проєкту;
+ * `null` — жодна група не набрала ANOMALY_MIN_GROUP записів.
+ *
+ * Не мінімум із двох, як було: медіана проєкту змішує короткі й довгі задачі,
+ * і довга, але звична для СВОЄЇ задачі сесія виходила «викидом» лише тому, що
+ * поруч у проєкті багато п'ятихвилинок.
+ */
+export function typicalSessionFor(
+  entry: AnomalyEntry,
+  medians: Map<string, number>,
+  taskProjects?: TaskProjects,
+): number | null {
+  const taskMedian = medians.get(taskGroupKey(entry) ?? '') ?? 0;
+  if (taskMedian > 0) return taskMedian;
+  const projectMedian = medians.get(projectGroupKey(entry, taskProjects) ?? '') ?? 0;
+  return projectMedian > 0 ? projectMedian : null;
+}
+
+/** Сесія набагато довша за типову: утричі І щонайменше на 30 хв. */
+export function isOutlier(seconds: number, typicalSeconds: number | null): boolean {
+  if (!typicalSeconds || typicalSeconds <= 0) return false;
+  return (
+    seconds > typicalSeconds * ANOMALY_OUTLIER_FACTOR &&
+    seconds - typicalSeconds >= ANOMALY_OUTLIER_MIN_EXCESS
+  );
+}
+
+/**
+ * «×3.5» — у скільки разів сесія довша за типову. До десятих, а від десяти —
+ * цілими: «×12.3» нічого не додає до «×12».
+ */
+export function outlierFactor(seconds: number, typicalSeconds: number | null): number | null {
+  if (!typicalSeconds || typicalSeconds <= 0 || seconds <= 0) return null;
+  const ratio = seconds / typicalSeconds;
+  return ratio >= 10 ? Math.round(ratio) : Math.round(ratio * 10) / 10;
+}
+
+/**
  * Усі порушення конкретного запису. Масив, а не один прапорець: та сама сесія
  * буває і задовгою, і викидом, і людині корисно бачити обидві причини.
  */
 export function anomalyKinds(
   entry: AnomalyEntry,
   medians: Map<string, number> = new Map(),
+  taskProjects?: TaskProjects,
 ): AnomalyKind[] {
   const kinds: AnomalyKind[] = [];
   const seconds = entrySeconds(entry);
   if (seconds > ANOMALY_MAX_SECONDS) kinds.push('long');
   if (crossesMidnight(entry)) kinds.push('midnight');
-
-  const taskMedian = medians.get(taskGroupKey(entry) ?? '') ?? 0;
-  const projectMedian = medians.get(projectGroupKey(entry) ?? '') ?? 0;
-  const limit = Math.min(
-    taskMedian > 0 ? taskMedian * ANOMALY_OUTLIER_FACTOR : Infinity,
-    projectMedian > 0 ? projectMedian * ANOMALY_OUTLIER_FACTOR : Infinity,
-  );
-  if (Number.isFinite(limit) && seconds > limit) kinds.push('outlier');
+  if (isOutlier(seconds, typicalSessionFor(entry, medians, taskProjects))) kinds.push('outlier');
 
   // Нульова тривалість — це не «коротка сесія», а биті дані: такий запис
   // однаково не потрапляє в підсумки, і тягти його в чергу на перевірку
@@ -179,16 +234,59 @@ export function anomalyKinds(
  */
 export function detectAnomalies<T extends AnomalyEntry>(
   entries: readonly T[] | undefined,
+  taskProjects?: TaskProjects,
 ): AnomalyReport<T>[] {
   const list = entries ?? [];
-  const medians = groupMedians(list);
+  const medians = groupMedians(list, taskProjects);
   const reports: AnomalyReport<T>[] = [];
   for (const entry of list) {
     if (!entry || entry.markedNormal) continue;
-    const kinds = anomalyKinds(entry, medians);
-    if (kinds.length) reports.push({ entry, kinds });
+    const kinds = anomalyKinds(entry, medians, taskProjects);
+    if (kinds.length) {
+      reports.push({ entry, kinds, typicalSeconds: typicalSessionFor(entry, medians, taskProjects) });
+    }
   }
   return reports.sort((a, b) => (entryEndMs(b.entry) ?? 0) - (entryEndMs(a.entry) ?? 0));
+}
+
+/** Що список записів знає про аномалію рядка — за id запису. */
+export interface RowAnomaly {
+  kinds: AnomalyKind[];
+  typicalSeconds: number | null;
+}
+
+/**
+ * Черга → мапа для рядків списку. Рядок бере рівно той самий звіт, що й блок
+ * «Перевір N записів»: інакше рядок і блок могли б розійтись у тому, що вони
+ * вважають аномалією.
+ */
+export function anomalyMap(reports: readonly AnomalyReport[]): Map<string, RowAnomaly> {
+  const map = new Map<string, RowAnomaly>();
+  for (const report of reports ?? []) {
+    map.set(report.entry.id, { kinds: report.kinds, typicalSeconds: report.typicalSeconds });
+  }
+  return map;
+}
+
+/**
+ * Наскільки серйозно виділяти рядок: «red» — задовга чи через північ (майже
+ * завжди забутий таймер), «amber» — лише довша за звичне або коротша за
+ * хвилину (варто глянути, але найчастіше це правда).
+ */
+export function anomalySeverity(kinds: readonly AnomalyKind[]): 'red' | 'amber' | null {
+  if (!kinds?.length) return null;
+  return kinds.includes('long') || kinds.includes('midnight') ? 'red' : 'amber';
+}
+
+/**
+ * «Звичайна сесія» для KPI — медіана тривалості записів вибірки, секунди.
+ *
+ * Поруч із «Середнє на задачу» (сума ÷ число задач): середнє тягне вгору одна
+ * забута на ніч сесія, медіана — ні, і саме її людина впізнає як «зазвичай».
+ */
+export function typicalSessionSeconds(entries: readonly AnomalyEntry[] | undefined): number {
+  const values = (entries ?? []).map(entrySeconds).filter((v) => v > 0);
+  return Math.round(median(values));
 }
 
 /**

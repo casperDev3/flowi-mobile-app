@@ -18,7 +18,14 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import type { TimeColors } from '@/components/time/TimePalette';
 import type { Lang, Translations } from '@/store/translations';
-import { trimmedSeconds, type AnomalyKind, type AnomalyReport } from '@/utils/timeAnomalies';
+import {
+  entrySeconds,
+  outlierFactor,
+  trimmedSeconds,
+  type AnomalyEntry,
+  type AnomalyKind,
+  type AnomalyReport,
+} from '@/utils/timeAnomalies';
 import type { TimeRecord } from '@/utils/timeEntries';
 
 export interface AnomalyPanelProps {
@@ -74,8 +81,9 @@ export function AnomalyPanel({
         </Text>
       </View>
 
-      {visible.map(({ entry, kinds }) => {
+      {visible.map(({ entry, kinds, typicalSeconds }) => {
         const trim = trimmedSeconds(entry);
+        const outlier = outlierText(entry, kinds, typicalSeconds, tr, lang, formatDuration);
         return (
           <View key={entry.id} style={[s.row, { borderColor: c.border }]}>
             <Text numberOfLines={1} style={[s.rowTitle, { color: c.text }]}>
@@ -91,6 +99,7 @@ export function AnomalyPanel({
                 </View>
               ))}
             </View>
+            {outlier ? <Text style={[s.rowMeta, { color: c.text, marginTop: 6 }]}>{outlier}</Text> : null}
             <View style={s.actions}>
               {/* «Обрізати» є не завжди: коротку сесію обрізати нема куди, і
                   кнопка, що нічого не робить, гірша за її відсутність. */}
@@ -167,8 +176,48 @@ function QuickAction({
   );
 }
 
+/**
+ * «×3,1 від звичного · зазвичай 25 хв» — для викиду; `null`, коли запис не
+ * викид або порівнювати не було з чим. Спільне для блоку й рядка списку
+ * (`app/(tabs)/time.tsx`), щоб обидва казали те саме.
+ */
+export function outlierText(
+  entry: AnomalyEntry,
+  kinds: readonly AnomalyKind[],
+  typicalSeconds: number | null,
+  tr: Translations,
+  lang: Lang,
+  formatDuration: (seconds: number) => string,
+): string | null {
+  if (!kinds.includes('outlier') || !typicalSeconds) return null;
+  const factor = outlierFactor(entrySeconds(entry), typicalSeconds);
+  if (factor === null) return null;
+  const factorText = lang === 'uk' ? String(factor).replace('.', ',') : String(factor);
+  return tr.timeRowOutlier.replace('{factor}', factorText).replace('{typical}', formatDuration(typicalSeconds));
+}
+
+/**
+ * Причини аномалії рядком для рядка списку: назви порушень, а викид — з
+ * множником і типовою сесією замість загального «довше за звичне».
+ */
+export function anomalyReasonText(
+  entry: AnomalyEntry,
+  kinds: readonly AnomalyKind[],
+  typicalSeconds: number | null,
+  tr: Translations,
+  lang: Lang,
+  formatDuration: (seconds: number) => string,
+): string {
+  const outlier = outlierText(entry, kinds, typicalSeconds, tr, lang, formatDuration);
+  return kinds
+    .filter(kind => !(kind === 'outlier' && outlier))
+    .map(kind => anomalyLabel(kind, tr))
+    .concat(outlier ? [outlier] : [])
+    .join(' · ');
+}
+
 /** Назва порушення — зі словника, щоб збігалась із вебом і з рештою інтерфейсу. */
-function anomalyLabel(kind: AnomalyKind, tr: Translations): string {
+export function anomalyLabel(kind: AnomalyKind, tr: Translations): string {
   if (kind === 'long') return tr.anomalyLong;
   if (kind === 'midnight') return tr.anomalyMidnight;
   if (kind === 'outlier') return tr.anomalyOutlier;

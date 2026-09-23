@@ -1565,8 +1565,6 @@ export interface Translations {
   notesRetry: string;
   notesDeleteConfirm: string;
   noteBodyPlaceholder: string;
-  timeManualTask: string;
-  timeManualMinutes: string;
   timeNoEntries: string;
   projectModuleDisabled: string;
   projectBudgetOwnerOnly: string;
@@ -1835,6 +1833,23 @@ export interface Translations {
   anomalyTrimTo: string;
   anomalyMarkNormal: string;
   anomalyShowMore: string;
+  // пункт 4: облік часу — звичайна сесія, виділення аномалій у списку, швидка правка
+  timeTypicalSession: string;
+  timeRowOutlier: string;
+  timeRowAnomalyA11y: string;
+  timeEntryStartLabel: string;
+  timeEntryEndLabel: string;
+  timeEntryNextDay: string;
+  timeEntryClockPlaceholder: string;
+  timeEntryErrorStart: string;
+  timeEntryErrorEnd: string;
+  timeEntryProjectLabel: string;
+  timeEntryPersonal: string;
+  timeEntryProjectLocked: string;
+  timeEntryNoTask: string;
+  timeEntrySearchTask: string;
+  timeEntryPickTask: string;
+  timeEntryNoTasksFound: string;
 
   // ─── Вкладки розділу «Здоровʼя» ──────────────────────────────────────────────
   healthTabOverview: string;
@@ -3787,8 +3802,6 @@ const uk: Translations = {
   notesRetry: 'Повторити',
   notesDeleteConfirm: 'Видалити цю нотатку з усіх синхронізованих пристроїв?',
   noteBodyPlaceholder: 'Текст нотатки...',
-  timeManualTask: 'Над чим працювали',
-  timeManualMinutes: 'Хв',
   timeNoEntries: 'Ще немає записів часу',
   projectModuleDisabled: 'Цей розділ вимкнено в налаштуваннях проєкту',
   projectBudgetOwnerOnly: 'Бюджет бачить лише власник проєкту',
@@ -4006,7 +4019,7 @@ const uk: Translations = {
   hkFailed: 'HealthKit не відповів: це не «нуль», а відсутність даних',
 
   // Екран «Час»
-  timeAverageTask: 'Середня задача',
+  timeAverageTask: 'Середнє на задачу',
   timeProjectBreakdown: 'Розподіл за проєктами',
   timeMoreProjects: '+ ще {count}',
   timePeriodGroup: 'Період',
@@ -4035,7 +4048,7 @@ const uk: Translations = {
   // Черга «Перевір N записів» (було ANOMALY_LABEL)
   anomalyLong: 'Довше за 8 год',
   anomalyMidnight: 'Перетинає північ',
-  anomalyOutlier: 'Утричі більше за звичне',
+  anomalyOutlier: 'Набагато довше за звичне',
   anomalyShort: 'Коротше за 1 хв',
   anomalyCheckTitle: 'Перевір {count} {noun}',
   anomalyRecordOne: 'запис',
@@ -4044,6 +4057,23 @@ const uk: Translations = {
   anomalyTrimTo: 'Обрізати до {duration}',
   anomalyMarkNormal: 'Нормально',
   anomalyShowMore: 'Показати ще {count}',
+  // пункт 4: облік часу — звичайна сесія, виділення аномалій у списку, швидка правка
+  timeTypicalSession: 'Звичайна сесія',
+  timeRowOutlier: '×{factor} від звичного · зазвичай {typical}',
+  timeRowAnomalyA11y: 'Перевір: {kinds}',
+  timeEntryStartLabel: 'Початок',
+  timeEntryEndLabel: 'Кінець',
+  timeEntryNextDay: 'наступної доби',
+  timeEntryClockPlaceholder: 'ГГ:ХХ',
+  timeEntryErrorStart: 'Початок у форматі ГГ:ХХ',
+  timeEntryErrorEnd: 'Кінець у форматі ГГ:ХХ',
+  timeEntryProjectLabel: 'Проєкт',
+  timeEntryPersonal: 'Особисте',
+  timeEntryProjectLocked: 'Проєкт задає задача',
+  timeEntryNoTask: 'Без задачі',
+  timeEntrySearchTask: 'Знайти задачу',
+  timeEntryPickTask: 'Обрати задачу',
+  timeEntryNoTasksFound: 'Задач не знайдено',
 
   // Вкладки розділу «Здоровʼя»
   healthTabOverview: 'Огляд',
@@ -5992,8 +6022,6 @@ const en: Translations = {
   notesRetry: 'Retry',
   notesDeleteConfirm: 'Delete this note from all synced devices?',
   noteBodyPlaceholder: 'Note text...',
-  timeManualTask: 'What did you work on',
-  timeManualMinutes: 'Min',
   timeNoEntries: 'No time entries yet',
   projectModuleDisabled: 'This section is turned off in project settings',
   projectBudgetOwnerOnly: 'Only the project owner sees the budget',
@@ -6211,7 +6239,7 @@ const en: Translations = {
   hkFailed: 'HealthKit did not answer: this is missing data, not a zero',
 
   // Time screen
-  timeAverageTask: 'Average task',
+  timeAverageTask: 'Average per task',
   timeProjectBreakdown: 'Breakdown by project',
   timeMoreProjects: '+ {count} more',
   timePeriodGroup: 'Period',
@@ -6240,7 +6268,7 @@ const en: Translations = {
   // Review queue (was ANOMALY_LABEL)
   anomalyLong: 'Longer than 8 h',
   anomalyMidnight: 'Crosses midnight',
-  anomalyOutlier: 'Three times the usual',
+  anomalyOutlier: 'Much longer than usual',
   anomalyShort: 'Shorter than 1 min',
   anomalyCheckTitle: 'Check {count} {noun}',
   anomalyRecordOne: 'record',
@@ -6249,6 +6277,23 @@ const en: Translations = {
   anomalyTrimTo: 'Trim to {duration}',
   anomalyMarkNormal: 'Normal',
   anomalyShowMore: 'Show {count} more',
+  // пункт 4: облік часу — звичайна сесія, виділення аномалій у списку, швидка правка
+  timeTypicalSession: 'Typical session',
+  timeRowOutlier: '×{factor} the usual · usually {typical}',
+  timeRowAnomalyA11y: 'Check: {kinds}',
+  timeEntryStartLabel: 'Start',
+  timeEntryEndLabel: 'End',
+  timeEntryNextDay: 'next day',
+  timeEntryClockPlaceholder: 'HH:MM',
+  timeEntryErrorStart: 'Use HH:MM for the start',
+  timeEntryErrorEnd: 'Use HH:MM for the end',
+  timeEntryProjectLabel: 'Project',
+  timeEntryPersonal: 'Personal',
+  timeEntryProjectLocked: 'The task sets the project',
+  timeEntryNoTask: 'No task',
+  timeEntrySearchTask: 'Find a task',
+  timeEntryPickTask: 'Pick a task',
+  timeEntryNoTasksFound: 'No tasks found',
 
   // Health tabs
   healthTabOverview: 'Overview',

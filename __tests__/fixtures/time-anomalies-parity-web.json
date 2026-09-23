@@ -1,0 +1,250 @@
+{
+  "_comment": "Паритет аномалій часу (пункт 4). Побайтова копія: web lib/__fixtures__/time-anomalies-parity.json ↔ mobile __tests__/fixtures/time-anomalies-parity-web.json. Дати — ЛОКАЛЬНІ (без Z): тест перетворює їх на ISO у поясі пристрою, бо «перетин півночі» міряється добою людини.",
+  "tasks": [
+    {
+      "id": "a1",
+      "projectId": "p1"
+    },
+    {
+      "id": "a2",
+      "projectId": "p1"
+    },
+    {
+      "id": "a3",
+      "projectId": "p1"
+    },
+    {
+      "id": "a4",
+      "projectId": "p1"
+    },
+    {
+      "id": "review"
+    }
+  ],
+  "entries": [
+    {
+      "id": "rev1",
+      "task": "Код-рев'ю",
+      "duration": 1200,
+      "date": "2026-09-15T11:00:00",
+      "taskId": "review"
+    },
+    {
+      "id": "rev2",
+      "task": "Код-рев'ю",
+      "duration": 1200,
+      "date": "2026-09-16T11:00:00",
+      "taskId": "review"
+    },
+    {
+      "id": "rev3",
+      "task": "Код-рев'ю",
+      "duration": 1200,
+      "date": "2026-09-17T11:00:00",
+      "taskId": "review"
+    },
+    {
+      "id": "rev-big",
+      "task": "Код-рев'ю",
+      "duration": 3700,
+      "date": "2026-09-18T15:00:00",
+      "taskId": "review"
+    },
+    {
+      "id": "mail1",
+      "task": "Пошта",
+      "duration": 300,
+      "date": "2026-09-15T09:10:00"
+    },
+    {
+      "id": "mail2",
+      "task": " пошта ",
+      "duration": 300,
+      "date": "2026-09-16T09:10:00"
+    },
+    {
+      "id": "mail3",
+      "task": "ПОШТА",
+      "duration": 300,
+      "date": "2026-09-17T09:10:00"
+    },
+    {
+      "id": "mail-slow",
+      "task": "Пошта",
+      "duration": 1500,
+      "date": "2026-09-18T09:30:00"
+    },
+    {
+      "id": "a1",
+      "task": "Ранок",
+      "duration": 600,
+      "date": "2026-09-15T10:00:00",
+      "taskId": "a1"
+    },
+    {
+      "id": "a2",
+      "task": "День",
+      "duration": 600,
+      "date": "2026-09-16T10:00:00",
+      "taskId": "a2"
+    },
+    {
+      "id": "a3",
+      "task": "Вечір",
+      "duration": 600,
+      "date": "2026-09-17T10:00:00",
+      "taskId": "a3"
+    },
+    {
+      "id": "a4-odd",
+      "task": "Разовий огляд",
+      "duration": 4000,
+      "date": "2026-09-18T14:00:00",
+      "taskId": "a4"
+    },
+    {
+      "id": "call1",
+      "task": "Дзвінок",
+      "duration": 3600,
+      "date": "2026-09-15T16:00:00",
+      "projectId": "p2",
+      "taskId": "call"
+    },
+    {
+      "id": "call2",
+      "task": "Дзвінок",
+      "duration": 3600,
+      "date": "2026-09-16T16:00:00",
+      "projectId": "p2",
+      "taskId": "call"
+    },
+    {
+      "id": "call3",
+      "task": "Дзвінок",
+      "duration": 3600,
+      "date": "2026-09-17T16:00:00",
+      "projectId": "p2",
+      "taskId": "call"
+    },
+    {
+      "id": "q1",
+      "task": "Швидке",
+      "duration": 300,
+      "date": "2026-09-15T17:00:00",
+      "projectId": "p2",
+      "taskId": "q1"
+    },
+    {
+      "id": "q2",
+      "task": "Швидке",
+      "duration": 300,
+      "date": "2026-09-16T17:00:00",
+      "projectId": "p2",
+      "taskId": "q2"
+    },
+    {
+      "id": "q3",
+      "task": "Швидке",
+      "duration": 300,
+      "date": "2026-09-17T17:00:00",
+      "projectId": "p2",
+      "taskId": "q3"
+    },
+    {
+      "id": "q4",
+      "task": "Швидке",
+      "duration": 300,
+      "date": "2026-09-18T17:00:00",
+      "projectId": "p2",
+      "taskId": "q4"
+    },
+    {
+      "id": "long",
+      "task": "Забутий таймер",
+      "duration": 32400,
+      "date": "2026-09-19T18:00:00"
+    },
+    {
+      "id": "night",
+      "task": "Нічна",
+      "duration": 3600,
+      "date": "2026-09-20T00:30:00",
+      "startedAt": "2026-09-19T23:30:00",
+      "endedAt": "2026-09-20T00:30:00"
+    },
+    {
+      "id": "short",
+      "task": "Мить",
+      "duration": 30,
+      "date": "2026-09-20T08:00:00"
+    },
+    {
+      "id": "ok-long",
+      "task": "Інвентаризація",
+      "duration": 36000,
+      "date": "2026-09-14T20:00:00",
+      "markedNormal": true
+    }
+  ],
+  "expected": {
+    "withTaskProjects": [
+      {
+        "id": "short",
+        "kinds": [
+          "short"
+        ],
+        "typicalSeconds": null,
+        "factor": null,
+        "severity": "amber",
+        "trim": null
+      },
+      {
+        "id": "night",
+        "kinds": [
+          "midnight"
+        ],
+        "typicalSeconds": null,
+        "factor": null,
+        "severity": "red",
+        "trim": 1800
+      },
+      {
+        "id": "long",
+        "kinds": [
+          "long"
+        ],
+        "typicalSeconds": null,
+        "factor": null,
+        "severity": "red",
+        "trim": 28800
+      },
+      {
+        "id": "rev-big",
+        "kinds": [
+          "outlier"
+        ],
+        "typicalSeconds": 1200,
+        "factor": 3.1,
+        "severity": "amber",
+        "trim": null
+      },
+      {
+        "id": "a4-odd",
+        "kinds": [
+          "outlier"
+        ],
+        "typicalSeconds": 600,
+        "factor": 6.7,
+        "severity": "amber",
+        "trim": null
+      }
+    ],
+    "withoutTaskProjects": [
+      "short",
+      "night",
+      "long",
+      "rev-big"
+    ],
+    "typicalSessionSeconds": 1200
+  }
+}

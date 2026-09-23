@@ -11,6 +11,11 @@
  * Порядок блоків задає порядок питань: що йде ЗАРАЗ → скільки вийшло за період
  * → що треба перевірити → самі записи.
  *
+ * Аномалії видно не лише в блоці «Перевір N записів», а й у САМОМУ рядку
+ * списку (червона смуга — задовга чи через північ, бурштинова — довша за
+ * звичне), з «Обрізати до …» одним дотиком. Рядок бере той самий звіт
+ * `detectAnomalies`, що й блок, тож вони не розходяться.
+ *
  * Чого тут навмисно НЕМАЄ:
  *  • блоку «Новий таймер» — таймер стартує лише із задачі або зустрічі, бо
  *    вільний секундомір лишав час, не привʼязаний ні до чого, і його однаково
@@ -33,11 +38,13 @@ import {
 import { PressableScale } from '@/components/shared/PressableScale';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
-import { AnomalyPanel } from '@/components/time/AnomalyPanel';
+import { AnomalyPanel, anomalyReasonText } from '@/components/time/AnomalyPanel';
+import { TimerProjectTag } from '@/components/time/ActiveTimerRow';
 import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { TimeEntrySheet } from '@/components/time/TimeEntrySheet';
 import { TimeFilterSheet } from '@/components/time/TimeFilterSheet';
 import { TimeKpi } from '@/components/time/TimeKpi';
+import { useTimerProjects } from '@/components/time/useTimerProjects';
 import { timeColors } from '@/components/time/TimePalette';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useContentWidth } from '@/hooks/use-content-width';
@@ -50,11 +57,19 @@ import type { Translations } from '@/store/translations';
 import { loadData } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
-import type { ActiveTimer } from '@/utils/activeTimers';
+import type { ActiveTimer, TimerProject } from '@/utils/activeTimers';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
 import { elapsedSince } from '@/utils/taskTimer';
-import { applyDuration, detectAnomalies } from '@/utils/timeAnomalies';
+import {
+  anomalyMap,
+  anomalySeverity,
+  applyDuration,
+  detectAnomalies,
+  trimmedSeconds,
+  typicalSessionSeconds,
+  type RowAnomaly,
+} from '@/utils/timeAnomalies';
 import {
   averageTaskSeconds,
   filterRecords,
@@ -73,6 +88,7 @@ import {
   type TimeRecord,
   type TimeSort,
 } from '@/utils/timeEntries';
+import type { EditableTask } from '@/utils/timeEntryEdit';
 import { migrateTaskSessions, type MigratableTask } from '@/utils/timeMigration';
 
 /** Рівно те, що рядок активного таймера показує про підзавдання. */
@@ -100,6 +116,8 @@ export default function TimeScreen() {
   const isDark = useColorScheme() === 'dark';
   useScreenView('time');
   const { activeTimers, stopTimer, tasksRevision, timeEntriesRevision } = useTimerContext();
+  // Мітка проєкту в рядку таймера — та сама, що в панелі над табами й сайдбарі.
+  const projectOf = useTimerProjects(activeTimers);
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
@@ -112,6 +130,8 @@ export default function TimeScreen() {
   const [entries, setEntries] = useState<TimeRecord[]>([]);
   const [projects, setProjects] = useState<ProjectLike[]>([]);
   const [taskProjects, setTaskProjects] = useState<TaskProjects>(() => new Map());
+  /** Задачі для вибору у формі запису (id, назва, проєкт). */
+  const [taskChoices, setTaskChoices] = useState<EditableTask[]>([]);
   const [timerSubtasks, setTimerSubtasks] = useState<Record<string, RowSubtask[]>>({});
   const [initialized, setInitialized] = useState(false);
 
@@ -163,8 +183,13 @@ export default function TimeScreen() {
     try {
       const stored = await loadData<ProjectLike[]>('projects', []);
       setProjects(stored.filter(p => p?.id));
-      const tasks = await loadData<{ id: string; projectId?: string }[]>('tasks', []);
+      const tasks = await loadData<{ id: string; title?: string; projectId?: string }[]>('tasks', []);
       setTaskProjects(taskProjectMap(tasks));
+      setTaskChoices(
+        tasks
+          .filter(t => t?.id && typeof t.title === 'string' && t.title.trim())
+          .map(t => ({ id: t.id, title: t.title as string, projectId: t.projectId })),
+      );
     } catch (e) {
       if (__DEV__) console.warn('[time] проєкти не прочитались:', e);
     }
@@ -268,13 +293,15 @@ export default function TimeScreen() {
   );
   const total = useMemo(() => totalSeconds(filtered), [filtered]);
   const average = useMemo(() => averageTaskSeconds(filtered), [filtered]);
+  const typical = useMemo(() => typicalSessionSeconds(filtered), [filtered]);
 
   /**
    * Аномалії шукаємо у ВСІХ записах, а не лише у відфільтрованих: медіана за
    * тижнем на трьох сесіях — не медіана, а випадкове число, і фільтр «сьогодні»
    * щоразу давав би інший список «перевір».
    */
-  const anomalies = useMemo(() => detectAnomalies(entries), [entries]);
+  const anomalies = useMemo(() => detectAnomalies(entries, taskProjects), [entries, taskProjects]);
+  const rowAnomalies = useMemo(() => anomalyMap(anomalies), [anomalies]);
 
   const sections = useMemo<Section[]>(() => {
     if (grouping === 'project') {
@@ -297,7 +324,7 @@ export default function TimeScreen() {
         : date.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
       return { key: group.key, title, seconds: group.seconds, color: null, data: group.items };
     });
-  }, [grouping, sorted, projects, now, tr.today, tr.yesterday, locale]);
+  }, [grouping, sorted, projects, now, tr.today, tr.yesterday, locale, taskProjects]);
 
   const c = useMemo(() => timeColors(isDark), [isDark]);
   const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);
@@ -431,23 +458,34 @@ export default function TimeScreen() {
               </View>
             </View>
           )}
-          renderItem={({ item }) => (
-            <EntryRow
-              entry={item}
-              projectName={projectById.get(recordProjectId(item, taskProjects) ?? '')?.name}
-              projectColor={projectById.get(recordProjectId(item, taskProjects) ?? '')?.color}
-              accent={c.indigo}
-              border={c.border}
-              text={c.text}
-              sub={c.sub}
-              danger={c.danger}
-              duration={fmtDur(item.duration)}
-              when={formatEntryDate(item.date)}
-              tr={tr}
-              onPress={openEntry}
-              onDelete={deleteEntry}
-            />
-          )}
+          renderItem={({ item }) => {
+            const anomaly: RowAnomaly | undefined = rowAnomalies.get(item.id);
+            const severity = anomalySeverity(anomaly?.kinds ?? []);
+            const trim = severity ? trimmedSeconds(item) : null;
+            return (
+              <EntryRow
+                entry={item}
+                severity={severity}
+                reason={anomaly && severity ? anomalyReasonText(item, anomaly.kinds, anomaly.typicalSeconds, tr, lang, fmtDur) : null}
+                trimSeconds={trim}
+                trimLabel={trim !== null ? tr.anomalyTrimTo.replace('{duration}', fmtDur(trim)) : null}
+                warn={c.warn}
+                projectName={projectById.get(recordProjectId(item, taskProjects) ?? '')?.name}
+                projectColor={projectById.get(recordProjectId(item, taskProjects) ?? '')?.color}
+                accent={c.indigo}
+                border={c.border}
+                text={c.text}
+                sub={c.sub}
+                danger={c.danger}
+                duration={fmtDur(item.duration)}
+                when={formatEntryDate(item.date)}
+                tr={tr}
+                onPress={openEntry}
+                onDelete={deleteEntry}
+                onTrim={trimEntry}
+              />
+            );
+          }}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 48 }}>
               <IconSymbol name="clock.fill" size={40} color={c.sub} />
@@ -477,6 +515,8 @@ export default function TimeScreen() {
                     <ActiveTimerRow
                       key={timer.id}
                       timer={timer}
+                      project={projectOf(timer)}
+                      tr={tr}
                       subtasks={timer.taskId ? timerSubtasks[timer.taskId] : undefined}
                       accent={c.indigo}
                       border={c.border}
@@ -496,6 +536,7 @@ export default function TimeScreen() {
                 isDark={isDark}
                 totalSeconds={total}
                 averageTaskSeconds={average}
+                typicalSessionSeconds={typical}
                 recordCount={filtered.length}
                 breakdown={breakdown}
                 formatDuration={fmtDur}
@@ -550,6 +591,9 @@ export default function TimeScreen() {
         height={height}
         isWide={isWide}
         tr={tr}
+        tasks={taskChoices}
+        projects={projects}
+        taskProjects={taskProjects}
         onClose={() => { setSheetOpen(false); setSheetEntry(null); }}
         onSubmit={upsertEntry}
       />
@@ -590,6 +634,9 @@ export default function TimeScreen() {
 interface ActiveTimerRowProps {
   subtasks?: RowSubtask[];
   timer: ActiveTimer;
+  /** Проєкт таймера (useTimerProjects); undefined — мітки немає. */
+  project?: TimerProject;
+  tr: Translations;
   accent: string;
   border: string;
   card: string;
@@ -604,7 +651,7 @@ interface ActiveTimerRowProps {
  * прямо в <Text>: інакше число завмирає до наступного перерендеру екрана.
  */
 const ActiveTimerRow = React.memo(function ActiveTimerRow({
-  timer, subtasks, accent, border, card, text, sub, stopLabel, onStop,
+  timer, project, tr, subtasks, accent, border, card, text, sub, stopLabel, onStop,
 }: ActiveTimerRowProps) {
   const all = subtasks ?? [];
   const doneCount = all.filter(x => x.done).length;
@@ -616,6 +663,7 @@ const ActiveTimerRow = React.memo(function ActiveTimerRow({
       <View style={[s.rowDot, { backgroundColor: accent }]} />
       <View style={{ flex: 1, marginLeft: 11, marginRight: 8 }}>
         <Text style={[s.entryTask, { color: text }]} numberOfLines={1}>{timer.label}</Text>
+        <TimerProjectTag project={project} tr={tr} color={sub} style={{ marginTop: 2 }} />
         {all.length > 0 && (
           <Text style={[s.entryMeta, { color: sub }]}>{doneCount}/{all.length}</Text>
         )}
@@ -646,6 +694,13 @@ const ActiveTimerRow = React.memo(function ActiveTimerRow({
 
 interface EntryRowProps {
   entry: TimeRecord;
+  /** З `anomalySeverity`: червоне — задовга чи через північ, бурштинове — решта. */
+  severity: 'red' | 'amber' | null;
+  /** Готовий підпис причин («×3,1 від звичного · зазвичай 25 хв»). */
+  reason: string | null;
+  trimSeconds: number | null;
+  trimLabel: string | null;
+  warn: string;
   projectName?: string;
   projectColor?: string;
   accent: string;
@@ -659,6 +714,7 @@ interface EntryRowProps {
   tr: Translations;
   onPress: (entry: TimeRecord) => void;
   onDelete: (entry: TimeRecord) => void;
+  onTrim: (entry: TimeRecord, seconds: number) => void;
 }
 
 /**
@@ -667,23 +723,52 @@ interface EntryRowProps {
  * список записів.
  */
 const EntryRow = React.memo(function EntryRow({
-  entry, projectName, projectColor, accent, border, text, sub, danger, duration, when, tr, onPress, onDelete,
+  entry, severity, reason, trimSeconds, trimLabel, warn, projectName, projectColor, accent, border, text, sub, danger,
+  duration, when, tr, onPress, onDelete, onTrim,
 }: EntryRowProps) {
+  const flag = severity === 'red' ? danger : severity === 'amber' ? warn : null;
+  const title = entry.task || tr.untitled;
   return (
     <TouchableOpacity
       activeOpacity={0.75}
       onPress={() => onPress(entry)}
       accessibilityRole="button"
-      accessibilityLabel={`${entry.task}, ${duration}. ${tr.edit}`}
-      style={[s.entryCard, { borderColor: border }]}>
-      <View style={[s.entryBar, { backgroundColor: projectColor ?? accent }]} />
+      accessibilityLabel={`${title}, ${duration}.${reason ? ` ${tr.timeRowAnomalyA11y.replace('{kinds}', reason)}.` : ''} ${tr.edit}`}
+      style={[
+        s.entryCard,
+        { borderColor: flag ? flag + '88' : border, backgroundColor: flag ? flag + '12' : 'transparent' },
+      ]}>
+      {/* Смуга: колір проєкту, а в аномального запису — колір тривоги, і
+          ширша, щоб її було видно краєм ока під час гортання. */}
+      <View style={[s.entryBar, flag ? { width: 4, backgroundColor: flag } : { backgroundColor: projectColor ?? accent }]} />
       <View style={{ flex: 1, marginLeft: 11 }}>
-        <Text numberOfLines={1} style={[s.entryTask, { color: text }]}>{entry.task || tr.untitled}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {flag && (
+            <IconSymbol name="exclamationmark.triangle.fill" size={12} color={flag} style={{ marginRight: 5 }} />
+          )}
+          <Text numberOfLines={1} style={[s.entryTask, { color: text, flexShrink: 1 }]}>{title}</Text>
+        </View>
         <Text numberOfLines={1} style={[s.entryMeta, { color: sub }]}>
           {when}
           {projectName ? ` · ${projectName}` : ''}
           {entry.note ? ` · ${entry.note}` : ''}
         </Text>
+        {reason ? (
+          // Текст — кольором тексту: бурштиновий 11 px у світлій темі не
+          // тримає 4.5:1. Колір несуть смуга, рамка й іконка.
+          <Text numberOfLines={2} style={[s.entryMeta, { color: text, fontWeight: '600' }]}>{reason}</Text>
+        ) : null}
+        {trimSeconds !== null && trimLabel ? (
+          <TouchableOpacity
+            onPress={() => onTrim(entry, trimSeconds)}
+            accessibilityRole="button"
+            accessibilityLabel={`${trimLabel}: ${title}`}
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            style={[s.trimBtn, { borderColor: border }]}>
+            <IconSymbol name="arrow.down.trend" size={11} color={accent} />
+            <Text style={{ color: accent, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{trimLabel}</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       <Text style={[s.entryDur, { color: text }]}>{duration}</Text>
       <TouchableOpacity
@@ -713,6 +798,7 @@ const s = StyleSheet.create({
   entryTask: { fontSize: 13, fontWeight: '600' },
   entryMeta: { fontSize: 11, marginTop: 2 },
   entryDur: { fontSize: 13, fontWeight: '800' },
+  trimBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6, marginTop: 7 },
   emptyAction: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 11 },
   fab: { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
 });

@@ -2820,19 +2820,6 @@ export default function TasksScreen() {
 
             <View style={[s.menuDivider, { backgroundColor: c.border }]} />
 
-            {/* Time Records */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/time-records'); }}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#6366F120' }]}>
-                <IconSymbol name="timer" size={15} color="#6366F1" />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.timeRecords}</Text>
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
             {/* Archive */}
             <TouchableOpacity
               onPress={() => { setShowOptionsMenu(false); router.push('/archive'); }}

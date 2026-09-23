@@ -1,7 +1,9 @@
 /**
  * components/time/TimeKpi.tsx — KPI сторінки «Час».
  *
- * Три числа й розподіл за проєктами. Рахує їх не цей файл, а чистий
+ * Чотири числа й розподіл за проєктами. «Середнє на задачу» і «Звичайна
+ * сесія» стоять поруч навмисно: середнє тягне вгору одна забута на ніч сесія,
+ * медіана — ні, і розрив між ними сам підказує, що в списку є що перевірити. Рахує їх не цей файл, а чистий
  * `utils/timeEntries.ts` — дзеркало вебового `lib/time-entries.ts`: KPI, що
  * розходиться між телефоном і браузером, підриває довіру до всіх решти цифр.
  *
@@ -22,6 +24,8 @@ export interface TimeKpiProps {
   isDark: boolean;
   totalSeconds: number;
   averageTaskSeconds: number;
+  /** Медіана тривалості записів вибірки (utils/timeAnomalies.typicalSessionSeconds). */
+  typicalSessionSeconds: number;
   recordCount: number;
   breakdown: ProjectShare[];
   formatDuration: (seconds: number) => string;
@@ -36,6 +40,7 @@ export function TimeKpi({
   isDark,
   totalSeconds,
   averageTaskSeconds,
+  typicalSessionSeconds,
   recordCount,
   breakdown,
   formatDuration,
@@ -54,6 +59,13 @@ export function TimeKpi({
           value={averageTaskSeconds > 0 ? formatDuration(averageTaskSeconds) : '—'}
           label={tr.timeAverageTask}
           color="#10B981"
+          sub={c.sub}
+        />
+        <View style={{ width: 1, backgroundColor: c.border }} />
+        <StatCell
+          value={typicalSessionSeconds > 0 ? formatDuration(typicalSessionSeconds) : '—'}
+          label={tr.timeTypicalSession}
+          color={c.text}
           sub={c.sub}
         />
         <View style={{ width: 1, backgroundColor: c.border }} />
@@ -97,7 +109,7 @@ export function TimeKpi({
 function StatCell({ value, label, color, sub }: { value: string; label: string; color: string; sub: string }) {
   return (
     <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4 }}>
-      <Text numberOfLines={1} style={{ color, fontSize: 17, fontWeight: '800' }}>{value}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={{ color, fontSize: 16, fontWeight: '800' }}>{value}</Text>
       <Text numberOfLines={2} style={{ color: sub, fontSize: 10, fontWeight: '500', marginTop: 3, textAlign: 'center' }}>{label}</Text>
     </View>
   );

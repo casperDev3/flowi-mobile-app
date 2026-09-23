@@ -58,8 +58,7 @@ app/
   c/[workspaceId]/[slug].tsx — редирект QR-наліпки ftrackingapp://c/<ws>/<slug> → /containers?qr=
   finance-stats.tsx        — Статистика фінансів (Stack)
   banks.tsx                — Скарбнички (Stack)
-  time-records.tsx         — Записи часу (Stack)
-  time-stats.tsx           — Статистика часу (Stack)
+  time-records.tsx / time-stats.tsx — РЕДИРЕКТИ на /(tabs)/time (журнал, KPI і фільтри — на самій сторінці «Час»)
   ideas.tsx / bugs.tsx     — РЕДИРЕКТИ на /feedback?kind=idea|bug (лишаються на один реліз)
   data.tsx                 — Управління даними (Stack)
   sync.tsx                 — Синхронізація (Stack)

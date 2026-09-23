@@ -1059,6 +1059,13 @@ export interface Translations {
   authShowPassword: string;
   authHidePassword: string;
   budgetOtherCurrenciesHint: string;
+  // пункт 1: вкладка «Бюджет» — кілька місяців, збій запису/читання, валюта фільтра
+  budgetShowMonth: string;
+  budgetMultiMonthHint: string;
+  budgetSaveFailed: string;
+  budgetReadOnlyTitle: string;
+  budgetReadOnlyBody: string;
+  budgetPrimaryCurrencyNote: string;
   welcomeSubtitle: string;
   onlineNeedsAccount: string;
   onlineNeedsAccountMsg: string;
@@ -3384,6 +3391,13 @@ const uk: Translations = {
   authShowPassword: 'Показати пароль',
   authHidePassword: 'Сховати пароль',
   budgetOtherCurrenciesHint: 'Транзакції в інших валютах ({n}) не враховано',
+  // пункт 1: вкладка «Бюджет» — кілька місяців, збій запису/читання, валюта фільтра
+  budgetShowMonth: 'Показати місяць',
+  budgetMultiMonthHint: 'Ліміти задаються на місяць. Щоб змінити їх, відкрийте поточний місяць.',
+  budgetSaveFailed: 'Ліміт не збережено — зміну скасовано. Спробуйте ще раз.',
+  budgetReadOnlyTitle: 'Ліміти зараз лише для перегляду',
+  budgetReadOnlyBody: 'Збережені ліміти не прочитались, тож редагування вимкнене, щоб їх не перезаписати. Натисніть «Повторити» вище.',
+  budgetPrimaryCurrencyNote: 'Бюджет завжди в основній валюті ({primary}) — ліміти не конвертуються.',
   welcomeSubtitle: 'Завдання, фінанси, здоров\'я — приватно і офлайн-first',
   onlineNeedsAccount: 'Для онлайн-функцій потрібен акаунт',
   onlineNeedsAccountMsg: 'Увійдіть або зареєструйтесь, щоб увімкнути онлайн-режим.',
@@ -5580,6 +5594,13 @@ const en: Translations = {
   authShowPassword: 'Show password',
   authHidePassword: 'Hide password',
   budgetOtherCurrenciesHint: 'Transactions in other currencies ({n}) not included',
+  // пункт 1: вкладка «Бюджет» — кілька місяців, збій запису/читання, валюта фільтра
+  budgetShowMonth: 'Show month',
+  budgetMultiMonthHint: 'Limits are set per month. To change them, open the current month.',
+  budgetSaveFailed: 'Limit not saved — the change was undone. Please try again.',
+  budgetReadOnlyTitle: 'Limits are read-only right now',
+  budgetReadOnlyBody: 'Saved limits could not be read, so editing is off to avoid overwriting them. Tap “Try again” above.',
+  budgetPrimaryCurrencyNote: 'Budget is always in the primary currency ({primary}) — limits are not converted.',
   welcomeSubtitle: 'Tasks, finance, health — private and offline-first',
   onlineNeedsAccount: 'Online features require an account',
   onlineNeedsAccountMsg: 'Sign in or register to enable online mode.',

@@ -36,7 +36,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -94,6 +94,7 @@ import {
 import { type Account } from '@/utils/accounts';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,19 @@ const ICON_OPTIONS: IconSymbolName[] = [
 ];
 
 const LIMIT_PRESETS = [500, 1000, 1500, 2000, 3000, 5000, 10000];
+
+/**
+ * Ключі, з яких складається екран. Поки вкладка ВІДКРИТА, у них пишуть і
+ * інші: рушій синку (ліміт, заданий на вебі), `persistTxs` «Фінансів»
+ * (операція, додана тут же, пишеться асинхронно), сусідні екрани. Без
+ * підписки панель жила зі знімком моменту фокуса — саме це й виглядало як
+ * «бюджет не працює». Ракурс (MONEY_SCOPE_KEY) сюди не входить: у вбудованій
+ * вкладці він приходить пропом зі спільного фільтра.
+ */
+const BUDGET_REFRESH_KEYS = [
+  'budget_limits', 'transactions', 'accounts', 'categories',
+  'finance_primary_currency', 'finance_currencies',
+] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -190,6 +204,17 @@ export interface BudgetEmbed {
   months: readonly string[];
   scope: MoneyScope;
   bottomInset: number;
+  /**
+   * Валюта спільного фільтра. Бюджет її НЕ застосовує (ліміти в основній
+   * валюті, курсів немає) — лише попереджає, як веб (budget-tab.tsx).
+   */
+  currency: string;
+  /**
+   * «Показати місяць»: у кварталі/році/довільному періоді панель показує лише
+   * таблицю по місяцях — редагувати там нічого. Кнопка перемикає СПІЛЬНИЙ
+   * фільтр розділу на поточний місяць (власника фільтра знає лише екран).
+   */
+  onShowMonth?: () => void;
 }
 
 export default function BudgetScreen() {
@@ -256,6 +281,10 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
   const [addError, setAddError]           = useState<string | null>(null);
   /** ERR-01: «ліміти не прочитались» — окремий стан, а не порожній бюджет. */
   const [loadFailed, setLoadFailed] = useState(false);
+  /** Перше читання завершилось — лише тоді слухаємо сховище (як `initialized`). */
+  const [loaded, setLoaded] = useState(false);
+  /** Останній запис лімітів провалився і був відкочений — кажемо про це вголос. */
+  const [saveError, setSaveError] = useState(false);
 
   // ─── Load ─────────────────────────────────────────────────────────────────
 
@@ -298,22 +327,66 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
     // перекладається лише підпис — інакше перемикання мови створювало б другу
     // копію тієї самої категорії.
     setPresets(budgetPresets(catRows.ok && Array.isArray(catRows.value) ? catRows.value : [], lang));
+    setLoaded(true);
   }, [lang]);
 
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    load().catch(e => { if (__DEV__) console.warn('[budget] завантаження не вдалося:', e); });
+  }, [load]));
+
+  /**
+   * Перечитуємо, щойно в сховище записали повз панель (див. BUDGET_REFRESH_KEYS).
+   * `trackWrite` обгортає ВЛАСНИЙ запис лімітів, щоб він не перечитував сам себе.
+   */
+  const trackWrite = useStorageRefresh(BUDGET_REFRESH_KEYS, () => load(), loaded);
 
   /** «Повторити»: без retryStorageRead ключ лишається заблокованим на запис. */
   const retryLoad = useCallback(() => { void load(true); }, [load]);
 
+  // Останній показаний стан лімітів — точка відкату, якщо запис провалиться.
+  const savedLimitsRef = useRef(savedLimits);
+  useEffect(() => { savedLimitsRef.current = savedLimits; }, [savedLimits]);
+
   const saveLimits = useCallback((next: BudgetLimit[]) => {
+    const prev = savedLimitsRef.current;
+    savedLimitsRef.current = next;
     setSavedLimits(next);
+    setSaveError(false);
     // id похідний від назви категорії: два пристрої, що офлайн додали ліміт на
     // ту саму категорію, мусять зійтись в один запис, а не в два.
-    // Запис у ключ із проваленим читанням шар сховища відхиляє — без .catch
-    // RN лаявся б Possible Unhandled Promise Rejection (ERR-01).
-    void saveSynced('budget_limits', next.map(b => ({ ...b, id: b.category })))
-      .catch(e => { if (__DEV__) console.warn('[budget] запис лімітів не вдався:', e); });
-  }, []);
+    //
+    // Провал запису (ERR-01: ключ заблокований після збою читання; повний
+    // диск тощо) раніше лише логувався в dev — людина бачила ліміт, якого в
+    // сховищі немає, і він зникав при наступному вході. Тепер стан
+    // відкочується, а панель каже, що зміну не збережено. Відкат — лише якщо
+    // відтоді ніхто не замінив стан (перечитування синку — вже правда сховища).
+    void trackWrite(
+      () => saveSynced('budget_limits', next.map(b => ({ ...b, id: b.category }))),
+      ['budget_limits'],
+    ).catch(e => {
+      if (__DEV__) console.warn('[budget] запис лімітів не вдався:', e);
+      setSavedLimits(cur => {
+        if (cur !== next) return cur;
+        savedLimitsRef.current = prev;
+        return prev;
+      });
+      setSaveError(true);
+    });
+  }, [trackWrite]);
+
+  /**
+   * Ліміти не прочитались — редагування вимкнене (інакше порожній список ліг
+   * би поверх справжніх). Але дотик не має бути мертвим: пояснюємо, чому.
+   */
+  const explainReadOnly = useCallback(() => {
+    Alert.alert(tr.budgetReadOnlyTitle, tr.budgetReadOnlyBody);
+  }, [tr.budgetReadOnlyTitle, tr.budgetReadOnlyBody]);
+
+  const openAdd = useCallback(() => {
+    if (loadFailed) { explainReadOnly(); return; }
+    setAddError(null);
+    setShowAddModal(true);
+  }, [loadFailed, explainReadOnly]);
 
   const changeScope = useCallback((next: MoneyScope) => {
     setScope(next);
@@ -410,11 +483,11 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
   // ─── Actions ──────────────────────────────────────────────────────────────
 
   const openEdit = useCallback((item: BudgetRow) => {
-    if (loadFailed) return;
+    if (loadFailed) { explainReadOnly(); return; }
     setEditItem(item);
     setEditLimit(item.limit > 0 ? String(item.limit) : '');
     setShowEditModal(true);
-  }, [loadFailed]);
+  }, [loadFailed, explainReadOnly]);
 
   function saveEdit() {
     if (!editItem) return;
@@ -493,7 +566,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
           }}
           actions={
             <HeaderButton
-              onPress={() => { setAddError(null); setShowAddModal(true); }}
+              onPress={openAdd}
               accessibilityLabel={tr.add}
               style={{ backgroundColor: ACCENT + '20', borderColor: ACCENT + '40' }}>
               <IconSymbol name="plus" size={18} color={c.accentText} />
@@ -526,7 +599,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         {/* Вбудована вкладка: шапка — розділу, тож «+ ліміт» живе тут. */}
         {embedded && !loadFailed ? (
           <TouchableOpacity
-            onPress={() => { setAddError(null); setShowAddModal(true); }}
+            onPress={openAdd}
             accessibilityRole="button"
             accessibilityLabel={tr.add}
             style={[st.inlineAdd, { borderColor: ACCENT + '40', backgroundColor: ACCENT + '15' }]}>
@@ -578,6 +651,41 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
           />
         ) : null}
 
+        {/* У таблиці редагувати нічого — ліміт задається на МІСЯЦЬ. Без цієї
+            кнопки вкладка в кварталі/році була глухою: ні рядків, ні «+». */}
+        {multiMonth && embedded?.onShowMonth ? (
+          <View style={{ marginBottom: 12, gap: 8 }}>
+            <Text style={{ fontSize: 12, color: c.sub, lineHeight: 17 }}>{tr.budgetMultiMonthHint}</Text>
+            <TouchableOpacity
+              onPress={embedded.onShowMonth}
+              accessibilityRole="button"
+              accessibilityLabel={tr.budgetShowMonth}
+              style={[st.inlineAdd, { borderColor: ACCENT + '40', backgroundColor: ACCENT + '15', marginBottom: 0 }]}>
+              <IconSymbol name="calendar" size={15} color={c.accentText} />
+              <Text style={{ color: c.accentText, fontSize: 14, fontWeight: '700' }}>{tr.budgetShowMonth}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {/* Валюта фільтра розділу бюджет не перемикає — кажемо це, як веб. */}
+        {embedded && embedded.currency && embedded.currency !== primaryCurrency ? (
+          <Text style={{ fontSize: 12, color: c.sub, marginBottom: 12, lineHeight: 17 }}>
+            {tr.budgetPrimaryCurrencyNote.replace('{primary}', primaryCurrency)}
+          </Text>
+        ) : null}
+
+        {/* Запис лімітів провалився — стан уже відкочено. */}
+        {saveError ? (
+          <View
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
+              backgroundColor: c.red + '15', borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: c.red + '40' }}>
+            <IconSymbol name="exclamationmark.triangle.fill" size={15} color={c.red} />
+            <Text style={{ flex: 1, fontSize: 12, color: c.text, lineHeight: 17 }}>{tr.budgetSaveFailed}</Text>
+          </View>
+        ) : null}
+
         {/* Info: other-currency transactions excluded */}
         {otherCurrencyCount > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
@@ -593,7 +701,13 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         {/* ERR-01: збій читання лімітів. Екран лишається живим — плашка стоїть
             НАД списком і каже, що зміни зараз не зберігаються. */}
         {loadFailed && (
-          <LoadErrorNotice lang={lang} isDark={isDark} text={c.text} sub={c.sub} onRetry={retryLoad} />
+          <>
+            <LoadErrorNotice lang={lang} isDark={isDark} text={c.text} sub={c.sub} onRetry={retryLoad} />
+            {/* Чому рядки не відкриваються і «+» немає — одразу, без дотику. */}
+            <Text style={{ fontSize: 12, color: c.sub, marginBottom: 12, lineHeight: 17 }}>
+              {tr.budgetReadOnlyBody}
+            </Text>
+          </>
         )}
 
         {/* Total summary card */}
@@ -670,7 +784,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
               {tr.budgetEmptyBody}
             </Text>
             <TouchableOpacity
-              onPress={() => { setAddError(null); setShowAddModal(true); }}
+              onPress={openAdd}
               style={[st.addBtn, { backgroundColor: ACCENT, marginTop: 24 }]}>
               <IconSymbol name="plus" size={16} color="#fff" />
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{tr.budgetAddManually}</Text>

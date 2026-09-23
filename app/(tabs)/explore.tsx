@@ -82,7 +82,7 @@ import { matchesMoneyScope } from '@/utils/budgetScope';
 import {
   categoryMeta, isCategoryGroup, isCostKind, subscriptionCategoryNames, type CategoryGroup, type CostKind,
 } from '@/utils/finance/classify';
-import { inRange, monthsOf } from '@/utils/finance/period';
+import { inRange, monthsOf, resolvePeriod } from '@/utils/finance/period';
 import { calcPeriodTotalsByCurrency } from '@/utils/financePeriod';
 import { parseFinanceTab, visibleFinanceTabs, type FinanceTab } from '@/utils/financeTabs';
 import { formatSubscriptionMoney, parseDateKey } from '@/utils/subscriptions';
@@ -1579,6 +1579,10 @@ export default function FinanceScreen() {
               months: budgetMonths,
               scope,
               bottomInset: tabBarInset,
+              currency: finFilter.filter.currency,
+              // Квартал/рік/довільний → поточний місяць СПІЛЬНОГО фільтра:
+              // лише в місяці бюджет має рядки, «+» і редагування.
+              onShowMonth: () => { finFilter.setPeriod(resolvePeriod('month', '', new Date())); setDateFilter(null); },
             }}
           />
         ) : tab === 'subscriptions' ? (

@@ -43,7 +43,7 @@ import {
   SubscriptionRow,
   type SubscriptionUiColors,
 } from '@/components/finance/SubscriptionDetail';
-import { useTodayKey } from '@/components/finance/UpcomingPaymentsCard';
+import { useTodayKey } from '@/hooks/use-today-key';
 import { DetailPane } from '@/components/shared/DetailPane';
 import { RecurringIncomesSection } from '@/components/finance/RecurringIncomesSection';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';

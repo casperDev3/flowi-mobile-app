@@ -1,0 +1,328 @@
+{
+  "//": "Паритет upcomingPayments (пункт 9). Спільна з мобільним: flowi-mobile-app/__tests__/fixtures/subscriptions-parity-web.json — побайтова копія. Зміна формули починається тут; копія правиться в тому самому заході. withinDays: null — виклик без аргументу (горизонт за замовчуванням, рішення власника: 7 днів). expected звірено вручну.",
+  "cases": [
+    {
+      "name": "сьогодні, прострочені, архів, endDate, межа 7/8 днів, сортування",
+      "today": "2026-06-10",
+      "withinDays": 7,
+      "subscriptions": [
+        {
+          "id": "day8",
+          "name": "Восьмий день",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-18",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "sort-beta",
+          "name": "Бета",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-12",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "archived",
+          "name": "Архівна",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-11",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9",
+          "archivedAt": "2026-06-01T10:00:00.000Z"
+        },
+        {
+          "id": "sort-alpha-2",
+          "name": "Альфа",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-12",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "day7",
+          "name": "Сьомий день",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-17",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "ended",
+          "name": "Завершена",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-12",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9",
+          "endDate": "2026-06-09"
+        },
+        {
+          "id": "today",
+          "name": "Сьогоднішня",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-10",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "ends-today",
+          "name": "Кінець сьогодні",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-13",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9",
+          "endDate": "2026-06-10"
+        },
+        {
+          "id": "sort-alpha-1",
+          "name": "Альфа",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-12",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "overdue",
+          "name": "Прострочена",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-06-05",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "bad-date",
+          "name": "Бита дата",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-02-31",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        }
+      ],
+      "expected": [
+        {
+          "id": "overdue",
+          "daysUntil": -5,
+          "status": "overdue"
+        },
+        {
+          "id": "today",
+          "daysUntil": 0,
+          "status": "active"
+        },
+        {
+          "id": "sort-alpha-1",
+          "daysUntil": 2,
+          "status": "active"
+        },
+        {
+          "id": "sort-alpha-2",
+          "daysUntil": 2,
+          "status": "active"
+        },
+        {
+          "id": "sort-beta",
+          "daysUntil": 2,
+          "status": "active"
+        },
+        {
+          "id": "ends-today",
+          "daysUntil": 3,
+          "status": "active"
+        },
+        {
+          "id": "day7",
+          "daysUntil": 7,
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "name": "межа місяця",
+      "today": "2026-06-28",
+      "withinDays": 7,
+      "subscriptions": [
+        {
+          "id": "jul6",
+          "name": "Липень 6",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-07-06",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "jul5",
+          "name": "Липень 5",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-07-05",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "may31",
+          "name": "Травень 31",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-05-31",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        }
+      ],
+      "expected": [
+        {
+          "id": "may31",
+          "daysUntil": -28,
+          "status": "overdue"
+        },
+        {
+          "id": "jul5",
+          "daysUntil": 7,
+          "status": "active"
+        }
+      ]
+    },
+    {
+      "name": "межа року, горизонт за замовчуванням",
+      "today": "2026-12-29",
+      "withinDays": null,
+      "subscriptions": [
+        {
+          "id": "jan6",
+          "name": "Січень 6",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2027-01-06",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "jan5",
+          "name": "Січень 5",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2027-01-05",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "dec29",
+          "name": "Грудень 29",
+          "amount": 100,
+          "currency": "UAH",
+          "period": {
+            "every": 1,
+            "unit": "month"
+          },
+          "nextPaymentDate": "2026-12-29",
+          "reminderDaysBefore": 1,
+          "icon": "creditcard.fill",
+          "color": "#0EA5E9"
+        }
+      ],
+      "expected": [
+        {
+          "id": "dec29",
+          "daysUntil": 0,
+          "status": "active"
+        },
+        {
+          "id": "jan5",
+          "daysUntil": 7,
+          "status": "active"
+        }
+      ]
+    }
+  ]
+}

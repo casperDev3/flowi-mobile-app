@@ -13,39 +13,26 @@
  * тій самій функції звіряється з реальним new Date(). Дві половини одного
  * правила живуть у різних добах.
  *
- * Оновлюємось на поверненні застосунку з фону і на фокусі екрана, а не раз на
- * секунду: дата міняється раз на добу, і тримати заради неї тікер
- * (hooks/use-clock-tick.ts) немає сенсу.
+ * Коли оновлюватись, вирішує hooks/use-today-key.ts (фокус, повернення з фону
+ * і таймер на північ при відкритому екрані) — тут лише Date для тих, кому
+ * потрібен момент, а не ключ. Раніше хук мав власну копію цієї логіки без
+ * таймера на північ, і відкритий через північ екран лишався у вчорашній добі.
  */
-import { useCallback, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useMemo } from 'react';
 
-import { isSameDay } from '@/utils/dateUtils';
+import { useTodayKey } from '@/hooks/use-today-key';
 
 /**
  * Момент часу, а не північ: так значення лишається взаємозамінним із
  * попереднім `new Date()` скрізь, де його вже читають (підписи груп рахують
  * різницю в мілісекундах, а не в добах).
+ *
+ * Нове посилання — лише коли змінився ключ доби: інакше кожен фокус екрана
+ * віддавав би новий Date і скидав усі мемоізації, що від нього залежать.
  */
 export function useToday(): Date {
-  const [today, setToday] = useState(() => new Date());
-
-  const refresh = useCallback(() => {
-    // Нове посилання лише коли доба СПРАВДІ змінилась. Інакше кожен фокус
-    // екрана віддавав би новий Date і скидав усі мемоізації, що від нього
-    // залежать, — тобто перебирав би весь список на кожне повернення.
-    setToday(prev => (isSameDay(prev, new Date()) ? prev : new Date()));
-  }, []);
-
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', state => {
-      if (state === 'active') refresh();
-    });
-    return () => sub.remove();
-  }, [refresh]);
-
-  useFocusEffect(refresh);
-
-  return today;
+  const dayKey = useTodayKey();
+  // dayKey — тригер перерахунку, а не вхід обчислення.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => new Date(), [dayKey]);
 }

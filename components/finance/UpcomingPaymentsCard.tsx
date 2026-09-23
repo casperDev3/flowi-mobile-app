@@ -13,16 +13,16 @@
  */
 import { BlurView } from 'expo-blur';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
+import { useTodayKey } from '@/hooks/use-today-key';
 import { loadData } from '@/store/storage';
 import type { Translations } from '@/store/translations';
 import { BUILTIN_CURRENCIES, type Currency } from '@/utils/financeUtils';
 import {
-  dateKeyOf,
   formatSubscriptionMoney,
   normalizeSubscriptions,
   upcomingPayments,
@@ -37,64 +37,11 @@ export interface UpcomingPaymentsData {
   currencies: Currency[];
 }
 
-/**
- * Ключ сьогоднішньої дати, що НЕ застигає.
- *
- * Це і був баг «оплата зʼявляється лише після нагадування». `today` рахувався
- * разом із читанням сховища, тобто лише на фокусі екрана. Але застосунок,
- * згорнутий увечері й розгорнутий наступного дня, фокус НЕ переотримує:
- * `useFocusEffect` спрацьовує на вхід на екран, а екран з нього й не виходив.
- * Тож секція лишалась із учорашнім «сьогодні», підписка з оплатою на сьогодні
- * не проходила поріг `nextPaymentDate <= today + 7` (для відпрацьованих
- * циклів — навпаки, висіла простроченою), і все ставало на місце аж коли
- * нагадування піднімало застосунок і давало фокус. Звідси три джерела
- * оновлення замість одного: фокус, повернення з фону і перехід через північ
- * при відкритому екрані.
- *
- * Нове значення ставиться ЛИШЕ коли доба справді змінилась: інакше кожне
- * повернення з фону скидало б мемоізацію списку.
- */
-export function useTodayKey(): string {
-  const [today, setToday] = useState(() => dateKeyOf(new Date()));
-
-  const sync = useCallback(() => {
-    setToday(prev => {
-      const next = dateKeyOf(new Date());
-      return prev === next ? prev : next;
-    });
-  }, []);
-
-  useFocusEffect(sync);
-
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', state => {
-      if (state === 'active') sync();
-    });
-    return () => sub.remove();
-  }, [sync]);
-
-  // Північ при відкритому екрані. Таймер переозброюється сам, а не через
-  // залежність від `today`: годинник пристрою може розбудити setTimeout на
-  // мілісекунду раніше за північ, дата тоді ще не зміниться — і таймер, який
-  // чекав би саме на зміну, більше не поставився б ніколи.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const arm = () => {
-      const now = new Date();
-      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1, 0);
-      timer = setTimeout(() => { sync(); arm(); }, Math.max(1000, midnight.getTime() - now.getTime()));
-    };
-    arm();
-    return () => clearTimeout(timer);
-  }, [sync]);
-
-  return today;
-}
-
 /** Підписки з оплатою протягом `withinDays` днів + прострочені. Перечитує при фокусі й записах. */
 export function useUpcomingPayments(withinDays = 7): UpcomingPaymentsData {
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>(BUILTIN_CURRENCIES);
+  // «Сьогодні» не застигає: фокус + повернення з фону + північ (hooks/use-today-key.ts).
   const today = useTodayKey();
 
   const load = useCallback(async () => {

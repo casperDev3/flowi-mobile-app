@@ -26,6 +26,8 @@ export interface ProjectLike {
    */
   deadline?: string;
   description?: string;
+  /** Штамп сховища (synced-storage stampUpdatedAt) — для «Оновлено». */
+  updatedAt?: string;
 }
 
 export interface ProjectTaskLike {
@@ -33,6 +35,8 @@ export interface ProjectTaskLike {
   projectId?: string;
   status: string;
   deadline?: string;
+  createdAt?: string;
+  updatedAt?: string;
   timeEntries?: { startedAt: string; endedAt?: string; duration: number }[];
 }
 
@@ -64,6 +68,20 @@ export interface ProjectStats {
   empty: boolean;
   /** Секунди: завершені сесії задач проєкту плюс та, що триває просто зараз. */
   trackedSeconds: number;
+  /**
+   * Остання активність — max(project.updatedAt, updatedAt його задач), ISO.
+   * Рахується в тому самому проході по задачах, що й лічильники вище; без
+   * жодної позначки часу — createdAt. Сортування «Оновлено» дивиться сюди.
+   */
+  lastActivityAt: string | null;
+}
+
+/** Найпізніший із моментів; нерозбірливі рядки пропускаються. */
+function laterIso(current: { iso: string; at: number } | null, iso: string | undefined) {
+  if (!iso) return current;
+  const at = new Date(iso).getTime();
+  if (Number.isNaN(at)) return current;
+  return !current || at > current.at ? { iso, at } : current;
 }
 
 export function isArchived(project: Pick<ProjectLike, 'archivedAt'>): boolean {
@@ -101,7 +119,9 @@ export function projectStats(
 
   let overdue = 0;
   let nearest: { iso: string; at: number } | null = null;
+  let activity = laterIso(null, project.updatedAt ?? project.createdAt);
   for (const task of own) {
+    activity = laterIso(activity, task.updatedAt ?? task.createdAt);
     if (task.status === 'done') continue;
     const at = deadlineTime(task);
     if (at === null) continue;
@@ -143,6 +163,7 @@ export function projectStats(
     archived: isArchived(project),
     empty: own.length === 0,
     trackedSeconds,
+    lastActivityAt: activity?.iso ?? null,
   };
 }
 
@@ -171,6 +192,132 @@ export function compareLive(a: ProjectStats, b: ProjectStats): number {
 
 export function compareArchived(a: ProjectStats, b: ProjectStats): number {
   return (b.project.archivedAt ?? '').localeCompare(a.project.archivedAt ?? '');
+}
+
+// ─── Сортування й фільтр списку проєктів ──────────────────────────────────────
+//
+// ДЗЕРКАЛО веб-блоку lib/project-stats.ts — ті самі назви й правила; паритет
+// тримає спільна фікстура __tests__/fixtures/project-list-parity-web.json
+// (побайтова копія flowi-web-app/lib/__fixtures__/project-list-parity.json).
+
+export type ProjectSortKey = 'smart' | 'status' | 'progress' | 'updated' | 'name';
+export const PROJECT_SORT_KEYS: readonly ProjectSortKey[] = ['smart', 'status', 'progress', 'updated', 'name'];
+
+/**
+ * Похідний статус проєкту — БЕЗ нового поля в даних. Архів — окремий явний
+ * стан (archivedAt) і окремий перемикач, тут його немає.
+ *  - overdue — є прострочена незавершена задача або минув власний термін;
+ *  - empty   — жодної задачі;
+ *  - done    — усі задачі виконані (100%);
+ *  - active  — решта: робота йде.
+ */
+export type ProjectListStatus = 'overdue' | 'active' | 'empty' | 'done';
+export const PROJECT_LIST_STATUSES: readonly ProjectListStatus[] = ['overdue', 'active', 'empty', 'done'];
+
+type SortableStats = Pick<
+  ProjectStats,
+  'overdue' | 'projectOverdue' | 'total' | 'done' | 'pct' | 'empty' | 'archived' | 'nearestDeadline' | 'lastActivityAt'
+> & { project: Pick<ProjectLike, 'id' | 'name' | 'deadline' | 'archivedAt'> };
+
+export function projectStatusOf(
+  stats: Pick<ProjectStats, 'overdue' | 'projectOverdue' | 'total' | 'done'>,
+): ProjectListStatus {
+  if (stats.overdue > 0 || stats.projectOverdue) return 'overdue';
+  if (stats.total === 0) return 'empty';
+  if (stats.done >= stats.total) return 'done';
+  return 'active';
+}
+
+/** Порядок груп у сортуванні «Статус»: що горить — зверху, закрите — внизу. */
+const STATUS_RANK: Record<ProjectListStatus, number> = { overdue: 0, active: 1, empty: 2, done: 3 };
+
+function byName(a: SortableStats, b: SortableStats): number {
+  return a.project.name.localeCompare(b.project.name, 'uk') || byId(a, b);
+}
+
+/** Останній тай-брейк: однакові назви не міняються місцями між рендерами. */
+function byId(a: SortableStats, b: SortableStats): number {
+  return a.project.id < b.project.id ? -1 : a.project.id > b.project.id ? 1 : 0;
+}
+
+function activityTime(stats: SortableStats): number {
+  if (!stats.lastActivityAt) return Number.NEGATIVE_INFINITY;
+  const at = new Date(stats.lastActivityAt).getTime();
+  return Number.isNaN(at) ? Number.NEGATIVE_INFINITY : at;
+}
+
+/** «Розумне» — нинішній порядок: живі за compareLive, архівні — за compareArchived. */
+function smart(a: SortableStats, b: SortableStats): number {
+  const order = a.archived && b.archived
+    ? compareArchived(a as ProjectStats, b as ProjectStats)
+    : compareLive(a as ProjectStats, b as ProjectStats);
+  return order || byId(a, b);
+}
+
+const COMPARATORS: Record<ProjectSortKey, (a: SortableStats, b: SortableStats) => number> = {
+  smart,
+  status: (a, b) =>
+    STATUS_RANK[projectStatusOf(a)] - STATUS_RANK[projectStatusOf(b)] || smart(a, b),
+  // Найближчі до фінішу — зверху; порожні (0 із 0) — під усіма непорожніми,
+  // бо їхні 0% — «нічого немає», а не «нічого не зроблено».
+  progress: (a, b) =>
+    Number(a.empty) - Number(b.empty) || b.pct - a.pct || byName(a, b),
+  // Найсвіжіша активність — зверху; без жодної позначки часу — у кінці.
+  updated: (a, b) => {
+    const ta = activityTime(a);
+    const tb = activityTime(b);
+    if (ta !== tb) return tb > ta ? 1 : -1;
+    return byName(a, b);
+  },
+  name: byName,
+};
+
+/** Новий відсортований масив; вхід не мутується. Невідомий ключ — «Розумне». */
+export function sortProjects<T extends SortableStats>(stats: readonly T[], key: ProjectSortKey): T[] {
+  const compare = COMPARATORS[key] ?? COMPARATORS.smart;
+  return [...stats].sort(compare);
+}
+
+/** Порожній набір статусів — фільтра немає, видно все. */
+export function filterProjects<T extends SortableStats>(
+  stats: readonly T[],
+  statuses: readonly ProjectListStatus[],
+): T[] {
+  if (!statuses.length) return [...stats];
+  const allowed = new Set(statuses);
+  return stats.filter(item => allowed.has(projectStatusOf(item)));
+}
+
+/** Скільки проєктів у кожному статусі — лічильники на чипах фільтра. */
+export function projectStatusCounts(
+  stats: readonly Pick<ProjectStats, 'overdue' | 'projectOverdue' | 'total' | 'done'>[],
+): Record<ProjectListStatus, number> {
+  const counts: Record<ProjectListStatus, number> = { overdue: 0, active: 0, empty: 0, done: 0 };
+  for (const item of stats) counts[projectStatusOf(item)] += 1;
+  return counts;
+}
+
+export interface ProjectListPrefs {
+  sort: ProjectSortKey;
+  statuses: ProjectListStatus[];
+}
+
+export const DEFAULT_PROJECT_LIST_PREFS: ProjectListPrefs = { sort: 'smart', statuses: [] };
+
+/**
+ * Збережений на пристрої вибір → валідний стан. Сміття, старі ключі чи чужий
+ * формат не ламають екран, а дають типовий вибір; дублікати й невідомі
+ * статуси відкидаються, порядок — канонічний.
+ */
+export function parseProjectListPrefs(raw: unknown): ProjectListPrefs {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT_PROJECT_LIST_PREFS, statuses: [] };
+  const value = raw as { sort?: unknown; statuses?: unknown };
+  const sort = PROJECT_SORT_KEYS.includes(value.sort as ProjectSortKey)
+    ? (value.sort as ProjectSortKey)
+    : DEFAULT_PROJECT_LIST_PREFS.sort;
+  const picked: unknown[] = Array.isArray(value.statuses) ? value.statuses : [];
+  const statuses = PROJECT_LIST_STATUSES.filter(status => picked.includes(status));
+  return { sort, statuses };
 }
 
 // ─── Міні-шкала ───────────────────────────────────────────────────────────────

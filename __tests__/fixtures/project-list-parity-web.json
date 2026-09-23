@@ -1,0 +1,64 @@
+{
+  "_about": "Паритет списку проєктів: projectStatusOf / sortProjects / filterProjects / parseProjectListPrefs. Побайтова копія — flowi-mobile-app/__tests__/fixtures/project-list-parity-web.json. Дати — ЛОКАЛЬНИЙ час без зсуву, now — локальні компоненти [рік, місяць, день, година, хвилина].",
+  "now": [2026, 9, 23, 12, 0],
+  "projects": [
+    { "id": "a", "name": "Бета", "color": "#7C3AED", "createdAt": "2026-06-01T10:00:00", "updatedAt": "2026-09-01T10:00:00" },
+    { "id": "b", "name": "Альфа", "color": "#7C3AED", "createdAt": "2026-07-01T00:00:00", "deadline": "2026-09-10T12:00:00" },
+    { "id": "c", "name": "Гамма", "color": "#7C3AED", "createdAt": "2026-09-02T10:00:00", "updatedAt": "2026-09-23T09:00:00" },
+    { "id": "d", "name": "Дельта", "color": "#7C3AED", "createdAt": "2026-08-01T00:00:00" },
+    { "id": "e", "name": "Альфа", "color": "#7C3AED", "createdAt": "2026-06-01T10:00:00", "updatedAt": "2026-09-15T09:00:00" },
+    { "id": "f", "name": "Епсилон", "color": "#7C3AED", "createdAt": "2026-06-01T10:00:00", "updatedAt": "2026-09-20T10:00:00", "deadline": "2026-09-01T12:00:00" },
+    { "id": "g", "name": "Ета", "color": "#7C3AED", "createdAt": "2026-05-01T10:00:00", "archivedAt": "2026-09-10T10:00:00" },
+    { "id": "h", "name": "Зета", "color": "#7C3AED", "createdAt": "2026-05-01T10:00:00", "archivedAt": "2026-09-12T10:00:00" }
+  ],
+  "tasks": [
+    { "id": "a1", "projectId": "a", "status": "active", "deadline": "2026-09-20T12:00:00", "updatedAt": "2026-09-22T08:00:00" },
+    { "id": "a2", "projectId": "a", "status": "done", "updatedAt": "2026-09-10T08:00:00" },
+    { "id": "b1", "projectId": "b", "status": "done", "updatedAt": "2026-09-15T09:00:00" },
+    { "id": "b2", "projectId": "b", "status": "done", "updatedAt": "2026-09-14T09:00:00" },
+    { "id": "d1", "projectId": "d", "status": "done", "createdAt": "2026-09-05T10:00:00" },
+    { "id": "d2", "projectId": "d", "status": "active", "deadline": "2026-10-05T12:00:00", "createdAt": "2026-09-01T10:00:00" },
+    { "id": "d3", "projectId": "d", "status": "active" },
+    { "id": "e1", "projectId": "e", "status": "active" },
+    { "id": "f1", "projectId": "f", "status": "active" },
+    { "id": "x1", "status": "active", "updatedAt": "2026-09-23T11:00:00" }
+  ],
+  "expected": {
+    "status": { "a": "overdue", "b": "done", "c": "empty", "d": "active", "e": "active", "f": "overdue", "g": "empty", "h": "empty" },
+    "lastActivityAt": {
+      "a": "2026-09-22T08:00:00",
+      "b": "2026-09-15T09:00:00",
+      "c": "2026-09-23T09:00:00",
+      "d": "2026-09-05T10:00:00",
+      "e": "2026-09-15T09:00:00",
+      "f": "2026-09-20T10:00:00",
+      "g": "2026-05-01T10:00:00",
+      "h": "2026-05-01T10:00:00"
+    },
+    "liveSort": {
+      "smart": ["f", "a", "b", "d", "e", "c"],
+      "status": ["f", "a", "d", "e", "c", "b"],
+      "progress": ["b", "a", "d", "e", "f", "c"],
+      "updated": ["c", "a", "f", "b", "e", "d"],
+      "name": ["b", "e", "a", "c", "d", "f"]
+    },
+    "archiveSort": {
+      "smart": ["h", "g"],
+      "name": ["g", "h"]
+    },
+    "liveFilter": [
+      { "statuses": [], "ids": ["f", "a", "b", "d", "e", "c"] },
+      { "statuses": ["overdue"], "ids": ["f", "a"] },
+      { "statuses": ["active", "empty"], "ids": ["d", "e", "c"] },
+      { "statuses": ["done"], "ids": ["b"] }
+    ],
+    "liveCounts": { "overdue": 2, "active": 2, "empty": 1, "done": 1 },
+    "prefs": [
+      { "raw": null, "parsed": { "sort": "smart", "statuses": [] } },
+      { "raw": "garbage", "parsed": { "sort": "smart", "statuses": [] } },
+      { "raw": { "sort": "name", "statuses": ["done", "overdue", "done", "bogus"] }, "parsed": { "sort": "name", "statuses": ["overdue", "done"] } },
+      { "raw": { "sort": "zzz", "statuses": "overdue" }, "parsed": { "sort": "smart", "statuses": [] } },
+      { "raw": { "sort": "updated", "statuses": ["empty"] }, "parsed": { "sort": "updated", "statuses": ["empty"] } }
+    ]
+  }
+}

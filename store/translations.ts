@@ -1347,6 +1347,20 @@ export interface Translations {
   projectAssigned: string;
   projectUnassigned: string;
   projectBacklog: string;
+  // пункт 6: сортування й фільтр списку проєктів
+  projectSortLabel: string;
+  projectSortSmart: string;
+  projectSortStatus: string;
+  projectSortProgress: string;
+  projectSortUpdated: string;
+  projectSortName: string;
+  projectListFilterLabel: string;
+  projectListStatusOverdue: string;
+  projectListStatusActive: string;
+  projectListStatusEmpty: string;
+  projectListStatusDone: string;
+  projectListFilterNoMatch: string;
+  projectListFilterReset: string;
   projectFunnelA11y: string;
   projectFlagA11y: string;
   sprintCurrent: string;
@@ -3596,6 +3610,20 @@ const uk: Translations = {
   projectAssigned: 'призначено',
   projectUnassigned: 'без виконавця',
   projectBacklog: 'без спринту',
+  // пункт 6: сортування й фільтр списку проєктів
+  projectSortLabel: 'Сортування',
+  projectSortSmart: 'Розумне',
+  projectSortStatus: 'Статус',
+  projectSortProgress: 'Прогрес',
+  projectSortUpdated: 'Оновлено',
+  projectSortName: 'А–Я',
+  projectListFilterLabel: 'Фільтр за статусом',
+  projectListStatusOverdue: 'Прострочені',
+  projectListStatusActive: 'У процесі',
+  projectListStatusEmpty: 'Порожні',
+  projectListStatusDone: 'Завершені',
+  projectListFilterNoMatch: 'Жоден проєкт не підходить під фільтр',
+  projectListFilterReset: 'Скинути фільтр',
   projectFunnelA11y: '{n} із {total} задач: {label}',
   projectFlagA11y: '{n} із {open} відкритих задач: {label}',
   sprintCurrent: 'Поточний спринт',
@@ -5816,6 +5844,20 @@ const en: Translations = {
   projectAssigned: 'assigned',
   projectUnassigned: 'unassigned',
   projectBacklog: 'no sprint',
+  // пункт 6: сортування й фільтр списку проєктів
+  projectSortLabel: 'Sort',
+  projectSortSmart: 'Smart',
+  projectSortStatus: 'Status',
+  projectSortProgress: 'Progress',
+  projectSortUpdated: 'Updated',
+  projectSortName: 'A–Z',
+  projectListFilterLabel: 'Filter by status',
+  projectListStatusOverdue: 'Overdue',
+  projectListStatusActive: 'In progress',
+  projectListStatusEmpty: 'Empty',
+  projectListStatusDone: 'Completed',
+  projectListFilterNoMatch: 'No projects match the filter',
+  projectListFilterReset: 'Reset filter',
   projectFunnelA11y: '{n} of {total} tasks: {label}',
   projectFlagA11y: '{n} of {open} open tasks: {label}',
   sprintCurrent: 'Current sprint',

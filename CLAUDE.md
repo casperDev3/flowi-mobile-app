@@ -275,6 +275,7 @@ constants/
 | `'feedback_queue_v1'` / `'feedback_files_v1'` / `'feedback_status_cache_v1'` | локальні | Черга подання, шляхи файлів вкладень, кеш статусів — у бекапи не йдуть |
 | `'training_group_v1:*'` / `'training_groups_cache_v1:*'` / `'training_session_draft_v1:*'` | локальні | Кеші груп тренувань і чернетки сесій (стираються при виході за префіксом) |
 | `'health_auto_state'` / `'health_auto_suppressed'` / `'health_weight_cleanup_v1'` | локальні | Стан автоданих здоровʼя пристрою — не синхронізуються й не бекапляться |
+| `'projects_list_prefs_v1'` | локальний | Сортування й фільтр статусу екрана «Проєкти» на цьому пристрої (utils/projectListPrefs.ts): не синхронізується, не бекапиться, при виході не стирається — даних акаунта не містить |
 
 SecureStore (не AsyncStorage): `flowi_access`, `flowi_refresh`, `flowi_registration_token`.
 

@@ -43,13 +43,24 @@ import {
 } from '@/utils/projectStatsMetrics';
 import type { Translations } from '@/store/translations';
 import {
-  compareArchived,
-  compareLive,
+  filterProjects,
+  PROJECT_LIST_STATUSES,
+  PROJECT_SORT_KEYS,
   projectStats,
+  projectStatusCounts,
   projectTimeline,
+  sortProjects,
+  DEFAULT_PROJECT_LIST_PREFS,
+  type ProjectListPrefs,
+  type ProjectListStatus,
+  type ProjectSortKey,
   type ProjectStats,
   type TimelineBucket,
 } from '@/utils/projectStats';
+import { loadProjectListPrefs, saveProjectListPrefs } from '@/utils/projectListPrefs';
+import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
+import { masonryColumnCount } from '@/utils/masonry';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { ProjectAnalytics } from '@/components/projects/ProjectAnalytics';
 import { PortfolioKpi } from '@/components/projects/PortfolioKpi';
 import { ProjectTimeline } from '@/components/projects/ProjectTimeline';
@@ -57,7 +68,7 @@ import { useTimerContext } from '@/store/timer-context';
 import { mergeTaskStatusColumns, seedProjectStatusColumns, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { hasPendingProjectOutbox, queueProjectDeletion, syncAllMyProjects } from '@/store/project-sync';
 import { uuidV4 } from '@/utils/uuid';
-import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
+import { useSheetSurface } from '@/hooks/use-content-width';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { haptic } from '@/utils/haptics';
 import { useAuth } from '@/store/auth';
@@ -114,6 +125,8 @@ interface Task {
   kanbanColumnId?: string;
   deadline?: string;
   createdAt?: string;
+  /** Штамп сховища — остання активність для сортування «Оновлено». */
+  updatedAt?: string;
   /**
    * Справжня дата початку роботи. Заповнена рідко — Таймлайн проєкту
    * (app/project/[id]/tasks.tsx) без неї бере початок із createdAt.
@@ -147,6 +160,46 @@ const EMPTY_BUCKETS: TimelineBucket[] = [];
 const EMPTY_COUNTERS: ProjectCounters = {
   total: 0, done: 0, inProgress: 0, todo: 0, open: 0, assigned: 0, unassigned: 0, backlog: 0, overdue: 0,
 };
+
+const SORT_LABEL_KEY: Record<ProjectSortKey, keyof Translations> = {
+  smart: 'projectSortSmart',
+  status: 'projectSortStatus',
+  progress: 'projectSortProgress',
+  updated: 'projectSortUpdated',
+  name: 'projectSortName',
+};
+
+const STATUS_LABEL_KEY: Record<ProjectListStatus, keyof Translations> = {
+  overdue: 'projectListStatusOverdue',
+  active: 'projectListStatusActive',
+  empty: 'projectListStatusEmpty',
+  done: 'projectListStatusDone',
+};
+
+/** Чип сортування/фільтра — той самий вигляд, що й перемикач «Активні / Архів». */
+function ListChip({ label, count, selected, onPress, accent, sub, dim, border }: {
+  label: string; count?: number; selected: boolean; onPress: () => void;
+  accent: string; sub: string; dim: string; border: string;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={count === undefined ? label : `${label}: ${count}`}
+      accessibilityState={{ selected }}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36,
+        paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1,
+        backgroundColor: selected ? accent + '18' : dim,
+        borderColor: selected ? accent : border,
+      }}>
+      <Text style={{ color: selected ? accent : sub, fontWeight: '700', fontSize: 12 }}>{label}</Text>
+      {count === undefined ? null : (
+        <Text style={{ color: sub, fontSize: 11, fontVariant: ['tabular-nums'] }}>{count}</Text>
+      )}
+    </TouchableOpacity>
+  );
+}
 
 /** Протермінований спринт — бурштиновий: червоний зайнятий простроченими задачами (§4). */
 const SPRINT_OVERDUE_COLOR = '#F59E0B';
@@ -433,7 +486,10 @@ export const ProjectCard = React.memo(function ProjectCard({
 });
 
 export default function ProjectsScreen() {
-  const contentWidth = useContentWidth();
+  // Планшет: стелю читабельної колонки (720pt) тут знято — картки лягають у
+  // колонки на всю ширину екрана (вікно мінус сайдбар), як дашборд «Сьогодні».
+  const { isWide } = useResponsive();
+  const columnCount = masonryColumnCount(useScreenWidth());
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -497,13 +553,39 @@ export default function ProjectsScreen() {
     [projects, tasks, activeTimers],
   );
 
-  const visibleStats = useMemo(() => {
-    const live = statsList.filter(stat => !stat.archived);
-    const archived = statsList.filter(stat => stat.archived);
-    return showArchived
-      ? [...archived].sort(compareArchived)
-      : [...live].sort(compareLive);
-  }, [statsList, showArchived]);
+  // Сортування й фільтр статусу — вибір ЦЬОГО пристрою (utils/projectListPrefs).
+  // До прочитання — типовий вибір; записуємо лише дію людини, тож невдале
+  // читання не затирає збережене.
+  const [listPrefs, setListPrefs] = useState<ProjectListPrefs>(DEFAULT_PROJECT_LIST_PREFS);
+  useEffect(() => {
+    let alive = true;
+    void loadProjectListPrefs().then(prefs => { if (alive) setListPrefs(prefs); });
+    return () => { alive = false; };
+  }, []);
+  const updateListPrefs = useCallback((next: ProjectListPrefs) => {
+    setListPrefs(next);
+    void saveProjectListPrefs(next);
+  }, []);
+  const toggleStatus = useCallback((status: ProjectListStatus) => {
+    const on = listPrefs.statuses.includes(status);
+    const picked = on ? listPrefs.statuses.filter(s => s !== status) : [...listPrefs.statuses, status];
+    updateListPrefs({ ...listPrefs, statuses: PROJECT_LIST_STATUSES.filter(s => picked.includes(s)) });
+  }, [listPrefs, updateListPrefs]);
+
+  // Зріз перемикача «Активні / Архів» — до фільтра статусу: від нього рахуються
+  // лічильники на чипах.
+  const scopedStats = useMemo(
+    () => statsList.filter(stat => stat.archived === showArchived),
+    [statsList, showArchived],
+  );
+  const statusCounts = useMemo(() => projectStatusCounts(scopedStats), [scopedStats]);
+
+  // Видимий набір: фільтр статусу, далі вибране сортування (спільні з вебом
+  // sortProjects/filterProjects). Картки, KPI й аналітика — саме з нього.
+  const visibleStats = useMemo(
+    () => sortProjects(filterProjects(scopedStats, listPrefs.statuses), listPrefs.sort),
+    [scopedStats, listPrefs],
+  );
 
   // Шкали рахуються один раз на всі картки, а не всередині кожної: інакше
   // кожен ререндер екрана (набір тексту в модалці) перебирав би всі задачі
@@ -938,83 +1020,166 @@ export default function ProjectsScreen() {
         </View>
       )}
 
+      {/* Сортування й фільтр статусу — лише коли в зрізі є що сортувати. */}
+      {scopedStats.length > 0 && (
+        <View style={{ marginBottom: 18, gap: 8 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            accessibilityLabel={tr.projectSortLabel}
+            contentContainerStyle={{ gap: 7, alignItems: 'center' }}>
+            <Text style={{ color: c.sub, fontSize: 12, marginRight: 2 }}>{tr.projectSortLabel}</Text>
+            {PROJECT_SORT_KEYS.map(key => (
+              <ListChip
+                key={key}
+                label={tr[SORT_LABEL_KEY[key]] as string}
+                selected={listPrefs.sort === key}
+                onPress={() => updateListPrefs({ ...listPrefs, sort: key })}
+                accent={c.accent} sub={c.sub} dim={c.dim} border={c.border}
+              />
+            ))}
+          </ScrollView>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            accessibilityLabel={tr.projectListFilterLabel}
+            contentContainerStyle={{ gap: 7, alignItems: 'center' }}>
+            {PROJECT_LIST_STATUSES.map(status => (
+              <ListChip
+                key={status}
+                label={tr[STATUS_LABEL_KEY[status]] as string}
+                count={statusCounts[status]}
+                selected={listPrefs.statuses.includes(status)}
+                onPress={() => toggleStatus(status)}
+                accent={c.accent} sub={c.sub} dim={c.dim} border={c.border}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Портфель — над списком: KPI і «виконано за тиждень» по видимому
           набору (§8.3). Детальні графіки лишаються в підвалі. */}
       <PortfolioKpi kpi={kpi} palette={analyticsPalette} />
     </>
   );
 
+  const renderCard = (item: ProjectStats) => (
+    <ProjectCard
+      project={item.project}
+      stats={item}
+      counters={counters.get(item.project.id) ?? EMPTY_COUNTERS}
+      sprintCard={sprintCards.get(item.project.id) ?? null}
+      sprintsEnabled={projectModules(item.project as Project).sprints}
+      canEditContent={(projectRoles[item.project.id] ?? 'owner') !== 'viewer'}
+      onOpenSprints={openSprints}
+      buckets={timelines.get(item.project.id) ?? EMPTY_BUCKETS}
+      selected={false}
+      locale={locale}
+      tr={tr}
+      isDark={isDark}
+      borderColor={c.border}
+      textColor={c.text}
+      subColor={c.sub}
+      surfaceColor={c.sheet}
+      accentColor={c.accent}
+      canManage={isProjectOwner(item.project.id)}
+      onPress={selectProject}
+      onEdit={openEdit}
+      onDelete={deleteProject}
+      onLeave={leaveProject}
+    />
+  );
+
+  // Порожній зріз через фільтр — це не «проєктів немає»: інша підказка й
+  // кнопка скинути фільтр, а не «створити проєкт».
+  const filteredOut = scopedStats.length > 0 && visibleStats.length === 0;
+  const listEmpty = filteredOut ? (
+    <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+      <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', textAlign: 'center' }}>{tr.projectListFilterNoMatch}</Text>
+      <TouchableOpacity
+        onPress={() => updateListPrefs({ ...listPrefs, statuses: [] })}
+        accessibilityRole="button"
+        accessibilityLabel={tr.projectListFilterReset}
+        style={{ marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: c.accent }}>
+        <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.projectListFilterReset}</Text>
+      </TouchableOpacity>
+    </View>
+  ) : (
+    <View style={{ alignItems: 'center', paddingVertical: 64 }}>
+      <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
+        <IconSymbol name="folder" size={32} color={c.accent} />
+      </View>
+      <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontWeight: '700' }}>{tr.noProjects}</Text>
+      <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+        {tr.pressToAdd}
+      </Text>
+      <TouchableOpacity
+        onPress={openAdd}
+        accessibilityRole="button"
+        accessibilityLabel={tr.newProject}
+        style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <IconSymbol name="plus" size={15} color="#fff" />
+        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.newProject}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const listFooter = (
+    <ProjectAnalytics
+      projects={analyticsProjects}
+      tasks={tasks}
+      columns={columns}
+      scopeLabel={showArchived ? tr.archive : tr.projects}
+      palette={analyticsPalette}
+    />
+  );
+
+  // Картки для masonry: вертикальний відступ — справа самої обгортки картки.
+  const masonryItems: MasonryEntry[] = isWide
+    ? visibleStats.map(item => ({
+        key: item.project.id,
+        node: <View style={{ marginBottom: 12 }}>{renderCard(item)}</View>,
+      }))
+    : [];
+
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <FlatList
-          data={visibleStats}
-          keyExtractor={stat => stat.project.id}
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 40 }]}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
-          ListHeaderComponent={listHeader}
-          // Аналітика — підвал списку, а не окремий екран: цифри під картками
-          // відповідають на питання, яке виникає саме після погляду на них
-          // («а куди все це рухається»), і зайвий перехід розірвав би цю
-          // послідовність. На порожньому списку компонент повертає null сам.
-          ListFooterComponent={
-            <ProjectAnalytics
-              projects={analyticsProjects}
-              tasks={tasks}
-              columns={columns}
-              scopeLabel={showArchived ? tr.archive : tr.projects}
-              palette={analyticsPalette}
-            />
-          }
-          renderItem={({ item }) => (
-            <ProjectCard
-              project={item.project}
-              stats={item}
-              counters={counters.get(item.project.id) ?? EMPTY_COUNTERS}
-              sprintCard={sprintCards.get(item.project.id) ?? null}
-              sprintsEnabled={projectModules(item.project as Project).sprints}
-              canEditContent={(projectRoles[item.project.id] ?? 'owner') !== 'viewer'}
-              onOpenSprints={openSprints}
-              buckets={timelines.get(item.project.id) ?? EMPTY_BUCKETS}
-              selected={false}
-              locale={locale}
-              tr={tr}
-              isDark={isDark}
-              borderColor={c.border}
-              textColor={c.text}
-              subColor={c.sub}
-              surfaceColor={c.sheet}
-              accentColor={c.accent}
-              canManage={isProjectOwner(item.project.id)}
-              onPress={selectProject}
-              onEdit={openEdit}
-              onDelete={deleteProject}
-              onLeave={leaveProject}
-            />
-          )}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', paddingVertical: 64 }}>
-              <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
-                <IconSymbol name="folder" size={32} color={c.accent} />
-              </View>
-              <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontWeight: '700' }}>{tr.noProjects}</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }}>
-                {tr.pressToAdd}
-              </Text>
-              <TouchableOpacity
-                onPress={openAdd}
-                accessibilityRole="button"
-                accessibilityLabel={tr.newProject}
-                style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <IconSymbol name="plus" size={15} color="#fff" />
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.newProject}</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
+        {isWide ? (
+          // Планшет: колонки masonry (2 від 600pt, 3 від 1100pt) на всю ширину
+          // екрана — без стелі 720pt, яка лишала пів екрана порожнім.
+          <ScrollView
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
+            {listHeader}
+            {visibleStats.length > 0
+              ? <MasonryColumns items={masonryItems} columnCount={columnCount} />
+              : listEmpty}
+            {listFooter}
+          </ScrollView>
+        ) : (
+          <FlatList
+            data={visibleStats}
+            keyExtractor={stat => stat.project.id}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+            ListHeaderComponent={listHeader}
+            // Аналітика — підвал списку, а не окремий екран: цифри під картками
+            // відповідають на питання, яке виникає саме після погляду на них
+            // («а куди все це рухається»), і зайвий перехід розірвав би цю
+            // послідовність. На порожньому списку компонент повертає null сам.
+            ListFooterComponent={listFooter}
+            renderItem={({ item }) => renderCard(item)}
+            ListEmptyComponent={listEmpty}
+          />
+        )}
       </SafeAreaView>
 
       {/* Add/Edit Modal */}

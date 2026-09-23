@@ -19,6 +19,7 @@ import {
   contextRows,
   formatBytes,
   moduleLabel,
+  platformsLabel,
   stateLabel,
   weightLabel,
   weightStyle,
@@ -107,6 +108,11 @@ export function FeedbackDetailBody({
         <View style={[st.chip, { borderColor: c.border }]}>
           <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{moduleLabel(tr, item.module)}</Text>
         </View>
+        {item.platforms?.length ? (
+          <View style={[st.chip, { borderColor: c.border }]}>
+            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{platformsLabel(tr, item.platforms)}</Text>
+          </View>
+        ) : null}
         {Number.isFinite(created.getTime()) ? (
           <Text style={{ color: c.sub, fontSize: 12 }}>
             {created.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}

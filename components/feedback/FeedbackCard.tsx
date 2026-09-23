@@ -11,7 +11,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 
-import { DONE_COLOR, KIND_COLOR, STATE_COLOR, moduleLabel, stateLabel, weightLabel, weightStyle } from './labels';
+import { DONE_COLOR, KIND_COLOR, STATE_COLOR, moduleLabel, platformsLabel, stateLabel, weightLabel, weightStyle } from './labels';
 import { isDone, weightOf, type FeedbackEntry, type FeedbackStateView } from './model';
 
 export interface FeedbackCardProps {
@@ -80,6 +80,11 @@ export const FeedbackCard = React.memo(function FeedbackCard({
               {entry.item.module ? (
                 <View style={[st.badge, { borderColor: colors.border }]}>
                   <Text style={[st.badgeText, { color: colors.sub }]}>{moduleLabel(tr, entry.item.module)}</Text>
+                </View>
+              ) : null}
+              {entry.item.platforms?.length ? (
+                <View style={[st.badge, { borderColor: colors.border }]}>
+                  <Text style={[st.badgeText, { color: colors.sub }]} numberOfLines={1}>{platformsLabel(tr, entry.item.platforms)}</Text>
                 </View>
               ) : null}
               <View style={[st.badge, { backgroundColor: stateColor + '18', borderColor: stateColor + '35' }]}>

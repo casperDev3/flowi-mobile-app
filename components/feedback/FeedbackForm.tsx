@@ -23,6 +23,7 @@ import {
   contextRows,
   formatBytes,
   moduleLabel,
+  platformLabel,
   requiredFieldLabel,
   weightLabel,
 } from './labels';
@@ -33,6 +34,9 @@ import {
   TITLE_MAX,
   emptyDraft,
   feedbackModules,
+  FEEDBACK_PLATFORMS,
+  normalizePlatforms,
+  type AffectedPlatform,
   missingForSubmit,
   type BugSeverity,
   type FeedbackAttachment,
@@ -91,8 +95,16 @@ export function FeedbackForm({
     if (!isNew || kind === draft.kind) return;
     // Спільні поля переносимо, вага — своя для кожного типу.
     const fresh = emptyDraft(kind);
-    setDraft(prev => ({ ...fresh, title: prev.title, description: prev.description, module: prev.module, attachments: prev.attachments }));
+    setDraft(prev => ({ ...fresh, title: prev.title, description: prev.description, module: prev.module, platforms: prev.platforms, attachments: prev.attachments }));
   };
+
+  const togglePlatform = (platform: AffectedPlatform) =>
+    setDraft(prev => ({
+      ...prev,
+      platforms: normalizePlatforms(
+        prev.platforms.includes(platform) ? prev.platforms.filter(p => p !== platform) : [...prev.platforms, platform],
+      ),
+    }));
 
   const pick = async () => {
     if (picking || attachmentsLocked || draft.attachments.length >= MAX_ATTACHMENTS) return;
@@ -185,6 +197,27 @@ export function FeedbackForm({
             );
           })}
         </ScrollView>
+
+        <Text style={[st.label, { color: c.sub }]}>
+          {tr.fbFieldPlatforms}
+          <Text style={{ fontWeight: '400' }}>{' · ' + tr.fbFieldPlatformsHint}</Text>
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {FEEDBACK_PLATFORMS.map(platform => {
+            const active = draft.platforms.includes(platform);
+            return (
+              <TouchableOpacity
+                key={platform}
+                onPress={() => togglePlatform(platform)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: active }}
+                accessibilityLabel={`${tr.fbFieldPlatforms}: ${platformLabel(tr, platform)}`}
+                style={[st.chip, { borderColor: active ? accent : c.border, backgroundColor: active ? accent + '20' : c.dim }]}>
+                <Text style={{ color: active ? accent : c.sub, fontSize: 12, fontWeight: '600' }}>{platformLabel(tr, platform)}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         <Text style={[st.label, { color: c.sub }]}>{isBug ? tr.fbFieldSeverity : tr.fbFieldPriority}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>

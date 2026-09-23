@@ -74,6 +74,11 @@ export interface Translations {
   fbTitlePhIdea: string;
   fbTitlePhBug: string;
   fbFieldModule: string;
+  fbFieldPlatforms: string;
+  fbFieldPlatformsHint: string;
+  fbAffectsMobile: string;
+  fbAffectsTablet: string;
+  fbAffectsWeb: string;
   fbModuleNone: string;
   fbModuleOther: string;
   fbModuleSync: string;
@@ -2439,6 +2444,11 @@ const uk: Translations = {
   fbTitlePhIdea: 'Ідея або функція…',
   fbTitlePhBug: 'Що не так?',
   fbFieldModule: 'Модуль',
+  fbFieldPlatforms: 'Стосується платформ',
+  fbFieldPlatformsHint: 'можна кілька, необовʼязково',
+  fbAffectsMobile: 'Мобільний',
+  fbAffectsTablet: 'Планшет',
+  fbAffectsWeb: 'Веб',
   fbModuleNone: 'Не вказано',
   fbModuleOther: 'Інше',
   fbModuleSync: 'Синхронізація',
@@ -4633,6 +4643,11 @@ const en: Translations = {
   fbTitlePhIdea: 'Idea or feature…',
   fbTitlePhBug: 'What went wrong?',
   fbFieldModule: 'Module',
+  fbFieldPlatforms: 'Affects platforms',
+  fbFieldPlatformsHint: 'pick any, optional',
+  fbAffectsMobile: 'Mobile',
+  fbAffectsTablet: 'Tablet',
+  fbAffectsWeb: 'Web',
   fbModuleNone: 'Not set',
   fbModuleOther: 'Other',
   fbModuleSync: 'Sync',

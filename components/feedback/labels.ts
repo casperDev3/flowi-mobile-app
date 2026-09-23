@@ -49,6 +49,17 @@ export function weightLabel(tr: Translations, kind: FeedbackKind, weight: string
   return tr.fbPrioMedium;
 }
 
+export function platformLabel(tr: Translations, platform: string): string {
+  if (platform === 'mobile') return tr.fbAffectsMobile;
+  if (platform === 'tablet') return tr.fbAffectsTablet;
+  if (platform === 'web') return tr.fbAffectsWeb;
+  return platform;
+}
+
+export function platformsLabel(tr: Translations, platforms: readonly string[] | undefined): string {
+  return (platforms ?? []).map(p => platformLabel(tr, p)).join(', ');
+}
+
 export function moduleLabel(tr: Translations, module: string | undefined): string {
   if (!module) return tr.fbModuleNone;
   if (module === 'other') return tr.fbModuleOther;

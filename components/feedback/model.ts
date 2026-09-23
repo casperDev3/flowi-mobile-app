@@ -56,8 +56,24 @@ export interface FeedbackContext {
  */
 export type SubmitState = 'draft' | 'queued' | 'sent' | 'failed';
 
+/**
+ * Яких платформ стосується звернення — обирає автор, можна кілька. Не плутати
+ * з `context.platform` (звідки надіслано). Канонічний порядок — як у сервера
+ * (core/feedback/validation.py) і вебу (lib/feedback.ts).
+ */
+export type AffectedPlatform = 'mobile' | 'tablet' | 'web';
+export const FEEDBACK_PLATFORMS: readonly AffectedPlatform[] = ['mobile', 'tablet', 'web'];
+
+/** Лише відомі значення, без дублів, у канонічному порядку. */
+export function normalizePlatforms(raw: unknown): AffectedPlatform[] {
+  const list: unknown[] = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',') : [];
+  const picked = new Set(list.map(value => String(value).trim().toLowerCase()));
+  return FEEDBACK_PLATFORMS.filter(value => picked.has(value));
+}
+
 interface FeedbackExtras {
   module?: string;
+  platforms?: AffectedPlatform[];
   attachments?: FeedbackAttachment[];
   context?: FeedbackContext;
   reportUid?: string;
@@ -275,6 +291,7 @@ export interface FeedbackDraft {
   title: string;
   description: string;
   module: string;
+  platforms: AffectedPlatform[];
   weight: BugSeverity | IdeaPriority;
   steps: string;
   expected: string;
@@ -288,6 +305,7 @@ export function emptyDraft(kind: FeedbackKind): FeedbackDraft {
     title: '',
     description: '',
     module: '',
+    platforms: [],
     weight: kind === 'bug' ? DEFAULT_SEVERITY : DEFAULT_PRIORITY,
     steps: '',
     expected: '',
@@ -302,6 +320,7 @@ export function draftFromEntry(entry: FeedbackEntry): FeedbackDraft {
     title: entry.item.title ?? '',
     description: entry.item.description ?? '',
     module: entry.item.module ?? '',
+    platforms: normalizePlatforms(entry.item.platforms),
     attachments: entry.item.attachments ?? [],
   };
   if (entry.kind === 'bug') {
@@ -339,6 +358,7 @@ export function applyDraft(entry: FeedbackEntry | null, draft: FeedbackDraft, id
     title: draft.title.trim().slice(0, TITLE_MAX),
     description: draft.description.trim().slice(0, DESCRIPTION_MAX),
     module: draft.module || undefined,
+    platforms: draft.platforms.length ? normalizePlatforms(draft.platforms) : undefined,
     attachments: draft.attachments.length ? draft.attachments : undefined,
   };
   if (draft.kind === 'bug') {
@@ -423,6 +443,7 @@ export interface SubmitPayload {
   title: string;
   description: string;
   module: string;
+  platforms: AffectedPlatform[];
   weight: string;
   steps?: string;
   expected?: string;
@@ -465,6 +486,7 @@ export function buildSubmitPayload(entry: FeedbackEntry, uploadable: ReadonlySet
     title: (item.title ?? '').slice(0, TITLE_MAX),
     description: (item.description ?? '').slice(0, DESCRIPTION_MAX),
     module: item.module ?? '',
+    platforms: normalizePlatforms(item.platforms),
     weight: weightOf(entry),
     context,
     attachments,

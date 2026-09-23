@@ -22,6 +22,7 @@ import {
   filterAndSort,
   mimeFor,
   missingForSubmit,
+  normalizePlatforms,
   resolveState,
   routeTemplate,
   type Bug,
@@ -194,7 +195,7 @@ describe('тіло POST /api/feedback/reports/ (§4.1)', () => {
     const payload = buildSubmitPayload({ kind: 'bug', item: bug }, new Set(['u1']));
     expect(payload).toEqual({
       kind: 'bug', collection: 'bugs', local_id: bug.id, title: bug.title, description: 'опис',
-      module: 'finance', weight: 'critical', steps: 's', expected: 'e', actual: 'a',
+      module: 'finance', platforms: [], weight: 'critical', steps: 's', expected: 'e', actual: 'a',
       context: { platform: 'mobile', device_type: 'tablet', app_version: '1.1.0', screen: '/project/[id]/tasks', os_version: 'iOS 18', locale: 'uk' },
       attachments: [{ client_uid: 'u1', kind: 'image', name: 's.png', bytes: 10, mime: 'image/png' }],
     });
@@ -206,6 +207,25 @@ describe('тіло POST /api/feedback/reports/ (§4.1)', () => {
     expect(payload.weight).toBe('high');
     expect(payload).not.toHaveProperty('steps');
     expect(payload.context).toEqual({});
+  });
+});
+
+describe('платформи, яких стосується звернення', () => {
+  it('кілька, без дублів і сміття, канонічний порядок', () => {
+    expect(normalizePlatforms(['web', 'mobile', 'desktop', 'web'])).toEqual(['mobile', 'web']);
+    expect(normalizePlatforms('tablet, WEB')).toEqual(['tablet', 'web']);
+    expect(normalizePlatforms(undefined)).toEqual([]);
+  });
+
+  it('форма → запис → payload; старий запис без платформ читається', () => {
+    const draft = { ...emptyDraft('idea'), title: 'x', description: 'y', platforms: ['web', 'tablet'] as const };
+    const entry = applyDraft(null, { ...draft, platforms: [...draft.platforms] }, 'i9', '2026-09-23T10:00:00.000Z');
+    expect(entry.item.platforms).toEqual(['tablet', 'web']);
+    expect(draftFromEntry(entry).platforms).toEqual(['tablet', 'web']);
+    expect(buildSubmitPayload(entry, new Set()).platforms).toEqual(['tablet', 'web']);
+    expect(buildSubmitPayload({ kind: 'idea', item: idea }, new Set()).platforms).toEqual([]);
+    expect(applyDraft(entry, { ...draftFromEntry(entry), platforms: [] }, 'i9', '2026-09-23T11:00:00.000Z').item.platforms)
+      .toBeUndefined();
   });
 });
 

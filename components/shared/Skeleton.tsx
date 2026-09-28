@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
@@ -106,7 +107,7 @@ export function SkeletonRow({ style }: SkeletonRowProps) {
 
 const ss = StyleSheet.create({
   card: {
-    borderRadius: 18,
+    borderRadius: Atlas.radius.xlarge,
     borderWidth: 1,
     padding: 14,
     marginBottom: 12,
@@ -115,7 +116,7 @@ const ss = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 14,
+    borderRadius: Atlas.radius.large,
     borderWidth: 1,
     padding: 14,
     marginBottom: 8,

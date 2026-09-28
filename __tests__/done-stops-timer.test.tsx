@@ -1,3 +1,5 @@
+// Advertising is outside the timer/status contract and needs a navigation provider.
+jest.mock('@/components/advertising/Advertising', () => ({ AdSlot: () => null, SponsorPause: () => null, advertisingActivity: jest.fn() }));
 /**
  * __tests__/done-stops-timer.test.tsx — «готово» з деталі проєкту зупиняє
  * таймер задачі (паритет з екраном Завдань, subtasks.tsx і вебом).

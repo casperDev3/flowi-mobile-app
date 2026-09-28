@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/FinanceSectionBar.tsx — смуга вкладок і спільний фільтр
  * розділу «Фінанси» (finance-revamp.md §2.1, §3, §9.4).
@@ -128,7 +129,7 @@ export function FinanceFilterBar({
                 accessibilityState={{ selected: on, checked: on }}
                 accessibilityLabel={`${tr.finFilterCurrency}: ${code}`}
                 style={[st.chip, { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent + '18' : c.dim }]}>
-                <Text style={{ color: on ? c.accent : c.sub, fontSize: 12, fontWeight: '800' }}>{code}</Text>
+                <Text style={{ color: on ? c.accent : c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{code}</Text>
               </TouchableOpacity>
             );
           }) : null}
@@ -143,7 +144,7 @@ export function FinanceFilterBar({
           accessibilityLabel={tr.finFilterButton}
           style={[st.chip, { borderColor: filter.scope !== 'all' ? c.accent : c.border, backgroundColor: filter.scope !== 'all' ? c.accent + '18' : c.dim, flexDirection: 'row', gap: 5 }]}>
           <IconSymbol name="line.3.horizontal.decrease" size={12} color={filter.scope !== 'all' ? c.accent : c.sub} />
-          <Text style={{ color: filter.scope !== 'all' ? c.accent : c.sub, fontSize: 12, fontWeight: '800' }}>
+          <Text style={{ color: filter.scope !== 'all' ? c.accent : c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>
             {showScope ? `${filter.currency} · ${moneyScopeText(filter.scope, tr)}` : filter.currency}
           </Text>
         </TouchableOpacity>
@@ -176,7 +177,7 @@ export function FinanceFilterBar({
                   accessibilityState={{ selected: on, checked: on }}
                   accessibilityLabel={code}
                   style={[st.chip, { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent + '18' : c.dim }]}>
-                  <Text style={{ color: on ? c.accent : c.sub, fontSize: 13, fontWeight: '800' }}>{code}</Text>
+                  <Text style={{ color: on ? c.accent : c.sub, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>{code}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -313,16 +314,16 @@ function PeriodSheet({ visible, onClose, period, onPick, c, tr, isWide, isDark }
 }
 
 const st = StyleSheet.create({
-  tab: { paddingHorizontal: 14, minHeight: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  periodBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 2 },
+  tab: { paddingHorizontal: 14, minHeight: 36, borderRadius: Atlas.radius.xlarge, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  periodBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 2 },
   arrow: { width: 32, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
-  chip: { minHeight: 36, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  segment: { flexDirection: 'row', borderWidth: 1, borderRadius: 12, padding: 2 },
-  segmentBtn: { minHeight: 32, paddingHorizontal: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 20, paddingBottom: 36 },
+  chip: { minHeight: 36, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  segment: { flexDirection: 'row', borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 2 },
+  segmentBtn: { minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  sheet: { borderTopLeftRadius: Atlas.radius.xlarge, borderTopRightRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, paddingBottom: 36 },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
   sheetLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14 },
-  input: { flex: 1, minHeight: 44, borderRadius: 12, paddingHorizontal: 12, fontSize: 14 },
-  primaryBtn: { minHeight: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 14 },
+  input: { flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, fontSize: 14 },
+  primaryBtn: { minHeight: 46, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
 });

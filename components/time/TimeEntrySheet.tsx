@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/TimeEntrySheet.tsx — ручний запис часу: створення І правка.
  *
@@ -454,17 +455,17 @@ export function TimeEntrySheet({
 const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet: { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle: { fontSize: 20, fontWeight: '800', marginBottom: 4 },
+  sheetTitle: { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 4 },
   label: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input: { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
-  suggestBox: { borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
+  input: { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
+  suggestBox: { borderRadius: Atlas.radius.medium, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
   suggestRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, minHeight: 44 },
   linkedRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, minHeight: 36 },
-  durBlock: { flexDirection: 'row', borderRadius: 16, borderWidth: 1, padding: 16, alignItems: 'flex-start' },
+  chip: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, minHeight: 36 },
+  durBlock: { flexDirection: 'row', borderRadius: Atlas.radius.large, borderWidth: 1, padding: 16, alignItems: 'flex-start' },
   durInput: { color: '#6366F1', fontSize: 36, fontWeight: '700', textAlign: 'center', letterSpacing: -1, alignSelf: 'stretch' },
-  btn: { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  btn: { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

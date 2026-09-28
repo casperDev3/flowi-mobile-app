@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/settings-notifications.tsx — налаштування сповіщень
  * (notifications-module.md §4.4–§4.5, §6.3, §11).
@@ -238,12 +239,12 @@ function ToggleRow({ icon, iconColor, title, subtitle, value, disabled, onChange
 
 const st = StyleSheet.create({
   intro:     { fontSize: 13, lineHeight: 18, marginTop: 6, marginBottom: 14 },
-  card:      { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
+  card:      { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
   notice:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
   iconBox:   { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   divider:   { height: StyleSheet.hairlineWidth, marginLeft: 58 },
   section:   { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginTop: 10, marginBottom: 8, marginLeft: 2 },
   chips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  chip:      { minHeight: 40, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chip:      { minHeight: 40, paddingHorizontal: 14, borderRadius: Atlas.radius.xlarge, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

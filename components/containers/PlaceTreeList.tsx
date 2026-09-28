@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useMemo, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -90,7 +91,7 @@ export function PlaceTreeList({
     const active = mode === 'column' && selected === node.place.id;
     return (
       <View key={node.place.id}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 4 + node.depth * 16, borderRadius: 10,
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 4 + node.depth * 16, borderRadius: Atlas.radius.medium,
           backgroundColor: active ? accent + '22' : 'transparent' }}>
           <TouchableOpacity onPress={() => expandable && toggle(node.place.id)} disabled={!expandable}
             accessibilityRole="button" accessibilityState={{ expanded: expandable ? open : undefined }}
@@ -132,7 +133,7 @@ export function PlaceTreeList({
     const active = selected === id;
     return (
       <TouchableOpacity onPress={() => onSelect?.(id)} accessibilityRole="button" accessibilityState={{ selected: active }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, borderRadius: 10,
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, borderRadius: Atlas.radius.medium,
           backgroundColor: active ? accent + '22' : 'transparent' }}>
         <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '700' }}>{label}</Text>
         <Text style={{ color: c.sub, fontSize: 12 }}>{count}</Text>

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React from 'react';
 import { Text, View } from 'react-native';
 
@@ -33,10 +34,10 @@ export function QrSheet({ container, c, onClose, onCreate, onPrint }: {
       )) : undefined}>
       {url && slug ? (
         <View style={{ alignItems: 'center', gap: 12, paddingVertical: 8 }}>
-          <View style={{ padding: 10, borderRadius: 16, backgroundColor: '#fff' }}>
+          <View style={{ padding: 10, borderRadius: Atlas.radius.large, backgroundColor: '#fff' }}>
             <QrCodeSvg value={url} size={200} label={`${tr.ctrQr}: ${container?.name ?? ''}`} />
           </View>
-          <Text selectable style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: 2, fontVariant: ['tabular-nums'] }}>
+          <Text selectable style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: 2, fontVariant: ['tabular-nums'] }}>
             {groupSlug(slug)}
           </Text>
           <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>{tr.ctrQrHint}</Text>

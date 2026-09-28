@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/ProjectTransactionForm.tsx — операція проєкту з телефона
  * (finance-revamp.md §10.2, П3).
@@ -62,7 +63,7 @@ export function ProjectTransactionForm({
     setAccountId(defaultAccountId([...usableRef.current]));
   }, [visible]);
 
-  const account = usable.find(a => a.id === accountId);
+  const account = usable.find((a) => a.id === accountId);
   const canSave = usable.length > 0 && !!account && !busy;
   const inputBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
 
@@ -77,7 +78,7 @@ export function ProjectTransactionForm({
       <View style={[st.sheet, sheetColumnStyle(isWide), { maxHeight: height * 0.88, backgroundColor: c.sheet, borderColor: c.border }]}>
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={[st.handle, { backgroundColor: c.border }]} />
-          <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 12 }}>{tr.finProjectTxTitle}</Text>
+          <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 12 }}>{tr.finProjectTxTitle}</Text>
 
           <View accessibilityRole="radiogroup" style={[st.segment, { backgroundColor: c.dim, borderColor: c.border }]}>
             {(['expense', 'income'] as const).map(t => {
@@ -97,7 +98,9 @@ export function ProjectTransactionForm({
             })}
           </View>
 
-          <Text style={[st.label, { color: c.sub }]}>{tr.amount}{account ? ` (${account.currency})` : ''}</Text>
+          <Text style={[st.label, { color: c.sub }]}>{tr.amount}{account ? ` (${account.currency})` : ""}
+            <Text style={{ color: "#EF4444" }}> *</Text>
+          </Text>
           <TextInput
             value={amount}
             onChangeText={v => { setAmount(v); setInvalid(false); }}
@@ -107,11 +110,17 @@ export function ProjectTransactionForm({
             accessibilityLabel={tr.amount}
             style={[st.input, { color: c.text, backgroundColor: inputBg, borderColor: invalid ? '#EF4444' : 'transparent' }]}
           />
-          {invalid ? <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 4 }}>{tr.finProjectInvalid}</Text> : null}
+          {invalid ? (
+            <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 4 }}>
+              {tr.finProjectInvalid}
+            </Text>
+          ) : null}
 
           <Text style={[st.label, { color: c.sub }]}>{tr.account}</Text>
           {usable.length === 0 ? (
-            <Text style={{ color: c.sub, fontSize: 13, lineHeight: 18 }}>{tr.finProjectNeedAccount}</Text>
+            <Text style={{ color: c.sub, fontSize: 13, lineHeight: 18 }}>
+              {tr.finProjectNeedAccount}
+            </Text>
           ) : (
             <ChipRow
               items={usable.map(a => ({ id: a.id, label: `${a.name} · ${a.currency}` }))}
@@ -142,14 +151,20 @@ export function ProjectTransactionForm({
             style={[st.input, { color: c.text, backgroundColor: inputBg, borderColor: 'transparent' }]}
           />
 
-          {error ? <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 10 }}>{error}</Text> : null}
+          {error ? (
+            <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 10 }}>
+              {error}
+            </Text>
+          ) : null}
 
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
             <TouchableOpacity
               onPress={onClose}
               accessibilityRole="button"
               style={[st.btn, { backgroundColor: c.dim }]}>
-              <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+              <Text style={{ color: c.sub, fontWeight: "600" }}>
+                {tr.cancel}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={submit}
@@ -158,7 +173,9 @@ export function ProjectTransactionForm({
               accessibilityState={{ disabled: !canSave }}
               accessibilityLabel={tr.save}
               style={[st.btn, { flex: 1.6, backgroundColor: canSave ? c.accent : c.dim }]}>
-              <Text style={{ color: canSave ? '#fff' : c.sub, fontWeight: '700' }}>{tr.save}</Text>
+              <Text style={{ color: canSave ? '#fff' : c.sub, fontWeight: '700' }}>
+                {tr.save}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -180,7 +197,7 @@ function ChipRow({ items, value, onChange, c }: {
       keyboardShouldPersistTaps="handled"
       accessibilityRole="radiogroup"
       contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
-      {items.map(item => {
+      {items.map((item) => {
         const on = item.id === value;
         return (
           <TouchableOpacity
@@ -190,7 +207,9 @@ function ChipRow({ items, value, onChange, c }: {
             accessibilityState={{ selected: on, checked: on }}
             accessibilityLabel={item.label}
             style={[st.chip, { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent + '18' : 'transparent' }]}>
-            <Text numberOfLines={1} style={{ color: on ? c.accent : c.sub, fontSize: 12, fontWeight: '700', maxWidth: 180 }}>{item.label}</Text>
+            <Text numberOfLines={1} style={{ color: on ? c.accent : c.sub, fontSize: 12, fontWeight: '700', maxWidth: 180 }}>
+              {item.label}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -199,12 +218,12 @@ function ChipRow({ items, value, onChange, c }: {
 }
 
 const st = StyleSheet.create({
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 20, paddingBottom: 36 },
+  sheet: { borderTopLeftRadius: Atlas.radius.xlarge, borderTopRightRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, paddingBottom: 36 },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
-  segment: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
+  segment: { flexDirection: 'row', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 3 },
   segmentBtn: { flex: 1, minHeight: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 12, fontWeight: '700', marginTop: 14, marginBottom: 6 },
-  input: { minHeight: 46, borderRadius: 12, paddingHorizontal: 12, fontSize: 16, borderWidth: 1 },
-  chip: { minHeight: 34, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  btn: { flex: 1, minHeight: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  input: { minHeight: 46, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, fontSize: 16, borderWidth: 1 },
+  chip: { minHeight: 34, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  btn: { flex: 1, minHeight: 46, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
 });

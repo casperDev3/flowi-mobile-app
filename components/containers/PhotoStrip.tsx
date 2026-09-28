@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
@@ -69,7 +70,7 @@ export function PhotoStrip({
         <TouchableOpacity key={id} onPress={() => manage(id, index)} activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel={`${tr.ctrPhotos} ${index + 1}${index === 0 ? ` · ${tr.ctrPhotoCoverBadge}` : ''}`}>
-          <MediaImage asset={mediaById.get(id)} style={{ width: w, height: h, borderRadius: 12 }}
+          <MediaImage asset={mediaById.get(id)} style={{ width: w, height: h, borderRadius: Atlas.radius.medium }}
             pendingLabel={tr.ctrPhotoPending} placeholderColor={c.dim} />
           {index === 0 && ids.length > 1 ? (
             <View style={{ position: 'absolute', left: 6, top: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 999,
@@ -81,7 +82,7 @@ export function PhotoStrip({
       ))}
       {ids.length < MAX_PHOTOS ? (
         <TouchableOpacity onPress={add} disabled={busy} accessibilityRole="button" accessibilityLabel={tr.ctrPhotoAdd}
-          style={{ width: large ? 110 : w, height: h, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed',
+          style={{ width: large ? 110 : w, height: h, borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed',
             borderColor: accent + '70', backgroundColor: accent + '10', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
           {busy ? <ActivityIndicator color={accent} /> : <IconSymbol name="camera.fill" size={18} color={accent} />}
           {large ? <Text style={{ color: accent, fontSize: 12, fontWeight: '700' }}>{tr.ctrPhotoAdd}</Text> : null}

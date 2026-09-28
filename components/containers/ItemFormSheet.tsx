@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useEffect, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -91,7 +92,7 @@ export function ItemFormSheet({
         <SheetButton label={tr.cancel} onPress={onClose} c={c} />
         <SheetButton label={tr.save} onPress={save} c={c} color={accent} disabled={!canSave} flex={2} />
       </>}>
-      <SheetLabel text={tr.itemName} c={c} />
+      <SheetLabel text={tr.itemName} c={c} required />
       <TextInput value={name} onChangeText={setName} placeholder={tr.itemNamePlaceholder} placeholderTextColor={c.sub}
         autoFocus={!request?.item} style={input} accessibilityLabel={tr.itemName} />
 
@@ -99,14 +100,14 @@ export function ItemFormSheet({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <TouchableOpacity onPress={() => setQty(String(Math.max(0, count - 1)))} disabled={count <= 0}
           accessibilityRole="button" accessibilityLabel={tr.ctrQtyLess}
-          style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center', opacity: count <= 0 ? 0.4 : 1 }}>
+          style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center', opacity: count <= 0 ? 0.4 : 1 }}>
           <IconSymbol name="minus" size={16} color={c.text} />
         </TouchableOpacity>
         <TextInput value={qty} onChangeText={t => setQty(t.replace(/[^\d]/g, ''))} keyboardType="number-pad"
           accessibilityLabel={tr.ctrItemQty}
           style={[sheetStyles.input, { backgroundColor: c.dim, color: c.text, width: 72, textAlign: 'center' }]} />
         <TouchableOpacity onPress={() => setQty(String(count + 1))} accessibilityRole="button" accessibilityLabel={tr.ctrQtyMore}
-          style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center' }}>
+          style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name="plus" size={16} color={c.text} />
         </TouchableOpacity>
       </View>
@@ -119,7 +120,7 @@ export function ItemFormSheet({
           return (
             <TouchableOpacity key={option} onPress={() => setStatus(option)} accessibilityRole="radio"
               accessibilityState={{ checked: active }} accessibilityLabel={statusLabel(tr, option)}
-              style={{ flex: 1, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+              style={{ flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
                 borderWidth: 1, borderColor: active ? color : c.border, backgroundColor: active ? color + '22' : c.dim }}>
               <Text style={{ color: c.text, fontSize: 13, fontWeight: active ? '800' : '600' }}>{statusLabel(tr, option)}</Text>
             </TouchableOpacity>

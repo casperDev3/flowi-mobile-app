@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/training/[groupId]/leaderboard.tsx — лідерборд (training-module.md
  * §6.4, §10.1): перемикач «Тиждень / За весь час», навігація ISO-тижнями,
@@ -65,10 +66,10 @@ export default function LeaderboardScreen() {
       footer={data?.me ? (
         <Card c={c} accent={TG_ACCENT}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>
+            <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>
               {fmt(tr.tgYourPlace, { rank: data.me.rank, xp: data.me.xp })}
             </Text>
-            {meRow ? <Text style={{ color: TG_XP, fontWeight: '800' }}>{`🔥${meRow.streak_days}`}</Text> : null}
+            {meRow ? <Text style={{ color: TG_XP, fontWeight: Atlas.type.headingWeight }}>{`🔥${meRow.streak_days}`}</Text> : null}
           </View>
         </Card>
       ) : undefined}>

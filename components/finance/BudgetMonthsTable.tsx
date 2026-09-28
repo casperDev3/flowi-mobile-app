@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/BudgetMonthsTable.tsx — «категорія × місяць» для
  * періоду, довшого за місяць (finance-revamp.md §5.5). Кожна клітинка —
@@ -69,7 +70,7 @@ export function BudgetMonthsTable({ rows, monthsShort, fmt, c, title, hint, empt
 }
 
 const st = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: 18, padding: 14, marginBottom: 16 },
+  card: { borderWidth: 1, borderRadius: Atlas.radius.xlarge, padding: 14, marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center' },
   nameCell: { width: 110, fontSize: 13, paddingRight: 6 },
   cell: { width: CELL_W, fontSize: 11, textAlign: 'right', paddingVertical: 4 },

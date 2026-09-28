@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/ScreenHeader.tsx
  *
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
   // й знизу на Android.
   pageTitle: {
     fontSize: 32,
-    fontWeight: '800',
+    fontWeight: Atlas.type.headingWeight,
     letterSpacing: -0.8,
     lineHeight: 38,
   },

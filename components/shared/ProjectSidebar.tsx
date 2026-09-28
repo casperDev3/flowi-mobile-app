@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/ProjectSidebar.tsx
  *
@@ -136,8 +137,8 @@ const st = StyleSheet.create({
   exitRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingHorizontal: 10, marginBottom: 8 },
   header:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 14 },
   dot:        { width: 12, height: 12, borderRadius: 6 },
-  brand:      { fontSize: 18, fontWeight: '800', flex: 1 },
-  groupHead:  { flexDirection: 'row', alignItems: 'center', minHeight: 32, paddingHorizontal: 10, borderRadius: 8 },
+  brand:      { fontSize: 18, fontWeight: Atlas.type.headingWeight, flex: 1 },
+  groupHead:  { flexDirection: 'row', alignItems: 'center', minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.small },
   groupTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 10, borderRadius: 10 },
+  row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
 });

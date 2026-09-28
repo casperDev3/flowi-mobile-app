@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskTimerTab.tsx
  *
@@ -146,9 +147,9 @@ export function TaskTimerTab({
 
 const st = StyleSheet.create({
   caption:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' },
-  bigClock: { fontSize: 44, fontWeight: '800', letterSpacing: -1 },
+  bigClock: { fontSize: 44, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 },
   label:    { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  btn:      { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  row:      { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 7 },
+  btn:      { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  row:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10, marginBottom: 7 },
   rowValue: { fontSize: 13, fontWeight: '600' },
 });

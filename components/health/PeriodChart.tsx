@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -13,7 +14,7 @@ export function PeriodSelector({ period, onChange, color, c, tr }: {
   period: Period; onChange: (p: Period) => void; color: string; c: any; tr: any;
 }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 4, backgroundColor: c.dim, borderRadius: 12, padding: 3 }}>
+    <View style={{ flexDirection: 'row', gap: 4, backgroundColor: c.dim, borderRadius: Atlas.radius.medium, padding: 3 }}>
       {PERIODS.map(p => {
         const active = p === period;
         return (

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import {
@@ -78,7 +79,7 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 380 }}>
                 {FIELDS.map(f => (
                   <View key={f.type} style={[s.row, { borderColor: c.border }]}>
-                    <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: f.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 32, height: 32, borderRadius: Atlas.radius.medium, backgroundColor: f.color + '20', alignItems: 'center', justifyContent: 'center' }}>
                       <IconSymbol name={f.icon as any} size={16} color={f.color} />
                     </View>
                     <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', flex: 1, marginLeft: 10 }}>{tr[f.labelKey]}</Text>
@@ -88,7 +89,7 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
                       onChangeText={t => setVals(p => ({ ...p, [f.type]: t }))}
                       keyboardType="decimal-pad"
                       placeholder="—" placeholderTextColor={c.sub}
-                      style={{ width: 84, color: c.text, fontSize: 18, fontWeight: '800', textAlign: 'right', paddingVertical: 8 }}
+                      style={{ width: 84, color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, textAlign: 'right', paddingVertical: 8 }}
                     />
                     <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', width: 28, textAlign: 'right' }}>{f.unit}</Text>
                   </View>
@@ -125,7 +126,7 @@ const s = StyleSheet.create({
   sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   handle:    { width: 36, height: 4, borderRadius: 2 },
-  title:     { fontSize: 20, fontWeight: '800', marginBottom: 10 },
+  title:     { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 10 },
   row:       { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 10 },
-  btn:       { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  btn:       { paddingVertical: 14, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/projects/ProjectSwitcherSheet.tsx — свічер проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §3: «У шапці свічер проєкту» на телефоні,
@@ -202,11 +203,11 @@ export function ProjectSwitcherTrigger({
 const st = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: 34 },
-  sheet: { borderRadius: 24, borderWidth: 1, padding: 18, overflow: 'hidden' },
+  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18, overflow: 'hidden' },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', backgroundColor: 'rgba(128,128,128,0.4)', marginBottom: 14 },
-  title: { fontSize: 17, fontWeight: '800', marginBottom: 12 },
+  title: { fontSize: 17, fontWeight: Atlas.type.headingWeight, marginBottom: 12 },
   sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, marginTop: 10, marginBottom: 4, paddingHorizontal: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 10, borderRadius: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
   dot: { width: 10, height: 10, borderRadius: 5 },
   trigger: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginBottom: 2 },
 });

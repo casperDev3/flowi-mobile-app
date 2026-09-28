@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/activity.tsx — Стрічка активності проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §4, контракт §4.6).
@@ -95,7 +96,7 @@ export default function ProjectActivityScreen() {
         {loading ? (
           <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
         ) : offline ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, borderRadius: 12, padding: 12, marginTop: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, borderRadius: Atlas.radius.medium, padding: 12, marginTop: 8 }}>
             <IconSymbol name="exclamationmark.circle" size={14} color={c.sub} />
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 6, flex: 1 }}>{tr.projectMembersOfflineHint}</Text>
           </View>

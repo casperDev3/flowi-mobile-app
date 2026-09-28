@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import {
@@ -162,7 +163,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
                     <TextInput placeholder="7" placeholderTextColor={c.sub} value={val} onChangeText={setVal}
                       accessibilityLabel={`${tr.sleep}, ${tr.hrs}`}
                       keyboardType="number-pad" autoFocus
-                      style={{ color: ACCENT_SLEEP, fontSize: 38, fontWeight: '800', textAlign: 'center', letterSpacing: -1 }} />
+                      style={{ color: ACCENT_SLEEP, fontSize: 38, fontWeight: Atlas.type.headingWeight, textAlign: 'center', letterSpacing: -1 }} />
                     <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.hrs}</Text>
                   </View>
                   <Text style={{ color: c.sub, fontSize: 30, fontWeight: '200', alignSelf: 'center', marginBottom: 18 }}>:</Text>
@@ -170,7 +171,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
                     <TextInput placeholder="30" placeholderTextColor={c.sub} value={val2} onChangeText={setVal2}
                       accessibilityLabel={`${tr.sleep}, ${tr.mins}`}
                       keyboardType="number-pad"
-                      style={{ color: ACCENT_SLEEP, fontSize: 38, fontWeight: '800', textAlign: 'center', letterSpacing: -1 }} />
+                      style={{ color: ACCENT_SLEEP, fontSize: 38, fontWeight: Atlas.type.headingWeight, textAlign: 'center', letterSpacing: -1 }} />
                     <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.mins}</Text>
                   </View>
                 </View>
@@ -264,7 +265,7 @@ function Macro({ label, value, onChange, color, c }: {
     <View style={{ flex: 1 }}>
       <TextInput placeholder="0" placeholderTextColor={c.sub} value={value} onChangeText={onChange} keyboardType="number-pad"
         accessibilityLabel={label}
-        style={{ color, fontSize: 18, fontWeight: '800', textAlign: 'center', borderRadius: 12, borderWidth: 1, borderColor: color + '40', backgroundColor: color + '10', paddingVertical: 10 }} />
+        style={{ color, fontSize: 18, fontWeight: Atlas.type.headingWeight, textAlign: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: color + '40', backgroundColor: color + '10', paddingVertical: 10 }} />
       <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 4 }}>{label}</Text>
     </View>
   );
@@ -276,7 +277,7 @@ function ModalTitle({ title, icon, color, textColor }: { title: string; icon: an
       <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
         <IconSymbol name={icon} size={18} color={color} />
       </View>
-      <Text style={{ color: textColor, fontSize: 20, fontWeight: '800' }}>{title}</Text>
+      <Text style={{ color: textColor, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{title}</Text>
     </View>
   );
 }
@@ -291,9 +292,9 @@ const s = StyleSheet.create({
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2 },
   label:        { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  bigInput:     { fontSize: 36, fontWeight: '800', textAlign: 'center', borderRadius: 16, borderWidth: 1.5, paddingVertical: 16, letterSpacing: -1 },
-  noteInput:    { fontSize: 14, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11 },
-  durBlock:     { flexDirection: 'row', borderRadius: 16, borderWidth: 1, padding: 16, alignItems: 'flex-start' },
-  presetBtn:    { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 9, alignItems: 'center' },
-  btn:          { paddingVertical: 14, borderRadius: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  bigInput:     { fontSize: 36, fontWeight: Atlas.type.headingWeight, textAlign: 'center', borderRadius: Atlas.radius.large, borderWidth: 1.5, paddingVertical: 16, letterSpacing: -1 },
+  noteInput:    { fontSize: 14, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11 },
+  durBlock:     { flexDirection: 'row', borderRadius: Atlas.radius.large, borderWidth: 1, padding: 16, alignItems: 'flex-start' },
+  presetBtn:    { flex: 1, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingVertical: 9, alignItems: 'center' },
+  btn:          { paddingVertical: 14, borderRadius: Atlas.radius.large, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

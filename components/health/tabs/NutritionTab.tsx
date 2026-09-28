@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/NutritionTab.tsx — вкладка «Харчування».
  *
@@ -70,7 +71,7 @@ export function NutritionTab({ h }: HealthTabProps) {
               входить: день без їжі й із 500 спаленими має показувати нуль
               зʼїдених, а не «500 / 2200». Вплив тренувань видно в залишку. */}
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
-            <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{cal.consumed}</Text>
+            <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{cal.consumed}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>/ {goals.calories} кк</Text>
             <View style={{ flex: 1 }} />
             <View style={[s.badge, { backgroundColor: (cal.over ? ACCENT_PULSE : ACCENT_CAL) + '20', borderColor: (cal.over ? ACCENT_PULSE : ACCENT_CAL) + '40' }]}>
@@ -114,7 +115,7 @@ export function NutritionTab({ h }: HealthTabProps) {
         <SectionHeader title={tr.protein} icon="bolt.fill" color={ACCENT_PROT} textColor={c.text} />
         <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
-            <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{Math.round(today.protein)}</Text>
+            <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{Math.round(today.protein)}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>/ {goals.protein} г</Text>
             <View style={{ flex: 1 }} />
             <View style={[s.badge, { backgroundColor: ACCENT_PROT + '20', borderColor: ACCENT_PROT + '40' }]}>
@@ -137,7 +138,7 @@ export function NutritionTab({ h }: HealthTabProps) {
         <SectionHeader title={tr.water} icon="drop.fill" color={ACCENT} textColor={c.text} />
         <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
-            <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>
+            <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>
               {today.water >= 1000 ? `${(today.water / 1000).toFixed(1)} л` : `${today.water} мл`}
             </Text>
             <Text style={{ color: c.sub, fontSize: 11, marginLeft: 5 }}>/ {goals.water} мл</Text>
@@ -191,7 +192,7 @@ export function NutritionTab({ h }: HealthTabProps) {
               {foodToday.map(e => (
                 <BlurView key={e.id} intensity={isDark ? 18 : 38} tint={isDark ? 'dark' : 'light'}
                   style={[s.logRow, { borderColor: c.border }]}>
-                  <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ width: 34, height: 34, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
                     <IconSymbol name="flame.fill" size={15} color={ACCENT_CAL} />
                   </View>
                   <View style={{ flex: 1, marginLeft: 10 }}>
@@ -216,11 +217,11 @@ export function NutritionTab({ h }: HealthTabProps) {
 }
 
 const s = StyleSheet.create({
-  addBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  card:   { borderRadius: 18, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
+  addBtn: { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  card:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
   track:  { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill:   { height: '100%', borderRadius: 4 },
   chip:   { flex: 1, borderRadius: 11, borderWidth: 1.5, paddingVertical: 7, alignItems: 'center' },
   badge:  { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  logRow: { borderRadius: 14, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  logRow: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
 });

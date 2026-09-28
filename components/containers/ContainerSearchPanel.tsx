@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -67,7 +68,7 @@ export function ContainerSearchPanel({ renderResults }: {
   return (
     <View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1,
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1,
           paddingHorizontal: 12, minHeight: 44, backgroundColor: c.dim, borderColor: c.border }}>
           <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
           <TextInput placeholder={tr.ctrQuickSearchPlaceholder} placeholderTextColor={c.sub} value={search} onChangeText={setSearch}
@@ -81,7 +82,7 @@ export function ContainerSearchPanel({ renderResults }: {
           ) : null}
         </View>
         <TouchableOpacity onPress={() => setScanning(true)} accessibilityRole="button" accessibilityLabel={tr.ctrScan}
-          style={{ width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim,
+          style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim,
             alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name="viewfinder" size={17} color={CONTAINERS_ACCENT} />
         </TouchableOpacity>

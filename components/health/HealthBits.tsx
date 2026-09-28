@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Text, View } from 'react-native';
@@ -9,10 +10,10 @@ export function SectionHeader({ title, icon, color, textColor, top = 22 }: {
 }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: top, marginBottom: 10, gap: 9 }}>
-      <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
         <IconSymbol name={icon} size={14} color={color} />
       </View>
-      <Text style={{ color: textColor, fontSize: 17, fontWeight: '800' }}>{title}</Text>
+      <Text style={{ color: textColor, fontSize: 17, fontWeight: Atlas.type.headingWeight }}>{title}</Text>
     </View>
   );
 }
@@ -23,11 +24,11 @@ export function QuickStatCard({ value, label, icon, color, isDark, border, sub, 
 }) {
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ flex: 1, borderRadius: 16, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 12, alignItems: 'center' }}>
-      <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+      style={{ flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 12, alignItems: 'center' }}>
+      <View style={{ width: 32, height: 32, borderRadius: Atlas.radius.medium, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
         <IconSymbol name={icon} size={15} color={color} />
       </View>
-      <Text style={{ color: text, fontSize: 12, fontWeight: '800', textAlign: 'center' }} numberOfLines={1}>{value}</Text>
+      <Text style={{ color: text, fontSize: 12, fontWeight: Atlas.type.headingWeight, textAlign: 'center' }} numberOfLines={1}>{value}</Text>
       <Text style={{ color: sub, fontSize: 10, fontWeight: '600', marginTop: 2 }}>{label}</Text>
     </BlurView>
   );
@@ -36,7 +37,7 @@ export function QuickStatCard({ value, label, icon, color, isDark, border, sub, 
 export function CalStat({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
   return (
     <View style={{ flex: 1 }}>
-      <Text style={{ color, fontSize: 16, fontWeight: '800' }}>{value}</Text>
+      <Text style={{ color, fontSize: 16, fontWeight: Atlas.type.headingWeight }}>{value}</Text>
       <Text style={{ color: sub, fontSize: 10, fontWeight: '600', marginTop: 1 }}>{label}</Text>
     </View>
   );

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/SleepTab.tsx — вкладка «Сон».
  *
@@ -94,7 +95,7 @@ export function SleepTab({ h }: HealthTabProps) {
           {sleep ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ color: c.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.5, flex: 1 }}>{fmtSleep(sleep)}</Text>
+                <Text style={{ color: c.text, fontSize: 30, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5, flex: 1 }}>{fmtSleep(sleep)}</Text>
                 <View style={[s.badge, { backgroundColor: sleepColor + '20', borderColor: sleepColor + '40' }]}>
                   <Text style={{ color: sleepColor, fontSize: 11, fontWeight: '700' }}>{sleepLabel}</Text>
                 </View>
@@ -129,7 +130,7 @@ export function SleepTab({ h }: HealthTabProps) {
             <SectionHeader title={tr.hautoSleepQuality} icon="sparkles" color={ACCENT_SLEEP} textColor={c.text} />
             <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{quality.score}</Text>
+                <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{quality.score}</Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4, flex: 1 }}>/ 100</Text>
                 <View style={[s.badge, { backgroundColor: qualityColor + '20', borderColor: qualityColor + '40' }]}>
                   <Text style={{ color: qualityColor, fontSize: 11, fontWeight: '700' }}>
@@ -165,7 +166,7 @@ export function SleepTab({ h }: HealthTabProps) {
         <SectionHeader title={tr.hautoPulseRest} icon="waveform.path.ecg" color={ACCENT_PULSE} textColor={c.text} />
         <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{today.pulseRest ?? '—'}</Text>
+            <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{today.pulseRest ?? '—'}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>{tr.hautoBpm}</Text>
           </View>
           <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>
@@ -174,7 +175,7 @@ export function SleepTab({ h }: HealthTabProps) {
           {today.pulse != null && (
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 10 }}>
               <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', flex: 1 }}>{tr.hautoPulseAvg}</Text>
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{today.pulse}</Text>
+              <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{today.pulse}</Text>
               <Text style={{ color: c.sub, fontSize: 11, marginLeft: 4 }}>{tr.hautoBpm}</Text>
             </View>
           )}
@@ -187,11 +188,11 @@ export function SleepTab({ h }: HealthTabProps) {
 }
 
 const s = StyleSheet.create({
-  addBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  card:   { borderRadius: 18, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
+  addBtn: { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  card:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
   track:  { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill:   { height: '100%', borderRadius: 4 },
   badge:  { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   stack:  { height: 10, borderRadius: 5, overflow: 'hidden', flexDirection: 'row', marginTop: 10 },
-  empty:  { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, padding: 13 },
+  empty:  { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 13 },
 });

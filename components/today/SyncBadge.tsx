@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -160,6 +161,6 @@ const s = StyleSheet.create({
   badgeText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: Atlas.type.headingWeight,
   },
 });

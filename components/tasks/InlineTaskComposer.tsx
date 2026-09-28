@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/InlineTaskComposer.tsx — поле «одна назва» просто в колонці
  * дошки / секції статусу простору проєкту.
@@ -127,11 +128,11 @@ export function InlineComposerSlot({
 }
 
 const st = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   input: { flex: 1, fontSize: 13, paddingVertical: 10 },
   slot: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 10, paddingVertical: 10,
+    borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 10, paddingVertical: 10,
   },
 });

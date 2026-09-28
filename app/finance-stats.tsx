@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -664,7 +665,7 @@ export default function FinanceStatsScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <View>
                     <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 2 }}>Поточний баланс</Text>
-                    <Text style={{ color: trendColor, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{fmt(balance)}</Text>
+                    <Text style={{ color: trendColor, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{fmt(balance)}</Text>
                   </View>
                   <View style={[s.trendBadge, { backgroundColor: trendColor + '18', borderColor: trendColor + '30' }]}>
                     <IconSymbol name={balance >= 0 ? 'arrow.up.trend' : 'arrow.down.trend'} size={12} color={trendColor} />
@@ -739,7 +740,7 @@ export default function FinanceStatsScreen() {
                       alignItems: 'center', justifyContent: 'center',
                     }}>
                       <Text style={{ color: c.sub, fontSize: 9, fontWeight: '600' }}>збереж.</Text>
-                      <Text style={{ color: c.green, fontSize: 20, fontWeight: '800' }}>{savingsPct}%</Text>
+                      <Text style={{ color: c.green, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{savingsPct}%</Text>
                     </View>
                   </View>
                   {/* Stats */}
@@ -753,7 +754,7 @@ export default function FinanceStatsScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.color }} />
                           <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', flex: 1 }}>{item.label}</Text>
-                          <Text style={{ color: item.color, fontSize: 12, fontWeight: '800' }}>{fmt(item.value)}</Text>
+                          <Text style={{ color: item.color, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{fmt(item.value)}</Text>
                         </View>
                         <View style={{ height: 3, backgroundColor: c.dim, borderRadius: 2, overflow: 'hidden' }}>
                           <View style={{ height: '100%', borderRadius: 2, backgroundColor: item.color, width: income + expense > 0 ? `${(item.value / (income + expense)) * 100}%` : '0%' }} />
@@ -774,7 +775,7 @@ export default function FinanceStatsScreen() {
           </View>
           {largestTx && (
             <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.red + '20', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 40, height: 40, borderRadius: Atlas.radius.medium, backgroundColor: c.red + '20', alignItems: 'center', justifyContent: 'center' }}>
                 <IconSymbol name={getCatIcon(largestTx.category, 'expense')} size={18} color={c.red} />
               </View>
               <View style={{ flex: 1 }}>
@@ -782,7 +783,7 @@ export default function FinanceStatsScreen() {
                 <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{largestTx.category}</Text>
                 {largestTx.note ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{largestTx.note}</Text> : null}
               </View>
-              <Text style={{ color: c.red, fontSize: 16, fontWeight: '800' }}>−{fmt(largestTx.amount)}</Text>
+              <Text style={{ color: c.red, fontSize: 16, fontWeight: Atlas.type.headingWeight }}>−{fmt(largestTx.amount)}</Text>
             </BlurView>
           )}
 
@@ -804,7 +805,7 @@ export default function FinanceStatsScreen() {
                         <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }} numberOfLines={1}>
                           {row.account.name}
                         </Text>
-                        <Text style={{ color: c.red, fontSize: 13, fontWeight: '800' }}>
+                        <Text style={{ color: c.red, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>
                           {fmtIn(row.spent, row.account.currency)}
                         </Text>
                       </View>
@@ -906,7 +907,7 @@ export default function FinanceStatsScreen() {
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
                           <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{item.cat}</Text>
-                          <Text style={{ color: item.color, fontSize: 13, fontWeight: '800' }}>{fmt(item.amt)}</Text>
+                          <Text style={{ color: item.color, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>{fmt(item.amt)}</Text>
                         </View>
                         <View style={{ height: 4, backgroundColor: c.dim, borderRadius: 2, overflow: 'hidden' }}>
                           <View style={{ height: '100%', width: `${item.pct}%`, backgroundColor: item.color, borderRadius: 2 }} />
@@ -1044,8 +1045,8 @@ export default function FinanceStatsScreen() {
                         activeOpacity={isFuture ? 1 : 0.7}>
                         <View style={[
                           s.dayCell,
-                          isStart && { backgroundColor: c.accent, borderRadius: 10 },
-                          isEnd   && { backgroundColor: c.accent, borderRadius: 10 },
+                          isStart && { backgroundColor: c.accent, borderRadius: Atlas.radius.medium },
+                          isEnd   && { backgroundColor: c.accent, borderRadius: Atlas.radius.medium },
                           isInRange && { backgroundColor: c.accent + '22', borderRadius: 4 },
                           !isStart && !isEnd && isToday && { borderWidth: 1.5, borderColor: c.accent },
                         ]}>
@@ -1098,7 +1099,7 @@ const SummCard = React.memo(function SummCard({ label, value, color, border, isD
   return (
     <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.summCard, { borderColor: border, flex: 1 }]}>
       <Text style={{ color, fontSize: 10, fontWeight: '600', marginBottom: 5, opacity: 0.55 }}>{label}</Text>
-      <Text style={{ color, fontSize: 15, fontWeight: '800', letterSpacing: -0.3 }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      <Text style={{ color, fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
     </BlurView>
   );
 });
@@ -1106,12 +1107,12 @@ const SummCard = React.memo(function SummCard({ label, value, color, border, isD
 const QuickStat = React.memo(function QuickStat({ icon, label, value, color, border, isDark }: { icon: IconSymbolName; label: string; value: string; color: string; border: string; isDark: boolean }) {
   return (
     <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.summCard, { borderColor: border, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-      <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: color + '20', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 34, height: 34, borderRadius: Atlas.radius.medium, backgroundColor: color + '20', alignItems: 'center', justifyContent: 'center' }}>
         <IconSymbol name={icon} size={15} color={color} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ color, fontSize: 10, fontWeight: '600', marginBottom: 3, opacity: 0.55 }}>{label}</Text>
-        <Text style={{ color, fontSize: 13, fontWeight: '800' }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+        <Text style={{ color, fontSize: 13, fontWeight: Atlas.type.headingWeight }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
       </View>
     </BlurView>
   );
@@ -1129,23 +1130,23 @@ const LegendDot = React.memo(function LegendDot({ color, label, sub }: { color: 
 const s = StyleSheet.create({
   // Заголовок 20pt, не спільні 32: у шапці поруч живуть лічильники
   // періоду, і більший кегль лишав би їм пів рядка.
-  title:        { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
-  segRow:       { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
+  title:        { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
+  segRow:       { flexDirection: 'row', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 3 },
   segBtn:       { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   segLabel:     { fontSize: 11, fontWeight: '600' },
-  summCard:     { borderRadius: 14, borderWidth: 1, padding: 12, overflow: 'hidden' },
+  summCard:     { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, overflow: 'hidden' },
   sectionTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-  card:         { borderRadius: 20, borderWidth: 1, padding: 18, overflow: 'hidden', marginBottom: 0 },
+  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18, overflow: 'hidden', marginBottom: 0 },
   legendRow:    { flexDirection: 'row', gap: 16, justifyContent: 'center' },
-  catIcon:      { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  catIcon:      { width: 34, height: 34, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   trendBadge:   { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
-  rangeChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
-  calSheet:     { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  rangeChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
+  calSheet:     { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
   stepPill:     { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   navBtn:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell:      { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  calBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, paddingVertical: 11 },
-  hintRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 18 },
-  emptyIcon:    { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  emptyBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 14, marginTop: 20 },
+  dayCell:      { width: 34, height: 34, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  calBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, paddingVertical: 11 },
+  hintRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 18 },
+  emptyIcon:    { width: 80, height: 80, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
+  emptyBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, paddingHorizontal: 24, paddingVertical: 14, marginTop: 20 },
 });

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -32,7 +33,7 @@ export const ContainerTile = React.memo(function ContainerTile({
   const hasCover = !!con.photoIds?.length;
   const title = (
     <>
-      <Text style={{ color: c.text, fontSize: 15, fontWeight: '800', letterSpacing: -0.3 }} numberOfLines={2}>{con.name}</Text>
+      <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 }} numberOfLines={2}>{con.name}</Text>
       {placeLabel ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 }}>
           <IconSymbol name="location.fill" size={10} color={c.sub} />
@@ -46,7 +47,7 @@ export const ContainerTile = React.memo(function ContainerTile({
       accessibilityLabel={`${con.name}${placeLabel ? `, ${placeLabel}` : ''}, ${itemsCount(tr, stats.count, lang)}`}
       accessibilityState={{ selected }}>
       {/* Товщина рамки НЕ змінюється від вибору: інакше вміст плитки сіпався б. */}
-      <View style={{ width, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: selected ? color : color + '35' }}>
+      <View style={{ width, borderRadius: Atlas.radius.xlarge, overflow: 'hidden', borderWidth: 1, borderColor: selected ? color : color + '35' }}>
         {hasCover ? (
           <View>
             <MediaImage asset={cover} style={{ width: '100%', height: 96 }} pendingLabel={tr.ctrPhotoPending} placeholderColor={color + '20'} />

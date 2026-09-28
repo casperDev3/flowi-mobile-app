@@ -1,0 +1,7 @@
+{
+  "name": "@flowi/image-size-compat",
+  "version": "2.0.3",
+  "private": true,
+  "main": "index.js",
+  "dependencies": { "image-size-modern": "npm:image-size@2.0.3" }
+}

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/training/QuestCard.tsx — картка квеста (training-module.md §3.4).
  *
@@ -78,11 +79,11 @@ export function QuestCard({ c, quest, progress, mode, doneCount, assigneeCount, 
   return (
     <Card c={c} accent={done ? TG_OK : undefined} style={{ marginBottom: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-        <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: (done ? TG_OK : TG_ACCENT) + '22', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 36, height: 36, borderRadius: Atlas.radius.medium, backgroundColor: (done ? TG_OK : TG_ACCENT) + '22', alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name={done ? 'checkmark.seal' : measurable ? 'chart.line.uptrend.xyaxis' : 'checklist'} size={18} color={done ? TG_OK : TG_ACCENT} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{quest.title}</Text>
+          <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{quest.title}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
             <Badge label={measurable ? tr.tgQuestMeasurable : tr.tgQuestCheckbox} color={c.sub} />
             <Badge label={`+${quest.xpReward ?? 0} XP`} color={TG_XP} />

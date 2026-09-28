@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -250,12 +251,20 @@ export default function RegisterScreen() {
 
               {/* Email */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEmail.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEmail.toUpperCase()}{" "}
+                  <Text style={{ color: c.red }}>*</Text>
+                </Text>
                 <TextInput
-                  style={[st.input, { color: c.text }]}
+                  style={[st.input, { color: c.text },
+                    emailError
+                      ? { borderWidth: 1, borderColor: c.red, borderRadius: Atlas.radius.small }
+                      : null,
+                  ]}
                   placeholderTextColor={c.sub}
                   placeholder="you@example.com"
                   value={email}
+                  accessibilityLabel={tr.authEmail}
+                  accessibilityHint={emailError || undefined}
                   onChangeText={v => { setEmail(v); if (emailError) setEmailError(''); }}
                   onBlur={() => validateEmailFormat(email)}
                   autoCapitalize="none"
@@ -272,10 +281,20 @@ export default function RegisterScreen() {
 
               {/* Password */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPassword.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPassword.toUpperCase()}{" "}
+                  <Text style={{ color: c.red }}>*</Text>
+                </Text>
                 <View style={st.passwordRow}>
                   <TextInput
-                    style={[st.input, { color: c.text, flex: 1 }]}
+                    style={[st.input, { color: c.text, flex: 1 },
+                      passwordError
+                        ? {
+                            borderWidth: 1,
+                            borderColor: c.red,
+                            borderRadius: Atlas.radius.small,
+                          }
+                        : null,
+                    ]}
                     placeholderTextColor={c.sub}
                     placeholder="••••••••"
                     value={password}
@@ -302,10 +321,20 @@ export default function RegisterScreen() {
 
               {/* Repeat password */}
               <View style={st.fieldWrap}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPasswordRepeat.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPasswordRepeat.toUpperCase()}{" "}
+                  <Text style={{ color: c.red }}>*</Text>
+                </Text>
                 <View style={st.passwordRow}>
                   <TextInput
-                    style={[st.input, { color: c.text, flex: 1 }]}
+                    style={[st.input, { color: c.text, flex: 1 },
+                      passwordError
+                        ? {
+                            borderWidth: 1,
+                            borderColor: c.red,
+                            borderRadius: Atlas.radius.small,
+                          }
+                        : null,
+                    ]}
                     placeholderTextColor={c.sub}
                     placeholder="••••••••"
                     value={passwordRepeat}
@@ -385,14 +414,14 @@ const st = StyleSheet.create({
   inviteBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: Atlas.radius.medium,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 16,
   },
   card: {
-    borderRadius: 18,
+    borderRadius: Atlas.radius.xlarge,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -431,7 +460,7 @@ const st = StyleSheet.create({
     paddingHorizontal: 4,
   },
   primaryBtn: {
-    borderRadius: 14,
+    borderRadius: Atlas.radius.large,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 20,

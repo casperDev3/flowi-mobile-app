@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/ActiveTimersBar.tsx — глобальна панель активних таймерів
  * на телефоні (як міні-плеєр над панеллю табів).
@@ -204,7 +205,7 @@ const st = StyleSheet.create({
   wrap: { position: 'absolute', justifyContent: 'flex-end', paddingBottom: ACTIVE_TIMERS_BAR_HEIGHT - BAR_BODY_HEIGHT - 2 },
   bar: {
     height: BAR_BODY_HEIGHT,
-    borderRadius: 14,
+    borderRadius: Atlas.radius.large,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
     flexDirection: 'row',
@@ -225,8 +226,8 @@ const st = StyleSheet.create({
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
     maxHeight: '70%',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: Atlas.radius.xlarge,
+    borderTopRightRadius: Atlas.radius.xlarge,
     paddingHorizontal: 18,
     paddingTop: 10,
   },
@@ -241,7 +242,7 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     minHeight: 44,
-    borderRadius: 12,
+    borderRadius: Atlas.radius.medium,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 10,
   },

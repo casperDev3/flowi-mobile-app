@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useEffect, useRef } from 'react';
 import { Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
@@ -116,13 +117,13 @@ export function RingCell({ pct, color, label, value }: RingCellProps) {
         </Svg>
 
         {/* Pct text (uncapped — same as old implementation) */}
-        <Text style={{ color, fontSize: 10, fontWeight: '800' }}>
+        <Text style={{ color, fontSize: 10, fontWeight: Atlas.type.headingWeight }}>
           {Math.round(pct * 100)}%
         </Text>
       </View>
 
       {/* Value */}
-      <Text style={{ color, fontSize: 12, fontWeight: '800', marginTop: 5 }}>{value}</Text>
+      <Text style={{ color, fontSize: 12, fontWeight: Atlas.type.headingWeight, marginTop: 5 }}>{value}</Text>
       {/* Label */}
       <Text style={{ color: color + '99', fontSize: 10, fontWeight: '600', marginTop: 2 }}>{label}</Text>
     </Animated.View>

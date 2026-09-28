@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/training/index.tsx — мої групи тренувань (training-module.md §10.1):
  * бейдж ролі, «Створити групу», «Приєднатись за запрошенням».
@@ -99,11 +100,11 @@ export default function TrainingGroupsScreen() {
             style={{ marginBottom: 10 }}>
             <Card c={c} accent={g.color}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: g.color + '26', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 44, height: 44, borderRadius: Atlas.radius.large, backgroundColor: g.color + '26', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name="dumbbell.fill" size={20} color={g.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 16, fontWeight: '800' }} numberOfLines={1}>{g.name}</Text>
+                  <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight }} numberOfLines={1}>{g.name}</Text>
                   <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
                     {fmt(tr.tgMembersCount, { n: g.member_count })}
                     {g.description ? ` · ${g.description}` : ''}
@@ -112,7 +113,7 @@ export default function TrainingGroupsScreen() {
                 <View style={{ alignItems: 'flex-end', gap: 6 }}>
                   <Badge label={g.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember} color={g.role === 'coach' ? TG_ACCENT : c.sub} />
                   {g.role === 'member' ? (
-                    <Text style={{ color: TG_XP, fontSize: 12, fontWeight: '800' }}>
+                    <Text style={{ color: TG_XP, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>
                       {`${g.xp_total} XP · 🔥${g.streak_days}`}
                     </Text>
                   ) : null}

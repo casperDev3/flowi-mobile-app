@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/PriorityFilterChips.tsx
  *
@@ -79,7 +80,7 @@ const s = StyleSheet.create({
     minWidth: 40,
     height: 34,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: Atlas.radius.small,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',

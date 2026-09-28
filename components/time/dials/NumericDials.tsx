@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/dials/NumericDials.tsx — циферблати, що показують саме цифри.
  *
@@ -185,7 +186,7 @@ export function FlipDial({ startedAt, size, colors, material: m }: DialRenderPro
 }
 
 const st = StyleSheet.create({
-  digits:   { fontWeight: '800', letterSpacing: -1 },
+  digits:   { fontWeight: Atlas.type.headingWeight, letterSpacing: -1 },
   flipRow:  { flexDirection: 'row', alignItems: 'center' },
   flipCard: {
     borderRadius: 9,
@@ -193,6 +194,6 @@ const st = StyleSheet.create({
     paddingVertical: 6,
     overflow: 'hidden',
   },
-  flipText: { fontWeight: '800', textAlign: 'center' },
+  flipText: { fontWeight: Atlas.type.headingWeight, textAlign: 'center' },
   seam:     { position: 'absolute', left: 0, right: 0, top: '50%', height: StyleSheet.hairlineWidth },
 });

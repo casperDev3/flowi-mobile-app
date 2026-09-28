@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/training/session/[sessionId].tsx — виконавець сесії (training-module.md
  * §10.1): вправа за вправою, чекбокс підходу, поля повторів/ваги/RPE, таймер
@@ -206,7 +207,7 @@ export default function TrainingSessionScreen() {
               .filter(Boolean).join(' · ')}
           </Text>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-            <Text style={{ color: statusColor(session.status, c), fontWeight: '800' }}>{statusLabel(tr, session.status)}</Text>
+            <Text style={{ color: statusColor(session.status, c), fontWeight: Atlas.type.headingWeight }}>{statusLabel(tr, session.status)}</Text>
             {draft ? (
               <Text style={{ color: c.sub, fontSize: 13 }}>
                 {`${counts.done}/${counts.total} · ${fmt(tr.tgVolume, { kg: formatKg(totalVolumeG(draft.exercises)) })}`}

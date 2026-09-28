@@ -49,7 +49,7 @@ export interface InvitePreview {
   workspace: { id: string; name: string };
   project: { id: string; name: string; color: string };
   role: 'member' | 'viewer';
-  invited_by: { name: string };
+  invited_by: { name: string } | null;
   expires_at: string;
 }
 
@@ -137,8 +137,11 @@ export async function createInviteLink(
   });
 }
 
-export type InviteByEmailResult =
-  | { kind: 'member_added'; member: MemberOut };
+export type InviteByEmailResult = {
+  kind: "member_added";
+  member: MemberOut;
+  email_sent?: boolean;
+};
 
 /** POST /projects/{id}/invites/ з email — акаунт уже існує, додається одразу. */
 export async function inviteByEmail(

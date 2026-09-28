@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/LoadErrorNotice.tsx — «дані не прочитались» ≠ «порожньо».
  *
@@ -43,7 +44,7 @@ export function LoadErrorNotice({ lang, isDark, text, sub, onRetry, style }: {
       intensity={isDark ? 22 : 42}
       tint={isDark ? 'dark' : 'light'}
       style={[{
-        borderRadius: 16, borderWidth: 1, borderColor: ERR + '55',
+        borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: ERR + '55',
         overflow: 'hidden', padding: 14, marginBottom: 12,
       }, style]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -57,7 +58,7 @@ export function LoadErrorNotice({ lang, isDark, text, sub, onRetry, style }: {
         accessibilityLabel={t.loadErrorRetry}
         style={{
           alignSelf: 'flex-start', marginTop: 10, paddingHorizontal: 14, paddingVertical: 8,
-          borderRadius: 10, backgroundColor: ERR + '1A', borderWidth: 1, borderColor: ERR + '55',
+          borderRadius: Atlas.radius.medium, backgroundColor: ERR + '1A', borderWidth: 1, borderColor: ERR + '55',
         }}>
         <Text style={{ color: ERR, fontSize: 13, fontWeight: '700' }}>{t.loadErrorRetry}</Text>
       </TouchableOpacity>

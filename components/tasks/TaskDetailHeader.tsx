@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskDetailHeader.tsx — липка шапка деталі завдання.
  *
@@ -152,7 +153,7 @@ const st = StyleSheet.create({
   leading:  { marginRight: 10, marginTop: 1 },
   title:    { flex: 1, fontSize: 18, fontWeight: '700', lineHeight: 24 },
   badge:    { marginLeft: 8, marginTop: 2 },
-  tabs:     { flexDirection: 'row', gap: 5, borderRadius: 12, padding: 4 },
+  tabs:     { flexDirection: 'row', gap: 5, borderRadius: Atlas.radius.medium, padding: 4 },
   tab:      { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 5 },
   runDot:   { width: 6, height: 6, borderRadius: 3 },
 });

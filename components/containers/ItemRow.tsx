@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -28,7 +29,7 @@ function Action({ icon, label, color, onPress, disabled }: {
   return (
     <TouchableOpacity onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
-      style={{ width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }}>
+      style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }}>
       <IconSymbol name={icon} size={14} color={color} />
     </TouchableOpacity>
   );
@@ -51,7 +52,7 @@ export const ItemRow = React.memo(function ItemRow({
   const { tr } = useI18n();
   const discarded = item.status === 'discarded';
   return (
-    <View style={{ borderRadius: 14, backgroundColor: c.card, borderWidth: 1, borderColor: c.border,
+    <View style={{ borderRadius: Atlas.radius.large, backgroundColor: c.card, borderWidth: 1, borderColor: c.border,
       paddingHorizontal: 12, paddingTop: 11, paddingBottom: 6, opacity: discarded ? 0.72 : 1 }}>
       <TouchableOpacity onPress={() => actions.onEdit(item)} activeOpacity={0.75} accessibilityRole="button"
         accessibilityLabel={`${tr.ctrEditItem}: ${item.name}`} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
@@ -73,7 +74,7 @@ export const ItemRow = React.memo(function ItemRow({
           {item.tags.length > 0 ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
               {item.tags.map(tag => (
-                <View key={tag} style={{ backgroundColor: accent + '20', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                <View key={tag} style={{ backgroundColor: accent + '20', borderRadius: Atlas.radius.small, paddingHorizontal: 7, paddingVertical: 2 }}>
                   <Text style={{ color: accent, fontSize: 11, fontWeight: '600' }}>#{tag}</Text>
                 </View>
               ))}

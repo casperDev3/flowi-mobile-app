@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/SubscriptionDetail.tsx — рядок списку й деталь підписки.
  *
@@ -109,7 +110,7 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
         </View>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 6 }}>
-        <Text style={{ color: overdue ? OVERDUE_RED : c.text, fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+        <Text style={{ color: overdue ? OVERDUE_RED : c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight, fontVariant: ['tabular-nums'] }}>
           {formatSubscriptionMoney(sub.amount, sub.currency, currencies, locale)}
         </Text>
         {!archived && onRenew ? (
@@ -131,7 +132,7 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
 function StatusChip({ label, color }: { label: string; color: string }) {
   return (
     <View style={[st.statusChip, { backgroundColor: color + '22', borderColor: color + '55' }]}>
-      <Text style={{ color, fontSize: 10, fontWeight: '800' }}>{label}</Text>
+      <Text style={{ color, fontSize: 10, fontWeight: Atlas.type.headingWeight }}>{label}</Text>
     </View>
   );
 }
@@ -151,7 +152,7 @@ export function SubscriptionDetailHeader({ sub, onEdit, onClose, colors: c, tr }
       <View style={[st.iconBoxLg, { backgroundColor: tint + '22' }]}>
         <IconSymbol name={(sub.icon || 'repeat') as IconSymbolName} size={20} color={tint} />
       </View>
-      <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontSize: 19, fontWeight: '800' }}>{sub.name}</Text>
+      <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontSize: 19, fontWeight: Atlas.type.headingWeight }}>{sub.name}</Text>
       <TouchableOpacity
         onPress={onEdit}
         accessibilityRole="button"
@@ -227,7 +228,7 @@ export function SubscriptionDetailBody({
     <View>
       {/* Сума, період, статус */}
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
-        <Text style={{ color: overdue ? OVERDUE_RED : c.text, fontSize: 28, fontWeight: '800', letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
+        <Text style={{ color: overdue ? OVERDUE_RED : c.text, fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
           {money(sub.amount)}
         </Text>
         <Text style={{ color: c.sub, fontSize: 14, marginBottom: 5 }}>{formatPeriod(sub.period, lang)}</Text>
@@ -395,18 +396,18 @@ function InfoRow({ icon, label, value, valueColor, dot, last, c }: {
 }
 
 const st = StyleSheet.create({
-  row:         { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, padding: 12 },
-  iconBox:     { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  iconBoxLg:   { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  projectChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
-  statusChip:  { borderRadius: 6, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
-  renewMini:   { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12 },
+  iconBox:     { width: 40, height: 40, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  iconBoxLg:   { width: 40, height: 40, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  projectChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: Atlas.radius.small, paddingHorizontal: 6, paddingVertical: 1 },
+  statusChip:  { borderRadius: Atlas.radius.small, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
+  renewMini:   { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderRadius: Atlas.radius.small, paddingHorizontal: 7, paddingVertical: 3 },
   headerRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12 },
-  headerBtn:   { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  renewPanel:  { marginTop: 14, borderRadius: 14, borderWidth: 1, padding: 12 },
-  input:       { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 17, fontWeight: '700', marginTop: 6 },
-  btn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 12 },
-  infoBlock:   { marginTop: 16, borderRadius: 14, borderWidth: 1, paddingHorizontal: 12 },
+  headerBtn:   { width: 34, height: 34, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  renewPanel:  { marginTop: 14, borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12 },
+  input:       { borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 17, fontWeight: '700', marginTop: 6 },
+  btn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: Atlas.radius.medium, paddingVertical: 12, paddingHorizontal: 12 },
+  infoBlock:   { marginTop: 16, borderRadius: Atlas.radius.large, borderWidth: 1, paddingHorizontal: 12 },
   infoRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 11 },
   sectionLabel:{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 },
   historyRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9 },

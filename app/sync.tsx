@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -521,21 +522,21 @@ function fmtSyncTime(ms: number): string {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  card:          { borderRadius: 20, borderWidth: 1, overflow: 'hidden', padding: 20, marginBottom: 16 },
-  statusRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, borderWidth: 1, marginBottom: 14 },
+  card:          { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', padding: 20, marginBottom: 16 },
+  statusRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderRadius: Atlas.radius.medium, borderWidth: 1, marginBottom: 14 },
   statusDot:     { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
   statusText:    { fontSize: 13, fontWeight: '600' },
   pendingText:   { fontSize: 12, color: '#888', marginBottom: 12, paddingHorizontal: 2 },
-  hintRow:       { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, marginBottom: 14 },
+  hintRow:       { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, marginBottom: 14 },
   hintText:      { fontSize: 12, fontWeight: '500', flex: 1 },
-  syncBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 14, marginTop: 4 },
+  syncBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: Atlas.radius.large, marginTop: 4 },
   syncBtnText:   { fontSize: 14, fontWeight: '700' },
-  banner:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 16 },
+  banner:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: Atlas.radius.large, borderWidth: 1, marginBottom: 16 },
   bannerIcon:    { width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   bannerTitle:   { fontSize: 14, fontWeight: '700' },
   bannerSub:     { fontSize: 12, marginTop: 2 },
   sectionLabel:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginLeft: 2 },
-  conflictCard:  { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
+  conflictCard:  { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
   conflictHead:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1 },
   conflictDot:   { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
   conflictLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, color: '#F59E0B' },

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -65,7 +66,7 @@ export function TransactionGroup({
         </Text>
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {incomeCodes.map(code => (
-            <View key={'in_' + code} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.green + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+            <View key={'in_' + code} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.green + '18', borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 4 }}>
               <IconSymbol name="arrow.up" size={9} color={c.green} />
               <Text style={{ color: c.green, fontSize: 11, fontWeight: '700' }}>
                 {fmt(group.dayIncomeByCur[code], curOf(code))}
@@ -73,7 +74,7 @@ export function TransactionGroup({
             </View>
           ))}
           {expenseCodes.map(code => (
-            <View key={'ex_' + code} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.red + '18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+            <View key={'ex_' + code} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.red + '18', borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 4 }}>
               <IconSymbol name="arrow.down" size={9} color={c.red} />
               <Text style={{ color: c.red, fontSize: 11, fontWeight: '700' }}>
                 {fmt(group.dayExpenseByCur[code], curOf(code))}
@@ -122,7 +123,7 @@ export function TransactionGroup({
                   tint={isDark ? 'dark' : 'light'}
                   style={{ borderRadius: 15, borderWidth: 1, borderColor: c.border, paddingLeft: 10, paddingRight: 13, paddingVertical: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' }}>
                   <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: color + '70', borderRadius: 2, marginRight: 12 }} />
-                  <View style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '20' : '12') }}>
+                  <View style={{ width: 40, height: 40, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '20' : '12') }}>
                     <IconSymbol name={iconName} size={19} color={color} />
                   </View>
                   <View style={{ flex: 1, marginLeft: 11 }}>
@@ -147,7 +148,7 @@ export function TransactionGroup({
                     </View>
                   </View>
                   <View style={{ alignItems: 'flex-end', marginLeft: 10 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '800', color }}>
+                    <Text style={{ fontSize: 15, fontWeight: Atlas.type.headingWeight, color }}>
                       {sign}{fmt(tx.amount, cur)}
                     </Text>
                     {showCredited && (
@@ -182,7 +183,7 @@ export function TransactionGroup({
                   {tx.note ? <Text style={{ fontSize: 11, marginTop: 1, color: c.sub }} numberOfLines={1}>{tx.note}</Text> : null}
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color }}>
+                  <Text style={{ fontSize: 13, fontWeight: Atlas.type.headingWeight, color }}>
                     {sign}{fmt(tx.amount, cur)}
                   </Text>
                   {showCredited && (

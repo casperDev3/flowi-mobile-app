@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskEditForm.tsx
  *
@@ -5,11 +6,10 @@
  * часу, дедлайн, проєкт і повторення.
  *
  * Весь стан форми належить редакторові (див. use-task-editor): компонент
- * лише малює його й повідомляє про зміни. Тому тут немає жодного
- * useState — форму можна відкрити, закрити й відкрити знову, і вона
- * поводитиметься однаково, бо памʼять у неї одна й зовнішня.
+ * лише малює його й повідомляє про зміни. Локально зберігається
+ * тільки стан показу помилки після спроби зберегти порожню назву.
  */
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { CalendarGrid } from '@/components/tasks/CalendarGrid';
@@ -90,6 +90,8 @@ export function TaskEditForm({
   deadlinePresets: DEADLINE_PRESETS,
   today, onSave, onCancel, colors: c, isDark, tr, locale,
 }: TaskEditFormProps) {
+  const titleRef = useRef<TextInput>(null);
+  const [attempted, setAttempted] = useState(false);
   const { projectId, sprintId } = editor.draft;
   // Варіанти — від поточного АБО вихідного спринта (як веб): «Беклог» не
   // мусить ховати закритий/чужий спринт задачі, до якого ще можна повернутись.
@@ -102,12 +104,15 @@ export function TaskEditForm({
         {/* Без title заголовок малює власна шапка (липка шапка деталі). */}
         {title ? <Text style={[st.sheetTitle, { color: c.text }]}>{title}</Text> : null}
 
+        <Text style={{color:c.sub,marginBottom:6}}>{tr.taskNamePlaceholder} <Text style={{color:'#EF4444'}}>*</Text></Text>
         <TextInput
+          ref={titleRef}
+          accessibilityLabel={tr.taskNamePlaceholder}
           placeholder={tr.taskNamePlaceholder}
           placeholderTextColor={c.sub}
           value={editor.draft.title}
           onChangeText={v => editor.patch({ title: v })}
-          style={[st.input, { backgroundColor: c.dim, color: c.text }]}
+          style={[st.input, { backgroundColor: c.dim, color: c.text }, attempted && !editor.draft.title.trim() ? {borderWidth:2,borderColor:'#EF4444'} : null]}
         />
         <TextInput
           placeholder={tr.taskDescPlaceholder}
@@ -313,7 +318,7 @@ export function TaskEditForm({
         </TouchableOpacity>
 
         {editor.draft.repeat && (
-          <View style={{ borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 7,
+          <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 7,
             borderColor: c.accent + '40', backgroundColor: c.accent + '08' }}>
             <View style={{ flexDirection: 'row', gap: 5, marginBottom: 10 }}>
               {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => {
@@ -336,14 +341,14 @@ export function TaskEditForm({
               <TouchableOpacity onPress={() => editor.patch({ repeatInterval: Math.max(1, editor.draft.repeatInterval - 1) })}
                 accessibilityRole="button"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
-                style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
+                style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>−</Text>
               </TouchableOpacity>
-              <Text style={{ color: c.accent, fontSize: 16, fontWeight: '800', minWidth: 24, textAlign: 'center' }}>{editor.draft.repeatInterval}</Text>
+              <Text style={{ color: c.accent, fontSize: 16, fontWeight: Atlas.type.headingWeight, minWidth: 24, textAlign: 'center' }}>{editor.draft.repeatInterval}</Text>
               <TouchableOpacity onPress={() => editor.patch({ repeatInterval: Math.min(99, editor.draft.repeatInterval + 1) })}
                 accessibilityRole="button"
                 hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-                style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
+                style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>+</Text>
               </TouchableOpacity>
               <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
@@ -358,7 +363,7 @@ export function TaskEditForm({
                   const on = editor.draft.repeatDays.includes(i);
                   return (
                     <TouchableOpacity key={i} onPress={() => editor.patch({ repeatDays: on ? editor.draft.repeatDays.filter(x => x !== i) : [...editor.draft.repeatDays, i] })}
-                      style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8,
+                      style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: Atlas.radius.small,
                         backgroundColor: on ? c.accent : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
                       <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{d}</Text>
                     </TouchableOpacity>
@@ -403,7 +408,7 @@ export function TaskEditForm({
           <TouchableOpacity onPress={onCancel} style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>
             <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={onSave} style={[st.btn, { flex: 2, backgroundColor: c.accent }]}>
+          <TouchableOpacity onPress={() => { setAttempted(true); if (!editor.draft.title.trim()) { titleRef.current?.focus(); return; } onSave(); }} style={[st.btn, { flex: 2, backgroundColor: c.accent }]}>
             <Text style={{ color: '#fff', fontWeight: '700' }}>{submitLabel}</Text>
           </TouchableOpacity>
         </View>
@@ -412,14 +417,14 @@ export function TaskEditForm({
 }
 
 const st = StyleSheet.create({
-  sheetTitle:     { fontSize: 20, fontWeight: '800', marginBottom: 18 },
+  sheetTitle:     { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 18 },
   label:          { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input:          { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
+  input:          { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
   badge:          { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
-  btn:            { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
-  inlineCalendar: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 8 },
-  dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
-  dropdownList:   { borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
+  btn:            { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: Atlas.radius.medium, borderWidth: 1 },
+  inlineCalendar: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginBottom: 8 },
+  dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
+  dropdownList:   { borderRadius: Atlas.radius.medium, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
   dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 11 },
 });

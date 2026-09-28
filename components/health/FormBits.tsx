@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
@@ -94,6 +95,6 @@ export function Segment<T extends string>({ label, options, value, onChange, col
 
 const s = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input: { fontSize: 15, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
-  seg:   { textAlign: 'center', borderRadius: 12, borderWidth: 1.5, paddingVertical: 11, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  input: { fontSize: 15, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  seg:   { textAlign: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1.5, paddingVertical: 11, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
 });

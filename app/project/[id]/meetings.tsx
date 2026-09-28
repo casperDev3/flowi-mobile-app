@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/meetings.tsx — Наради простору проєкту.
  *
@@ -157,7 +158,7 @@ export default function ProjectMeetingsScreen() {
                 key={`${meeting.id}_${date}`}
                 onPress={canEdit ? () => openEdit(meeting) : undefined}
                 activeOpacity={0.75}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
                 <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: meeting.color }} />
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -189,7 +190,7 @@ export default function ProjectMeetingsScreen() {
                     key={meeting.id}
                     onPress={canEdit ? () => openEdit(meeting) : undefined}
                     activeOpacity={0.75}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8, opacity: 0.6 }}>
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8, opacity: 0.6 }}>
                     <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: meeting.color }} />
                     <View style={{ flex: 1 }}>
                       <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{meeting.title}</Text>

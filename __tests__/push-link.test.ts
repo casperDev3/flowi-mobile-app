@@ -2,7 +2,7 @@
  * __tests__/push-link.test.ts — маршрут тапу по проєктному push
  * (WORKSPACE_PROJECTS_CONTRACT.md §7).
  */
-import { pushTapUrl } from '../utils/pushLink';
+import { pushTapUrl, deepLinkRoute, modulesForEvent } from '../utils/pushLink';
 
 describe('pushTapUrl', () => {
   it('project_invite веде на Огляд проєкту', () => {
@@ -61,5 +61,14 @@ describe('pushTapUrl', () => {
   it('екранує спецсимволи в id', () => {
     expect(pushTapUrl({ type: 'project_invite', project_id: 'p 1/x' }))
       .toBe('/project/p%201%2Fx/overview');
+  });
+});
+
+describe("weekly menu notifications", () => {
+  it("opens the specific menu and respects its module setting", () => {
+    expect(deepLinkRoute("ftrackingapp://menu?space=menu-123")).toBe(
+      "/menu?space=menu-123",
+    );
+    expect(modulesForEvent("menu.feedback")).toEqual(["menu"]);
   });
 });

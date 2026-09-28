@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskReminderRow.tsx
  *
@@ -138,9 +139,9 @@ export function TaskReminderRow({
 
 const st = StyleSheet.create({
   badge:   { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
-  box:     { borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 8 },
+  box:     { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 8 },
   caption: { fontSize: 11, fontWeight: '600', marginBottom: 8 },
-  chip:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
-  input:   { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500', flex: 1, textAlign: 'center' },
-  btn:     { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  chip:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: Atlas.radius.medium, borderWidth: 1 },
+  input:   { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500', flex: 1, textAlign: 'center' },
+  btn:     { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

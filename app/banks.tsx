@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/banks.tsx — заощадження як РАХУНКИ, а не окремі скарбнички.
  *
@@ -964,35 +965,35 @@ const JarCard = React.memo(function JarCard({
 });
 
 const s = StyleSheet.create({
-  summaryCard:  { borderRadius: 20, borderWidth: 1, padding: 18, overflow: 'hidden' },
+  summaryCard:  { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18, overflow: 'hidden' },
   summaryLabel: { fontSize: 11, fontWeight: '600', marginBottom: 4 },
-  summaryAmount:{ fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  jarCard:      { borderRadius: 18, borderWidth: 1, padding: 16, overflow: 'hidden' },
+  summaryAmount:{ fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
+  jarCard:      { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
   jarIcon:      { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   jarName:      { fontSize: 15, fontWeight: '700' },
   jarNote:      { fontSize: 12, marginTop: 2 },
   doneBadge:    { borderRadius: 7, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
   editBtn:      { width: 30, height: 30, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  savedAmt:     { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
+  savedAmt:     { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
   goalAmt:      { fontSize: 14, fontWeight: '500', paddingBottom: 2 },
   pctLabel:     { fontSize: 13, fontWeight: '700' },
   progressBg:   { height: 5, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
-  depositBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 10 },
-  fab:          { position: 'absolute', right: 20, bottom: FAB_BOTTOM, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  depositBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 10 },
+  fab:          { position: 'absolute', right: 20, bottom: FAB_BOTTOM, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:        { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:        { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:   { fontSize: 20, fontWeight: '800', marginBottom: 16 },
-  amountBlock:  { borderRadius: 16, borderWidth: 1, padding: 18, marginBottom: 4 },
+  sheetTitle:   { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 16 },
+  amountBlock:  { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 18, marginBottom: 4 },
   label:        { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input:        { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
+  input:        { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
   chip:         { borderRadius: 11, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
-  iconChip:     { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  iconChip:     { width: 44, height: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   colorDot:     { width: 30, height: 30, borderRadius: 15 },
-  btn:          { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  typeRow:      { flexDirection: 'row', borderRadius: 12, padding: 3 },
+  btn:          { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  typeRow:      { flexDirection: 'row', borderRadius: Atlas.radius.medium, padding: 3 },
   typeBtn:      { flex: 1, flexDirection: 'row', paddingVertical: 9, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
 });

@@ -57,7 +57,7 @@ export function ContainerFormSheet({ request, places, c, onClose, onSubmit, onCr
         <SheetButton label={tr.cancel} onPress={onClose} c={c} />
         <SheetButton label={tr.save} onPress={save} c={c} color={color} disabled={!name.trim()} flex={2} />
       </>}>
-      <SheetLabel text={tr.containerName} c={c} />
+      <SheetLabel text={tr.containerName} c={c} required />
       <TextInput value={name} onChangeText={setName} placeholder={tr.containerNamePlaceholder} placeholderTextColor={c.sub}
         autoFocus={request?.mode === 'new'} accessibilityLabel={tr.containerName}
         style={[sheetStyles.input, { backgroundColor: c.dim, color: c.text }]} />

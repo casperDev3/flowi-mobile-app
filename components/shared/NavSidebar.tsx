@@ -1,3 +1,5 @@
+import { Atlas } from '@/constants/atlas';
+import { Image } from 'expo-image';
 /**
  * components/shared/NavSidebar.tsx
  *
@@ -107,7 +109,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
     <View
       style={[st.root, { width: SIDEBAR_WIDTH, backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 14 }]}
       accessibilityRole="menu">
-      <Text style={[st.brand, { color: c.accent }]}>Flowi</Text>
+      <View style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:12}}><Image source={require('@/assets/logo_app.png')} style={{width:34,height:34,borderRadius:Atlas.radius.medium}} accessible={false}/><Text style={[st.brand, { color: c.accent, marginBottom:0 }]}>Flowi</Text></View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
         {navGroups.map((group, gi) => {
@@ -186,15 +188,15 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
 
 const st = StyleSheet.create({
   root:       { borderRightWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10 },
-  brand:      { fontSize: 20, fontWeight: '800', paddingHorizontal: 10, marginBottom: 18 },
+  brand:      { fontSize: 20, fontWeight: Atlas.type.headingWeight, paddingHorizontal: 10, marginBottom: 18 },
   // 32 — свідомо менше за 44: це заголовок, а не пункт призначення. Промах по
   // ньому нічого не ламає (розгорнулась зайва група), тож повний тач-таргет
   // тут коштував би рядків, заради яких усе й затівалося.
-  groupHead:  { flexDirection: 'row', alignItems: 'center', minHeight: 32, paddingHorizontal: 10, borderRadius: 8 },
+  groupHead:  { flexDirection: 'row', alignItems: 'center', minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.small },
   groupTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 6 },
   groupCount: { fontSize: 10, fontWeight: '700', marginBottom: 6, opacity: 0.8 },
   // 44 — мінімальний тач-таргет за HIG; на планшеті промахуються частіше,
   // бо палець тягнеться через увесь екран.
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 10, borderRadius: 10 },
+  row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
   label:      { fontSize: 14, flex: 1 },
 });

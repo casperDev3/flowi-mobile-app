@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/CommentsSection.tsx — коментарі та @згадки на завданні
  * чи нараді (WORKSPACE_PROJECTS_PLAN.md §4, контракт §4.4).
@@ -193,7 +194,7 @@ export function CommentsSection({
                 width: 26, height: 26, borderRadius: 13, backgroundColor: c.accent + '26',
                 alignItems: 'center', justifyContent: 'center', marginTop: 2,
               }}>
-                <Text style={{ color: c.accent, fontSize: 10, fontWeight: '800' }}>{initials(nameFor(comment.authorId))}</Text>
+                <Text style={{ color: c.accent, fontSize: 10, fontWeight: Atlas.type.headingWeight }}>{initials(nameFor(comment.authorId))}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
@@ -213,7 +214,7 @@ export function CommentsSection({
                       maxLength={COMMENT_BODY_MAX_LENGTH}
                       style={{
                         color: c.text, fontSize: 13, borderWidth: 1, borderColor: c.border,
-                        borderRadius: 10, padding: 8, minHeight: 40,
+                        borderRadius: Atlas.radius.medium, padding: 8, minHeight: 40,
                       }}
                     />
                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
@@ -255,7 +256,7 @@ export function CommentsSection({
       )}
 
       {mentionCandidates.length > 0 ? (
-        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: 10, marginBottom: 6, overflow: 'hidden' }}>
+        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: Atlas.radius.medium, marginBottom: 6, overflow: 'hidden' }}>
           {mentionCandidates.map(m => (
             <TouchableOpacity
               key={m.user.id}
@@ -280,7 +281,7 @@ export function CommentsSection({
           maxLength={COMMENT_BODY_MAX_LENGTH}
           style={{
             flex: 1, color: c.text, fontSize: 13, borderWidth: 1, borderColor: c.border,
-            borderRadius: 12, padding: 10, minHeight: 40, maxHeight: 120,
+            borderRadius: Atlas.radius.medium, padding: 10, minHeight: 40, maxHeight: 120,
           }}
         />
         <TouchableOpacity
@@ -289,7 +290,7 @@ export function CommentsSection({
           accessibilityRole="button"
           accessibilityLabel={tr.commentsSend}
           style={{
-            width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+            width: 40, height: 40, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
             backgroundColor: draft.trim() && !busy ? c.accent : c.dim,
           }}>
           {busy ? <ActivityIndicator size="small" color="#fff" /> : (

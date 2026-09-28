@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -136,11 +137,11 @@ export default function HabitsScreen() {
             const done = habitDoneToday(h); const streak = habitStreak(h);
             return (
               <BlurView key={h.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-                <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: h.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: h.color + '20', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name={h.icon} size={17} color={h.color} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{h.title}</Text>
+                  <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{h.title}</Text>
                   <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>
                     🔥 {tr.streak}: {streak} {tr.daysStreak}{h.reminderAt ? ` · ⏰ ${h.reminderAt}` : ''}
                   </Text>
@@ -203,17 +204,17 @@ export default function HabitsScreen() {
 
 const s = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
-  title:     { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
-  addBtn:    { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  card:      { borderRadius: 16, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', marginBottom: 10 },
+  title:     { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
+  addBtn:    { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  card:      { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', marginBottom: 10 },
   check:     { width: 32, height: 32, borderRadius: 16, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  pick:      { width: 44, height: 44, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  pick:      { width: 44, height: 44, borderRadius: Atlas.radius.medium, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти — числом із useSheetSurface(); відсоток тут не працював
   // (батько має height:auto), і кнопка «Зберегти» лишалась за краєм вікна.
   sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  sheetTitle:{ fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  sheetTitle:{ fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 6 },
   label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  btn:       { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  btn:       { paddingVertical: 14, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
 });

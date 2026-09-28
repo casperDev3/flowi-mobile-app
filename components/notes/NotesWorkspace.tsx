@@ -1,3 +1,5 @@
+import { Atlas } from '@/constants/atlas';
+import { AdSlot } from '@/components/advertising/Advertising';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, SectionList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -84,6 +86,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
   const [mode, setMode] = useState<'read' | 'edit'>('read');
   const [isNew, setIsNew] = useState(false);
   const [title, setTitle] = useState('');
+  const [emptyError, setEmptyError] = useState(false);
   const [body, setBody] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [pinned, setPinned] = useState(false);
@@ -169,6 +172,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
     setMode('read');
   };
   const fillDraft = (note: Note) => {
+    setEmptyError(false);
     setTitle(note.title); setBody(note.body);
     setTagsInput(formatTagsInput(note.tags));
     setPinned(note.pinned === true);
@@ -201,7 +205,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
   };
   const save = async () => {
     if (!selected || !canEdit || busy.current || readError || !ready) return;
-    if (!title.trim() && !body.trim()) { Alert.alert(tr.error, tr.notesEmptyError); return; }
+    if (!title.trim() && !body.trim()) { setEmptyError(true); Alert.alert(tr.error, tr.notesEmptyError); return; }
     busy.current = true; setSaving(true);
     try {
       const next = writeNote(selected, {
@@ -371,7 +375,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
       {!canEdit && <Text style={{ color: c.sub, paddingBottom: 8 }}>{tr.notesReadOnly}</Text>}
       <TextInput testID="notes-title" accessibilityLabel={tr.titlePlaceholder} placeholder={tr.titlePlaceholder}
         placeholderTextColor={c.sub} value={title} onChangeText={setTitle} editable={canEdit && !saving}
-        style={[s.title, { color: c.text, borderColor: c.border }]} />
+        style={[s.title, { color: c.text, borderColor: emptyError && !title.trim() && !body.trim() ? '#EF4444' : c.border }]} />
       <TextInput testID="notes-tags" accessibilityLabel={tr.notesTagsLabel} placeholder={tr.notesTagsPlaceholder}
         placeholderTextColor={c.sub} value={tagsInput} onChangeText={setTagsInput} editable={canEdit && !saving}
         autoCapitalize="none" style={[s.tagsInput, { color: c.text, borderColor: c.border }]} />
@@ -399,7 +403,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
       ) : (
         <TextInput testID="notes-body" accessibilityLabel={tr.noteBodyPlaceholder} placeholder={tr.noteBodyPlaceholder}
           placeholderTextColor={c.sub} value={body} onChangeText={setBody} editable={canEdit && !saving}
-          multiline textAlignVertical="top" scrollEnabled style={[s.body, { color: c.text }]} />
+          multiline textAlignVertical="top" scrollEnabled style={[s.body, { color: c.text }, emptyError && !title.trim() && !body.trim() ? {borderWidth:1,borderColor:'#EF4444'} : null]} />
       )}
       <Text style={[s.hint, { color: c.sub }]}>{tr.notesMarkdownHint}</Text>
     </View>
@@ -441,6 +445,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
           )}
           <SectionList sections={readError ? [] : sections} keyExtractor={n => n.id} keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 16 }} stickySectionHeadersEnabled={false}
+            ListFooterComponent={notes.length >= 10 && !selected ? <AdSlot slot="M2" /> : null}
             ListEmptyComponent={<Text style={{ padding: 20, color: c.sub }}>{!ready ? tr.loading : readError ? '' : query || tagFilter ? tr.notesNoResults : tr.noNotes}</Text>}
             renderSectionHeader={({ section }) => <Text style={[s.section, { color: c.sub }]}>{section.title} · {section.data.length}</Text>}
             renderItem={({ item }) => {
@@ -474,12 +479,12 @@ const s = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: 16 }, panes: { flex: 1, gap: 16 }, list: { flex: 1 }, listWide: { width: 300 },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
   tagRow: { flexDirection: 'row', gap: 8, paddingVertical: 4, paddingRight: 8 },
-  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center', borderRadius: 10, borderWidth: 1 },
-  search: { minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderRadius: 12, fontSize: 16 },
-  section: { fontWeight: '600', paddingVertical: 12 }, card: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 10 },
+  button: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1 },
+  search: { minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderRadius: Atlas.radius.medium, fontSize: 16 },
+  section: { fontWeight: '600', paddingVertical: 12 }, card: { borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 14, marginBottom: 10 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cardFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 8 },
-  editor: { flex: 1, minWidth: 0, padding: 16, borderWidth: 1, borderRadius: 16 },
+  editor: { flex: 1, minWidth: 0, padding: 16, borderWidth: 1, borderRadius: Atlas.radius.large },
   context: { fontSize: 13, paddingVertical: 8 },
   readTitle: { fontSize: 24, fontWeight: '700' }, title: { fontSize: 24, fontWeight: '700', minHeight: 52, borderBottomWidth: 1 },
   tagsInput: { minHeight: 44, fontSize: 15, borderBottomWidth: 1, paddingVertical: 8 },

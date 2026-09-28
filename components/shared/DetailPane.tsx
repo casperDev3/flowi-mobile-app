@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/DetailPane.tsx
  *
@@ -110,5 +111,5 @@ const st = StyleSheet.create({
   emptyBox:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:  { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:         { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
 });

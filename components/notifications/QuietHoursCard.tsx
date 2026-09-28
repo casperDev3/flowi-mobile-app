@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * Тихі години (notifications-module.md §4.5, §8.3): у цей проміжок сервер
  * відкладає push до кінця вікна, а в застосунку сповіщення з'являються
@@ -105,10 +106,10 @@ export function QuietHoursCard({ enabled, start, end, timezone, tr, colors: c, o
 }
 
 const st = StyleSheet.create({
-  card:      { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
+  card:      { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
   iconBox:   { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   timeRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 10, marginTop: 4, borderTopWidth: StyleSheet.hairlineWidth },
-  stepBtn:   { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  time:      { fontSize: 20, fontWeight: '800', minWidth: 72, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  stepBtn:   { width: 44, height: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  time:      { fontSize: 20, fontWeight: Atlas.type.headingWeight, minWidth: 72, textAlign: 'center', fontVariant: ['tabular-nums'] },
 });

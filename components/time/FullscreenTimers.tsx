@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/FullscreenTimers.tsx
  *
@@ -436,7 +437,7 @@ const st = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: PAD,
   },
-  title:    { fontSize: 17, fontWeight: '800', flex: 1 },
+  title:    { fontSize: 17, fontWeight: Atlas.type.headingWeight, flex: 1 },
   back:     { flexDirection: 'row', alignItems: 'center', flex: 1 },
   backText: { fontSize: 15, fontWeight: '600', marginLeft: 2 },
   exit:     { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
@@ -444,7 +445,7 @@ const st = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
 
   empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyIcon:  { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  emptyIcon:  { width: 64, height: 64, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: '700', marginTop: 16 },
   emptyHint:  { fontSize: 13, marginTop: 6, textAlign: 'center', lineHeight: 19 },
 
@@ -455,13 +456,13 @@ const st = StyleSheet.create({
   // tabular-nums: без нього ширина цифр гуляє і великий годинник смикається.
   caption:     { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginTop: 8, textTransform: 'uppercase' },
 
-  metaRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginBottom: 8 },
+  metaRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginBottom: 8 },
   metaLabel:    { fontSize: 12, fontWeight: '600', marginLeft: 9, flex: 1 },
   metaValue:    { fontSize: 13, fontWeight: '700', marginLeft: 10, flexShrink: 1 },
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
-  subRow:       { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginBottom: 7 },
+  subRow:       { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginBottom: 7 },
   subText:      { fontSize: 14, fontWeight: '600', marginLeft: 10, flex: 1 },
 
-  stopWide:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 1, paddingVertical: 13, marginTop: 22 },
+  stopWide:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.large, borderWidth: 1, paddingVertical: 13, marginTop: 22 },
   stopWideText: { color: STOP, fontSize: 14, fontWeight: '700', marginLeft: 8 },
 });

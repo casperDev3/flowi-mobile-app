@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/BodyTab.tsx — вкладка «Тіло і вітальні».
  *
@@ -105,7 +106,7 @@ export function BodyTab({ h }: HealthTabProps) {
         {/* Одноразове прибирання ваги, яку старий синк щодня переклеював на
             «сьогодні» (ВАДА-2): видаляти мовчки не можна — кажемо підсумок. */}
         {h.weightCleanupRemoved != null && h.weightCleanupRemoved > 0 && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, borderColor: ACCENT_WEIGHT + '44', backgroundColor: ACCENT_WEIGHT + '12', padding: 12, marginTop: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: ACCENT_WEIGHT + '44', backgroundColor: ACCENT_WEIGHT + '12', padding: 12, marginTop: 8 }}>
             <IconSymbol name="scalemass.fill" size={15} color={ACCENT_WEIGHT} />
             <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', flex: 1, marginLeft: 8 }}>
               {tr.hautoWeightCleanup.replace('{n}', String(h.weightCleanupRemoved))}
@@ -131,7 +132,7 @@ export function BodyTab({ h }: HealthTabProps) {
           {latestWeight ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ color: c.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.5 }}>{latestWeight} кг</Text>
+                <Text style={{ color: c.text, fontSize: 30, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{latestWeight} кг</Text>
                 {bmi && (
                   <View style={[s.badge, { marginLeft: 10, backgroundColor: bmiColor + '20', borderColor: bmiColor + '40' }]}>
                     <Text style={{ color: bmiColor, fontSize: 10, fontWeight: '700' }}>{tr.bmi} {bmi.toFixed(1)} · {bmiLbl}</Text>
@@ -180,7 +181,7 @@ export function BodyTab({ h }: HealthTabProps) {
           {pulse ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{pulse}</Text>
+                <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{pulse}</Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>{lang === 'uk' ? 'уд/хв' : 'bpm'}</Text>
                 <View style={{ flex: 1 }} />
                 <View style={[s.badge, { backgroundColor: zoneColor + '20', borderColor: zoneColor + '40' }]}>
@@ -246,7 +247,7 @@ export function BodyTab({ h }: HealthTabProps) {
                 <BlurView key={t} intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[s.row, { borderColor: c.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{tr[labelKey[t]]}</Text>
-                    <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginTop: 1 }}>
+                    <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, marginTop: 1 }}>
                       {lv(t)}<Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}> {unitOf(t)}</Text>
                     </Text>
                     {delta != null && delta !== 0 && (
@@ -306,7 +307,7 @@ function Stat({ label, value, color, sub, badge }: {
 }) {
   return (
     <View style={{ width: '33.3%', paddingVertical: 6 }}>
-      <Text style={{ color, fontSize: 17, fontWeight: '800' }}>{value}</Text>
+      <Text style={{ color, fontSize: 17, fontWeight: Atlas.type.headingWeight }}>{value}</Text>
       <Text style={{ color: sub, fontSize: 10, fontWeight: '600', marginTop: 1 }} numberOfLines={1}>{label}</Text>
       {badge && <Text style={{ color, fontSize: 9, fontWeight: '700', marginTop: 1 }}>{badge}</Text>}
     </View>
@@ -314,11 +315,11 @@ function Stat({ label, value, color, sub, badge }: {
 }
 
 const s = StyleSheet.create({
-  addBtn:  { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  addBtn:  { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   iconBtn: { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  card:    { borderRadius: 18, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
-  row:     { borderRadius: 14, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  card:    { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
+  row:     { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
   badge:   { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  empty:   { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, padding: 13 },
+  empty:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 13 },
   remRow:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
 });

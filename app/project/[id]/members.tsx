@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/members.tsx — Учасники проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §4, контракт §4.2–4.3).
@@ -336,10 +337,10 @@ export default function ProjectMembersScreen() {
     setSendingEmail(true);
     setEmailError('');
     try {
-      await inviteByEmail(projectId, inviteRole, email.trim());
+      const result = await inviteByEmail(projectId, inviteRole, email.trim());
       setEmail('');
       haptic.success();
-      Alert.alert(tr.projectMembersInviteByEmail, tr.projectMembersEmailInviteSent);
+      Alert.alert(tr.projectMembersInviteByEmail, result.email_sent ? tr.projectMembersEmailInviteSent : tr.projectMembersEmailDeliveryFailed);
       void load();
     } catch (e) {
       haptic.error();
@@ -540,7 +541,7 @@ export default function ProjectMembersScreen() {
             <TouchableOpacity
               onPress={handleCreateLink}
               disabled={creatingLink}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: c.accent, borderRadius: 12, paddingVertical: 12, marginBottom: 14, opacity: creatingLink ? 0.7 : 1 }}>
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: c.accent, borderRadius: Atlas.radius.medium, paddingVertical: 12, marginBottom: 14, opacity: creatingLink ? 0.7 : 1 }}>
               {creatingLink ? <ActivityIndicator color="#fff" /> : (
                 <>
                   <IconSymbol name="link" size={15} color="#fff" />
@@ -602,12 +603,12 @@ export default function ProjectMembersScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
-                style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 14 }}
+                style={{ flex: 1, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 14 }}
               />
               <TouchableOpacity
                 onPress={handleInviteEmail}
                 disabled={!email.trim() || sendingEmail}
-                style={{ borderRadius: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: email.trim() ? c.accent : c.border }}>
+                style={{ borderRadius: Atlas.radius.medium, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: email.trim() ? c.accent : c.border }}>
                 {sendingEmail ? <ActivityIndicator color="#fff" size="small" /> : (
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{tr.projectMembersSendInvite}</Text>
                 )}
@@ -622,10 +623,10 @@ export default function ProjectMembersScreen() {
 }
 
 const st = StyleSheet.create({
-  hint: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, padding: 10 },
-  memberRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
+  hint: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 12, marginBottom: 8 },
   roleBadge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4, marginLeft: 8 },
-  segment: { flex: 1, alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingVertical: 9 },
-  linkCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
-  smallBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 10, paddingVertical: 9 },
+  segment: { flex: 1, alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingVertical: 9 },
+  linkCard: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, marginBottom: 14 },
+  smallBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, paddingVertical: 9 },
 });

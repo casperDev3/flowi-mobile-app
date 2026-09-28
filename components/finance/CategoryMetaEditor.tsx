@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/CategoryMetaEditor.tsx — група і ознака «фікс/змінна»
  * категорії (finance-revamp.md §4.1). Показує ПОТОЧНЕ значення (явне або
@@ -85,5 +86,5 @@ export function CategoryMetaEditor({ type, group, cost, onGroup, onCost, c, tr }
 
 const st = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '700', marginBottom: 6 },
-  chip: { minHeight: 34, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chip: { minHeight: 34, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

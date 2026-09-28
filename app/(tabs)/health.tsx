@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/(tabs)/health.tsx — розділ «Здоровʼя» однією сторінкою з вкладками.
  *
@@ -268,7 +269,7 @@ const s = StyleSheet.create({
   badge:        { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   // 44×44 — мінімальна ціль дотику (HIG); іконка маленька, ціль — ні.
   deleteBtn:    { width: 44, height: 44, marginLeft: 4, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
-  historyCard:  { borderRadius: 14, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' },
+  historyCard:  { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' },
   fabContainer: { position: 'absolute', right: 20, alignItems: 'center', justifyContent: 'center' },
   fab:          { width: 58, height: 58, borderRadius: 29, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
   fabGrad:      { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
@@ -279,5 +280,5 @@ const s = StyleSheet.create({
   sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2 },
-  sheetTitle:   { fontSize: 20, fontWeight: '800' },
+  sheetTitle:   { fontSize: 20, fontWeight: Atlas.type.headingWeight },
 });

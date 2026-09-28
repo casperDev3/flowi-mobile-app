@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -332,9 +333,9 @@ export function WeekBars({
 }
 
 const st = StyleSheet.create({
-  heading:    { fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
-  chip:       { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
-  panel:      { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 10 },
+  heading:    { fontSize: 17, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 },
+  chip:       { paddingHorizontal: 13, paddingVertical: 8, borderRadius: Atlas.radius.medium, borderWidth: 1 },
+  panel:      { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, marginBottom: 10 },
   panelTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
   note:       { fontSize: 11, lineHeight: 15 },
   track:      { height: 6, borderRadius: 3, overflow: 'hidden' },

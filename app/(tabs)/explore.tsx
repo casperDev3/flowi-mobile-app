@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -442,7 +443,7 @@ export default function FinanceScreen() {
       setCatMeta(meta);
       setCatsInitialized(true);
     });
-  }, []);
+  }, [DEFAULT_CATEGORIES]);
 
   // Save categories
   useEffect(() => {
@@ -635,12 +636,14 @@ export default function FinanceScreen() {
     return true;
   }, []);
 
+  const todayLabel = now.toDateString();
+  const yesterdayLabel = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString();
   const groups = useMemo(() => groupTransactions(
     filtered,
-    now.toDateString(),
-    new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString(),
+    todayLabel,
+    yesterdayLabel,
     locale,
-  ), [filtered, locale]);
+  ), [filtered, locale, todayLabel, yesterdayLabel]);
 
   const typeLabel = useCallback(
     (t: FormType) => (t === 'income' ? tr.income : t === 'expense' ? tr.expense : tr.transfer),
@@ -1323,7 +1326,7 @@ export default function FinanceScreen() {
             {/* Empty state with CTA */}
             {groups.length === 0 && !loadFailed && (
               <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-                <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.accent + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                <View style={{ width: 64, height: 64, borderRadius: Atlas.radius.xlarge, backgroundColor: c.accent + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                   <IconSymbol name="banknote" size={32} color={c.accent} />
                 </View>
                 <Text style={{ color: c.text, fontSize: 16, marginTop: 6, fontWeight: '700' }}>{tr.noTransactions}</Text>
@@ -1332,7 +1335,7 @@ export default function FinanceScreen() {
                   onPress={() => openAdd()}
                   accessibilityRole="button"
                   accessibilityLabel={tr.add}
-                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <IconSymbol name="plus" size={15} color="#fff" />
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.add}</Text>
                 </TouchableOpacity>
@@ -1407,7 +1410,7 @@ export default function FinanceScreen() {
                               <Text style={{ color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{typeLabel(selected.type)}</Text>
                             </View>
                             <View style={[s.typePill, { backgroundColor: c.dim, borderColor: c.border }]}>
-                              <Text style={{ color: c.sub, fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>
+                              <Text style={{ color: c.sub, fontSize: 11, fontWeight: Atlas.type.headingWeight, letterSpacing: 0.5 }}>
                                 {detailCur.code}
                               </Text>
                             </View>
@@ -1886,7 +1889,7 @@ export default function FinanceScreen() {
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                   {editingId ? (
-                    <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 14 }}>{tr.editTransaction}</Text>
+                    <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 14 }}>{tr.editTransaction}</Text>
                   ) : null}
 
                   {/* Вид операції: переказ — третій рівноправний, а не витрата */}
@@ -2081,7 +2084,7 @@ export default function FinanceScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 6 }}>{tr.primaryCurrency}</Text>
+              <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 6 }}>{tr.primaryCurrency}</Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 18, marginBottom: 14 }}>
                 {tr.primaryCurrencyDesc}
               </Text>
@@ -2101,10 +2104,10 @@ export default function FinanceScreen() {
                     style={[{
                       flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4,
                     }, idx < allCurrencies.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                    <View style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+                    <View style={{ width: 34, height: 34, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
                       backgroundColor: isSelected ? c.accent : c.dim,
                       borderWidth: 1, borderColor: isSelected ? c.accent : c.border }}>
-                      <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 14, fontWeight: '800' }}>{curr.symbol}</Text>
+                      <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>{curr.symbol}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{curr.code}</Text>
@@ -2150,7 +2153,7 @@ export default function FinanceScreen() {
                     </View>
                   </View>
 
-                  <Text style={{ color: c.text, fontSize: 17, fontWeight: '800', marginBottom: 12 }}>{tr.categories}</Text>
+                  <Text style={{ color: c.text, fontSize: 17, fontWeight: Atlas.type.headingWeight, marginBottom: 12 }}>{tr.categories}</Text>
 
                   {/* Tabs */}
                   <View style={[s.typeRow, { backgroundColor: c.dim, marginBottom: 12 }]}>
@@ -2182,7 +2185,7 @@ export default function FinanceScreen() {
                           style={!isLast ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border } : undefined}>
                         <View
                           style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7 }}>
-                          <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.accent + '18', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                          <View style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: c.accent + '18', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
                             <IconSymbol name={cat.icon} size={13} color={c.accent} />
                           </View>
                           <TouchableOpacity
@@ -2228,7 +2231,7 @@ export default function FinanceScreen() {
 
                   {/* Add new category */}
                   {showAddCat ? (
-                    <View style={[{ borderRadius: 16, borderWidth: 1, padding: 14 }, { borderColor: c.border, backgroundColor: c.dim }]}>
+                    <View style={[{ borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14 }, { borderColor: c.border, backgroundColor: c.dim }]}>
                       <TextInput
                         placeholder={tr.category}
                         placeholderTextColor={c.sub}
@@ -2307,7 +2310,7 @@ export default function FinanceScreen() {
               </View>
             </View>
 
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 12 }}>{tr.accounts}</Text>
+            <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 12 }}>{tr.accounts}</Text>
 
             {accounts.length === 0 && (
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>{tr.noAccountsHint}</Text>
@@ -2359,7 +2362,7 @@ export default function FinanceScreen() {
             )}
 
             {accForm ? (
-              <View style={{ borderRadius: 16, borderWidth: 1, padding: 14, borderColor: c.border, backgroundColor: c.dim }}>
+              <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, borderColor: c.border, backgroundColor: c.dim }}>
                 <Text style={[s.label, { color: c.sub, marginTop: 0 }]}>{tr.nameLabel}</Text>
                 <TextInput
                   placeholder={tr.accountDefaultName}
@@ -2415,7 +2418,7 @@ export default function FinanceScreen() {
                             accessibilityLabel={curr.code}
                             accessibilityState={{ selected: isSel }}
                             style={[s.catChip, { backgroundColor: isSel ? c.accent : c.dim, borderColor: isSel ? c.accent : c.border }]}>
-                            <Text style={{ color: isSel ? '#fff' : c.sub, fontSize: 12, fontWeight: '800' }}>{curr.symbol}</Text>
+                            <Text style={{ color: isSel ? '#fff' : c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{curr.symbol}</Text>
                             <Text style={{ color: isSel ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{curr.code}</Text>
                           </TouchableOpacity>
                         );
@@ -2431,7 +2434,7 @@ export default function FinanceScreen() {
                     </ScrollView>
 
                     {showInlineAddCur && (
-                      <View style={{ borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 10, borderColor: c.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+                      <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 10, borderColor: c.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
                         <TextInput
                           placeholder={tr.currencyTicker}
                           placeholderTextColor={c.sub}
@@ -2569,7 +2572,7 @@ export default function FinanceScreen() {
               </View>
             </View>
 
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 6 }}>{tr.markAsTransfer}</Text>
+            <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 6 }}>{tr.markAsTransfer}</Text>
             <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19 }}>{tr.transfersNotCounted}</Text>
             <Text style={{ color: c.sub, fontSize: 12, lineHeight: 18, marginTop: 4 }}>{tr.markTransferSameCurrency}</Text>
 
@@ -2624,37 +2627,37 @@ function InfoRow({ icon, label, value, color, text, sub, border, last }: any) {
 }
 
 const s = StyleSheet.create({
-  dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
-  filterRow:   { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
+  dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
+  filterRow:   { flexDirection: 'row', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 3 },
   filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   filterLabel: { fontSize: 12, fontWeight: '600' },
   groupLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  fab:         { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  fab:         { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  amountBlock: { borderRadius: 16, borderWidth: 1, padding: 18, marginBottom: 4 },
-  detailHero:  { borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center' },
+  sheet:       { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  amountBlock: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 18, marginBottom: 4 },
+  detailHero:  { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, alignItems: 'center' },
   typePill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:  { fontSize: 20, fontWeight: '800', marginBottom: 16 },
-  typeRow:     { flexDirection: 'row', borderRadius: 12, padding: 3 },
+  sheetTitle:  { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 16 },
+  typeRow:     { flexDirection: 'row', borderRadius: Atlas.radius.medium, padding: 3 },
   typeBtn:     { flex: 1, flexDirection: 'row', paddingVertical: 9, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  input:       { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
+  input:       { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
   label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
   catChip:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9, borderWidth: 1 },
-  btn:         { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  detailIcon:  { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  detailAmount:{ fontSize: 32, fontWeight: '800', letterSpacing: -1 },
+  btn:         { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  detailIcon:  { width: 64, height: 64, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
+  detailAmount:{ fontSize: 32, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 },
   detailCat:   { fontSize: 15, fontWeight: '600', marginTop: 4 },
-  infoBlock:   { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  infoBlock:   { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden' },
   navBtn:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell:     { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  dayCell:     { width: 32, height: 32, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   daydot:      { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
-  clearBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1 },
+  clearBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1 },
   // Context menu
-  menuBox:     { borderRadius: 18, borderWidth: 1, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 10 },
+  menuBox:     { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 10 },
   menuItem:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   menuIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   menuLabel:   { flex: 1, fontSize: 14, fontWeight: '600' },
@@ -2664,10 +2667,10 @@ const s = StyleSheet.create({
   menuPill:    { borderRadius: 7, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
   menuPillText:{ fontSize: 11, fontWeight: '700' },
   // Compact rows
-  txCompact:   { borderRadius: 12, borderWidth: 1, paddingRight: 13, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  txCompact:   { borderRadius: Atlas.radius.medium, borderWidth: 1, paddingRight: 13, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
   txAccentBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginRight: 0 },
   txIconSm:    { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   txCategorySm:{ fontSize: 13, fontWeight: '600' },
   txNoteSm:    { fontSize: 11, fontWeight: '400' },
-  txAmountSm:  { fontSize: 13, fontWeight: '800' },
+  txAmountSm:  { fontSize: 13, fontWeight: Atlas.type.headingWeight },
 });

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -384,9 +385,9 @@ export default function ArchiveScreen() {
 
 const ar = StyleSheet.create({
   countBadge: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
-  chip:       { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
-  emptyIcon:  { width: 80, height: 80, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  card:       { borderRadius: 14, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  chip:       { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
+  emptyIcon:  { width: 80, height: 80, borderRadius: Atlas.radius.xlarge, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  card:       { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
   badge:      { flexDirection: 'row', alignItems: 'center', borderRadius: 7, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 3 },
   iconBtn:    { width: 32, height: 32, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

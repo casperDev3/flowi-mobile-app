@@ -1,3 +1,5 @@
+import { Atlas } from '@/constants/atlas';
+import { AdvertisingSettings } from '@/components/advertising/Advertising';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
@@ -56,6 +58,7 @@ const TOOL_ROWS: readonly {
   module: ModuleId;
 }[] = [
   { route: '/meetings',      icon: 'calendar',         iconColor: '#6366F1', labelKey: 'meetings',         module: 'meetings' },
+  { route: '/menu',          icon: 'fork.knife',       iconColor: '#F59E0B', labelKey: 'menuNavLabel',     module: 'menu' },
   { route: '/(tabs)/time',   icon: 'timer',            iconColor: '#6366F1', labelKey: 'navTimeTracker',   module: 'time' },
   { route: '/budget',        icon: 'chart.pie.fill',   iconColor: '#0EA5E9', labelKey: 'navBudget',        module: 'budget' },
   { route: '/subscriptions', icon: 'repeat',           iconColor: '#8B5CF6', labelKey: 'navSubscriptions', module: 'subscriptions' },
@@ -252,6 +255,7 @@ export default function SettingsScreen() {
             <Text style={[st.pageTitle, { color: c.text }]}>{tr.settings}</Text>
           </View>
 
+          <AdvertisingSettings />
           <View style={gridStyle}>
 
             {/* Акаунт */}
@@ -849,7 +853,7 @@ const NotifRow = React.memo(function NotifRow(
         <NotificationBadge />
         {scheduledCount > 0 && (
           <View style={{ backgroundColor: accent, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
-            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{scheduledCount}</Text>
+            <Text style={{ color: '#fff', fontSize: 11, fontWeight: Atlas.type.headingWeight }}>{scheduledCount}</Text>
           </View>
         )}
         <IconSymbol name="chevron.right" size={16} color={sub} />
@@ -884,28 +888,28 @@ const InfoRow = React.memo(function InfoRow(
 });
 
 const st = StyleSheet.create({
-  pageTitle:   { fontSize: 34, fontWeight: '800', letterSpacing: -0.8 },
+  pageTitle:   { fontSize: 34, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.8 },
   sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 20, marginLeft: 4 },
   // Дві колонки вмикаються лише на широкому екрані; на телефоні обгортки
   // лишаються без стилю й розкладка не змінюється.
   grid:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   col:         { width: '48%' },
-  card:        { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  card:        { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden' },
   row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
   iconBox:     { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   rowLabel:    { fontSize: 14, fontWeight: '500' },
   rowValue:    { fontSize: 13, fontWeight: '500' },
   footerCard:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28, marginBottom: 8 },
   footerLogo:  { width: 26, height: 26, borderRadius: 7 },
-  footerName:  { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
+  footerName:  { fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 },
   footerBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти приходить із useSheetSurface() на місці використання.
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:       { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 12 },
+  sheetTitle:  { fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 12 },
   optionRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   optionLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
 });

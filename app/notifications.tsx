@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/notifications.tsx — центр сповіщень (notifications-module.md §10.4, §11).
  *
@@ -298,18 +299,18 @@ export default function NotificationsScreen() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:   { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
-  segment:     { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 3, marginBottom: 12 },
+  pageTitle:   { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
+  segment:     { flexDirection: 'row', borderRadius: Atlas.radius.large, borderWidth: 1, padding: 3, marginBottom: 12 },
   segmentBtn:  { flex: 1, minHeight: 40, borderRadius: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   segmentText: { fontSize: 14, fontWeight: '700' },
   countPill:   { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
-  countText:   { color: '#fff', fontSize: 11, fontWeight: '800' },
+  countText:   { color: '#fff', fontSize: 11, fontWeight: Atlas.type.headingWeight },
   filterRow:   { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  chip:        { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  banner:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
+  chip:        { minHeight: 36, paddingHorizontal: 14, borderRadius: Atlas.radius.xlarge, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  banner:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Atlas.radius.large, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
   bannerText:  { flex: 1, fontSize: 13, lineHeight: 18 },
   retryBtn:    { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
   hint:        { fontSize: 12, marginBottom: 10, marginHorizontal: 2 },
-  emptyIcon:   { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  moreBtn:     { minHeight: 44, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  emptyIcon:   { width: 72, height: 72, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
+  moreBtn:     { minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
 });

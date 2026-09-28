@@ -51,7 +51,9 @@ import type { Translations } from '@/store/translations';
 export type ModuleId =
   | 'tasks' | 'projects' | 'meetings' | 'time' | 'notes'
   | 'finance' | 'budget' | 'subscriptions' | 'banks' | 'health'
-  | 'health_summary' | 'health_profile' | 'prevention' | 'workouts' | 'training' | 'containers'
+  | 'health_summary' | 'health_profile' | 'prevention' | 'workouts' | 'training'
+  | "menu"
+  | 'containers'
   | 'archive' | 'time_records'
   | 'ideas' | 'bugs';
 
@@ -169,6 +171,11 @@ export const NAV_GROUPS: NavGroup[] = [
       // Групи тренувань (training-module.md §10): окремий модуль `training`,
       // як і на вебі (`lib/nav-groups.ts`), — вимкнення особистого журналу
       // не має ховати групу, де людина тренер.
+      { route: "/menu",
+        icon: "fork.knife",
+        labelKey: "menuNavLabel",
+        module: "menu",
+      },
       { route: '/training',          icon: 'person.2.fill',   labelKey: 'tgNavLabel',       module: 'training' },
       { route: '/containers',        icon: 'shippingbox.fill',labelKey: 'containers',       module: 'containers' },
       // Мобільні службові пункти без веб-аналога — теж сюди.
@@ -373,6 +380,7 @@ export const STACK_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.fr
   '/meetings': 'meetings',
   '/notes': 'notes',
   '/workouts': 'workouts',
+    "/menu": "menu",
   '/training': 'training',
   '/containers': 'containers',
   '/budget': 'budget',
@@ -590,6 +598,7 @@ export const SIDEBAR_HIDDEN_ON: readonly string[] = [
   // Запрошення (§4, контракт §4.3) — досяжний і гостю без акаунта: сайдбар
   // особистого простору тут так само недоречний, як на /welcome чи /login.
   '/invite',
+  "/menu-invite",
 ];
 
 /** Чи видно сайдбар зараз. */

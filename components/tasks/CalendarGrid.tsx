@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/CalendarGrid.tsx
  *
@@ -79,6 +80,6 @@ export function CalendarGrid({ year, month, markedDays, selectedDate, todayDate,
 
 const st = StyleSheet.create({
   navBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  dayCell: { width: 32, height: 32, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   daydot:  { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
 });

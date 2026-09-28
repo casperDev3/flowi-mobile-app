@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/health/HealthTabs.tsx — вкладки розділу «Здоровʼя».
  *
@@ -123,5 +124,5 @@ const s = StyleSheet.create({
   tab:   { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, minHeight: 36 },
   label: { fontSize: 13, fontWeight: '700' },
   badge: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: Atlas.type.headingWeight },
 });

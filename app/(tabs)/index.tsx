@@ -1,3 +1,5 @@
+import { Atlas } from '@/constants/atlas';
+import { AdSlot } from '@/components/advertising/Advertising';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -110,7 +112,7 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { useToday } from '@/hooks/use-today';
-import { useCalendarNav, type CalSpan } from '@/hooks/use-calendar-nav';
+import { useCalendarNav } from '@/hooks/use-calendar-nav';
 import { draftEstimatedMinutes, draftRecurrence, editedDraftFields, useTaskEditor } from '@/hooks/use-task-editor';
 import { useAllProjectMembers, useProjectMembers } from '@/hooks/use-project-members';
 import type { MemberOut } from '@/store/project-team';
@@ -133,7 +135,7 @@ import { monthGrid } from '@/utils/dateUtils';
 import { initialReminderDraft, resolveReminderMoment } from '@/utils/reminderTime';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
-import { formatClock, formatDuration, formatDurationShort } from '@/utils/durationFormat';
+import { formatClock, formatDuration } from '@/utils/durationFormat';
 
 type ViewMode = 'list' | 'calendar';
 
@@ -2021,7 +2023,7 @@ export default function TasksScreen() {
                 стиснутись (NAT-06). */}
             {viewMode === 'list' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1, backgroundColor: c.dim, borderRadius: 12, padding: 3, borderWidth: 1, borderColor: c.border }}>
+                <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1, backgroundColor: c.dim, borderRadius: Atlas.radius.medium, padding: 3, borderWidth: 1, borderColor: c.border }}>
                   {([
                     { key: 'today' as const, label: tr.today, count: scopeCounts.today },
                     { key: 'week' as const, label: tr.tasksScopeWeek, count: scopeCounts.week },
@@ -2035,7 +2037,7 @@ export default function TasksScreen() {
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
                         accessibilityLabel={`${option.label}, ${option.count}`}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: active ? c.accent : 'transparent' }}>
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Atlas.radius.medium, backgroundColor: active ? c.accent : 'transparent' }}>
                         <Text numberOfLines={1} style={{ color: active ? '#fff' : c.sub, fontSize: 13, fontWeight: '700', flexShrink: 1 }}>{option.label}</Text>
                         <Text style={{ color: active ? 'rgba(255,255,255,0.75)' : c.sub, fontSize: 11, fontWeight: '600' }}>{option.count}</Text>
                       </TouchableOpacity>
@@ -2053,7 +2055,7 @@ export default function TasksScreen() {
                     accessibilityState={{ checked: noDeadline }}
                     accessibilityLabel={`${tr.withoutDeadline}, ${scopeCounts.noDeadline}`}
                     accessibilityHint={tr.tasksNoDeadlineA11y}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: noDeadline ? c.accent : c.border, backgroundColor: noDeadline ? c.accent + '22' : c.dim }}>
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: noDeadline ? c.accent : c.border, backgroundColor: noDeadline ? c.accent + '22' : c.dim }}>
                     <IconSymbol name="calendar" size={13} color={noDeadline ? c.accent : c.sub} />
                     <Text numberOfLines={1} style={{ color: noDeadline ? c.accent : c.sub, fontSize: 13, fontWeight: '700', flexShrink: 1 }}>{tr.withoutDeadline}</Text>
                     <Text style={{ color: noDeadline ? c.accent : c.sub, fontSize: 11, fontWeight: '600' }}>{scopeCounts.noDeadline}</Text>
@@ -2214,7 +2216,7 @@ export default function TasksScreen() {
                     <IconSymbol name="chevron.right" size={12} color={c.sub} style={{ marginLeft: 2 }} />
                   </TouchableOpacity>
                   {todayMeetings2.length > 0 && (
-                    <View style={{ backgroundColor: '#6366F120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
+                    <View style={{ backgroundColor: '#6366F120', borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
                       <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{todayMeetings2.length}</Text>
                     </View>
                   )}
@@ -2232,7 +2234,7 @@ export default function TasksScreen() {
 
                 {todayMeetings2.length === 0 ? (
                   <TouchableOpacity onPress={() => openAddMeeting()} activeOpacity={0.7}
-                    style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 10, gap: 8 }}>
+                    style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 10, gap: 8 }}>
                     <IconSymbol name="calendar.badge.plus" size={16} color={c.sub} />
                     <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500' }}>{tr.addMeeting}</Text>
                   </TouchableOpacity>
@@ -2254,7 +2256,7 @@ export default function TasksScreen() {
                             <View style={{ width: 2.5, alignSelf: 'stretch', backgroundColor: mtg.color, borderRadius: 2, marginLeft: 0, minHeight: 36 }} />
                             {/* Time + day */}
                             <View style={{ alignItems: 'center', minWidth: 44 }}>
-                              <Text style={{ color: mtg.color, fontSize: 13, fontWeight: '800', letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
+                              <Text style={{ color: mtg.color, fontSize: 13, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
                               <Text style={{ color: mtg.color, fontSize: 9, fontWeight: '600', opacity: 0.75, marginTop: 1 }}>{dFmt}</Text>
                             </View>
                             {/* Divider */}
@@ -2331,7 +2333,7 @@ export default function TasksScreen() {
                   onPress={() => selectScope(emptyTodayTarget.scope, emptyTodayTarget.noDeadline)}
                   accessibilityRole="button"
                   accessibilityLabel={`${emptyTodayTarget.label}, ${emptyTodayTarget.count}`}
-                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <IconSymbol name="list.bullet" size={15} color={c.accent} />
                   <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{emptyTodayTarget.label} · {emptyTodayTarget.count}</Text>
                 </TouchableOpacity>
@@ -2361,7 +2363,7 @@ export default function TasksScreen() {
                     onPress={clearAllFilters}
                     accessibilityRole="button"
                     accessibilityLabel={tr.resetAllFilters}
-                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <IconSymbol name="arrow.clockwise" size={15} color={c.accent} />
                     <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.resetAllFilters}</Text>
                   </TouchableOpacity>
@@ -2370,7 +2372,7 @@ export default function TasksScreen() {
                     onPress={() => setShowAdd(true)}
                     accessibilityRole="button"
                     accessibilityLabel={tr.addTask}
-                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <IconSymbol name="plus" size={15} color="#fff" />
                     <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addTask}</Text>
                   </TouchableOpacity>
@@ -2383,7 +2385,7 @@ export default function TasksScreen() {
               <View style={{ marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
                   <Text style={[s.groupLabel, { color: '#EF4444', marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
-                  <View style={{ backgroundColor: '#EF444420', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <View style={{ backgroundColor: '#EF444420', borderRadius: Atlas.radius.small, paddingHorizontal: 7, paddingVertical: 2 }}>
                     <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>{overdueItems.length}</Text>
                   </View>
                 </View>
@@ -2511,6 +2513,7 @@ export default function TasksScreen() {
             stickySectionHeadersEnabled={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
             ListHeaderComponent={listHeader}
+            ListFooterComponent={tasks.length >= 10 ? <AdSlot slot="M2" hidden={showAdd || showMeetingForm || showFilterSheet} /> : null}
             renderSectionHeader={renderSectionHeader}
             renderSectionFooter={renderSectionFooter}
             ItemSeparatorComponent={TaskItemSeparator}
@@ -2601,7 +2604,7 @@ export default function TasksScreen() {
               {/* Header */}
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 14 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', letterSpacing: -0.3, textTransform: 'capitalize' }}>
+                  <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3, textTransform: 'capitalize' }}>
                     {calPopupDate?.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </Text>
                   {calPopupDate && (() => {
@@ -2645,10 +2648,10 @@ export default function TasksScreen() {
                         return (
                           <TouchableOpacity key={mtg.id} onPress={() => { setCalPopupDate(null); openMeetingView(mtg, true); }} activeOpacity={0.75}>
                             <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
-                              style={{ borderRadius: 14, borderWidth: 1, borderColor: mtg.color + '40', padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                              style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: mtg.color + '40', padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                               <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: mtg.color, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 }} />
-                              <View style={{ marginLeft: 6, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, backgroundColor: mtg.color + '1A', alignItems: 'center', minWidth: 44 }}>
-                                <Text style={{ color: mtg.color, fontSize: 12, fontWeight: '800' }}>{mtg.time || '--:--'}</Text>
+                              <View style={{ marginLeft: 6, paddingHorizontal: 6, paddingVertical: 4, borderRadius: Atlas.radius.small, backgroundColor: mtg.color + '1A', alignItems: 'center', minWidth: 44 }}>
+                                <Text style={{ color: mtg.color, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{mtg.time || '--:--'}</Text>
                               </View>
                               <View style={{ flex: 1 }}>
                                 <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>{mtg.title}</Text>
@@ -2700,7 +2703,7 @@ export default function TasksScreen() {
                     <BlurView
                       intensity={isDark ? 18 : 35}
                       tint={isDark ? 'dark' : 'light'}
-                      style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
                       <TouchableOpacity
                         onPress={e => { e.stopPropagation(); toggleTask(task.id); }}
                         accessibilityRole="checkbox"
@@ -2719,12 +2722,12 @@ export default function TasksScreen() {
                           {task.title}
                         </Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                          <PriorityBadge level={normalizePriority(task)} />
                           {task.subtasks.length > 0 && (
                             <Text style={{ color: c.sub, fontSize: 11 }}>· {task.subtasks.filter(s => s.done).length}/{task.subtasks.length}</Text>
                           )}
                         </View>
                       </View>
+                      <PriorityBadge level={normalizePriority(task)} style={{ alignSelf: 'flex-start' }} />
                       <IconSymbol name="chevron.right" size={12} color={c.sub} />
                     </BlurView>
                   </TouchableOpacity>
@@ -2747,7 +2750,7 @@ export default function TasksScreen() {
               position: 'absolute',
               top: topInset + 62,
               right: 16,
-              borderRadius: 18,
+              borderRadius: Atlas.radius.xlarge,
               borderWidth: 1,
               borderColor: c.border,
               overflow: 'hidden',
@@ -2811,7 +2814,7 @@ export default function TasksScreen() {
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.meetings}</Text>
               {meetings.length > 0 && (
-                <View style={{ backgroundColor: '#6366F120', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, marginRight: 4 }}>
+                <View style={{ backgroundColor: '#6366F120', borderRadius: Atlas.radius.small, paddingHorizontal: 7, paddingVertical: 2, marginRight: 4 }}>
                   <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{meetings.length}</Text>
                 </View>
               )}
@@ -3177,7 +3180,7 @@ function StatCell({ value, label, color, sub }: any) {
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
-        style={{ color, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{value}</Text>
+        style={{ color, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{value}</Text>
       <Text
         numberOfLines={2}
         maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
@@ -3191,12 +3194,12 @@ const s = StyleSheet.create({
   searchInput:    { flex: 1, fontSize: 14, fontWeight: '400', marginLeft: 8, paddingVertical: 0 },
   activeChip:     { flexDirection: 'row', alignItems: 'center', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5 },
   activeChipText: { fontSize: 11, fontWeight: '600' },
-  statsRow:       { flexDirection: 'row', borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  subtaskStatRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, overflow: 'hidden' },
-  sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
+  statsRow:       { flexDirection: 'row', borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden' },
+  subtaskStatRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, overflow: 'hidden' },
+  sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: Atlas.radius.medium, borderWidth: 1 },
   sortLabel:      { fontSize: 12, fontWeight: '600' },
   groupLabel:     { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 6 },
-  taskCard:       { borderRadius: 16, borderWidth: 1, padding: 14, overflow: 'hidden' },
+  taskCard:       { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, overflow: 'hidden' },
   boardCard:      { borderRadius: 13, padding: 11, overflow: 'hidden' },
   taskTitle:      { fontSize: 14, fontWeight: '600' },
   checkbox:       { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
@@ -3209,40 +3212,40 @@ const s = StyleSheet.create({
   // при кожній зміні.
   pct:            { fontSize: 11, fontWeight: '600', minWidth: 30, fontVariant: ['tabular-nums'] },
   colLabel:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-  emptyCol:       { borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 24, alignItems: 'center' },
-  fab:            { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  emptyCol:       { borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 24, alignItems: 'center' },
+  fab:            { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:   { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:          { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  detailSheet:    { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  inlineCalendar: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 8 },
-  reminderPickerBox: { borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 8 },
+  sheet:          { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  detailSheet:    { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  inlineCalendar: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginBottom: 8 },
+  reminderPickerBox: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 8 },
   handleRow:      { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:         { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:     { fontSize: 20, fontWeight: '800', marginBottom: 18 },
+  sheetTitle:     { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 18 },
   detailTitle:    { fontSize: 18, fontWeight: '700', lineHeight: 24 },
   detailDesc:     { fontSize: 13, lineHeight: 19, marginBottom: 8, opacity: 0.7 },
-  input:          { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
+  input:          { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
   label:          { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  priorityBtn:    { flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, alignItems: 'center' },
-  btn:            { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  subRow:         { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, padding: 10 },
+  priorityBtn:    { flex: 1, paddingVertical: 9, borderRadius: Atlas.radius.medium, borderWidth: 1.5, alignItems: 'center' },
+  btn:            { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  subRow:         { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10 },
   subCheck:       { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   subTitle:       { fontSize: 13, fontWeight: '500' },
-  addSubRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 10, paddingVertical: 10 },
+  addSubRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 10, paddingVertical: 10 },
   subInput:       { fontSize: 13, paddingVertical: 0 },
   navBtn:         { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell:        { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  dayCell:        { width: 32, height: 32, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   daydot:         { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
-  clearBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: 12, borderWidth: 1 },
+  clearBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1 },
   // Filter sheet
-  filterActionBtn:{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
-  filterSegBtn:   { paddingVertical: 11, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  viewAllBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11 },
+  filterActionBtn:{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
+  filterSegBtn:   { paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  viewAllBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11 },
   itemSeparator:  { height: 6 },
-  groupShowAll:   { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginTop: 6 },
-  dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
-  dropdownList:   { borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
+  groupShowAll:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginTop: 6 },
+  dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
+  dropdownList:   { borderRadius: Atlas.radius.medium, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
   dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 11 },
   menuItem:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13 },
   menuIconBox:    { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginRight: 12 },

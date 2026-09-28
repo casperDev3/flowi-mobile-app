@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/UpcomingPaymentsCard.tsx — блок «Найближчі оплати / Прострочено».
  *
@@ -164,10 +165,10 @@ const st = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   title:   { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
   badge:   { borderRadius: 8, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2 },
-  card:    { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  card:    { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden' },
   row:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
   iconBox: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  renewBtn: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 5 },
+  renewBtn: { borderRadius: Atlas.radius.small, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 5 },
   sectionHead: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 2 },
   sectionText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
 });

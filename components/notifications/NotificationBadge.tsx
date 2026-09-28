@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * Бейдж непрочитаних сповіщень (notifications-module.md §11: «таб
  * Налаштування / шапка»). Сам тримає лічильник живим: монтування бейджа —
@@ -58,6 +59,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  text: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  text: { color: '#fff', fontSize: 11, fontWeight: Atlas.type.headingWeight },
   dot: { width: 9, height: 9, borderRadius: 5 },
 });

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/ActiveTimerRow.tsx — рядок активного таймера зі стопом.
  *
@@ -169,7 +170,7 @@ export function ActiveTimerRow({
 
 const st = StyleSheet.create({
   row:   { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
-  kind:  { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  kind:  { width: 26, height: 26, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
   body:  { flex: 1, minWidth: 0 },
   label: { fontSize: 14, fontWeight: '600' },
   clock: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'], marginTop: 1 },

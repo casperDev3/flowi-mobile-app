@@ -123,7 +123,7 @@ export function InvitePanel({ c, groupId, onMemberAdded }: {
           </>
         ) : (
           <>
-            <Field c={c} label={tr.tgEmail} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+            <Field required c={c} label={tr.tgEmail} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
             <PrimaryButton label={tr.tgInvite} icon="person.badge.plus" onPress={() => { void addByEmail(); }} busy={busy} disabled={!email.includes('@')} />
           </>
         )}

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/FinanceSummary.tsx — шапка екрана фінансів.
  *
@@ -128,7 +129,7 @@ export function FinanceSummary({
                 key={code}
                 numberOfLines={1}
                 accessibilityLabel={`${totalLabel ?? ''} ${fmt(value, curOf(code))}`}
-                style={{ color: value < 0 ? c.red : c.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.5, flexShrink: 1 }}>
+                style={{ color: value < 0 ? c.red : c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5, flexShrink: 1 }}>
                 {fmt(value, curOf(code))}
               </Text>
             );
@@ -142,7 +143,7 @@ export function FinanceSummary({
           accessibilityRole="button"
           accessibilityState={{ selected: !!unassignedActive }}
           accessibilityLabel={unassignedLabel}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: unassignedActive ? '#F59E0B' : '#F59E0B66', backgroundColor: '#F59E0B' + (unassignedActive ? '26' : '12'), marginBottom: 10 }}>
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: unassignedActive ? '#F59E0B' : '#F59E0B66', backgroundColor: '#F59E0B' + (unassignedActive ? '26' : '12'), marginBottom: 10 }}>
           <IconSymbol name="exclamationmark.triangle.fill" size={14} color="#F59E0B" />
           <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', flex: 1 }}>{unassignedLabel}</Text>
           <IconSymbol name={unassignedActive ? 'xmark' : 'chevron.right'} size={12} color={c.sub} />
@@ -163,7 +164,7 @@ export function FinanceSummary({
             onPress={onNewAccount}
             accessibilityRole="button"
             accessibilityLabel={newAccountLabel}
-            style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: c.accent }}>
+            style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: Atlas.radius.medium, backgroundColor: c.accent }}>
             <IconSymbol name="plus" size={14} color="#fff" />
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{newAccountLabel}</Text>
           </TouchableOpacity>
@@ -211,7 +212,7 @@ export function FinanceSummary({
                   </View>
                   <Text
                     numberOfLines={1}
-                    style={{ marginTop: 10, fontSize: 17, fontWeight: '800', letterSpacing: -0.4, color: balance < 0 ? c.red : c.text }}>
+                    style={{ marginTop: 10, fontSize: 17, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4, color: balance < 0 ? c.red : c.text }}>
                     {fmt(balance, curOf(account.currency))}
                   </Text>
                   {account.goal ? (
@@ -253,8 +254,8 @@ export function FinanceSummary({
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel={primaryCode}
-              style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: c.border }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: c.sub, letterSpacing: 0.5 }}>{primaryCode}</Text>
+              style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: c.border }}>
+              <Text style={{ fontSize: 11, fontWeight: Atlas.type.headingWeight, color: c.sub, letterSpacing: 0.5 }}>{primaryCode}</Text>
               <IconSymbol name="chevron.down" size={10} color={c.sub} style={{ marginLeft: 4 }} />
             </TouchableOpacity>
           </View>
@@ -282,11 +283,11 @@ export function FinanceSummary({
                   borderTopColor: c.border,
                 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 0.5, color: c.sub }}>{cur.code}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: Atlas.type.headingWeight, letterSpacing: 0.5, color: c.sub }}>{cur.code}</Text>
                   {t.income > 0 && (
                     <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Text style={{ color: c.sub, fontSize: 11 }}>{savingsLabel}</Text>
-                      <Text style={{ color: c.green, fontSize: 12, fontWeight: '800' }}>{savingsPct}%</Text>
+                      <Text style={{ color: c.green, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{savingsPct}%</Text>
                     </View>
                   )}
                 </View>
@@ -318,7 +319,7 @@ function FlowCell({ label, value, color, sub }: { label: string; value: string; 
   return (
     <View style={{ flexShrink: 1 }}>
       <Text style={{ color: sub, fontSize: 11 }}>{label}</Text>
-      <Text numberOfLines={1} style={{ color, fontSize: 16, fontWeight: '800', letterSpacing: -0.4, marginTop: 2 }}>
+      <Text numberOfLines={1} style={{ color, fontSize: 16, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4, marginTop: 2 }}>
         {value}
       </Text>
     </View>
@@ -326,10 +327,10 @@ function FlowCell({ label, value, color, sub }: { label: string; value: string; 
 }
 
 const s = StyleSheet.create({
-  card:         { borderRadius: 18, borderWidth: 1, padding: 14, overflow: 'hidden' },
+  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 14, overflow: 'hidden' },
   sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   // 158pt тримає в один рядок і «Основний UAH», і суму на шість знаків.
-  accountCard:  { width: 158, borderRadius: 16, borderWidth: 1, padding: 12, overflow: 'hidden' },
+  accountCard:  { width: 158, borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, overflow: 'hidden' },
   accountAdd:   { borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   accountIcon:  { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
 });

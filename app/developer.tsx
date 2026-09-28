@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -175,10 +176,10 @@ export default function DeveloperScreen() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:      { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  pageTitle:      { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
   sectionLabel:   { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 4, marginLeft: 4 },
   devCard: {
-    borderRadius: 20,
+    borderRadius: Atlas.radius.xlarge,
     borderWidth: 1,
     padding: 24,
     alignItems: 'center',
@@ -202,8 +203,8 @@ const st = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
-  avatarText:     { fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
-  devName:        { fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: 4 },
+  avatarText:     { fontSize: 26, fontWeight: Atlas.type.headingWeight, color: '#fff', letterSpacing: -0.5 },
+  devName:        { fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4, marginBottom: 4 },
   devRole:        { fontSize: 14, fontWeight: '500', marginBottom: 16 },
   githubBtn: {
     flexDirection: 'row',
@@ -211,12 +212,12 @@ const st = StyleSheet.create({
     gap: 7,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: Atlas.radius.medium,
     borderWidth: 1,
   },
   githubBtnText:  { fontSize: 13, fontWeight: '600' },
   socialsCard: {
-    borderRadius: 18,
+    borderRadius: Atlas.radius.xlarge,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -226,7 +227,7 @@ const st = StyleSheet.create({
     elevation: 3,
   },
   socialRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 13 },
-  socialIconWrap: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  socialIconWrap: { width: 42, height: 42, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   socialLabel:    { fontSize: 15, fontWeight: '600' },
   socialHandle:   { fontSize: 12, fontWeight: '400', marginTop: 1 },
 });

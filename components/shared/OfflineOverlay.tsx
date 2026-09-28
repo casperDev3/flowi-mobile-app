@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -184,13 +185,13 @@ export function OfflineOverlay({
 
 const s = StyleSheet.create({
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  card:       { width: '100%', maxWidth: 340, borderRadius: 22, borderWidth: 1, padding: 24, alignItems: 'center' },
-  iconBox:    { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  title:      { fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  card:       { width: '100%', maxWidth: 340, borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 24, alignItems: 'center' },
+  iconBox:    { width: 56, height: 56, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  title:      { fontSize: 17, fontWeight: Atlas.type.headingWeight, textAlign: 'center', marginBottom: 8 },
   desc:       { fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 18 },
-  btn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14 },
+  btn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 12, borderRadius: Atlas.radius.large },
   btnOutline: { backgroundColor: 'transparent', borderWidth: 1 },
-  btnLabel:   { color: '#fff', fontWeight: '800', fontSize: 14, marginLeft: 6 },
+  btnLabel:   { color: '#fff', fontWeight: Atlas.type.headingWeight, fontSize: 14, marginLeft: 6 },
   banner:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1 },
   bannerText: { fontSize: 12, fontWeight: '700' },
 });

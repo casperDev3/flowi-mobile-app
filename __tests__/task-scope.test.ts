@@ -70,3 +70,14 @@ describe('applyTaskScope + лічильники перемикача', () => {
     expect(ids(listed)).toEqual(['in3', 'in7', 'overdue', 'today']);
   });
 });
+
+
+describe('scope uses the supplied clock', () => {
+  afterEach(() => jest.useRealTimers());
+
+  test('a future deadline stays out of today even when the device clock is later', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2027, 0, 1));
+    expect(inTaskScope(task({ id: 'future', deadline: day(3) }), COLUMNS, 'today', {}, NOW)).toBe(false);
+    expect(inTaskScope(task({ id: 'past', deadline: day(-1) }), COLUMNS, 'today', {}, NOW)).toBe(true);
+  });
+});

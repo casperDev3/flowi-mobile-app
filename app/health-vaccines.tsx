@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -167,11 +168,11 @@ const VaccineCard = React.memo(function VaccineCard({ item, onRemove, isDark, c,
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name="syringe" size={17} color={ACCENT_CAL} />
         </View>
         <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{item.name}{item.doseNo ? ` · №${item.doseNo}` : ''}</Text>
+          <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{item.name}{item.doseNo ? ` · №${item.doseNo}` : ''}</Text>
           <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{fmtD(item.date)}</Text>
         </View>
         <TouchableOpacity onPress={() => onRemove(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }}>
@@ -190,15 +191,15 @@ const VaccineCard = React.memo(function VaccineCard({ item, onRemove, isDark, c,
 
 const s = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
-  title:     { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
-  addBtn:    { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  card:      { borderRadius: 16, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 10 },
+  title:     { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
+  addBtn:    { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  card:      { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 10 },
   next:      { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 },
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти — числом із useSheetSurface(); відсоток тут не працював
   // (батько має height:auto), і кнопка «Зберегти» лишалась за краєм вікна.
   sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  sheetTitle:{ fontSize: 20, fontWeight: '800', marginBottom: 6 },
-  btn:       { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  sheetTitle:{ fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 6 },
+  btn:       { paddingVertical: 14, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
 });

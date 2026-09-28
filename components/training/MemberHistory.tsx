@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/training/MemberHistory.tsx — історія виконання учасника для
  * тренера (training-module.md §0.5, §10.1): сесії, вправи, підходи, вага,
@@ -42,13 +43,13 @@ function LogCard({ c, localId, log, onSaveNote, canNote }: {
     <Card c={c} style={{ marginBottom: 10 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{log.title || formatSessionDate(tr, log.date)}</Text>
+          <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{log.title || formatSessionDate(tr, log.date)}</Text>
           <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
             {[formatSessionDate(tr, log.date), log.durationMin ? fmt(tr.tgMinutesShort, { n: log.durationMin }) : null,
               log.totalVolumeG ? fmt(tr.tgVolume, { kg: formatKg(log.totalVolumeG) }) : null].filter(Boolean).join(' · ')}
           </Text>
         </View>
-        <Text style={{ color: statusColor(log.status, c), fontWeight: '800' }}>{statusLabel(tr, log.status)}</Text>
+        <Text style={{ color: statusColor(log.status, c), fontWeight: Atlas.type.headingWeight }}>{statusLabel(tr, log.status)}</Text>
       </View>
       {(log.exercises ?? []).map(ex => (
         <View key={ex.exerciseId + ex.name} style={{ marginTop: 8 }}>
@@ -71,7 +72,7 @@ function LogCard({ c, localId, log, onSaveNote, canNote }: {
             accessibilityLabel={tr.tgCoachNote}
             multiline
             maxLength={2000}
-            style={{ minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.input, color: c.text, padding: 10, fontSize: 14 }}
+            style={{ minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.input, color: c.text, padding: 10, fontSize: 14 }}
           />
           {changed ? (
             <PrimaryButton
@@ -141,11 +142,11 @@ export function MemberHistory({ c, groupId, userId, stream, canNote }: {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Avatar name={member.user.name || member.user.email} size={44} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: c.text, fontSize: 18, fontWeight: '800' }}>{member.user.name || member.user.email}</Text>
+              <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight }}>{member.user.name || member.user.email}</Text>
               <Text style={{ color: c.sub, fontSize: 13 }}>{member.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ color: TG_XP, fontSize: 16, fontWeight: '800' }}>{`${member.xp_total || xpTotal} XP`}</Text>
+              <Text style={{ color: TG_XP, fontSize: 16, fontWeight: Atlas.type.headingWeight }}>{`${member.xp_total || xpTotal} XP`}</Text>
               <Text style={{ color: c.sub, fontSize: 13 }}>{`🔥 ${fmt(tr.tgStreakDays, { n: member.streak_days })}`}</Text>
             </View>
           </View>

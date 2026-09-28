@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/budget.tsx — місячні ліміти витрат по категоріях.
  *
@@ -680,7 +681,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
-              backgroundColor: c.red + '15', borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: c.red + '40' }}>
+              backgroundColor: c.red + '15', borderRadius: Atlas.radius.medium, marginBottom: 12, borderWidth: 1, borderColor: c.red + '40' }}>
             <IconSymbol name="exclamationmark.triangle.fill" size={15} color={c.red} />
             <Text style={{ flex: 1, fontSize: 12, color: c.text, lineHeight: 17 }}>{tr.budgetSaveFailed}</Text>
           </View>
@@ -689,7 +690,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         {/* Info: other-currency transactions excluded */}
         {otherCurrencyCount > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
-            backgroundColor: ACCENT + '15', borderRadius: 12, marginBottom: 12,
+            backgroundColor: ACCENT + '15', borderRadius: Atlas.radius.medium, marginBottom: 12,
             borderWidth: 1, borderColor: ACCENT + '30' }}>
             <IconSymbol name="info.circle" size={15} color={c.accentText} />
             <Text style={{ flex: 1, fontSize: 12, color: c.sub, lineHeight: 17 }}>
@@ -717,13 +718,13 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
               <View>
                 <Text style={{ fontSize: 12, color: c.sub, fontWeight: '600' }}>{tr.budgetSpentCaps}</Text>
-                <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, marginTop: 2, letterSpacing: -0.5 }}>
+                <Text style={{ fontSize: 22, fontWeight: Atlas.type.headingWeight, color: c.text, marginTop: 2, letterSpacing: -0.5 }}>
                   {fmt(totals.totalSpent)}
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={{ fontSize: 12, color: c.sub, fontWeight: '600' }}>{tr.budgetBudgetCaps}</Text>
-                <Text style={{ fontSize: 22, fontWeight: '800', color: c.accentText, marginTop: 2, letterSpacing: -0.5 }}>
+                <Text style={{ fontSize: 22, fontWeight: Atlas.type.headingWeight, color: c.accentText, marginTop: 2, letterSpacing: -0.5 }}>
                   {fmt(totals.totalBudget)}
                 </Text>
               </View>
@@ -1067,22 +1068,22 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  summaryCard:  { borderRadius: 18, borderWidth: 1, overflow: 'hidden', padding: 16, marginBottom: 16 },
-  card:         { borderRadius: 18, borderWidth: 1, overflow: 'hidden', marginBottom: 16 },
+  summaryCard:  { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', padding: 16, marginBottom: 16 },
+  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', marginBottom: 16 },
   categoryRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   catIconBox:   { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   progressTrack:{ height: 5, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
-  scopeChip:    { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  inlineAdd:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: 14, borderWidth: 1, marginBottom: 12 },
-  emptyIcon:    { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  addBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16 },
+  scopeChip:    { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Atlas.radius.xlarge, borderWidth: 1 },
+  inlineAdd:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: Atlas.radius.large, borderWidth: 1, marginBottom: 12 },
+  emptyIcon:    { width: 80, height: 80, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
+  addBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: Atlas.radius.large },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { width: '100%', flexShrink: 1 },
-  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, padding: 24, paddingBottom: 36 },
-  input:        { borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, marginBottom: 8 },
-  spentRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16 },
-  preset:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
-  btn:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 24 },
-  iconOption:   { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1.5, padding: 6 },
+  sheet:        { borderTopLeftRadius: Atlas.radius.xlarge, borderTopRightRadius: Atlas.radius.xlarge, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, padding: 24, paddingBottom: 36 },
+  input:        { borderRadius: Atlas.radius.large, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, marginBottom: 8 },
+  spentRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16 },
+  preset:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Atlas.radius.xlarge, borderWidth: 1 },
+  btn:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: Atlas.radius.large, paddingVertical: 14, paddingHorizontal: 24 },
+  iconOption:   { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1.5, padding: 6 },
 });

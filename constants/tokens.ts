@@ -1,13 +1,14 @@
+import { Atlas } from './atlas';
 // ─── Дизайн-токени Flowi ─────────────────────────────────────────────────────
 // Фундамент B8: radius / spacing / палітра-фабрика (B5-контрастний sub ≥0.62/0.58)
 
 /** Радіуси заокруглення (в пікселях) */
 export const Radius = {
-  sm:  8,
-  md:  12,
-  lg:  16,
-  xl:  20,
-  xxl: 24,
+  sm:  Atlas.radius.small,
+  md:  Atlas.radius.medium,
+  lg:  Atlas.radius.large,
+  xl:  Atlas.radius.xlarge,
+  xxl: Atlas.radius.xxlarge,
 } as const;
 
 /** Відступи (в пікселях) */

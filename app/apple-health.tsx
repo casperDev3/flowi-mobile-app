@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -385,7 +386,7 @@ export default function AppleHealthScreen() {
             {/* ERR-14: збій читання показуємо явно — інакше нулі нижче
                 неможливо відрізнити від справжніх «сьогодні 0 кроків». */}
             {readFailed && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#EF444444', backgroundColor: '#EF444412', padding: 14, marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: '#EF444444', backgroundColor: '#EF444412', padding: 14, marginBottom: 12 }}>
                 <IconSymbol name="exclamationmark.triangle.fill" size={16} color="#EF4444" />
                 <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '700', flex: 1 }}>
                   {tr.hautoReadFailedBody.replace('{source}', sourceLabel)}
@@ -394,7 +395,7 @@ export default function AppleHealthScreen() {
             )}
 
             {/* WIP banner */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#F59E0B44', backgroundColor: '#F59E0B12', padding: 14, marginBottom: 18 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: '#F59E0B44', backgroundColor: '#F59E0B12', padding: 14, marginBottom: 18 }}>
               <IconSymbol name="hammer.fill" size={16} color="#F59E0B" />
               <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '700', flex: 1 }}>
                 {tr.hautoWip}
@@ -520,14 +521,14 @@ const MetricCard = React.memo(function MetricCard({ label, value, unit, note, ic
 }) {
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ width, borderRadius: 16, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14 }}>
+      style={{ width, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
         <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name={icon} size={14} color={color} />
         </View>
         <Text style={{ color: sub, fontSize: 11, fontWeight: '600', marginLeft: 8 }}>{label}</Text>
       </View>
-      <Text style={{ color: text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }} numberOfLines={1}>
+      <Text style={{ color: text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }} numberOfLines={1}>
         {value}{unit ? <Text style={{ fontSize: 13, fontWeight: '600', color: sub }}> {unit}</Text> : null}
       </Text>
       {note ? <Text style={{ color: sub, fontSize: 10, marginTop: 3 }} numberOfLines={1}>{note}</Text> : null}
@@ -580,7 +581,7 @@ function HRStatBox({ label, value, unit, color, c }: { label: string; value: num
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
       <Text style={{ color: c.sub, fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{label}</Text>
-      <Text style={{ color, fontSize: 18, fontWeight: '800', letterSpacing: -0.5 }}>{value ?? '—'}</Text>
+      <Text style={{ color, fontSize: 18, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{value ?? '—'}</Text>
       {value != null && <Text style={{ color: c.sub, fontSize: 9, marginTop: 2 }}>{unit}</Text>}
     </View>
   );
@@ -593,7 +594,7 @@ function NotAvailable({ c, tr, androidMissing }: { c: any; tr: Translations; and
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
       <IconSymbol name="heart.slash.fill" size={52} color={c.sub} />
-      <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>
+      <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginTop: 16, textAlign: 'center' }}>
         {tr.hautoNotAvailable}
       </Text>
       <Text style={{ color: c.sub, fontSize: 14, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
@@ -602,8 +603,8 @@ function NotAvailable({ c, tr, androidMissing }: { c: any; tr: Translations; and
       {androidMissing && (
         <TouchableOpacity onPress={() => { void openHealthConnectInstall(); }}
           accessibilityRole="button" accessibilityLabel={tr.hautoInstallHc}
-          style={{ marginTop: 24, backgroundColor: '#10B981', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 14 }}>
-          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{tr.hautoInstallHc}</Text>
+          style={{ marginTop: 24, backgroundColor: '#10B981', borderRadius: Atlas.radius.large, paddingHorizontal: 24, paddingVertical: 14 }}>
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{tr.hautoInstallHc}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -613,29 +614,29 @@ function NotAvailable({ c, tr, androidMissing }: { c: any; tr: Translations; and
 function NotAuthorized({ c, tr, label, onRequest }: { c: any; tr: Translations; label: string; onRequest: () => void }) {
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-      <View style={{ width: 80, height: 80, borderRadius: 22, backgroundColor: '#EF444420', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+      <View style={{ width: 80, height: 80, borderRadius: Atlas.radius.xlarge, backgroundColor: '#EF444420', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
         <IconSymbol name="heart.fill" size={38} color="#EF4444" />
       </View>
-      <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', textAlign: 'center' }}>
+      <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, textAlign: 'center' }}>
         {tr.hautoConnectTitle.replace('{source}', label)}
       </Text>
       <Text style={{ color: c.sub, fontSize: 14, marginTop: 10, textAlign: 'center', lineHeight: 22 }}>
         {tr.hautoConnectBody}
       </Text>
       <TouchableOpacity onPress={onRequest} accessibilityRole="button" accessibilityLabel={tr.hkGrant}
-        style={{ marginTop: 28, backgroundColor: '#EF4444', borderRadius: 14, paddingHorizontal: 32, paddingVertical: 14 }}>
-        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{tr.hkGrant}</Text>
+        style={{ marginTop: 28, backgroundColor: '#EF4444', borderRadius: Atlas.radius.large, paddingHorizontal: 32, paddingVertical: 14 }}>
+        <Text style={{ color: '#fff', fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{tr.hkGrant}</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  pageTitle:   { fontSize: 26, fontWeight: '800', letterSpacing: -0.6 },
-  sectionTitle:{ fontSize: 17, fontWeight: '800' },
-  card:        { borderRadius: 18, borderWidth: 1, padding: 16, overflow: 'hidden' },
+  pageTitle:   { fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
+  sectionTitle:{ fontSize: 17, fontWeight: Atlas.type.headingWeight },
+  card:        { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
   syncBtn:     { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  hkvRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, padding: 12 },
-  workoutCard: { borderRadius: 14, borderWidth: 1, padding: 14, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  hkvRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 12 },
+  workoutCard: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
   workoutIcon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
 });

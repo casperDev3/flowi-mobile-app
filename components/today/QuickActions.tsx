@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -62,7 +63,7 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
 const s = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   btn: {
-    borderRadius: 14,
+    borderRadius: Atlas.radius.large,
     borderWidth: 1,
     paddingVertical: 10,
     alignItems: 'center',
@@ -71,7 +72,7 @@ const s = StyleSheet.create({
   iconWrap: {
     width: 32,
     height: 32,
-    borderRadius: 10,
+    borderRadius: Atlas.radius.medium,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 5,

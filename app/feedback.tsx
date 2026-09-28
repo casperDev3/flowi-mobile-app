@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/feedback.tsx — «Ідеї та баги»: ОДИН екран замість ideas.tsx + bugs.tsx
  * (flowi-server-app/docs/specs/feedback-inbox.md §10).
@@ -532,7 +533,7 @@ export default function FeedbackScreen() {
                 { label: tr.fbStatSent, value: counts.sent, color: '#F59E0B' },
               ]).map(stat => (
                 <View key={stat.label} style={[st.statCard, { backgroundColor: stat.color + '18', borderColor: stat.color + '30' }]}>
-                  <Text style={{ color: stat.color, fontSize: 20, fontWeight: '800' }}>{stat.value}</Text>
+                  <Text style={{ color: stat.color, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{stat.value}</Text>
                   <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: stat.color, fontSize: 11, fontWeight: '600', marginTop: 2 }}>{stat.label}</Text>
                 </View>
               ))}
@@ -677,16 +678,16 @@ function Separator() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:  { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
+  pageTitle:  { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
   segment:    { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, marginTop: 6 },
-  segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, minHeight: 40 },
+  segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: Atlas.radius.medium, minHeight: 40 },
   stats:      { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 12 },
-  statCard:   { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
+  statCard:   { flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
   filterRow:  { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, overflow: 'hidden' },
-  filterBtn:  { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
+  filterBtn:  { flex: 1, paddingVertical: 8, borderRadius: Atlas.radius.medium, alignItems: 'center' },
   sortRow:    { flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 12 },
-  sortChip:   { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
-  banner:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 12 },
+  sortChip:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
+  banner:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 10, marginBottom: 12 },
   empty:      { alignItems: 'center', paddingTop: 60, gap: 10 },
   retryBtn:   { borderWidth: 1, borderRadius: 11, paddingHorizontal: 16, paddingVertical: 10, minHeight: 44, justifyContent: 'center' },
 });

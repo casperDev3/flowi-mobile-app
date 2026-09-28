@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -154,10 +155,10 @@ export default function DonateScreen() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:    { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  pageTitle:    { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
   sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 4, marginLeft: 4 },
   hero: {
-    borderRadius: 20,
+    borderRadius: Atlas.radius.xlarge,
     borderWidth: 1,
     padding: 22,
     alignItems: 'center',
@@ -171,15 +172,15 @@ const st = StyleSheet.create({
   heroIconWrap: {
     width: 60,
     height: 60,
-    borderRadius: 18,
+    borderRadius: Atlas.radius.xlarge,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
   },
-  heroTitle:    { fontSize: 20, fontWeight: '800', letterSpacing: -0.4, marginBottom: 8, textAlign: 'center' },
+  heroTitle:    { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4, marginBottom: 8, textAlign: 'center' },
   heroSub:      { fontSize: 14, lineHeight: 20, textAlign: 'center', fontWeight: '400' },
   card: {
-    borderRadius: 18,
+    borderRadius: Atlas.radius.xlarge,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -189,9 +190,9 @@ const st = StyleSheet.create({
     elevation: 4,
   },
   cardContent:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, gap: 14 },
-  iconWrap:     { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  cardTitle:    { fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  iconWrap:     { width: 48, height: 48, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
+  cardTitle:    { fontSize: 17, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 },
   cardSub:      { fontSize: 12, marginTop: 3, fontWeight: '400' },
-  actionBtn:    { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  actionBtn:    { width: 36, height: 36, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   thankYou:     { textAlign: 'center', fontSize: 13, marginTop: 28, fontWeight: '500' },
 });

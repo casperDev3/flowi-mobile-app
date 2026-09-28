@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * Матриця «категорія × канал» з розгортанням до окремих подій
  * (notifications-module.md §4.4, §6.3).
@@ -182,15 +183,15 @@ const CELL = 56;
 const st = StyleSheet.create({
   headRow:    { flexDirection: 'row', alignItems: 'flex-end', paddingLeft: 12, marginBottom: 6 },
   headCell:   { width: CELL, textAlign: 'center', fontSize: 11, fontWeight: '700' },
-  card:       { borderRadius: 16, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  card:       { borderRadius: Atlas.radius.large, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
   row:        { flexDirection: 'row', alignItems: 'center', paddingLeft: 12, paddingVertical: 6 },
   labelCol:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0, paddingRight: 4 },
-  iconBox:    { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  iconBox:    { width: 28, height: 28, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
   catLabel:   { flex: 1, fontSize: 14, fontWeight: '700' },
   expandBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, minHeight: 44 },
   eventRow:   { flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingVertical: 4, borderTopWidth: StyleSheet.hairlineWidth },
   evLabel:    { fontSize: 13.5, fontWeight: '600' },
   resetBtn:   { minHeight: 36, justifyContent: 'center' },
   toggleTarget: { width: CELL, height: 44, alignItems: 'center', justifyContent: 'center' },
-  toggleBox:  { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  toggleBox:  { width: 26, height: 26, borderRadius: Atlas.radius.small, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
 });

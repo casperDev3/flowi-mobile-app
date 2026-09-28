@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/training/[groupId]/index.tsx — огляд групи (training-module.md §10.1):
  * сьогоднішня сесія великою карткою, тиждень стрічкою, стрік і XP, топ-3
@@ -120,7 +121,7 @@ export default function TrainingGroupHome() {
           accessibilityRole="button"
           accessibilityLabel={t.label}
           style={{
-            flexGrow: 1, flexBasis: '45%', minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: c.border,
+            flexGrow: 1, flexBasis: '45%', minHeight: 52, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border,
             backgroundColor: c.card, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14,
           }}>
           <IconSymbol name={t.icon} size={18} color={TG_ACCENT} />

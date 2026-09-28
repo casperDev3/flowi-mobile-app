@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/SyncDiagnosticsPanel.tsx
  *
@@ -307,7 +308,7 @@ function ago(at: number, now: number): string {
 }
 
 const st = StyleSheet.create({
-  wrap:         { borderRadius: 16, borderWidth: 1, marginBottom: 16, overflow: 'hidden' },
+  wrap:         { borderRadius: Atlas.radius.large, borderWidth: 1, marginBottom: 16, overflow: 'hidden' },
   head:         { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 14, paddingVertical: 12 },
   headTitle:    { fontSize: 13, fontWeight: '700' },
   headHint:     { fontSize: 11, marginTop: 2, lineHeight: 15 },

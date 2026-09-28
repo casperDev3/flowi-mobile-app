@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/TimerCell.tsx
  *
@@ -192,7 +193,7 @@ export function TimerCell({
 
 const st = StyleSheet.create({
   card: {
-    borderRadius: 20,
+    borderRadius: Atlas.radius.xlarge,
     borderWidth: 1,
     overflow: 'hidden',
     paddingHorizontal: 14,

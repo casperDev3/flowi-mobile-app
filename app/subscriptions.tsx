@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/subscriptions.tsx — Підписки (регулярні платежі).
  *
@@ -737,7 +738,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
             {totals.length > 0 ? (
               <View style={[st.totalsCard, { borderColor: c.border, backgroundColor: c.dim }]}>
                 <Text style={[st.sectionLabel, { color: c.sub }]}>{tr.subTotals}</Text>
-                <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }}>
+                <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4 }}>
                   {formatTotalsLine(totals, 'monthly', tr.subPerMonth, currencies, locale)}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 4 }}>
@@ -897,7 +898,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                 <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>
                   {tr.payTitle}
                 </Text>
-                <Text numberOfLines={2} style={{ color: c.text, fontSize: 19, fontWeight: '800', marginTop: 4 }}>
+                <Text numberOfLines={2} style={{ color: c.text, fontSize: 19, fontWeight: Atlas.type.headingWeight, marginTop: 4 }}>
                   {paySub.name}
                 </Text>
 
@@ -973,15 +974,15 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
 }
 
 const st = StyleSheet.create({
-  totalsCard:    { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 14 },
+  totalsCard:    { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, marginBottom: 14 },
   sectionLabel:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 },
-  filterChip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  emptyIcon:     { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  sheet:         { borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 28 },
+  filterChip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  emptyIcon:     { width: 80, height: 80, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
+  sheet:         { borderTopLeftRadius: Atlas.radius.xxlarge, borderTopRightRadius: Atlas.radius.xxlarge, borderWidth: 1, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 28 },
   handleRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   handle:        { width: 38, height: 4, borderRadius: 2 },
-  payInput:      { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 17, fontWeight: '700', marginTop: 6 },
-  payBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 14, paddingVertical: 13 },
-  addBtn:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 16 },
+  payInput:      { borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 11, fontSize: 17, fontWeight: '700', marginTop: 6 },
+  payBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.large, paddingVertical: 13 },
+  addBtn:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 13, borderRadius: Atlas.radius.large },
   archiveToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 14, marginTop: 8 },
 });

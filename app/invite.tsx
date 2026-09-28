@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/invite.tsx — обробка запрошення в проєкт (WORKSPACE_PROJECTS_PLAN.md §4,
  * контракт §4.3).
@@ -279,11 +280,11 @@ export default function InviteScreen() {
             <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <View style={[st.colorDot, { backgroundColor: preview.project.color || c.accent }]} />
-                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 18, fontWeight: '800' }}>{preview.project.name}</Text>
+                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight }}>{preview.project.name}</Text>
               </View>
-              <Text style={{ color: c.sub, fontSize: 13, marginBottom: 4 }}>
+              {preview.invited_by ? <Text style={{ color: c.sub, fontSize: 13, marginBottom: 4 }}>
                 {tr.inviteInvitedByLabel}: {preview.invited_by.name}
-              </Text>
+              </Text> : null}
               <Text style={{ color: c.sub, fontSize: 13, marginBottom: 4 }}>
                 {preview.role === 'member' ? tr.roleMember : tr.roleViewer}
               </Text>
@@ -312,7 +313,7 @@ export default function InviteScreen() {
           {stage === 'joined' && (
             <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, alignItems: 'center' }]}>
               <IconSymbol name="checkmark.circle.fill" size={40} color={c.accent} />
-              <Text style={{ color: c.text, fontSize: 17, fontWeight: '800', marginTop: 12, marginBottom: 16 }}>{tr.inviteJoinedTitle}</Text>
+              <Text style={{ color: c.text, fontSize: 17, fontWeight: Atlas.type.headingWeight, marginTop: 12, marginBottom: 16 }}>{tr.inviteJoinedTitle}</Text>
               <TouchableOpacity onPress={openProject} style={[st.primaryBtn, { backgroundColor: c.accent, alignSelf: 'stretch' }]}>
                 <Text style={st.primaryBtnText}>{tr.inviteJoinedOpenProject}</Text>
               </TouchableOpacity>
@@ -340,10 +341,10 @@ export default function InviteScreen() {
 const st = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 60 },
   title: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, marginBottom: 20 },
-  card: { borderRadius: 18, borderWidth: 1, overflow: 'hidden', padding: 18 },
+  card: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', padding: 18 },
   colorDot: { width: 14, height: 14, borderRadius: 7 },
-  primaryBtn: { borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
+  primaryBtn: { borderRadius: Atlas.radius.large, paddingVertical: 15, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   linkBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 6 },
-  hintRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
+  hintRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12, borderRadius: Atlas.radius.medium, borderWidth: 1 },
 });

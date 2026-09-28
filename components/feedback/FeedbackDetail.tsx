@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/feedback/FeedbackDetail.tsx — деталь звернення: повний текст,
  * кроки / очікувалось / сталось окремими блоками, стан і коментар власника
@@ -122,7 +123,7 @@ export function FeedbackDetailBody({
 
       {/* Стан і зворотний зв'язок */}
       <View style={[st.stateBox, { borderColor: stateColor + '50', backgroundColor: stateColor + '12' }]} accessibilityLiveRegion="polite">
-        <Text style={{ color: stateColor, fontSize: 14, fontWeight: '800' }}>{stateLabel(tr, state.key)}</Text>
+        <Text style={{ color: stateColor, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>{stateLabel(tr, state.key)}</Text>
         {state.key === 'failed' && state.comment ? (
           <Text style={{ color: c.text, fontSize: 13, marginTop: 4 }}>{tr.fbSendError.replace('{reason}', state.comment)}</Text>
         ) : null}
@@ -209,16 +210,16 @@ export function FeedbackDetailBody({
 
 const st = StyleSheet.create({
   header:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 8 },
-  kindChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  iconBtn:     { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  title:       { fontSize: 20, fontWeight: '800', lineHeight: 26 },
+  kindChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 4 },
+  iconBtn:     { width: 44, height: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  title:       { fontSize: 20, fontWeight: Atlas.type.headingWeight, lineHeight: 26 },
   chips:       { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 8 },
-  chip:        { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  stateBox:    { borderWidth: 1, borderRadius: 14, padding: 12, marginTop: 14 },
+  chip:        { borderWidth: 1, borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 3 },
+  stateBox:    { borderWidth: 1, borderRadius: Atlas.radius.large, padding: 12, marginTop: 14 },
   primary:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 11, paddingVertical: 11, marginTop: 10, minHeight: 44 },
   primaryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  attRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 6 },
+  attRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 10, marginBottom: 6 },
   ctxRow:      { flexDirection: 'row', gap: 8, paddingVertical: 5, borderBottomWidth: StyleSheet.hairlineWidth },
   actions:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20 },
   action:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, minHeight: 44 },

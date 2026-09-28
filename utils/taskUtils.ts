@@ -296,11 +296,11 @@ export function assigneeDisplayName(
  * інтерфейси завдання (з recurrence, recordings тощо), і номінально
  * несумісний тип змушував би або кастити, або тримати локальну копію правила.
  */
-export function isOverdue(task: Pick<Task, 'deadline' | 'status'>): boolean {
+export function isOverdue(task: Pick<Task, 'deadline' | 'status'>, now: Date = new Date()): boolean {
   if (!task.deadline || task.status === 'done') return false;
   const d = new Date(task.deadline);
   d.setHours(23, 59, 59, 999);
-  return d < new Date();
+  return d < now;
 }
 
 export function deadlineDiff(iso: string): number {

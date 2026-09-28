@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/health-profile.tsx — налаштування розділу «Здоровʼя».
  *
@@ -223,7 +224,7 @@ export default function HealthProfileScreen() {
 
             <TouchableOpacity onPress={save} disabled={!initialized}
               style={[s.saveBtn, { backgroundColor: ACCENT, opacity: initialized ? 1 : 0.5 }]}>
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{tr.saveProfile}</Text>
+              <Text style={{ color: '#fff', fontWeight: Atlas.type.headingWeight, fontSize: 15 }}>{tr.saveProfile}</Text>
             </TouchableOpacity>
 
             {/*
@@ -299,13 +300,13 @@ function clampInt(text: string, max: number, fallback: number): number {
 }
 
 const s = StyleSheet.create({
-  pageTitle: { fontSize: 28, fontWeight: '800', letterSpacing: -0.6 },
-  sectionTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3, marginTop: 6 },
-  sourceRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 12 },
+  pageTitle: { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
+  sectionTitle: { fontSize: 17, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3, marginTop: 6 },
+  sourceRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 12 },
   label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 18 },
-  input:     { fontSize: 18, fontWeight: '700', borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
-  segBtn:    { flex: 1, borderRadius: 14, borderWidth: 1.5, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
-  rowBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 13 },
-  preview:   { borderRadius: 18, borderWidth: 1, padding: 16, overflow: 'hidden', marginTop: 24 },
-  saveBtn:   { borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
+  input:     { fontSize: 18, fontWeight: '700', borderRadius: Atlas.radius.large, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
+  segBtn:    { flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1.5, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  rowBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 13 },
+  preview:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden', marginTop: 24 },
+  saveBtn:   { borderRadius: Atlas.radius.large, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
 });

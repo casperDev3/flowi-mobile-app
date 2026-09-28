@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -508,7 +509,7 @@ const st = StyleSheet.create({
     marginLeft: 4,
   },
   card: {
-    borderRadius: 18,
+    borderRadius: Atlas.radius.xlarge,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -541,7 +542,7 @@ const st = StyleSheet.create({
     paddingHorizontal: 4,
   },
   btn: {
-    borderRadius: 14,
+    borderRadius: Atlas.radius.large,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 12,

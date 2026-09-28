@@ -96,7 +96,9 @@
         {
           "microphonePermission": "Flowi записує звук зустрічі, лише коли ви натискаєте «Запис», щоб зберегти аудіо до цієї зустрічі."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

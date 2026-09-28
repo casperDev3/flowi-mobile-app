@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/training/LeaderboardList.tsx — рядки лідерборда (§6.4).
  * Порядок і ранги — з сервера (детерміноване сортування там), клієнт лише
@@ -22,10 +23,10 @@ export function LeaderboardRowView({ c, row }: { c: TrainingColors; row: Leaderb
       accessible
       accessibilityLabel={`${row.rank}. ${row.is_me ? tr.tgYou : name}: ${row.xp} XP`}
       style={{
-        flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingHorizontal: 10, borderRadius: 12,
+        flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingHorizontal: 10, borderRadius: Atlas.radius.medium,
         backgroundColor: row.is_me ? TG_ACCENT + '14' : 'transparent',
       }}>
-      <Text style={{ width: 28, textAlign: 'center', color: c.sub, fontWeight: '800', fontSize: row.rank <= 3 ? 18 : 14 }}>
+      <Text style={{ width: 28, textAlign: 'center', color: c.sub, fontWeight: Atlas.type.headingWeight, fontSize: row.rank <= 3 ? 18 : 14 }}>
         {row.rank <= 3 ? MEDALS[row.rank - 1] : row.rank}
       </Text>
       <Avatar name={name} color={row.is_me ? TG_ACCENT : '#8B5CF6'} size={32} />
@@ -37,7 +38,7 @@ export function LeaderboardRowView({ c, row }: { c: TrainingColors; row: Leaderb
           {`${fmt(tr.tgSessionsShort, { n: row.sessions })} · 🔥${row.streak_days}`}
         </Text>
       </View>
-      <Text style={{ color: TG_XP, fontSize: 15, fontWeight: '800' }}>{`${row.xp} XP`}</Text>
+      <Text style={{ color: TG_XP, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{`${row.xp} XP`}</Text>
     </View>
   );
 }

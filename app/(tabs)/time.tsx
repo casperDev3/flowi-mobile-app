@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/(tabs)/time.tsx — єдина сторінка про час.
  *
@@ -783,22 +784,22 @@ const EntryRow = React.memo(function EntryRow({
 });
 
 const s = StyleSheet.create({
-  activeRow: { borderRadius: 14, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  activeRow: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   rowDot: { width: 9, height: 9, borderRadius: 5 },
   rowSubLine: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
   rowSubDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1.2, marginRight: 6 },
   rowSubText: { flex: 1, fontSize: 11, opacity: 0.85 },
   rowSubMore: { fontSize: 10, fontWeight: '700', marginTop: 3, letterSpacing: 0.3 },
-  rowClock: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3, fontVariant: ['tabular-nums'], marginRight: 10 },
-  stopBtn: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(239,68,68,0.28)', backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' },
-  sectionTitle: { fontSize: 17, fontWeight: '800' },
+  rowClock: { fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3, fontVariant: ['tabular-nums'], marginRight: 10 },
+  stopBtn: { width: 32, height: 32, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: 'rgba(239,68,68,0.28)', backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: 17, fontWeight: Atlas.type.headingWeight },
   groupLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  entryCard: { borderRadius: 14, borderWidth: 1, paddingVertical: 11, paddingRight: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  entryCard: { borderRadius: Atlas.radius.large, borderWidth: 1, paddingVertical: 11, paddingRight: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
   entryBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginLeft: 11 },
   entryTask: { fontSize: 13, fontWeight: '600' },
   entryMeta: { fontSize: 11, marginTop: 2 },
-  entryDur: { fontSize: 13, fontWeight: '800' },
+  entryDur: { fontSize: 13, fontWeight: Atlas.type.headingWeight },
   trimBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6, marginTop: 7 },
   emptyAction: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 11 },
-  fab: { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  fab: { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
 });

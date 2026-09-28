@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/OverviewTab.tsx — вкладка «Огляд» (finance-revamp.md §6, §9.4):
  * попередження про мінус → Cash Flow факт → прогноз 30/90 → баланси рахунків.
@@ -88,7 +89,7 @@ export function OverviewTab(props: OverviewTabProps) {
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
         <IconSymbol name="exclamationmark.triangle.fill" size={16} color={c.red} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ color: c.text, fontSize: 14, fontWeight: '800' }}>
+          <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>
             {tr.finShortfallTitle
               .replace('{date}', date(warning.shortfall.day))
               .replace('{amount}', signed(warning.shortfall.balance))}
@@ -179,7 +180,7 @@ export function OverviewTab(props: OverviewTabProps) {
           .replace('{date}', date(forecast.points[forecast.points.length - 1]?.day ?? ''))
           .replace('{amount}', signed(forecast.closing))}
       />
-      <Text style={{ color: forecast.closing < 0 ? c.red : c.text, fontSize: 15, fontWeight: '800', marginTop: 10 }}>
+      <Text style={{ color: forecast.closing < 0 ? c.red : c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight, marginTop: 10 }}>
         {tr.finForecastOn
           .replace('{date}', date(forecast.points[forecast.points.length - 1]?.day ?? ''))
           .replace('{amount}', signed(forecast.closing))}
@@ -224,7 +225,7 @@ export function OverviewTab(props: OverviewTabProps) {
   const balancesCard = (
     <View style={[st.card, { borderColor: c.border, backgroundColor: c.card }]}>
       <Text style={[st.cardTitle, { color: c.sub }]}>{tr.finOnAccounts.replace('{currency}', currency)}</Text>
-      <Text style={{ color: c.text, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>{signed(total)}</Text>
+      <Text style={{ color: c.text, fontSize: 24, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{signed(total)}</Text>
       {accountsInCurrency.length === 0 ? (
         <Text style={{ color: c.sub, fontSize: 13, marginTop: 6 }}>{tr.finNoAccountsInCurrency.replace('{currency}', currency)}</Text>
       ) : accountsInCurrency.map(a => (
@@ -297,18 +298,18 @@ function Stat({ label, value, color, c }: { label: string; value: string; color:
   return (
     <View style={{ flex: 1, minWidth: 0 }}>
       <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{label}</Text>
-      <Text numberOfLines={1} style={{ color, fontSize: 15, fontWeight: '800', marginTop: 2 }}>{value}</Text>
+      <Text numberOfLines={1} style={{ color, fontSize: 15, fontWeight: Atlas.type.headingWeight, marginTop: 2 }}>{value}</Text>
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: 18, padding: 16, marginBottom: 12 },
+  card: { borderWidth: 1, borderRadius: Atlas.radius.xlarge, padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 10 },
   statsRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
-  segment: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, padding: 2 },
-  segmentBtn: { minHeight: 30, paddingHorizontal: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  smallBtn: { minHeight: 36, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  segment: { flexDirection: 'row', borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 2 },
+  segmentBtn: { minHeight: 30, paddingHorizontal: 10, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
+  smallBtn: { minHeight: 36, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   accountRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 6 },
   eventDay: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 8 },
 });

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useMemo, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -49,7 +50,7 @@ export function PlacePicker({
       <TouchableOpacity key={id ?? '__none__'} onPress={() => onChange(id)} disabled={disabled}
         accessibilityRole="radio" accessibilityState={{ checked: active, disabled }} accessibilityLabel={label}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingLeft: 10 + depth * 16, paddingRight: 10,
-          borderRadius: 10, backgroundColor: active ? accent + '22' : 'transparent', opacity: disabled ? 0.4 : 1 }}>
+          borderRadius: Atlas.radius.medium, backgroundColor: active ? accent + '22' : 'transparent', opacity: disabled ? 0.4 : 1 }}>
         <IconSymbol name={icon} size={14} color={active ? accent : c.sub} />
         <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: active ? '700' : '500' }}>{label}</Text>
         {active ? <IconSymbol name="checkmark" size={14} color={accent} /> : null}
@@ -58,7 +59,7 @@ export function PlacePicker({
   };
 
   return (
-    <View accessibilityRole="radiogroup" style={{ borderRadius: 12, backgroundColor: c.dim, padding: 4 }}>
+    <View accessibilityRole="radiogroup" style={{ borderRadius: Atlas.radius.medium, backgroundColor: c.dim, padding: 4 }}>
       {row(null, noneLabel, 0, 'xmark.circle')}
       {rows.map(({ place, depth }) => row(place.id, place.name, depth, placeKindIcon(place.kind),
         disabledFor !== undefined && !canPlaceUnder(disabledFor, place.id, places)))}
@@ -77,12 +78,12 @@ export function PlacePicker({
                 placeholderTextColor={c.sub} onSubmitEditing={create} returnKeyType="done" accessibilityLabel={tr.ctrPlaceName}
                 style={[sheetStyles.input, { flex: 1, backgroundColor: c.card, color: c.text }]} />
               <TouchableOpacity onPress={create} disabled={!draft.trim()} accessibilityRole="button" accessibilityLabel={tr.add}
-                style={{ width: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+                style={{ width: 48, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: draft.trim() ? accent : c.card }}>
                 <IconSymbol name="checkmark" size={16} color={draft.trim() ? '#fff' : c.sub} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { setDraft(null); setError(false); }} accessibilityRole="button" accessibilityLabel={tr.cancel}
-                style={{ width: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card }}>
+                style={{ width: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card }}>
                 <IconSymbol name="xmark" size={14} color={c.sub} />
               </TouchableOpacity>
             </View>

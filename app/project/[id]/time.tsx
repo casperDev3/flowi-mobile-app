@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/time.tsx — Час простору проєкту.
  *
@@ -188,7 +189,7 @@ export default function ProjectTimeScreen() {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                borderRadius: 12,
+                borderRadius: Atlas.radius.medium,
                 borderWidth: 1,
                 borderColor: flag ? flag + '88' : c.border,
                 backgroundColor: flag ? flag + '12' : 'transparent',

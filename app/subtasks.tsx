@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -274,10 +275,10 @@ export default function SubtasksScreen() {
 const st = StyleSheet.create({
   // Кегль заголовка тут менший за спільні 32: у шапці стоїть назва
   // завдання, і на телефоні довга назва інакше з'їдає весь рядок.
-  title:       { fontSize: 18, fontWeight: '800', letterSpacing: -0.4 },
+  title:       { fontSize: 18, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4 },
   progressBg:  { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
   progressFill:{ height: '100%', borderRadius: 2 },
-  subRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
+  subRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
   subCheck:    { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  addSubRow:   { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 13 },
+  addSubRow:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 13 },
 });

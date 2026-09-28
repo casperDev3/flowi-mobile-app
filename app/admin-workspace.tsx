@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/admin-workspace.tsx — «Адміністрування workspace» (контракт §2.7).
  *
@@ -390,7 +391,7 @@ function describeAdminError(e: unknown, tr: Translations): string {
 
 const st = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginLeft: 2, marginBottom: 8 },
-  card: { borderRadius: 20, borderWidth: 1, overflow: 'hidden', marginBottom: 4 },
+  card: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
   rowLabel: { fontSize: 14, fontWeight: '600' },
   rowSub: { fontSize: 12, marginTop: 2 },
@@ -401,7 +402,7 @@ const st = StyleSheet.create({
   // `requestBlock` (та вже дає горизонтальний відступ заявкам вище) —
   // без власного `paddingHorizontal` вміст торкався б країв картки.
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
-  reasonInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13 },
-  actionBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  reasonInput: { borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13 },
+  actionBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: Atlas.radius.medium },
   actionBtnText: { fontSize: 12, fontWeight: '700' },
 });

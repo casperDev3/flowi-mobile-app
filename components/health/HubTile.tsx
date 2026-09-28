@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -47,19 +48,19 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
       accessibilityLabel={[title, detail, badge != null && badge > 0 ? String(badge) : null].filter(Boolean).join(', ')}
     >
       <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-        style={{ borderRadius: 18, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14, minHeight: 112 }}>
+        style={{ borderRadius: Atlas.radius.xlarge, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14, minHeight: 112 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name={icon as any} size={19} color={color} />
           </View>
           <View style={{ flex: 1 }} />
           {badge != null && badge > 0 && (
             <View style={{ minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{badge}</Text>
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: Atlas.type.headingWeight }}>{badge}</Text>
             </View>
           )}
         </View>
-        <Text numberOfLines={2} style={{ color: text, fontSize: 15, fontWeight: '800', marginTop: 12 }}>{title}</Text>
+        <Text numberOfLines={2} style={{ color: text, fontSize: 15, fontWeight: Atlas.type.headingWeight, marginTop: 12 }}>{title}</Text>
         {stat ? <Text numberOfLines={2} style={{ color, fontSize: 13, fontWeight: '700', marginTop: 3 }}>{stat}</Text>
               : hint ? <Text numberOfLines={2} style={{ color: sub, fontSize: 11, fontWeight: '600', marginTop: 3 }}>{hint}</Text> : null}
       </BlurView>

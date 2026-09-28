@@ -74,7 +74,7 @@ export function QuestFormSheet({ c, visible, quest, members, onClose, onSave, on
         </>
       )}>
       {error ? <Notice c={c} text={error} tone="error" /> : null}
-      <Field c={c} label={tr.tgQuestTitle} value={draft.title} onChangeText={title => setDraft({ ...draft, title })} maxLength={200} />
+      <Field required error={error && !draft.title.trim() ? tr.tgQuestInvalid : undefined} c={c} label={tr.tgQuestTitle} value={draft.title} onChangeText={title => setDraft({ ...draft, title })} maxLength={200} />
       <Field c={c} label={tr.tgGroupDescription} value={draft.description ?? ''} onChangeText={description => setDraft({ ...draft, description })} multiline maxLength={1000} />
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         <Chip c={c} label={tr.tgQuestMeasurable} active={measurable} onPress={() => setDraft({ ...draft, type: 'measurable', metric: draft.metric ?? 'session_count' })} />
@@ -98,6 +98,8 @@ export function QuestFormSheet({ c, visible, quest, members, onClose, onSave, on
           {info?.health ? <Text style={{ color: c.sub, fontSize: 12, marginBottom: 10 }}>{tr.tgHealthMetricHint}</Text> : null}
           <Field
             c={c}
+            required
+            error={error && (!Number.isFinite(Number(target.replace(',', '.'))) || Number(target.replace(',', '.')) === 0) ? tr.tgQuestInvalid : undefined}
             label={`${tr.tgTarget}${info ? `, ${tr[info.unitKey]}` : ''}`}
             value={target}
             onChangeText={setTarget}

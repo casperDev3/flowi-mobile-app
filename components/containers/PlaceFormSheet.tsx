@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useEffect, useState } from 'react';
 import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -69,7 +70,7 @@ export function PlaceFormSheet({ request, places, c, onClose, onSubmit, onDelete
         <SheetButton label={tr.cancel} onPress={onClose} c={c} />
         <SheetButton label={tr.save} onPress={save} c={c} color={CONTAINERS_ACCENT} disabled={!name.trim()} flex={2} />
       </>}>
-      <SheetLabel text={tr.ctrPlaceName} c={c} />
+      <SheetLabel text={tr.ctrPlaceName} c={c} required />
       <TextInput value={name} onChangeText={setName} placeholder={tr.ctrPlaceNamePlaceholder} placeholderTextColor={c.sub}
         autoFocus={request?.mode === 'new'} accessibilityLabel={tr.ctrPlaceName}
         style={[sheetStyles.input, { backgroundColor: c.dim, color: c.text }]} />
@@ -81,7 +82,7 @@ export function PlaceFormSheet({ request, places, c, onClose, onSubmit, onDelete
           return (
             <TouchableOpacity key={option} onPress={() => setKind(option)} accessibilityRole="radio"
               accessibilityState={{ checked: active }} accessibilityLabel={placeKindLabel(tr, option)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 12, borderRadius: 12,
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 12, borderRadius: Atlas.radius.medium,
                 borderWidth: 1, borderColor: active ? CONTAINERS_ACCENT : c.border, backgroundColor: active ? CONTAINERS_ACCENT + '22' : c.dim }}>
               <IconSymbol name={placeKindIcon(option)} size={13} color={active ? CONTAINERS_ACCENT : c.sub} />
               <Text style={{ color: c.text, fontSize: 13, fontWeight: active ? '800' : '600' }}>{placeKindLabel(tr, option)}</Text>

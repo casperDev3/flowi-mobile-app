@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -254,7 +255,7 @@ export default function ContainersScreen() {
 
   const emptyState = (
     <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-      <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+      <View style={{ width: 64, height: 64, borderRadius: Atlas.radius.xlarge, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
         <IconSymbol name="shippingbox.fill" size={32} color={ACCENT} />
       </View>
       <Text style={{ color: c.text, fontSize: 17, fontWeight: '700', marginBottom: 6 }}>
@@ -352,7 +353,7 @@ export default function ContainersScreen() {
         <IconSymbol name="exclamationmark.triangle" size={28} color={ACCENT} />
         <Text style={{ color: c.text, fontSize: 15, textAlign: 'center' }}>{tr.ctrReadFailed}</Text>
         <TouchableOpacity onPress={() => void data.retry()} accessibilityRole="button"
-          style={{ minHeight: 48, paddingHorizontal: 20, borderRadius: 12, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' }}>
+          style={{ minHeight: 48, paddingHorizontal: 20, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.ctrRetry}</Text>
         </TouchableOpacity>
       </View>
@@ -428,7 +429,7 @@ export default function ContainersScreen() {
             }
           />
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1,
+          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1,
             paddingHorizontal: 12, gap: 8, marginHorizontal: 20, marginBottom: 10, minHeight: 44,
             backgroundColor: c.dim, borderColor: c.border }}>
             <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
@@ -445,7 +446,7 @@ export default function ContainersScreen() {
 
           {!isSearching && data.status !== 'failed' ? (
             <View accessibilityRole="tablist" style={{ flexDirection: 'row', marginHorizontal: 20, marginBottom: 14, padding: 3,
-              borderRadius: 12, backgroundColor: c.dim }}>
+              borderRadius: Atlas.radius.medium, backgroundColor: c.dim }}>
               {segment('grid', tr.ctrViewGrid, 'square.grid.2x2')}
               {segment('places', tr.ctrViewPlaces, 'folder')}
             </View>

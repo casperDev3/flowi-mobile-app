@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/feedback/FeedbackCard.tsx — рядок списку «Ідеї та баги».
  *
@@ -125,7 +126,7 @@ export const FeedbackCard = React.memo(function FeedbackCard({
 });
 
 const st = StyleSheet.create({
-  card:      { borderRadius: 14, padding: 13, overflow: 'hidden' },
+  card:      { borderRadius: Atlas.radius.large, padding: 13, overflow: 'hidden' },
   row:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   check:     { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   badges:    { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 5 },

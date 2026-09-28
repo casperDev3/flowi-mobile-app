@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useState } from 'react';
 import {
   Modal,
@@ -143,7 +144,7 @@ export function MonthPicker({
                   <Text
                     style={{
                       fontSize: 24,
-                      fontWeight: '800',
+                      fontWeight: Atlas.type.headingWeight,
                       color: textColor,
                       letterSpacing: -0.6,
                     }}>
@@ -207,7 +208,7 @@ export function MonthPicker({
                           style={{
                             flex: 1,
                             paddingVertical: 14,
-                            borderRadius: 14,
+                            borderRadius: Atlas.radius.large,
                             alignItems: 'center',
                             justifyContent: 'center',
                             backgroundColor: isSelected

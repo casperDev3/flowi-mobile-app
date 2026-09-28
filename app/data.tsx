@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
@@ -624,13 +625,13 @@ const StatRow = React.memo(function StatRow(
 
 const st = StyleSheet.create({
   sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10, marginLeft: 2 },
-  card:        { borderRadius: 18, borderWidth: 1, overflow: 'hidden', marginBottom: 0 },
+  card:        { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', marginBottom: 0 },
   statRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   statDot:     { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   statLabel:   { flex: 1, fontSize: 13, fontWeight: '500' },
   statVal:     { fontSize: 14, fontWeight: '700', minWidth: 24, textAlign: 'right' },
   row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13 },
-  iconBox:     { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  iconBox:     { width: 36, height: 36, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   actionBadge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
-  dangerHint:  { flexDirection: 'row', alignItems: 'flex-start', borderRadius: 10, borderWidth: 1, padding: 12, margin: 14, marginBottom: 0 },
+  dangerHint:  { flexDirection: 'row', alignItems: 'flex-start', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 12, margin: 14, marginBottom: 0 },
 });

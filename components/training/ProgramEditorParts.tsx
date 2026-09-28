@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/training/ProgramEditorParts.tsx — частини конструктора програми
  * (training-module.md §3.3, §5, §6.3): аркуш блоку з прогресією, вибір
@@ -202,7 +203,7 @@ export function ProgressionPreview({ c, program, day }: { c: TrainingColors; pro
       <View style={{ flexDirection: 'row' }}>
         <Text style={{ flex: 2, color: c.faint, fontSize: 12, fontWeight: '700' }} />
         {weeks.map(w => (
-          <Text key={w} style={{ flex: 1, color: c.sub, fontSize: 12, fontWeight: '800', textAlign: 'right' }}>
+          <Text key={w} style={{ flex: 1, color: c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight, textAlign: 'right' }}>
             {fmt(tr.tgWeekN, { n: w + 1 })}
           </Text>
         ))}
@@ -274,7 +275,7 @@ export function AssignSheet({ c, visible, onClose, program, members, today, busy
         </>
       )}>
       {error ? <Notice c={c} text={error} tone="error" /> : null}
-      <Text style={{ color: c.text, fontSize: 16, fontWeight: '800', marginBottom: 10 }}>{program.name}</Text>
+      <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight, marginBottom: 10 }}>{program.name}</Text>
       <Field c={c} label={tr.tgStartDate} value={start} onChangeText={setStart} autoCapitalize="none" keyboardType="numbers-and-punctuation" />
       {!validDate ? <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -6, marginBottom: 10 }}>{tr.tgDateInvalid}</Text> : null}
       <Stepper c={c} label={tr.tgWeekCount} value={weeks} min={1} max={Math.min(52, program.weekCount)} onChange={setWeeks} />

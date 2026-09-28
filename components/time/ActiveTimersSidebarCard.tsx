@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/ActiveTimersSidebarCard.tsx — активні таймери внизу
  * сайдбара на широкому екрані (планшет).
@@ -161,10 +162,10 @@ export function ActiveTimersSidebarCard({ colors: c }: { colors: SidebarCardColo
 }
 
 const st = StyleSheet.create({
-  card:     { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, paddingVertical: 8, marginTop: 8 },
+  card:     { borderRadius: Atlas.radius.medium, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, paddingVertical: 8, marginTop: 8 },
   head:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, minWidth: 0 },
-  icon:     { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  icon:     { width: 26, height: 26, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
   title:    { fontSize: 13, fontWeight: '700' },
   clock:    { fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 1 },
   meta:     { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },

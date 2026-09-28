@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/PreventionTab.tsx — вкладка «Профілактика».
  *
@@ -125,11 +126,11 @@ export function PreventionTab({ h }: HealthTabProps) {
       <TouchableOpacity onPress={exportReport} activeOpacity={0.85} style={{ marginTop: 16 }}
         accessibilityRole="button" accessibilityLabel={tr.exportReport}>
         <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.report, { borderColor: ACCENT + '40' }]}>
-          <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name="square.and.arrow.up" size={18} color={ACCENT} />
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: '800' }}>{tr.exportReport}</Text>
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>{tr.exportReport}</Text>
             <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.reportSub}</Text>
           </View>
           <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -142,5 +143,5 @@ export function PreventionTab({ h }: HealthTabProps) {
 const s = StyleSheet.create({
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6, marginVertical: -6 },
   tileCell: { padding: 6 },
-  report:   { borderRadius: 16, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  report:   { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
 });

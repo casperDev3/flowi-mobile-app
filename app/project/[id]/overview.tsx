@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/overview.tsx — дашборд простору проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §3: «прогрес і дедлайн, прострочене, найближчі
@@ -62,8 +63,8 @@ interface ProjectBudgetRecord {
 
 function StatCard({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
   return (
-    <View style={{ flex: 1, minWidth: 130, borderRadius: 14, borderWidth: 1, borderColor: color + '30', backgroundColor: color + '12', padding: 12 }}>
-      <Text style={{ color, fontSize: 20, fontWeight: '800' }}>{value}</Text>
+    <View style={{ flex: 1, minWidth: 130, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: color + '30', backgroundColor: color + '12', padding: 12 }}>
+      <Text style={{ color, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{value}</Text>
       <Text style={{ color: sub, fontSize: 11, marginTop: 2 }}>{label}</Text>
     </View>
   );
@@ -261,7 +262,7 @@ export default function ProjectOverviewScreen() {
             редагує; без цього напису обмеження в кожному розділі виглядали б
             як прихована помилка, а не свідома роль. */}
         {role === 'viewer' ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 16, alignSelf: 'flex-start' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 16, alignSelf: 'flex-start' }}>
             <IconSymbol name="eye" size={13} color={c.sub} />
             <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{tr.viewerReadOnlyNotice}</Text>
           </View>
@@ -272,7 +273,7 @@ export default function ProjectOverviewScreen() {
           <View style={[{ flex: 1, height: 8, borderRadius: 4, backgroundColor: c.dim, overflow: 'hidden' }]}>
             <View style={{ width: `${stats?.pct ?? 0}%`, height: 8, backgroundColor: project.color }} />
           </View>
-          <Text style={{ color: c.text, fontSize: 13, fontWeight: '800' }}>{stats?.pct ?? 0}%</Text>
+          <Text style={{ color: c.text, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>{stats?.pct ?? 0}%</Text>
         </View>
         <Text style={{ color: c.sub, fontSize: 12, marginBottom: counterLine ? 4 : 16 }}>
           {stats?.done ?? 0}/{stats?.total ?? 0} {tr.projectDone}
@@ -329,7 +330,7 @@ export default function ProjectOverviewScreen() {
                     key={`${meeting.id}_${date}`}
                     onPress={() => router.push(projectRoute(project.id, 'meetings') as never)}
                     activeOpacity={0.75}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 10 }}>
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 10 }}>
                     <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: meeting.color }} />
                     <View style={{ flex: 1 }}>
                       <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{meeting.title}</Text>

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/training/[groupId]/program/[programId].tsx — конструктор програми
  * (training-module.md §3.3, §5, §10.1): тижневий шаблон (7 днів × блоки),
@@ -232,7 +233,7 @@ export default function ProgramEditorScreen() {
       <Card c={c}>
         {readOnly ? (
           <>
-            <Text style={{ color: c.text, fontSize: 20, fontWeight: '800' }}>{program.name}</Text>
+            <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{program.name}</Text>
             <Text style={{ color: c.sub, fontSize: 13, marginTop: 4 }}>{fmt(tr.tgWeeks, { n: program.weekCount })}</Text>
             {program.notes ? <Text style={{ color: c.text, fontSize: 14, marginTop: 8 }}>{program.notes}</Text> : null}
           </>
@@ -267,10 +268,10 @@ export default function ProgramEditorScreen() {
               accessibilityState={{ selected: active }}
               accessibilityLabel={`${tr.weekdaysFull[i]}: ${training ? fmt(tr.tgExercisesCount, { n: d?.blocks.length ?? 0 }) : tr.tgRestDayShort}`}
               style={{
-                flex: 1, minHeight: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 1,
+                flex: 1, minHeight: 56, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 1,
                 borderColor: active ? TG_ACCENT : c.border, backgroundColor: active ? TG_ACCENT + '1C' : c.card,
               }}>
-              <Text style={{ color: active ? TG_ACCENT : c.sub, fontSize: 12, fontWeight: '800' }}>{tr.weekdays[i]}</Text>
+              <Text style={{ color: active ? TG_ACCENT : c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{tr.weekdays[i]}</Text>
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: training ? (program.color || TG_ACCENT) : 'transparent', borderWidth: training ? 0 : 1, borderColor: c.border }} />
             </TouchableOpacity>
           );
@@ -285,7 +286,7 @@ export default function ProgramEditorScreen() {
             <Stepper c={c} label={tr.tgEstimatedMin} value={day.estimatedMin ?? 60} step={5} min={5} max={300}
               onChange={estimatedMin => updateDay({ ...day, estimatedMin })} />
           </View>
-        ) : day.title ? <Text style={{ color: c.text, fontSize: 16, fontWeight: '800', marginBottom: 8 }}>{day.title}</Text> : null}
+        ) : day.title ? <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight, marginBottom: 8 }}>{day.title}</Text> : null}
 
         {blocks.length === 0 ? (
           <Text style={{ color: c.sub, fontSize: 14, marginVertical: 6 }}>{tr.tgRestDayShort}</Text>

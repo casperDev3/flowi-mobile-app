@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/ActivityTab.tsx — вкладка «Активність і тренування».
  *
@@ -91,7 +92,7 @@ export function ActivityTab({ h }: HealthTabProps) {
         <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
             <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={{ color: c.text, fontSize: 30, fontWeight: '800', letterSpacing: -1 }}>{today.steps.toLocaleString(locale)}</Text>
+              <Text style={{ color: c.text, fontSize: 30, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 }}>{today.steps.toLocaleString(locale)}</Text>
               <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
                 {/* Справжня дистанція з телефона, коли є; інакше — оцінка з кроків (≈). */}
                 {today.distance != null
@@ -134,7 +135,7 @@ export function ActivityTab({ h }: HealthTabProps) {
               див. burnedForDay). Рядок нижче показує внесок тренувань, щоб
               число не розходилось із журналом записів мовчки. */}
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ color: c.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 }}>{cal.burned}</Text>
+            <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{cal.burned}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>кк {tr.burned.toLowerCase()}</Text>
           </View>
           {cal.burned > today.calOut && (
@@ -156,11 +157,11 @@ export function ActivityTab({ h }: HealthTabProps) {
         <TouchableOpacity onPress={() => router.push('/workouts')} activeOpacity={0.85}
           accessibilityRole="button" accessibilityLabel={tr.workoutsLabel}>
           <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, flexDirection: 'row', alignItems: 'center' }]}>
-            <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: ACCENT_STEPS + '20', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT_STEPS + '20', alignItems: 'center', justifyContent: 'center' }}>
               <IconSymbol name="dumbbell.fill" size={18} color={ACCENT_STEPS} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>
+              <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>
                 {week.count > 0 ? `${week.count} · ${tr.thisWeek}` : tr.workoutsSub}
               </Text>
               <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
@@ -194,8 +195,8 @@ export function ActivityTab({ h }: HealthTabProps) {
 }
 
 const s = StyleSheet.create({
-  addBtn: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  card:   { borderRadius: 18, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
+  addBtn: { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  card:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
   track:  { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill:   { height: '100%', borderRadius: 4 },
   chip:   { flex: 1, borderRadius: 11, borderWidth: 1.5, paddingVertical: 7, alignItems: 'center' },

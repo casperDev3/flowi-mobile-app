@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskCompactCard.tsx — компактна картка завдання у списку.
  *
@@ -152,17 +153,21 @@ function TaskCompactCardInner<T extends Task>({
           <View
             style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}
             importantForAccessibility="no-hide-descendants">
-            <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: statusColumn.color + '16' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.small, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: statusColumn.color + '16' }}>
               <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 4 }} />
-              <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 10, fontWeight: '700' }}>{statusColumn.name}</Text>
+              <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 10, fontWeight: '700' }}>
+                {statusColumn.name}
+              </Text>
             </View>
 
             {proj && badgeLabel && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: proj.color + '16' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.small, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: proj.color + '16' }}>
                 <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: proj.color, marginRight: 4 }} />
                 {/* maxWidth більший за колишні 110: у бейдж тепер уміщається
                     ще й назва спринта, і на 110 від неї лишалося три літери. */}
-                <Text numberOfLines={1} style={{ color: proj.color, fontSize: 10, fontWeight: '600', maxWidth: 180 }}>{badgeLabel}</Text>
+                <Text numberOfLines={1} style={{ color: proj.color, fontSize: 10, fontWeight: '600', maxWidth: 180 }}>
+                  {badgeLabel}
+                </Text>
               </View>
             )}
 
@@ -201,7 +206,15 @@ function TaskCompactCardInner<T extends Task>({
 
         {/* Пріоритет — бейдж P0–P5 (замість кольорової крапки). Озвучується
             в a11ySummary картки, тож сам бейдж від VoiceOver схований. */}
-        <View style={{ alignItems: 'center', justifyContent: 'center' }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        <View
+          style={{
+            alignItems: "center",
+            justifyContent: "flex-start",
+            alignSelf: "flex-start",
+          }}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+        >
           <PriorityBadge level={normalizePriority(task)} />
         </View>
       </BlurView>
@@ -216,5 +229,5 @@ export const TaskCompactCard = React.memo(TaskCompactCardInner) as <T extends Ta
 const st = StyleSheet.create({
   // minHeight 44 — мінімальна ціль дотику (Apple HIG). Було ~38: рядок цілком
   // клікабельний, тож він мусить відповідати нормі, а не лише чекбокс у ньому.
-  card: { minHeight: 44, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' },
+  card: { minHeight: 44, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 9, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' },
 });

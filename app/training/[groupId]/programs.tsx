@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/training/[groupId]/programs.tsx — програми групи (training-module.md
  * §10.1): тренер пише, учасник читає; на планшеті — дві колонки
@@ -74,7 +75,7 @@ export default function ProgramsScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <View style={{ width: 10, alignSelf: 'stretch', borderRadius: 5, backgroundColor: p.color || TG_ACCENT }} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '800' }} numberOfLines={2}>{p.name}</Text>
+                <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight }} numberOfLines={2}>{p.name}</Text>
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 4 }}>
                   {`${fmt(tr.tgWeeks, { n: p.weekCount })} · ${fmt(tr.tgDaysPerWeek, { n: days })}`}
                 </Text>

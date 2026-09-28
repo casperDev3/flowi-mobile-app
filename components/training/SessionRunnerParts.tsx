@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/training/SessionRunnerParts.tsx — частини виконавця сесії
  * (training-module.md §10.1): рядок підходу, таймер відпочинку, аркуш
@@ -38,7 +39,7 @@ function NumberCell({ c, value, onCommit, label, width = 64, decimal }: {
       accessibilityLabel={label}
       selectTextOnFocus
       style={{
-        width, minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: c.border, backgroundColor: c.input,
+        width, minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.input,
         color: c.text, fontSize: 16, fontWeight: '700', textAlign: 'center',
       }}
     />
@@ -102,7 +103,7 @@ export function SetRow({ c, set, onChange, readOnly }: {
         accessibilityState={{ checked: set.done, disabled: !!readOnly }}
         accessibilityLabel={set.done ? fmt(tr.tgSetDone, { n }) : fmt(tr.tgSetNotDone, { n })}
         style={{
-          width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+          width: 44, height: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
           backgroundColor: set.done ? TG_OK : c.chip, borderWidth: 1, borderColor: set.done ? TG_OK : c.border,
         }}>
         {set.done ? <IconSymbol name="checkmark" size={18} color="#fff" /> : null}
@@ -136,13 +137,13 @@ export function RestTimerBar({ c, endsAt, onAdd, onSkip, onDone }: {
     <View
       accessibilityLiveRegion="polite"
       style={{
-        flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16,
+        flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: Atlas.radius.large,
         backgroundColor: c.isDark ? '#1C2A3A' : '#E0F2FE', borderWidth: 1, borderColor: TG_ACCENT + '66',
       }}>
       <IconSymbol name="timer" size={20} color={TG_ACCENT} />
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700' }}>{tr.tgRestTimer}</Text>
-        <Text accessibilityLabel={`${tr.tgRestTimer} ${mmss(left)}`} style={{ color: c.text, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+        <Text accessibilityLabel={`${tr.tgRestTimer} ${mmss(left)}`} style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, fontVariant: ['tabular-nums'] }}>
           {mmss(left)}
         </Text>
       </View>
@@ -221,7 +222,7 @@ export function FinishSheet({ c, visible, onClose, onConfirm, status, done, tota
         </>
       )}>
       {status === 'completed' ? (
-        <Text style={{ color: TG_XP, fontSize: 22, fontWeight: '800', marginBottom: 12 }}>{fmt(tr.tgXpEstimate, { n: xpEstimate })}</Text>
+        <Text style={{ color: TG_XP, fontSize: 22, fontWeight: Atlas.type.headingWeight, marginBottom: 12 }}>{fmt(tr.tgXpEstimate, { n: xpEstimate })}</Text>
       ) : (
         <Notice c={c} text={fmt(tr.tgFinishPartial, { done, total })} />
       )}

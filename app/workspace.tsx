@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/workspace.tsx — «Адреса workspace» (§2 плану, контракт §2.1–2.2).
  *
@@ -335,7 +336,7 @@ const st = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.4, marginBottom: 8 },
   subtitle: { fontSize: 14, lineHeight: 20, marginBottom: 24 },
   card: {
-    borderRadius: 18, borderWidth: 1, overflow: 'hidden',
+    borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
   },
   fieldWrap: { paddingHorizontal: 16, paddingVertical: 12 },
@@ -343,16 +344,16 @@ const st = StyleSheet.create({
   input: { fontSize: 16, paddingVertical: 2 },
   hintRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1, marginTop: 14,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: Atlas.radius.medium, borderWidth: 1, marginTop: 14,
   },
   hintText: { fontSize: 13, lineHeight: 18, flex: 1 },
   successCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: 14, borderWidth: 1.5, padding: 14, marginTop: 14,
+    borderRadius: Atlas.radius.large, borderWidth: 1.5, padding: 14, marginTop: 14,
   },
   colorDot: { width: 14, height: 14, borderRadius: 7 },
   workspaceName: { fontSize: 16, fontWeight: '700' },
   hintSmall: { fontSize: 12, marginTop: 3, lineHeight: 16 },
-  primaryBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
+  primaryBtn: { borderRadius: Atlas.radius.large, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

@@ -1,5 +1,6 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
@@ -39,13 +40,17 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
     return Number.isFinite(value) && value > 0;
   });
 
-  // Префіл останніми значеннями при відкритті
+  const wasVisible = useRef(false);
+
+  // Префіл лише при відкритті: фонове оновлення не стирає введені значення.
   useEffect(() => {
-    if (!visible) return;
+    const opening = visible && !wasVisible.current;
+    wasVisible.current = visible;
+    if (!opening) return;
     const init: Record<string, string> = {};
     FIELDS.forEach(f => { const d = defaults[f.type]; init[f.type] = d != null ? String(d) : ''; });
     setVals(init);
-  }, [visible]);
+  }, [visible, defaults]);
 
   const save = () => {
     const records: BodyRecord[] = [];
@@ -132,10 +137,10 @@ const s = StyleSheet.create({
   sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   handle:    { width: 36, height: 4, borderRadius: 2 },
-  title:     { fontSize: 20, fontWeight: '800', marginBottom: 12 },
+  title:     { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 12 },
   grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   cell:      { width: '47%' },
   label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 5 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12 },
-  btn:       { paddingVertical: 14, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12 },
+  btn:       { paddingVertical: 14, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
 });

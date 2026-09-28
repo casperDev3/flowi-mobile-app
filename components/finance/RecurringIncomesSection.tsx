@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/RecurringIncomesSection.tsx — «Регулярні доходи» у вкладці
  * «Підписки» (finance-revamp.md §4.2, §9.5).
@@ -254,7 +255,7 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
               {overdue ? `${tr.subOverdue} · ` : ''}{formatDateKey(item.nextPaymentDate, locale)} · {formatPeriod(item.period, lang)}
             </Text>
           </View>
-          <Text style={{ color: c.green, fontSize: 14, fontWeight: '800' }}>+{money(item.amount, item.currency)}</Text>
+          <Text style={{ color: c.green, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>+{money(item.amount, item.currency)}</Text>
         </TouchableOpacity>
         {status !== 'archived' ? (
           <TouchableOpacity
@@ -288,7 +289,7 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
         </TouchableOpacity>
       </View>
       {totals.length > 0 ? (
-        <Text style={{ color: c.text, fontSize: 16, fontWeight: '800', marginBottom: 8 }}>
+        <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight, marginBottom: 8 }}>
           {formatTotalsLine(totals, 'monthly', tr.subPerMonth, currencies, locale)}
         </Text>
       ) : null}
@@ -318,7 +319,7 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
         <View style={[st.sheet, sheetColumnStyle(isWide), { maxHeight: height * 0.88, backgroundColor: c.sheet, borderColor: c.border }]}>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={[st.handle, { backgroundColor: c.border }]} />
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 12 }}>
+            <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 12 }}>
               {form?.editing ? tr.finRiEdit : tr.finRiNew}
             </Text>
             {draft ? (
@@ -444,7 +445,7 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
             {receive && receiveItem ? (
               <>
                 <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{tr.finRiReceiveTitle}</Text>
-                <Text numberOfLines={2} style={{ color: c.text, fontSize: 19, fontWeight: '800', marginTop: 4 }}>{receiveItem.name}</Text>
+                <Text numberOfLines={2} style={{ color: c.text, fontSize: 19, fontWeight: Atlas.type.headingWeight, marginTop: 4 }}>{receiveItem.name}</Text>
                 <Text style={[st.label, { color: c.sub }]}>{tr.amount} ({receiveAccount?.currency || receiveItem.currency})</Text>
                 <TextInput
                   value={receive.amount}
@@ -534,14 +535,14 @@ function ChipRow({ items, value, onChange, c }: {
 const st = StyleSheet.create({
   section: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
   addIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
-  icon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  receiveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1 },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 20, paddingBottom: 36 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: Atlas.radius.large, paddingHorizontal: 12, paddingVertical: 6 },
+  icon: { width: 32, height: 32, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  receiveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 10, borderRadius: Atlas.radius.medium, borderWidth: 1 },
+  sheet: { borderTopLeftRadius: Atlas.radius.xlarge, borderTopRightRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, paddingBottom: 36 },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
   label: { fontSize: 12, fontWeight: '700', marginTop: 12, marginBottom: 6 },
-  input: { flex: 1, minHeight: 44, borderRadius: 12, paddingHorizontal: 12, fontSize: 15 },
-  chip: { minHeight: 34, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  primary: { flex: 1, minHeight: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  secondary: { flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, fontSize: 15 },
+  chip: { minHeight: 34, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  primary: { flex: 1, minHeight: 46, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
+  secondary: { flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

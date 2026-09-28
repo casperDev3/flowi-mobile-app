@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/projects/SprintVelocity.tsx — таблиця велосіті під спринтами
  * проєкту (docs/specs/projects-analytics.md §6.1, §8.4).
@@ -81,8 +82,8 @@ export function SprintVelocity({
 }
 
 const st = StyleSheet.create({
-  panel: { borderRadius: 14, borderWidth: 1, padding: 12, marginTop: 8 },
-  title: { fontSize: 14, fontWeight: '800' },
+  panel: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 8 },
+  title: { fontSize: 14, fontWeight: Atlas.type.headingWeight },
   note:  { fontSize: 11, lineHeight: 15 },
   row:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth },
   num:   { fontSize: 11, textAlign: 'right', fontVariant: ['tabular-nums'], minWidth: 58 },

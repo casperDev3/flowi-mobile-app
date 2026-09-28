@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -34,7 +35,7 @@ export function MetricTrend({ entries, type, agg, color, goal, format, isDark, c
     <View style={{ marginBottom: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
         <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, flex: 1 }}>{tr.dynamics}</Text>
-        <Text style={{ color, fontSize: 16, fontWeight: '800' }}>{hasAny ? format(headline) : '—'}</Text>
+        <Text style={{ color, fontSize: 16, fontWeight: Atlas.type.headingWeight }}>{hasAny ? format(headline) : '—'}</Text>
       </View>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
         <View style={{ flex: 1 }}><PeriodSelector period={period} onChange={setPeriod} color={color} c={c} tr={tr} /></View>
@@ -55,5 +56,5 @@ export function MetricTrend({ entries, type, agg, color, goal, format, isDark, c
 }
 
 const s = StyleSheet.create({
-  card: { borderRadius: 18, borderWidth: 1, padding: 12, overflow: 'hidden' },
+  card: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 12, overflow: 'hidden' },
 });

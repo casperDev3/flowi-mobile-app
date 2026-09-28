@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * Аркуш модуля: SheetModal + BlurView зі стелею висоти ЧИСЛОМ (useSheetSurface,
  * NEW-01) і ScrollView всередині; кнопки дії — у футері поза прокруткою.
@@ -62,20 +63,28 @@ export function SheetButton({ label, onPress, c, color, disabled, flex = 1 }: {
   );
 }
 
-export function SheetLabel({ text, c }: { text: string; c: ContainersColors }) {
-  return <Text style={[styles.label, { color: c.sub }]}>{text.toUpperCase()}</Text>;
+export function SheetLabel({ text, c,
+  required = false,
+}: { text: string; c: ContainersColors;
+  required?: boolean;
+}) {
+  return (
+    <Text style={[styles.label, { color: c.sub }]}>{text.toUpperCase()}
+      {required ? <Text style={{ color: "#EF4444" }}> *</Text> : null}
+    </Text>
+  );
 }
 
 export const sheetStyles = StyleSheet.create({
-  input: { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500', marginBottom: 2 },
+  input: { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500', marginBottom: 2 },
 });
 
 const styles = StyleSheet.create({
-  sheet: { borderRadius: 24, borderWidth: 1, padding: 18, overflow: 'hidden' },
+  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18, overflow: 'hidden' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
-  title: { flex: 1, fontSize: 19, fontWeight: '800' },
-  close: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  title: { flex: 1, fontSize: 19, fontWeight: Atlas.type.headingWeight },
+  close: { width: 44, height: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   footer: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  btn: { minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  btn: { minHeight: 48, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   label: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
 });

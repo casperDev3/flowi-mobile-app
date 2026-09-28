@@ -14,6 +14,7 @@ import { ProjectSidebar } from '@/components/shared/ProjectSidebar';
 import { SIDEBAR_HIDDEN_ON, sidebarVisible } from '@/constants/nav';
 import { projectIdFromPathname } from '@/constants/projectNav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { usePendingMenuInvite } from '@/hooks/use-pending-menu-invite';
 import { useIncomingInviteLinks } from '@/hooks/use-incoming-invite-links';
 import { useOrientationLock } from '@/hooks/use-orientation-lock';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -144,7 +145,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // само підставляє потрібний workspace (checkWorkspace + setWorkspaceConfig
   // усередині app/invite.tsx), тож на фреш-інсталі без жодного workspace_config
   // його не можна відкидати сюди ж раніше, ніж екран устигне це зробити.
-  if (!hasWorkspace && pathname !== '/workspace' && pathname !== '/invite') {
+  if (!hasWorkspace && pathname !== '/workspace' && pathname !== '/invite' && pathname !== '/menu-invite') {
     return <Redirect href="/workspace" />;
   }
   if (hasWorkspace && authStatus === 'guest' && !isAuthScreen) {
@@ -337,6 +338,7 @@ function RootLayoutContent() {
   // порожній View замість Stack) — сам router.push('/invite') звідти й
   // виводить на екран, що встановлює потрібний workspace.
   useIncomingInviteLinks();
+  usePendingMenuInvite();
 
   // Сайдбар живе ТУТ, а не в (tabs)/_layout: інакше Stack-екрани
   // (Проєкти, Нотатки, Контейнери…) відкривалися б поверх нього, і

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/projects/PortfolioKpi.tsx — дашборд портфеля над списком проєктів
  * (docs/specs/projects-analytics.md §8.3).
@@ -154,12 +155,12 @@ function formatAverage(value: number): string {
 }
 
 const st = StyleSheet.create({
-  wrap:       { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 18 },
+  wrap:       { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, marginBottom: 18 },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, minHeight: 28 },
-  title:      { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+  title:      { fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.2 },
   grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tile:       { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
-  tileValue:  { fontSize: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  tile:       { borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
+  tileValue:  { fontSize: 20, fontWeight: Atlas.type.headingWeight, fontVariant: ['tabular-nums'] },
   tileLabel:  { fontSize: 11, marginTop: 2 },
   chartTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
 });

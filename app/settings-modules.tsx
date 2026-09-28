@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/settings-modules.tsx — які модулі інтерфейсу показувати.
  *
@@ -133,7 +134,7 @@ export default function SettingsModulesScreen() {
 const st = StyleSheet.create({
   intro:        { fontSize: 13, lineHeight: 19, marginTop: 4, marginBottom: 4 },
   sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 20, marginLeft: 4 },
-  card:         { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden' },
   row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
   iconBox:      { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   rowLabel:     { fontSize: 14, fontWeight: '500' },

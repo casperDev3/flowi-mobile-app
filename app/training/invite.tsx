@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/training/invite.tsx — прийняття запрошення в групу тренувань за
  * посиланням (`ftrackingapp://training-invite?ws=&g=&t=` або веб-посилання
@@ -43,7 +44,7 @@ export default function TrainingInviteScreen() {
       {!online ? <Notice c={c} text={tr.tgOnlineOnly} tone="info" /> : null}
       {joined ? (
         <Card c={c} accent={TG_OK}>
-          <Text style={{ color: c.text, fontSize: 18, fontWeight: '800' }}>{joined.group.name}</Text>
+          <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight }}>{joined.group.name}</Text>
           <Text style={{ color: c.sub, fontSize: 14, marginTop: 6 }}>{joined.already ? tr.tgAlreadyMember : tr.tgJoined}</Text>
           <PrimaryButton
             label={tr.tgOpenGroup}

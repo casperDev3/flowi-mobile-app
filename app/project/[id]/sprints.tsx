@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/sprints.tsx — Спринти простору проєкту.
  *
@@ -182,7 +183,7 @@ export default function ProjectSprintsScreen() {
   const shortDate = (iso: string | undefined) =>
     iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
 
-  const inputStyle = { borderRadius: 10, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 8, color: c.text } as const;
+  const inputStyle = { borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 8, color: c.text } as const;
 
   /** Спільна форма: назва + дати «з»/«по» + помилка/попередження. */
   const renderDraftForm = (submitLabel: string) => (
@@ -230,7 +231,7 @@ export default function ProjectSprintsScreen() {
       ) : (
         <Text style={{ color: c.sub, fontSize: 11 }}>{tr.sprintDatesHint}</Text>
       )}
-      <TouchableOpacity onPress={saveDraft} style={{ backgroundColor: c.accent, borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}>
+      <TouchableOpacity onPress={saveDraft} style={{ backgroundColor: c.accent, borderRadius: Atlas.radius.medium, paddingVertical: 8, alignItems: 'center' }}>
         <Text style={{ color: '#fff', fontWeight: '700' }}>{submitLabel}</Text>
       </TouchableOpacity>
     </>
@@ -294,7 +295,7 @@ export default function ProjectSprintsScreen() {
       <View
         key={sprint.id}
         onLayout={e => onRowLayout(sprint.id, e.nativeEvent.layout.y)}
-        style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginBottom: 10 }}>
+        style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginBottom: 10 }}>
         {/* Звичайний View, а не TouchableOpacity: пенал/закриття — окремі
             дотикові цілі, і вкладені TouchableOpacity в RN ненадійно
             передають дотик у дочірні — рядок і кнопки мають бути сиблінгами. */}
@@ -337,7 +338,7 @@ export default function ProjectSprintsScreen() {
             {dated ? `${shortDate(sprint.startDate)} – ${shortDate(sprint.endDate)}` : tr.sprintUndated}
           </Text>
           {overdue ? (
-            <View style={{ borderRadius: 6, borderWidth: 1, borderColor: SPRINT_OVERDUE_COLOR, paddingHorizontal: 6, paddingVertical: 1 }}>
+            <View style={{ borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: SPRINT_OVERDUE_COLOR, paddingHorizontal: 6, paddingVertical: 1 }}>
               <Text style={{ color: SPRINT_OVERDUE_COLOR, fontSize: 10, fontWeight: '700' }}>{tr.sprintOverdue}</Text>
             </View>
           ) : null}
@@ -406,7 +407,7 @@ export default function ProjectSprintsScreen() {
                     placeholder={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
                     accessibilityLabel={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
                     placeholderTextColor={c.sub}
-                    style={{ flex: 1, borderRadius: 10, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 7, color: c.text, fontSize: 13 }}
+                    style={{ flex: 1, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 7, color: c.text, fontSize: 13 }}
                   />
                   <TouchableOpacity onPress={() => addTask(sprint)} accessibilityRole="button" accessibilityLabel={tr.sprintAddTaskA11y}>
                     <IconSymbol name="plus" size={17} color={c.accent} />
@@ -467,7 +468,7 @@ export default function ProjectSprintsScreen() {
         // виглядає мертвою.
         keyboardShouldPersistTaps="handled">
         {draft && !draft.sprint && (
-          <View style={{ borderRadius: 14, borderWidth: 1, borderColor: c.accent, backgroundColor: c.dim, padding: 12, marginBottom: 12, gap: 8 }}>
+          <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.accent, backgroundColor: c.dim, padding: 12, marginBottom: 12, gap: 8 }}>
             {renderDraftForm(tr.create)}
           </View>
         )}

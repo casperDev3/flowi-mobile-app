@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/OverviewTab.tsx — вкладка «Огляд».
  *
@@ -111,7 +112,7 @@ export function OverviewTab({ h }: HealthTabProps) {
               <IconSymbol name="person.fill" size={18} color={ACCENT} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={{ color: c.text, fontSize: 14, fontWeight: '800' }}>{tr.healthProfile}</Text>
+              <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>{tr.healthProfile}</Text>
               <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.profileHint}</Text>
             </View>
             <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -152,11 +153,11 @@ export function OverviewTab({ h }: HealthTabProps) {
               return (
                 <View key={ins.type} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 9,
                   borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth, borderTopColor: c.border }}>
-                  <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: col + '20', alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ width: 26, height: 26, borderRadius: Atlas.radius.small, backgroundColor: col + '20', alignItems: 'center', justifyContent: 'center' }}>
                     <IconSymbol name={up ? 'arrow.up.right' : 'arrow.down.right'} size={13} color={col} />
                   </View>
                   <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginLeft: 10, flex: 1 }}>{insightLabel[ins.type]}</Text>
-                  <Text style={{ color: col, fontSize: 13, fontWeight: '800' }}>{up ? '+' : ''}{ins.deltaPct}%</Text>
+                  <Text style={{ color: col, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>{up ? '+' : ''}{ins.deltaPct}%</Text>
                   <Text style={{ color: c.sub, fontSize: 11, marginLeft: 6 }}>{tr.thisWeek}</Text>
                 </View>
               );
@@ -183,7 +184,7 @@ export function OverviewTab({ h }: HealthTabProps) {
 function VitalMini({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ color, fontSize: 15, fontWeight: '800' }} numberOfLines={1}>{value}</Text>
+      <Text style={{ color, fontSize: 15, fontWeight: Atlas.type.headingWeight }} numberOfLines={1}>{value}</Text>
       <Text style={{ color: sub, fontSize: 10, fontWeight: '600', marginTop: 2 }}>{label}</Text>
     </View>
   );
@@ -206,8 +207,8 @@ const SummaryCard = React.memo(function SummaryCard({ m, period, entries, isDark
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.trendCard, { borderColor: c.border }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
         <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: m.color, marginRight: 8 }} />
-        <Text style={{ color: c.text, fontSize: 15, fontWeight: '800', flex: 1 }}>{m.label}</Text>
-        <Text style={{ color: m.color, fontSize: 17, fontWeight: '800', marginRight: 10 }}>{hasAny ? fmtMetric(m, headline) : '—'}</Text>
+        <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight, flex: 1 }}>{m.label}</Text>
+        <Text style={{ color: m.color, fontSize: 17, fontWeight: Atlas.type.headingWeight, marginRight: 10 }}>{hasAny ? fmtMetric(m, headline) : '—'}</Text>
         <ChartTypeToggle value={chartType} onChange={setChartType} color={m.color} c={c} tr={tr} />
       </View>
       {hasAny ? (
@@ -224,7 +225,7 @@ const SummaryCard = React.memo(function SummaryCard({ m, period, entries, isDark
 
 const s = StyleSheet.create({
   kicker:    { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10, marginLeft: 2 },
-  card:      { borderRadius: 18, borderWidth: 1, padding: 16, overflow: 'hidden' },
-  trendCard: { borderRadius: 18, borderWidth: 1, padding: 14, overflow: 'hidden', marginBottom: 12 },
-  banner:    { borderRadius: 16, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center' },
+  card:      { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
+  trendCard: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 14, overflow: 'hidden', marginBottom: 12 },
+  banner:    { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center' },
 });

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -46,11 +47,11 @@ export const SearchHitRow = React.memo(function SearchHitRow({ match, search, pl
     <TouchableOpacity activeOpacity={0.75} onPress={() => onPress(container.id)} accessibilityRole="button"
       accessibilityLabel={`${container.name}${placeLabel ? `, ${placeLabel}` : ''}`} accessibilityState={{ selected }}>
       <BlurView intensity={c.isDark ? 20 : 38} tint={c.isDark ? 'dark' : 'light'}
-        style={{ borderRadius: 14, borderWidth: 1, borderColor: selected ? color : color + '40', padding: 12, overflow: 'hidden' }}>
+        style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: selected ? color : color + '40', padding: 12, overflow: 'hidden' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
           <Highlighted text={container.name} search={search} color={color}
-            style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '800' }} />
+            style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight }} />
           <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>
             {!search.trim() || byContainer ? itemsCount(tr, total, lang) : `${items.length}/${total}`}
           </Text>

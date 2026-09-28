@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import {
@@ -91,11 +92,11 @@ function CalGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMon
   while (cells.length % 7 !== 0) cells.push(null);
   const weeks: (number | null)[][] = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-  const months = lang === 'uk' ? MONTHS_UK : MONTHS_EN;
-  const wdShort = lang === 'uk' ? WD_SHORT_UK : WD_SHORT_EN;
+  const months = lang === "uk" ? MONTHS_UK : MONTHS_EN;
+  const wdShort = lang === "uk" ? WD_SHORT_UK : WD_SHORT_EN;
 
   return (
-    <View style={{ borderRadius: 14, borderWidth: 1, padding: 12, borderColor: border }}>
+    <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, borderColor: border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
         <TouchableOpacity onPress={onPrevMonth} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name="chevron.left" size={18} color={sub} />
@@ -107,9 +108,11 @@ function CalGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMon
           <IconSymbol name="chevron.right" size={18} color={sub} />
         </TouchableOpacity>
       </View>
-      <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-        {wdShort.map(d => (
-          <Text key={d} style={{ flex: 1, textAlign: 'center', color: sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
+      <View style={{ flexDirection: "row", marginBottom: 4 }}>
+        {wdShort.map((d) => (
+          <Text key={d} style={{ flex: 1, textAlign: 'center', color: sub, fontSize: 11, fontWeight: '600' }}>
+            {d}
+          </Text>
         ))}
       </View>
       {weeks.map((week, wi) => (
@@ -126,7 +129,9 @@ function CalGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMon
                 <View style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
                   backgroundColor: isSel ? accent : 'transparent',
                   borderWidth: !isSel && isToday ? 1.5 : 0, borderColor: accent }}>
-                  <Text style={{ color: isSel ? '#fff' : isToday ? accent : text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
+                  <Text style={{ color: isSel ? '#fff' : isToday ? accent : text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>
+                    {day}
+                  </Text>
                 </View>
                 {hasMark && !isSel && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: accent, marginTop: 1 }} />}
               </TouchableOpacity>
@@ -173,8 +178,9 @@ export function MeetingFormSheet({
   isDark, lang, tr, markedDays = new Set(), projects = NO_PROJECTS, presetProjectId,
   currentUserId = null, isProjectOwner = false,
 }: Props) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const isUk = lang === 'uk';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isUk = lang === "uk";
   const sheetSurface = useSheetSurface();
 
   const c = {
@@ -186,14 +192,14 @@ export function MeetingFormSheet({
   };
 
   // ── Form state ──────────────────────────────────────────────────────────────
-  const [fTitle, setFTitle] = useState('');
-  const [fDate, setFDate] = useState('');
-  const [fTime, setFTime] = useState('');
+  const [fTitle, setFTitle] = useState("");
+  const [fDate, setFDate] = useState("");
+  const [fTime, setFTime] = useState("");
   const [fDuration, setFDuration] = useState(60);
-  const [fDurationText, setFDurationText] = useState('60');
-  const [fLocation, setFLocation] = useState('');
-  const [fLink, setFLink] = useState('');
-  const [fNotes, setFNotes] = useState('');
+  const [fDurationText, setFDurationText] = useState("60");
+  const [fLocation, setFLocation] = useState("");
+  const [fLink, setFLink] = useState("");
+  const [fNotes, setFNotes] = useState("");
   const [fColor, setFColor] = useState(MEETING_COLORS[0]);
   const [fProjectId, setFProjectId] = useState<string | undefined>(undefined);
   const [showCal, setShowCal] = useState(false);
@@ -206,7 +212,7 @@ export function MeetingFormSheet({
   const [fRepeatInterval, setFRepeatInterval] = useState(1);
   const [fRepeatDays, setFRepeatDays] = useState<number[]>([]);
   const [fRepeatEndType, setFRepeatEndType] = useState<'never' | 'until'>('never');
-  const [fRepeatUntil, setFRepeatUntil] = useState('');
+  const [fRepeatUntil, setFRepeatUntil] = useState("");
   const [showRepeatUntilCal, setShowRepeatUntilCal] = useState(false);
   const [repeatUntilCalYear, setRepeatUntilCalYear] = useState(today.getFullYear());
   const [repeatUntilCalMonth, setRepeatUntilCalMonth] = useState(today.getMonth());
@@ -214,6 +220,8 @@ export function MeetingFormSheet({
   // Reset form whenever the sheet opens or `initial` changes
   useEffect(() => {
     if (!visible) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const m = initial;
     if (m) {
       setFTitle(m.title); setFDate(m.date); setFTime(m.time);
@@ -299,7 +307,6 @@ export function MeetingFormSheet({
               {/* bounces тут був false — на обрізаному аркуші це остаточно
                   вбивало будь-який натяк на те, що вміст можна прогорнути. */}
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-
                 {/* Handle + close */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                   <View style={{ flex: 1 }} />
@@ -317,7 +324,7 @@ export function MeetingFormSheet({
                   <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
                     {MEETING_COLORS.map(col => (
                       <TouchableOpacity key={col} onPress={() => setFColor(col)}
-                        style={{ width: col === fColor ? 20 : 14, height: col === fColor ? 20 : 14, borderRadius: 10, backgroundColor: col,
+                        style={{ width: col === fColor ? 20 : 14, height: col === fColor ? 20 : 14, borderRadius: Atlas.radius.medium, backgroundColor: col,
                           borderWidth: col === fColor ? 2 : 0, borderColor: '#fff',
                           shadowColor: col, shadowOpacity: col === fColor ? 0.55 : 0, shadowRadius: 4, elevation: col === fColor ? 3 : 0 }} />
                     ))}
@@ -340,6 +347,10 @@ export function MeetingFormSheet({
                 </View>
 
                 {/* Title */}
+                <Text style={{ color: c.sub, marginBottom: 6 }}>
+                  {isUk ? "Назва зустрічі" : "Meeting title"}{" "}
+                  <Text style={{ color: "#EF4444" }}>*</Text>
+                </Text>
                 <TextInput
                   placeholder={isUk ? 'Назва зустрічі...' : 'Meeting title...'}
                   placeholderTextColor={c.sub}
@@ -395,7 +406,7 @@ export function MeetingFormSheet({
                       const on = fDuration === d;
                       return (
                         <TouchableOpacity key={d} onPress={() => { setFDuration(d); setFDurationText(String(d)); }} style={{ flex: 1 }}>
-                          <View style={{ paddingVertical: 8, alignItems: 'center', borderRadius: 10,
+                          <View style={{ paddingVertical: 8, alignItems: 'center', borderRadius: Atlas.radius.medium,
                             backgroundColor: on ? fColor : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
                             <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>
                               {d >= 60 ? `${d / 60}г` : `${d}хв`}
@@ -419,24 +430,34 @@ export function MeetingFormSheet({
                       keyboardType="number-pad"
                       style={{ color: !DUR_PRESETS.includes(fDuration) ? fColor : c.text, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1, padding: 0 }}
                     />
-                    <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{isUk ? 'хв' : 'min'}</Text>
+                    <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
+                      {isUk ? "хв" : "min"}
+                    </Text>
                   </View>
                 </View>
 
                 {/* Details: location / link / notes */}
-                <View style={{ borderRadius: 12, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 10 }}>
+                <View style={{ borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, backgroundColor: c.dim, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }}>
                     <IconSymbol name="mappin" size={13} color={fLocation ? fColor : c.sub} />
                     <TextInput placeholder={isUk ? 'Місце…' : 'Location…'} placeholderTextColor={c.sub} value={fLocation} onChangeText={setFLocation}
                       style={{ color: c.text, fontSize: 13, marginLeft: 8, flex: 1, padding: 0 }} />
-                    {!!fLocation && <TouchableOpacity onPress={() => setFLocation('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><IconSymbol name="xmark.circle.fill" size={14} color={c.sub} /></TouchableOpacity>}
+                    {!!fLocation && (
+                      <TouchableOpacity onPress={() => setFLocation('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <IconSymbol name="xmark.circle.fill" size={14} color={c.sub} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, backgroundColor: c.dim, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }}>
                     <IconSymbol name="link" size={13} color={fLink ? fColor : c.sub} />
                     <TextInput placeholder="Zoom / Meet…" placeholderTextColor={c.sub} value={fLink} onChangeText={setFLink}
                       keyboardType="url" autoCapitalize="none"
                       style={{ color: c.text, fontSize: 13, marginLeft: 8, flex: 1, padding: 0 }} />
-                    {!!fLink && <TouchableOpacity onPress={() => setFLink('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}><IconSymbol name="xmark.circle.fill" size={14} color={c.sub} /></TouchableOpacity>}
+                    {!!fLink && (
+                      <TouchableOpacity onPress={() => setFLink('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <IconSymbol name="xmark.circle.fill" size={14} color={c.sub} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: c.dim }}>
                     <IconSymbol name="note.text" size={13} color={fNotes ? fColor : c.sub} style={{ marginTop: 1 }} />
@@ -454,8 +475,8 @@ export function MeetingFormSheet({
                       {projectLabel}
                     </Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
-                        {[{ id: undefined as string | undefined, name: noProjectLabel, color: c.sub }, ...projectOptions].map(p => {
+                      <View style={{ flexDirection: "row", gap: 6 }}>
+                        {[{ id: undefined as string | undefined, name: noProjectLabel, color: c.sub }, ...projectOptions].map((p) => {
                           const on = p.id ? p.id === fProjectId : !knownProject;
                           return (
                             <TouchableOpacity
@@ -466,7 +487,9 @@ export function MeetingFormSheet({
                               accessibilityLabel={`${projectLabel}: ${p.name}`}
                               style={[s.chip, { borderColor: on ? (p.id ? p.color : fColor) : c.border, backgroundColor: on ? (p.id ? p.color : fColor) + '18' : c.dim }]}>
                               {p.id ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.color }} /> : null}
-                              <Text numberOfLines={1} style={{ color: on ? c.text : c.sub, fontSize: 12, fontWeight: '600', maxWidth: 160 }}>{p.name}</Text>
+                              <Text numberOfLines={1} style={{ color: on ? c.text : c.sub, fontSize: 12, fontWeight: '600', maxWidth: 160 }}>
+                                {p.name}
+                              </Text>
                             </TouchableOpacity>
                           );
                         })}
@@ -488,48 +511,59 @@ export function MeetingFormSheet({
                 </TouchableOpacity>
 
                 {fRepeat && (
-                  <View style={{ borderRadius: 14, borderWidth: 1, borderColor: fColor + '40', backgroundColor: fColor + '08', padding: 12, marginBottom: 10 }}>
-
+                  <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: fColor + '40', backgroundColor: fColor + '08', padding: 12, marginBottom: 10 }}>
                     {/* Frequency chips */}
                     <View style={{ flexDirection: 'row', gap: 5, marginBottom: 10 }}>
-                      {(Object.keys(FREQ_LABELS) as RecurrenceFreq[]).map(f => {
-                        const on = fRepeatFreq === f;
-                        return (
-                          <TouchableOpacity key={f} onPress={() => { setFRepeatFreq(f); if (f !== 'weekly') setFRepeatDays([]); }}
+                      {(Object.keys(FREQ_LABELS) as RecurrenceFreq[]).map(
+                        (f) => {
+                          const on = fRepeatFreq === f;
+                          return (
+                            <TouchableOpacity key={f} onPress={() => { setFRepeatFreq(f); if (f !== 'weekly') setFRepeatDays([]); }}
                             style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
                               backgroundColor: on ? fColor : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                            <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{FREQ_LABELS[f]}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+                              <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>
+                                {FREQ_LABELS[f]}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        },
+                      )}
                     </View>
 
                     {/* Interval stepper */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{isUk ? 'Кожні' : 'Every'}</Text>
+                      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
+                        {isUk ? "Кожні" : "Every"}
+                      </Text>
                       <TouchableOpacity onPress={() => setFRepeatInterval(i => Math.max(1, i - 1))}
-                        style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
+                        style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>−</Text>
                       </TouchableOpacity>
-                      <Text style={{ color: fColor, fontSize: 16, fontWeight: '800', minWidth: 24, textAlign: 'center' }}>{fRepeatInterval}</Text>
+                      <Text style={{ color: fColor, fontSize: 16, fontWeight: Atlas.type.headingWeight, minWidth: 24, textAlign: 'center' }}>
+                        {fRepeatInterval}
+                      </Text>
                       <TouchableOpacity onPress={() => setFRepeatInterval(i => Math.min(99, i + 1))}
-                        style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
+                        style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>+</Text>
                       </TouchableOpacity>
-                      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{intervalUnit(fRepeatInterval)}</Text>
+                      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
+                        {intervalUnit(fRepeatInterval)}
+                      </Text>
                     </View>
 
                     {/* Days of week (weekly only) */}
-                    {fRepeatFreq === 'weekly' && (
+                    {fRepeatFreq === "weekly" && (
                       <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
                         {wdShort.map((d, i) => {
                           const on = fRepeatDays.includes(i);
                           return (
                             <TouchableOpacity key={i}
                               onPress={() => setFRepeatDays(prev => on ? prev.filter(x => x !== i) : [...prev, i])}
-                              style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8,
+                              style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: Atlas.radius.small,
                                 backgroundColor: on ? fColor : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                              <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{d}</Text>
+                              <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>
+                                {d}
+                              </Text>
                             </TouchableOpacity>
                           );
                         })}
@@ -537,15 +571,17 @@ export function MeetingFormSheet({
                     )}
 
                     {/* End type */}
-                    <View style={{ flexDirection: 'row', gap: 7 }}>
-                      {(['never', 'until'] as const).map(type => {
+                    <View style={{ flexDirection: "row", gap: 7 }}>
+                      {(["never", "until"] as const).map((type) => {
                         const labels = { never: isUk ? 'Ніколи' : 'Never', until: isUk ? 'До дати' : 'Until' };
                         const on = fRepeatEndType === type;
                         return (
                           <TouchableOpacity key={type} onPress={() => setFRepeatEndType(type)}
                             style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
                               backgroundColor: on ? fColor : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                            <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>{labels[type]}</Text>
+                            <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>
+                              {labels[type]}
+                            </Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -601,7 +637,7 @@ export function MeetingFormSheet({
                 ) : null}
 
                 {/* Buttons */}
-                <View style={{ flexDirection: 'row', gap: 7 }}>
+                <View style={{ flexDirection: "row", gap: 7 }}>
                   {onDelete && (
                     <TouchableOpacity onPress={onDelete}
                       style={[s.btn, { backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.22)', paddingHorizontal: 13 }]}>
@@ -609,7 +645,9 @@ export function MeetingFormSheet({
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600', fontSize: 13 }}>{isUk ? 'Скасувати' : 'Cancel'}</Text>
+                    <Text style={{ color: c.sub, fontWeight: '600', fontSize: 13 }}>
+                      {isUk ? "Скасувати" : "Cancel"}
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={handleSave} disabled={!canSave}
                     style={[s.btn, { flex: 2, backgroundColor: canSave ? fColor : c.dim }]}>
@@ -619,7 +657,6 @@ export function MeetingFormSheet({
                     </Text>
                   </TouchableOpacity>
                 </View>
-
               </ScrollView>
             </BlurView>
           </Pressable>
@@ -635,9 +672,9 @@ const s = StyleSheet.create({
   // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
   // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
   // ScrollView усередині нічого не гортав (NAT-01).
-  sheet:   { borderRadius: 22, borderWidth: 1, padding: 16, overflow: 'hidden' },
+  sheet:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
   inp:     { borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontWeight: '600', borderWidth: 1.5 },
   pill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 9 },
-  chip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
+  chip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
   btn:     { paddingVertical: 11, borderRadius: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

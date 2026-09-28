@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/UndoToast.tsx
  *
@@ -157,7 +158,7 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 16,
+    borderRadius: Atlas.radius.large,
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 12,

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/AccountsTab.tsx — вкладка «Рахунки» (finance-revamp.md §2.1):
  * рахунки по валютах із балансами (ті самі цифри, що financeOverview),
@@ -61,7 +62,7 @@ export function AccountsTab({
               <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{a.name}</Text>
               <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{kindLabel(a.kind)}</Text>
             </View>
-            <Text style={{ color: balance < 0 ? c.red : c.text, fontSize: 15, fontWeight: '800' }}>{signed(balance, code)}</Text>
+            <Text style={{ color: balance < 0 ? c.red : c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{signed(balance, code)}</Text>
           </View>
           {goal ? (
             <View style={[st.bar, { backgroundColor: c.dim }]}>
@@ -84,7 +85,7 @@ export function AccountsTab({
     <View key={code} style={[st.card, { borderColor: c.border, backgroundColor: c.card }]}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
         <Text style={[st.cardTitle, { color: c.sub, flex: 1 }]}>{tr.finOnAccounts.replace('{currency}', code)}</Text>
-        <Text style={{ color: c.text, fontSize: 18, fontWeight: '800' }}>{signed(overview.totalByCurrency[code] ?? 0, code)}</Text>
+        <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight }}>{signed(overview.totalByCurrency[code] ?? 0, code)}</Text>
       </View>
       {list.map(row)}
     </View>
@@ -143,10 +144,10 @@ export function AccountsTab({
 }
 
 const st = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: 18, padding: 16, marginBottom: 12 },
+  card: { borderWidth: 1, borderRadius: Atlas.radius.xlarge, padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase' },
   row: { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 6 },
   bar: { height: 5, borderRadius: 3, marginTop: 6, overflow: 'hidden' },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: 12 },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: Atlas.radius.medium },
 });

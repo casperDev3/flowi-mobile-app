@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/more.tsx — розділ «Ще» простору проєкту.
  *
@@ -68,7 +69,7 @@ export default function ProjectMoreScreen() {
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 12,
                 minHeight: 56, paddingHorizontal: 14,
-                borderRadius: 14, borderWidth: 1, borderColor: c.border,
+                borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border,
                 backgroundColor: c.dim, marginBottom: 10,
               }}>
               <IconSymbol name={item.icon} size={20} color={c.accent} />

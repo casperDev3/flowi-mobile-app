@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/SubscriptionForm.tsx — створення й редагування підписки.
  *
@@ -131,31 +132,38 @@ export function SubscriptionForm({
           <Text style={[st.title, { color: c.text }]}>{editing ? tr.subEditTitle : tr.subNew}</Text>
 
           {/* Назва */}
-          <Text style={[st.label, { color: c.sub }]}>{tr.subName}</Text>
+          <Text style={[st.label, { color: c.sub }]}>{tr.subName}
+            <Text style={{ color: "#EF4444" }}> *</Text>
+          </Text>
           <TextInput
             value={draft.name}
-            onChangeText={name => patch({ name })}
+            onChangeText={(name) => patch({ name })}
             placeholder={tr.subNamePlaceholder}
             placeholderTextColor={c.sub}
             autoFocus={!editing}
             maxLength={120}
-            style={[st.input, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]}
+            style={[st.input, { color: c.text, borderColor: error && !draft.name.trim() ? "#EF4444" : c.border, backgroundColor: c.dim }]}
           />
 
           {/* Сума + валюта */}
-          <Text style={[st.label, { color: c.sub }]}>{tr.subAmountPerCycle}</Text>
+          <Text style={[st.label, { color: c.sub }]}>{tr.subAmountPerCycle}
+            <Text style={{ color: "#EF4444" }}> *</Text>
+          </Text>
           <TextInput
             value={draft.amount}
-            onChangeText={amount => patch({ amount })}
+            onChangeText={(amount) => patch({ amount })}
             placeholder="0"
             placeholderTextColor={c.sub}
             keyboardType="decimal-pad"
             accessibilityLabel={tr.subAmountPerCycle}
-            style={[st.input, { color: c.text, borderColor: c.border, backgroundColor: c.dim, fontSize: 18, fontWeight: '700' }]}
+            style={[st.input, { color: c.text, borderColor:
+                  error && !(Number(draft.amount.replace(",", ".")) > 0)
+                    ? "#EF4444"
+                    : c.border, backgroundColor: c.dim, fontSize: 18, fontWeight: '700' }]}
           />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginTop: 8 }}>
             <View style={st.chipsRow}>
-              {currencyList.map(cur => {
+              {currencyList.map((cur) => {
                 const on = draft.currency === cur.code;
                 return (
                   <TouchableOpacity
@@ -165,7 +173,9 @@ export function SubscriptionForm({
                     accessibilityState={{ selected: on }}
                     accessibilityLabel={`${tr.currency}: ${cur.code}`}
                     style={[st.chip, { backgroundColor: on ? c.accent : c.dim, borderColor: on ? c.accent : c.border }]}>
-                    <Text style={{ color: on ? '#fff' : c.text, fontSize: 13, fontWeight: '700' }}>{cur.symbol} {cur.code}</Text>
+                    <Text style={{ color: on ? '#fff' : c.text, fontSize: 13, fontWeight: '700' }}>
+                      {cur.symbol} {cur.code}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -173,9 +183,14 @@ export function SubscriptionForm({
           </ScrollView>
 
           {/* Період: кожні N + одиниця */}
-          <Text style={[st.label, { color: c.sub }]}>{tr.subPeriod}</Text>
+          <Text style={[st.label, { color: c.sub }]}>
+            {tr.subPeriod}
+            <Text style={{ color: "#EF4444" }}> *</Text>
+          </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{tr.subEvery}</Text>
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>
+              {tr.subEvery}
+            </Text>
             <TouchableOpacity
               onPress={() => patch({ every: String(Math.max(1, everyNum - 1)) })}
               accessibilityRole="button"
@@ -219,7 +234,10 @@ export function SubscriptionForm({
           </ScrollView>
 
           {/* Наступна оплата */}
-          <Text style={[st.label, { color: c.sub }]}>{tr.subNextPayment}</Text>
+          <Text style={[st.label, { color: c.sub }]}>
+            {tr.subNextPayment}
+            <Text style={{ color: "#EF4444" }}> *</Text>
+          </Text>
           <DateButton
             value={draft.nextPaymentDate}
             open={openCalendar === 'next'}
@@ -252,14 +270,16 @@ export function SubscriptionForm({
                   setOpenCalendar('end');
                 },
               },
-            ]).map(opt => (
+            ]).map((opt) => (
               <TouchableOpacity
                 key={opt.label}
                 onPress={opt.onPress}
                 accessibilityRole="button"
                 accessibilityState={{ selected: opt.on }}
                 style={[st.chip, { backgroundColor: opt.on ? c.accent : c.dim, borderColor: opt.on ? c.accent : c.border }]}>
-                <Text style={{ color: opt.on ? '#fff' : c.text, fontSize: 13, fontWeight: '600' }}>{opt.label}</Text>
+                <Text style={{ color: opt.on ? '#fff' : c.text, fontSize: 13, fontWeight: '600' }}>
+                  {opt.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -288,7 +308,7 @@ export function SubscriptionForm({
           <Text style={[st.label, { color: c.sub }]}>{tr.subReminder}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={st.chipsRow}>
-              {REMINDER_DAY_OPTIONS.map(days => {
+              {REMINDER_DAY_OPTIONS.map((days) => {
                 const on = draft.reminderDaysBefore === days;
                 return (
                   <TouchableOpacity
@@ -298,7 +318,9 @@ export function SubscriptionForm({
                     accessibilityState={{ selected: on }}
                     style={[st.chip, { backgroundColor: on ? c.accent : c.dim, borderColor: on ? c.accent : c.border }]}>
                     <IconSymbol name="bell" size={12} color={on ? '#fff' : c.sub} />
-                    <Text style={{ color: on ? '#fff' : c.text, fontSize: 13, fontWeight: '600' }}>{reminderLabel(days)}</Text>
+                    <Text style={{ color: on ? '#fff' : c.text, fontSize: 13, fontWeight: '600' }}>
+                      {reminderLabel(days)}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -343,7 +365,9 @@ export function SubscriptionForm({
             isDark={isDark}
             tr={tr}
           />
-          <Text style={{ color: c.sub, fontSize: 11, marginTop: 4 }}>{tr.subAccountHint}</Text>
+          <Text style={{ color: c.sub, fontSize: 11, marginTop: 4 }}>
+            {tr.subAccountHint}
+          </Text>
 
           {/* Іконка */}
           <Text style={[st.label, { color: c.sub }]}>{tr.icon}</Text>
@@ -413,7 +437,9 @@ export function SubscriptionForm({
           />
 
           {errorText ? (
-            <Text accessibilityLiveRegion="polite" style={{ color: c.red, fontSize: 13, fontWeight: '600', marginTop: 12 }}>{errorText}</Text>
+            <Text accessibilityLiveRegion="polite" style={{ color: c.red, fontSize: 13, fontWeight: '600', marginTop: 12 }}>
+              {errorText}
+            </Text>
           ) : null}
 
           <TouchableOpacity
@@ -421,7 +447,9 @@ export function SubscriptionForm({
             accessibilityRole="button"
             accessibilityLabel={tr.save}
             style={[st.saveBtn, { backgroundColor: c.accent }]}>
-            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{editing ? tr.save : tr.create}</Text>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
+              {editing ? tr.save : tr.create}
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </BlurView>
@@ -448,7 +476,9 @@ function DateButton({ value, open, onToggle, label, locale, c }: {
       accessibilityLabel={`${label}: ${text}`}
       style={[st.dateBtn, { borderColor: open ? c.accent : c.border, backgroundColor: c.dim }]}>
       <IconSymbol name="calendar" size={15} color={open ? c.accent : c.sub} />
-      <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{text}</Text>
+      <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>
+        {text}
+      </Text>
       <IconSymbol name={open ? 'chevron.up' : 'chevron.down'} size={13} color={c.sub} />
     </TouchableOpacity>
   );
@@ -501,17 +531,17 @@ function chunk<T>(arr: T[], n: number): T[][] {
 }
 
 const st = StyleSheet.create({
-  sheet:      { borderRadius: 24, borderWidth: 1, padding: 18, overflow: 'hidden' },
-  title:      { fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  sheet:      { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18, overflow: 'hidden' },
+  title:      { fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 4 },
   label:      { fontSize: 12, fontWeight: '700', marginTop: 14, marginBottom: 6, letterSpacing: 0.3 },
-  input:      { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15 },
+  input:      { borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15 },
   everyInput: { width: 64, textAlign: 'center', paddingVertical: 8, fontWeight: '700' },
-  stepBtn:    { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  stepBtn:    { width: 36, height: 36, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   chipsRow:   { flexDirection: 'row', gap: 7 },
-  chip:       { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8 },
-  dateBtn:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, minHeight: 44 },
-  calendar:   { borderRadius: 14, borderWidth: 1, padding: 10, marginTop: 8 },
-  iconOption: { flex: 1, aspectRatio: 1, maxWidth: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1.5 },
+  chip:       { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8 },
+  dateBtn:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, minHeight: 44 },
+  calendar:   { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 10, marginTop: 8 },
+  iconOption: { flex: 1, aspectRatio: 1, maxWidth: 52, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1.5 },
   swatch:     { width: 32, height: 32, borderRadius: 16, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  saveBtn:    { marginTop: 18, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  saveBtn:    { marginTop: 18, borderRadius: Atlas.radius.large, paddingVertical: 14, alignItems: 'center' },
 });

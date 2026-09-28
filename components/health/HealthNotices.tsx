@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/health/HealthNotices.tsx
  *
@@ -38,17 +39,17 @@ export function LoadErrorNotice({ lang, c, isDark, onRetry }: {
   const t = allTranslations[lang] ?? allTranslations.uk;
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: 16, borderWidth: 1, borderColor: ERR + '55', overflow: 'hidden', padding: 14, marginBottom: 12 }}>
+      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: ERR + '55', overflow: 'hidden', padding: 14, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <IconSymbol name="exclamationmark.triangle.fill" size={16} color={ERR} />
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: '800', marginLeft: 8, flex: 1 }}>{t.loadErrorTitle}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight, marginLeft: 8, flex: 1 }}>{t.loadErrorTitle}</Text>
       </View>
       <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{t.loadErrorBody}</Text>
       <TouchableOpacity
         onPress={onRetry}
         accessibilityRole="button"
         accessibilityLabel={t.loadErrorRetry}
-        style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: ERR }}>
+        style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: ERR }}>
         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.loadErrorRetry}</Text>
       </TouchableOpacity>
     </BlurView>
@@ -66,10 +67,10 @@ export function ReminderBlockedNotice({ lang, c, isDark, onOpenSettings, onDismi
   const t = allTranslations[lang] ?? allTranslations.uk;
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: 16, borderWidth: 1, borderColor: WARN + '55', overflow: 'hidden', padding: 14, marginBottom: 12 }}>
+      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: WARN + '55', overflow: 'hidden', padding: 14, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <IconSymbol name="bell.slash" size={16} color={WARN} />
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: '800', marginLeft: 8, flex: 1 }}>{t.healthReminderOff}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight, marginLeft: 8, flex: 1 }}>{t.healthReminderOff}</Text>
         {onDismiss ? (
           <TouchableOpacity onPress={onDismiss} accessibilityRole="button" accessibilityLabel={t.healthReminderOff}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -83,7 +84,7 @@ export function ReminderBlockedNotice({ lang, c, isDark, onOpenSettings, onDismi
           onPress={onOpenSettings}
           accessibilityRole="button"
           accessibilityLabel={t.healthNoticeSettings}
-          style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: WARN }}>
+          style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: WARN }}>
           <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.healthNoticeSettings}</Text>
         </TouchableOpacity>
       ) : null}
@@ -146,7 +147,7 @@ export function HealthKitStatus({ lang, c, hk, onGrant, onRetry }: {
           onPress={action === 'grant' ? onGrant : onRetry}
           accessibilityRole="button"
           accessibilityLabel={action === 'grant' ? t.hkGrant : t.loadErrorRetry}
-          style={{ marginTop: 8, alignSelf: 'flex-start', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: WARN }}>
+          style={{ marginTop: 8, alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: WARN }}>
           <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{action === 'grant' ? t.hkGrant : t.loadErrorRetry}</Text>
         </TouchableOpacity>
       ) : null}

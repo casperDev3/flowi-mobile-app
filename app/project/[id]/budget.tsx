@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/budget.tsx — Бюджет проєкту (WORKSPACE_PROJECTS_CONTRACT
  * §3.3 `project_budgets`, §4.1: «бюджет бачить лише власник»).
@@ -221,7 +222,7 @@ export default function ProjectBudgetScreen() {
         // виглядає мертвою.
         keyboardShouldPersistTaps="handled">
 
-        <View style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 16, marginBottom: 20 }}>
+        <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 16, marginBottom: 20 }}>
           <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 8 }}>{tr.projectBudgetLimit}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <TextInput
@@ -232,9 +233,9 @@ export default function ProjectBudgetScreen() {
               onChangeText={setAmountDraft}
               keyboardType="decimal-pad"
               onSubmitEditing={() => saveAmount(currency)}
-              style={{ flex: 1, color: c.text, fontSize: 20, fontWeight: '800', borderBottomWidth: 1, borderColor: c.border, paddingVertical: 6 }}
+              style={{ flex: 1, color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, borderBottomWidth: 1, borderColor: c.border, paddingVertical: 6 }}
             />
-            <TouchableOpacity onPress={() => saveAmount(currency)} style={{ backgroundColor: c.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 }}>
+            <TouchableOpacity onPress={() => saveAmount(currency)} style={{ backgroundColor: c.accent, borderRadius: Atlas.radius.medium, paddingHorizontal: 14, paddingVertical: 10 }}>
               <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
             </TouchableOpacity>
           </View>
@@ -273,7 +274,7 @@ export default function ProjectBudgetScreen() {
           onPress={() => { setTxError(null); setTxFormOpen(true); }}
           accessibilityRole="button"
           accessibilityLabel={tr.finProjectAddTx}
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: c.accent + '55', backgroundColor: c.accent + '14', marginBottom: 20 }}>
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.accent + '55', backgroundColor: c.accent + '14', marginBottom: 20 }}>
           <IconSymbol name="plus" size={15} color={c.accent} />
           <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.finProjectAddTx}</Text>
         </TouchableOpacity>
@@ -295,7 +296,7 @@ export default function ProjectBudgetScreen() {
           <Text style={{ color: c.sub, fontSize: 13, opacity: 0.8, marginBottom: 20 }}>{tr.subProjectEmpty}</Text>
         ) : (
           <View style={{ marginBottom: 20 }}>
-            <Text style={{ color: c.text, fontSize: 15, fontWeight: '800', marginBottom: 6 }}>{projectSubscriptions.monthlyLine}</Text>
+            <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight, marginBottom: 6 }}>{projectSubscriptions.monthlyLine}</Text>
             {projectSubscriptions.live.map(sub => {
               const overdue = subscriptionStatus(sub, projectSubscriptions.today ?? '') === 'overdue';
               return (
@@ -303,7 +304,7 @@ export default function ProjectBudgetScreen() {
                   key={sub.id}
                   onPress={() => router.push({ pathname: '/subscriptions', params: { open: sub.id } } as never)}
                   activeOpacity={0.75}
-                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
+                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
                   <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: sub.color || (project?.color ?? c.accent), marginRight: 10 }} />
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{sub.name}</Text>
@@ -324,7 +325,7 @@ export default function ProjectBudgetScreen() {
         {projectTx.length === 0 ? (
           <Text style={{ color: c.sub, fontSize: 13, opacity: 0.8 }}>{tr.projectBudgetNoTransactions}</Text>
         ) : projectTx.map(tx => (
-          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
+          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{tx.category || tx.note || '—'}</Text>
               <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
@@ -340,7 +341,7 @@ export default function ProjectBudgetScreen() {
         {projectIncome.length === 0 ? (
           <Text style={{ color: c.sub, fontSize: 13, opacity: 0.8 }}>{tr.finProjectNoIncome}</Text>
         ) : projectIncome.map(tx => (
-          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
+          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
             <View style={{ flex: 1 }}>
               <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{tx.category || tx.note || '—'}</Text>
               <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>

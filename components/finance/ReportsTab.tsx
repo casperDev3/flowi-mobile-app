@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/ReportsTab.tsx — вкладка «Звіти» (finance-revamp.md §5.3–§5.4, §9.1):
  * P&L (Доходи → Фіксовані → Змінні → Чистий результат → Норма заощаджень) з
@@ -108,7 +109,7 @@ export function ReportsTab(props: ReportsTabProps) {
     <View style={{ paddingVertical: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
         <Text style={{ color: c.text, fontSize: opts.strong ? 15 : 14, fontWeight: opts.strong ? '800' : '600', flex: 1 }}>{label}</Text>
-        <Text style={{ color: opts.color ?? c.text, fontSize: opts.strong ? 17 : 15, fontWeight: '800' }}>{value}</Text>
+        <Text style={{ color: opts.color ?? c.text, fontSize: opts.strong ? 17 : 15, fontWeight: Atlas.type.headingWeight }}>{value}</Text>
       </View>
       {deltaLine(field)}
     </View>
@@ -176,7 +177,7 @@ export function ReportsTab(props: ReportsTabProps) {
                   {categoryGroupLabel(g.group, tr)}
                   <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}> · {costKindLabel(g.cost, tr)}</Text>
                 </Text>
-                <Text style={{ color: c.text, fontSize: 14, fontWeight: '800' }}>{money(g.value, currency)}</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>{money(g.value, currency)}</Text>
                 <Text style={{ color: c.sub, fontSize: 12, width: 40, textAlign: 'right' }}>{Math.round(g.share * 100)}%</Text>
               </View>
               <View style={[st.bar, { backgroundColor: c.dim }]}>
@@ -231,11 +232,11 @@ export function ReportsTab(props: ReportsTabProps) {
 }
 
 const st = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: 18, padding: 16, marginBottom: 12 },
+  card: { borderWidth: 1, borderRadius: Atlas.radius.xlarge, padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 6 },
-  segment: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, padding: 2 },
-  segmentBtn: { minHeight: 32, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  segment: { flexDirection: 'row', borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 2 },
+  segmentBtn: { minHeight: 32, paddingHorizontal: 12, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
   bar: { height: 6, borderRadius: 3, marginTop: 6, overflow: 'hidden' },
-  hint: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, padding: 10, marginTop: 6 },
-  smallBtn: { minHeight: 36, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  hint: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 10, marginTop: 6 },
+  smallBtn: { minHeight: 36, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

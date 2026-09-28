@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/DialPicker.tsx — вибір циферблата.
  *
@@ -190,8 +191,8 @@ const st = StyleSheet.create({
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
     maxHeight: '82%',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: Atlas.radius.xlarge,
+    borderTopRightRadius: Atlas.radius.xlarge,
     paddingHorizontal: 14,
     paddingTop: 10,
   },
@@ -201,7 +202,7 @@ const st = StyleSheet.create({
   subtitle: { fontSize: 12, marginTop: 2 },
   grid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 8 },
   cell: {
-    borderRadius: 18,
+    borderRadius: Atlas.radius.xlarge,
     overflow: 'hidden',
     paddingVertical: 12,
     alignItems: 'center',
@@ -211,12 +212,12 @@ const st = StyleSheet.create({
   name:    { fontSize: 12 },
   defaultTag: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    borderWidth: StyleSheet.hairlineWidth, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: Atlas.radius.small, paddingHorizontal: 5, paddingVertical: 1,
   },
   defaultTagText: { fontSize: 10, fontWeight: '700' },
   makeDefault: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    minHeight: 44, borderRadius: 14, borderWidth: 1, marginTop: 8, paddingHorizontal: 12,
+    minHeight: 44, borderRadius: Atlas.radius.large, borderWidth: 1, marginTop: 8, paddingHorizontal: 12,
   },
   makeDefaultText: { fontSize: 14, fontWeight: '600' },
 });

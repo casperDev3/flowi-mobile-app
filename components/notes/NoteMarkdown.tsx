@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/notes/NoteMarkdown.tsx — показ тексту нотатки з розміткою.
  *
@@ -115,7 +116,7 @@ const s = StyleSheet.create({
   marker: { fontSize: 17, lineHeight: 26, width: 14, textAlign: 'center' },
   bar: { width: 3, alignSelf: 'stretch', borderRadius: 2 },
   // 44×44 — мінімальна ціль дотику; сам квадратик менший, поле навколо лишається.
-  box: { width: 24, height: 24, marginTop: 2, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  box: { width: 24, height: 24, marginTop: 2, borderRadius: Atlas.radius.small, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   action: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: -8 },
   code: { fontFamily: 'Courier', fontSize: 15 },
 });

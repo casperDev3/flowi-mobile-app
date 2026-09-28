@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/tasks.tsx — Завдання простору проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §3: «Завдання (Дошка / Список / Календар /
@@ -909,7 +910,7 @@ export default function ProjectTasksScreen() {
                   коментар угорі файлу); дати також редагуються текстом у
                   рядку під графіком (усі розміри екрана). */}
               {ganttChart ? (
-                <View style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginBottom: 6 }}>
+                <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginBottom: 6 }}>
                   <ProjectGantt
                     chart={ganttChart}
                     wide={isWide}
@@ -977,11 +978,11 @@ export default function ProjectTasksScreen() {
 const st = StyleSheet.create({
   viewChip: { width: 32, height: 32, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 7 },
-  boardColumn: { width: 240, borderRadius: 14, borderWidth: 1, padding: 10 },
-  timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 10 },
-  meetingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 9 },
-  dateEditRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, padding: 8, marginTop: 6 },
-  dateInput: { flex: 1, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12 },
-  saveDatesBtn: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
-  addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14 },
+  boardColumn: { width: 240, borderRadius: Atlas.radius.large, borderWidth: 1, padding: 10 },
+  timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10 },
+  meetingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 9 },
+  dateEditRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 8, marginTop: 6 },
+  dateInput: { flex: 1, borderWidth: 1, borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12 },
+  saveDatesBtn: { borderRadius: Atlas.radius.small, paddingHorizontal: 10, paddingVertical: 8 },
+  addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.large, borderWidth: 1, paddingHorizontal: 14 },
 });

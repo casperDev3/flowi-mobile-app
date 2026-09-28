@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * Вкладка «Нагадування» центру сповіщень — локально заплановані нагадування
  * ОС (notifications-module.md §10.4). Раніше це був увесь екран
@@ -310,7 +311,7 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
                 intensity={isDark ? 20 : 40}
                 tint={isDark ? 'dark' : 'light'}
                 style={[st.statCard, { borderColor: c.border, flex: 1 }]}>
-                <Text style={{ color: stat.color, fontSize: 24, fontWeight: '800' }}>{stat.value}</Text>
+                <Text style={{ color: stat.color, fontSize: 24, fontWeight: Atlas.type.headingWeight }}>{stat.value}</Text>
                 <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>{stat.label}</Text>
               </BlurView>
             ))}
@@ -407,18 +408,18 @@ const ReminderCard = React.memo(function ReminderCard({ item, meta, dateText, is
 
 const st = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginLeft: 2 },
-  card:         { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden' },
   toggleRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13 },
   iconBox:      { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  statCard:     { borderRadius: 14, borderWidth: 1, overflow: 'hidden', paddingVertical: 14, paddingHorizontal: 14 },
-  itemCard:     { borderRadius: 16, borderWidth: 1, overflow: 'hidden', paddingVertical: 6, paddingLeft: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  statCard:     { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', paddingVertical: 14, paddingHorizontal: 14 },
+  itemCard:     { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', paddingVertical: 6, paddingLeft: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   deleteBtnTarget: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  deleteBtn:    { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  banner:       { borderRadius: 16, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  deleteBtn:    { width: 28, height: 28, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
+  banner:       { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   bannerIcon:   { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   hint:         { fontSize: 12, lineHeight: 17, marginBottom: 8, marginHorizontal: 2 },
-  deleteAll:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 12, minHeight: 44, marginBottom: 16 },
-  emptyIcon:    { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  deleteAll:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: Atlas.radius.medium, minHeight: 44, marginBottom: 16 },
+  emptyIcon:    { width: 72, height: 72, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
   emptyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 18, paddingVertical: 11, borderRadius: 13, marginTop: 20 },
   emptyBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

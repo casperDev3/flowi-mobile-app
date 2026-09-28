@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -74,7 +75,8 @@ export default function LoginScreen() {
     const trimEmail = email.trim().toLowerCase();
     if (!trimEmail || !password) {
       haptic.error();
-      setPasswordError(tr.authInvalidCreds);
+      if (!trimEmail) setEmailError(tr.authInvalidEmail);
+      if (!password) setPasswordError(tr.authInvalidCreds);
       return;
     }
     if (!EMAIL_RE.test(trimEmail)) {
@@ -166,9 +168,18 @@ export default function LoginScreen() {
             >
               {/* Email */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEmail.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>
+                  {tr.authEmail.toUpperCase()}{" "}
+                  <Text style={{ color: c.red }}>*</Text>
+                </Text>
                 <TextInput
-                  style={[st.input, { color: c.text }]}
+                  style={[
+                    st.input,
+                    { color: c.text },
+                    emailError
+                      ? { borderWidth: 1, borderColor: c.red, borderRadius: Atlas.radius.small }
+                      : null,
+                  ]}
                   placeholderTextColor={c.sub}
                   placeholder="you@example.com"
                   value={email}
@@ -183,15 +194,30 @@ export default function LoginScreen() {
                 />
               </View>
               {emailError ? (
-                <Text style={[st.fieldError, { color: c.red }]}>{emailError}</Text>
+                <Text style={[st.fieldError, { color: c.red }]}>
+                  {emailError}
+                </Text>
               ) : null}
 
               {/* Password */}
               <View style={[st.fieldWrap, { borderTopColor: emailError ? c.border : 'transparent' }]}>
-                <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authPassword.toUpperCase()}</Text>
+                <Text style={[st.fieldLabel, { color: c.sub }]}>
+                  {tr.authPassword.toUpperCase()}{" "}
+                  <Text style={{ color: c.red }}>*</Text>
+                </Text>
                 <View style={st.passwordRow}>
                   <TextInput
-                    style={[st.input, { color: c.text, flex: 1 }]}
+                    style={[
+                      st.input,
+                      { color: c.text, flex: 1 },
+                      passwordError
+                        ? {
+                            borderWidth: 1,
+                            borderColor: c.red,
+                            borderRadius: Atlas.radius.small,
+                          }
+                        : null,
+                    ]}
                     placeholderTextColor={c.sub}
                     placeholder="••••••••"
                     value={password}
@@ -242,14 +268,18 @@ export default function LoginScreen() {
               style={st.linkBtn}
               onPress={() => router.push('/forgot-password')}
             >
-              <Text style={[st.linkText, { color: c.accent }]}>{tr.authForgotPassword}</Text>
+              <Text style={[st.linkText, { color: c.accent }]}>
+                {tr.authForgotPassword}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={st.linkBtn}
               onPress={() => router.replace('/register')}
             >
-              <Text style={[st.linkText, { color: c.sub }]}>{tr.authNoAccount}</Text>
+              <Text style={[st.linkText, { color: c.sub }]}>
+                {tr.authNoAccount}
+              </Text>
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -276,7 +306,7 @@ const st = StyleSheet.create({
     marginBottom: 24,
   },
   card: {
-    borderRadius: 18,
+    borderRadius: Atlas.radius.xlarge,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -315,7 +345,7 @@ const st = StyleSheet.create({
     paddingHorizontal: 4,
   },
   primaryBtn: {
-    borderRadius: 14,
+    borderRadius: Atlas.radius.large,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 20,

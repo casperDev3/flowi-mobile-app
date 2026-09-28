@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/TimeFilterSheet.tsx — фільтри, сортування і режим показу.
  *
@@ -247,12 +248,12 @@ function Chip({
 const s = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet: { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle: { fontSize: 20, fontWeight: '800' },
+  sheetTitle: { fontSize: 20, fontWeight: Atlas.type.headingWeight },
   label: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  chip: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', borderRadius: 10, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 7 },
-  btn: { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  chip: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 7 },
+  btn: { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

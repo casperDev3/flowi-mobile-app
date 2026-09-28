@@ -1956,6 +1956,13 @@ export interface Translations {
   ncEvFeedback: string;
   ncEvRegistration: string;
   // ── Групи тренувань (training-module.md, мобільний клієнт) — префікс tg ──
+  menuInviteLabel: string;
+  menuUpdatedLabel: string;
+  menuFeedbackLabel: string;
+  menuReviewedLabel: string;
+  menuNavLabel: string;
+  projectMembersEmailDeliveryFailed: string;
+  // ── Групи тренувань (training-module.md, мобільний клієнт) — префікс tg ──
   tgNavLabel: string;
   tgTitle: string;
   tgGroupsButton: string;
@@ -4194,6 +4201,14 @@ const uk: Translations = {
   ncEvFeedback: 'Статус звернення',
   ncEvRegistration: 'Нова заявка на реєстрацію',
   // ── Групи тренувань (training-module.md, мобільний клієнт) — префікс tg ──
+  menuInviteLabel: "Додано до меню",
+  menuUpdatedLabel: "Меню оновлено",
+  menuFeedbackLabel: "Пропозиції та скарги меню",
+  menuReviewedLabel: "Звернення опрацьовано",
+  menuNavLabel: "Меню",
+  projectMembersEmailDeliveryFailed:
+    "Учасника додано, але лист не надіслано. Перевірте налаштування пошти сервера.",
+  // ── Групи тренувань (training-module.md, мобільний клієнт) — префікс tg ──
   tgNavLabel: 'Тренування (групи)',
   tgTitle: 'Групи тренувань',
   tgGroupsButton: 'Групи тренувань',
@@ -6429,6 +6444,13 @@ const en: Translations = {
   ncEvFeedback: 'Feedback status',
   ncEvRegistration: 'New registration request',
   // ── Групи тренувань (training-module.md, мобільний клієнт) — префікс tg ──
+  menuInviteLabel: "Added to a menu",
+  menuUpdatedLabel: "Menu updated",
+  menuFeedbackLabel: "Menu feedback",
+  menuReviewedLabel: "Feedback reviewed",
+  menuNavLabel: "Menu",
+  projectMembersEmailDeliveryFailed:
+    "Member added, but email was not sent. Check server email settings.",
   tgNavLabel: 'Training groups',
   tgTitle: 'Training groups',
   tgGroupsButton: 'Training groups',

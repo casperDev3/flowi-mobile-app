@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import * as Notifications from 'expo-notifications';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -151,7 +152,7 @@ function ExerciseModal({
 
   const inp = {
     backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 10,
     color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border,
   } as const;
 
@@ -167,7 +168,7 @@ function ExerciseModal({
             <Text style={{ color: c.text, fontSize: 18, fontWeight: '700', flex: 1 }}>
               {exercise ? 'Редагувати вправу' : 'Нова вправа'}
             </Text>
-            <TouchableOpacity onPress={save} style={{ backgroundColor: ACCENT, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
+            <TouchableOpacity onPress={save} style={{ backgroundColor: ACCENT, borderRadius: Atlas.radius.medium, paddingHorizontal: 16, paddingVertical: 8 }}>
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Зберегти</Text>
             </TouchableOpacity>
           </View>
@@ -184,7 +185,7 @@ function ExerciseModal({
                     key={mg}
                     onPress={() => setMuscleGroup(mg === muscleGroup ? '' : mg)}
                     style={{
-                      paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+                      paddingHorizontal: 12, paddingVertical: 7, borderRadius: Atlas.radius.medium,
                       backgroundColor: muscleGroup === mg ? ACCENT + '20' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
                       borderWidth: 1, borderColor: muscleGroup === mg ? ACCENT + '60' : c.border,
                     }}>
@@ -273,7 +274,7 @@ function ProgramModal({
 
   const inp = {
     backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 10,
     color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border,
   } as const;
 
@@ -289,7 +290,7 @@ function ProgramModal({
             <Text style={{ color: c.text, fontSize: 18, fontWeight: '700', flex: 1 }}>
               {program ? 'Редагувати програму' : 'Нова програма'}
             </Text>
-            <TouchableOpacity onPress={save} style={{ backgroundColor: ACCENT, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
+            <TouchableOpacity onPress={save} style={{ backgroundColor: ACCENT, borderRadius: Atlas.radius.medium, paddingHorizontal: 16, paddingVertical: 8 }}>
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Зберегти</Text>
             </TouchableOpacity>
           </View>
@@ -323,12 +324,12 @@ function ProgramModal({
                   onPress={() => toggleEx(ex.id)}
                   style={{
                     flexDirection: 'row', alignItems: 'center', padding: 12,
-                    borderRadius: 12, marginBottom: 8,
+                    borderRadius: Atlas.radius.medium, marginBottom: 8,
                     backgroundColor: selectedEx.includes(ex.id) ? ACCENT + '15' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
                     borderWidth: 1, borderColor: selectedEx.includes(ex.id) ? ACCENT + '50' : c.border,
                   }}>
                   <View style={{
-                    width: 22, height: 22, borderRadius: 6,
+                    width: 22, height: 22, borderRadius: Atlas.radius.small,
                     backgroundColor: selectedEx.includes(ex.id) ? ACCENT : 'transparent',
                     borderWidth: selectedEx.includes(ex.id) ? 0 : 1.5,
                     borderColor: c.sub, alignItems: 'center', justifyContent: 'center', marginRight: 12,
@@ -350,7 +351,7 @@ function ProgramModal({
             <Text style={[sectionLabel(c), { marginTop: 16 }]}>Нагадування</Text>
             <View style={{
               backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-              borderRadius: 14, padding: 14, borderWidth: 1, borderColor: c.border,
+              borderRadius: Atlas.radius.large, padding: 14, borderWidth: 1, borderColor: c.border,
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: remOn ? 14 : 0 }}>
                 <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>Увімкнути нагадування</Text>
@@ -377,7 +378,7 @@ function ProgramModal({
                       key={idx}
                       onPress={() => toggleDay(idx)}
                       style={{
-                        flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center',
+                        flex: 1, paddingVertical: 8, borderRadius: Atlas.radius.small, alignItems: 'center',
                         backgroundColor: remDays.includes(idx) ? ACCENT : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
                       }}>
                       <Text style={{ color: remDays.includes(idx) ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{label}</Text>
@@ -445,7 +446,7 @@ function StatsModal({
       <LinearGradient colors={[isDark ? '#0C0C14' : '#F4F2FF', isDark ? '#14121E' : '#EAE6FF']} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}>
-            <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', flex: 1, letterSpacing: -0.5 }}>Статистика</Text>
+            <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, flex: 1, letterSpacing: -0.5 }}>Статистика</Text>
             <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <IconSymbol name="xmark" size={18} color={c.sub} />
@@ -461,9 +462,9 @@ function StatsModal({
                 { label: 'Стрік', value: streak, sub: 'днів' },
               ] as const).map(item => (
                 <BlurView key={item.label} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                  style={{ flex: 1, borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, alignItems: 'center' }}>
+                  style={{ flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, alignItems: 'center' }}>
                   <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{item.label}</Text>
-                  <Text style={{ color: c.text, fontSize: 24, fontWeight: '800', letterSpacing: -1 }}>{item.value}</Text>
+                  <Text style={{ color: c.text, fontSize: 24, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 }}>{item.value}</Text>
                   <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{item.sub}</Text>
                 </BlurView>
               ))}
@@ -471,15 +472,15 @@ function StatsModal({
 
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
               <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                style={{ flex: 1, borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, alignItems: 'center' }}>
+                style={{ flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, alignItems: 'center' }}>
                 <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Загальний час</Text>
-                <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.5 }}>{fmtDuration(totalMin)}</Text>
+                <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{fmtDuration(totalMin)}</Text>
               </BlurView>
               {totalCal > 0 && (
                 <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                  style={{ flex: 1, borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, alignItems: 'center' }}>
+                  style={{ flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, alignItems: 'center' }}>
                   <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Ккал спалено</Text>
-                  <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.5 }}>{totalCal}</Text>
+                  <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{totalCal}</Text>
                 </BlurView>
               )}
             </View>
@@ -487,12 +488,12 @@ function StatsModal({
             {/* 7-day chart */}
             <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Активність за 7 днів</Text>
             <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-              style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16, marginBottom: 16 }}>
+              style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16, marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 72 }}>
                 {last7.map((item, idx) => (
                   <View key={idx} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
                     <View style={{
-                      width: '100%', borderRadius: 6,
+                      width: '100%', borderRadius: Atlas.radius.small,
                       height: Math.max((item.count / max7) * 50, item.count > 0 ? 8 : 4),
                       backgroundColor: item.count > 0 ? ACCENT : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
                     }} />
@@ -506,17 +507,17 @@ function StatsModal({
             {byType.length > 0 && <>
               <Text style={[sectionLabel(c), { marginBottom: 10 }]}>За типом</Text>
               <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 16 }}>
+                style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 16 }}>
                 {byType.map((wt, idx) => (
                   <View key={wt.key} style={{
                     flexDirection: 'row', alignItems: 'center', padding: 14,
                     borderBottomWidth: idx < byType.length - 1 ? 1 : 0, borderBottomColor: c.border,
                   }}>
-                    <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: wt.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <View style={{ width: 34, height: 34, borderRadius: Atlas.radius.medium, backgroundColor: wt.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
                       <IconSymbol name={wt.icon as any} size={16} color={wt.color} />
                     </View>
                     <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{wt.label}</Text>
-                    <Text style={{ color: wt.color, fontSize: 18, fontWeight: '800' }}>{wt.count}</Text>
+                    <Text style={{ color: wt.color, fontSize: 18, fontWeight: Atlas.type.headingWeight }}>{wt.count}</Text>
                   </View>
                 ))}
               </BlurView>
@@ -525,15 +526,15 @@ function StatsModal({
             {/* This month */}
             <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Цього місяця</Text>
             <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-              style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16 }}>
+              style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16 }}>
               <View style={{ flexDirection: 'row', gap: 16 }}>
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ color: c.text, fontSize: 28, fontWeight: '800', letterSpacing: -1 }}>{thisMonth.length}</Text>
+                  <Text style={{ color: c.text, fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 }}>{thisMonth.length}</Text>
                   <Text style={{ color: c.sub, fontSize: 12 }}>тренувань</Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: c.border }} />
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>
+                  <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>
                     {fmtDuration(thisMonth.reduce((s, w) => s + w.durationMin, 0))}
                   </Text>
                   <Text style={{ color: c.sub, fontSize: 12 }}>загалом</Text>
@@ -584,8 +585,8 @@ const WorkoutRow = React.memo(function WorkoutRow({ w, c, isDark, lastInGroup, o
   const cfg = WORKOUT_TYPES.find(t => t.key === w.type) ?? WORKOUT_TYPES[6];
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: lastInGroup ? 24 : 8, flexDirection: 'row', alignItems: 'center' }}>
-      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: lastInGroup ? 24 : 8, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: 40, height: 40, borderRadius: Atlas.radius.medium, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
         <IconSymbol name={cfg.icon as any} size={20} color={cfg.color} />
       </View>
       <View style={{ flex: 1 }}>
@@ -610,8 +611,8 @@ const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onD
   const { tr } = useI18n();
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: 14, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
-      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: ACCENT2 + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: 40, height: 40, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT2 + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
         <IconSymbol name="dumbbell.fill" size={18} color={ACCENT2} />
       </View>
       <View style={{ flex: 1 }}>
@@ -649,7 +650,7 @@ const ProgramShortcut = React.memo(function ProgramShortcut({ prog, exercises, c
       activeOpacity={0.75}
       style={{
         flexDirection: 'row', alignItems: 'center',
-        padding: 14, borderRadius: 14, marginBottom: 10,
+        padding: 14, borderRadius: Atlas.radius.large, marginBottom: 10,
         backgroundColor: prog.color + '12',
         borderWidth: 1, borderColor: prog.color + '35',
       }}>
@@ -664,7 +665,7 @@ const ProgramShortcut = React.memo(function ProgramShortcut({ prog, exercises, c
             : `${prog.exerciseIds.length} вправ`}
         </Text>
       </View>
-      <View style={{ backgroundColor: prog.color + '20', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 }}>
+      <View style={{ backgroundColor: prog.color + '20', borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 7 }}>
         <Text style={{ color: prog.color, fontSize: 12, fontWeight: '700' }}>Старт</Text>
       </View>
     </TouchableOpacity>
@@ -679,10 +680,10 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
   const progExs = exercises.filter(e => prog.exerciseIds.includes(e.id));
   return (
     <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 12 }}>
+      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 12 }}>
       <View style={{ padding: 14 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: prog.color + '25', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+          <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: prog.color + '25', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
             <IconSymbol name="dumbbell.fill" size={18} color={prog.color} />
           </View>
           <View style={{ flex: 1 }}>
@@ -725,7 +726,7 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
 
         <TouchableOpacity
           onPress={() => onStart(prog)}
-          style={{ marginTop: 14, padding: 10, borderRadius: 10, backgroundColor: prog.color + '20', alignItems: 'center' }}>
+          style={{ marginTop: 14, padding: 10, borderRadius: Atlas.radius.medium, backgroundColor: prog.color + '20', alignItems: 'center' }}>
           <Text style={{ color: prog.color, fontSize: 13, fontWeight: '700' }}>Розпочати тренування</Text>
         </TouchableOpacity>
       </View>
@@ -993,7 +994,7 @@ export default function WorkoutsScreen() {
           onPress={openNewExercise}
           style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            gap: 8, padding: 14, borderRadius: 14, marginBottom: 16,
+            gap: 8, padding: 14, borderRadius: Atlas.radius.large, marginBottom: 16,
             backgroundColor: ACCENT2 + '15', borderWidth: 1, borderColor: ACCENT2 + '40',
           }}>
           <IconSymbol name="plus" size={16} color={ACCENT2} />
@@ -1007,7 +1008,7 @@ export default function WorkoutsScreen() {
           onPress={openNewProgram}
           style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            gap: 8, padding: 14, borderRadius: 14, marginBottom: 16,
+            gap: 8, padding: 14, borderRadius: Atlas.radius.large, marginBottom: 16,
             backgroundColor: ACCENT + '15', borderWidth: 1, borderColor: ACCENT + '40',
           }}>
           <IconSymbol name="plus" size={16} color={ACCENT} />
@@ -1019,22 +1020,22 @@ export default function WorkoutsScreen() {
       <>
         {todayStats.count > 0 && (
           <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-            style={{ borderRadius: 16, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16, marginBottom: 16 }}>
+            style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16, marginBottom: 16 }}>
             <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Сьогодні</Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{todayStats.count}</Text>
+                <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{todayStats.count}</Text>
                 <Text style={{ color: c.sub, fontSize: 11 }}>тренувань</Text>
               </View>
               <View style={{ width: 1, backgroundColor: c.border }} />
               <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{fmtDuration(todayStats.minutes)}</Text>
+                <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{fmtDuration(todayStats.minutes)}</Text>
                 <Text style={{ color: c.sub, fontSize: 11 }}>загалом</Text>
               </View>
               {todayStats.calories > 0 && <>
                 <View style={{ width: 1, backgroundColor: c.border }} />
                 <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                  <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.5 }}>{todayStats.calories}</Text>
+                  <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{todayStats.calories}</Text>
                   <Text style={{ color: c.sub, fontSize: 11 }}>ккал</Text>
                 </View>
               </>}
@@ -1061,7 +1062,7 @@ export default function WorkoutsScreen() {
     if (tab === 'exercises') {
       return (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: ACCENT2 + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+          <View style={{ width: 56, height: 56, borderRadius: Atlas.radius.xlarge, backgroundColor: ACCENT2 + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
             <IconSymbol name="dumbbell.fill" size={26} color={ACCENT2} />
           </View>
           <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає вправ</Text>
@@ -1072,7 +1073,7 @@ export default function WorkoutsScreen() {
     if (tab === 'programs') {
       return (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+          <View style={{ width: 56, height: 56, borderRadius: Atlas.radius.xlarge, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
             <IconSymbol name="list.bullet.clipboard" size={26} color={ACCENT} />
           </View>
           <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає програм</Text>
@@ -1086,7 +1087,7 @@ export default function WorkoutsScreen() {
     const hasPrograms = programs.length > 0;
     return (
       <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-        <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+        <View style={{ width: 56, height: 56, borderRadius: Atlas.radius.xlarge, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
           <IconSymbol name="figure.run" size={26} color={ACCENT} />
         </View>
         <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає тренувань</Text>
@@ -1098,7 +1099,7 @@ export default function WorkoutsScreen() {
             onPress={goToPrograms}
             style={{
               marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 8,
-              paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12,
+              paddingHorizontal: 18, paddingVertical: 11, borderRadius: Atlas.radius.medium,
               backgroundColor: ACCENT + '15', borderWidth: 1, borderColor: ACCENT + '40',
             }}>
             <IconSymbol name="plus" size={15} color={ACCENT} />
@@ -1162,7 +1163,7 @@ export default function WorkoutsScreen() {
                 key={t.key}
                 onPress={() => setTab(t.key)}
                 style={{
-                  flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center',
+                  flex: 1, paddingVertical: 8, borderRadius: Atlas.radius.medium, alignItems: 'center',
                   backgroundColor: tab === t.key ? ACCENT : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
                   borderWidth: 1, borderColor: tab === t.key ? ACCENT + '80' : c.border,
                 }}>

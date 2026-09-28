@@ -118,6 +118,10 @@ const EVENT_MODULES: Record<string, readonly string[]> = {
   'sprint.started': ['projects'],
   'sprint.closed': ['projects'],
   'project.invite': ['projects'],
+  'menu.invite': ['menu'],
+  'menu.updated': ['menu'],
+  'menu.feedback': ['menu'],
+  'menu.reviewed': ['menu'],
   'meeting.reminder': ['meetings'],
   'subscription.due_today': ['subscriptions'],
   'budget.limit_exceeded': ['budget'],
@@ -217,6 +221,10 @@ export function deepLinkRoute(url: string | null | undefined): string | null {
     case 'feedback': {
       const open = query.get('open');
       return open ? `/feedback?open=${enc(open)}` : '/feedback';
+    }
+    case 'menu': {
+      const space = query.get('space');
+      return space ? `/menu?space=${enc(space)}` : '/menu';
     }
     case 'training':
       return trainingDeepLinkRoute(parts.slice(1));

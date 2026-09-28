@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/feedback/FeedbackForm.tsx — форма ідеї / бага (§10.2).
  *
@@ -169,7 +170,9 @@ export function FeedbackForm({
           </View>
         ) : null}
 
-        <Text style={[st.label, { color: c.sub }]}>{tr.fbFieldTitle}</Text>
+        <Text style={[st.label, { color: c.sub }]}>{tr.fbFieldTitle}
+          <Text style={{ color: "#EF4444" }}> *</Text>
+        </Text>
         <TextInput
           value={draft.title}
           onChangeText={v => set('title', v)}
@@ -203,7 +206,7 @@ export function FeedbackForm({
           <Text style={{ fontWeight: '400' }}>{' · ' + tr.fbFieldPlatformsHint}</Text>
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {FEEDBACK_PLATFORMS.map(platform => {
+          {FEEDBACK_PLATFORMS.map((platform) => {
             const active = draft.platforms.includes(platform);
             return (
               <TouchableOpacity
@@ -213,13 +216,17 @@ export function FeedbackForm({
                 accessibilityState={{ checked: active }}
                 accessibilityLabel={`${tr.fbFieldPlatforms}: ${platformLabel(tr, platform)}`}
                 style={[st.chip, { borderColor: active ? accent : c.border, backgroundColor: active ? accent + '20' : c.dim }]}>
-                <Text style={{ color: active ? accent : c.sub, fontSize: 12, fontWeight: '600' }}>{platformLabel(tr, platform)}</Text>
+                <Text style={{ color: active ? accent : c.sub, fontSize: 12, fontWeight: '600' }}>
+                  {platformLabel(tr, platform)}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <Text style={[st.label, { color: c.sub }]}>{isBug ? tr.fbFieldSeverity : tr.fbFieldPriority}</Text>
+        <Text style={[st.label, { color: c.sub }]}>
+          {isBug ? tr.fbFieldSeverity : tr.fbFieldPriority}
+        </Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {(isBug ? SEVERITIES : PRIORITIES).map(weight => {
             const style = isBug ? SEVERITY_STYLE[weight as BugSeverity] : PRIORITY_STYLE[weight as IdeaPriority];
@@ -244,7 +251,14 @@ export function FeedbackForm({
         </View>
 
         <Text style={[st.label, { color: c.sub }]}>
-          {isBug ? `${tr.fbFieldDescription} · ${tr.fbOptional}` : tr.fbFieldDescription}
+          {isBug ? (
+            `${tr.fbFieldDescription} · ${tr.fbOptional}`
+          ) : (
+            <>
+              {tr.fbFieldDescription}
+              <Text style={{ color: "#EF4444" }}> *</Text>
+            </>
+          )}
         </Text>
         <TextInput
           value={draft.description}
@@ -272,7 +286,9 @@ export function FeedbackForm({
               accessibilityLabel={tr.fbFieldSteps}
               style={[inputStyle, st.multi, invalid('steps')]}
             />
-            <Text style={[st.label, { color: c.sub }]}>{tr.fbFieldExpected}</Text>
+            <Text style={[st.label, { color: c.sub }]}>
+              {tr.fbFieldExpected}
+            </Text>
             <TextInput
               value={draft.expected}
               onChangeText={v => set('expected', v)}
@@ -305,13 +321,16 @@ export function FeedbackForm({
         <Text style={{ color: c.sub, fontSize: 12, marginBottom: 8 }}>
           {attachmentsLocked ? tr.fbAttachLocked : tr.fbAttachHint.replace('{max}', String(MAX_ATTACHMENTS))}
         </Text>
-        {draft.attachments.map(att => (
+        {draft.attachments.map((att) => (
           <View key={att.uid} style={[st.attRow, { borderColor: c.border, backgroundColor: c.dim }]}>
             <IconSymbol name={att.kind === 'video' ? 'play.circle.fill' : 'camera.fill'} size={15} color={c.sub} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{att.name}</Text>
+              <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+                {att.name}
+              </Text>
               <Text style={{ color: c.sub, fontSize: 11 }}>
-                {formatBytes(att.bytes, tr)} · {attachmentStateLabel(tr, att.state, localFileUids.has(att.uid))}
+                {formatBytes(att.bytes, tr)} ·{" "}
+                {attachmentStateLabel(tr, att.state, localFileUids.has(att.uid))}
               </Text>
             </View>
             {!attachmentsLocked ? (
@@ -333,18 +352,28 @@ export function FeedbackForm({
             accessibilityLabel={tr.fbAddAttachment}
             style={[st.addAtt, { borderColor: c.border }]}>
             {picking ? <ActivityIndicator size="small" color={accent} /> : <IconSymbol name="plus" size={14} color={accent} />}
-            <Text style={{ color: accent, fontWeight: '700', fontSize: 13 }}>{tr.fbAddAttachment}</Text>
+            <Text style={{ color: accent, fontWeight: '700', fontSize: 13 }}>
+              {tr.fbAddAttachment}
+            </Text>
           </TouchableOpacity>
         ) : null}
 
         {canSend ? (
           <View style={[st.ctxBox, { borderColor: c.border }]}>
-            <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>{tr.fbContext}</Text>
-            <Text style={{ color: c.sub, fontSize: 11, marginBottom: 6 }}>{tr.fbContextHint}</Text>
-            {contextRows(tr, contextPreview).map(row => (
+            <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>
+              {tr.fbContext}
+            </Text>
+            <Text style={{ color: c.sub, fontSize: 11, marginBottom: 6 }}>
+              {tr.fbContextHint}
+            </Text>
+            {contextRows(tr, contextPreview).map((row) => (
               <View key={row.label} style={st.ctxRow}>
-                <Text style={{ color: c.sub, fontSize: 12, width: 96 }}>{row.label}</Text>
-                <Text style={{ color: c.text, fontSize: 12, flex: 1 }} numberOfLines={1}>{row.value}</Text>
+                <Text style={{ color: c.sub, fontSize: 12, width: 96 }}>
+                  {row.label}
+                </Text>
+                <Text style={{ color: c.text, fontSize: 12, flex: 1 }} numberOfLines={1}>
+                  {row.value}
+                </Text>
               </View>
             ))}
           </View>
@@ -353,7 +382,9 @@ export function FeedbackForm({
         {!isNew && !canSend ? (
           // «Що надіслав — те й надіслав» (§15 п. 3): правка лишається в
           // особистому списку, звернення на сервері не змінюється.
-          <Text style={{ color: c.sub, fontSize: 12, marginTop: 14 }}>{tr.fbEditAfterSent}</Text>
+          <Text style={{ color: c.sub, fontSize: 12, marginTop: 14 }}>
+            {tr.fbEditAfterSent}
+          </Text>
         ) : null}
 
         {showMissing && missing.length ? (
@@ -370,7 +401,9 @@ export function FeedbackForm({
             onPress={() => submit(false)}
             accessibilityRole="button"
             style={[st.btn, { flex: canSend ? 1.4 : 2, backgroundColor: canSend ? c.dim : accent, borderWidth: canSend ? 1 : 0, borderColor: accent }]}>
-            <Text style={{ color: canSend ? accent : '#fff', fontWeight: '700' }}>{canSend ? tr.fbSaveDraft : tr.fbSave}</Text>
+            <Text style={{ color: canSend ? accent : '#fff', fontWeight: '700' }}>
+              {canSend ? tr.fbSaveDraft : tr.fbSave}
+            </Text>
           </TouchableOpacity>
         </View>
         {canSend ? (
@@ -379,7 +412,9 @@ export function FeedbackForm({
             accessibilityRole="button"
             style={[st.btn, { marginTop: 8, backgroundColor: accent }]}>
             <IconSymbol name="paperplane.fill" size={15} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 6 }}>{tr.fbSaveAndSend}</Text>
+            <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 6 }}>
+              {tr.fbSaveAndSend}
+            </Text>
           </TouchableOpacity>
         ) : null}
       </ScrollView>
@@ -388,21 +423,21 @@ export function FeedbackForm({
 }
 
 const st = StyleSheet.create({
-  sheet:      { borderRadius: 24, borderWidth: 1, padding: 20, paddingTop: 4, overflow: 'hidden', flexShrink: 1 },
-  sheetTitle: { fontSize: 20, fontWeight: '800', marginBottom: 12 },
-  segment:    { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3, marginBottom: 4 },
+  sheet:      { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, paddingTop: 4, overflow: 'hidden', flexShrink: 1 },
+  sheetTitle: { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 12 },
+  segment:    { flexDirection: 'row', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 3, marginBottom: 4 },
   segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 9 },
   label:      { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input:      { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500', borderWidth: 1 },
+  input:      { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500', borderWidth: 1 },
   multi:      { minHeight: 84 },
   multiShort: { minHeight: 60 },
-  chip:       { borderRadius: 10, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8 },
-  weightBtn:  { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  attRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 6 },
-  addAtt:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, paddingVertical: 12, minHeight: 44 },
-  ctxBox:     { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 16 },
+  chip:       { borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8 },
+  weightBtn:  { flex: 1, paddingVertical: 10, borderRadius: Atlas.radius.medium, alignItems: 'center' },
+  attRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 10, marginBottom: 6 },
+  addAtt:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderRadius: Atlas.radius.medium, paddingVertical: 12, minHeight: 44 },
+  ctxBox:     { borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 12, marginTop: 16 },
   ctxRow:     { flexDirection: 'row', gap: 8, paddingVertical: 2 },
   missing:    { color: '#EF4444', fontSize: 12, fontWeight: '600', marginTop: 12 },
   actions:    { flexDirection: 'row', gap: 8, marginTop: 18 },
-  btn:        { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', minHeight: 44 },
+  btn:        { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', minHeight: 44 },
 });

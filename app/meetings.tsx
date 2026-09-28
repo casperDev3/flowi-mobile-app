@@ -1,3 +1,6 @@
+import { Atlas } from '@/constants/atlas';
+import { Audio as AVAudio } from 'expo-av';
+import { setAdvertisingRecording } from '@/store/advertising-safety';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -49,10 +52,6 @@ import {
 
 /** Мінімум проєкту для чипа й поля «Проєкт» форми. */
 interface MeetingsProject extends MeetingChipProject { archivedAt?: string }
-
-// ─── expo-av conditional (install with: npx expo install expo-av) ────────────
-let AVAudio: any = null;
-try { AVAudio = require('expo-av').Audio; } catch {}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -219,12 +218,12 @@ const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, on
         backgroundColor: selected ? mtg.color + '20' : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.72)',
       }]}>
         {/* Left accent bar */}
-        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: selected ? 5 : 3, backgroundColor: mtg.color, borderTopLeftRadius: 12, borderBottomLeftRadius: 12 }} />
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: selected ? 5 : 3, backgroundColor: mtg.color, borderTopLeftRadius: Atlas.radius.medium, borderBottomLeftRadius: Atlas.radius.medium }} />
 
         <View style={{ marginLeft: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {/* Time column */}
           <View style={{ alignItems: 'center', minWidth: 50 }}>
-            <Text style={{ color: mtg.color, fontSize: 15, fontWeight: '800', letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
+            <Text style={{ color: mtg.color, fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
             <Text style={{ color: mtg.color + 'AA', fontSize: 10, fontWeight: '600', marginTop: 1 }}>{dur}</Text>
             {showDate && dateDisp && (
               <Text style={{ color: c.sub, fontSize: 9, fontWeight: '600', marginTop: 2, textAlign: 'center' }} numberOfLines={2}>{dateDisp}</Text>
@@ -269,7 +268,7 @@ const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, on
           {onRecord && (
             <TouchableOpacity onPress={e => { e.stopPropagation(); onRecord(mtg); }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={{ width: 28, height: 28, borderRadius: 8,
+              style={{ width: 28, height: 28, borderRadius: Atlas.radius.small,
                 backgroundColor: (mtg.recordings?.length ?? 0) > 0 ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.07)',
                 alignItems: 'center', justifyContent: 'center' }}>
               <IconSymbol name={(mtg.recordings?.length ?? 0) > 0 ? 'waveform' : 'mic'} size={12}
@@ -280,7 +279,7 @@ const MeetingCard = React.memo(function MeetingCard({ mtg, onPress, onDelete, on
           {/* Delete */}
           <TouchableOpacity onPress={e => { e.stopPropagation(); onDelete(mtg); }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+            style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name="trash" size={12} color="#EF4444" />
           </TouchableOpacity>
         </View>
@@ -319,7 +318,7 @@ function WeekStrip({ weekStart, meetingsByDate, selected, onSelect, c }: {
         const dowIdx = dow === 0 ? 6 : dow - 1;
         return (
           <TouchableOpacity key={dStr} onPress={() => onSelect(dStr)}
-            style={{ flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 12,
+            style={{ flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: Atlas.radius.medium,
               backgroundColor: isSel ? ACCENT : isToday ? ACCENT + '15' : c.dim,
               borderWidth: isToday && !isSel ? 1.5 : 0, borderColor: ACCENT }}>
             <Text style={{ color: isSel ? 'rgba(255,255,255,0.7)' : c.sub, fontSize: 10, fontWeight: '600' }}>
@@ -551,7 +550,7 @@ export default function MeetingsScreen() {
     setGcalClientInput('');
   }, []);
 
-  const connectGoogleCalendar = useCallback(async () => {
+  const connectGoogleCalendar = async () => {
     if (!isOnlineMode()) { Alert.alert('Офлайн', 'Недоступно в офлайн-режимі'); return; }
     const clientId = gcalClientIdRef.current;
     if (!clientId) return;
@@ -602,7 +601,7 @@ export default function MeetingsScreen() {
       if (__DEV__) console.warn('[gcal] connect error:', e);
       Alert.alert('Помилка підключення', e?.message ?? 'Спробуйте ще раз.');
     }
-  }, []);
+  };
 
   const getValidGcalToken = useCallback(async (): Promise<string | null> => {
     const expiry = await SecureStore.getItemAsync(GCAL_EXPIRY_KEY);
@@ -737,6 +736,7 @@ export default function MeetingsScreen() {
       await AVAudio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
       const { recording } = await AVAudio.Recording.createAsync(AVAudio.RecordingOptionsPresets.HIGH_QUALITY);
       recordingRef.current = recording;
+      setAdvertisingRecording(true);
       setRecordingMtgId(mtgId);
       setIsRecording(true);
       setRecordingStartedAt(Date.now());
@@ -753,6 +753,7 @@ export default function MeetingsScreen() {
       await AVAudio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
+      setAdvertisingRecording(false);
       setIsRecording(false);
       setRecordingStartedAt(null);
 
@@ -800,6 +801,7 @@ export default function MeetingsScreen() {
 
   // Cleanup on unmount
   useEffect(() => () => {
+    setAdvertisingRecording(false);
     recordingRef.current?.stopAndUnloadAsync().catch(() => {});
     soundRef.current?.unloadAsync().catch(() => {});
   }, []);
@@ -1166,12 +1168,12 @@ export default function MeetingsScreen() {
           {/* ── Period navigation ── */}
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 }}>
             <TouchableOpacity onPress={goBack}
-              style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
+              style={{ width: 32, height: 32, borderRadius: Atlas.radius.medium, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
               <IconSymbol name="chevron.left" size={15} color={c.sub} />
             </TouchableOpacity>
             <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 14, fontWeight: '700' }}>{spanTitle}</Text>
             <TouchableOpacity onPress={goFwd}
-              style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
+              style={{ width: 32, height: 32, borderRadius: Atlas.radius.medium, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
               <IconSymbol name="chevron.right" size={15} color={c.sub} />
             </TouchableOpacity>
           </View>
@@ -1180,12 +1182,12 @@ export default function MeetingsScreen() {
           <View style={{ flexDirection: 'row', gap: 10, marginHorizontal: 16, marginBottom: 14 }}>
             <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
               style={[s.statCard, { borderColor: c.border, flex: 1 }]}>
-              <Text style={{ color: ACCENT, fontSize: 22, fontWeight: '800' }}>{stats.total}</Text>
+              <Text style={{ color: ACCENT, fontSize: 22, fontWeight: Atlas.type.headingWeight }}>{stats.total}</Text>
               <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>зустрічей</Text>
             </BlurView>
             <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
               style={[s.statCard, { borderColor: c.border, flex: 1 }]}>
-              <Text style={{ color: ACCENT, fontSize: 22, fontWeight: '800' }}>{stats.timeStr}</Text>
+              <Text style={{ color: ACCENT, fontSize: 22, fontWeight: Atlas.type.headingWeight }}>{stats.timeStr}</Text>
               <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>загальний час</Text>
             </BlurView>
           </View>
@@ -1273,7 +1275,7 @@ export default function MeetingsScreen() {
 
                 {/* Google icon + title */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#4285F4' + '18',
+                  <View style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, backgroundColor: '#4285F4' + '18',
                     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#4285F4' + '30' }}>
                     <IconSymbol name="calendar" size={22} color="#4285F4" />
                   </View>
@@ -1290,7 +1292,7 @@ export default function MeetingsScreen() {
                 {!gcalClientId && (
                   <>
                     {/* Steps */}
-                    <View style={{ backgroundColor: c.dim, borderRadius: 14, padding: 14, marginBottom: 16, gap: 10 }}>
+                    <View style={{ backgroundColor: c.dim, borderRadius: Atlas.radius.large, padding: 14, marginBottom: 16, gap: 10 }}>
                       {[
                         ['1', 'Відкрийте console.cloud.google.com'],
                         ['2', 'Увімкніть Google Calendar API'],
@@ -1300,7 +1302,7 @@ export default function MeetingsScreen() {
                         <View key={n} style={{ flexDirection: 'row', gap: 10 }}>
                           <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#4285F4' + '20',
                             alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#4285F4' }}>{n}</Text>
+                            <Text style={{ fontSize: 11, fontWeight: Atlas.type.headingWeight, color: '#4285F4' }}>{n}</Text>
                           </View>
                           <Text style={{ fontSize: 13, color: c.sub, flex: 1, lineHeight: 19 }}>{text}</Text>
                         </View>
@@ -1337,7 +1339,7 @@ export default function MeetingsScreen() {
                 {/* ── STATE 2: Client ID set, not connected ── */}
                 {gcalClientId && !gcalToken && (
                   <>
-                    <View style={{ backgroundColor: '#4285F4' + '10', borderRadius: 12, padding: 12, marginBottom: 16,
+                    <View style={{ backgroundColor: '#4285F4' + '10', borderRadius: Atlas.radius.medium, padding: 12, marginBottom: 16,
                       borderWidth: 1, borderColor: '#4285F4' + '25' }}>
                       <Text style={{ fontSize: 11, color: c.sub, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>CLIENT ID</Text>
                       <Text style={{ fontSize: 13, color: c.text, marginTop: 4 }} numberOfLines={1}>
@@ -1368,7 +1370,7 @@ export default function MeetingsScreen() {
                   <>
                     {gcalLastSync && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14,
-                        paddingVertical: 10, borderRadius: 12, backgroundColor: '#34A853' + '10',
+                        paddingVertical: 10, borderRadius: Atlas.radius.medium, backgroundColor: '#34A853' + '10',
                         borderWidth: 1, borderColor: '#34A853' + '30', marginBottom: 16 }}>
                         <IconSymbol name="checkmark.circle.fill" size={16} color="#34A853" />
                         <View style={{ flex: 1 }}>
@@ -1376,7 +1378,7 @@ export default function MeetingsScreen() {
                           <Text style={{ fontSize: 12, color: c.sub, marginTop: 1 }}>{gcalLastSync}</Text>
                         </View>
                         {gcalImportCount > 0 && (
-                          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: '#34A853' + '20' }}>
+                          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: Atlas.radius.small, backgroundColor: '#34A853' + '20' }}>
                             <Text style={{ fontSize: 12, fontWeight: '700', color: '#34A853' }}>+{gcalImportCount} нових</Text>
                           </View>
                         )}
@@ -1421,7 +1423,7 @@ export default function MeetingsScreen() {
           onPress={() => { if (!isRecording) setRecordingMtgId(null); }}>
           <Pressable accessible={false} onPress={e => e.stopPropagation()}
             accessibilityViewIsModal importantForAccessibility="yes"
-            style={{ backgroundColor: isDark ? '#12121E' : '#FFFFFF', borderRadius: 24, padding: 28,
+            style={{ backgroundColor: isDark ? '#12121E' : '#FFFFFF', borderRadius: Atlas.radius.xlarge, padding: 28,
               alignItems: 'center', width: 280, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20 }}>
 
             {/* Pulsing circle indicator */}
@@ -1436,20 +1438,20 @@ export default function MeetingsScreen() {
             </Text>
             <RecordingClock
               startedAt={recordingStartedAt}
-              style={{ fontSize: 28, fontWeight: '800', color: isRecording ? '#EF4444' : ACCENT,
+              style={{ fontSize: 28, fontWeight: Atlas.type.headingWeight, color: isRecording ? '#EF4444' : ACCENT,
                 letterSpacing: 2, marginBottom: 24, fontVariant: ['tabular-nums'] }}
             />
 
             {isRecording ? (
               <TouchableOpacity onPress={stopRecording}
-                style={{ backgroundColor: '#EF4444', borderRadius: 16, paddingVertical: 14,
+                style={{ backgroundColor: '#EF4444', borderRadius: Atlas.radius.large, paddingVertical: 14,
                   paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <IconSymbol name="stop.fill" size={16} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Зупинити</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity onPress={() => recordingMtgId && startRecording(recordingMtgId)}
-                style={{ backgroundColor: ACCENT, borderRadius: 16, paddingVertical: 14,
+                style={{ backgroundColor: ACCENT, borderRadius: Atlas.radius.large, paddingVertical: 14,
                   paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <IconSymbol name="mic.fill" size={16} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Почати запис</Text>
@@ -1467,21 +1469,21 @@ export default function MeetingsScreen() {
 
 const s = StyleSheet.create({
   hBtn:     { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  statCard: { borderRadius: 14, borderWidth: 1, padding: 14, alignItems: 'center', overflow: 'hidden' },
-  card:     { borderRadius: 12, paddingVertical: 9, paddingHorizontal: 8, overflow: 'hidden' },
-  emptyBox: { alignItems: 'center', paddingVertical: 48, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed' },
-  addMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 10 },
-  fab:      { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  statCard: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, alignItems: 'center', overflow: 'hidden' },
+  card:     { borderRadius: Atlas.radius.medium, paddingVertical: 9, paddingHorizontal: 8, overflow: 'hidden' },
+  emptyBox: { alignItems: 'center', paddingVertical: 48, borderRadius: Atlas.radius.large, borderWidth: 1, borderStyle: 'dashed' },
+  addMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 10 },
+  fab:      { position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
-  sheet:    { borderRadius: 22, borderWidth: 1, padding: 16, overflow: 'hidden' },
+  sheet:    { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
   label:    { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, color: '#888', marginBottom: 6, marginTop: 12 },
-  input:    { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
+  input:    { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
   inp:      { borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontWeight: '600', borderWidth: 1.5 },
   pill:     { flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 9 },
   detailRow:{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9 },
-  row:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
-  chip:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
+  row:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
+  chip:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: Atlas.radius.medium, borderWidth: 1 },
   btn:      { paddingVertical: 11, borderRadius: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  fieldBox: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 12 },
+  fieldBox: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 12 },
 });

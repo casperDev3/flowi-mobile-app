@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * Картка одного сповіщення інбоксу.
  *
@@ -97,7 +98,7 @@ export const NotificationRow = React.memo(function NotificationRow({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
+    borderRadius: Atlas.radius.large,
     borderWidth: 1,
     overflow: 'hidden',
     flexDirection: 'row',
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   main: { flex: 1, flexDirection: 'row', padding: 12, paddingRight: 4, minHeight: 44 },
-  iconBox: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  iconBox: { width: 34, height: 34, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   textCol: { flex: 1, marginLeft: 12, minWidth: 0 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   title: { flex: 1, fontSize: 14 },
@@ -117,5 +118,5 @@ const styles = StyleSheet.create({
   // Ціль 44×44 власними розмірами, а не hitSlop: кнопка стоїть впритул до
   // краю картки, і hitSlop за межі батька не працює (CLAUDE.md, A11Y-08).
   archiveBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  archiveIcon: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  archiveIcon: { width: 26, height: 26, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
 });

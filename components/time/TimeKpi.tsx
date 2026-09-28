@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/TimeKpi.tsx — KPI сторінки «Час».
  *
@@ -109,15 +110,15 @@ export function TimeKpi({
 function StatCell({ value, label, color, sub }: { value: string; label: string; color: string; sub: string }) {
   return (
     <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4 }}>
-      <Text numberOfLines={1} adjustsFontSizeToFit style={{ color, fontSize: 16, fontWeight: '800' }}>{value}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={{ color, fontSize: 16, fontWeight: Atlas.type.headingWeight }}>{value}</Text>
       <Text numberOfLines={2} style={{ color: sub, fontSize: 10, fontWeight: '500', marginTop: 3, textAlign: 'center' }}>{label}</Text>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  statsRow: { flexDirection: 'row', borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  card: { borderRadius: 18, borderWidth: 1, padding: 16, overflow: 'hidden' },
+  statsRow: { flexDirection: 'row', borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden' },
+  card: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
   cardTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   progressBg: { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 2 },

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/ModuleGate.tsx — заглушка вимкненого розділу ЗА МАРШРУТОМ.
  *
@@ -132,11 +133,11 @@ export function ModuleGate({
 
 const st = StyleSheet.create({
   stub:            { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
-  stubIcon:        { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  stubTitle:       { fontSize: 20, fontWeight: '800', textAlign: 'center', letterSpacing: -0.3 },
+  stubIcon:        { width: 64, height: 64, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  stubTitle:       { fontSize: 20, fontWeight: Atlas.type.headingWeight, textAlign: 'center', letterSpacing: -0.3 },
   stubModule:      { fontSize: 14, fontWeight: '700' },
   stubBody:        { fontSize: 14, lineHeight: 20, textAlign: 'center' },
   // 48 заввишки — вище мінімальних 44pt за HIG: це головна дія на екрані.
-  stubButton:      { marginTop: 12, height: 48, minWidth: 200, borderRadius: 14, paddingHorizontal: 22, alignItems: 'center', justifyContent: 'center' },
+  stubButton:      { marginTop: 12, height: 48, minWidth: 200, borderRadius: Atlas.radius.large, paddingHorizontal: 22, alignItems: 'center', justifyContent: 'center' },
   stubButtonLabel: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

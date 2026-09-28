@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskCalendarView.tsx
  *
@@ -119,7 +120,7 @@ export function TaskCalendarView<T extends CalendarTask>({
                           onPress={() => nav.setWeekDay(d)}
                           activeOpacity={0.75}
                           style={{
-                            flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 16,
+                            flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Atlas.radius.large,
                             backgroundColor: isSel ? c.accent : isToday ? c.accent + '18' : c.dim,
                             borderWidth: 1,
                             borderColor: isSel ? c.accent : isToday ? c.accent + '60' : c.border,
@@ -131,7 +132,7 @@ export function TaskCalendarView<T extends CalendarTask>({
                             {WEEKDAYS_SHORT[i]}
                           </Text>
                           <Text style={{
-                            fontSize: 15, fontWeight: '800', lineHeight: 18,
+                            fontSize: 15, fontWeight: Atlas.type.headingWeight, lineHeight: 18,
                             color: isSel ? '#fff' : isToday ? c.accent : c.text,
                           }}>
                             {d.getDate()}
@@ -160,12 +161,12 @@ export function TaskCalendarView<T extends CalendarTask>({
                     {weekDayTasks.length > 0 && (
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         {weekActiveTasks.length > 0 && (
-                          <View style={{ backgroundColor: c.accent + '20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                          <View style={{ backgroundColor: c.accent + '20', borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 3 }}>
                             <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>{weekActiveTasks.length} {tr.active}</Text>
                           </View>
                         )}
                         {weekDoneTasks.length > 0 && (
-                          <View style={{ backgroundColor: '#10B98120', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                          <View style={{ backgroundColor: '#10B98120', borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 3 }}>
                             <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>{weekDoneTasks.length} {tr.done}</Text>
                           </View>
                         )}
@@ -175,7 +176,7 @@ export function TaskCalendarView<T extends CalendarTask>({
 
                   {/* Task list for selected day */}
                   {weekDayTasks.length === 0 ? (
-                    <View style={{ alignItems: 'center', paddingVertical: 32, borderRadius: 16, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' }}>
+                    <View style={{ alignItems: 'center', paddingVertical: 32, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed' }}>
                       <IconSymbol name="calendar.badge.checkmark" size={28} color={c.sub} />
                       <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginTop: 8 }}>{tr.noTasksForDay}</Text>
                     </View>
@@ -196,7 +197,7 @@ export function TaskCalendarView<T extends CalendarTask>({
                               intensity={isDark ? 18 : 35}
                               tint={isDark ? 'dark' : 'light'}
                               style={{
-                                borderRadius: 16, borderWidth: 1,
+                                borderRadius: Atlas.radius.large, borderWidth: 1,
                                 borderColor: task.status === 'done' ? c.border : overdue ? '#EF444450' : c.border,
                                 padding: 13, overflow: 'hidden',
                               }}>
@@ -292,7 +293,7 @@ export function TaskCalendarView<T extends CalendarTask>({
                             activeOpacity={hasAny ? 0.7 : 1}
                             style={{ flex: 1, alignItems: 'center' }}>
                             <View style={[
-                              { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+                              { width: 32, height: 32, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
                               isToday && { backgroundColor: c.accent },
                               hasAny && !isToday && { backgroundColor: c.accent + '1A' },
                             ]}>
@@ -300,10 +301,10 @@ export function TaskCalendarView<T extends CalendarTask>({
                             </View>
                             <View style={{ flexDirection: 'row', gap: 2, marginTop: 2, minHeight: 10 }}>
                               {cnt > 0 && <View style={{ backgroundColor: activeCnt > 0 ? c.accent : '#10B981', borderRadius: 3, paddingHorizontal: 3, minWidth: 12, alignItems: 'center' }}>
-                                <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{cnt}</Text>
+                                <Text style={{ color: '#fff', fontSize: 7, fontWeight: Atlas.type.headingWeight }}>{cnt}</Text>
                               </View>}
                               {hasMeet && <View style={{ backgroundColor: '#6366F1', borderRadius: 3, paddingHorizontal: 3, minWidth: 12, alignItems: 'center' }}>
-                                <Text style={{ color: '#fff', fontSize: 7, fontWeight: '800' }}>{dayMeets.length}</Text>
+                                <Text style={{ color: '#fff', fontSize: 7, fontWeight: Atlas.type.headingWeight }}>{dayMeets.length}</Text>
                               </View>}
                             </View>
                           </TouchableOpacity>
@@ -347,7 +348,7 @@ export function TaskCalendarView<T extends CalendarTask>({
                                   activeOpacity={cnt > 0 ? 0.7 : 1}
                                   style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
                                   <View style={[
-                                    { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+                                    { width: 24, height: 24, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
                                     isToday && { backgroundColor: c.accent },
                                     cnt > 0 && !isToday && { backgroundColor: c.accent + '1A' },
                                   ]}>
@@ -388,7 +389,7 @@ export function TaskCalendarView<T extends CalendarTask>({
                         activeOpacity={0.75}
                         style={{
                           width: '30.5%',
-                          borderRadius: 14,
+                          borderRadius: Atlas.radius.large,
                           borderWidth: 1,
                           borderColor: isCurrent ? c.accent : c.border,
                           backgroundColor: isCurrent ? c.accent + '14' : c.dim,
@@ -399,8 +400,8 @@ export function TaskCalendarView<T extends CalendarTask>({
                         }}>
                         <Text style={{ color: isCurrent ? c.accent : c.text, fontSize: 12, fontWeight: '700' }}>{mName.slice(0, 3)}</Text>
                         {cnt > 0 ? (
-                          <View style={{ backgroundColor: activeCnt > 0 ? c.accent : '#10B981', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, minWidth: 20, alignItems: 'center' }}>
-                            <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{cnt}</Text>
+                          <View style={{ backgroundColor: activeCnt > 0 ? c.accent : '#10B981', borderRadius: Atlas.radius.small, paddingHorizontal: 6, paddingVertical: 2, minWidth: 20, alignItems: 'center' }}>
+                            <Text style={{ color: '#fff', fontSize: 11, fontWeight: Atlas.type.headingWeight }}>{cnt}</Text>
                           </View>
                         ) : (
                           <Text style={{ color: c.sub, fontSize: 11, opacity: 0.5 }}>—</Text>
@@ -416,7 +417,7 @@ export function TaskCalendarView<T extends CalendarTask>({
 }
 
 const st = StyleSheet.create({
-  sortChip:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
+  sortChip:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: Atlas.radius.medium, borderWidth: 1 },
   dot:          { width: 8, height: 8, borderRadius: 4 },
   badge:        { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
   progressBg:   { height: 3, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },

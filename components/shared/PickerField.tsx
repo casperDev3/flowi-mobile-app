@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/PickerField.tsx — поле вибору одного зі списку.
  *
@@ -383,23 +384,23 @@ function Row({ label, color, icon, active, colors: c, isDark, onPress }: {
 const st = StyleSheet.create({
   labelRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
   label:      { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  trigger:    { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, gap: 9 },
+  trigger:    { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, gap: 9 },
   dot:        { width: 10, height: 10, borderRadius: 5 },
   backdrop:   { ...StyleSheet.absoluteFillObject },
   sheet: {
     position: 'absolute',
     left: 0, right: 0,
     // bottom і maxHeight задаються в компоненті: вони залежать від клавіатури.
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: Atlas.radius.xlarge,
+    borderTopRightRadius: Atlas.radius.xlarge,
     paddingHorizontal: 16,
     paddingTop: 10,
   },
   handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   sheetTitle: { fontSize: 17, fontWeight: '700', marginBottom: 12 },
-  search:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14 },
-  create:     { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: 12,
+  search:     { borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14 },
+  create:     { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: Atlas.radius.medium,
                 borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 13, gap: 9, marginBottom: 7 },
   rowWrap:    { marginBottom: 7 },
-  row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, gap: 9, overflow: 'hidden' },
+  row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, gap: 9, overflow: 'hidden' },
 });

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -28,7 +29,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
     if (!this.state.error) return this.props.children;
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#0C0C14' }}>
-        <Text style={{ color: '#F4F2FF', fontSize: 18, fontWeight: '800', marginBottom: 8 }}>
+        <Text style={{ color: '#F4F2FF', fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 8 }}>
           Щось пішло не так
         </Text>
         <Text style={{ color: 'rgba(244,242,255,0.55)', fontSize: 13, textAlign: 'center', marginBottom: 20 }}>
@@ -42,7 +43,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
           // був ще одним місцем, де українське просочувалось в англійський UI.
           // Повна локалізація цього екрана — окрема робота (I18N-01): межа
           // помилок стоїть НАД I18nProvider, тож tr.* тут просто недосяжний.
-          style={{ backgroundColor: '#0EA5E9', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}>
+          style={{ backgroundColor: '#0EA5E9', paddingHorizontal: 24, paddingVertical: 12, borderRadius: Atlas.radius.medium }}>
           <Text style={{ color: '#fff', fontWeight: '700' }}>Спробувати знову</Text>
         </TouchableOpacity>
       </View>

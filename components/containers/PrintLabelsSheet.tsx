@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from 'react-native';
 
@@ -117,7 +118,7 @@ export function PrintLabelsSheet({ visible, containers, places, statsFor, presel
           return (
             <TouchableOpacity key={option.id} onPress={() => setPreset(option.id)} accessibilityRole="radio"
               accessibilityState={{ checked: active }} accessibilityLabel={`${option.title}. ${option.hint}`}
-              style={{ padding: 12, borderRadius: 12, borderWidth: 1, borderColor: active ? CONTAINERS_ACCENT : c.border,
+              style={{ padding: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: active ? CONTAINERS_ACCENT : c.border,
                 backgroundColor: active ? CONTAINERS_ACCENT + '1A' : c.dim }}>
               <Text style={{ color: c.text, fontWeight: '700', fontSize: 14 }}>{option.title}</Text>
               <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{option.hint} · {p.columns}×{p.rows}</Text>
@@ -137,14 +138,14 @@ export function PrintLabelsSheet({ visible, containers, places, statsFor, presel
           <Text style={{ color: c.sub, fontWeight: '700' }}>{tr.ctrPrintSelectNone}</Text>
         </TouchableOpacity>
       </View>
-      <View style={{ borderRadius: 12, backgroundColor: c.dim, padding: 4 }}>
+      <View style={{ borderRadius: Atlas.radius.medium, backgroundColor: c.dim, padding: 4 }}>
         {containers.map(box => {
           const on = selected.has(box.id);
           return (
             <TouchableOpacity key={box.id} onPress={() => toggle(box.id)} accessibilityRole="checkbox"
               accessibilityState={{ checked: on }} accessibilityLabel={box.name}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 10 }}>
-              <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center',
+              <View style={{ width: 22, height: 22, borderRadius: Atlas.radius.small, borderWidth: 2, alignItems: 'center', justifyContent: 'center',
                 borderColor: on ? CONTAINERS_ACCENT : c.sub, backgroundColor: on ? CONTAINERS_ACCENT : 'transparent' }}>
                 {on ? <IconSymbol name="checkmark" size={12} color="#fff" /> : null}
               </View>

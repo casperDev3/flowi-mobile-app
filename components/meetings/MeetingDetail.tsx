@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/meetings/MeetingDetail.tsx — ПЕРЕГЛЯД зустрічі.
  *
@@ -254,7 +255,7 @@ export function MeetingDetailBody({
               running
               seconds={now => elapsedSince(timer.startedAt, now)}
               format={formatClock}
-              style={{ fontSize: 15, fontWeight: '800', color: GREEN }}
+              style={{ fontSize: 15, fontWeight: Atlas.type.headingWeight, color: GREEN }}
             />
           ) : (
             <Text style={{ fontSize: 14, color: c.text }}>
@@ -311,10 +312,10 @@ const st = StyleSheet.create({
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
   headerRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
   colorBar:     { width: 4, alignSelf: 'stretch', minHeight: 44, borderRadius: 2 },
-  title:        { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  title:        { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4 },
   timeRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   headerBtn:    { width: 28, alignItems: 'center', justifyContent: 'center' },
-  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, marginBottom: 8 },
+  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderRadius: Atlas.radius.medium, marginBottom: 8 },
   rowText:      { fontSize: 14, marginLeft: 10 },
   sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   smallBtn:     { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },

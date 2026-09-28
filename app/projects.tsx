@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -189,7 +190,7 @@ function ListChip({ label, count, selected, onPress, accent, sub, dim, border }:
       accessibilityState={{ selected }}
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36,
-        paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1,
+        paddingHorizontal: 12, paddingVertical: 7, borderRadius: Atlas.radius.medium, borderWidth: 1,
         backgroundColor: selected ? accent + '18' : dim,
         borderColor: selected ? accent : border,
       }}>
@@ -460,7 +461,7 @@ export const ProjectCard = React.memo(function ProjectCard({
                       accessibilityRole="button"
                       accessibilityLabel={`${tr.sprintClose}: ${sprintCard.name}`}
                       hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
-                      style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: SPRINT_OVERDUE_COLOR }}>
+                      style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: SPRINT_OVERDUE_COLOR }}>
                       <Text style={{ color: SPRINT_OVERDUE_COLOR, fontSize: 11, fontWeight: '700' }}>{tr.sprintClose}</Text>
                     </TouchableOpacity>
                   ) : null}
@@ -1007,7 +1008,7 @@ export default function ProjectsScreen() {
               accessibilityState={{ selected: showArchived === opt.key }}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 6,
-                paddingHorizontal: 13, paddingVertical: 8, borderRadius: 10, borderWidth: 1,
+                paddingHorizontal: 13, paddingVertical: 8, borderRadius: Atlas.radius.medium, borderWidth: 1,
                 backgroundColor: showArchived === opt.key ? c.accent + '18' : c.dim,
                 borderColor: showArchived === opt.key ? c.accent : c.border,
               }}>
@@ -1103,7 +1104,7 @@ export default function ProjectsScreen() {
         onPress={() => updateListPrefs({ ...listPrefs, statuses: [] })}
         accessibilityRole="button"
         accessibilityLabel={tr.projectListFilterReset}
-        style={{ marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: c.accent }}>
+        style={{ marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.accent }}>
         <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.projectListFilterReset}</Text>
       </TouchableOpacity>
     </View>
@@ -1120,7 +1121,7 @@ export default function ProjectsScreen() {
         onPress={openAdd}
         accessibilityRole="button"
         accessibilityLabel={tr.newProject}
-        style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 12, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <IconSymbol name="plus" size={15} color="#fff" />
         <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.newProject}</Text>
       </TouchableOpacity>
@@ -1325,10 +1326,10 @@ export default function ProjectsScreen() {
 const st = StyleSheet.create({
   metaChip:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
 
-  pageTitle:   { fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
+  pageTitle:   { fontSize: 32, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.8 },
   headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon:   { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  card:        { borderRadius: 16, borderWidth: 1, padding: 14, overflow: 'hidden' },
+  emptyIcon:   { width: 72, height: 72, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
+  card:        { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, overflow: 'hidden' },
   colorBadge:  { width: 42, height: 42, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   colorDot:    { width: 20, height: 20, borderRadius: 6 },
   progressBg:  { height: 3, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
@@ -1338,12 +1339,12 @@ const st = StyleSheet.create({
   // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
   // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
   // ScrollView усередині нічого не гортав (NAT-01).
-  sheet:       { borderRadius: 24, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:       { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:  { fontSize: 20, fontWeight: '800', marginBottom: 16 },
-  input:       { borderRadius: 12, padding: 13, fontSize: 14, fontWeight: '500' },
+  sheetTitle:  { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 16 },
+  input:       { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
   label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 16 },
-  colorChip:   { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  btn:         { paddingVertical: 13, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  colorChip:   { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  btn:         { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

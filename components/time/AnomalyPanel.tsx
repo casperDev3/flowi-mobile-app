@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/time/AnomalyPanel.tsx — блок «Перевір N записів».
  *
@@ -241,10 +242,10 @@ function recordsNoun(count: number, tr: Translations, lang: Lang): string {
 }
 
 const s = StyleSheet.create({
-  card: { borderRadius: 18, borderWidth: 1, padding: 14, overflow: 'hidden' },
+  card: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 14, overflow: 'hidden' },
   headRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   headIcon: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  headTitle: { fontSize: 15, fontWeight: '800', marginLeft: 9, flex: 1 },
+  headTitle: { fontSize: 15, fontWeight: Atlas.type.headingWeight, marginLeft: 9, flex: 1 },
   row: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, marginTop: 10 },
   rowTitle: { fontSize: 13, fontWeight: '700' },
   rowMeta: { fontSize: 11, marginTop: 2 },

@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -135,7 +136,7 @@ const st = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
   },
   primaryBtn: {
-    borderRadius: 14,
+    borderRadius: Atlas.radius.large,
     paddingVertical: 16,
     alignItems: 'center',
   },
@@ -146,7 +147,7 @@ const st = StyleSheet.create({
     letterSpacing: 0.1,
   },
   secondaryBtn: {
-    borderRadius: 14,
+    borderRadius: Atlas.radius.large,
     borderWidth: 1.5,
     paddingVertical: 15,
     alignItems: 'center',

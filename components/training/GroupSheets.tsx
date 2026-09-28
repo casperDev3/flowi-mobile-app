@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/training/GroupSheets.tsx — створення групи й приєднання за
  * запрошенням (training-module.md §8, §8.1).
@@ -88,7 +89,9 @@ export function CreateGroupSheet({ visible, onClose, onCreated, c, scope }: {
         </>
       )}>
       {error && <Notice c={c} text={error} tone="error" />}
-      <Field c={c} label={tr.tgGroupName} value={name} onChangeText={setName} placeholder={tr.tgGroupNamePlaceholder} maxLength={200} autoFocus />
+      <Field
+        required
+        c={c} label={tr.tgGroupName} value={name} onChangeText={setName} placeholder={tr.tgGroupNamePlaceholder} maxLength={200} autoFocus />
       <Field c={c} label={tr.tgGroupDescription} value={description} onChangeText={setDescription} placeholder={tr.tgGroupDescriptionPlaceholder} maxLength={500} />
       <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{tr.tgColor}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
@@ -96,7 +99,9 @@ export function CreateGroupSheet({ visible, onClose, onCreated, c, scope }: {
           <Chip key={col} c={c} label="●" color={col} active={color === col} onPress={() => setColor(col)} accessibilityLabel={`${tr.tgColor} ${col}`} />
         ))}
       </View>
-      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{tr.tgWeekStart}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>
+        {tr.tgWeekStart}
+      </Text>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         <Chip c={c} label={tr.tgWeekStartMon} active={weekStart === 1} onPress={() => setWeekStart(1)} />
         <Chip c={c} label={tr.tgWeekStartSun} active={weekStart === 0} onPress={() => setWeekStart(0)} />
@@ -118,7 +123,7 @@ export function JoinInvitePanel({ c, initial, onJoined }: {
   onJoined: (group: TrainingGroupSummary, alreadyMember: boolean) => void;
 }) {
   const { tr } = useI18n();
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [parsed, setParsed] = useState<ParsedTrainingInvite | null>(initial ?? null);
   const [preview, setPreview] = useState<TrainingInvitePreview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -192,16 +197,24 @@ export function JoinInvitePanel({ c, initial, onJoined }: {
           />
         </>
       )}
-      {error && <View style={{ marginTop: 12 }}><Notice c={c} text={error} tone="error" /></View>}
+      {error && (
+        <View style={{ marginTop: 12 }}>
+          <Notice c={c} text={error} tone="error" />
+        </View>
+      )}
       {preview && (
         <Card c={c} accent={preview.group.color || TG_ACCENT} style={{ marginTop: 12 }}>
           <Text style={{ color: c.sub, fontSize: 13 }}>{tr.tgInviteTo}</Text>
-          <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginTop: 4 }}>{preview.group.name}</Text>
+          <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, marginTop: 4 }}>
+            {preview.group.name}
+          </Text>
           <Text style={{ color: c.sub, fontSize: 13, marginTop: 6 }}>
             {fmt(tr.tgInviteAs, { role: preview.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember })}
           </Text>
           {preview.invited_by?.name ? (
-            <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{fmt(tr.tgInviteFrom, { name: preview.invited_by.name })}</Text>
+            <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>
+              {fmt(tr.tgInviteFrom, { name: preview.invited_by.name })}
+            </Text>
           ) : null}
           <PrimaryButton label={tr.tgInviteJoin} onPress={join} busy={busy} style={{ marginTop: 14 }} />
         </Card>

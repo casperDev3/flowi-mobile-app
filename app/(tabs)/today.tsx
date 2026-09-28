@@ -1,3 +1,5 @@
+import { Atlas } from '@/constants/atlas';
+import { AdSlot, SponsorPause, advertisingActivity } from '@/components/advertising/Advertising';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -286,7 +288,7 @@ export default function TodayScreen() {
 
   // Tasks
   const activeCount  = tasks.filter(t => t.status === 'active').length;
-  const overdueCount = tasks.filter(isOverdue).length;
+  const overdueCount = tasks.filter(task => isOverdue(task)).length;
 
   /**
    * Незавершені завдання на сьогодні — прострочені та з дедлайном сьогодні,
@@ -698,7 +700,7 @@ export default function TodayScreen() {
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
-              style={{ color: headlineValue >= 0 ? '#10B981' : '#EF4444', fontSize: 20, fontWeight: '800', marginTop: 2 }}>
+              style={{ color: headlineValue >= 0 ? '#10B981' : '#EF4444', fontSize: 20, fontWeight: Atlas.type.headingWeight, marginTop: 2 }}>
               {fmtMoney(headlineValue)}
             </Text>
             {hasPrimaryAccounts && (
@@ -718,7 +720,7 @@ export default function TodayScreen() {
             icon="timer" color={ACCENT_TIME}
             title={tr.quickTimer}
             onPress={() => router.push('/time')}>
-            <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginTop: 6 }}>
+            <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, marginTop: 6 }}>
               {fmtTime(trackedSec)}
             </Text>
             <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.todayTracked}</Text>
@@ -778,10 +780,13 @@ export default function TodayScreen() {
     });
   }
 
+  if (loaded && sections.length > 0) sections.splice(1, 0, { key: 'sponsor', node: <AdSlot slot="M1" /> });
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} onTouchStart={advertisingActivity}>
+      <SponsorPause />
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       <View style={{ flex: 1 }}>
         {/* Header */}
@@ -868,8 +873,8 @@ function StatTile({ c, isDark, icon, color, title, onPress, children }: {
 const s = StyleSheet.create({
   // lineHeight явний: ScreenHeader задає 38 під свої 32pt, і без переозначення
   // 26-й кегль тягнув би за собою чужий міжрядковий інтервал.
-  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.6, lineHeight: 32, marginTop: 2 },
-  card:  { borderRadius: 18, borderWidth: 1, padding: 14, overflow: 'hidden' },
+  title: { fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6, lineHeight: 32, marginTop: 2 },
+  card:  { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 14, overflow: 'hidden' },
   cardHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -902,7 +907,7 @@ const s = StyleSheet.create({
   focusCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: Atlas.radius.large,
     borderWidth: 1,
     paddingVertical: 14,
     paddingLeft: 18,
@@ -920,7 +925,7 @@ const s = StyleSheet.create({
   playBtn: {
     width: 38,
     height: 38,
-    borderRadius: 12,
+    borderRadius: Atlas.radius.medium,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
@@ -928,7 +933,7 @@ const s = StyleSheet.create({
   meetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: Atlas.radius.medium,
     borderWidth: 1,
     paddingVertical: 10,
     paddingLeft: 16,
@@ -949,7 +954,7 @@ const s = StyleSheet.create({
   habitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: Atlas.radius.medium,
     borderWidth: 1,
     paddingVertical: 10,
     paddingLeft: 16,

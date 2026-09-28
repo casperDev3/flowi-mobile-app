@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/task-group.tsx — «Всі (N)»: повний список ОДНІЄЇ групи завдань.
  *
@@ -280,7 +281,7 @@ export default function TaskGroupScreen() {
 }
 
 const st = StyleSheet.create({
-  title:      { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
+  title:      { fontSize: 24, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
   countBadge: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4, marginLeft: 8 },
   separator:  { height: 6 },
 });

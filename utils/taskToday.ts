@@ -69,7 +69,7 @@ export function isTodayTask(
     || column.sourceStatusId === REVIEW_COLUMN_ID
     || (!!column.projectId && personalDisplayColumn(task, columns).id === REVIEW_COLUMN_ID)) return true;
 
-  if (isOverdue(task)) return true;
+  if (isOverdue(task, now)) return true;
 
   if (!task.deadline) return false;
 

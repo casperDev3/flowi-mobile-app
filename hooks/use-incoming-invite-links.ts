@@ -20,6 +20,21 @@ import { parseInviteLink, setPendingInvite } from '@/store/invite-link';
 
 function handleUrl(url: string | null | undefined): void {
   if (!url) return;
+  try {
+    const link = new URL(url);
+    if (
+      (link.protocol === "https:" && link.pathname === "/invite/menu") ||
+      (link.protocol === "ftrackingapp:" && link.hostname === "menu-invite")
+    ) {
+      const ws = link.searchParams.get("ws"),
+        t = link.searchParams.get("t");
+      if (ws && t)
+        router.push({ pathname: "/menu-invite", params: { ws, t } } as never);
+      return;
+    }
+  } catch {
+    return;
+  }
   const parsed = parseInviteLink(url);
   if (!parsed) return;
   void setPendingInvite(parsed).then(() => {

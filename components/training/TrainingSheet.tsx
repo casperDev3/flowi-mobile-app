@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * components/training/TrainingSheet.tsx — аркуш-форма модуля тренувань.
  *
@@ -40,7 +41,7 @@ export function TrainingSheet({ visible, onClose, c, title, children, footer }: 
 }
 
 const styles = StyleSheet.create({
-  sheet: { borderRadius: 24, borderWidth: 1, padding: 18, overflow: 'hidden' },
-  title: { fontSize: 18, fontWeight: '800', marginBottom: 12 },
+  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18, overflow: 'hidden' },
+  title: { fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 12 },
   footer: { flexDirection: 'row', gap: 10, marginTop: 12 },
 });

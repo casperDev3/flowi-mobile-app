@@ -1,3 +1,4 @@
+import { Atlas } from '@/constants/atlas';
 /**
  * app/register-pending.tsx — екран очікування заявки на реєстрацію
  * (контракт §2.4, §2.5): режим workspace «за погодженням» не створює акаунт
@@ -233,11 +234,11 @@ const st = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 10 },
   msg: { fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 24 },
   statusCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, borderWidth: 1,
     paddingHorizontal: 16, paddingVertical: 12, marginBottom: 24, alignSelf: 'stretch',
   },
   statusText: { fontSize: 13, fontWeight: '500' },
-  primaryBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', alignSelf: 'stretch' },
+  primaryBtn: { borderRadius: Atlas.radius.large, paddingVertical: 16, alignItems: 'center', alignSelf: 'stretch' },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   linkBtn: { marginTop: 16, alignItems: 'center', paddingVertical: 8 },
   linkText: { fontSize: 14, fontWeight: '500' },

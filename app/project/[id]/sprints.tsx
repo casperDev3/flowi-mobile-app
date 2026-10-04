@@ -63,7 +63,7 @@ export default function ProjectSprintsScreen() {
   const { project } = useProject(projectId);
   // Contract §4.1: спринти — командний CRUD (owner/member), глядач лише читає.
   const canEdit = useProjectRole(projectId) !== 'viewer';
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
 
   const { items: allSprints, setItems: setSprints, reload: reloadSprints } = useSyncedList<Sprint>('sprints', { enabled: true });
   const [tasks, setTasks] = useState<Task[]>([]);

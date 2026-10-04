@@ -1560,6 +1560,12 @@ export interface Translations {
   notifMeetingTitle: string;
 
   // Простір проєкту (WORKSPACE_PROJECTS_PLAN.md §3)
+  projectMyWork: string;
+  projectBacklogNav: string;
+  projectArchive: string;
+  projectDiscussions: string;
+  projectTeam: string;
+  projectWorkload: string;
   projectNavOverview: string;
   projectNotFound: string;
   overviewHoursThisWeek: string;
@@ -3818,6 +3824,11 @@ const uk: Translations = {
   notifMeetingTitle: '📅 Зустріч через 15 хв',
 
   // Простір проєкту (WORKSPACE_PROJECTS_PLAN.md §3)
+  projectMyWork: 'Моя робота',
+    projectBacklogNav: 'Беклог', projectArchive: 'Архів',
+  projectDiscussions: 'Обговорення',
+  projectTeam: 'Команда',
+  projectWorkload: 'Навантаження',
   projectNavOverview: 'Огляд',
   projectNotFound: 'Проєкт не знайдено',
   overviewHoursThisWeek: 'Годин за тиждень',
@@ -6061,6 +6072,11 @@ const en: Translations = {
   notifMeetingTitle: '📅 Meeting in 15 min',
 
   // Project space (WORKSPACE_PROJECTS_PLAN.md §3)
+  projectMyWork: 'My work',
+    projectBacklogNav: 'Backlog', projectArchive: 'Archive',
+  projectDiscussions: 'Discussions',
+  projectTeam: 'Team',
+  projectWorkload: 'Workload',
   projectNavOverview: 'Overview',
   projectNotFound: 'Project not found',
   overviewHoursThisWeek: 'Hours this week',

@@ -36,7 +36,7 @@ export default function ProjectActivityScreen() {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { project } = useProject(projectId);
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
 
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);

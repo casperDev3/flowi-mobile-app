@@ -78,6 +78,7 @@ import { removeProjectMember } from '@/store/project-team';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 
 export interface Project {
+  appearance?: import("@/utils/projectAppearance").ProjectAppearance;
   id: string;
   name: string;
   color: string;
@@ -523,7 +524,7 @@ export default function ProjectsScreen() {
   const [name, setName] = useState('');
   const [color, setColor] = useState(PROJECT_COLORS[0]);
   /** Шаблон при СТВОРЕННІ (contract §3.3) — вибір, застиглий у modules/task_statuses з першого запису. */
-  const [template, setTemplate] = useState<ProjectTemplate>('work');
+  const [template, setTemplate] = useState<ProjectTemplate>('simple');
   const [showArchived, setShowArchived] = useState(false);
   const [deadline, setDeadline] = useState('');
   const [description, setDescription] = useState('');
@@ -707,7 +708,7 @@ export default function ProjectsScreen() {
     setEditing(null);
     setName('');
     setColor(PROJECT_COLORS[0]);
-    setTemplate('work');
+    setTemplate('simple');
     setDeadline('');
     setDescription('');
     setShowModal(true);
@@ -798,7 +799,7 @@ export default function ProjectsScreen() {
       })();
       closeModal();
       // Створення = одразу вхід у простір проєкту (план §3: вхід із «Проєкти»).
-      router.push(projectRoute(id, 'overview') as never);
+      router.push(`/project/${encodeURIComponent(id)}` as never);
     }
   };
 
@@ -956,7 +957,7 @@ export default function ProjectsScreen() {
   /** Тап по картці — повна зміна контексту (план §3): вхід у простір проєкту. */
   const selectProject = useCallback((project: Project) => {
     haptic.light();
-    router.push(projectRoute(project.id, 'overview') as never);
+    router.push(`/project/${encodeURIComponent(project.id)}` as never);
   }, [router]);
 
   // Шапка їде разом зі списком, як і раніше, — тому вона ListHeaderComponent,

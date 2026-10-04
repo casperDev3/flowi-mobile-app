@@ -173,7 +173,7 @@ test('задача, створена на екрані Завдань, має в
   expect(task.title).toBe('Нова');
   expect(task.priority).toBe('medium');
   expect(task.priorityLevel).toBe(3);
-  expect(allText(tree)).toContain('Нова');
+  expect(allText(tree)).not.toContain('Нова'); // Unscheduled task belongs to the backlog.
 });
 
 test('«+» відкритого спринта створює задачу одразу в цьому спринті', async () => {

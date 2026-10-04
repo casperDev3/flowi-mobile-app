@@ -25,10 +25,9 @@ import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
 import { projectMeetingSections, withMeetingProject, type Meeting } from '@/utils/meetings';
-import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
 
 export default function ProjectMeetingsScreen() {
-  const { id: projectId, open: openParam } = useLocalSearchParams<{ id: string; open?: string }>();
+  const { id: projectId, open: openParam, create, date } = useLocalSearchParams<{ id: string; open?: string; create?:string; date?:string }>();
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const contentWidth = useContentWidth();
@@ -47,6 +46,8 @@ export default function ProjectMeetingsScreen() {
   const [showPast, setShowPast] = useState(false);
   const [form, setForm] = useState<{ initial: MeetingFormData | null } | null>(null);
 
+  useEffect(()=>{if(create==='1'&&canEdit){setForm({initial:{title:'',date:date||new Date().toISOString().slice(0,10),time:'09:00',durationMinutes:30,color:project?.color??'#7C3AED',projectId}});router.setParams({create:'',date:''});}},[create,date,canEdit,project?.color,projectId,router]);
+
   const loadAll = useCallback(async () => {
     setMeetings(await loadData<Meeting[]>('meetings', []));
     setLoaded(true);
@@ -54,7 +55,7 @@ export default function ProjectMeetingsScreen() {
   useFocusEffect(useCallback(() => { void loadAll(); }, [loadAll]));
   const trackWrite = useStorageRefresh(['meetings'], loadAll);
 
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
   const sections = useMemo(
     () => (projectId ? projectMeetingSections(meetings, projectId, new Date()) : { upcoming: [], past: [] }),
     [meetings, projectId],
@@ -117,20 +118,6 @@ export default function ProjectMeetingsScreen() {
     }
   }, [form, trackWrite]);
 
-  const modules = project ? projectModules(project) : MODULES_BY_TEMPLATE.work;
-  // Мінор із ревʼю: вимикач `modules.meetings` у Налаштуваннях ховає лише
-  // таб/пункт сайдбару (`visibleProjectNavItems`) — користувач, який лишився
-  // на розділі саме в момент вимкнення, чи прийшов сюди deep link'ом/
-  // `router.push`, і далі бачив і редагував би наради вимкненого розділу.
-  if (project && !modules.meetings) {
-    return (
-      <ProjectScreenShell project={project} isDark={isDark} title={tr.navMeetings}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <Text style={{ color: c.sub, fontSize: 14, textAlign: 'center' }}>{tr.projectModuleDisabled}</Text>
-        </View>
-      </ProjectScreenShell>
-    );
-  }
 
   return (
     <ProjectScreenShell

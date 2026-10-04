@@ -13,7 +13,7 @@ export default function ProjectNotesScreen() {
   const { project, loading } = useProject(id);
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
   const available = project && projectModules(project).notes;
   return <ProjectScreenShell project={project} isDark={isDark} title={tr.notes}>
     {available ? <NotesWorkspace key={id} projectId={id} isDark={isDark} /> :

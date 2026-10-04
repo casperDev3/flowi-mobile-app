@@ -10,7 +10,7 @@
  */
 import { uuidV4 } from './uuid';
 
-export type CommentTargetType = 'task' | 'meeting';
+export type CommentTargetType = 'task' | 'meeting' | 'discussion';
 
 export interface Comment {
   id: string;

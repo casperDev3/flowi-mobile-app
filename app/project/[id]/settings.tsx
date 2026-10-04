@@ -1,3 +1,4 @@
+import {ProjectAppearanceForm} from '@/components/projects/ProjectAppearanceForm';
 import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/settings.tsx — Налаштування проєкту
@@ -59,7 +60,7 @@ export default function ProjectSettingsScreen() {
   const { project } = useProject(projectId);
   const role = useProjectRole(projectId);
   const { stopTimerForTask } = useTimerContext();
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
 
   const [name, setName] = useState('');
   const [color, setColor] = useState(PROJECT_COLORS[0]);
@@ -292,6 +293,7 @@ export default function ProjectSettingsScreen() {
         keyboardShouldPersistTaps="handled">
 
         {/* Назва/колір/опис/термін */}
+        {project&&<ProjectAppearanceForm key={project.id} project={project} canEdit={role==='owner'} textColor={c.text}/>}
         <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>{tr.projectSettingsInfo}</Text>
         <TextInput
           value={name}
@@ -366,7 +368,7 @@ export default function ProjectSettingsScreen() {
         ) : null}
 
         {/* Розділи */}
-        {isOwner && (
+        {(isOwner || role === 'manager') && (
           <>
             <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginTop: 16, marginBottom: 6 }}>{tr.projectSettingsModules}</Text>
             <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, marginBottom: 20 }}>
@@ -393,7 +395,7 @@ export default function ProjectSettingsScreen() {
         )}
 
         {/* Workflow статусів */}
-        {isOwner && (
+        {(isOwner || role === "manager") && (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 6 }}>
               <Text style={{ flex: 1, color: c.sub, fontSize: 11, fontWeight: '700' }}>{tr.projectSettingsStatuses}</Text>

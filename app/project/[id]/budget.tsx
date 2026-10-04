@@ -62,7 +62,7 @@ export default function ProjectBudgetScreen() {
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { project } = useProject(projectId);
   const role = useProjectRole(projectId);
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
 
   const [budgets, setBudgets] = useState<ProjectBudgetRecord[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);

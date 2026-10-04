@@ -38,7 +38,7 @@ const WORKSPACE_PROJECTS_KEY = 'workspace_projects';
 export type ProjectRoleMap = Readonly<Record<string, ProjectRole>>;
 
 function isProjectRole(value: unknown): value is ProjectRole {
-  return value === 'owner' || value === 'member' || value === 'viewer';
+  return value === 'owner' || value === 'manager' || value === 'member' || value === 'viewer';
 }
 
 let lastKnown: ProjectRoleMap = {};

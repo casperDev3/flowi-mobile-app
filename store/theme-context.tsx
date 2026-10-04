@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme as useSystemColorScheme } from 'react-native';
 
 import { loadData, saveData } from '@/store/storage';
@@ -23,13 +23,13 @@ const ThemeContext = createContext<ThemeContextValue>({
   isDark: false,
 });
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({ children, storageKey=STORAGE_KEY }: { children: React.ReactNode; storageKey?:string }) {
   const systemScheme = (useSystemColorScheme() ?? 'light') as ColorScheme;
   const [theme, setThemeState] = useState<ThemeOption>('system');
 
   useEffect(() => {
     let mounted = true;
-    loadData<ThemeOption>(STORAGE_KEY, 'system').then(saved => {
+    loadData<ThemeOption>(storageKey, 'system').then(saved => {
       if (!mounted) return;
       if (saved === 'light' || saved === 'dark' || saved === 'system') {
         setThemeState(saved);
@@ -38,12 +38,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [storageKey]);
 
-  const setTheme = (next: ThemeOption) => {
+  const setTheme = useCallback((next: ThemeOption) => {
     setThemeState(next);
-    saveData(STORAGE_KEY, next);
-  };
+    saveData(storageKey, next);
+  },[storageKey]);
 
   const colorScheme: ColorScheme = theme === 'system' ? systemScheme : theme;
   const value = useMemo(
@@ -53,7 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       colorScheme,
       isDark: colorScheme === 'dark',
     }),
-    [theme, colorScheme],
+    [theme, colorScheme,setTheme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

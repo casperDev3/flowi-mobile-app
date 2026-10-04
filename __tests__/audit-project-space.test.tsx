@@ -52,11 +52,11 @@ const codeOnly = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/
 describe('L2: розділи проєкту в нижній панелі', () => {
   const workOwner = visibleProjectNavItems(MODULES_BY_TEMPLATE.work, 'owner');
 
-  test('стан за замовчуванням — це справді вісім розділів', () => {
+  test('стан за замовчуванням — містить командні та додаткові розділи', () => {
     // Передумова знахідки: шаблон work вмикає всі опційні розділи, Бюджет
     // додається власнику. Якщо це колись зміниться, решта тестів тут
     // охороняє вже іншу сцену.
-    expect(workOwner).toHaveLength(8);
+    expect(workOwner).toHaveLength(15);
   });
 
   test('на 402pt у панелі лишається не більше п’яти кнопок разом із «Ще»', () => {
@@ -89,13 +89,13 @@ describe('L2: розділи проєкту в нижній панелі', () =>
 
   test('щоденне лишається внизу, рідкісне йде в «Ще»', () => {
     const { tabs, overflow } = splitProjectNav(workOwner, DEVICE_WIDTH);
-    expect(tabs.map(i => i.key)).toEqual(expect.arrayContaining(['overview', 'tasks']));
+    expect(tabs.map(i => i.key)).toEqual(expect.arrayContaining(['my-work', 'tasks', 'calendar']));
     // Налаштування — найрідший вхід із восьми; саме воно й мусить поступитись.
     expect(overflow.map(i => i.key)).toContain('settings');
   });
 
   test('коли розділів мало — «Ще» не з’являється взагалі', () => {
-    const simple = visibleProjectNavItems(MODULES_BY_TEMPLATE.simple, 'owner');
+    const simple = workOwner.slice(0, 3);
     const { tabs, overflow } = splitProjectNav(simple, DEVICE_WIDTH);
     expect(tabs).toHaveLength(simple.length);
     expect(overflow).toHaveLength(0);
@@ -112,7 +112,7 @@ describe('L2: розділи проєкту в нижній панелі', () =>
     const { overflow } = splitProjectNav(workOwner, DEVICE_WIDTH);
     const hidden = overflow[0];
     expect(isProjectOverflowActive(projectRoute('p-1', hidden.key), overflow)).toBe(true);
-    expect(isProjectOverflowActive(projectRoute('p-1', 'overview'), overflow)).toBe(false);
+    expect(isProjectOverflowActive(projectRoute('p-1', 'tasks'), overflow)).toBe(false);
     expect(isProjectOverflowActive('/projects', overflow)).toBe(false);
   });
 

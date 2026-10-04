@@ -23,11 +23,12 @@ export const PROJECT_COLLECTIONS = [
   // як транзакції й підписки; той самий перелік, що й core/sync_contract.py.
   'recurring_incomes',
   'comments',
+  'discussions', 'milestones', 'team_preferences',
 ] as const;
 export type ProjectCollection = (typeof PROJECT_COLLECTIONS)[number];
 
 /** Колекції, чиї записи ЗАВЖДИ належать проєкту — особистої версії не існує. */
-export const PROJECT_ONLY_COLLECTIONS: ReadonlySet<string> = new Set(['comments', 'project_budgets']);
+export const PROJECT_ONLY_COLLECTIONS: ReadonlySet<string> = new Set(['comments', 'project_budgets', 'discussions', 'milestones', 'team_preferences']);
 
 export const PERSONAL_STREAM = 'personal';
 
@@ -156,7 +157,7 @@ export interface ProjectSyncStateEntry {
   cursor: number;
   /** `${collection}:${local_id}` → revision, той самий формат, що й особистий. */
   revisions: Record<string, number>;
-  role: 'owner' | 'member' | 'viewer';
+  role: 'owner' | 'manager' | 'member' | 'viewer';
   lastSyncedAt: number | null;
 }
 

@@ -1,3 +1,4 @@
+import {ThemeProvider} from '@/store/theme-context';
 /**
  * app/project/[id]/_layout.tsx — оболонка простору проєкту на телефоні
  * (WORKSPACE_PROJECTS_PLAN.md §3: «телефон: нижні таби замінюються табами
@@ -72,7 +73,8 @@ function tabLabel(label: string) {
   return TabLabel;
 }
 
-export default function ProjectLayout() {
+export default function ProjectThemeLayout(){const {id}=useLocalSearchParams<{id:string}>();return <ThemeProvider key={id} storageKey={`project-theme-${id}`}><ProjectLayout/></ThemeProvider>;}
+function ProjectLayout() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
@@ -240,7 +242,7 @@ export default function ProjectLayout() {
           `time` у (tabs)/_layout — файл лишається на місці, просто
           без кнопки в барі.
         */}
-        <Tabs.Screen name="members" options={{ href: null, headerShown: false }} />
+        <Tabs.Screen name="index" options={{ href: null, headerShown: false }} />
         <Tabs.Screen name="activity" options={{ href: null, headerShown: false }} />
       </Tabs>
       <ActiveTimersBar />

@@ -144,7 +144,7 @@ export function ProjectSwitcherSheet({
     onClose();
     if (projectId === currentProjectId) return;
     void addRecentProject(projectId);
-    router.replace({ pathname: '/project/[id]/overview', params: { id: projectId } } as never);
+    router.replace({ pathname: '/project/[id]', params: { id: projectId } } as never);
   };
 
   const exitToPersonal = () => {

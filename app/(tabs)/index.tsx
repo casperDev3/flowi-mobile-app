@@ -51,6 +51,8 @@ import {
 } from '@/utils/meetings';
 import { MeetingDetailBody, MeetingDetailHeader } from '@/components/meetings/MeetingDetail';
 import { MeetingProjectChip } from '@/components/meetings/MeetingProjectChip';
+import {isLead,taskRights} from '@/utils/teamwork';
+import { TeamTaskPanel } from '@/components/projects/TeamTaskPanel';
 import { TaskDetailHeader } from '@/components/tasks/TaskDetailHeader';
 import { CommentsSection } from '@/components/shared/CommentsSection';
 import { loadData } from '@/store/storage';
@@ -60,6 +62,7 @@ import { cancelReminder, scheduleReminder } from '@/store/notifications';
 import {
   assigneeDisplayName,
   assigneeForPersonalProjectTask,
+  closeSubtasksOnDone,
   createdByAfterProjectChange,
   isMyTask,
   isOverdue,
@@ -454,7 +457,7 @@ export default function TasksScreen() {
   // відкривається з уже обраними проєктом і спринтом (CONTRACT §D.3.6).
   const {
     create: createParam, open: openParam, projectId: projectParam, sprintId: sprintParam,
-    statusId: statusParam,
+    statusId: statusParam, deadline: deadlineParam,
     meeting: meetingParam, meetingDate: meetingDateParam,
   } = useLocalSearchParams<{
     create?: string; open?: string; projectId?: string; sprintId?: string;
@@ -466,7 +469,7 @@ export default function TasksScreen() {
      * (§3.7) — звідси мапінг в обидва боки (див. `personalStatusIdFor`
      * нижче і `projectEquivalentColumn` у `addTask`).
      */
-    statusId?: string;
+    statusId?: string; deadline?:string;
     /** ?meeting=<id оригіналу>&meetingDate=YYYY-MM-DD — перегляд зустрічі (з «Сьогодні»). */
     meeting?: string; meetingDate?: string;
   }>();
@@ -498,12 +501,12 @@ export default function TasksScreen() {
       const statusId = statusParam
         ? personalStatusIdFor(statusParam, storedTaskStatuses)
         : ACTIVE_COLUMN_ID;
-      composerReset(statusId, { projectId: projectParam, sprintId: sprintParam || null });
+      composerReset(statusId, { projectId: projectParam, sprintId: sprintParam || null, ...(deadlineParam ? {deadline:deadlineParam} : {}) });
       setReturnToProject(projectParam);
     }
     setShowAdd(true);
-    router.setParams({ create: '', projectId: '', sprintId: '', statusId: '' });
-  }, [createParam, projectParam, sprintParam, statusParam, initialized, storedTaskStatuses, router, composerReset]);
+    router.setParams({ create: '', projectId: '', sprintId: '', statusId: '', deadline:'' });
+  }, [createParam, projectParam, sprintParam, statusParam, deadlineParam, initialized, storedTaskStatuses, router, composerReset]);
 
   // Open task details when navigated with ?open=<taskId> (e.g. from Today rows)
   useEffect(() => {
@@ -767,7 +770,7 @@ export default function TasksScreen() {
     // лише прихованою кнопкою (review finding): та сама функція викликається
     // з деталі задачі, з рядків «Сьогодні»/Завдань і з дошки/списку проєкту —
     // один захист замість дублювання в кожному місці виклику.
-    if (!canEditProjectItem(taskToDelete?.projectId, projectRoles)) return;
+    if (taskToDelete?.projectId && !isLead(projectRoles[taskToDelete.projectId] ?? 'owner')) return;
     Alert.alert(
       tr.deletePermanently,
       title ? `«${title}»\n${tr.cannotUndo}` : tr.cannotUndo,
@@ -815,14 +818,14 @@ export default function TasksScreen() {
       if (t.id !== id) return t;
       if (scopedTaskStatusColumn(t, storedTaskStatusesRef.current).id === column.id && t.kanbanColumnId === column.id) return t;
       const status: Status = column.isDone ? 'done' : 'active';
-      return {
+      return closeSubtasksOnDone(t, {
         ...t,
         status,
         kanbanColumnId: column.id,
         // Назва колонки в нотатці: інакше в історії видно лише «активне», без
         // того, КУДИ саме перенесли завдання.
         history: appendHistory(t, column.isDone ? 'done' : 'active', column.name),
-      };
+      });
     }));
   }, [getTimerForTask, setTasks]);
 
@@ -865,7 +868,10 @@ export default function TasksScreen() {
     // Знімок поточного стану задачі для undo
     const prevTask = tasksRef.current.find(t => t.id === id);
     // Contract §4.1: глядач не відмічає проєктну задачу готовою.
-    if (!canEditProjectItem(prevTask?.projectId, projectRoles)) return;
+    if (prevTask?.projectId) {
+      if(!taskRights(prevTask,projectRoles[prevTask.projectId]??'owner',String(user?.id??'')).execute)return;
+      if(prevTask.reviewRequired || prevTask.resultRequirements?.length){setSelected(prevTask);return;}
+    }
     haptic.light();
     const becomingDone = prevTask?.status === 'active';
 
@@ -942,7 +948,7 @@ export default function TasksScreen() {
         setSelected(prev => prev?.id === id ? restore(prev) : prev);
       });
     }
-  }, [showUndo, tr.taskMarkedDone, getTimerForTask, setTasks, storedTaskStatuses, projectRoles]);
+  }, [showUndo, tr.taskMarkedDone, getTimerForTask, setTasks, storedTaskStatuses, projectRoles, user?.id]);
 
   const addSubtask = useCallback((taskId: string) => {
     if (!newSubtask.trim()) return;
@@ -1285,7 +1291,7 @@ export default function TasksScreen() {
       if (edited.has('project') || edited.has('sprint')) {
         next = applyFormSprint(next, sprints, draft.sprintId);
       }
-      return next;
+      return closeSubtasksOnDone(t, next);
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === selected.id ? patch(prev) : prev);
@@ -1505,7 +1511,7 @@ export default function TasksScreen() {
   // відмічає — ✎/✕-кнопки й чекбокс у деталі ховаються (review finding:
   // спільний редактор `(tabs)/index.tsx` раніше не питав роль ВЗАГАЛІ, тож
   // виконував будь-яку дію ще ДО того, як сервер устигав її відхилити).
-  const canEditSelectedTask = canEditProjectItem(selectedTask?.projectId, projectRoles);
+  const canEditSelectedTask = !selectedTask?.projectId || taskRights(selectedTask,selectedTaskRole,String(user?.id??'')).execute;
 
   // Вміст деталі. Однаковий для модалки й для колонки — різниться
   // лише обрамлення, див. DetailPane.
@@ -1578,6 +1584,7 @@ export default function TasksScreen() {
                       />
                     ) : detailTab === 'info' ? (
                     <>
+                    {selectedTask.projectId && <TeamTaskPanel task={selectedTask} role={selectedTaskRole}/>}
                     {selectedTask.description ? <Text style={[s.detailDesc, { color: c.sub }]}>{selectedTask.description}</Text> : null}
 
                     {/* Статус і проєкт — однакове поле вибору: обидва
@@ -1743,7 +1750,7 @@ export default function TasksScreen() {
                     {/* Contract §4.1: глядач читає, але не редагує/видаляє/
                         відмічає — кнопки просто зникають, а не диз'юнктивно
                         no-op'ляться (review finding). */}
-                    {canEditSelectedTask && (
+                    {canEditSelectedTask && (!selectedTask.projectId || isLead(selectedTaskRole)) && (
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                       <TouchableOpacity
                         onPress={() => deleteTask(selectedTask.id, selectedTask.title)}
@@ -1814,7 +1821,7 @@ export default function TasksScreen() {
       tab={detailTab}
       onTabChange={setDetailTab}
       timerRunning={isTimerRunning}
-      onEdit={canEditSelectedTask ? () => editor.begin(selectedTask, personalDisplayColumn(selectedTask, storedTaskStatuses).id) : undefined}
+      onEdit={canEditSelectedTask && (!selectedTask.projectId || isLead(selectedTaskRole)) ? () => editor.begin(selectedTask, personalDisplayColumn(selectedTask, storedTaskStatuses).id) : undefined}
       onClose={() => closeTaskDetail(false)}
       onCopy={() => copyTask(selectedTask)}
       showHandle={!showDetailColumn}

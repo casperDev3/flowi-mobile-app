@@ -1,3 +1,4 @@
+import { TeamWorkspace } from '@/components/projects/TeamWorkspace';
 import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/overview.tsx — дашборд простору проєкту
@@ -46,6 +47,7 @@ import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
 
 interface OverviewTask extends SprintTaskLike {
+  backlogKind?: string;
   kanbanColumnId?: string;
   assigneeId?: string | null;
   history?: { at: string; type: string }[];
@@ -132,7 +134,7 @@ export default function ProjectOverviewScreen() {
       loadData<TaskStatusColumn[]>('task_statuses', []),
     ]);
     setStatusColumns(cols);
-    setTasks(t); setMeetings(m); setSprints(s); setTimeEntries(te);
+    setTasks(t.filter(task => !task.backlogKind)); setMeetings(m); setSprints(s); setTimeEntries(te);
     setTransactions(tx); setAccounts(acc); setBudgets(pb); setCurrencies(cur);
   }, []);
 
@@ -162,7 +164,7 @@ export default function ProjectOverviewScreen() {
     })();
   }, [id, loadAll, loadActivity]);
 
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
   const modules = project ? projectModules(project) : MODULES_BY_TEMPLATE.work;
 
   const stats = useMemo(
@@ -374,6 +376,7 @@ export default function ProjectOverviewScreen() {
             ))}
           </View>
         )}
+        <TeamWorkspace mode="overview" embedded/>
       </ScrollView>
     </ProjectScreenShell>
   );

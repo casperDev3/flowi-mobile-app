@@ -199,6 +199,8 @@ export function deepLinkRoute(url: string | null | undefined): string | null {
       if (!b) return `/project/${enc(a)}/overview`;
       if (b === 'task' && c) return `/(tabs)?open=${enc(c)}`;
       if (b === 'meeting' && c) return `/project/${enc(a)}/meetings?open=${enc(c)}`;
+      if (b === 'discussions') {const topic=query.get('discussion');return `/project/${enc(a)}/discussions${topic?`?discussion=${enc(topic)}`:''}`;}
+      if (b === 'workload' || b === 'my-work') return `/project/${enc(a)}/${b}`;
       if (b === 'sprint') return c ? `/project/${enc(a)}/sprints?sprint=${enc(c)}` : `/project/${enc(a)}/sprints`;
       return `/project/${enc(a)}/overview`;
     }

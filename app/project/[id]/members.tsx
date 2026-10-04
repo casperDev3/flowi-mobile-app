@@ -1,3 +1,5 @@
+import { Modal, useWindowDimensions } from 'react-native';
+import { TeamButton } from '@/components/projects/TeamControls';
 import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/members.tsx — Учасники проєкту
@@ -76,8 +78,10 @@ export default function ProjectMembersScreen() {
   const { project } = useProject(projectId);
   const { user } = useAuth();
   const role = useProjectRole(projectId);
+  const [removing, setRemoving] = useState<MemberOut|null>(null);
   const isOwner = role === 'owner';
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const canManage = isOwner || role === 'manager';
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
 
   const [members, setMembers] = useState<MemberOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,9 +97,10 @@ export default function ProjectMembersScreen() {
   // §4.2/§9.4 (review finding): власник раніше не мав ЖОДНОГО способу вийти
   // з власного проєкту — блок нижче з'являється поверх звичайного списку й
   // пропонує обрати нового власника серед наявних учасників/глядачів.
+  const {height:modalHeight}=useWindowDimensions();
   const [transferring, setTransferring] = useState(false);
 
-  const [inviteRole, setInviteRole] = useState<'member' | 'viewer'>('member');
+  const [inviteRole, setInviteRole] = useState<'manager' | 'member' | 'viewer'>('member');
   const [inviteHours, setInviteHours] = useState(24 * 7);
   const [inviteMaxUses, setInviteMaxUses] = useState<number | null>(null);
   const [creatingLink, setCreatingLink] = useState(false);
@@ -134,13 +139,13 @@ export default function ProjectMembersScreen() {
   }, [projectId]);
 
   const loadInvites = useCallback(async () => {
-    if (!projectId || !isOwner) return;
+    if (!projectId || !canManage) return;
     try {
       setInvites(await listProjectInvites(projectId));
     } catch (e) {
       if (!(e instanceof OfflineError) && __DEV__) console.warn('[project/members] список запрошень не вдався:', e);
     }
-  }, [projectId, isOwner]);
+  }, [projectId, canManage]);
 
   useFocusEffect(useCallback(() => { void load(); void loadInvites(); }, [load, loadInvites]));
 
@@ -148,10 +153,10 @@ export default function ProjectMembersScreen() {
 
   const handleChangeRole = useCallback((member: MemberOut) => {
     if (!projectId) return;
-    const nextRole = member.role === 'member' ? 'viewer' : 'member';
+    const nextRole = isOwner ? (member.role === 'member' ? 'manager' : member.role === 'manager' ? 'viewer' : 'member') : (member.role === 'member' ? 'viewer' : 'member');
     Alert.alert(
       tr.projectMembersChangeRole,
-      `${member.user.name || member.user.email} → ${nextRole === 'member' ? tr.roleMember : tr.roleViewer}`,
+      `${member.user.name || member.user.email} → ${nextRole === 'manager' ? 'Менеджер' : nextRole === 'member' ? tr.roleMember : tr.roleViewer}`,
       [
         { text: tr.cancel, style: 'cancel' },
         {
@@ -179,9 +184,9 @@ export default function ProjectMembersScreen() {
         },
       ],
     );
-  }, [projectId, tr, members]);
+  }, [projectId, tr, members, isOwner]);
 
-  const handleRemove = useCallback((member: MemberOut) => {
+  const handleRemove = useCallback((member: MemberOut, replacementId?: number) => {
     if (!projectId) return;
     Alert.alert(tr.projectMembersRemove, tr.projectMembersRemoveConfirm, [
       { text: tr.cancel, style: 'cancel' },
@@ -192,7 +197,7 @@ export default function ProjectMembersScreen() {
           void (async () => {
             setBusyUserId(member.user.id);
             try {
-              await removeProjectMember(projectId, member.user.id);
+              await removeProjectMember(projectId, member.user.id, replacementId);
               const next = members.filter(m => m.user.id !== member.user.id);
               setMembers(next);
               // review finding: див. коментар у handleChangeRole — той самий
@@ -209,7 +214,7 @@ export default function ProjectMembersScreen() {
         },
       },
     ]);
-  }, [projectId, tr, members]);
+  }, [projectId, tr, members, isOwner]);
 
   const doLeave = useCallback(() => {
     if (!projectId || !myId) return;
@@ -369,7 +374,7 @@ export default function ProjectMembersScreen() {
     ]);
   }, [projectId, tr]);
 
-  const roleLabel = (r: MemberOut['role']) => (r === 'owner' ? tr.roleOwner : r === 'member' ? tr.roleMember : tr.roleViewer);
+  const roleLabel = (r: MemberOut['role']) => (r === 'owner' ? tr.roleOwner : r === 'manager' ? 'Менеджер' : r === 'member' ? tr.roleMember : tr.roleViewer);
 
   const sortedMembers = useMemo(
     () => [...members].sort((a, b) => (a.role === b.role ? a.user.name.localeCompare(b.user.name, 'uk') : a.role === 'owner' ? -1 : b.role === 'owner' ? 1 : 0)),
@@ -381,6 +386,7 @@ export default function ProjectMembersScreen() {
       project={project}
       isDark={isDark}
       title={tr.projectMembersTitle}
+      crumbs={project ? [{label:project.name,onPress:()=>router.push(`/project/${projectId}/overview` as never)},{label:tr.projectMembersTitle}] : undefined}
       // «Назад» — у проп back: ScreenHeader сам сховає стрілку на планшеті, де
       // оболонка вже малює крихти «Проєкт → …» (ScreenHeaderNav.ts).
       back={{
@@ -469,12 +475,12 @@ export default function ProjectMembersScreen() {
                   </View>
                   {busy ? (
                     <ActivityIndicator size="small" color={c.accent} style={{ marginLeft: 10 }} />
-                  ) : isOwner && !isMe && member.role !== 'owner' ? (
+                  ) : canManage && !isMe && member.role !== 'owner' && (isOwner || member.role !== 'manager') ? (
                     <TouchableOpacity
                       onPress={() => {
                         Alert.alert(member.user.name || member.user.email, undefined, [
                           { text: tr.projectMembersChangeRole, onPress: () => handleChangeRole(member) },
-                          { text: tr.projectMembersRemove, style: 'destructive', onPress: () => handleRemove(member) },
+                          { text: tr.projectMembersRemove, style: 'destructive', onPress: () => setRemoving(member) },
                           { text: tr.cancel, style: 'cancel' },
                         ]);
                       }}
@@ -495,18 +501,18 @@ export default function ProjectMembersScreen() {
           </View>
         )}
 
-        {isOwner && (
+        {canManage && (
           <>
             <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>{tr.projectMembersInviteSection}</Text>
 
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-              {(['member', 'viewer'] as const).map(r => (
+              {(isOwner ? ['manager', 'member', 'viewer'] as const : ['member', 'viewer'] as const).map(r => (
                 <TouchableOpacity
                   key={r}
                   onPress={() => setInviteRole(r)}
                   style={[st.segment, { backgroundColor: inviteRole === r ? c.accent : c.dim, borderColor: inviteRole === r ? c.accent : c.border }]}>
                   <Text style={{ color: inviteRole === r ? '#fff' : c.text, fontSize: 12, fontWeight: '700' }}>
-                    {r === 'member' ? tr.roleMember : tr.roleViewer}
+                    {r === 'manager' ? 'Менеджер' : r === 'member' ? tr.roleMember : tr.roleViewer}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -618,7 +624,8 @@ export default function ProjectMembersScreen() {
           </>
         )}
       </ScrollView>
-    </ProjectScreenShell>
+    {removing && <Modal visible transparent animationType="slide" onRequestClose={()=>setRemoving(null)}><View style={{flex:1,justifyContent:'center',backgroundColor:'rgba(0,0,0,0.5)',padding:20}}><ScrollView style={{maxHeight:modalHeight * 0.8,backgroundColor:c.bg1,borderRadius:16}} contentContainerStyle={{padding:20,gap:10}}><Text style={{color:c.text,fontSize:18,fontWeight:'700'}}>Кому передати незавершені завдання й перевірки?</Text>{members.filter(m=>m.user.id!==removing?.user.id&&m.role!=='viewer').map(m=><TeamButton key={m.user.id} label={m.user.name||m.user.email} onPress={()=>{if(removing)handleRemove(removing,m.user.id);setRemoving(null);}}/>)}<TeamButton label="Залишити непризначеними" onPress={()=>{if(removing)handleRemove(removing);setRemoving(null);}}/><TeamButton label="Скасувати" onPress={()=>setRemoving(null)}/></ScrollView></View></Modal>}
+      </ProjectScreenShell>
   );
 }
 

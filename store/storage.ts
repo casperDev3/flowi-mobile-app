@@ -148,7 +148,13 @@ export async function loadDataResult<T>(key: string, fallback: T): Promise<Stora
     // `!json` (а не `== null`) — точно та сама умова, що була в loadData:
     // порожній рядок теж означає «значення немає».
     if (!json) return { ok: true, value: fallback, found: false };
-    return { ok: true, value: JSON.parse(json) as T, found: true };
+    const parsed = JSON.parse(json);
+    // Web tasks may omit this optional collection. Native task views always
+    // consume an array; preserve all other fields and do not mutate persisted JSON.
+    const value = key === 'tasks' && Array.isArray(parsed)
+      ? parsed.map(record => record && typeof record === 'object' && record.subtasks == null ? {...record, subtasks: []} : record)
+      : parsed;
+    return { ok: true, value: value as T, found: true };
   } catch (e) {
     readFailures.set(key, e);
     if (__DEV__) console.warn(`[storage] loadData(${key}) failed:`, e);

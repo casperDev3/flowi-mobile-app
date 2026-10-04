@@ -39,6 +39,25 @@ export interface TaskHistoryEvent {
 }
 
 export interface Task {
+  backlogKind?: 'idea' | 'bug';
+  bugSteps?: string;
+  bugExpected?: string;
+  bugActual?: string;
+  bugSeverity?: 'low' | 'normal' | 'high' | 'critical';
+  completedAt?: string;
+  reviewRequired?: boolean;
+  reviewerId?: string | null;
+  reviewState?: "none" | "pending" | "approved" | "changes_requested";
+  reviewFeedback?: string;
+  resultRequirements?: ("summary" | "link" | "file")[];
+  resultSummary?: string;
+  resultLinks?: string[];
+  resultFiles?: string[];
+  blocked?: boolean;
+  blockReason?: string;
+  blockedById?: string | null;
+  dependencyIds?: string[];
+
   id: string;
   /** Час останньої правки на клієнті. Проставляє saveSynced — основа LWW. */
   updatedAt?: string;
@@ -201,6 +220,20 @@ export const PRIORITY_COLORS: Record<LegacyPriority, string> = {
   low:    '#10B981',
 };
 
+/**
+ * Завершення завдання закриває всі його підзавдання. Правило одне на всі
+ * шляхи в «Готово» (чекбокс, колонка дошки, статус у формі), бо інакше
+ * завдання «готово» висить з 2/5 і прогресом, що бреше.
+ * Лише на ПЕРЕХОДІ в done: правка вже завершеного завдання не відмічає
+ * назад підзадачу, яку людина свідомо зняла. Повернення в роботу підзадачі
+ * теж не скидає.
+ */
+export function closeSubtasksOnDone<T extends Pick<Task, 'status' | 'subtasks'>>(prev: Pick<Task, 'status'>, next: T): T {
+  if (prev.status === 'done' || next.status !== 'done') return next;
+  if (!next.subtasks?.length || next.subtasks.every(s => s.done)) return next;
+  return { ...next, subtasks: next.subtasks.map(s => (s.done ? s : { ...s, done: true })) };
+}
+
 export function getProgress(t: Task): number {
   if (t.status === 'done') return 100;
   if (!t.subtasks.length) return 0;
@@ -223,11 +256,12 @@ export function getProgress(t: Task): number {
  * лежить в особистому потоці, тобто мій, як і на вебі (joinedProjectIds).
  */
 export function isMyTask(
-  task: Pick<Task, 'projectId' | 'assigneeId' | 'createdBy'>,
+  task: Pick<Task, 'projectId' | 'assigneeId' | 'createdBy' | 'backlogKind'>,
   myUserId: string | null | undefined,
   /** Ролі в проєктах (useProjectRoles) — лише для винятку вище. */
   roles?: Readonly<Record<string, string>>,
 ): boolean {
+  if (task.backlogKind) return false;
   if (!task.projectId) return true; // особистий потік
   if (!myUserId) return false;
   if (roles && !(task.projectId in roles)) return !task.assigneeId || task.assigneeId === myUserId;

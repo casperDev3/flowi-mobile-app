@@ -1,4 +1,4 @@
-import { DONE_VISIBLE_DAYS, completedWithinDays } from './taskUtils';
+import { DONE_VISIBLE_DAYS, closeSubtasksOnDone, completedWithinDays } from './taskUtils';
 import type { Filter, SortBy, Status, SubTask, Task } from './taskUtils';
 import { uuidV4 } from './uuid';
 import { displayFallbackPersonal, personalForProjectColumn, projectForPersonalColumn } from './statusLinks';
@@ -171,7 +171,7 @@ export function seedProjectStatusColumns(
   source: readonly TaskStatusColumn[],
   projectId: string,
 ): TaskStatusColumn[] {
-  return source.map(column => ({
+  const seeded = source.map(column => ({
     id: newProjectStatusId(),
     name: column.name,
     color: column.color,
@@ -181,6 +181,13 @@ export function seedProjectStatusColumns(
     projectId,
     sourceStatusId: column.id,
   }));
+  if (!seeded.some(c => /перевір|review/i.test(c.name))) {
+    const done = seeded.find(c => c.isDone);
+    seeded.push({id: newProjectStatusId(), name:'На перевірці', color:'#8B5CF6',
+      position:(done?.position ?? seeded.length)-0.5, isDone:false,
+      type:'in_progress', projectId, sourceStatusId:'team-review'});
+  }
+  return seeded.sort((a,b)=>a.position-b.position);
 }
 
 // ─── Резолюція статусу завдання по проєкту (§3.3, §3.7 «Особисте агрегує») ───
@@ -496,7 +503,7 @@ export function applyColumnDoneChangeToTasks(
   const next = tasks.map(task => {
     if (task.kanbanColumnId !== columnId) return task;
     if (isDone && task.status !== 'done') becameDoneIds.push(task.id);
-    return task.status === nextStatus ? task : { ...task, status: nextStatus };
+    return task.status === nextStatus ? task : closeSubtasksOnDone(task, { ...task, status: nextStatus });
   });
   return { tasks: next, becameDoneIds };
 }

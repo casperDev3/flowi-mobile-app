@@ -1,3 +1,7 @@
+import {IconSymbol} from '@/components/ui/icon-symbol';
+import {ProjectPaletteContext} from './ProjectPaletteContext';
+import {projectAppearance,appearanceTokens,type ProjectAppearance} from '@/utils/projectAppearance';
+import {useTheme} from '@/store/theme-context';
 /**
  * components/projects/ProjectScreenShell.tsx — спільна обв'язка розділу
  * простору проєкту.
@@ -14,12 +18,11 @@
 import * as ExpoRouter from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 
 import { ProjectSwitcherSheet, ProjectSwitcherTrigger } from '@/components/projects/ProjectSwitcherSheet';
 import { ScreenHeader, type Crumb, type ScreenBack } from '@/components/shared/ScreenHeader';
 import { projectRoute, projectSectionFromPathname } from '@/constants/projectNav';
-import { useResponsive } from '@/hooks/use-responsive';
 import type { Project } from '@/app/projects';
 
 /**
@@ -36,7 +39,8 @@ const useRouterSafe: () => ShellRouter =
     ? (ExpoRouter.useRouter as unknown as () => ShellRouter)
     : () => ({});
 
-export function projectShellColors(isDark: boolean, accent: string) {
+export function projectShellColors(isDark: boolean, accent: string, appearance?:ProjectAppearance) {
+  if(appearance){const p=projectAppearance(appearance)[isDark?'dark':'light'],t=appearanceTokens(p);return {bg1:p.background,bg2:p.background,border:t['--flowi-border'],text:t['--flowi-text'],sub:t['--flowi-muted'],dim:p.surface,accent:p.accent};}
   return {
     bg1: isDark ? '#0C0C14' : '#F4F2FF',
     bg2: isDark ? '#14121E' : '#EAE6FF',
@@ -70,10 +74,10 @@ export function ProjectScreenShell({
    */
   crumbs?: Crumb[];
 }) {
-  const { isWide } = useResponsive();
+  const {setTheme}=useTheme();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const accent = project?.color ?? '#7C3AED';
-  const c = projectShellColors(isDark, accent);
+  const c = projectShellColors(isDark, accent,project?.appearance);
   const pathname = useRoutePathname();
   const router = useRouterSafe();
 
@@ -109,7 +113,7 @@ export function ProjectScreenShell({
   }, [crumbs, project, pathname, title, router]);
 
   return (
-    <View style={{ flex: 1 }}>
+    <ProjectPaletteContext.Provider value={c}><View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
       {/* Без нативного SafeAreaView(edges=['top']) — ScreenHeader сам додає
           верхній інсет через useTopInset() (CLAUDE.md: «нативний SafeAreaView
@@ -119,17 +123,17 @@ export function ProjectScreenShell({
         <ScreenHeader
           title={title}
           color={c.accent}
-          actions={actions}
+          actions={<View style={{flexDirection:'row',alignItems:'center',gap:4}}>{actions}<TouchableOpacity accessibilityRole="button" accessibilityLabel="Сповіщення" onPress={()=>router.push?.('/notifications' as never)} style={{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'}}><IconSymbol name="bell" size={18} color={c.text}/></TouchableOpacity><TouchableOpacity accessibilityRole="button" accessibilityLabel={isDark?'Світла тема':'Темна тема'} onPress={()=>setTheme(isDark?'light':'dark')} style={{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.text}}>{isDark?'☀':'☾'}</Text></TouchableOpacity></View>}
           back={back}
           crumbs={derivedCrumbs}
           crumbColor={c.sub}
-          eyebrow={!isWide && project ? (
-            <ProjectSwitcherTrigger
+          eyebrow={project ? (
+            <View style={{flexDirection:'row',alignItems:'center',gap:8}}><TouchableOpacity accessibilityRole="button" accessibilityLabel="Повернутися в особистий простір" onPress={()=>router.push?.('/(tabs)/today' as never)} style={{minWidth:36,minHeight:36,alignItems:'center',justifyContent:'center'}}><IconSymbol name="chevron.left" size={16} color={c.sub}/></TouchableOpacity><ProjectSwitcherTrigger
               name={project.name}
               color={project.color}
               textColor={c.sub}
               onPress={() => setSwitcherOpen(true)}
-            />
+            /></View>
           ) : undefined}>
           {headerChildren}
         </ScreenHeader>
@@ -144,6 +148,6 @@ export function ProjectScreenShell({
           accent={accent}
         />
       ) : null}
-    </View>
+    </View></ProjectPaletteContext.Provider>
   );
 }

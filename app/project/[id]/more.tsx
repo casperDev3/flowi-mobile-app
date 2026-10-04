@@ -40,7 +40,7 @@ export default function ProjectMoreScreen() {
   const { tr } = useI18n();
   const { project } = useProject(projectId);
   const role = useProjectRole(projectId);
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
 
   const modules = project ? projectModules(project) : MODULES_BY_TEMPLATE.work;
   const visible = useMemo(() => visibleProjectNavItems(modules, role), [modules, role]);

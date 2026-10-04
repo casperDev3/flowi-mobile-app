@@ -17,9 +17,9 @@ import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 import type { ProjectModules } from '@/utils/projectUtils';
 
-export type ProjectRole = 'owner' | 'member' | 'viewer';
+export type ProjectRole = 'owner' | 'manager' | 'member' | 'viewer';
 export type ProjectSectionKey =
-  | 'overview' | 'tasks' | 'meetings' | 'notes' | 'time' | 'budget' | 'sprints' | 'settings';
+  | 'backlog' | 'archive' | 'calendar' | 'my-work' | 'discussions' | 'workload' | 'members' | 'overview' | 'tasks' | 'meetings' | 'notes' | 'time' | 'budget' | 'sprints' | 'settings';
 
 export interface ProjectNavItem {
   key: ProjectSectionKey;
@@ -32,9 +32,16 @@ export interface ProjectNavItem {
 }
 
 export const PROJECT_NAV_ITEMS: readonly ProjectNavItem[] = [
-  { key: 'overview', icon: 'square.grid.2x2.fill', labelKey: 'projectNavOverview' },
+  { key: 'my-work', icon: 'checklist', labelKey: 'projectMyWork' },
   { key: 'tasks',    icon: 'checklist',             labelKey: 'tabTasks' },
-  { key: 'meetings', icon: 'calendar',              labelKey: 'navMeetings',       moduleKey: 'meetings' },
+  { key: 'calendar', icon: 'calendar', labelKey: 'calendar' },
+  { key: 'backlog', icon: 'list.bullet', labelKey: 'projectBacklogNav' },
+  { key: 'archive', icon: 'archivebox', labelKey: 'projectArchive' },
+  { key: 'discussions', icon: 'note.text', labelKey: 'projectDiscussions' },
+  { key: 'members', icon: 'person.2.fill', labelKey: 'projectTeam' },
+  { key: 'workload', icon: 'chart.pie.fill', labelKey: 'projectWorkload' },
+  { key: 'overview', icon: 'square.grid.2x2.fill', labelKey: 'projectNavOverview' },
+  { key: 'meetings', icon: 'calendar',              labelKey: 'navMeetings' },
   { key: 'notes',    icon: 'note.text',             labelKey: 'notes',             moduleKey: 'notes' },
   { key: 'time',     icon: 'timer',                 labelKey: 'navTime',           moduleKey: 'time' },
   { key: 'budget',   icon: 'chart.pie.fill',        labelKey: 'navBudget',         moduleKey: 'budget', ownerOnly: true },
@@ -102,7 +109,7 @@ export function projectTabCapacity(width: number): number {
  * не ховати щоденне заради рідкісного.
  */
 const PROJECT_TAB_PRIORITY: readonly ProjectSectionKey[] = [
-  'overview', 'tasks', 'meetings', 'time', 'notes', 'sprints', 'budget', 'settings',
+  'my-work', 'tasks', 'calendar', 'meetings', 'overview', 'backlog', 'archive', 'discussions', 'members', 'workload', 'time', 'notes', 'sprints', 'budget', 'settings',
 ];
 
 export interface ProjectNavSplit {

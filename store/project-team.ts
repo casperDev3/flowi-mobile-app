@@ -33,7 +33,7 @@ export interface MemberOut {
 
 export interface InviteOut {
   id: string;
-  role: 'member' | 'viewer';
+  role: 'manager' | 'member' | 'viewer';
   expires_at: string;
   max_uses: number | null;
   uses: number;
@@ -48,7 +48,7 @@ export interface InviteOut {
 export interface InvitePreview {
   workspace: { id: string; name: string };
   project: { id: string; name: string; color: string };
-  role: 'member' | 'viewer';
+  role: 'manager' | 'member' | 'viewer';
   invited_by: { name: string } | null;
   expires_at: string;
 }
@@ -92,7 +92,7 @@ export async function fetchProjectMembers(projectId: string): Promise<MemberOut[
 export async function changeMemberRole(
   projectId: string,
   userId: number,
-  role: 'member' | 'viewer',
+  role: 'manager' | 'member' | 'viewer',
 ): Promise<MemberOut> {
   return apiFetch<MemberOut>(`/projects/${encodeURIComponent(projectId)}/members/${userId}/`, {
     method: 'PATCH',
@@ -105,8 +105,8 @@ export async function changeMemberRole(
  * себе), або сам учасник виходить (userId == власний). `409 owner_cannot_leave`
  * — власник спершу мусить передати власність (`transferProjectOwnership`).
  */
-export async function removeProjectMember(projectId: string, userId: number): Promise<void> {
-  await apiFetch(`/projects/${encodeURIComponent(projectId)}/members/${userId}/`, { method: 'DELETE' });
+export async function removeProjectMember(projectId: string, userId: number, replacementId?: number): Promise<void> {
+  await apiFetch(`/projects/${encodeURIComponent(projectId)}/members/${userId}/`, { method: 'DELETE', body: replacementId ? {replacement_id:replacementId}:undefined });
 }
 
 /** POST /projects/{id}/transfer-ownership/ (§3.2) — передати власність іншому учаснику. */
@@ -127,7 +127,7 @@ export async function transferProjectOwnership(projectId: string, userId: number
  */
 export async function createInviteLink(
   projectId: string,
-  role: 'member' | 'viewer',
+  role: 'manager' | 'member' | 'viewer',
   expiresInHours: number,
   maxUses: number | null = null,
 ): Promise<InviteOut> {
@@ -146,7 +146,7 @@ export type InviteByEmailResult = {
 /** POST /projects/{id}/invites/ з email — акаунт уже існує, додається одразу. */
 export async function inviteByEmail(
   projectId: string,
-  role: 'member' | 'viewer',
+  role: 'manager' | 'member' | 'viewer',
   email: string,
 ): Promise<InviteByEmailResult> {
   return apiFetch<InviteByEmailResult>(`/projects/${encodeURIComponent(projectId)}/invites/`, {

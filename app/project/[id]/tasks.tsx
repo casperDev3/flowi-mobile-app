@@ -1,3 +1,4 @@
+import {isProjectWork} from '@/utils/projectBacklog';
 import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/tasks.tsx — Завдання простору проєкту
@@ -83,9 +84,10 @@ import {
   type TaskStatusColumn,
 } from '@/utils/taskStatuses';
 import { saveStatusLink } from '@/store/status-links';
+import { taskRights } from '@/utils/teamwork';
 import { useAuth } from '@/store/auth';
 import {
-  assigneeDisplayName,
+  assigneeDisplayName, closeSubtasksOnDone,
   filterTasksByMonth, priorityFields, priorityLabel as priorityLevelLabel, DEFAULT_PRIORITY_LEVEL,
   normalizePriority, type Filter, type Task,
 } from '@/utils/taskUtils';
@@ -125,7 +127,8 @@ export default function ProjectTasksScreen() {
   const { user } = useAuth();
   // Contract §4.1: глядач читає завдання проєкту, але не створює, не рухає по
   // дошці/дедлайнах і не відмічає готовим.
-  const canEdit = useProjectRole(projectId) !== 'viewer';
+  const teamRole = useProjectRole(projectId);
+  const canEdit = teamRole !== 'viewer';
   const { stopTimerForTask } = useTimerContext();
   const { isWide } = useResponsive();
   // §4.5 — підпис виконавця на картках усіх чотирьох видів. Один проєкт тут
@@ -143,6 +146,7 @@ export default function ProjectTasksScreen() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   // 'all', а не 'active' (як на екрані Завдань): це повний беклог проєкту,
   // і щойно позначена «готово» задача не має раптово зникати з-під пальця.
+  const [query,setQuery]=useState(''),[mineOnly,setMineOnly]=useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [view, setView] = useState<ViewMode>('list');
   // Список (contract §3: «Список — групування за статусом/пріоритетом/
@@ -201,15 +205,15 @@ export default function ProjectTasksScreen() {
     })();
   }, [projectId, loadAll]);
 
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
 
   const ownTasks = useMemo(
     () => (projectId ? projectDetailTasks(tasks, sprints, projectId) : []),
     [tasks, sprints, projectId],
   );
   const filtered = useMemo(
-    () => ownTasks.filter(t => filter === 'all' || t.status === filter),
-    [ownTasks, filter],
+    () => ownTasks.filter(t => !t.backlogKind && t.title.toLowerCase().includes(query.toLowerCase()) && (!mineOnly||t.assigneeId===String(user?.id)) && t.status!=='done' && isProjectWork(t,columns) && (filter === 'all' || t.status === filter)),
+    [ownTasks, filter, columns,query,mineOnly,user?.id],
   );
 
   // Годинник «щойно створених» для дошки (як на вебі, kanban-board.tsx):
@@ -299,7 +303,8 @@ export default function ProjectTasksScreen() {
   }, [tr]);
 
   const toggleTask = useCallback(async (task: Task) => {
-    if (!canEdit) return;
+    if (!taskRights(task,teamRole,String(user?.id??'')).execute) return;
+    if(task.reviewRequired || task.resultRequirements?.length) {router.push({pathname:'/(tabs)',params:{open:task.id}} as never);return;}
     let becameDone = false;
     try {
       await trackWrite(async () => {
@@ -312,7 +317,7 @@ export default function ProjectTasksScreen() {
           // старим, і задача «готово» стояла на дошці в колонці «todo»
           // назавжди (review finding).
           const column = scopedColumnFor(columns, projectId, status === 'done' ? 'done' : 'todo');
-          return { ...t, status, kanbanColumnId: column?.id ?? t.kanbanColumnId };
+          return closeSubtasksOnDone(t, { ...t, status, kanbanColumnId: column?.id ?? t.kanbanColumnId });
         }));
         setTasks(updated);
       }, TASKS_KEY_ONLY);
@@ -321,7 +326,7 @@ export default function ProjectTasksScreen() {
     } catch (e) {
       if (__DEV__) console.warn('[project/tasks] відмітка не вдалася:', e);
     }
-  }, [canEdit, trackWrite, stopTimerForTask, columns, projectId]);
+  }, [teamRole, user?.id, router, trackWrite, stopTimerForTask, columns, projectId]);
 
   const openTask = useCallback((task: Task) => {
     router.push({ pathname: '/(tabs)', params: { open: task.id } } as never);
@@ -357,14 +362,15 @@ export default function ProjectTasksScreen() {
   }, [projectId, user?.id, columns, project?.name, tr]);
 
   const moveToColumn = useCallback(async (task: Task, column: TaskStatusColumn) => {
-    if (!canEdit || column.id === task.kanbanColumnId) return;
+    if (!taskRights(task,teamRole,String(user?.id??'')).execute || column.id === task.kanbanColumnId) return;
+    if(task.reviewRequired || (column.isDone && task.resultRequirements?.length)){router.push({pathname:'/(tabs)',params:{open:task.id}} as never);return;}
     let becameDone = false;
     try {
       await trackWrite(async () => {
         const updated = await updateSynced<Task>('tasks', fresh => fresh.map(t => {
           if (t.id !== task.id) return t;
           becameDone = column.isDone && t.status !== 'done';
-          return { ...t, status: column.isDone ? 'done' : 'active', kanbanColumnId: column.id };
+          return closeSubtasksOnDone(t, { ...t, status: column.isDone ? 'done' : 'active', kanbanColumnId: column.id });
         }));
         setTasks(updated);
       }, TASKS_KEY_ONLY);
@@ -567,8 +573,7 @@ export default function ProjectTasksScreen() {
   const VIEWS: { key: ViewMode; icon: 'list.bullet' | 'square.grid.2x2' | 'calendar' | 'chart.bar.xaxis' }[] = [
     { key: 'list', icon: 'list.bullet' },
     { key: 'board', icon: 'square.grid.2x2' },
-    { key: 'calendar', icon: 'calendar' },
-    { key: 'timeline', icon: 'chart.bar.xaxis' },
+
   ];
 
   return (
@@ -592,7 +597,7 @@ export default function ProjectTasksScreen() {
             </TouchableOpacity>
           ))}
           <View style={{ flex: 1 }} />
-          {(['active', 'all', 'done'] as Filter[]).map(f => (
+          {([] as Filter[]).map(f => (
             <TouchableOpacity
               key={f}
               onPress={() => setFilter(f)}
@@ -616,6 +621,8 @@ export default function ProjectTasksScreen() {
         // <RefreshControl … /> обриває їй цей тег передчасно.
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
 
+        <TextInput accessibilityLabel="Пошук завдань" placeholder="Пошук завдань" placeholderTextColor={c.sub} value={query} onChangeText={setQuery} style={{minHeight:44,borderWidth:1,borderColor:c.border,borderRadius:8,padding:10,color:c.text,marginBottom:8}}/>
+        <TouchableOpacity accessibilityRole="button" accessibilityState={{selected:mineOnly}} onPress={()=>setMineOnly(!mineOnly)} style={{minHeight:44,justifyContent:'center'}}><Text style={{color:c.accent}}>{mineOnly?'✓ ':''}Призначені мені</Text></TouchableOpacity>
         {/* Швидке створення — повна форма (проєкт/спринт/пріоритет/дедлайн)
             лишається на екрані Завдань, тут лише назва. Глядач (contract §4.1)
             рядка взагалі не бачить — створювати йому нічого. */}
@@ -779,7 +786,7 @@ export default function ProjectTasksScreen() {
               const colTasks = limitBoardColumn(
                 filtered.filter(t => boardColumnForTask(t, boardColumns, columns)?.id === col.id),
                 boardNow,
-              ).visible;
+              ).visible.slice(0,5);
               return (
                 <View key={col.id} style={[st.boardColumn, { borderColor: c.border, backgroundColor: c.dim }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -796,6 +803,7 @@ export default function ProjectTasksScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
+                  {filtered.filter(t=>boardColumnForTask(t,boardColumns,columns)?.id===col.id).length>5&&<TouchableOpacity accessibilityRole="button" onPress={()=>setView('list')}><Text style={{color:c.accent,paddingVertical:10}}>Перейти до списку</Text></TouchableOpacity>}
                   {colTasks.map(task => (
                     <View key={task.id} style={{ marginBottom: 6 }}>
                       <TaskCompactCard
@@ -924,7 +932,7 @@ export default function ProjectTasksScreen() {
                 return (
                   <View key={task.id}>
                     <TouchableOpacity
-                      onPress={canEdit ? () => setEditingDates(editing ? null : {
+                      onPress={taskRights(task,teamRole,String(user?.id??'')).plan ? () => setEditingDates(editing ? null : {
                         id: task.id,
                         // localDateKey (не `.slice(0, 10)` рядка ISO, який
                         // читає УТС-компоненти): для UTC+2/+3 (Україна)

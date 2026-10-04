@@ -70,7 +70,7 @@ const { create, act } = require('react-test-renderer') as any;
 
 const NOW = '2026-09-01T10:00:00.000Z';
 const PROJECT = { id: 'p1', name: 'Сайт', color: '#EF4444', createdAt: NOW };
-const TASK = { id: 't1', title: 'Зверстати головну', projectId: 'p1', status: 'active', createdAt: NOW, subtasks: [] };
+const TASK = { id: 't1', title: 'Зверстати головну', projectId: 'p1', status: 'active', createdAt: NOW, deadline: NOW, subtasks: [] };
 
 const flush = () => act(async () => { await new Promise(r => setTimeout(r, 0)); });
 
@@ -112,17 +112,13 @@ test('простір проєкту → Завдання: active → done зуп
   expect(mockStatusAtStop).toEqual(['done']);
 });
 
-test('простір проєкту → Завдання: done → active таймер не чіпає', async () => {
+test('простір проєкту → Завдання: завершене зникає з активної дошки', async () => {
   const tree = await openProjectTasks();
   await pressByLabel(tree, TASK.title, checkbox);
   await flush();
-  mockStopTimerForTask.mockClear();
-
-  await pressByLabel(tree, TASK.title, checkbox);
-  await flush();
-
-  expect(JSON.parse(mockStore.get('tasks')!)[0].status).toBe('active');
-  expect(mockStopTimerForTask).not.toHaveBeenCalled();
+  expect(tree.root.findAll((n: any)=>n.props?.accessibilityLabel===TASK.title && typeof n.props.onPress==='function')).toHaveLength(0);
+  expect(JSON.parse(mockStore.get('tasks')!)[0].status).toBe('done');
+  expect(mockStopTimerForTask).toHaveBeenCalledTimes(1);
 });
 
 describe('вкладка «Сьогодні»', () => {

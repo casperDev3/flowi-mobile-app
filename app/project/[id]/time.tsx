@@ -55,7 +55,7 @@ export default function ProjectTimeScreen() {
   const { project } = useProject(projectId);
   // Contract §4.1: глядач бачить записи часу проєкту, але не додає й не видаляє.
   const canEdit = useProjectRole(projectId) !== 'viewer';
-  const c = projectShellColors(isDark, project?.color ?? '#7C3AED');
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
   const sheetColors = useMemo(() => timeColors(isDark), [isDark]);
 
   const { items: entries, setItems: setEntries, reload: reloadEntries } = useSyncedList<TimeRecord>('time_entries', { enabled: true });

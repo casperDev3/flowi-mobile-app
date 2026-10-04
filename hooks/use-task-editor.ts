@@ -226,7 +226,7 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
    * Почати з чистої форми — для створення нового завдання.
    * `preset` — наперед обраний проєкт/спринт (створення зі спринта в деталі проєкту).
    */
-  const reset = useCallback((statusId: string, preset?: Partial<Pick<TaskDraft, 'projectId' | 'sprintId'>>) => {
+  const reset = useCallback((statusId: string, preset?: Partial<Pick<TaskDraft, 'projectId' | 'sprintId' | 'deadline'>>) => {
     setDraft({ ...emptyDraft(statusId), ...preset });
     setOriginal(null);
     setInitial(null);

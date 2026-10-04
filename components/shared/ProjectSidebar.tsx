@@ -1,3 +1,4 @@
+import {loadData,saveData} from '@/store/storage';
 import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/ProjectSidebar.tsx
@@ -16,7 +17,7 @@ import { Atlas } from '@/constants/atlas';
  * розійшовся б між формфакторами для того самого проєкту.
  */
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -44,6 +45,10 @@ export function ProjectSidebar({
   const { project } = useProject(projectId);
   const role = useProjectRole(projectId);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [collapsed,setCollapsed]=useState(false),[closed,setClosed]=useState<string[]>([]);
+  useEffect(()=>{void loadData<boolean>('project-sidebar-collapsed',false).then(setCollapsed);void loadData<string[]>('project-sidebar-groups',[]).then(setClosed);},[]);
+  const toggle=()=>{setCollapsed(!collapsed);void saveData('project-sidebar-collapsed',!collapsed);};
+  const toggleGroup=(name:string)=>{const next=closed.includes(name)?closed.filter(n=>n!==name):[...closed,name];setClosed(next);void saveData('project-sidebar-groups',next);};
 
   const modules = project ? projectModules(project) : MODULES_BY_TEMPLATE.work;
   const items = visibleProjectNavItems(modules, role);
@@ -69,14 +74,15 @@ export function ProjectSidebar({
 
   return (
     <View
-      style={[st.root, { width: SIDEBAR_WIDTH, backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 14 }]}
+      style={[st.root, { width: collapsed?64:SIDEBAR_WIDTH, backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 14 }]}
       accessibilityRole="menu">
+      <TouchableOpacity onPress={toggle} accessibilityRole="button" accessibilityLabel={collapsed?'Розгорнути сайдбар':'Згорнути сайдбар'} style={st.row}><IconSymbol name="list.bullet" size={18} color={c.sub}/>{!collapsed&&<Text style={{color:c.sub}}>Згорнути сайдбар</Text>}</TouchableOpacity>
       <TouchableOpacity onPress={goPersonal} accessibilityRole="button" style={st.exitRow}>
         <IconSymbol name="chevron.left" size={14} color={c.sub} />
-        <Text style={{ color: c.sub, fontSize: 13, fontWeight: '700' }}>{tr.projectExitToPersonal}</Text>
+        {!collapsed&&<Text style={{ color: c.sub, fontSize: 13, fontWeight: '700' }}>{tr.projectExitToPersonal}</Text>}
       </TouchableOpacity>
 
-      {project ? (
+      {project && !collapsed ? (
         <View style={st.header}>
           <View style={[st.dot, { backgroundColor: project.color }]} />
           <Text numberOfLines={1} style={[st.brand, { color: c.text }]}>{project.name}</Text>
@@ -84,7 +90,12 @@ export function ProjectSidebar({
       ) : null}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-        {items.map(item => {
+        {[
+          {label:'',keys:['my-work','tasks','calendar','meetings']},
+          {label:'Завдання',keys:['overview','backlog','archive','sprints']},
+          {label:'Робота',keys:['notes','time','budget']},
+          {label:'Команда',keys:['discussions','workload','members']},
+        ].map(group=><View key={group.label} style={{marginBottom:collapsed?2:12}}>{!collapsed&&!!group.label&&<TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:!closed.includes(group.label)}} onPress={()=>toggleGroup(group.label)} style={st.groupHead}><Text style={{color:c.sub}}>{closed.includes(group.label)?'▸':'▾'} {group.label}</Text></TouchableOpacity>}{(collapsed||!closed.includes(group.label))&&items.filter(item=>group.keys.includes(item.key)).map(item => {
           const route = projectRoute(projectId, item.key);
           const active = pathname === route || pathname.startsWith(route + '/');
           return (
@@ -93,18 +104,19 @@ export function ProjectSidebar({
               onPress={() => goSection(route)}
               accessibilityRole="menuitem"
               accessibilityState={{ selected: active }}
-              style={[st.row, active && { backgroundColor: c.activeBg }]}>
+              accessibilityLabel={String(tr[item.labelKey])}
+              style={[st.row, collapsed&&{minHeight:36,justifyContent:'center'}, active && { backgroundColor: c.activeBg }]}>
               <IconSymbol name={item.icon} size={19} color={active ? c.accent : c.sub} />
-              <Text
+              {!collapsed&&<Text
                 numberOfLines={1}
                 style={{ color: active ? c.accent : c.text, fontSize: 14, fontWeight: active ? '700' : '500', flex: 1 }}>
                 {String(tr[item.labelKey])}
-              </Text>
+              </Text>}
             </TouchableOpacity>
           );
-        })}
+        })}</View>)}
 
-        <TouchableOpacity
+        {!collapsed&&<TouchableOpacity
           onPress={() => setSwitcherOpen(v => !v)}
           accessibilityRole="button"
           accessibilityState={{ expanded: switcherOpen }}
@@ -113,8 +125,8 @@ export function ProjectSidebar({
           <Text style={[st.groupTitle, { color: c.sub, flex: 1, marginLeft: 4 }]}>
             {tr.projectSwitcherTitle.toUpperCase()}
           </Text>
-        </TouchableOpacity>
-        {switcherOpen ? (
+        </TouchableOpacity>}
+        {switcherOpen && !collapsed ? (
           <ProjectSwitcherList
             currentProjectId={projectId}
             isDark={isDark}
@@ -126,7 +138,8 @@ export function ProjectSidebar({
       </ScrollView>
 
       <View style={{ paddingBottom: insets.bottom + 10 }}>
-        <ActiveTimersSidebarCard colors={{ border: c.border, text: c.text, sub: c.sub, accent: c.accent, activeBg: c.activeBg }} />
+        {!collapsed&&<ActiveTimersSidebarCard colors={{ border: c.border, text: c.text, sub: c.sub, accent: c.accent, activeBg: c.activeBg }} />}
+        <TouchableOpacity accessibilityRole="menuitem" accessibilityLabel={tr.tabOptions} onPress={()=>goSection(projectRoute(projectId,'settings'))} style={st.row}><IconSymbol name="gearshape.fill" size={19} color={c.sub}/>{!collapsed&&<Text style={{color:c.text}}>{tr.tabOptions}</Text>}</TouchableOpacity>
       </View>
     </View>
   );

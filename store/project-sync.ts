@@ -35,7 +35,6 @@ import {
   applyRevisionUpdates,
   normalizeSyncLocalId,
   quarantineRejections,
-  resolveConflictSide,
   setProjectsChangedHandler,
   setProjectSyncsIdleWaiter,
   syncRecordKey,
@@ -82,7 +81,7 @@ export interface ProjectSummary {
   name: string;
   color: string;
   template: 'work' | 'simple';
-  role: 'owner' | 'member' | 'viewer';
+  role: 'owner' | 'manager' | 'member' | 'viewer';
   member_count: number;
   cursor: number;
   created_at: string;
@@ -561,7 +560,7 @@ interface ProjectSyncResponse {
   protocol_version: 2;
   project_sync_protocol?: number;
   project_id: string;
-  role: 'owner' | 'member' | 'viewer';
+  role: 'owner' | 'manager' | 'member' | 'viewer';
   cursor: number;
   changes: ProjectSyncResponseItem[];
   acknowledged: { status: 'applied'; mutation_id: string; collection: string; local_id: string; revision: number; change_seq: number }[];
@@ -696,7 +695,7 @@ async function applyProjectPull(
 interface ProjectExchangeResult {
   cursor: number;
   serverCursor: number;
-  role: 'owner' | 'member' | 'viewer';
+  role: 'owner' | 'manager' | 'member' | 'viewer';
   revisions: SyncRevisionMap;
   conflicts: ProjectSyncResponse['conflicts'];
   /**
@@ -741,8 +740,13 @@ async function exchangeProject(
       ...response.conflicts.map(i => i.mutation_id),
       ...rejections.map(i => i.mutation_id),
     ]);
+    if(rejections.length){
+      const previous=await loadData<any[]>('team_rejected_drafts',[]);
+      const drafts=rejections.map(rejection=>({projectId,rejection,mutation:mutations.find(m=>m.mutation_id===rejection.mutation_id)}));
+      await saveDataChecked('team_rejected_drafts',[...previous,...drafts]);
+    }
     await removeMutationsFromOutbox(finishedIds);
-    if (rejections.some(r => r.reason === 'forbidden')) hadForbiddenRejection = true;
+    if (rejections.length) hadForbiddenRejection = true;
     if (rejections.length) {
       // ERR-06: відхилену мутацію прибирали з outbox, курсор скидали в 0, і
       // наступний pull повертав запис до серверної правди — введене зникало
@@ -762,7 +766,7 @@ async function exchangeProject(
     const skippedDirty = await applyProjectPull(projectId, pulled.filter(item => !conflictKeys.has(syncRecordKey(item.collection, item.local_id))));
     revisions = applyRevisionUpdates(
       revisions,
-      response.changes.filter(c => !skippedDirty.has(syncRecordKey(c.collection, c.local_id))),
+      [...response.changes.filter(c => !skippedDirty.has(syncRecordKey(c.collection, c.local_id))), ...conflictRows],
       response.acknowledged,
     );
     conflicts.push(...response.conflicts);
@@ -1019,28 +1023,15 @@ async function runProjectSync(projectId: string): Promise<void> {
     if (result.conflicts.length) {
       const needsUser: SyncConflict[] = [];
       for (const conflict of result.conflicts) {
-        const side = resolveConflictSide(
-          conflict.client.data?.updatedAt,
-          conflict.server?.client_updated_at,
-          { localDeleted: conflict.client.deleted, serverMissing: !conflict.server },
-        );
-        if (side === 'local') {
-          await markDirty(conflict.collection, conflict.local_id, conflict.client.deleted, true, stream);
-        } else if (side === 'server' && conflict.server) {
-          await applyProjectPull(projectId, [conflict.server]);
-        } else {
-          // 'manual' — та сама черга ручного вирішення, що й особистий синк
-          // (store/sync-conflicts.ts, показує app/sync.tsx і app/data.tsx):
-          // без явного рішення запис не має тихо зникати з жодної сторони.
-          // Префікс id проєктом — інакше конфлікт того самого local_id у
-          // двох різних проєктах ліг би в чергу під одним ключем.
-          needsUser.push({
-            id: `${projectId}:${syncRecordKey(conflict.collection, conflict.local_id)}`,
-            dataKey: conflict.collection,
-            local: { id: conflict.local_id, ...(conflict.client.data ?? {}) },
-            remote: conflict.server ? { id: conflict.local_id, ...(conflict.server.data ?? {}) } : null,
-          });
-        }
+        // Team conflicts keep the canonical version; preserve local work for retry.
+        needsUser.push({
+          id: `${projectId}:${syncRecordKey(conflict.collection, conflict.local_id)}`,
+          dataKey: conflict.collection,
+          local: { id: conflict.local_id, ...(conflict.client.data ?? {}) },
+          remote: conflict.server ? { id: conflict.local_id, ...(conflict.server.data ?? {}) } : null,
+        });
+        if (conflict.server) await applyProjectPull(projectId, [conflict.server]);
+
       }
       if (needsUser.length) await appendConflicts(needsUser);
     }

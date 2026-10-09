@@ -19,7 +19,7 @@
  * type стирається при компіляції), тож ані RN, ані сховище сюди не приходять.
  */
 
-import type { Transaction } from '@/utils/financeUtils';
+import { fiatFractionDigits, type Transaction } from '@/utils/financeUtils';
 
 // ─── Типи (G.1) ───────────────────────────────────────────────────────────────
 
@@ -684,12 +684,15 @@ export function formatSubscriptionMoney(
   const kind = cur?.kind ?? 'fiat';
   const decimals = Math.max(0, Math.min(kind === 'fiat' ? 2 : 8, cur?.decimals ?? 2));
   if (kind === 'fiat') {
+    // Те саме правило, що й formatCurrency (utils/financeUtils.ts): ціла
+    // сума без копійок, інакше — повна точність валюти.
+    const digits = fiatFractionDigits(value, decimals);
     try {
       return value.toLocaleString(locale, {
         style: 'currency',
         currency: code,
-        minimumFractionDigits: 0,
-        maximumFractionDigits: decimals,
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
       });
     } catch {
       // невідомий ISO-код (власна валюта) — нижче, через символ
@@ -697,7 +700,10 @@ export function formatSubscriptionMoney(
   }
   let formatted: string;
   try {
-    formatted = value.toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+    const fiatDigits = kind === 'fiat' ? fiatFractionDigits(value, decimals) : null;
+    formatted = value.toLocaleString(locale, fiatDigits == null
+      ? { minimumFractionDigits: 0, maximumFractionDigits: decimals }
+      : { minimumFractionDigits: fiatDigits, maximumFractionDigits: fiatDigits });
   } catch {
     formatted = String(Math.round(value * 100) / 100);
   }

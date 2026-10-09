@@ -14,20 +14,20 @@ import { Atlas } from '@/constants/atlas';
  * оцінка чесно підписана «за тривалістю». Бейдж тривалості (420/360 хв)
  * лишається окремо — якість його не заміняє.
  */
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { SectionHeader } from '@/components/health/HealthBits';
+import { HealthAddButton, HealthCard } from '@/components/health/HealthBits';
 import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
 import { LoadErrorNotice } from '@/components/health/HealthNotices';
 import { MetricTrend } from '@/components/health/MetricTrend';
 import { MiniBarChart } from '@/components/health/MiniBarChart';
+import { useHealthTabGrid } from '@/components/health/HealthLayout';
 import type { HealthTabProps } from '@/components/health/tabs/types';
+import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useContentWidth } from '@/hooks/use-content-width';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import {
@@ -35,7 +35,7 @@ import {
 } from '@/utils/healthTheme';
 
 export function SleepTab({ h }: HealthTabProps) {
-  const contentWidth = useContentWidth();
+  const grid = useHealthTabGrid();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
@@ -71,27 +71,11 @@ export function SleepTab({ h }: HealthTabProps) {
     ? tr.hautoPulseRestNote.replace('{source}', h.hk.label)
     : tr.hautoPulseRestNoteManual;
 
-  return (
-    <>
-      <ScrollView
-        contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: tabBarInset + 32 }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
-
-        {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
-        {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
-
-        {/* Сон */}
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}>
-            <SectionHeader title={tr.sleep} icon="moon.fill" color={ACCENT_SLEEP} textColor={c.text} top={8} />
-          </View>
-          <TouchableOpacity onPress={() => setModal('sleep')} accessibilityRole="button" accessibilityLabel={tr.add}
-            style={[s.addBtn, { backgroundColor: ACCENT_SLEEP }]}>
-            <IconSymbol name="plus" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+  const items: MasonryEntry[] = [
+    {
+      key: 'sleep',
+      node: (
+        <HealthCard c={c} title={tr.sleep} right={<HealthAddButton onPress={() => setModal('sleep')} label={tr.add} />}>
           {sleep ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -110,76 +94,98 @@ export function SleepTab({ h }: HealthTabProps) {
               </View>
             </>
           ) : (
-            <TouchableOpacity onPress={() => setModal('sleep')} style={[s.empty, { borderColor: c.border, backgroundColor: c.dim }]}>
+            <TouchableOpacity onPress={() => setModal('sleep')} accessibilityRole="button" accessibilityLabel={tr.recordSleep}
+              style={[s.empty, { borderColor: c.border, backgroundColor: c.dim }]}>
               <IconSymbol name="moon.fill" size={18} color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 9, flex: 1 }}>{tr.recordSleep}</Text>
               <IconSymbol name="plus" size={14} color={c.sub} />
             </TouchableOpacity>
           )}
-        </BlurView>
-
-        {/* Динаміка сну */}
-        <View style={{ marginTop: 14 }}>
-          <MetricTrend entries={h.entries} type="sleep" agg="avg" color={ACCENT_SLEEP} goal={goals.sleep}
-            format={v => fmtSleep(Math.round(v))} isDark={isDark} c={c} tr={tr} />
-        </View>
-
-        {/* Якість сну — з фаз, або «за тривалістю», коли фаз немає. */}
-        {quality && (
-          <>
-            <SectionHeader title={tr.hautoSleepQuality} icon="sparkles" color={ACCENT_SLEEP} textColor={c.text} />
-            <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{quality.score}</Text>
-                <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4, flex: 1 }}>/ 100</Text>
-                <View style={[s.badge, { backgroundColor: qualityColor + '20', borderColor: qualityColor + '40' }]}>
-                  <Text style={{ color: qualityColor, fontSize: 11, fontWeight: '700' }}>
-                    {quality.byDurationOnly ? tr.hautoSleepQualityByDuration : tr.hautoSleepQualityByPhases}
-                  </Text>
-                </View>
-              </View>
-              {phases && phaseTotal > 0 ? (
-                <>
-                  <View style={[s.stack, { backgroundColor: c.track }]}
-                    accessibilityLabel={`${tr.hautoSleepPhases}: ${phases.map(p => `${p.label} ${fmtSleep(p.value)}`).join(', ')}`}>
-                    {phases.map(p => p.value > 0 ? (
-                      <View key={p.key} style={{ flex: p.value, backgroundColor: p.color }} />
-                    ) : null)}
-                  </View>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 10 }}>
-                    {phases.map(p => (
-                      <View key={p.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.color, marginRight: 5 }} />
-                        <Text style={{ color: c.sub, fontSize: 11 }}>{p.label} · {fmtSleep(p.value)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </>
-              ) : (
-                <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>{tr.hautoSleepNoPhases}</Text>
-              )}
-            </BlurView>
-          </>
-        )}
-
-        {/* Пульс спокою — справжній (pulse_rest); середній за добу — поруч, підписаний як середній. */}
-        <SectionHeader title={tr.hautoPulseRest} icon="waveform.path.ecg" color={ACCENT_PULSE} textColor={c.text} />
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+        </HealthCard>
+      ),
+    },
+    {
+      key: 'sleep-trend',
+      node: (
+        <MetricTrend entries={h.entries} type="sleep" agg="avg" color={ACCENT_SLEEP} goal={goals.sleep}
+          title={`${tr.sleep} · ${tr.dynamics}`}
+          format={v => fmtSleep(Math.round(v))} c={c} tr={tr} />
+      ),
+    },
+  ];
+  // Якість сну — з фаз, або «за тривалістю», коли фаз немає.
+  if (quality) {
+    items.push({
+      key: 'quality',
+      node: (
+        <HealthCard c={c} title={tr.hautoSleepQuality}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{today.pulseRest ?? '—'}</Text>
-            <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>{tr.hautoBpm}</Text>
-          </View>
-          <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>
-            {today.pulseRest == null ? tr.hautoPulseRestEmpty : restNote}
-          </Text>
-          {today.pulse != null && (
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 10 }}>
-              <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', flex: 1 }}>{tr.hautoPulseAvg}</Text>
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{today.pulse}</Text>
-              <Text style={{ color: c.sub, fontSize: 11, marginLeft: 4 }}>{tr.hautoBpm}</Text>
+            <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{quality.score}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4, flex: 1 }}>/ 100</Text>
+            <View style={[s.badge, { backgroundColor: qualityColor + '20', borderColor: qualityColor + '40' }]}>
+              <Text style={{ color: qualityColor, fontSize: 11, fontWeight: '700' }}>
+                {quality.byDurationOnly ? tr.hautoSleepQualityByDuration : tr.hautoSleepQualityByPhases}
+              </Text>
             </View>
+          </View>
+          {phases && phaseTotal > 0 ? (
+            <>
+              <View style={[s.stack, { backgroundColor: c.track }]}
+                accessibilityLabel={`${tr.hautoSleepPhases}: ${phases.map(p => `${p.label} ${fmtSleep(p.value)}`).join(', ')}`}>
+                {phases.map(p => p.value > 0 ? (
+                  <View key={p.key} style={{ flex: p.value, backgroundColor: p.color }} />
+                ) : null)}
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 10 }}>
+                {phases.map(p => (
+                  <View key={p.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.color, marginRight: 5 }} />
+                    <Text style={{ color: c.sub, fontSize: 11 }}>{p.label} · {fmtSleep(p.value)}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : (
+            <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>{tr.hautoSleepNoPhases}</Text>
           )}
-        </BlurView>
+        </HealthCard>
+      ),
+    });
+  }
+  // Пульс спокою — справжній (pulse_rest); середній за добу — поруч, підписаний як середній.
+  items.push({
+    key: 'pulse-rest',
+    node: (
+      <HealthCard c={c} title={tr.hautoPulseRest}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+          <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{today.pulseRest ?? '—'}</Text>
+          <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>{tr.hautoBpm}</Text>
+        </View>
+        <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>
+          {today.pulseRest == null ? tr.hautoPulseRestEmpty : restNote}
+        </Text>
+        {today.pulse != null && (
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 10 }}>
+            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', flex: 1 }}>{tr.hautoPulseAvg}</Text>
+            <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{today.pulse}</Text>
+            <Text style={{ color: c.sub, fontSize: 11, marginLeft: 4 }}>{tr.hautoBpm}</Text>
+          </View>
+        )}
+      </HealthCard>
+    ),
+  });
+
+  return (
+    <>
+      <ScrollView
+        contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+        {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+        {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
+
+        <MasonryColumns items={items} columnCount={grid.columnCount} columnGap={12} />
       </ScrollView>
 
       <HealthEntryModal modalKey={modal} onClose={() => setModal(null)} onSubmit={onSubmit} isDark={isDark} tr={tr} />
@@ -188,8 +194,6 @@ export function SleepTab({ h }: HealthTabProps) {
 }
 
 const s = StyleSheet.create({
-  addBtn: { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  card:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
   track:  { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill:   { height: '100%', borderRadius: 4 },
   badge:  { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },

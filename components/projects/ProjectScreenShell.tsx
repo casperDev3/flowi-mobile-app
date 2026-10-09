@@ -1,5 +1,7 @@
-import {IconSymbol} from '@/components/ui/icon-symbol';
 import {ProjectPaletteContext} from './ProjectPaletteContext';
+import {IconAction} from '@/components/shared/ActionBar';
+import {useResponsive} from '@/hooks/use-responsive';
+import {useI18n} from '@/store/i18n';
 import {projectAppearance,appearanceTokens,type ProjectAppearance} from '@/utils/projectAppearance';
 import {useTheme} from '@/store/theme-context';
 /**
@@ -7,10 +9,12 @@ import {useTheme} from '@/store/theme-context';
  * простору проєкту.
  *
  * Восьми екранам (`app/project/[id]/*.tsx`) потрібне те саме: тло під колір
- * проєкту, ScreenHeader із назвою розділу, і — ЛИШЕ на телефоні — пілюля
- * свічера проєкту в шапці (contract §3: «у шапці свічер проєкту»). На
- * широкому екрані свічер уже стоїть у ProjectSidebar, і другий у шапці був би
- * тим самим вибором двічі.
+ * проєкту, ScreenHeader із назвою розділу, і — ЛИШЕ на телефоні — рядок
+ * «‹ · ● Назва проєкту ▾» над заголовком: шеврон веде назад до СПИСКУ
+ * проєктів (`/projects`), пілюля відкриває свічер (contract §3: «у шапці
+ * свічер проєкту»). Так проєкт і шлях назад видно на кожному розділі.
+ * На широкому екрані обидва вже стоять у ProjectSidebar (і в згорнутому
+ * теж), і другий набір у шапці був би тим самим вибором двічі.
  *
  * Не рендерить ані ScrollView, ані FlatList: кожен екран сам вирішує, який
  * контейнер йому потрібен, — оболонка лише дає шапку й тло.
@@ -18,11 +22,12 @@ import {useTheme} from '@/store/theme-context';
 import * as ExpoRouter from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 
 import { ProjectSwitcherSheet, ProjectSwitcherTrigger } from '@/components/projects/ProjectSwitcherSheet';
 import { ScreenHeader, type Crumb, type ScreenBack } from '@/components/shared/ScreenHeader';
-import { projectRoute, projectSectionFromPathname } from '@/constants/projectNav';
+import { goProjectsList, projectRoute, projectSectionFromPathname } from '@/constants/projectNav';
 import type { Project } from '@/app/projects';
 
 /**
@@ -33,7 +38,7 @@ import type { Project } from '@/app/projects';
  */
 const useRoutePathname: () => string =
   typeof ExpoRouter.usePathname === 'function' ? ExpoRouter.usePathname : () => '';
-type ShellRouter = { push?: (href: never) => void };
+type ShellRouter = { push?: (href: never) => void; navigate?: (href: never) => void };
 const useRouterSafe: () => ShellRouter =
   typeof ExpoRouter.useRouter === 'function'
     ? (ExpoRouter.useRouter as unknown as () => ShellRouter)
@@ -53,7 +58,7 @@ export function projectShellColors(isDark: boolean, accent: string, appearance?:
 }
 
 export function ProjectScreenShell({
-  project, isDark, title, actions, children, headerChildren, back, crumbs,
+  project, isDark, title, actions, children, headerChildren, back, crumbs, hideSpaceExit,
 }: {
   project: Project | null;
   isDark: boolean;
@@ -73,6 +78,12 @@ export function ProjectScreenShell({
    * глибше за розділ (див. нижче).
    */
   crumbs?: Crumb[];
+  /**
+   * Сховати шеврон «в особистий простір» біля свічера. Екрани глибше за
+   * розділ (Учасники) уже мають кнопку «Назад» — два шеврони поруч читались
+   * як дубль однієї дії.
+   */
+  hideSpaceExit?: boolean;
 }) {
   const {setTheme}=useTheme();
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -80,6 +91,8 @@ export function ProjectScreenShell({
   const c = projectShellColors(isDark, accent,project?.appearance);
   const pathname = useRoutePathname();
   const router = useRouterSafe();
+  const { tr } = useI18n();
+  const { isWide } = useResponsive();
 
   /**
    * Крихти «Проєкт → Учасники» для екранів ГЛИБШЕ за розділ.
@@ -123,17 +136,44 @@ export function ProjectScreenShell({
         <ScreenHeader
           title={title}
           color={c.accent}
-          actions={<View style={{flexDirection:'row',alignItems:'center',gap:4}}>{actions}<TouchableOpacity accessibilityRole="button" accessibilityLabel="Сповіщення" onPress={()=>router.push?.('/notifications' as never)} style={{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'}}><IconSymbol name="bell" size={18} color={c.text}/></TouchableOpacity><TouchableOpacity accessibilityRole="button" accessibilityLabel={isDark?'Світла тема':'Темна тема'} onPress={()=>setTheme(isDark?'light':'dark')} style={{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'}}><Text style={{color:c.text}}>{isDark?'☀':'☾'}</Text></TouchableOpacity></View>}
+          actions={
+            // Дії розділу + сповіщення + тема — один рядок зі сталим проміжком;
+            // іконки — спільні IconAction 44×44 (а не гліф ☀/☾ текстом).
+            <View style={st.actions}>
+              {actions}
+              <IconAction icon="bell" label={tr.notifications} color={c.text} onPress={() => router.push?.('/notifications' as never)} colors={c} />
+              <IconAction
+                icon={isDark ? 'sun.max' : 'moon'}
+                label={isDark ? tr.projectThemeToLight : tr.projectThemeToDark}
+                color={c.text}
+                onPress={() => setTheme(isDark ? 'light' : 'dark')}
+                colors={c}
+              />
+            </View>
+          }
           back={back}
           crumbs={derivedCrumbs}
           crumbColor={c.sub}
-          eyebrow={project ? (
-            <View style={{flexDirection:'row',alignItems:'center',gap:8}}><TouchableOpacity accessibilityRole="button" accessibilityLabel="Повернутися в особистий простір" onPress={()=>router.push?.('/(tabs)/today' as never)} style={{minWidth:36,minHeight:36,alignItems:'center',justifyContent:'center'}}><IconSymbol name="chevron.left" size={16} color={c.sub}/></TouchableOpacity><ProjectSwitcherTrigger
-              name={project.name}
-              color={project.color}
-              textColor={c.sub}
-              onPress={() => setSwitcherOpen(true)}
-            /></View>
+          eyebrow={project && !isWide ? (
+            <View style={st.eyebrow}>
+              {hideSpaceExit ? null : (
+                <TouchableOpacity
+                  accessibilityRole="link"
+                  accessibilityLabel={tr.projectBackToProjectsA11y}
+                  onPress={() => goProjectsList(router)}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                  style={st.exit}>
+                  <IconSymbol name="chevron.left" size={16} color={c.sub} />
+                </TouchableOpacity>
+              )}
+              <ProjectSwitcherTrigger
+                name={project.name}
+                color={project.color}
+                textColor={c.sub}
+                onPress={() => setSwitcherOpen(true)}
+                accessibilityLabel={tr.projectSwitchProjectA11y.replace('{name}', project.name)}
+              />
+            </View>
           ) : undefined}>
           {headerChildren}
         </ScreenHeader>
@@ -151,3 +191,10 @@ export function ProjectScreenShell({
     </View></ProjectPaletteContext.Provider>
   );
 }
+
+const st = StyleSheet.create({
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  eyebrow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // Ціль 40 + hitSlop 4 = 48 — шеврон стоїть не впритул до краю шапки (A11Y-08).
+  exit:    { minWidth: 40, minHeight: 40, alignItems: 'center', justifyContent: 'center', marginLeft: -10 },
+});

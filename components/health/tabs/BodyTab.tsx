@@ -12,20 +12,20 @@ import { Atlas } from '@/constants/atlas';
  * Обчислення лишились у healthUtils: тут немає жодної власної формули, бо
  * WHtR, порахований по-своєму, розійшовся б із вебом мовчки.
  */
-import { BlurView } from 'expo-blur';
 import React, { useState } from 'react';
 import { Linking, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 import { BodyEntrySheet, BodyRecord } from '@/components/health/BodyEntrySheet';
-import { SectionHeader } from '@/components/health/HealthBits';
+import { HealthAddButton, HealthCard } from '@/components/health/HealthBits';
 import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
 import { LoadErrorNotice, ReminderBlockedNotice } from '@/components/health/HealthNotices';
 import { MetricTrend } from '@/components/health/MetricTrend';
 import { MiniBarChart } from '@/components/health/MiniBarChart';
+import { useHealthTabGrid } from '@/components/health/HealthLayout';
 import type { HealthTabProps } from '@/components/health/tabs/types';
+import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useContentWidth } from '@/hooks/use-content-width';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
@@ -43,7 +43,7 @@ const labelKey = {
 } as const satisfies Record<MeasurementType, keyof Translations>;
 
 export function BodyTab({ h }: HealthTabProps) {
-  const contentWidth = useContentWidth();
+  const grid = useHealthTabGrid();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
@@ -93,49 +93,20 @@ export function BodyTab({ h }: HealthTabProps) {
   const series = (t: EntryType) => h.entries.filter(e => e.type === t).slice(0, 8).reverse().map(e => e.value);
   const unitOf = (t: MeasurementType) => (t === 'bodyfat' ? '%' : 'см');
 
-  return (
-    <>
-      <ScrollView
-        contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: tabBarInset + 32 }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT_WEIGHT} />}>
+  const measured = MEASUREMENT_TYPES.filter(t => lv(t) != null);
 
-        {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
-        {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
-
-        {/* Одноразове прибирання ваги, яку старий синк щодня переклеював на
-            «сьогодні» (ВАДА-2): видаляти мовчки не можна — кажемо підсумок. */}
-        {h.weightCleanupRemoved != null && h.weightCleanupRemoved > 0 && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: ACCENT_WEIGHT + '44', backgroundColor: ACCENT_WEIGHT + '12', padding: 12, marginTop: 8 }}>
-            <IconSymbol name="scalemass.fill" size={15} color={ACCENT_WEIGHT} />
-            <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', flex: 1, marginLeft: 8 }}>
-              {tr.hautoWeightCleanup.replace('{n}', String(h.weightCleanupRemoved))}
-            </Text>
-            <TouchableOpacity onPress={h.dismissWeightCleanup} accessibilityRole="button" accessibilityLabel={tr.close}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <IconSymbol name="xmark" size={14} color={c.sub} />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Вага */}
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}>
-            <SectionHeader title={tr.weight} icon="scalemass.fill" color={ACCENT_WEIGHT} textColor={c.text} top={8} />
-          </View>
-          <TouchableOpacity onPress={() => setSheet(true)} accessibilityRole="button" accessibilityLabel={tr.addBodyEntry}
-            style={[s.addBtn, { backgroundColor: ACCENT_WEIGHT }]}>
-            <IconSymbol name="plus" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+  const items: MasonryEntry[] = [
+    {
+      key: 'weight',
+      node: (
+        <HealthCard c={c} title={tr.weight} right={<HealthAddButton onPress={() => setSheet(true)} label={tr.addBodyEntry} />}>
           {latestWeight ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                 <Text style={{ color: c.text, fontSize: 30, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{latestWeight} кг</Text>
                 {bmi && (
-                  <View style={[s.badge, { marginLeft: 10, backgroundColor: bmiColor + '20', borderColor: bmiColor + '40' }]}>
-                    <Text style={{ color: bmiColor, fontSize: 10, fontWeight: '700' }}>{tr.bmi} {bmi.toFixed(1)} · {bmiLbl}</Text>
+                  <View style={[s.badge, { marginLeft: 10, flexShrink: 1, backgroundColor: bmiColor + '20', borderColor: bmiColor + '40' }]}>
+                    <Text numberOfLines={1} style={{ color: bmiColor, fontSize: 10, fontWeight: '700' }}>{tr.bmi} {bmi.toFixed(1)} · {bmiLbl}</Text>
                   </View>
                 )}
                 <View style={{ flex: 1 }} />
@@ -161,23 +132,29 @@ export function BodyTab({ h }: HealthTabProps) {
               </View>
             </>
           ) : (
-            <TouchableOpacity onPress={() => setModal('weight')} style={[s.empty, { borderColor: c.border, backgroundColor: c.dim }]}>
+            <TouchableOpacity onPress={() => setModal('weight')} accessibilityRole="button" accessibilityLabel={tr.recordWeight}
+              style={[s.empty, { borderColor: c.border, backgroundColor: c.dim }]}>
               <IconSymbol name="scalemass.fill" size={16} color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 8, flex: 1 }}>{tr.recordWeight}</Text>
               <IconSymbol name="plus" size={14} color={c.sub} />
             </TouchableOpacity>
           )}
-        </BlurView>
-
-        {/* Динаміка ваги — одна на вкладку, а не по одній на кожен колишній екран */}
-        <View style={{ marginTop: 14 }}>
-          <MetricTrend entries={h.entries} type="weight" agg="avg" color={ACCENT_WEIGHT}
-            format={v => `${v.toFixed(1)} кг`} isDark={isDark} c={c} tr={tr} />
-        </View>
-
-        {/* Пульс */}
-        <SectionHeader title={tr.pulse} icon="waveform.path.ecg" color={ACCENT_PULSE} textColor={c.text} />
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+        </HealthCard>
+      ),
+    },
+    {
+      // Динаміка ваги — одна на вкладку, а не по одній на кожен колишній екран.
+      key: 'weight-trend',
+      node: (
+        <MetricTrend entries={h.entries} type="weight" agg="avg" color={ACCENT_WEIGHT}
+          title={`${tr.weight} · ${tr.dynamics}`}
+          format={v => `${v.toFixed(1)} кг`} c={c} tr={tr} />
+      ),
+    },
+    {
+      key: 'pulse',
+      node: (
+        <HealthCard c={c} title={tr.pulse}>
           {pulse ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
@@ -207,17 +184,21 @@ export function BodyTab({ h }: HealthTabProps) {
               <Text style={{ color: c.sub, fontSize: 11, marginTop: 8 }}>{pulseNote}</Text>
             </>
           ) : (
-            <TouchableOpacity onPress={() => setModal('pulse')} style={[s.empty, { borderColor: c.border, backgroundColor: c.dim }]}>
+            <TouchableOpacity onPress={() => setModal('pulse')} accessibilityRole="button" accessibilityLabel={tr.recordPulse}
+              style={[s.empty, { borderColor: c.border, backgroundColor: c.dim }]}>
               <IconSymbol name="waveform.path.ecg" size={18} color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 9, flex: 1 }}>{tr.recordPulse}</Text>
               <IconSymbol name="plus" size={14} color={c.sub} />
             </TouchableOpacity>
           )}
-        </BlurView>
-
-        {/* Склад тіла */}
-        <SectionHeader title={tr.summary} icon="ruler.fill" color={ACCENT_WEIGHT} textColor={c.text} />
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+        </HealthCard>
+      ),
+    },
+    {
+      // Склад тіла
+      key: 'composition',
+      node: (
+        <HealthCard c={c} title={tr.summary}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             <Stat label={bodyfatManual ? tr.mBodyfat : tr.bodyfatEst} value={bodyfat != null ? `${bodyfat.toFixed(1)}%` : '—'} color={ACCENT_MOOD} sub={c.sub} />
             <Stat label={tr.leanMass} value={lean ? `${lean.toFixed(1)} кг` : '—'} color={ACCENT} sub={c.sub} />
@@ -226,74 +207,107 @@ export function BodyTab({ h }: HealthTabProps) {
               badge={whtr ? whtrLbl : undefined} />
             <Stat label={tr.whr} value={whr ? whr.toFixed(2) : '—'} color={whr ? (whrHealthy(whr, sex) ? ACCENT : ACCENT_PULSE) : c.sub} sub={c.sub} />
           </View>
-        </BlurView>
-
-        {/* Виміри */}
-        <SectionHeader title={tr.bodyMeasurements} icon="figure.arms.open" color={ACCENT_WEIGHT} textColor={c.text} />
-        {MEASUREMENT_TYPES.every(t => lv(t) == null) && latestWeight == null ? (
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-            <TouchableOpacity onPress={() => setSheet(true)} style={[s.empty, { borderColor: c.border, backgroundColor: c.dim }]}>
+        </HealthCard>
+      ),
+    },
+    {
+      // Виміри — одна картка з рядками: у masonry стос дрібних карток розлетівся б по колонках.
+      key: 'measurements',
+      node: (
+        <HealthCard c={c} title={tr.bodyMeasurements}>
+          {/* Порожньо — підказка «додати», а не порожня картка з самим заголовком. */}
+          {measured.length === 0 ? (
+            <TouchableOpacity onPress={() => setSheet(true)} accessibilityRole="button" accessibilityLabel={tr.addBodyEntry}
+              style={[s.empty, { borderColor: c.border, backgroundColor: c.dim }]}>
               <IconSymbol name="ruler.fill" size={18} color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 9, flex: 1 }}>{tr.noMeasurements}</Text>
               <IconSymbol name="plus" size={14} color={c.sub} />
             </TouchableOpacity>
-          </BlurView>
-        ) : (
-          <View style={{ gap: 8 }}>
-            {MEASUREMENT_TYPES.filter(t => lv(t) != null).map(t => {
-              const ser = series(t);
-              const delta = ser.length >= 2 ? ser[ser.length - 1] - ser[0] : null;
-              return (
-                <BlurView key={t} intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[s.row, { borderColor: c.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{tr[labelKey[t]]}</Text>
-                    <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, marginTop: 1 }}>
-                      {lv(t)}<Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}> {unitOf(t)}</Text>
+          ) : measured.map((t, i) => {
+            const ser = series(t);
+            const delta = ser.length >= 2 ? ser[ser.length - 1] - ser[0] : null;
+            return (
+              <View key={t} style={[s.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{tr[labelKey[t]]}</Text>
+                  <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, marginTop: 1 }}>
+                    {lv(t)}<Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}> {unitOf(t)}</Text>
+                  </Text>
+                  {delta != null && delta !== 0 && (
+                    <Text style={{ color: delta < 0 ? ACCENT : ACCENT_MOOD, fontSize: 11, fontWeight: '700', marginTop: 1 }}>
+                      {delta > 0 ? '+' : ''}{delta.toFixed(1)} {unitOf(t)}
                     </Text>
-                    {delta != null && delta !== 0 && (
-                      <Text style={{ color: delta < 0 ? ACCENT : ACCENT_MOOD, fontSize: 11, fontWeight: '700', marginTop: 1 }}>
-                        {delta > 0 ? '+' : ''}{delta.toFixed(1)} {unitOf(t)}
-                      </Text>
-                    )}
-                  </View>
-                  {ser.length >= 2 && <View style={{ width: 90 }}><MiniBarChart values={ser} color={ACCENT_WEIGHT} height={40} /></View>}
-                </BlurView>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Нагадування */}
-        <SectionHeader title={tr.reminders} icon="bell.fill" color={ACCENT_MOOD} textColor={c.text} />
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, paddingVertical: 4 }]}>
+                  )}
+                </View>
+                {ser.length >= 2 && <View style={{ width: 90 }}><MiniBarChart values={ser} color={ACCENT_WEIGHT} height={40} /></View>}
+              </View>
+            );
+          })}
+        </HealthCard>
+      ),
+    },
+    {
+      key: 'reminders',
+      node: (
+        <HealthCard c={c} title={tr.reminders} style={{ paddingBottom: 8 }}>
           <View style={s.remRow}>
-            <IconSymbol name="scalemass.fill" size={16} color={ACCENT_WEIGHT} />
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 10 }}>{tr.weightReminder}</Text>
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{tr.weightReminder}</Text>
             <Switch
               value={h.reminders.weight}
               disabled={!h.remindersLoaded || h.reminderBusy !== null}
               accessibilityLabel={tr.weightReminder}
               accessibilityState={{ checked: h.reminders.weight, disabled: !h.remindersLoaded || h.reminderBusy !== null }}
               onValueChange={v => { void h.setReminder('weight', v, tr.weight, tr.weightReminderBody).then(ok => setReminderBlocked(v && !ok)); }}
-              trackColor={{ true: ACCENT_WEIGHT }} />
+              trackColor={{ true: ACCENT }} />
           </View>
           <View style={[s.remRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
-            <IconSymbol name="ruler.fill" size={16} color={ACCENT_WEIGHT} />
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 10 }}>{tr.measurementsReminder}</Text>
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{tr.measurementsReminder}</Text>
             <Switch
               value={h.reminders.measurements}
               disabled={!h.remindersLoaded || h.reminderBusy !== null}
               accessibilityLabel={tr.measurementsReminder}
               accessibilityState={{ checked: h.reminders.measurements, disabled: !h.remindersLoaded || h.reminderBusy !== null }}
               onValueChange={v => { void h.setReminder('measurements', v, tr.bodyMeasurements, tr.measurementsReminderBody).then(ok => setReminderBlocked(v && !ok)); }}
-              trackColor={{ true: ACCENT_WEIGHT }} />
+              trackColor={{ true: ACCENT }} />
           </View>
           {reminderBlocked && (
-            <ReminderBlockedNotice lang={lang} c={c} isDark={isDark}
-              onOpenSettings={() => { void Linking.openSettings(); }}
-              onDismiss={() => setReminderBlocked(false)} />
+            <View style={{ marginTop: 8 }}>
+              <ReminderBlockedNotice lang={lang} c={c} isDark={isDark}
+                onOpenSettings={() => { void Linking.openSettings(); }}
+                onDismiss={() => setReminderBlocked(false)} />
+            </View>
           )}
-        </BlurView>
+        </HealthCard>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <ScrollView
+        contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+        {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+        {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
+
+        {/* Одноразове прибирання ваги, яку старий синк щодня переклеював на
+            «сьогодні» (ВАДА-2): видаляти мовчки не можна — кажемо підсумок. */}
+        {h.weightCleanupRemoved != null && h.weightCleanupRemoved > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.xlarge, borderWidth: 1, borderColor: ACCENT_WEIGHT + '44', backgroundColor: ACCENT_WEIGHT + '12', padding: 12, marginBottom: 12 }}>
+            <IconSymbol name="scalemass.fill" size={15} color={ACCENT_WEIGHT} />
+            <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', flex: 1, marginLeft: 8 }}>
+              {tr.hautoWeightCleanup.replace('{n}', String(h.weightCleanupRemoved))}
+            </Text>
+            <TouchableOpacity onPress={h.dismissWeightCleanup} accessibilityRole="button" accessibilityLabel={tr.close}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <IconSymbol name="xmark" size={14} color={c.sub} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <MasonryColumns items={items} columnCount={grid.columnCount} columnGap={12} />
       </ScrollView>
 
       <HealthEntryModal modalKey={modal} onClose={() => setModal(null)} onSubmit={onSubmit} isDark={isDark} tr={tr} />
@@ -315,11 +329,9 @@ function Stat({ label, value, color, sub, badge }: {
 }
 
 const s = StyleSheet.create({
-  addBtn:  { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   iconBtn: { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  card:    { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
-  row:     { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  row:     { paddingVertical: 10, flexDirection: 'row', alignItems: 'center' },
   badge:   { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   empty:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 13 },
-  remRow:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
+  remRow:  { flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingVertical: 4 },
 });

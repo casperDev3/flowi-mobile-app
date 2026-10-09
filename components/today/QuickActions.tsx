@@ -61,7 +61,8 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
 }
 
 const s = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  // Без зовнішнього marginBottom: відступ дає секція (TodaySectionGrid).
+  row: { flexDirection: 'row', gap: 8 },
   btn: {
     borderRadius: Atlas.radius.large,
     borderWidth: 1,

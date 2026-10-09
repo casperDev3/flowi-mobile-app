@@ -33,8 +33,12 @@ export interface TaskSubtasksProps {
   onCopy: (subtask: Subtask) => void;
   /** Довгий тап або «…»: меню дій над підзавданням. */
   onShowActions: (subtask: Subtask, indexInTask: number) => void;
-  /** Перехід на повний екран підзавдань. */
-  onOpenAll: () => void;
+  /**
+   * Перехід на повний екран підзавдань. Без нього (картка в просторі проєкту:
+   * екран /subtasks — особистий, і перехід виводив би з проєкту) список
+   * показується повністю тут же.
+   */
+  onOpenAll?: () => void;
   newText: string;
   onChangeNewText: (text: string) => void;
   onAdd: () => void;
@@ -79,7 +83,7 @@ export function TaskSubtasks({
       // completed subtasks go to end
       const sortedSubs = [...task.subtasks].sort((a, b) => Number(a.done) - Number(b.done));
       const LIMIT = 4;
-      const hasMore = sortedSubs.length > LIMIT;
+      const hasMore = !!onOpenAll && sortedSubs.length > LIMIT;
       const displaySubs = hasMore ? sortedSubs.slice(0, LIMIT) : sortedSubs;
       return (
         <View style={{ gap: 7 }}>

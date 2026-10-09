@@ -10,21 +10,21 @@ describe('pushTapUrl', () => {
       .toBe('/project/p-1/overview');
   });
 
-  it('assigned на задачі веде у повний редактор (tabs)?open=', () => {
+  it('assigned на задачі веде в картку задачі В ПРОЄКТІ, а не в особистий редактор', () => {
     expect(pushTapUrl({ type: 'assigned', project_id: 'p-1', collection: 'tasks', local_id: 't-1' }))
-      .toBe('/(tabs)?open=t-1');
+      .toBe('/project/p-1/tasks?open=t-1');
   });
 
   it('status_changed на задачі — той самий шлях, що й assigned', () => {
     expect(pushTapUrl({ type: 'status_changed', project_id: 'p-1', collection: 'tasks', local_id: 't-2' }))
-      .toBe('/(tabs)?open=t-2');
+      .toBe('/project/p-1/tasks?open=t-2');
   });
 
-  it('mentioned на задачі веде у (tabs), на нараді — в екран нарад проєкту (легасі collection-фолбек)', () => {
+  it('mentioned на задачі веде в «Завдання» проєкту, на нараді — в екран нарад проєкту (легасі collection-фолбек)', () => {
     expect(pushTapUrl({ type: 'mentioned', project_id: 'p-1', collection: 'tasks', local_id: 't-3' }))
-      .toBe('/(tabs)?open=t-3');
+      .toBe('/project/p-1/tasks?open=t-3');
     expect(pushTapUrl({ type: 'mentioned', project_id: 'p-1', collection: 'meetings', local_id: 'm-1' }))
-      .toBe('/project/p-1/meetings?open=m-1');
+      .toBe('/project/p-1/calendar?open=m-1');
   });
 
   // Реальний payload сервера (flowi-server-app core/expo_push.py notify_mentioned):
@@ -34,14 +34,14 @@ describe('pushTapUrl', () => {
     expect(pushTapUrl({
       type: 'mentioned', project_id: 'p-1', collection: 'comments', local_id: 't-3',
       url: 'ftrackingapp://project/p-1/task/t-3',
-    })).toBe('/(tabs)?open=t-3');
+    })).toBe('/project/p-1/tasks?open=t-3');
   });
 
   it('mentioned на нараді — реальний payload веде в екран нарад проєкту, а не в редактор задачі', () => {
     expect(pushTapUrl({
       type: 'mentioned', project_id: 'p-1', collection: 'comments', local_id: 'm-1',
       url: 'ftrackingapp://project/p-1/meeting/m-1',
-    })).toBe('/project/p-1/meetings?open=m-1');
+    })).toBe('/project/p-1/calendar?open=m-1');
   });
 
   it('mentioned без url і без розпізнаваного collection — нікуди (не вгадуємо тип цілі)', () => {

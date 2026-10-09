@@ -258,10 +258,14 @@ describe('Екрани — «Назад» лише на телефоні', () =>
     { name: 'Налаштування здоровʼя', path: '/health-profile', load: () => require('@/app/health-profile').default },
   ];
 
+  // Монтовані екрани розмонтовуємо після тесту: MasonryColumns ставить
+  // fallback-таймер, який інакше спрацьовує вже після teardown jest.
+  const mounted: any[] = [];
   async function mountScreen(Screen: React.ComponentType) {
     let tree: any;
     await act(async () => { tree = create(<Screen />); });
     await act(async () => { await Promise.resolve(); });
+    mounted.push(tree);
     return tree;
   }
 
@@ -270,6 +274,7 @@ describe('Екрани — «Назад» лише на телефоні', () =>
 
   beforeEach(() => { jest.spyOn(console, 'warn').mockImplementation(() => {}); });
   afterEach(() => {
+    act(() => { mounted.splice(0).forEach(t => t.unmount()); });
     (console.warn as jest.Mock).mockRestore?.();
     mockWindow = PHONE;
     mockPathname = '/subscriptions';

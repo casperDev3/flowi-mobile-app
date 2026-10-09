@@ -33,10 +33,12 @@ interface Props {
   collapsedText: string | null;
   onOpen: (item: InboxItem) => void;
   onArchive: (item: InboxItem) => void;
+  /** Дії під текстом картки (напр. «Прийняти/Відхилити» запрошення в проєкт). */
+  footer?: React.ReactNode;
 }
 
 export const NotificationRow = React.memo(function NotificationRow({
-  item, timeText, isDark, colors, unreadLabel, archiveLabel, collapsedText, onOpen, onArchive,
+  item, timeText, isDark, colors, unreadLabel, archiveLabel, collapsedText, onOpen, onArchive, footer,
 }: Props) {
   const unread = !item.read_at;
   const look = eventLook(item.category, item.event_type);
@@ -50,6 +52,7 @@ export const NotificationRow = React.memo(function NotificationRow({
       intensity={isDark ? 20 : 40}
       tint={isDark ? 'dark' : 'light'}
       style={[styles.card, { borderColor: colors.border }, unread && { backgroundColor: colors.unreadBg }]}>
+      <View style={styles.row}>
       <Pressable
         onPress={handleOpen}
         accessibilityRole="button"
@@ -92,6 +95,8 @@ export const NotificationRow = React.memo(function NotificationRow({
           <IconSymbol name="xmark" size={12} color={colors.sub} />
         </View>
       </TouchableOpacity>
+      </View>
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
     </BlurView>
   );
 });
@@ -101,10 +106,11 @@ const styles = StyleSheet.create({
     borderRadius: Atlas.radius.large,
     borderWidth: 1,
     overflow: 'hidden',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     marginBottom: 8,
   },
+  row: { flexDirection: 'row', alignItems: 'flex-start' },
+  // Вирівняно з текстом картки: 12 (padding) + 34 (іконка) + 12 (відступ).
+  footer: { paddingLeft: 58, paddingRight: 12, paddingBottom: 12 },
   main: { flex: 1, flexDirection: 'row', padding: 12, paddingRight: 4, minHeight: 44 },
   iconBox: { width: 34, height: 34, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
   textCol: { flex: 1, marginLeft: 12, minWidth: 0 },

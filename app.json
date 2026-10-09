@@ -12,7 +12,15 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.casper3.f-tracking-app",
       "appleTeamId": "D28SUT8PH4",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "associatedDomains": [
+        "applinks:flowi-web-app.vercel.app"
+      ],
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.casper3.f-tracking-app"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -33,6 +41,23 @@
         "android.permission.health.READ_SLEEP",
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_WEIGHT"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "flowi-web-app.vercel.app",
+              "path": "/invite"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
@@ -98,7 +123,8 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,

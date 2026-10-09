@@ -26,9 +26,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Modal,
-  Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -36,7 +33,7 @@ import {
   View,
 } from 'react-native';
 
-import { HealthTabBar, type HealthTabId, parseHealthTab } from '@/components/health/HealthTabs';
+import { HealthTabBar, type HealthTabId, healthTabBarLayout, parseHealthTab } from '@/components/health/HealthTabs';
 import { QuickAddSheet, QuickRecord } from '@/components/health/QuickAddSheet';
 import { ActivityTab } from '@/components/health/tabs/ActivityTab';
 import { BodyTab } from '@/components/health/tabs/BodyTab';
@@ -46,11 +43,12 @@ import { PreventionTab } from '@/components/health/tabs/PreventionTab';
 import { SleepTab } from '@/components/health/tabs/SleepTab';
 import { MonthPicker } from '@/components/shared/MonthPicker';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { sheetSurfaceStyle } from '@/hooks/use-content-width';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
@@ -58,12 +56,17 @@ import { loadData } from '@/store/storage';
 import { isSameDay } from '@/utils/dateUtils';
 import {
   ACCENT, ACCENT_CAL, ACCENT_MOOD, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
-  fmtSleep, getHealthColors,
+  type HealthColors, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
 import { HealthEntry, getMonthEntries } from '@/utils/healthUtils';
 
 export default function HealthHubScreen() {
   const tabBarInset = useTabBarInset();
+  // Планшет: головна дія «додати» — кнопкою в шапці, як на інших екранах
+  // (рішення 6); FAB лишається телефону, де до шапки тягнутись далеко.
+  const { isWide } = useResponsive();
+  // Смуга вкладок: на планшеті — шість в один ряд без прокрутки (рішення 07.10).
+  const tabBarLayout = healthTabBarLayout(useScreenWidth(), isWide);
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -119,6 +122,12 @@ export default function HealthHubScreen() {
           color={c.text}
           actions={
             <>
+              {isWide && (
+                <HeaderButton onPress={() => setQuickOpen(true)} accessibilityLabel={tr.add}
+                  style={{ borderColor: ACCENT + '55', backgroundColor: ACCENT }}>
+                  <IconSymbol name="plus" size={17} color="#fff" />
+                </HeaderButton>
+              )}
               <HeaderButton onPress={() => setHistoryOpen(true)} accessibilityLabel={tr.history}
                 style={{ borderColor: c.border, backgroundColor: c.dim }}>
                 <IconSymbol name="clock.arrow.circlepath" size={17} color={c.text} />
@@ -130,7 +139,7 @@ export default function HealthHubScreen() {
               </HeaderButton>
             </>
           }>
-          <HealthTabBar value={tab} onChange={setTab} tr={tr} c={c} preventionBadge={medsDue} />
+          <HealthTabBar value={tab} onChange={setTab} tr={tr} c={c} preventionBadge={medsDue} layout={tabBarLayout} />
         </ScreenHeader>
 
         {tab === 'overview'   && <OverviewTab h={h} />}
@@ -145,15 +154,16 @@ export default function HealthHubScreen() {
       {/* L5: інсет із useTabBarInset() — він додає висоту ActiveTimersBar,
           коли йде хоч один таймер. Зашите 108 ховало нижню третину кнопки
           під панеллю таймерів, і тап потрапляв у панель. */}
+      {!isWide && (
       <View style={[s.fabContainer, { bottom: tabBarInset + 20 }]} pointerEvents="box-none">
         <TouchableOpacity onPress={() => setQuickOpen(true)} activeOpacity={0.85}
           accessibilityRole="button" accessibilityLabel={tr.add}
-          style={[s.fab, { shadowColor: ACCENT }]}>
-          <LinearGradient colors={[ACCENT, '#059669']} style={s.fabGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <IconSymbol name="plus" size={24} color="#fff" />
-          </LinearGradient>
+          style={[s.fab, { backgroundColor: ACCENT }]}>
+          {/* Суцільна кнопка без кольорового «сяйва» — як FAB Фінансів. */}
+          <IconSymbol name="plus" size={26} color="#fff" />
         </TouchableOpacity>
       </View>
+      )}
 
       <QuickAddSheet visible={quickOpen} onClose={() => setQuickOpen(false)} onSubmit={onQuickSubmit} isDark={isDark} tr={tr} />
 
@@ -170,32 +180,28 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
   activeMonth: Date; setActiveMonth: (d: Date) => void;
   /** h.deleteEntry: автоматичний запис ще й потрапляє в тумбстоуни, щоб синк його не повернув. */
   onDelete: (id: string) => void;
-  isDark: boolean; c: any; tr: any; locale: string;
+  isDark: boolean; c: HealthColors; tr: any; locale: string;
 }) {
-  const { height } = useResponsive();
+  const { height, isWide } = useResponsive();
   const sheetSurface = sheetSurfaceStyle(height);
   const now = new Date();
   const monthEntries = useMemo(() => getMonthEntries(entries, activeMonth), [entries, activeMonth]);
+  /*
+   * Журнал — довідка «збоку» від дашборда: на планшеті він виїжджає панеллю
+   * праворуч на всю висоту (SheetModal 'side'), і вкладка лишається видимою
+   * зліва; на телефоні — звичайний нижній лист. Ручку й хрестик дає
+   * SheetModal, тож власних тут немає.
+   */
   return (
-    <Modal visible={open} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-      <Pressable accessible={false} style={s.overlay} onPress={onClose}>
-        <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrapper} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-          <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
-            <View style={s.handleRow}>
-              <View style={{ flex: 1 }} />
-              <View style={[s.handle, { backgroundColor: c.border }]} />
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <IconSymbol name="xmark" size={17} color={c.sub} />
-                </TouchableOpacity>
-              </View>
-            </View>
+    <SheetModal visible={open} onClose={onClose} presentation="side">
+          <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
+            style={[s.sheet, isWide ? s.sheetSide : sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
               <Text style={[s.sheetTitle, { color: c.text, flex: 1 }]}>{tr.history}</Text>
               <MonthPicker month={activeMonth} onChange={setActiveMonth} months={tr.months}
                 accentColor={ACCENT} textColor={c.text} subColor={c.sub} dimColor={c.dim} borderColor={c.border} />
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: height * 0.58 }}>
+            <ScrollView showsVerticalScrollIndicator={false} style={isWide ? { flex: 1 } : { maxHeight: height * 0.58 }}>
               {monthEntries.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 32 }}>
                   <IconSymbol name="heart.fill" size={38} color={c.sub} />
@@ -209,7 +215,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
                     const timeStr = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
                     const cfg = getEntryCfg(entry, tr);
                     return (
-                      <View key={entry.id} style={[s.historyCard, { borderColor: c.border, backgroundColor: isDark ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.78)' }]}>
+                      <View key={entry.id} style={[s.historyCard, { borderColor: c.border, backgroundColor: c.card }]}>
                         <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center' }}>
                           <IconSymbol name={cfg.icon as any} size={16} color={cfg.color} />
                         </View>
@@ -238,9 +244,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
               )}
             </ScrollView>
           </BlurView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    </SheetModal>
   );
 }
 
@@ -271,14 +275,11 @@ const s = StyleSheet.create({
   deleteBtn:    { width: 44, height: 44, marginLeft: 4, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
   historyCard:  { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' },
   fabContainer: { position: 'absolute', right: 20, alignItems: 'center', justifyContent: 'center' },
-  fab:          { width: 58, height: 58, borderRadius: 29, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
-  fabGrad:      { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
-  overlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
-  sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  fab:          { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   // Стеля висоти — числом із sheetSurfaceStyle(); відсоток від батька з
   // height:auto не рахується і обмеження просто зникає (NAT-01).
   sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  handle:       { width: 36, height: 4, borderRadius: 2 },
+  // Бокова панель: на всю висоту, список гортається всередині.
+  sheetSide:    { flex: 1, marginBottom: 12 },
   sheetTitle:   { fontSize: 20, fontWeight: Atlas.type.headingWeight },
 });

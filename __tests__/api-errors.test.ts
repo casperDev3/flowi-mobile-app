@@ -32,3 +32,31 @@ describe('apiFetch error details', () => {
     }
   });
 });
+
+describe('apiFetch network errors without DOMException (Hermes)', () => {
+  const g = globalThis as { DOMException?: unknown };
+  let saved: unknown;
+  beforeEach(() => {
+    saved = g.DOMException;
+    delete g.DOMException;
+  });
+  afterEach(() => {
+    g.DOMException = saved;
+  });
+
+  test('TypeError from fetch → ApiError network', async () => {
+    global.fetch = jest.fn(async () => {
+      throw new TypeError('Network request failed');
+    }) as jest.Mock;
+    await expect(apiFetch('/health/')).rejects.toMatchObject({ code: 'network', status: 0 });
+  });
+
+  test('AbortError from fetch → ApiError timeout', async () => {
+    global.fetch = jest.fn(async () => {
+      const err = new Error('Aborted');
+      err.name = 'AbortError';
+      throw err;
+    }) as jest.Mock;
+    await expect(apiFetch('/health/')).rejects.toMatchObject({ code: 'timeout', status: 0 });
+  });
+});

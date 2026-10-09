@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Empty, Field, Segment } from '@/components/health/FormBits';
+import { useWideModal } from '@/components/health/HealthLayout';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScreenView } from '@/hooks/use-screen-view';
@@ -27,6 +28,7 @@ import { LoadErrorNotice, useSheetScreenMinHeight } from '@/components/health/He
 export default function CheckupsScreen() {
   const contentWidth = useContentWidth();
   const sheetSurface = useSheetSurface();
+  const wm = useWideModal();
   const sheetScreenMinHeight = useSheetScreenMinHeight();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -134,8 +136,8 @@ export default function CheckupsScreen() {
 
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setAdd(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrap, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addCheckup}</Text>

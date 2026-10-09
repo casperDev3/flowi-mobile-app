@@ -27,6 +27,12 @@ interface Props {
    * і мітки просто немає (особисті завдання без projectId).
    */
   projects?: readonly MeetingChipProject[];
+  /**
+   * Анімація появи рядків (типово — так). На планшеті вимкнена: masonry
+   * може перенести секцію в іншу колонку (перемонтування), і повторний
+   * FadeInDown там виглядав би як мерехтіння.
+   */
+  animate?: boolean;
 }
 
 // ─── Per-task row component (manages local checked state for animation) ────────
@@ -67,7 +73,6 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen, project }: RowProps)
   return (
     <PressableScale
       onPress={() => (onOpen ? onOpen(task.id) : handleToggle())}
-      style={{ marginBottom: 6 }}
       accessibilityRole="button"
       accessibilityLabel={task.title}>
       <BlurView
@@ -102,13 +107,14 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen, project }: RowProps)
         {/* Мітка проєкту — §3.7: агреговане «Сьогодні» показує задачі з усіх
             проєктів, і без мітки незрозуміло, звідки саме кожна з них. */}
         {project ? <MeetingProjectChip project={project} textColor={c.sub} maxWidth={90} /> : null}
-        {/* Пріоритет — бейдж P0–P5 біля назви (замість кольорової смужки зліва). */}
-        <PriorityBadge level={normalizePriority(task)} />
         {!done && isOverdue(task) && (
           <View style={s.overdueBadge}>
             <Text style={s.overdueText}>!</Text>
           </View>
         )}
+        {/* Пріоритет — бейдж P0–P5 у правому кінці рядка (рішення власника,
+            п. 4: в особистих картках/рядках пріоритет стоїть праворуч). */}
+        <PriorityBadge level={normalizePriority(task)} />
       </BlurView>
     </PressableScale>
   );
@@ -116,7 +122,7 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen, project }: RowProps)
 
 // ─── Public component ─────────────────────────────────────────────────────────
 
-export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle, onOpen, projects }: Props) {
+export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle, onOpen, projects, animate = true }: Props) {
   const motion = useMotion();
 
   // Компонент НІЧОГО не відбирає й не сортує — малює рівно те, що дали.
@@ -131,11 +137,13 @@ export function TodayTaskRow({ tasks, isDark, c, tr: _tr, onToggle, onOpen, proj
   const relevant = tasks;
 
   return (
-    <View style={{ marginBottom: 4 }}>
+    // gap, а не marginBottom на кожному рядку: під останнім рядком не
+    // лишається зайвого відступу, тож проміжок між секціями — рівно токен сітки.
+    <View style={{ gap: 6 }}>
       {relevant.map((task, i) => (
         <Animated.View
           key={task.id}
-          entering={motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40))}>
+          entering={animate ? motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40)) : undefined}>
           <TodayTaskItem
             task={task}
             isDark={isDark}

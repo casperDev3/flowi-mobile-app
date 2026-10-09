@@ -30,13 +30,26 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { moduleSections } from '@/constants/nav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { useResponsive } from '@/hooks/use-responsive';
+import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { useI18n } from '@/store/i18n';
 import { isModuleEnabled, useUiModules } from '@/store/ui-preferences';
 
 const ACCENT = '#7C3AED';
 
 export default function SettingsModulesScreen() {
-  const contentWidth = useContentWidth();
+  const readingWidth = useContentWidth();
+  /**
+   * Ландшафт планшета (рішення 6): секції модулів — двома незалежними
+   * колонками (MasonryColumns: секції різної висоти не тягнуть сусідку) у
+   * колонці 960pt, як і головний екран налаштувань. Телефон і портрет —
+   * одна колонка для читання.
+   */
+  const { isExpanded } = useResponsive();
+  const contentWidth = useMemo(
+    () => (isExpanded ? { ...readingWidth, maxWidth: 960 } : readingWidth),
+    [isExpanded, readingWidth],
+  );
   const isDark = useColorScheme() === 'dark';
   const { tr } = useI18n();
   const { disabledModules, setModuleEnabled } = useUiModules();
@@ -85,8 +98,13 @@ export default function SettingsModulesScreen() {
 
         <Text style={[st.intro, { color: c.sub }]}>{tr.modulesSubtitle}</Text>
 
-        {sections.map(section => (
-          <View key={String(section.titleKey)}>
+        <MasonryColumns
+          columnCount={isExpanded ? 2 : 1}
+          columnGap={16}
+          items={sections.map((section): MasonryEntry => ({
+          key: String(section.titleKey),
+          node: (
+          <View>
             <Text style={[st.sectionLabel, { color: c.sub }]}>
               {String(tr[section.titleKey]).toUpperCase()}
             </Text>
@@ -123,7 +141,9 @@ export default function SettingsModulesScreen() {
               })}
             </BlurView>
           </View>
-        ))}
+        ),
+          }))}
+        />
 
         <Text style={[st.note, { color: c.sub }]}>{tr.modulesSystemNote}</Text>
       </ScrollView>

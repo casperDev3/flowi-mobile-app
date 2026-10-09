@@ -38,6 +38,7 @@ import {
   refreshInbox,
 } from '@/api/notifications';
 import { fillTemplate, formatNotificationTime } from '@/components/notifications/labels';
+import { InviteActions } from '@/components/notifications/InviteActions';
 import { NotificationRow, type NotificationRowColors } from '@/components/notifications/NotificationRow';
 import { ScheduledReminders } from '@/components/notifications/ScheduledReminders';
 import { useNotificationInbox, useUnreadNotificationsCount } from '@/components/notifications/use-notification-center';
@@ -46,6 +47,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
+import { INVITE_EVENT_PENDING, inviteIdFromPayload, syncMyInvites } from '@/store/invite-inbox';
 import { notificationRoute } from '@/utils/pushLink';
 
 type Tab = 'inbox' | 'reminders';
@@ -86,6 +88,9 @@ export default function NotificationsScreen() {
   useFocusEffect(useCallback(() => {
     setNow(new Date());
     void refreshInbox();
+    // Decision 7: запрошення, надіслані на мою пошту до появи акаунта,
+    // прив'язуються й отримують картку саме цим викликом.
+    void syncMyInvites();
   }, []));
 
   const onRefresh = useCallback(() => {
@@ -115,6 +120,23 @@ export default function NotificationsScreen() {
     void archiveNotifications([item.id]);
   }, []);
 
+  /** «Прийняти/Відхилити» прямо в картці запрошення в проєкт (decision 7). */
+  const inviteFooter = useCallback((item: InboxItem) => {
+    if (item.event_type !== INVITE_EVENT_PENDING) return null;
+    const inviteId = inviteIdFromPayload(item.payload);
+    if (!inviteId) return null;
+    return (
+      <InviteActions
+        inviteId={inviteId}
+        accent={c.accent}
+        text={c.text}
+        sub={c.sub}
+        border={c.border}
+        onDone={() => { if (!item.read_at) void markNotificationsRead([item.id]); }}
+      />
+    );
+  }, [c]);
+
   const renderItem = useCallback(({ item }: { item: InboxItem }) => (
     <NotificationRow
       item={item}
@@ -126,8 +148,9 @@ export default function NotificationsScreen() {
       collapsedText={item.collapse_count > 1 ? fillTemplate(tr.ncCollapsedMore, { count: item.collapse_count - 1 }) : null}
       onOpen={openItem}
       onArchive={archiveItem}
+      footer={inviteFooter(item)}
     />
-  ), [now, tr, lang, isDark, rowColors, openItem, archiveItem]);
+  ), [now, tr, lang, isDark, rowColors, openItem, archiveItem, inviteFooter]);
 
   const header = (
     <ScreenHeader

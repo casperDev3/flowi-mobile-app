@@ -129,3 +129,14 @@ test('delete retry queues tombstone when local deletion succeeded before outbox 
   const outbox = JSON.parse(mockStore.get('sync_outbox') ?? '[]');
   expect(outbox).toHaveLength(1); expect(outbox[0]).toMatchObject({ local_id: 'a', deleted: true });
 });
+
+test('createRequested (/notes?create=1 з віджета) відкриває редактор нової нотатки один раз', async () => {
+  mockStore.set('notes', JSON.stringify([note('old')]));
+  const handled = jest.fn();
+  await act(async () => { tree = create(<NotesWorkspace isDark={false} createRequested onCreateHandled={handled} />); });
+  expect(find('notes-title')).toBeDefined();
+  expect(find('notes-title').props.value).toBe('');
+  expect(handled).toHaveBeenCalledTimes(1);
+  await act(async () => { tree.update(<NotesWorkspace isDark={false} createRequested onCreateHandled={() => handled()} />); });
+  expect(handled).toHaveBeenCalledTimes(1);
+});

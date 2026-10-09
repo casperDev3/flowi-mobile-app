@@ -88,7 +88,8 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
     return await fetch(`${getApiBase()}${path}`, { ...init, signal: controller.signal });
   } catch (e) {
     // Нормалізуємо мережеві помилки в ApiError з розпізнаваним кодом
-    if (e instanceof DOMException && e.name === 'AbortError') {
+    // Hermes не має глобального DOMException — перевіряємо за name, а не instanceof.
+    if ((e as { name?: unknown } | null)?.name === 'AbortError' || controller.signal.aborted) {
       throw new ApiError(0, 'timeout', 'Request timed out');
     }
     if (e instanceof TypeError) {

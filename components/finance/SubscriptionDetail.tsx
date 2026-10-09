@@ -117,11 +117,11 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
           <TouchableOpacity
             onPress={() => onRenew(sub.id)}
             accessibilityRole="button"
-            accessibilityLabel={`${tr.subRenew}: ${sub.name}`}
+            accessibilityLabel={`${tr.subPayNow}: ${sub.name}`}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             style={[st.renewMini, { borderColor: overdue ? OVERDUE_RED : c.accent }]}>
             <IconSymbol name="checkmark" size={11} color={overdue ? OVERDUE_RED : c.accent} />
-            <Text style={{ color: overdue ? OVERDUE_RED : c.accent, fontSize: 11, fontWeight: '700' }}>{tr.subRenew}</Text>
+            <Text style={{ color: overdue ? OVERDUE_RED : c.accent, fontSize: 11, fontWeight: '700' }}>{tr.subPayNow}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -284,10 +284,10 @@ export function SubscriptionDetailBody({
           <TouchableOpacity
             onPress={() => onRenewOpenChange(true)}
             accessibilityRole="button"
-            accessibilityLabel={tr.subRenew}
+            accessibilityLabel={tr.subPayNow}
             style={[st.btn, { marginTop: 14, backgroundColor: overdue ? OVERDUE_RED : c.accent }]}>
             <IconSymbol name="checkmark.circle" size={16} color="#fff" />
-            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{tr.subRenew}</Text>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{tr.subPayNow}</Text>
           </TouchableOpacity>
         )
       ) : null}

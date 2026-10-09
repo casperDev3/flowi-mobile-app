@@ -59,10 +59,17 @@ describe('TaskCompactCard — дерево доступності (NAT-04)', () 
     const toggled: Task[] = [];
     const tree = renderCard(t => toggled.push(t));
 
-    const checkbox = tree.root.find((n: any) => n.props.accessibilityRole === 'checkbox');
+    const checkbox = tree.root.find((n: any) => n.props.accessibilityRole === 'checkbox' && typeof n.props.onPress === 'function');
     expect(checkbox.props.accessibilityState).toEqual({ checked: false });
-    // 18 pt + hitSlop 13 з кожного боку = рівно 44×44 (Apple HIG).
-    expect(checkbox.props.hitSlop).toEqual({ top: 13, bottom: 13, left: 13, right: 13 });
+    // Підпис каже дію, а не дублює назву рядка (P2).
+    expect(checkbox.props.accessibilityLabel).toBe('Позначити виконаним: A11Y тест');
+    // Справжня ціль 44×44, а не 18 + hitSlop: hitSlop не виходить за межі
+    // картки з її відступами 12/9 (A11Y-08).
+    const style = Array.isArray(checkbox.props.style) ? Object.assign({}, ...checkbox.props.style) : checkbox.props.style;
+    expect(style.width).toBe(44);
+    expect(style.minHeight).toBe(44);
+    act(() => { checkbox.props.onPress(); });
+    expect(toggled).toHaveLength(1);
 
     // Жоден предок не має права бути елементом доступності — інакше чекбокс
     // зникає з дерева разом із рештою вмісту картки.

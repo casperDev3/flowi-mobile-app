@@ -349,7 +349,14 @@ describe('NAT-14 — екрани-аркуші профілактики запо
 
 describe('NAT-03 — аркуш історії на хабі не склеюється в один елемент', () => {
   it('Pressable-обгортка має accessible={false} і зберігає ізоляцію фону', () => {
-    const src = fs.readFileSync(path.join(ROOT, 'app/(tabs)/health.tsx'), 'utf8');
+    // Рішення 6: журнал історії перейшов на SheetModal (на планшеті — бокова
+    // панель); обгортка-stopPropagation тепер живе там, і правило NAT-03
+    // перевіряємо в ній.
+    const hub = fs.readFileSync(path.join(ROOT, 'app/(tabs)/health.tsx'), 'utf8');
+    const usesSheetModal = /<SheetModal[^>]*presentation="side"/.test(hub);
+    const src = usesSheetModal
+      ? fs.readFileSync(path.join(ROOT, 'components/shared/SheetModal.tsx'), 'utf8')
+      : hub;
     const wrappers = (src.match(/<Pressable(?:[^>]|(?<==)>)*>/g) ?? [])
       .filter((w) => w.includes('stopPropagation'));
     expect(wrappers.length).toBeGreaterThan(0);

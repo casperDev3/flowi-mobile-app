@@ -52,12 +52,14 @@ import {
   computeGoals,
   latestValue,
 } from '@/utils/healthUtils';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { HealthColumns, useHealthTabLayout } from '@/components/health/HealthLayout';
 
 const ACCENT = '#10B981';
 
 export default function HealthProfileScreen() {
-  const contentWidth = useContentWidth();
+  // Планшет (рішення 6): поля профілю ліворуч, живий розрахунок цілей,
+  // «Зберегти» й джерела даних праворуч — результат видно під час правки.
+  const lay = useHealthTabLayout();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -147,7 +149,8 @@ export default function HealthProfileScreen() {
         />
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 120 }]} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[lay.contentStyle, { paddingBottom: 120 }]} showsVerticalScrollIndicator={false}>
+            <HealthColumns twoCol={lay.twoCol} left={<>
 
             {/* Профіль — перша з двох налаштовок розділу */}
             <Text style={[s.sectionTitle, { color: c.text }]}>{tr.healthProfile}</Text>
@@ -207,8 +210,9 @@ export default function HealthProfileScreen() {
               ))}
             </View>
 
+            </>} right={<>
             {/* Превʼю розрахованих цілей */}
-            <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.preview, { borderColor: c.border }]}>
+            <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.preview, { borderColor: c.border }, lay.twoCol && { marginTop: 8 }]}>
               <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 }}>
                 {tr.todayLabel} · TDEE {tdee} кк
               </Text>
@@ -261,6 +265,7 @@ export default function HealthProfileScreen() {
                   : 'No automatic sources on this device — metrics are entered manually.'}
               </Text>
             )}
+            </>} />
 
           </ScrollView>
         </KeyboardAvoidingView>

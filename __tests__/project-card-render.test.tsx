@@ -38,7 +38,7 @@ jest.mock('@/store/i18n', () => ({
 import React from 'react';
 
 import { ProjectCard } from '@/app/projects';
-import ProjectSprintsScreen from '@/app/project/[id]/sprints';
+import ProjectSprintsScreen, { resetSprintListViews } from '@/app/project/[id]/sprints';
 import { PortfolioKpi } from '@/components/projects/PortfolioKpi';
 import { allTranslations } from '@/store/translations';
 import { projectStats } from '@/utils/projectStats';
@@ -191,6 +191,7 @@ const flush = () => act(async () => { await new Promise(r => setTimeout(r, 0)); 
 let mounted: any = null;
 
 afterEach(async () => {
+  resetSprintListViews();
   if (mounted) await act(async () => { mounted.unmount(); });
   mounted = null;
 });
@@ -255,6 +256,8 @@ test('велосіті під закритими спринтами і рядо�
       { id: '3', title: 'z', status: 'active', projectId: 'p1', sprintId: 'open' },
     ],
   });
+  // Усі спринти згорнуті за замовчуванням — «без дат» видно в розгорнутому.
+  await pressByLabel(tree, 'Відкритий');
   const text = allText(tree);
   expect(text).toContain(tr.velocityTitle);
   expect(text).toContain(tr.sprintNotDated);

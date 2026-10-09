@@ -20,7 +20,9 @@ import {
   ScreenBackground,
 } from '@/components/training/TrainingBits';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
+import { Layout } from '@/constants/tokens';
+import { useResponsive } from '@/hooks/use-responsive';
 import { trainingRoutes } from '@/components/training/routes';
 import { useI18n } from '@/store/i18n';
 import type { TrainingGroupSummary } from '@/utils/trainingTypes';
@@ -29,7 +31,9 @@ export default function TrainingGroupsScreen() {
   const router = useRouter();
   const { tr } = useI18n();
   const c = useTrainingColors();
-  const contentWidth = useContentWidth();
+  // Планшет: картки груп — сіткою 2–3 колонки під «широкою» стелею (рішення 6).
+  const { isWide } = useResponsive();
+  const contentWidth = isWide ? { width: '100%' as const, maxWidth: Layout.wideMaxWidth, alignSelf: 'center' as const } : {};
   const { scope, online } = useTrainingScope();
   const { groups, loaded, issue, refresh } = useTrainingGroups();
   const [refreshing, setRefreshing] = useState(false);
@@ -91,14 +95,15 @@ export default function TrainingGroupsScreen() {
           />
         ) : null}
 
+        <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={10}>
         {active.map(g => (
           <TouchableOpacity
             key={g.id}
             onPress={() => open(g.id)}
             accessibilityRole="button"
             accessibilityLabel={`${g.name}, ${g.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember}`}
-            style={{ marginBottom: 10 }}>
-            <Card c={c} accent={g.color}>
+            style={{ flex: 1 }}>
+            <Card c={c} accent={g.color} style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <View style={{ width: 44, height: 44, borderRadius: Atlas.radius.large, backgroundColor: g.color + '26', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name="dumbbell.fill" size={20} color={g.color} />
@@ -122,9 +127,10 @@ export default function TrainingGroupsScreen() {
             </Card>
           </TouchableOpacity>
         ))}
+        </ResponsiveGrid>
 
         {active.length > 0 && online ? (
-          <View style={{ gap: 10, marginTop: 8 }}>
+          <View style={{ gap: 10, marginTop: 18 }}>
             <PrimaryButton label={tr.tgCreateGroup} icon="plus" variant="soft" onPress={() => setSheet('create')} />
           </View>
         ) : null}

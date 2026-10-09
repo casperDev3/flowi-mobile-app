@@ -17,7 +17,6 @@ import { Atlas } from '@/constants/atlas';
  * більше немає. Плашки беруть мову прямо зі словника за пропом `lang`, а не
  * через `tr`: їх малює десяток екранів, і всі вони передають саме `lang`.
  */
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
@@ -38,8 +37,8 @@ export function LoadErrorNotice({ lang, c, isDark, onRetry }: {
 }) {
   const t = allTranslations[lang] ?? allTranslations.uk;
   return (
-    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: ERR + '55', overflow: 'hidden', padding: 14, marginBottom: 12 }}>
+    // Суцільна тонована картка, як попередження у Фінансах (OverviewTab warningCard).
+    <View style={{ borderRadius: Atlas.radius.xlarge, borderWidth: 1, borderColor: ERR + '55', backgroundColor: ERR + (isDark ? '1A' : '12'), padding: 14, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <IconSymbol name="exclamationmark.triangle.fill" size={16} color={ERR} />
         <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight, marginLeft: 8, flex: 1 }}>{t.loadErrorTitle}</Text>
@@ -52,7 +51,7 @@ export function LoadErrorNotice({ lang, c, isDark, onRetry }: {
         style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: ERR }}>
         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.loadErrorRetry}</Text>
       </TouchableOpacity>
-    </BlurView>
+    </View>
   );
 }
 
@@ -66,8 +65,7 @@ export function ReminderBlockedNotice({ lang, c, isDark, onOpenSettings, onDismi
 }) {
   const t = allTranslations[lang] ?? allTranslations.uk;
   return (
-    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: WARN + '55', overflow: 'hidden', padding: 14, marginBottom: 12 }}>
+    <View style={{ borderRadius: Atlas.radius.xlarge, borderWidth: 1, borderColor: WARN + '55', backgroundColor: WARN + (isDark ? '1A' : '12'), padding: 14, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <IconSymbol name="bell.slash" size={16} color={WARN} />
         <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight, marginLeft: 8, flex: 1 }}>{t.healthReminderOff}</Text>
@@ -88,7 +86,7 @@ export function ReminderBlockedNotice({ lang, c, isDark, onOpenSettings, onDismi
           <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.healthNoticeSettings}</Text>
         </TouchableOpacity>
       ) : null}
-    </BlurView>
+    </View>
   );
 }
 

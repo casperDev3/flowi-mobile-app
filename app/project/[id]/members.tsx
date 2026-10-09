@@ -1,4 +1,3 @@
-import { Modal, useWindowDimensions } from 'react-native';
 import { TeamButton } from '@/components/projects/TeamControls';
 import { Atlas } from '@/constants/atlas';
 /**
@@ -19,7 +18,7 @@ import { Atlas } from '@/constants/atlas';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Modal, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
@@ -32,6 +31,7 @@ import { useProjectRole } from '@/hooks/use-project-role';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
+import { pluralForm } from '@/utils/activeTimersBar';
 import { hasPendingProjectOutbox, syncAllMyProjects } from '@/store/project-sync';
 import { OfflineError, ApiError } from '@/store/api';
 import {
@@ -40,11 +40,13 @@ import {
   fetchProjectMembers,
   getCachedMembers,
   inviteByEmail,
-  listProjectInvites,
+  loadProjectInvites,
   removeProjectMember,
+  resendProjectInvite,
   revokeProjectInvite,
   setMembersCacheFor,
   transferProjectOwnership,
+  type InviteByEmailResult,
   type InviteOut,
   type MemberOut,
 } from '@/store/project-team';
@@ -110,8 +112,15 @@ export default function ProjectMembersScreen() {
   const [email, setEmail] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailError, setEmailError] = useState('');
+  // Decision 7: чесний підсумок запрошення поштою — кого саме запрошено, чи
+  // є в людини акаунт і чи справді пішов лист (SMTP може бути не налаштовано).
+  const [emailNotice, setEmailNotice] = useState<string[] | null>(null);
 
   const [invites, setInvites] = useState<InviteOut[]>([]);
+  /** «Очікують» — запрошення поштою, на які ще не відповіли. */
+  const [pendingInvites, setPendingInvites] = useState<InviteOut[]>([]);
+  const [emailConfigured, setEmailConfigured] = useState(true);
+  const [busyInviteId, setBusyInviteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -141,7 +150,10 @@ export default function ProjectMembersScreen() {
   const loadInvites = useCallback(async () => {
     if (!projectId || !canManage) return;
     try {
-      setInvites(await listProjectInvites(projectId));
+      const state = await loadProjectInvites(projectId);
+      setInvites(state.links);
+      setPendingInvites(state.pending);
+      setEmailConfigured(state.emailConfigured);
     } catch (e) {
       if (!(e instanceof OfflineError) && __DEV__) console.warn('[project/members] список запрошень не вдався:', e);
     }
@@ -156,7 +168,7 @@ export default function ProjectMembersScreen() {
     const nextRole = isOwner ? (member.role === 'member' ? 'manager' : member.role === 'manager' ? 'viewer' : 'member') : (member.role === 'member' ? 'viewer' : 'member');
     Alert.alert(
       tr.projectMembersChangeRole,
-      `${member.user.name || member.user.email} → ${nextRole === 'manager' ? 'Менеджер' : nextRole === 'member' ? tr.roleMember : tr.roleViewer}`,
+      `${member.user.name || member.user.email} → ${nextRole === 'manager' ? tr.roleManager : nextRole === 'member' ? tr.roleMember : tr.roleViewer}`,
       [
         { text: tr.cancel, style: 'cancel' },
         {
@@ -214,7 +226,7 @@ export default function ProjectMembersScreen() {
         },
       },
     ]);
-  }, [projectId, tr, members, isOwner]);
+  }, [projectId, tr, members]);
 
   const doLeave = useCallback(() => {
     if (!projectId || !myId) return;
@@ -337,26 +349,96 @@ export default function ProjectMembersScreen() {
     haptic.light();
   }, [createdInvite]);
 
+  /** Рядки підсумку після запрошення/повторного надсилання — без перебільшень. */
+  const describeEmailResult = useCallback((
+    address: string,
+    r: Pick<InviteByEmailResult, 'account_exists' | 'notified' | 'email_sent' | 'email_configured'> & { already_pending?: boolean },
+  ): string[] => {
+    const lines: string[] = [];
+    if (r.already_pending) lines.push(tr.projectMembersInviteAlreadyPending);
+    lines.push(
+      r.account_exists
+        ? (r.notified ? tr.projectMembersInviteNotified : tr.projectMembersInvitePendingCreated).replace('{email}', address)
+        : tr.projectMembersInviteNoAccount.replace('{email}', address),
+    );
+    lines.push(
+      r.email_sent ? tr.projectMembersInviteEmailSent
+        : r.email_configured ? tr.projectMembersInviteEmailFailed
+          : tr.projectMembersInviteEmailNotConfigured,
+    );
+    return lines;
+  }, [tr]);
+
   const handleInviteEmail = useCallback(async () => {
     if (!projectId || !email.trim()) return;
+    const address = email.trim();
     setSendingEmail(true);
     setEmailError('');
+    setEmailNotice(null);
     try {
-      const result = await inviteByEmail(projectId, inviteRole, email.trim());
+      const result = await inviteByEmail(projectId, inviteRole, address);
       setEmail('');
       haptic.success();
-      Alert.alert(tr.projectMembersInviteByEmail, result.email_sent ? tr.projectMembersEmailInviteSent : tr.projectMembersEmailDeliveryFailed);
-      void load();
+      setEmailNotice(describeEmailResult(result.invite?.email || address, result));
+      setEmailConfigured(result.email_configured);
+      void loadInvites();
     } catch (e) {
       haptic.error();
-      if (e instanceof ApiError && e.status === 404) setEmailError(tr.projectMembersEmailUserNotFound);
-      else if (e instanceof ApiError && e.status === 409) setEmailError(tr.projectMembersEmailAlreadyMember);
+      if (e instanceof ApiError && e.status === 409) setEmailError(tr.projectMembersEmailAlreadyMember);
+      else if (e instanceof ApiError && e.status === 400) setEmailError(tr.projectMembersEmailInvalid);
       else if (e instanceof OfflineError) setEmailError(tr.projectMembersOfflineHint);
       else setEmailError(e instanceof ApiError ? e.message : tr.projectMembersError);
     } finally {
       setSendingEmail(false);
     }
-  }, [projectId, email, inviteRole, tr, load]);
+  }, [projectId, email, inviteRole, tr, loadInvites, describeEmailResult]);
+
+  const handleResend = useCallback(async (invite: InviteOut) => {
+    if (!projectId) return;
+    setBusyInviteId(invite.id);
+    try {
+      const result = await resendProjectInvite(projectId, invite.id);
+      haptic.success();
+      setPendingInvites(prev => prev.map(i => (i.id === invite.id ? { ...result.invite, expired: false } : i)));
+      setEmailConfigured(result.email_configured);
+      Alert.alert(tr.projectMembersInviteResent, describeEmailResult(invite.email ?? '', result).join('\n'));
+    } catch (e) {
+      haptic.error();
+      if (e instanceof ApiError && e.status === 429) {
+        Alert.alert(tr.projectMembersInviteResend, tr.projectMembersInviteResendTooSoon);
+      } else if (e instanceof ApiError && e.status === 409) {
+        // Людина вже відповіла чи стала учасником — оновити обидва списки.
+        Alert.alert(tr.projectMembersInviteResend, e.code === 'already_member' ? tr.projectMembersEmailAlreadyMember : tr.projectMembersInviteNotPending);
+        void load();
+        void loadInvites();
+      } else {
+        Alert.alert(tr.error, e instanceof OfflineError ? tr.projectMembersOfflineHint : (e instanceof ApiError ? e.message : tr.projectMembersError));
+      }
+    } finally {
+      setBusyInviteId(null);
+    }
+  }, [projectId, tr, describeEmailResult, load, loadInvites]);
+
+  const handleCancelInvite = useCallback((invite: InviteOut) => {
+    if (!projectId) return;
+    Alert.alert(tr.projectMembersInviteCancel, tr.projectMembersInviteCancelConfirm.replace('{email}', invite.email ?? ''), [
+      { text: tr.cancel, style: 'cancel' },
+      {
+        text: tr.projectMembersInviteCancel,
+        style: 'destructive',
+        onPress: () => {
+          setBusyInviteId(invite.id);
+          void revokeProjectInvite(projectId, invite.id)
+            .then(() => { setPendingInvites(prev => prev.filter(i => i.id !== invite.id)); haptic.success(); })
+            .catch(e => {
+              haptic.error();
+              Alert.alert(tr.error, e instanceof OfflineError ? tr.projectMembersOfflineHint : (e instanceof ApiError ? e.message : tr.projectMembersError));
+            })
+            .finally(() => setBusyInviteId(null));
+        },
+      },
+    ]);
+  }, [projectId, tr]);
 
   const handleRevoke = useCallback((invite: InviteOut) => {
     if (!projectId) return;
@@ -374,7 +456,22 @@ export default function ProjectMembersScreen() {
     ]);
   }, [projectId, tr]);
 
-  const roleLabel = (r: MemberOut['role']) => (r === 'owner' ? tr.roleOwner : r === 'manager' ? 'Менеджер' : r === 'member' ? tr.roleMember : tr.roleViewer);
+  // «Лишилось 4 використання» / «Використано 5 разів» — українська множина
+  // (1 / 2–4 / 5+, з винятками 11–14) через спільний pluralForm.
+  const inviteUsesLabel = (invite: { uses?: number; max_uses: number | null }) => {
+    const used = Math.max(0, invite.uses ?? 0);
+    if (invite.max_uses != null) {
+      const left = Math.max(0, invite.max_uses - used);
+      const form = pluralForm(left, lang);
+      const tpl = form === 'one' ? tr.projectMembersUsesLeftOne : form === 'few' ? tr.projectMembersUsesLeftFew : tr.projectMembersUsesLeftMany;
+      return tpl.replace('{n}', String(left));
+    }
+    const form = pluralForm(used, lang);
+    const tpl = form === 'one' ? tr.projectMembersUsedOne : form === 'few' ? tr.projectMembersUsedFew : tr.projectMembersUsedMany;
+    return `${tr.projectMembersInviteMaxUsesUnlimited} · ${tpl.replace('{n}', String(used))}`;
+  };
+
+  const roleLabel = (r: MemberOut['role']) => (r === 'owner' ? tr.roleOwner : r === 'manager' ? tr.roleManager : r === 'member' ? tr.roleMember : tr.roleViewer);
 
   const sortedMembers = useMemo(
     () => [...members].sort((a, b) => (a.role === b.role ? a.user.name.localeCompare(b.user.name, 'uk') : a.role === 'owner' ? -1 : b.role === 'owner' ? 1 : 0)),
@@ -386,6 +483,9 @@ export default function ProjectMembersScreen() {
       project={project}
       isDark={isDark}
       title={tr.projectMembersTitle}
+      // Учасники — на рівень глибше за розділ і мають власну кнопку «Назад»;
+      // шеврон «в особистий простір» поруч був другою стрілкою в шапці.
+      hideSpaceExit
       crumbs={project ? [{label:project.name,onPress:()=>router.push(`/project/${projectId}/overview` as never)},{label:tr.projectMembersTitle}] : undefined}
       // «Назад» — у проп back: ScreenHeader сам сховає стрілку на планшеті, де
       // оболонка вже малює крихти «Проєкт → …» (ScreenHeaderNav.ts).
@@ -512,7 +612,7 @@ export default function ProjectMembersScreen() {
                   onPress={() => setInviteRole(r)}
                   style={[st.segment, { backgroundColor: inviteRole === r ? c.accent : c.dim, borderColor: inviteRole === r ? c.accent : c.border }]}>
                   <Text style={{ color: inviteRole === r ? '#fff' : c.text, fontSize: 12, fontWeight: '700' }}>
-                    {r === 'manager' ? 'Менеджер' : r === 'member' ? tr.roleMember : tr.roleViewer}
+                    {r === 'manager' ? tr.roleManager : r === 'member' ? tr.roleMember : tr.roleViewer}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -531,17 +631,31 @@ export default function ProjectMembersScreen() {
             </View>
 
             <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>{tr.projectMembersInviteMaxUses}</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-              {MAX_USES_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt ?? 'unlimited'}
-                  onPress={() => setInviteMaxUses(opt)}
-                  style={[st.segment, { backgroundColor: inviteMaxUses === opt ? c.accent : c.dim, borderColor: inviteMaxUses === opt ? c.accent : c.border }]}>
-                  <Text style={{ color: inviteMaxUses === opt ? '#fff' : c.text, fontSize: 12, fontWeight: '700' }}>
-                    {opt === null ? tr.projectMembersInviteMaxUsesUnlimited : opt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            {/* Один рядок без переносу: «Без обмежень» отримує ширшу комірку
+                (flex 2), підписи — в один рядок; висота й вирівнювання ті самі,
+                що в рядках «Роль» і «Термін дії» (st.segment). */}
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+              {MAX_USES_OPTIONS.map(opt => {
+                const on = inviteMaxUses === opt;
+                const label = opt === null ? tr.projectMembersInviteMaxUsesUnlimited : String(opt);
+                return (
+                  <TouchableOpacity
+                    key={opt ?? 'unlimited'}
+                    onPress={() => setInviteMaxUses(opt)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${tr.projectMembersInviteMaxUses}: ${label}`}
+                    accessibilityState={{ selected: on }}
+                    style={[st.segment, opt === null && { flex: 2 }, { backgroundColor: on ? c.accent : c.dim, borderColor: on ? c.accent : c.border }]}>
+                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}
+                      style={{ color: on ? '#fff' : c.text, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             <TouchableOpacity
@@ -584,6 +698,7 @@ export default function ProjectMembersScreen() {
                       <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{roleLabel(invite.role)}</Text>
                       <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
                         {tr.inviteExpiresLabel} {new Date(invite.expires_at).toLocaleDateString(dateLocale)}
+                        {' · '}{inviteUsesLabel(invite)}
                       </Text>
                     </View>
                     <TouchableOpacity
@@ -599,7 +714,7 @@ export default function ProjectMembersScreen() {
             )}
 
             <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>{tr.projectMembersInviteByEmail}</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: emailError ? 4 : 20 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}>
               <TextInput
                 value={email}
                 onChangeText={v => { setEmail(v); if (emailError) setEmailError(''); }}
@@ -609,22 +724,96 @@ export default function ProjectMembersScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
-                style={{ flex: 1, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 14 }}
+                returnKeyType="send"
+                onSubmitEditing={() => { void handleInviteEmail(); }}
+                style={{ flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 14 }}
               />
               <TouchableOpacity
                 onPress={handleInviteEmail}
                 disabled={!email.trim() || sendingEmail}
-                style={{ borderRadius: Atlas.radius.medium, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: email.trim() ? c.accent : c.border }}>
+                accessibilityRole="button"
+                accessibilityLabel={tr.projectMembersSendInvite}
+                accessibilityState={{ disabled: !email.trim() || sendingEmail, busy: sendingEmail }}
+                style={{ minHeight: 44, borderRadius: Atlas.radius.medium, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: email.trim() ? c.accent : c.border }}>
                 {sendingEmail ? <ActivityIndicator color="#fff" size="small" /> : (
                   <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{tr.projectMembersSendInvite}</Text>
                 )}
               </TouchableOpacity>
             </View>
-            {emailError ? <Text style={{ color: '#EF4444', fontSize: 12, marginBottom: 20 }}>{emailError}</Text> : null}
+            <Text style={{ color: c.sub, fontSize: 11, lineHeight: 15, marginBottom: emailError || emailNotice ? 8 : 20 }}>
+              {emailConfigured ? tr.projectMembersInviteEmailHint : tr.projectMembersInviteEmailHintNoSmtp}
+            </Text>
+            {emailError ? <Text accessibilityLiveRegion="polite" style={{ color: '#EF4444', fontSize: 12, marginBottom: 20 }}>{emailError}</Text> : null}
+            {emailNotice ? (
+              <View accessibilityLiveRegion="polite" style={[st.hint, { borderColor: c.border, backgroundColor: c.dim, marginBottom: 20, alignItems: 'flex-start' }]}>
+                <IconSymbol name="bell" size={14} color={c.accent} />
+                <View style={{ flex: 1, marginLeft: 8, gap: 4 }}>
+                  {emailNotice.map((line, i) => (
+                    <Text key={i} style={{ color: i === emailNotice.length - 1 ? c.sub : c.text, fontSize: 12, lineHeight: 17 }}>{line}</Text>
+                  ))}
+                </View>
+                <TouchableOpacity
+                  onPress={() => setEmailNotice(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel={tr.close}
+                  style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: -12, marginRight: -10 }}>
+                  <IconSymbol name="xmark" size={12} color={c.sub} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {pendingInvites.length > 0 && (
+              <View style={{ marginBottom: 20 }}>
+                <Text accessibilityRole="header" style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>
+                  {tr.projectMembersPendingSection} · {pendingInvites.length}
+                </Text>
+                {pendingInvites.map(invite => {
+                  const busy = busyInviteId === invite.id;
+                  const sentAt = invite.last_sent_at ?? invite.created_at;
+                  const status = invite.expired
+                    ? tr.projectMembersInviteExpiredShort
+                    : tr.projectMembersInviteSentAt.replace('{date}', new Date(sentAt).toLocaleDateString(dateLocale))
+                      + ((invite.send_count ?? 1) > 1 ? ` · ×${invite.send_count}` : '');
+                  return (
+                    <View key={invite.id} style={[st.memberRow, { borderColor: c.border, backgroundColor: c.dim, paddingVertical: 6 }]}>
+                      <View style={{ flex: 1, paddingVertical: 6 }}>
+                        <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>
+                          {invite.invitee?.name || invite.email}
+                        </Text>
+                        <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                          {roleLabel(invite.role)} · {status}
+                        </Text>
+                        {!invite.account_exists ? (
+                          <Text numberOfLines={2} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.projectMembersInviteNoAccountShort}</Text>
+                        ) : null}
+                      </View>
+                      {busy ? <ActivityIndicator size="small" color={c.accent} style={{ width: 44 }} /> : (
+                        <>
+                          <TouchableOpacity
+                            onPress={() => { void handleResend(invite); }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${tr.projectMembersInviteResend}: ${invite.email ?? ''}`}
+                            style={st.iconBtn}>
+                            <IconSymbol name="arrow.clockwise" size={16} color={c.accent} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleCancelInvite(invite)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${tr.projectMembersInviteCancel}: ${invite.email ?? ''}`}
+                            style={st.iconBtn}>
+                            <IconSymbol name="xmark" size={15} color="#EF4444" />
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </>
         )}
       </ScrollView>
-    {removing && <Modal visible transparent animationType="slide" onRequestClose={()=>setRemoving(null)}><View style={{flex:1,justifyContent:'center',backgroundColor:'rgba(0,0,0,0.5)',padding:20}}><ScrollView style={{maxHeight:modalHeight * 0.8,backgroundColor:c.bg1,borderRadius:16}} contentContainerStyle={{padding:20,gap:10}}><Text style={{color:c.text,fontSize:18,fontWeight:'700'}}>Кому передати незавершені завдання й перевірки?</Text>{members.filter(m=>m.user.id!==removing?.user.id&&m.role!=='viewer').map(m=><TeamButton key={m.user.id} label={m.user.name||m.user.email} onPress={()=>{if(removing)handleRemove(removing,m.user.id);setRemoving(null);}}/>)}<TeamButton label="Залишити непризначеними" onPress={()=>{if(removing)handleRemove(removing);setRemoving(null);}}/><TeamButton label="Скасувати" onPress={()=>setRemoving(null)}/></ScrollView></View></Modal>}
+    {removing && <Modal visible transparent animationType="slide" onRequestClose={()=>setRemoving(null)}><View style={{flex:1,justifyContent:'center',backgroundColor:'rgba(0,0,0,0.5)',padding:20}}><ScrollView style={{maxHeight:modalHeight * 0.8,backgroundColor:c.bg1,borderRadius:16}} contentContainerStyle={{padding:20,gap:10}}><Text style={{color:c.text,fontSize:18,fontWeight:'700'}}>{tr.projectReassignTitle}</Text>{members.filter(m=>m.user.id!==removing?.user.id&&m.role!=='viewer').map(m=><TeamButton key={m.user.id} label={m.user.name||m.user.email} onPress={()=>{if(removing)handleRemove(removing,m.user.id);setRemoving(null);}}/>)}<TeamButton label={tr.projectLeaveUnassigned} onPress={()=>{if(removing)handleRemove(removing);setRemoving(null);}}/><TeamButton label={tr.cancel} onPress={()=>setRemoving(null)}/></ScrollView></View></Modal>}
       </ProjectScreenShell>
   );
 }
@@ -633,7 +822,10 @@ const st = StyleSheet.create({
   hint: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10 },
   memberRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 12, marginBottom: 8 },
   roleBadge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4, marginLeft: 8 },
-  segment: { flex: 1, alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingVertical: 9 },
+  // 44 pt мін. висота й центр по обох осях — усі три ряди сегментів
+  // (роль / термін / ліміт) однакові навіть коли підпис довший за комірку.
+  segment: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 6 },
   linkCard: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, marginBottom: 14 },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   smallBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, paddingVertical: 9 },
 });

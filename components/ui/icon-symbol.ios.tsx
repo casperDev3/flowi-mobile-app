@@ -16,6 +16,12 @@ export function IconSymbol({
 }) {
   return (
     <SymbolView
+      // NAT-05: декоративна іконка — інакше VoiceOver читав імʼя SF Symbol
+      // («archive, Архів», «calendar, calendar, Календар»). Підпис дає
+      // батьківська кнопка/рядок.
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
       weight={weight}
       tintColor={color}
       resizeMode="scaleAspectFit"

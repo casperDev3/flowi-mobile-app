@@ -17,7 +17,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 
+import { wideModalStyles } from '@/components/finance/wideModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { addRecentProject, getRecentProjects } from '@/store/project-sync';
@@ -131,6 +133,9 @@ export function ProjectSwitcherSheet({
 }) {
   const router = useRouter();
   const { tr } = useI18n();
+  // Планшет: свічер — центрований діалог (рішення 6), а не смуга внизу на всю ширину.
+  const { isWide } = useResponsive();
+  const wm = wideModalStyles(isWide);
 
   const c: ProjectSwitcherColors = {
     text: isDark ? '#F0EEFF' : '#1A1433',
@@ -154,13 +159,13 @@ export function ProjectSwitcherSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <Pressable accessible={false} style={st.overlay} onPress={onClose}>
-        <Pressable accessible={false} onPress={e => e.stopPropagation()} style={st.sheetWrap}>
+      <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={onClose}>
+        <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[st.sheetWrap, wm.column]}>
           <BlurView
             intensity={isDark ? 50 : 70}
             tint={isDark ? 'dark' : 'light'}
             style={[st.sheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)' }]}>
-            <View style={st.handle} />
+            {!isWide && <View style={st.handle} />}
             <Text style={[st.title, { color: c.text }]}>{tr.projectSwitcherTitle}</Text>
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
               <ProjectSwitcherList
@@ -180,17 +185,19 @@ export function ProjectSwitcherSheet({
 
 /** Пілюля-тригер для шапки телефону: колір+назва поточного проєкту, тап відкриває свічер. */
 export function ProjectSwitcherTrigger({
-  name, color, onPress, textColor,
+  name, color, onPress, textColor, accessibilityLabel,
 }: {
   name: string;
   color: string;
   onPress: () => void;
   textColor: string;
+  accessibilityLabel?: string;
 }) {
   return (
     <TouchableOpacity
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? name}
       style={st.trigger}
       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
       <View style={[st.dot, { backgroundColor: color }]} />
@@ -209,5 +216,5 @@ const st = StyleSheet.create({
   sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, marginTop: 10, marginBottom: 4, paddingHorizontal: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
   dot: { width: 10, height: 10, borderRadius: 5 },
-  trigger: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginBottom: 2 },
+  trigger: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 36, marginBottom: 2 },
 });

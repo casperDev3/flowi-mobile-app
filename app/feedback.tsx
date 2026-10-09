@@ -85,6 +85,7 @@ import {
   type Idea,
 } from '@/components/feedback/model';
 import { DetailPane } from '@/components/shared/DetailPane';
+import { detailColumnWidthFor } from '@/constants/tokens';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -611,6 +612,7 @@ export default function FeedbackScreen() {
         <DetailPane
           open={!!selectedEntry}
           wide={isExpanded}
+          columnWidth={detailColumnWidthFor(width)}
           onClose={() => setSelected(null)}
           isDark={isDark}
           sheetColor={c.sheet}

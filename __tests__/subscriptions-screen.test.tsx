@@ -135,7 +135,7 @@ test('«Продовжено»: новий цикл і історія; тран�
   // Синк повз екран дописав ще одну підписку — стан екрана про неї не знає.
   mockStore.set('subscriptions', JSON.stringify([NETFLIX, SPOTIFY]));
 
-  await pressByLabel(tree, `${tr.subRenew}: Netflix`);
+  await pressByLabel(tree, `${tr.subPayNow}: Netflix`);
   const input = tree.root.findAll((n: any) => n.props?.accessibilityLabel === tr.subRenewAmount && typeof n.props.onChangeText === 'function')[0];
   await act(async () => { input.props.onChangeText('12,5'); });
   await pressByLabel(tree, tr.subRenewConfirm);
@@ -255,7 +255,7 @@ test('«Продовжено» після продовження на іншом
   const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   seed({ subscriptions: [NETFLIX] });
   const tree = await mount();
-  await pressByLabel(tree, `${tr.subRenew}: Netflix`);
+  await pressByLabel(tree, `${tr.subPayNow}: Netflix`);
 
   // Поки підтвердження відкрите, синк приніс продовження з вебу.
   const renewedDate = addDaysKey(NETFLIX.nextPaymentDate, 30);
@@ -368,6 +368,6 @@ test('блок «Найближчі оплати»: усі рядки, секц�
 
   // «Оплачено» веде на екран підписок з pay=1: там живе підтвердження суми,
   // запис витрати й захист від повторної оплати того самого циклу.
-  await pressByLabel(tree, `${tr.payAction}: Netflix`);
+  await pressByLabel(tree, `${tr.subPayNow}: Netflix`);
   expect(mockPush).toHaveBeenCalledWith({ pathname: '/subscriptions', params: { open: 'sub-a', pay: '1' } });
 });

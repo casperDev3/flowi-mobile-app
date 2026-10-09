@@ -16,9 +16,13 @@
 import { useMemo } from 'react';
 import type { ViewStyle } from 'react-native';
 
+import { Layout } from '@/constants/tokens';
 import { useResponsive } from '@/hooks/use-responsive';
 
-export const CONTENT_MAX_WIDTH = 720;
+export const CONTENT_MAX_WIDTH = Layout.readingMaxWidth;
+
+/** Стеля «широкого» вмісту (дашборди, сітки карток) — див. ContentContainer. */
+export const WIDE_CONTENT_MAX_WIDTH = Layout.wideMaxWidth;
 
 /**
  * Те саме правило для bottom-sheet-ів.
@@ -41,6 +45,25 @@ export function sheetColumnStyle(isWide: boolean): ViewStyle {
   return isWide
     ? { width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center', flexShrink: 1 }
     : { width: '100%', flexShrink: 1 };
+}
+
+/**
+ * Колонка центрованого діалогу (SheetModal presentation='dialog' на широкому
+ * вікні). Вужча за колонку аркуша: форма посеред екрана на 720pt виглядає
+ * як сторінка, а не як діалог.
+ */
+export function dialogColumnStyle(): ViewStyle {
+  return { width: '100%', maxWidth: Layout.dialogMaxWidth, alignSelf: 'center', flexShrink: 1 };
+}
+
+/** Бокова панель праворуч на всю висоту (presentation='side'). */
+export function sidePanelColumnStyle(windowWidth: number): ViewStyle {
+  return {
+    width: Math.min(Layout.sidePanelWidth, Math.max(windowWidth - 48, 0)),
+    alignSelf: 'flex-end',
+    flexShrink: 1,
+    height: '100%',
+  };
 }
 
 export function useContentWidth(): ViewStyle {

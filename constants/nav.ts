@@ -131,7 +131,10 @@ export const NAV_GROUPS: NavGroup[] = [
       { route: '/(tabs)/today',   icon: 'house.fill',   labelKey: 'tabToday' },
       { route: '/(tabs)',         icon: 'checklist',    labelKey: 'tabTasks',     module: 'tasks' },
       { route: '/projects',       icon: 'folder',       labelKey: 'projects',     module: 'projects' },
-      { route: '/meetings',       icon: 'calendar',     labelKey: 'navMeetings',  module: 'meetings' },
+      // «Наради» стали «Календарем»: зустрічі + дедлайни завдань + спринти.
+      // Модуль лишився 'meetings' — це ключ ui_preferences, спільний із вебом;
+      // старий /meetings редиректить сюди й теж підсвічує пункт.
+      { route: '/calendar',       icon: 'calendar',     labelKey: 'calendar',     module: 'meetings', activeOn: ['/meetings'] },
       { route: '/(tabs)/time',    icon: 'timer',        labelKey: 'navTime',      module: 'time' },
       { route: '/notes',          icon: 'note.text',    labelKey: 'notes',        module: 'notes' },
     ],
@@ -377,6 +380,7 @@ export const TAB_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.free
  */
 export const STACK_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.freeze({
   '/projects': 'projects',
+  '/calendar': 'meetings',
   '/meetings': 'meetings',
   '/notes': 'notes',
   '/workouts': 'workouts',
@@ -444,18 +448,55 @@ export function disabledModuleForPathname(
 /**
  * Чи згорнута група просто зараз.
  *
- * Група, всередині якої лежить поточний розділ, розгортається примусово —
- * навіть якщо користувач її згорнув. Інакше, перейшовши в «Баги», ви бачили б
- * сайдбар без жодного підсвіченого пункту й не могли б сказати, де ви.
+ * Раніше група з поточним розділом розгорталась примусово, і тап «згорнути»
+ * на ній мовчки нічого не робив (id додавався, а група лишалась відкритою —
+ * наступний тап «розгортав» уже розгорнуте). Тепер згортання слухається
+ * користувача завжди, а щоб не загубити, де ви, сайдбар малює на заголовку
+ * згорнутої групи крапку активного розділу ({@link groupHasActiveItem}).
+ *
+ * `collapsedIds` — `unknown`, бо приходить зі сховища: зіпсоване значення
+ * ('nav_collapsed_groups' = null / об'єкт / рядок) раніше падало на
+ * `.includes` прямо в рендері сайдбара.
  */
-export function isGroupCollapsed(
-  group: NavGroup,
-  collapsedIds: readonly string[],
-  pathname: string,
-): boolean {
+export function isGroupCollapsed(group: NavGroup, collapsedIds: unknown): boolean {
   if (!group.id) return false;
-  if (!collapsedIds.includes(group.id)) return false;
-  return !group.items.some(item => isNavItemActive(item, pathname));
+  return Array.isArray(collapsedIds) && collapsedIds.includes(group.id);
+}
+
+/** Чи лежить поточний розділ у групі — для крапки на згорнутому заголовку. */
+export function groupHasActiveItem(group: NavGroup, pathname: string): boolean {
+  return group.items.some(item => isNavItemActive(item, pathname));
+}
+
+/**
+ * Збережений список згорнутих груп → чистий масив непорожніх рядків без
+ * дублікатів. Будь-що інше (null, об'єкт, рядок, число) — дефолт: краще
+ * один раз показати групи як для нового користувача, ніж кинути TypeError.
+ * Старий формат-об'єкт `{ more: true }` читається за truthy-ключами.
+ */
+export function sanitizeCollapsedGroupIds(
+  raw: unknown,
+  fallback: readonly string[] = DEFAULT_COLLAPSED_GROUP_IDS,
+): string[] {
+  let source: unknown[];
+  if (Array.isArray(raw)) source = raw;
+  else if (raw && typeof raw === 'object') {
+    source = Object.entries(raw as Record<string, unknown>).filter(([, v]) => Boolean(v)).map(([k]) => k);
+  } else return [...fallback];
+  const out: string[] = [];
+  for (const id of source) {
+    if (typeof id !== 'string') continue;
+    const trimmed = id.trim();
+    if (trimmed && !out.includes(trimmed)) out.push(trimmed);
+  }
+  return out;
+}
+
+/** Перемкнути групу. `prev` санітизується — стан міг прийти зі сховища будь-яким. */
+export function toggleCollapsedGroupId(prev: unknown, id: string): string[] {
+  const list = sanitizeCollapsedGroupIds(prev, []);
+  if (!id) return list;
+  return list.includes(id) ? list.filter(x => x !== id) : [...list, id];
 }
 
 /**

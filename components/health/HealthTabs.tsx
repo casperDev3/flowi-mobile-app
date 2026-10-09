@@ -20,11 +20,9 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { Layout } from '@/constants/tokens';
 import type { Translations } from '@/store/translations';
-import type { HealthColors } from '@/utils/healthTheme';
-import {
-  ACCENT, ACCENT_CAL, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT, HEALTH_ACCENTS,
-} from '@/utils/healthTheme';
+import { ACCENT, type HealthColors } from '@/utils/healthTheme';
 
 /** Порядок вкладок — він же порядок у смузі. */
 export const HEALTH_TABS = ['overview', 'nutrition', 'activity', 'sleep', 'body', 'prevention'] as const;
@@ -45,21 +43,65 @@ export function parseHealthTab(raw: unknown): HealthTabId {
 export interface HealthTabMeta {
   id: HealthTabId;
   icon: IconSymbolName;
-  color: string;
-  /** Підпис — ключ словника: рядків у цьому файлі не заводимо. */
+  /** Короткий підпис на смузі — ключ словника: рядків у цьому файлі не заводимо. */
   label: (tr: Translations) => string;
+  /** Повна назва розділу для VoiceOver («Активність і тренування»). */
+  a11yLabel: (tr: Translations) => string;
 }
 
+/**
+ * Рішення власника (07.10): ОДИН акцент — зелений розділу — для всіх вкладок.
+ * Колір вкладки за розділом (помаранчеве харчування, індиго сон…) робив смугу
+ * райдужною й не схожою на решту застосунку; кольори розділів лишились лише
+ * на даних — кільцях і графіках. Тому поля `color` у маніфесті більше немає.
+ *
+ * Підписи — короткі (Огляд · Харчування · Активність · Сон · Тіло ·
+ * Профілактика): шість вкладок мусять стати в один ряд на планшеті без
+ * прокрутки, а «Активність і тренування» туди не вміщується.
+ */
 export const HEALTH_TAB_META: HealthTabMeta[] = [
-  { id: 'overview',   icon: 'chart.bar.fill',  color: ACCENT,        label: tr => tr.healthTabOverview },
-  { id: 'nutrition',  icon: 'flame.fill',      color: ACCENT_CAL,    label: tr => tr.nutrition },
+  { id: 'overview',   icon: 'chart.bar.fill',  label: tr => tr.healthTabOverview, a11yLabel: tr => tr.healthTabOverview },
+  { id: 'nutrition',  icon: 'flame.fill',      label: tr => tr.nutrition,         a11yLabel: tr => tr.nutrition },
   // Тренування лишаються окремим розділом, а вкладка лише показує їхнє зведення.
-  { id: 'activity',   icon: 'figure.walk',     color: ACCENT_STEPS,  label: tr => tr.healthTabActivity },
-  { id: 'sleep',      icon: 'moon.fill',       color: ACCENT_SLEEP,  label: tr => tr.sleepRecovery },
+  { id: 'activity',   icon: 'figure.walk',     label: tr => tr.activity,          a11yLabel: tr => tr.healthTabActivity },
+  { id: 'sleep',      icon: 'moon.fill',       label: tr => tr.sleep,             a11yLabel: tr => tr.sleepRecovery },
   // «Тіло і вітальні»: вага, ІМТ, пульс і обводи — те, що було двома екранами.
-  { id: 'body',       icon: 'ruler.fill',      color: ACCENT_WEIGHT, label: tr => tr.healthTabBody },
-  { id: 'prevention', icon: 'cross.case.fill', color: HEALTH_ACCENTS.prevention, label: tr => tr.prevention },
+  { id: 'body',       icon: 'ruler.fill',      label: tr => tr.healthTabBodyShort, a11yLabel: tr => tr.healthTabBody },
+  { id: 'prevention', icon: 'cross.case.fill', label: tr => tr.prevention,        a11yLabel: tr => tr.prevention },
 ];
+
+/** Проміжок між вкладками на смузі. */
+export const HEALTH_TAB_GAP = 6;
+/** Від цієї ширини однієї вкладки (у режимі «в один ряд») поруч із підписом є місце для іконки. */
+export const HEALTH_TAB_ICON_MIN_WIDTH = 116;
+/** Поля смуги — ті самі 20pt, що в ScreenHeader. */
+const HEADER_SIDE_PAD = 20;
+
+export interface HealthTabBarLayout {
+  /** true — горизонтальна прокрутка (телефон); false — усі шість в один ряд. */
+  scroll: boolean;
+  /** Показувати іконку поруч із підписом. */
+  showIcons: boolean;
+  /** Ширина однієї вкладки в режимі «в один ряд» (для тестів і рішення про іконки). */
+  tabWidth: number;
+}
+
+/**
+ * Чиста функція: як розкласти смугу вкладок.
+ *
+ * Телефон — прокрутка, як і була. Планшет (medium/expanded) — шість вкладок
+ * ділять ширину порівну (fill), а на дуже широкому вікні ряд не ширший за
+ * Layout.wideMaxWidth і стоїть по центру. Іконки зникають, коли вкладка
+ * вужча за HEALTH_TAB_ICON_MIN_WIDTH: на найвужчому medium (Split View,
+ * рейка) підпис важливіший за піктограму.
+ */
+export function healthTabBarLayout(screenWidth: number, isWide: boolean): HealthTabBarLayout {
+  if (!isWide) return { scroll: true, showIcons: true, tabWidth: 0 };
+  const row = Math.min(Math.max(0, screenWidth - HEADER_SIDE_PAD * 2), Layout.wideMaxWidth);
+  const n = HEALTH_TAB_META.length;
+  const tabWidth = Math.max(0, (row - HEALTH_TAB_GAP * (n - 1)) / n);
+  return { scroll: false, showIcons: tabWidth >= HEALTH_TAB_ICON_MIN_WIDTH, tabWidth };
+}
 
 export interface HealthTabBarProps {
   value: HealthTabId;
@@ -68,61 +110,82 @@ export interface HealthTabBarProps {
   c: HealthColors;
   /** Скільки справ «на сьогодні» висить у Профілактиці — бейдж на вкладці. */
   preventionBadge?: number;
+  /** Розкладка смуги — з healthTabBarLayout(); без неї — прокрутка (телефон). */
+  layout?: HealthTabBarLayout;
 }
 
 /**
- * Смуга вкладок.
+ * Смуга вкладок: контурні «пігулки», активна — зеленим акцентом розділу.
  *
- * Скролиться горизонтально, а не тисне шість підписів у ширину телефона:
- * «Активність · Тренування» не вміщається навіть на 430pt, і стиснення
- * перетворило б підписи на «Акт…». Активна вкладка тягне за собою колір свого
- * розділу — той самий, яким пофарбовані картки всередині.
+ * На телефоні скролиться горизонтально, а не тисне шість підписів у ширину
+ * екрана. На планшеті — один ряд без прокрутки.
  */
-export function HealthTabBar({ value, onChange, tr, c, preventionBadge = 0 }: HealthTabBarProps) {
+export function HealthTabBar({ value, onChange, tr, c, preventionBadge = 0, layout }: HealthTabBarProps) {
+  const lay = layout ?? { scroll: true, showIcons: true, tabWidth: 0 };
+  const tabs = HEALTH_TAB_META.map(meta => {
+    const active = meta.id === value;
+    const badge = meta.id === 'prevention' ? preventionBadge : 0;
+    const label = meta.label(tr);
+    return (
+      <TouchableOpacity
+        key={meta.id}
+        onPress={() => onChange(meta.id)}
+        activeOpacity={0.85}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
+        accessibilityLabel={badge > 0 ? `${meta.a11yLabel(tr)}, ${badge}` : meta.a11yLabel(tr)}
+        style={[s.tab, !lay.scroll && s.tabFill, {
+          borderColor: active ? ACCENT : c.border,
+          backgroundColor: active ? ACCENT + '1F' : 'transparent',
+        }]}>
+        {lay.showIcons && <IconSymbol name={meta.icon} size={14} color={active ? ACCENT : c.sub} />}
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit={!lay.scroll}
+          minimumFontScale={0.8}
+          maxFontSizeMultiplier={1.4}
+          style={[s.label, !lay.scroll && s.labelFill, { color: active ? ACCENT : c.sub }]}>
+          {label}
+        </Text>
+        {badge > 0 && (
+          <View style={[s.badge, { backgroundColor: ACCENT }]}>
+            <Text style={s.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  });
+
+  if (!lay.scroll) {
+    return (
+      <View accessibilityRole="tablist" style={s.fillRow}>
+        {tabs}
+      </View>
+    );
+  }
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={s.row}
       accessibilityRole="tablist">
-      {HEALTH_TAB_META.map(meta => {
-        const active = meta.id === value;
-        const badge = meta.id === 'prevention' ? preventionBadge : 0;
-        return (
-          <TouchableOpacity
-            key={meta.id}
-            onPress={() => onChange(meta.id)}
-            activeOpacity={0.85}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            accessibilityLabel={meta.label(tr)}
-            style={[s.tab, {
-              borderColor: active ? meta.color : c.border,
-              backgroundColor: active ? meta.color + '1F' : 'transparent',
-            }]}>
-            <IconSymbol name={meta.icon} size={14} color={active ? meta.color : c.sub} />
-            <Text
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.4}
-              style={[s.label, { color: active ? meta.color : c.sub }]}>
-              {meta.label(tr)}
-            </Text>
-            {badge > 0 && (
-              <View style={[s.badge, { backgroundColor: meta.color }]}>
-                <Text style={s.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        );
-      })}
+      {tabs}
     </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  row:   { flexDirection: 'row', gap: 8, paddingRight: 4 },
-  tab:   { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, minHeight: 36 },
-  label: { fontSize: 13, fontWeight: '700' },
-  badge: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  row:     { flexDirection: 'row', gap: 8, paddingRight: 4 },
+  // Планшет: ряд на всю ширину шапки, але не ширший за стелю дашборда — і по центру.
+  fillRow: { flexDirection: 'row', gap: HEALTH_TAB_GAP, width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center' },
+  tab:     { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, minHeight: 36 },
+  // Ширина за вмістом (flexBasis 'auto') + рівний розподіл залишку. Раніше
+  // flex:1 давав УСІМ вкладкам однакову ширину, і найдовша «Профілактика» з
+  // бейджем на iPad portrait стискала шрифт — помітно дрібніше за сусідів.
+  // adjustsFontSizeToFit лишився запасним — лише коли ряд справді не вміщає.
+  tabFill: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0, justifyContent: 'center', paddingHorizontal: 8 },
+  label:   { fontSize: 13, fontWeight: '700' },
+  labelFill: { flexShrink: 1 },
+  badge:   { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: Atlas.type.headingWeight },
 });

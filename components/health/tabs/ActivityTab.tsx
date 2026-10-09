@@ -8,25 +8,25 @@ import { Atlas } from '@/constants/atlas';
  * це майбутній модуль із групами й програмами, і вкладка на нього лише
  * посилається, а не тягне його всередину здоровʼя.
  */
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { SectionHeader } from '@/components/health/HealthBits';
+import { HealthAddButton, HealthCard } from '@/components/health/HealthBits';
 import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
 import { HealthKitStatus, LoadErrorNotice } from '@/components/health/HealthNotices';
 import { MetricTrend } from '@/components/health/MetricTrend';
 import { MiniBarChart } from '@/components/health/MiniBarChart';
+import { useHealthTabGrid } from '@/components/health/HealthLayout';
 import type { HealthTabProps } from '@/components/health/tabs/types';
+import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useContentWidth } from '@/hooks/use-content-width';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
-import { ACCENT, ACCENT_CAL, ACCENT_STEPS, ModalKey, getHealthColors } from '@/utils/healthTheme';
+import { ACCENT, ACCENT_STEPS, ModalKey, getHealthColors } from '@/utils/healthTheme';
 import { stepsToKm } from '@/utils/healthUtils';
 
 /** Тренування читаються лише заради дати й калорій — решта полів тут ні до чого. */
@@ -35,7 +35,7 @@ interface WorkoutBrief { date: string; calories?: number }
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function ActivityTab({ h }: HealthTabProps) {
-  const contentWidth = useContentWidth();
+  const grid = useHealthTabGrid();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -69,27 +69,11 @@ export function ActivityTab({ h }: HealthTabProps) {
   const onSubmit = (e: NewEntryPayload) => { h.addEntry(e); setModal(null); };
   const labels = h.last7.map(d => tr.weekdays[d.getDay() === 0 ? 6 : d.getDay() - 1]);
 
-  return (
-    <>
-      <ScrollView
-        contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: tabBarInset + 32 }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
-
-        {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
-        {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
-
-        {/* Кроки */}
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}>
-            <SectionHeader title={tr.steps} icon="figure.walk" color={ACCENT_STEPS} textColor={c.text} top={8} />
-          </View>
-          <TouchableOpacity onPress={() => setModal('steps')} accessibilityRole="button" accessibilityLabel={tr.add}
-            style={[s.addBtn, { backgroundColor: ACCENT_STEPS }]}>
-            <IconSymbol name="plus" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+  const items: MasonryEntry[] = [
+    {
+      key: 'steps',
+      node: (
+        <HealthCard c={c} title={tr.steps} right={<HealthAddButton onPress={() => setModal('steps')} label={tr.add} />}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
             <View style={{ flex: 1, marginRight: 10 }}>
               <Text style={{ color: c.text, fontSize: 30, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 }}>{today.steps.toLocaleString(locale)}</Text>
@@ -114,22 +98,27 @@ export function ActivityTab({ h }: HealthTabProps) {
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {[1000, 2000, 3000, 5000].map(st => (
               <TouchableOpacity key={st} onPress={() => h.addQuick('steps', st)}
-                style={[s.chip, { borderColor: ACCENT_STEPS + '50', backgroundColor: ACCENT_STEPS + '12' }]}>
-                <Text style={{ color: ACCENT_STEPS, fontSize: 11, fontWeight: '700' }}>+{st >= 1000 ? `${st / 1000}т` : st}</Text>
+                accessibilityRole="button" accessibilityLabel={`+${st}`}
+                style={[s.chip, { borderColor: c.border, backgroundColor: c.dim }]}>
+                <Text style={{ color: c.text, fontSize: 11, fontWeight: '700' }}>+{st >= 1000 ? `${st / 1000}т` : st}</Text>
               </TouchableOpacity>
             ))}
           </View>
-        </BlurView>
-
-        {/* Динаміка кроків */}
-        <View style={{ marginTop: 14 }}>
-          <MetricTrend entries={h.entries} type="steps" agg="sum" color={ACCENT_STEPS} goal={goals.steps}
-            format={v => (v >= 1000 ? `${(v / 1000).toFixed(1)}т` : `${Math.round(v)}`)} isDark={isDark} c={c} tr={tr} />
-        </View>
-
-        {/* Активні калорії */}
-        <SectionHeader title={tr.burned} icon="flame" color={ACCENT_CAL} textColor={c.text} />
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+        </HealthCard>
+      ),
+    },
+    {
+      key: 'steps-trend',
+      node: (
+        <MetricTrend entries={h.entries} type="steps" agg="sum" color={ACCENT_STEPS} goal={goals.steps}
+          title={`${tr.steps} · ${tr.dynamics}`}
+          format={v => (v >= 1000 ? `${(v / 1000).toFixed(1)}т` : `${Math.round(v)}`)} c={c} tr={tr} />
+      ),
+    },
+    {
+      key: 'burned',
+      node: (
+        <HealthCard c={c} title={tr.burned}>
           {/* cal.burned, а не today.calOut: у спалене входять ще й калорії
               тренувань Flowi за цей день (без подвоєння з Apple Health —
               див. burnedForDay). Рядок нижче показує внесок тренувань, щоб
@@ -150,43 +139,68 @@ export function ActivityTab({ h }: HealthTabProps) {
             hk={{ available: h.hk.available, access: h.hk.access, failed: h.hk.failed, label: h.hk.label }}
             onGrant={() => { void h.hk.requestAccess(); }}
             onRetry={() => { void h.hk.sync(); }} />
-        </BlurView>
-
-        {/* Тренування — зведення й вхід в окремий розділ */}
-        <SectionHeader title={tr.workoutsLabel} icon="dumbbell.fill" color={ACCENT_STEPS} textColor={c.text} />
+        </HealthCard>
+      ),
+    },
+    {
+      // Тренування — зведення й вхід в окремий розділ.
+      key: 'workouts',
+      node: (
         <TouchableOpacity onPress={() => router.push('/workouts')} activeOpacity={0.85}
           accessibilityRole="button" accessibilityLabel={tr.workoutsLabel}>
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, flexDirection: 'row', alignItems: 'center' }]}>
-            <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT_STEPS + '20', alignItems: 'center', justifyContent: 'center' }}>
-              <IconSymbol name="dumbbell.fill" size={18} color={ACCENT_STEPS} />
+          <HealthCard c={c} title={tr.workoutsLabel}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
+                <IconSymbol name="dumbbell.fill" size={18} color={ACCENT} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>
+                  {week.count > 0 ? `${week.count} · ${tr.thisWeek}` : tr.workoutsSub}
+                </Text>
+                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                  {week.calories > 0 ? `${week.calories} кк ${tr.burned.toLowerCase()}` : tr.workoutsSub}
+                </Text>
+              </View>
+              <IconSymbol name="chevron.right" size={13} color={c.sub} />
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>
-                {week.count > 0 ? `${week.count} · ${tr.thisWeek}` : tr.workoutsSub}
-              </Text>
-              <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
-                {week.calories > 0 ? `${week.calories} кк ${tr.burned.toLowerCase()}` : tr.workoutsSub}
-              </Text>
-            </View>
-            <IconSymbol name="chevron.right" size={13} color={c.sub} />
-          </BlurView>
+          </HealthCard>
         </TouchableOpacity>
-
-        {/* NAT-24: вхід в Apple Health саме звідси — це єдиний екран, що
-            показує ті самі дані HealthKit. Налаштування джерел живуть у
-            налаштуваннях розділу, а тут лишається швидкий перехід. */}
-        {h.hk.available && (
-          <TouchableOpacity
-            onPress={() => router.push('/apple-health')}
-            accessibilityRole="button"
-            accessibilityLabel={h.hk.label ?? 'Apple Health'}
-            style={[s.card, { borderColor: c.border, marginTop: 14, flexDirection: 'row', alignItems: 'center' }]}>
+      ),
+    },
+  ];
+  /* NAT-24: вхід в Apple Health саме звідси — це єдиний екран, що
+     показує ті самі дані HealthKit. Налаштування джерел живуть у
+     налаштуваннях розділу, а тут лишається швидкий перехід. */
+  if (h.hk.available) {
+    items.push({
+      key: 'apple-health',
+      node: (
+        <TouchableOpacity
+          onPress={() => router.push('/apple-health')}
+          accessibilityRole="button"
+          accessibilityLabel={h.hk.label ?? 'Apple Health'}>
+          <HealthCard c={c} style={{ flexDirection: 'row', alignItems: 'center' }}>
             <IconSymbol name="heart.fill" size={16} color={ACCENT} />
             {/* Назва сервісу не перекладається; на Android це Health Connect. */}
             <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', flex: 1, marginLeft: 10 }}>{h.hk.label ?? 'Apple Health'}</Text>
             <IconSymbol name="chevron.right" size={13} color={c.sub} />
-          </TouchableOpacity>
-        )}
+          </HealthCard>
+        </TouchableOpacity>
+      ),
+    });
+  }
+
+  return (
+    <>
+      <ScrollView
+        contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+        {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+        {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
+
+        <MasonryColumns items={items} columnCount={grid.columnCount} columnGap={12} />
       </ScrollView>
 
       <HealthEntryModal modalKey={modal} onClose={() => setModal(null)} onSubmit={onSubmit} isDark={isDark} tr={tr} />
@@ -195,9 +209,8 @@ export function ActivityTab({ h }: HealthTabProps) {
 }
 
 const s = StyleSheet.create({
-  addBtn: { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  card:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
   track:  { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill:   { height: '100%', borderRadius: 4 },
-  chip:   { flex: 1, borderRadius: 11, borderWidth: 1.5, paddingVertical: 7, alignItems: 'center' },
+  // Швидкі кнопки — нейтральні, як вторинні кнопки Фінансів: колір розділу лишається на даних.
+  chip:   { flex: 1, minHeight: 36, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

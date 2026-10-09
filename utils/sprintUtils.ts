@@ -53,6 +53,14 @@ export interface Sprint {
   startDate?: string;
   /** ОСТАННІЙ день спринта ВКЛЮЧНО, повний ISO. Пара до startDate. */
   endDate?: string;
+  /**
+   * Момент архівації, повний ISO. АДИТИВНЕ поле, незалежне від closedAt:
+   * архів — це «сховати зі списку», а не ще один стан роботи. Архівний спринт
+   * не показується за замовчуванням і не пропонується в жодному виборі
+   * спринта, але лишається історією (велосіті, бейдж «Проєкт · Спринт»).
+   * Веб пише те саме поле з тією ж семантикою (lib/types.ts Sprint).
+   */
+  archivedAt?: string;
 }
 
 /**
@@ -120,9 +128,105 @@ export function isSprintClosed(sprint: Pick<Sprint, 'closedAt'>): boolean {
  */
 export function setSprintClosed<T extends Sprint>(sprint: T, closed: boolean, now: Date = new Date()): T {
   if (closed) return { ...sprint, closedAt: now.toISOString() };
-  const { closedAt: _removed, ...rest } = sprint;
+  // Відкритий спринт не може лежати в архіві — archivedAt знімається разом
+  // (дзеркало веб reopenSprint, lib/sprints.ts).
+  const { closedAt: _removed, archivedAt: _archived, ...rest } = sprint;
+  void _removed;
+  void _archived;
+  return rest as T;
+}
+
+export function isSprintArchived(sprint: Pick<Sprint, 'archivedAt'>): boolean {
+  return !!sprint.archivedAt;
+}
+
+/**
+ * Архівувати спринт або повернути з архіву. Та сама конвенція, що в
+ * setSprintClosed: при поверненні ключ саме ВИДАЛЯЄТЬСЯ.
+ */
+export function setSprintArchived<T extends Sprint>(sprint: T, archived: boolean, now: Date = new Date()): T {
+  if (archived) {
+    // Як на вебі (archiveSprint): архів — лише для ЗАКРИТОГО спринта, а
+    // повторна архівація не переставляє дату.
+    if (!isSprintClosed(sprint) || isSprintArchived(sprint)) return sprint;
+    return { ...sprint, archivedAt: now.toISOString() };
+  }
+  if (!('archivedAt' in sprint)) return sprint;
+  const { archivedAt: _removed, ...rest } = sprint;
   void _removed;
   return rest as T;
+}
+
+/**
+ * Стан спринта для фільтра списку:
+ *   - completed — закритий (closedAt);
+ *   - planned — відкритий і датований, але перший день ще не настав;
+ *   - active — решта відкритих (і недатовані: «в роботі», доки не закрили).
+ */
+export type SprintStatus = 'planned' | 'active' | 'completed';
+
+export function sprintStatus(sprint: Sprint, now: Date = new Date()): SprintStatus {
+  if (isSprintClosed(sprint)) return 'completed';
+  if (sprint.startDate && !Number.isNaN(Date.parse(sprint.startDate))) {
+    const start = new Date(sprint.startDate);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    if (new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime() > today) return 'planned';
+  }
+  return 'active';
+}
+
+/** Сортування списку спринтів. За замовчуванням — найновіші за початком. */
+export type SprintSort = 'start-desc' | 'start-asc' | 'name' | 'progress';
+export type SprintStatusFilter = 'all' | SprintStatus;
+
+export interface SprintListOptions {
+  sort: SprintSort;
+  status: SprintStatusFilter;
+  showArchived: boolean;
+  now?: Date;
+}
+
+/** Початок для сортування: startDate, а недатований — момент створення. */
+function sprintStartKey(sprint: Sprint): number {
+  const start = isSprintDated(sprint) ? Date.parse(sprint.startDate as string) : NaN;
+  if (Number.isFinite(start)) return start;
+  const created = Date.parse(sprint.createdAt);
+  return Number.isFinite(created) ? created : 0;
+}
+
+const STATUS_ORDER: Record<SprintStatus, number> = { active: 0, planned: 1, completed: 2 };
+
+/**
+ * Відфільтрований і впорядкований список для екрана Спринтів.
+ *
+ * `progress` — спершу активні, далі заплановані, потім завершені; усередині
+ * групи — менш готові вище (там є що робити). id — запасний ключ, щоб
+ * порядок був стабільним між синками.
+ */
+export function filterSortSprints<T extends Sprint>(
+  sprints: readonly T[],
+  tasks: readonly SprintTaskLike[],
+  { sort, status, showArchived, now = new Date() }: SprintListOptions,
+): T[] {
+  const visible = sprints.filter(sprint =>
+    (showArchived || !isSprintArchived(sprint))
+    && (status === 'all' || sprintStatus(sprint, now) === status));
+  const ratio = (sprint: Sprint) => {
+    const own = tasks.filter(task => task.sprintId === sprint.id);
+    return own.length ? own.filter(task => task.status === 'done').length / own.length : 0;
+  };
+  return [...visible].sort((left, right) => {
+    let diff = 0;
+    if (sort === 'name') diff = left.name.localeCompare(right.name);
+    else if (sort === 'progress') {
+      diff = STATUS_ORDER[sprintStatus(left, now)] - STATUS_ORDER[sprintStatus(right, now)];
+      if (diff === 0) diff = ratio(left) - ratio(right);
+    } else {
+      diff = sprintStartKey(left) - sprintStartKey(right);
+      if (sort === 'start-desc') diff = -diff;
+    }
+    return diff !== 0 ? diff : left.id.localeCompare(right.id);
+  });
 }
 
 // ─── Дати спринта (§3.1 специфікації) ────────────────────────────────────────
@@ -262,10 +366,11 @@ export function sprintsForProject<T extends Sprint>(sprints: readonly T[], proje
  * Куди можна перенести незакриті завдання при закритті спринта: ВІДКРИТІ
  * спринти ТОГО САМОГО проєкту, крім самого себе. Закритий спринт як ціль не
  * пропонується — інакше робота переїхала б із однієї заморозки в іншу.
+ * Архівний — теж ні: його не видно в списку, і робота зникла б з очей.
  */
 export function sprintMoveTargets<T extends Sprint>(sprints: readonly T[], sprint: Sprint): T[] {
   return sprintsForProject(sprints, sprint.projectId)
-    .filter(candidate => candidate.id !== sprint.id && !isSprintClosed(candidate));
+    .filter(candidate => candidate.id !== sprint.id && !isSprintClosed(candidate) && !isSprintArchived(candidate));
 }
 
 /**
@@ -357,6 +462,8 @@ export function projectBacklogTasks<T extends SprintTaskLike>(
 
 /**
  * Відкриті спринти проєкту — у порядку sortSprints. Без проєкту — порожньо.
+ * Архівні не входять: архів ховає спринт з усіх виборів (поле «Спринт»,
+ * «поточний спринт» Огляду).
  * Дзеркало веб-версії (lib/sprints.ts openSprintsForProject).
  */
 export function openSprintsForProject<T extends Sprint>(
@@ -364,7 +471,7 @@ export function openSprintsForProject<T extends Sprint>(
   projectId: string | undefined | null,
 ): T[] {
   if (!projectId) return [];
-  return sprintsForProject(sprints, projectId).filter(sprint => !isSprintClosed(sprint));
+  return sprintsForProject(sprints, projectId).filter(sprint => !isSprintClosed(sprint) && !isSprintArchived(sprint));
 }
 
 /** Варіант поля «Спринт» у формі задачі. */

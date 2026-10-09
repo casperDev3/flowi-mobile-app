@@ -134,12 +134,12 @@ describe('unregisterPushToken', () => {
 
 describe('deep link сервера → маршрут', () => {
   it.each([
-    ['ftrackingapp://project/p-1/task/t-1', '/(tabs)?open=t-1'],
-    ['ftrackingapp://project/p-1/meeting/m-1', '/project/p-1/meetings?open=m-1'],
+    ['ftrackingapp://project/p-1/task/t-1', '/project/p-1/tasks?open=t-1'],
+    ['ftrackingapp://project/p-1/meeting/m-1', '/project/p-1/calendar?open=m-1'],
     ['ftrackingapp://project/p-1/sprint/s-1', '/project/p-1/sprints?sprint=s-1'],
     ['ftrackingapp://project/p-1', '/project/p-1/overview'],
     ['ftrackingapp://task/t-9', '/(tabs)?open=t-9'],
-    ['ftrackingapp://meeting/m-9', '/meetings?open=m-9'],
+    ['ftrackingapp://meeting/m-9', '/calendar?open=m-9'],
     ['ftrackingapp://feedback?open=idea%3Ai-1', '/feedback?open=idea%3Ai-1'],
     ['ftrackingapp://feedback', '/feedback'],
     ['ftrackingapp://ideas', '/feedback'],
@@ -165,8 +165,8 @@ describe('deep link сервера → маршрут', () => {
 
   it('deep link має пріоритет, легасі-тип — запасний шлях', () => {
     expect(notificationRoute({ event_type: 'task.assigned', url: 'ftrackingapp://project/p/meeting/m' }))
-      .toBe('/project/p/meetings?open=m');
-    expect(notificationRoute({ type: 'assigned', project_id: 'p', local_id: 't' })).toBe('/(tabs)?open=t');
+      .toBe('/project/p/calendar?open=m');
+    expect(notificationRoute({ type: 'assigned', project_id: 'p', local_id: 't' })).toBe('/project/p/tasks?open=t');
     expect(notificationRoute({ event_type: 'registration.requested' })).toBe('/admin-workspace');
   });
 });

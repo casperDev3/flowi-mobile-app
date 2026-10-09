@@ -67,7 +67,7 @@ export function useUpcomingPayments(withinDays = 7): UpcomingPaymentsData {
 }
 
 export function UpcomingPaymentsCard({
-  data, isDark, c, tr, lang, style, withinDays = 7,
+  data, isDark, c, tr, lang, style, withinDays = 7, todayOnly = false,
 }: {
   data: UpcomingPaymentsData;
   isDark: boolean;
@@ -77,10 +77,17 @@ export function UpcomingPaymentsCard({
   style?: StyleProp<ViewStyle>;
   /** Той самий горизонт, що й у useUpcomingPayments — лише для підпису секції. */
   withinDays?: number;
+  /**
+   * Лише оплати з датою СЬОГОДНІ — без прострочених і найближчих. Так блок
+   * стоїть на вкладці «Операції» Фінансів (рішення власника): повний список
+   * підписок живе у вкладці «Підписки».
+   */
+  todayOnly?: boolean;
 }) {
   const router = useRouter();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const { items, currencies } = data;
+  const { currencies } = data;
+  const items = todayOnly ? data.items.filter(item => item.daysUntil === 0) : data.items;
   const overdue = items.filter(item => item.status === 'overdue');
   const soon = items.filter(item => item.status !== 'overdue');
 
@@ -122,10 +129,10 @@ export function UpcomingPaymentsCard({
         <TouchableOpacity
           onPress={() => router.push({ pathname: '/subscriptions', params: { open: sub.id, pay: '1' } })}
           accessibilityRole="button"
-          accessibilityLabel={`${tr.payAction}: ${sub.name}`}
+          accessibilityLabel={`${tr.subPayNow}: ${sub.name}`}
           hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
           style={[st.renewBtn, { backgroundColor: isOverdue ? RED + '1A' : 'transparent', borderColor: isOverdue ? RED + '40' : c.border }]}>
-          <Text style={{ color: isOverdue ? RED : c.text, fontSize: 12, fontWeight: '700' }}>{tr.payAction}</Text>
+          <Text style={{ color: isOverdue ? RED : c.text, fontSize: 12, fontWeight: '700' }}>{tr.subPayNow}</Text>
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -141,13 +148,13 @@ export function UpcomingPaymentsCard({
   return (
     <View style={[{ marginBottom: 12 }, style]}>
       <View style={st.headRow}>
-        <Text style={[st.title, { color: overdue.length && !soon.length ? RED : c.sub }]}>
-          {overdue.length && !soon.length ? tr.subOverdue : tr.subUpcoming}
+        <Text style={[st.title, { color: !todayOnly && overdue.length && !soon.length ? RED : c.sub }]}>
+          {todayOnly ? tr.finTodayDue : overdue.length && !soon.length ? tr.subOverdue : tr.subUpcoming}
         </Text>
         <TouchableOpacity
           onPress={() => router.push('/subscriptions')}
           accessibilityRole="link"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700' }}>{tr.navSubscriptions}</Text>
         </TouchableOpacity>
       </View>

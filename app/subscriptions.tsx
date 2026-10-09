@@ -46,6 +46,7 @@ import {
 } from '@/components/finance/SubscriptionDetail';
 import { useTodayKey } from '@/hooks/use-today-key';
 import { DetailPane } from '@/components/shared/DetailPane';
+import { detailColumnWidthFor } from '@/constants/tokens';
 import { RecurringIncomesSection } from '@/components/finance/RecurringIncomesSection';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
@@ -147,7 +148,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   // де сервер однаково відхилить запис `forbidden`, і локальна копія лишалась
   // би висіти, ніколи не долетівши.
   const projectRoles = useProjectRoles();
-  const { isExpanded, height } = useResponsive();
+  const { isExpanded, height, width } = useResponsive();
   const c = useMemo(() => makeColors(isDark), [isDark]);
   const uiColors: SubscriptionUiColors = useMemo(
     () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, red: c.red, green: c.green }),
@@ -828,6 +829,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
         <DetailPane
           open={!!selected}
           wide={isExpanded}
+          columnWidth={detailColumnWidthFor(width)}
           onClose={closeDetail}
           isDark={isDark}
           sheetColor={c.sheet}

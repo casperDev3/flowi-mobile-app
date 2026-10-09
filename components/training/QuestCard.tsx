@@ -14,7 +14,7 @@ import { Atlas } from '@/constants/atlas';
  */
 import * as DocumentPicker from 'expo-document-picker';
 import React from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useI18n } from '@/store/i18n';
@@ -56,7 +56,10 @@ export function questUnit(tr: Translations, q: Quest): string {
   return q.unit || (info ? tr[info.unitKey] : '');
 }
 
-export function QuestCard({ c, quest, progress, mode, doneCount, assigneeCount, onToggle, onRecompute, onEdit, busy }: {
+const LIST_CARD: StyleProp<ViewStyle> = { marginBottom: 10 };
+const GRID_CARD: StyleProp<ViewStyle> = { flex: 1 };
+
+export function QuestCard({ c, quest, progress, mode, doneCount, assigneeCount, onToggle, onRecompute, onEdit, busy, inGrid }: {
   c: TrainingColors;
   quest: Quest;
   /** Мій прогрес (учасник) або null. */
@@ -68,6 +71,8 @@ export function QuestCard({ c, quest, progress, mode, doneCount, assigneeCount, 
   onRecompute?: () => void;
   onEdit?: () => void;
   busy?: boolean;
+  /** У сітці (планшет): проміжки дає ResponsiveGrid, картка тягнеться на висоту рядка. */
+  inGrid?: boolean;
 }) {
   const { tr } = useI18n();
   const info = metricInfo(quest.metric);
@@ -77,7 +82,7 @@ export function QuestCard({ c, quest, progress, mode, doneCount, assigneeCount, 
   const unit = questUnit(tr, quest);
 
   return (
-    <Card c={c} accent={done ? TG_OK : undefined} style={{ marginBottom: 10 }}>
+    <Card c={c} accent={done ? TG_OK : undefined} style={inGrid ? GRID_CARD : LIST_CARD}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
         <View style={{ width: 36, height: 36, borderRadius: Atlas.radius.medium, backgroundColor: (done ? TG_OK : TG_ACCENT) + '22', alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name={done ? 'checkmark.seal' : measurable ? 'chart.line.uptrend.xyaxis' : 'checklist'} size={18} color={done ? TG_OK : TG_ACCENT} />

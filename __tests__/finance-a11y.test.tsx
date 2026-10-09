@@ -28,7 +28,7 @@ jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   router: { back: jest.fn(), push: jest.fn(), setParams: jest.fn() },
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), setParams: jest.fn() }),
-  // Стрічка операцій — вкладка «Операції» розділу (типова тепер «Огляд»).
+  // Стрічка операцій — вкладка «Операції» (типова вкладка розділу).
   useLocalSearchParams: () => ({ tab: 'transactions' }),
   usePathname: () => '/explore',
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
@@ -89,20 +89,26 @@ describe('Фінанси: дерево доступності', () => {
     await act(async () => { trees.splice(0).forEach(t => t.unmount()); });
   });
 
-  it('сегмент «Всі / Доходи / Витрати» повідомляє про вибір, а не лише фарбує', async () => {
+  it('тип операцій «Всі / Доходи / Витрати» повідомляє про вибір, а не лише фарбує', async () => {
     const tree = await mountFinance();
 
-    // Над стрічкою є ще смуга вкладок розділу (теж role=tab) — тут лише сегмент стрічки.
-    const feedLabels = [tr.all, tr.incomes, tr.expenses];
-    const tabs = pressables(tree).filter((n: any) => n.props.accessibilityRole === 'tab'
-      && feedLabels.includes(n.props.accessibilityLabel));
-    const labels = tabs.map((n: any) => n.props.accessibilityLabel);
+    // Перемикач переїхав із рядка заголовка стрічки у фільтр-чип ряду періоду
+    // (аудит 2026-10: «три ряди контролів»). На телефоні — в аркуші фільтра.
+    // На планшеті (ширина тестового вікна) він стоїть у ряду одразу.
+    const chip = pressables(tree).find((n: any) => n.props.accessibilityLabel === tr.finFilterButton);
+    if (chip) await act(async () => { chip.props.onPress(); });
+
+    const group = tree.root.findAll((n: any) => n.props?.accessibilityRole === 'radiogroup'
+      && n.props?.accessibilityLabel === tr.finTxTypeLabel)[0];
+    expect(group).toBeTruthy();
+    const radios = group.findAll((n: any) => typeof n.props?.onPress === 'function' && n.props.accessibilityRole === 'radio');
+    const labels = radios.map((n: any) => n.props.accessibilityLabel);
     expect(labels).toEqual(expect.arrayContaining([tr.all, tr.incomes, tr.expenses]));
 
     // Вибраний рівно один — і це «Всі» за замовчуванням. Рахуємо за
     // підписами: findAll віддає і композит, і його host-вузол з тими ж пропсами.
     const selected = [...new Set(
-      tabs.filter((n: any) => n.props.accessibilityState?.selected)
+      radios.filter((n: any) => n.props.accessibilityState?.selected)
         .map((n: any) => n.props.accessibilityLabel),
     )];
     expect(selected).toEqual([tr.all]);

@@ -41,6 +41,12 @@ interface ToastData {
 interface UndoToastApi {
   show: (message: string, onUndo?: () => void) => void;
   element: React.ReactElement;
+  /**
+   * Тост зараз на екрані. Екрани з FAB ховають кнопку, поки він показаний:
+   * тост стоїть над таб-баром рівно там, де «+», і кнопка стирчала поверх
+   * нього (P2 аудиту 2026-10).
+   */
+  visible: boolean;
 }
 
 /**
@@ -144,7 +150,7 @@ export function useUndoToast(isTab = true): UndoToastApi {
     </Animated.View>
   ) : <></>;
 
-  return { show, element };
+  return { show, element, visible: toastData !== null };
 }
 
 const st = StyleSheet.create({

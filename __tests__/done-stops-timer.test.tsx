@@ -16,6 +16,14 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   multiGet: jest.fn(async (keys: string[]) => keys.map(k => [k, mockStore.get(k) ?? null])),
 }));
 jest.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
+// Ширина екрана «Сьогодні»: null — справжня (jest-вікно 750pt, тобто планшет
+// з masonry-колонками). Тест порядку секцій бере телефон: там одна колонка,
+// і порядок у дереві = порядок правила власника.
+let mockScreenWidth: number | null = null;
+jest.mock('@/hooks/use-responsive', () => {
+  const actual = jest.requireActual('@/hooks/use-responsive');
+  return { ...actual, useScreenWidth: (...args: unknown[]) => mockScreenWidth ?? actual.useScreenWidth(...args) };
+});
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: 'SafeAreaView',
@@ -100,11 +108,14 @@ async function openProjectTasks() {
   return tree;
 }
 
+/** Чекбокс рядка проєкту підписаний дією (P2): «Позначити виконаним: <назва>». */
+const ROW_CHECK = `Позначити виконаним: ${TASK.title}`;
+
 const checkbox = (nodes: any[]) => nodes.find(n => n.props.accessibilityRole === 'checkbox') ?? nodes[0];
 
 test('простір проєкту → Завдання: active → done зупиняє таймер після запису статусу', async () => {
   const tree = await openProjectTasks();
-  await pressByLabel(tree, TASK.title, checkbox);
+  await pressByLabel(tree, ROW_CHECK, checkbox);
   await flush();
 
   expect(JSON.parse(mockStore.get('tasks')!)[0].status).toBe('done');
@@ -114,9 +125,9 @@ test('простір проєкту → Завдання: active → done зуп
 
 test('простір проєкту → Завдання: завершене зникає з активної дошки', async () => {
   const tree = await openProjectTasks();
-  await pressByLabel(tree, TASK.title, checkbox);
+  await pressByLabel(tree, ROW_CHECK, checkbox);
   await flush();
-  expect(tree.root.findAll((n: any)=>n.props?.accessibilityLabel===TASK.title && typeof n.props.onPress==='function')).toHaveLength(0);
+  expect(tree.root.findAll((n: any)=>n.props?.accessibilityLabel===ROW_CHECK && typeof n.props.onPress==='function')).toHaveLength(0);
   expect(JSON.parse(mockStore.get('tasks')!)[0].status).toBe('done');
   expect(mockStopTimerForTask).toHaveBeenCalledTimes(1);
 });
@@ -158,5 +169,31 @@ describe('вкладка «Сьогодні»', () => {
 
     await act(async () => { row[0].props.onPress(); });
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/', params: { meeting: 'm1', meetingDate: TODAY } });
+  });
+
+  // Правило власника (CLAUDE.md → «Правила екранів»): здоров'я + швидкі
+  // кнопки → фінанси → звички → завдання → зустрічі (→ оплати).
+  test('секції йдуть у порядку правила власника', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const uk = require('@/store/translations').allTranslations.uk;
+    const DAILY = {
+      id: 'm1', title: 'Стендап', date: '2026-01-05', time: '23:58', durationMinutes: 1,
+      color: '#6366F1', recurrence: { freq: 'daily', interval: 1 },
+    };
+    const HABIT = { id: 'h1', title: 'Вода', color: '#10B981', log: [], createdAt: NOW };
+    mockScreenWidth = 390;
+    const tree = await mountToday({
+      tasks: [{ ...TASK, projectId: undefined, deadline: TODAY }],
+      meetings: [DAILY],
+      health_habits: [HABIT],
+    });
+    const texts: string[] = tree.root
+      .findAll((n: any) => n.type === 'Text' && typeof n.props.children === 'string')
+      .map((n: any) => n.props.children);
+    const order = [uk.tabHealth, uk.quickAddTask, uk.tabFinance, uk.todayHabits, uk.todayTasks, uk.todayMeetings]
+      .map(label => texts.indexOf(label));
+    order.forEach(i => expect(i).toBeGreaterThan(-1));
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    mockScreenWidth = null;
   });
 });

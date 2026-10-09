@@ -12,7 +12,7 @@ describe('healthTheme', () => {
     const light = getHealthColors(false);
     expect(dark.bg1).toBe('#0C0C14');
     expect(light.bg1).toBe('#F4F2FF');
-    for (const k of ['bg1', 'bg2', 'border', 'text', 'sub', 'dim', 'sheet', 'track'] as const) {
+    for (const k of ['bg1', 'bg2', 'border', 'text', 'sub', 'dim', 'sheet', 'track', 'card'] as const) {
       expect(typeof dark[k]).toBe('string');
       expect(typeof light[k]).toBe('string');
     }

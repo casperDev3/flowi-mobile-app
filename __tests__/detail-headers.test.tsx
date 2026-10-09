@@ -11,7 +11,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 import React from 'react';
-import { ScrollView, Text } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
 
 import { MeetingDetailBody, MeetingDetailHeader, meetingDayLabel } from '@/components/meetings/MeetingDetail';
 import { DetailPane } from '@/components/shared/DetailPane';
@@ -70,26 +70,45 @@ describe('DetailPane header', () => {
 
 describe('TaskDetailHeader', () => {
   const base = {
-    title: 'Задача', tab: 'info' as const, onTabChange: () => {}, timerRunning: false,
-    onEdit: jest.fn(), onClose: jest.fn(), showHandle: false, colors: COLORS, tr,
+    title: 'Задача', tab: 'main' as const, onTabChange: jest.fn(), timerRunning: false,
+    onClose: jest.fn(), showHandle: false, colors: COLORS, tr,
   };
   const texts = (tree: any) => tree.root.findAllByType(Text).map((n: any) => n.props.children).flat();
+  // Лише самі TouchableOpacity: їхні хост-вузли несуть ті самі пропси.
+  const tabs = (tree: any) => tree.root
+    .findAll((n: any) => n.type === TouchableOpacity && n.props.accessibilityRole === 'tab');
 
-  test('перегляд: назва, ✎, ✕ і три вкладки', () => {
+  test('особиста задача: назва, ✕ і три вкладки (без «Команди»)', () => {
     let tree: any;
-    act(() => { tree = create(<TaskDetailHeader {...base} editing={false} />); });
-    expect(texts(tree)).toEqual(expect.arrayContaining(['Задача', tr.details, tr.tracker, tr.history]));
-    expect(tree.root.findAll((n: any) => n.props.accessibilityLabel === tr.edit && n.props.onPress).length).toBeGreaterThan(0);
+    act(() => { tree = create(<TaskDetailHeader {...base} />); });
+    expect(texts(tree)).toContain('Задача');
+    expect(tabs(tree)).toHaveLength(3);
     expect(tree.root.findAll((n: any) => n.props.accessibilityLabel === tr.close && n.props.onPress).length).toBeGreaterThan(0);
   });
 
-  test('редагування: «Редагувати завдання», без ✎ і вкладок', () => {
+  test('задача командного проєкту: чотири вкладки', () => {
     let tree: any;
-    act(() => { tree = create(<TaskDetailHeader {...base} editing />); });
-    const t = texts(tree);
-    expect(t).toContain(tr.editTask);
-    expect(t).not.toContain(tr.details);
-    expect(tree.root.findAll((n: any) => n.props.accessibilityLabel === tr.edit && n.props.onPress)).toHaveLength(0);
+    act(() => { tree = create(<TaskDetailHeader {...base} showTeam />); });
+    expect(tabs(tree)).toHaveLength(4);
+  });
+
+  test('перейменування на місці: тап по назві → поле, зміна пишеться один раз', () => {
+    const onRename = jest.fn();
+    let tree: any;
+    act(() => { tree = create(<TaskDetailHeader {...base} onRename={onRename} />); });
+    const title = tree.root.findAll((n: any) => n.props.accessibilityLabel === 'Задача' && typeof n.props.onPress === 'function')[0];
+    act(() => { title.props.onPress(); });
+    const input = tree.root.findByType(TextInput);
+    act(() => { input.props.onChangeText('Нова назва'); });
+    act(() => { tree.root.findByType(TextInput).props.onSubmitEditing(); });
+    expect(onRename).toHaveBeenCalledTimes(1);
+    expect(onRename).toHaveBeenCalledWith('Нова назва');
+  });
+
+  test('без onRename (глядач) назва не натискається', () => {
+    let tree: any;
+    act(() => { tree = create(<TaskDetailHeader {...base} />); });
+    expect(tree.root.findAll((n: any) => n.props.accessibilityLabel === 'Задача' && typeof n.props.onPress === 'function')).toHaveLength(0);
   });
 });
 

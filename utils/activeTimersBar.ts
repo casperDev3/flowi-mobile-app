@@ -62,3 +62,22 @@ export function primaryTimer(timers: readonly ActiveTimer[]): ActiveTimer | unde
   if (timers.length === 0) return undefined;
   return sortTimers([...timers])[0];
 }
+
+/** Особистий Трекер часу. */
+export const PERSONAL_TIME_ROUTE = '/(tabs)/time';
+
+/**
+ * Куди веде «Трекер часу» з картки активних таймерів. У сайдбарі проєкту
+ * (`contextProjectId`) — на екран часу САМОГО проєкту, якщо всі показані
+ * таймери належать йому (`timerProjectIds` — id проєкту кожного таймера,
+ * undefined — особистий/невідомий); інакше — особистий трекер.
+ */
+export function timerTrackerRoute(
+  contextProjectId: string | null | undefined,
+  timerProjectIds: readonly (string | null | undefined)[],
+): string {
+  if (!contextProjectId || !timerProjectIds.length) return PERSONAL_TIME_ROUTE;
+  return timerProjectIds.every(id => id === contextProjectId)
+    ? `/project/${encodeURIComponent(contextProjectId)}/time`
+    : PERSONAL_TIME_ROUTE;
+}

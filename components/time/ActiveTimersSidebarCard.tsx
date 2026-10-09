@@ -10,6 +10,9 @@ import { Atlas } from '@/constants/atlas';
  *     в картці (не модалкою: сайдбар і так поруч, а модалка над планшетом
  *     закрила б те, заради чого таймер зупиняють), а під ним в один рядок —
  *     «Трекер часу» і «Зосередження», як в аркуші на телефоні.
+ *
+ * У сайдбарі проєкту (`projectId`) «Трекер часу» веде на екран часу ЦЬОГО
+ * проєкту, коли таймер належить йому (timerTrackerRoute), а не в особистий.
  */
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -29,7 +32,8 @@ import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useI18n } from '@/store/i18n';
 import { useTimerContext } from '@/store/timer-context';
-import { primaryTimer, timerKind, timersCountLabel } from '@/utils/activeTimersBar';
+import { primaryTimer, timerKind, timersCountLabel, timerTrackerRoute } from '@/utils/activeTimersBar';
+import type { TimerProject } from '@/utils/activeTimers';
 import { formatClock } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
 import { elapsedSince } from '@/utils/taskTimer';
@@ -42,7 +46,13 @@ export interface SidebarCardColors {
   activeBg: string;
 }
 
-export function ActiveTimersSidebarCard({ colors: c }: { colors: SidebarCardColors }) {
+const projectIdOf = (p: TimerProject) => (p.kind === 'personal' ? undefined : p.id);
+
+export function ActiveTimersSidebarCard({ colors: c, projectId }: {
+  colors: SidebarCardColors;
+  /** Сайдбар простору проєкту — «Трекер часу» його таймерів веде в час проєкту. */
+  projectId?: string;
+}) {
   const router = useRouter();
   const { tr, lang } = useI18n();
   const { activeTimers } = useTimerContext();
@@ -69,6 +79,10 @@ export function ActiveTimersSidebarCard({ colors: c }: { colors: SidebarCardColo
   const single = count === 1;
   const primaryLabel = primary.label?.trim() || timerKindLabel(timerKind(primary), tr);
   const rowColors = { text: c.text, sub: c.sub, border: c.border, accent: c.accent };
+  const trackerRoute = timerTrackerRoute(
+    projectId,
+    single ? [projectIdOf(projectOf(primary))] : activeTimers.map(t => projectIdOf(projectOf(t))),
+  );
 
   return (
     <View style={[st.card, { borderColor: c.border, backgroundColor: c.activeBg }]}>
@@ -76,7 +90,7 @@ export function ActiveTimersSidebarCard({ colors: c }: { colors: SidebarCardColo
         <Pressable
           onPress={() => {
             haptic.light();
-            if (single) router.push('/(tabs)/time' as never);
+            if (single) router.push(trackerRoute as never);
             else setExpanded(v => !v);
           }}
           accessibilityRole="button"
@@ -140,7 +154,7 @@ export function ActiveTimersSidebarCard({ colors: c }: { colors: SidebarCardColo
       {!single && expanded && (
         <View style={st.actions}>
           <Pressable
-            onPress={() => router.push('/(tabs)/time' as never)}
+            onPress={() => router.push(trackerRoute as never)}
             accessibilityRole="button"
             style={[st.action, { borderColor: c.border }]}>
             <IconSymbol name="timer" size={13} color={c.accent} />

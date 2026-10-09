@@ -42,6 +42,7 @@ import { Text } from 'react-native';
 
 import { SheetModal } from '@/components/shared/SheetModal';
 import { CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
+import { Layout, type SheetPresentation } from '@/constants/tokens';
 
 // Уникаємо TS7016 (відсутні @types/react-test-renderer — відома базова помилка)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -54,11 +55,11 @@ function flat(style: any): any {
 
 const trees: any[] = [];
 
-function open(onClose = jest.fn()) {
+function open(onClose = jest.fn(), presentation?: SheetPresentation) {
   let tree: any;
   act(() => {
     tree = create(
-      <SheetModal visible onClose={onClose}>
+      <SheetModal visible onClose={onClose} presentation={presentation}>
         <Text>вміст</Text>
       </SheetModal>,
     );
@@ -67,11 +68,11 @@ function open(onClose = jest.fn()) {
   return tree;
 }
 
-/** Аркуш — єдиний вузол, який несе transform: translateY. */
-function sheetStyle(tree: any) {
+/** Аркуш — єдиний вузол, який несе transform: translateY (або translateX у панелі). */
+function sheetStyle(tree: any, axis: 'translateY' | 'translateX' = 'translateY') {
   const node = tree.root.findAll((n: any) => {
     const st = flat(n.props?.style);
-    return Array.isArray(st.transform) && 'translateY' in (st.transform[0] ?? {});
+    return Array.isArray(st.transform) && axis in (st.transform[0] ?? {});
   })[0];
   return flat(node.props.style);
 }
@@ -85,10 +86,10 @@ describe('SheetModal — ширина аркуша', () => {
     WINDOW.height = 844;
   });
 
-  it('на планшеті в ландшафті — центрована колонка зі стелею', () => {
+  it('на планшеті presentation="sheet" — центрована колонка зі стелею', () => {
     WINDOW.width = 1194;
     WINDOW.height = 834;
-    const st = sheetStyle(open());
+    const st = sheetStyle(open(jest.fn(), 'sheet'));
     expect(st.maxWidth).toBe(CONTENT_MAX_WIDTH);
     expect(st.alignSelf).toBe('center');
     expect(st.width).toBe('100%');
@@ -105,14 +106,14 @@ describe('SheetModal — ширина аркуша', () => {
     // Порядок важливий: статичні стилі попереду, інакше вони затерли б
     // translateY і аркуш не з'їжджав би вниз.
     WINDOW.width = 1194;
-    const st = sheetStyle(open());
+    const st = sheetStyle(open(jest.fn(), 'sheet'));
     expect(st.transform[0].translateY).toBeDefined();
     expect(st.maxWidth).toBe(CONTENT_MAX_WIDTH);
   });
 
   it('контейнер аркуша не центрує вміст сам — інакше телефон би стиснуло', () => {
     WINDOW.width = 1194;
-    const tree = open();
+    const tree = open(jest.fn(), 'sheet');
     const outer = tree.root.findAll((n: any) => {
       const st = flat(n.props?.style);
       return st.flex === 1 && st.justifyContent === 'flex-end';
@@ -149,6 +150,77 @@ describe('SheetModal — ширина аркуша', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('SheetModal — діалог і бокова панель на широкому вікні', () => {
+  afterEach(() => {
+    act(() => { while (trees.length) trees.pop().unmount(); });
+    WINDOW.width = 390;
+    WINDOW.height = 844;
+  });
+
+  it('за замовчуванням на планшеті — центрований діалог', () => {
+    WINDOW.width = 1194;
+    WINDOW.height = 834;
+    const tree = open();
+    const st = sheetStyle(tree);
+    expect(st.maxWidth).toBe(Layout.dialogMaxWidth);
+    expect(st.alignSelf).toBe('center');
+    const outer = tree.root.findAll((n: any) => {
+      const s2 = flat(n.props?.style);
+      return s2.flex === 1 && s2.justifyContent === 'center';
+    })[0];
+    expect(outer).toBeDefined();
+  });
+
+  it('за замовчуванням на телефоні — і далі bottom-sheet', () => {
+    const tree = open();
+    const st = sheetStyle(tree);
+    expect(st.maxWidth).toBeUndefined();
+    const outer = tree.root.findAll((n: any) => {
+      const s2 = flat(n.props?.style);
+      return s2.flex === 1 && s2.justifyContent === 'flex-end' && s2.flexDirection === undefined;
+    })[0];
+    expect(outer).toBeDefined();
+  });
+
+  it('presentation="side" — панель праворуч, їде по X', () => {
+    WINDOW.width = 1194;
+    WINDOW.height = 834;
+    const st = sheetStyle(open(jest.fn(), 'side'), 'translateX');
+    expect(st.width).toBe(Layout.sidePanelWidth);
+    expect(st.alignSelf).toBe('flex-end');
+  });
+
+  it('presentation="side" на телефоні — звичайний аркуш', () => {
+    const st = sheetStyle(open(jest.fn(), 'side'));
+    expect(st.width).toBe('100%');
+  });
+
+  it('на планшеті ✕ має суцільну підкладку (видно на бекдропі)', () => {
+    WINDOW.width = 1194;
+    WINDOW.height = 834;
+    const tree = open();
+    const btn = tree.root.findAll((n: any) => n.props?.testID === 'sheet-close')[0];
+    const st = flat(btn.props.style);
+    expect(st.backgroundColor).toBeDefined();
+    expect(st.borderRadius).toBeGreaterThan(0);
+  });
+
+  it('на телефоні ✕ без підкладки, як і раніше', () => {
+    const tree = open();
+    const btn = tree.root.findAll((n: any) => n.props?.testID === 'sheet-close')[0];
+    expect(flat(btn.props.style).backgroundColor).toBeUndefined();
+  });
+
+  it('хрестик «Закрити» є в діалозі', () => {
+    WINDOW.width = 1194;
+    const tree = open();
+    const close = tree.root.findAll(
+      (n: any) => n.props?.accessibilityRole === 'button' && n.props?.accessibilityLabel === 'Закрити',
+    );
+    expect(close.length).toBeGreaterThan(0);
   });
 });
 
@@ -206,5 +278,34 @@ describe('SheetModal — доступність аркуша', () => {
     )[0];
     expect(close).toBeDefined();
     expect(close.props.accessible).not.toBe(false);
+  });
+});
+
+describe('SheetModal — екран втратив фокус', () => {
+  it('blur екрана (диплінк на інший маршрут) одразу закриває аркуш', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { NavigationContext } = require('@react-navigation/native');
+    const listeners: Record<string, () => void> = {};
+    const nav = {
+      addListener: jest.fn((ev: string, cb: () => void) => {
+        listeners[ev] = cb;
+        return () => { delete listeners[ev]; };
+      }),
+    };
+    const onClose = jest.fn();
+    let tree: any;
+    act(() => {
+      tree = create(
+        <NavigationContext.Provider value={nav}>
+          <SheetModal visible onClose={onClose}>
+            <Text>вміст</Text>
+          </SheetModal>
+        </NavigationContext.Provider>,
+      );
+    });
+    expect(listeners.blur).toBeDefined();
+    act(() => { listeners.blur(); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    act(() => { tree.unmount(); });
   });
 });

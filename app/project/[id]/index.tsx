@@ -2,11 +2,12 @@ import {useEffect} from 'react';
 import {ActivityIndicator,View} from 'react-native';
 import {useLocalSearchParams,useRouter} from 'expo-router';
 import {useAuth} from '@/store/auth';
+import {useI18n} from '@/store/i18n';
 import {loadData} from '@/store/storage';
 import {isLead,type TeamPreferences,type TeamRole} from '@/utils/teamwork';
 
 export default function ProjectEntry() {
-  const {id}=useLocalSearchParams<{id:string}>(),router=useRouter(),{user}=useAuth();
+  const {id}=useLocalSearchParams<{id:string}>(),router=useRouter(),{user}=useAuth(),{tr}=useI18n();
   useEffect(()=>{
     let active=true;
     // Read membership before choosing a landing page: the role hook's owner
@@ -23,5 +24,5 @@ export default function ProjectEntry() {
     });
     return()=>{active=false;};
   },[id,user?.id,router]);
-  return <View style={{flex:1,justifyContent:'center'}}><ActivityIndicator accessibilityLabel="Відкриваємо проєкт"/></View>;
+  return <View style={{flex:1,justifyContent:'center'}}><ActivityIndicator accessibilityLabel={tr.projectOpeningA11y}/></View>;
 }

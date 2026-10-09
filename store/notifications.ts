@@ -675,7 +675,7 @@ export function syncSubscriptionReminders(
 export async function rescheduleSubscriptionRemindersFromStorage(
   tr: Pick<Translations,
     'subNotifBeforeTitle' | 'subNotifBeforeBody' | 'subNotifDueTitle' | 'subNotifDueBody'
-    | 'subNotifOverdueTitle' | 'subNotifOverdueBody' | 'subNotifEndTitle' | 'subNotifEndBody'>,
+    | 'subNotifOverdueTitle' | 'subNotifOverdueBodyPay' | 'subNotifEndTitle' | 'subNotifEndBody'>,
   lang: string,
   opts: { requestPermission?: boolean } = {},
 ): Promise<void> {
@@ -692,7 +692,7 @@ export async function rescheduleSubscriptionRemindersFromStorage(
       dueTitle: tr.subNotifDueTitle,
       dueBody: tr.subNotifDueBody,
       overdueTitle: tr.subNotifOverdueTitle,
-      overdueBody: tr.subNotifOverdueBody,
+      overdueBody: tr.subNotifOverdueBodyPay,
       endTitle: tr.subNotifEndTitle,
       endBody: tr.subNotifEndBody,
     },

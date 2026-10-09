@@ -1606,6 +1606,126 @@ export interface Translations {
   statusTypeInProgress: string;
   statusTypeDone: string;
   projectExitToPersonal: string;
+  twInviteHint: string;
+  twInvite: string;
+  twSkipInvite: string;
+  twMilestones: string;
+  twMilestoneTitle: string;
+  twMilestoneDate: string;
+  twMilestoneTasks: string;
+  twAddMilestone: string;
+  twNoDeadline: string;
+  twNoTasks: string;
+  twSaveAvailability: string;
+  projectOpeningA11y: string;
+  projectReassignTitle: string;
+  projectLeaveUnassigned: string;
+  twTeamProgress: string;
+  twCounts: string;
+  twQueueReviews: string;
+  twQueueBlockers: string;
+  twQueueAssigned: string;
+  twQueueAvailable: string;
+  twAllActive: string;
+  twWorkloadHint: string;
+  twMyAvailability: string;
+  twActiveCount: string;
+  twAvgTime: string;
+  twForecast: string;
+  twMinutesShort: string;
+  twHoursShort: string;
+  twMemberAvailability: string;
+  twSaveMemberAvailability: string;
+  projectBackToProjects: string;
+  projectBackToProjectsA11y: string;
+  projectSidebarCollapse: string;
+  projectSidebarExpand: string;
+  projectNavGroupTasks: string;
+  projectNavGroupWork: string;
+  projectNavGroupTeam: string;
+  projectSwitchProjectA11y: string;
+  projectThemeToLight: string;
+  projectThemeToDark: string;
+  sprintArchive: string;
+  sprintUnarchive: string;
+  sprintArchivedBadge: string;
+  sprintArchiveHint: string;
+  sprintShowArchived: string;
+  sprintArchivedCount: string;
+  sprintListMenu: string;
+  sprintSortStartDesc: string;
+  sprintSortStartAsc: string;
+  sprintSortName: string;
+  sprintSortProgress: string;
+  sprintStatusFilterA11y: string;
+  sprintStatusAll: string;
+  sprintStatusPlanned: string;
+  sprintStatusActive: string;
+  sprintStatusCompleted: string;
+  sprintExpandAll: string;
+  sprintCollapseAll: string;
+  sprintNoMatch: string;
+  sprintResetFilters: string;
+  pbSection: string;
+  pbIdeas: string;
+  pbBugs: string;
+  pbIdea: string;
+  pbBug: string;
+  pbSearch: string;
+  pbAssignedToMe: string;
+  pbSprint: string;
+  pbAllSprints: string;
+  pbNoSprint: string;
+  pbAssignee: string;
+  pbAll: string;
+  pbUnassigned: string;
+  pbPriority: string;
+  pbNoPriority: string;
+  pbSort: string;
+  pbNewest: string;
+  pbOldest: string;
+  pbName: string;
+  pbDoneFrom: string;
+  pbDoneTo: string;
+  pbResetFilters: string;
+  pbNewIdea: string;
+  pbNewBug: string;
+  pbMoveToSprint: string;
+  pbToTask: string;
+  pbStartWork: string;
+  pbEmpty: string;
+  pbIdeaTitle: string;
+  pbBugTitle: string;
+  pbIdeaBody: string;
+  pbBugBody: string;
+  pbBugSteps: string;
+  pbBugExpected: string;
+  pbBugActual: string;
+  pbSeverity: string;
+  pbSeverityLow: string;
+  pbSeverityNormal: string;
+  pbSeverityHigh: string;
+  pbSeverityCritical: string;
+  pbStepsPrefix: string;
+  pbExpectedPrefix: string;
+  pbActualPrefix: string;
+  pbFilters: string;
+  pdSearch: string;
+  pdAll: string;
+  pdTopics: string;
+  pdChats: string;
+  pdArchive: string;
+  pdTopic: string;
+  pdChat: string;
+  pdNew: string;
+  pdEdit: string;
+  pdArchiveAction: string;
+  pdRestore: string;
+  pdCreateTask: string;
+  pdLinkedTasks: string;
+  pdTitle: string;
+  pdBody: string;
+  pdTaskFallback: string;
   projectSwitcherTitle: string;
   projectSwitcherRecent: string;
   projectSwitcherAll: string;
@@ -2383,6 +2503,304 @@ export interface Translations {
   tlHealthDeleteEntryMsg: string;
   tlTrainingStreakTitle: string;
   tlTrainingStreakBody: string;
+  // invite-clients
+  roleManager: string;
+  inviteAccept: string;
+  inviteDecline: string;
+  inviteDeclineConfirmTitle: string;
+  inviteDeclineConfirmMsg: string;
+  inviteAcceptedShort: string;
+  inviteDeclinedShort: string;
+  inviteForEmail: string;
+  inviteUnavailableTitle: string;
+  inviteInvalidTitle: string;
+  inviteWrongAccountTitle: string;
+  inviteWrongAccount: string;
+  inviteReasonExpired: string;
+  inviteReasonUsedUp: string;
+  inviteReasonRevoked: string;
+  inviteReasonCancelled: string;
+  inviteReasonAccepted: string;
+  inviteReasonDeclined: string;
+  inviteReasonProjectDeleted: string;
+  invitesTitle: string;
+  invitesLoadError: string;
+  invitesEmptyTitle: string;
+  invitesEmptySub: string;
+  projectMembersEmailInvalid: string;
+  projectMembersInviteAlreadyPending: string;
+  projectMembersInviteNotified: string;
+  projectMembersInvitePendingCreated: string;
+  projectMembersInviteNoAccount: string;
+  projectMembersInviteEmailSent: string;
+  projectMembersInviteEmailFailed: string;
+  projectMembersInviteEmailNotConfigured: string;
+  projectMembersInviteEmailHint: string;
+  projectMembersInviteEmailHintNoSmtp: string;
+  projectMembersPendingSection: string;
+  projectMembersInviteSentAt: string;
+  projectMembersInviteExpiredShort: string;
+  projectMembersInviteNoAccountShort: string;
+  projectMembersInviteResend: string;
+  projectMembersInviteResent: string;
+  projectMembersInviteResendTooSoon: string;
+  projectMembersInviteNotPending: string;
+  projectMembersInviteCancel: string;
+  projectMembersInviteCancelConfirm: string;
+  // m-calendar
+  calViewMonth: string;
+  calViewWeek: string;
+  calViewDay: string;
+  calPrevPeriod: string;
+  calNextPeriod: string;
+  calFilterAll: string;
+  calFilterPersonal: string;
+  calFilterDone: string;
+  calFilterMine: string;
+  calAllDay: string;
+  calMore: string;
+  calCreateAt: string;
+  calCreateTitle: string;
+  calCreateMeeting: string;
+  calCreateMeetingHint: string;
+  calCreateTask: string;
+  calCreateTaskHint: string;
+  calAddToDay: string;
+  calNothingPlanned: string;
+  calNothingPlannedHint: string;
+  calSectionSprints: string;
+  calSectionDeadlines: string;
+  calSectionMeetings: string;
+  calSprintA11y: string;
+  calA11yTask: string;
+  calA11yTasks: string;
+  calA11yMeetings: string;
+  calA11ySprints: string;
+  calRecordAudio: string;
+  calUndatedSprints: string;
+  calUndatedSprintsHint: string;
+  calDeleteMeetingTitle: string;
+  calDeleteMeetingBody: string;
+  // calendar: recording + Google Calendar (moved from meetings)
+  calRecPkgTitle: string;
+  calRecPkgBody: string;
+  calRecNoPermTitle: string;
+  calRecNoPermBody: string;
+  calRecErrorTitle: string;
+  calRecDeleteTitle: string;
+  calRecRecording: string;
+  calRecAudio: string;
+  calRecStop: string;
+  calRecStart: string;
+  gcalAuthTitle: string;
+  gcalAuthBody: string;
+  gcalSyncErrorTitle: string;
+  gcalTryLater: string;
+  gcalOfflineTitle: string;
+  gcalOfflineBody: string;
+  gcalConnectErrorTitle: string;
+  gcalTryAgain: string;
+  gcalDisconnectTitle: string;
+  gcalDisconnectBody: string;
+  gcalDisconnect: string;
+  gcalConnected: string;
+  gcalClientIdSet: string;
+  gcalSetup: string;
+  gcalStep1: string;
+  gcalStep2: string;
+  gcalStep3: string;
+  gcalStep4: string;
+  gcalSaveClientId: string;
+  gcalConnectHint: string;
+  gcalConnectGoogle: string;
+  gcalChangeClientId: string;
+  gcalLastSync: string;
+  gcalNewCount: string;
+  gcalSyncNow: string;
+  // m-card
+  cardTabMain: string;
+  cardTabDetails: string;
+  cardTabTeam: string;
+  cardTabActivity: string;
+  cardRenameHint: string;
+  cardDescPlaceholder: string;
+  cardNotSet: string;
+  cardDone: string;
+  cardSelectedCount: string;
+  cardClearDate: string;
+  cardPriorityHint: string;
+  cardHourShort: string;
+  cardMinShort: string;
+  cardStartDate: string;
+  cardCreated: string;
+  cardRepeat: string;
+  cardRepeatNone: string;
+  cardRepeatOff: string;
+  cardRepeatDaily: string;
+  cardRepeatWeekly: string;
+  cardRepeatMonthly: string;
+  cardRepeatYearly: string;
+  cardRepeatEvery: string;
+  cardRepeatEnds: string;
+  cardRepeatNever: string;
+  cardRepeatUntil: string;
+  cardRepeatNeedsDeadline: string;
+  cardUnitDays: string;
+  cardUnitWeeks: string;
+  cardUnitMonths: string;
+  cardUnitYears: string;
+  cardQuickPlaceholder: string;
+  cardTitleRequired: string;
+  cardMore: string;
+  cardMoreHint: string;
+  cardTeamResponsibility: string;
+  cardTeamReview: string;
+  cardTeamReviewRequired: string;
+  cardTeamReviewer: string;
+  cardTeamObstacles: string;
+  cardTeamBlocked: string;
+  cardTeamBlockReason: string;
+  cardTeamBlockedBy: string;
+  cardTeamDependencies: string;
+  cardTeamDepWarn: string;
+  cardTeamResult: string;
+  cardTeamRequiredResult: string;
+  cardTeamReqSummary: string;
+  cardTeamReqLink: string;
+  cardTeamReqFile: string;
+  cardTeamResultSummary: string;
+  cardTeamResultLinks: string;
+  cardTeamTake: string;
+  cardTeamStart: string;
+  cardTeamSubmitReview: string;
+  cardTeamComplete: string;
+  cardTeamRecall: string;
+  cardTeamApprove: string;
+  cardTeamReturn: string;
+  cardTeamReopen: string;
+  cardTeamFeedback: string;
+  cardTeamPending: string;
+  cardTeamApproved: string;
+  cardTeamChangesRequested: string;
+  cardTeamRemarks: string;
+  cardTeamErrBlockReason: string;
+  cardTeamErrFeedback: string;
+  cardTeamLoadUnknown: string;
+  cardTeamLoadLeft: string;
+  cardTeamOverload: string;
+  // m-scaffold
+  navSidebarExpand: string;
+  navSidebarCollapse: string;
+  // m-screens-b
+  discussionsSelectHint: string;
+  // m-tasks
+  tasksOpenCalendarHint: string;
+  projectNoTasksInGroup: string;
+  todayPaneActivity: string;
+  todayPaneTracked: string;
+  todayPaneNoTracked: string;
+  todayPaneNow: string;
+  todayPaneMeetings: string;
+  todayPaneNoMeetings: string;
+  todayPaneOpenCalendar: string;
+  // time
+  timeStartTimerTitle: string;
+  timeStartTimerSearch: string;
+  timeStartTimerA11y: string;
+  timeStartTimerNothingFound: string;
+  timeStartTimerNoTasks: string;
+  timeStartTimerMore: string;
+  timeStartTimerMeetingHint: string;
+  timeStartTimerFailed: string;
+  timeNothingRunning: string;
+  timeMoreFilters: string;
+  // ── area: m-finance ──
+  finTabMore: string;
+  finMoreSections: string;
+  finTodayDue: string;
+  finShowOperations: string;
+  finAccountFilterChip: string;
+  finPeriodFlow: string;
+  finBalances: string;
+  finOpenAccounts: string;
+  // ── end area: m-finance ──
+  // ── area: m-calendar ──
+  calSearch: string;
+  calSearchPlaceholder: string;
+  calSearchHint: string;
+  calSearchEmpty: string;
+  calSearchClear: string;
+  calSearchUpcoming: string;
+  calSearchPast: string;
+  calJoin: string;
+  calProjectAdd: string;
+  // ── end area: m-calendar ──
+  // ── area: m-tasks ──
+  taskToggleDoneA11y: string;
+  subtaskMoveUp: string;
+  subtaskMoveDown: string;
+  subtaskRemoveReminder: string;
+  taskWatch: string;
+  taskUnwatch: string;
+  taskCardDiscussions: string;
+  taskMovedToProject: string;
+  projectViewList: string;
+  projectViewBoard: string;
+  projectTasksMine: string;
+  projectTasksMenu: string;
+  projectTasksSearch: string;
+  projectBoardShowAll: string;
+  projectHomePage: string;
+  projectHomeMyWork: string;
+  projectHomeOverview: string;
+  projectAllTasks: string;
+  projectWorkMenu: string;
+  // ── end area: m-tasks ──
+  // ── area: m-misc ──
+  inviteAlreadyMemberTitle: string;
+  inviteAlreadyMemberMsg: string;
+  inviteAlreadyMemberRole: string;
+  projectMembersUsesLeftOne: string;
+  projectMembersUsesLeftFew: string;
+  projectMembersUsesLeftMany: string;
+  projectMembersUsedOne: string;
+  projectMembersUsedFew: string;
+  projectMembersUsedMany: string;
+  // ── end area: m-misc ──
+  // ── area: m-audit-p2 ──
+  finTxTypeLabel: string;
+  taskToggleUndoneA11y: string;
+  subPayNow: string;
+  subNotifOverdueBodyPay: string;
+  // ── end area: m-audit-p2 ──
+  // ── area: wf-1007 ──
+  healthTabBodyShort: string;
+  menu: {
+    tabsLabel: string;
+    switchSpace: string;
+    spacesTitle: string;
+    dayDishes: string;
+    dayEmpty: string;
+  };
+  settingsHub: {
+    sectionLookNotify: string;
+    serverTransfer: string;
+    profileGuest: string;
+  };
+  // ── end area: wf-1007 ──
+  // ── area: project-team-ui ──
+  projectAppearance: {
+    title: string; colorA11y: string; hexSuffix: string; spectrumSuffix: string; markLabel: string;
+    lightTheme: string; darkTheme: string; background: string; surface: string; accent: string;
+    reset: string; save: string; invalidColor: string; saved: string;
+  };
+  teamResultFiles: { title: string; open: string; remove: string; add: string; tooBig: string };
+  teamOffline: {
+    pending: string; conflict: string; recordFallback: string;
+    fieldTitle: string; fieldDescription: string; fieldComment: string; fieldResult: string;
+    fieldDeadline: string; fieldPriority: string; rejected: string; rejectedFallback: string;
+  };
+  // ── end area: project-team-ui ──
 }
 
 const uk: Translations = {
@@ -3869,6 +4287,126 @@ const uk: Translations = {
   statusTypeInProgress: 'У процесі',
   statusTypeDone: 'Готово',
   projectExitToPersonal: 'Особисте',
+  twInviteHint: 'Проєкт створено. Запросіть команду або пропустіть цей крок.',
+  twInvite: 'Запросити учасників',
+  twSkipInvite: 'Пропустити',
+  twMilestones: 'Контрольні точки',
+  twMilestoneTitle: 'Назва контрольної точки',
+  twMilestoneDate: 'Дата (РРРР-ММ-ДД)',
+  twMilestoneTasks: 'Завдання контрольної точки',
+  twAddMilestone: 'Додати контрольну точку',
+  twNoDeadline: 'Без строку',
+  twNoTasks: 'Немає завдань',
+  twSaveAvailability: 'Зберегти доступність',
+  projectOpeningA11y: 'Відкриваємо проєкт',
+  projectReassignTitle: 'Кому передати незавершені завдання й перевірки?',
+  projectLeaveUnassigned: 'Залишити непризначеними',
+  twTeamProgress: 'Командний прогрес',
+  twCounts: 'Готово {done}/{total} · На перевірці {pending} · Перешкоди {blocked} · Прострочено {overdue}',
+  twQueueReviews: 'Потрібна моя перевірка',
+  twQueueBlockers: 'Від мене очікується дія',
+  twQueueAssigned: 'Мої завдання',
+  twQueueAvailable: 'Можна взяти в роботу',
+  twAllActive: 'Усі активні завдання',
+  twWorkloadHint: 'Поточний тиждень і прострочена робота. Безстрокові завдання показані окремо.',
+  twMyAvailability: 'Моя доступність, годин на тиждень',
+  twActiveCount: 'Активних завдань: {n}',
+  twAvgTime: 'Середній час: {avg} · Вибірка: {n}',
+  twForecast: 'Прогноз: {value}',
+  twMinutesShort: '{n} хв',
+  twHoursShort: '{n} год',
+  twMemberAvailability: 'Доступність, год/тиждень',
+  twSaveMemberAvailability: 'Зберегти доступність учасника',
+  projectBackToProjects: 'Усі проєкти',
+  projectBackToProjectsA11y: 'Назад до списку проєктів',
+  projectSidebarCollapse: 'Згорнути сайдбар',
+  projectSidebarExpand: 'Розгорнути сайдбар',
+  projectNavGroupTasks: 'Завдання',
+  projectNavGroupWork: 'Робота',
+  projectNavGroupTeam: 'Команда',
+  projectSwitchProjectA11y: 'Проєкт {name}. Змінити проєкт',
+  projectThemeToLight: 'Світла тема',
+  projectThemeToDark: 'Темна тема',
+  sprintArchive: 'Архівувати спринт',
+  sprintUnarchive: 'Повернути з архіву',
+  sprintArchivedBadge: 'Архів',
+  sprintArchiveHint: 'Архівувати можна лише закритий спринт',
+  sprintShowArchived: 'Показати архівні',
+  sprintArchivedCount: 'Архівні · {n}',
+  sprintListMenu: 'Сортування й фільтр спринтів',
+  sprintSortStartDesc: 'Спочатку новіші',
+  sprintSortStartAsc: 'Спочатку старіші',
+  sprintSortName: 'За назвою',
+  sprintSortProgress: 'За статусом і прогресом',
+  sprintStatusFilterA11y: 'Фільтр спринтів за статусом',
+  sprintStatusAll: 'Усі',
+  sprintStatusPlanned: 'Заплановані',
+  sprintStatusActive: 'Активні',
+  sprintStatusCompleted: 'Завершені',
+  sprintExpandAll: 'Розгорнути всі',
+  sprintCollapseAll: 'Згорнути всі',
+  sprintNoMatch: 'Немає спринтів за цим фільтром',
+  sprintResetFilters: 'Скинути фільтр',
+  pbSection: 'Розділ',
+  pbIdeas: 'Ідеї',
+  pbBugs: 'Баги',
+  pbIdea: 'Ідея',
+  pbBug: 'Баг',
+  pbSearch: 'Пошук',
+  pbAssignedToMe: 'Призначені мені',
+  pbSprint: 'Спринт',
+  pbAllSprints: 'Усі спринти',
+  pbNoSprint: 'Без спринта',
+  pbAssignee: 'Виконавець',
+  pbAll: 'Усі',
+  pbUnassigned: 'Не призначено',
+  pbPriority: 'Пріоритет',
+  pbNoPriority: 'Без пріоритету',
+  pbSort: 'Сортування',
+  pbNewest: 'Новіші',
+  pbOldest: 'Старіші',
+  pbName: 'Назва',
+  pbDoneFrom: 'Завершено від (РРРР-ММ-ДД)',
+  pbDoneTo: 'Завершено до (РРРР-ММ-ДД)',
+  pbResetFilters: 'Скинути фільтри',
+  pbNewIdea: 'Нова ідея',
+  pbNewBug: 'Новий баг',
+  pbMoveToSprint: 'Перенести у спринт',
+  pbToTask: 'Перетворити на завдання',
+  pbStartWork: 'В роботу',
+  pbEmpty: 'Немає записів',
+  pbIdeaTitle: 'Назва ідеї',
+  pbBugTitle: 'Назва багу',
+  pbIdeaBody: 'Ідея та очікувана користь',
+  pbBugBody: 'Опис проблеми',
+  pbBugSteps: 'Кроки відтворення',
+  pbBugExpected: 'Очікуваний результат',
+  pbBugActual: 'Фактичний результат',
+  pbSeverity: 'Важливість',
+  pbSeverityLow: 'Низька',
+  pbSeverityNormal: 'Звичайна',
+  pbSeverityHigh: 'Висока',
+  pbSeverityCritical: 'Критична',
+  pbStepsPrefix: 'Кроки',
+  pbExpectedPrefix: 'Очікувано',
+  pbActualPrefix: 'Фактично',
+  pbFilters: 'Фільтри',
+  pdSearch: 'Пошук обговорень',
+  pdAll: 'Усі',
+  pdTopics: 'Топіки',
+  pdChats: 'Чати',
+  pdArchive: 'Архів',
+  pdTopic: 'Топік',
+  pdChat: 'Чат',
+  pdNew: 'Нове обговорення',
+  pdEdit: 'Редагувати',
+  pdArchiveAction: 'Архівувати',
+  pdRestore: 'Відновити',
+  pdCreateTask: 'Створити завдання з теми',
+  pdLinkedTasks: 'Пов’язані завдання',
+  pdTitle: 'Назва обговорення',
+  pdBody: 'Опис',
+  pdTaskFallback: 'Завдання',
   projectSwitcherTitle: 'Проєкти',
   projectSwitcherRecent: 'Нещодавні',
   projectSwitcherAll: 'Усі проєкти',
@@ -4634,6 +5172,306 @@ const uk: Translations = {
   tlHealthDeleteEntryMsg: 'Запис зникне з історії на всіх пристроях. Автоматичний запис із Health більше не повернеться синком.',
   tlTrainingStreakTitle: 'Тренування ще попереду',
   tlTrainingStreakBody: '{title} заплановано на сьогодні — ще встигаєте, щоб не перервати серію.',
+  // invite-clients
+  roleManager: 'Менеджер',
+  inviteAccept: 'Прийняти',
+  inviteDecline: 'Відхилити',
+  inviteDeclineConfirmTitle: 'Відхилити запрошення?',
+  inviteDeclineConfirmMsg: 'Власник проєкту дізнається, що ви відхилили запрошення. Приєднатися пізніше можна лише за новим запрошенням.',
+  inviteAcceptedShort: 'Ви приєдналися до проєкту',
+  inviteDeclinedShort: 'Запрошення відхилено',
+  inviteForEmail: 'Запрошення для {email}',
+  inviteUnavailableTitle: 'Запрошення більше не діє',
+  inviteInvalidTitle: 'Посилання недійсне',
+  inviteWrongAccountTitle: 'Запрошення для іншого акаунта',
+  inviteWrongAccount: 'Це запрошення надіслано на іншу пошту. Увійдіть в акаунт з тією поштою, на яку прийшло запрошення.',
+  inviteReasonExpired: 'Термін дії запрошення сплив. Попросіть власника проєкту надіслати нове.',
+  inviteReasonUsedUp: 'Посиланням уже скористалися максимальну кількість разів. Попросіть нове посилання.',
+  inviteReasonRevoked: 'Власник проєкту відкликав це посилання.',
+  inviteReasonCancelled: 'Власник проєкту скасував це запрошення.',
+  inviteReasonAccepted: 'Це запрошення вже прийнято.',
+  inviteReasonDeclined: 'Це запрошення вже відхилено.',
+  inviteReasonProjectDeleted: 'Проєкт, до якого вас запросили, видалено.',
+  invitesTitle: 'Запрошення',
+  invitesLoadError: 'Не вдалося завантажити запрошення.',
+  invitesEmptyTitle: 'Немає запрошень',
+  invitesEmptySub: 'Коли вас запросять до проєкту, запрошення з\'явиться тут і в сповіщеннях.',
+  projectMembersEmailInvalid: 'Перевірте адресу пошти.',
+  projectMembersInviteAlreadyPending: 'Запрошення на цю пошту вже очікувало — оновили роль і надіслали ще раз.',
+  projectMembersInviteNotified: 'Запрошення надіслано {email}. Людина побачить його в сповіщеннях і зможе прийняти або відхилити.',
+  projectMembersInvitePendingCreated: 'Запрошення для {email} створено й чекає відповіді.',
+  projectMembersInviteNoAccount: 'Акаунта з поштою {email} поки немає. Запрошення чекатиме: щойно людина зареєструється чи увійде з цією поштою, вона його побачить.',
+  projectMembersInviteEmailSent: 'Лист із запрошенням надіслано.',
+  projectMembersInviteEmailFailed: 'Лист не вдалося надіслати — людина побачить запрошення в застосунку.',
+  projectMembersInviteEmailNotConfigured: 'Лист не надіслано: на сервері не налаштовано пошту. Людина побачить запрошення в застосунку після входу з цією поштою.',
+  projectMembersInviteEmailHint: 'Людина отримає запрошення з кнопками «Прийняти» / «Відхилити». Акаунт можна створити й пізніше.',
+  projectMembersInviteEmailHintNoSmtp: 'Людина отримає запрошення в застосунку (сповіщення й push) з кнопками «Прийняти» / «Відхилити». Лист на пошту не надсилається — пошту на сервері не налаштовано.',
+  projectMembersPendingSection: 'ОЧІКУЮТЬ',
+  projectMembersInviteSentAt: 'надіслано {date}',
+  projectMembersInviteExpiredShort: 'термін сплив — надішліть ще раз',
+  projectMembersInviteNoAccountShort: 'Акаунта ще немає — побачить після реєстрації',
+  projectMembersInviteResend: 'Надіслати ще раз',
+  projectMembersInviteResent: 'Запрошення надіслано ще раз',
+  projectMembersInviteResendTooSoon: 'Щойно надсилали. Спробуйте ще раз за хвилину.',
+  projectMembersInviteNotPending: 'Людина вже відповіла на це запрошення.',
+  projectMembersInviteCancel: 'Скасувати запрошення',
+  projectMembersInviteCancelConfirm: 'Скасувати запрошення для {email}? Воно зникне зі сповіщень запрошеної людини.',
+  // m-calendar
+  calViewMonth: 'Місяць',
+  calViewWeek: 'Тиждень',
+  calViewDay: 'День',
+  calPrevPeriod: 'Попередній період',
+  calNextPeriod: 'Наступний період',
+  calFilterAll: 'Усі',
+  calFilterPersonal: 'Особисте',
+  calFilterDone: 'Виконані',
+  calFilterMine: 'Лише мої',
+  calAllDay: 'Весь день',
+  calMore: 'Ще',
+  calCreateAt: 'Створити о',
+  calCreateTitle: 'Створити',
+  calCreateMeeting: 'Зустріч',
+  calCreateMeetingHint: 'Нарада з часом і тривалістю',
+  calCreateTask: 'Завдання',
+  calCreateTaskHint: 'З дедлайном на цей день',
+  calAddToDay: 'Додати на цей день',
+  calNothingPlanned: 'Нічого не заплановано',
+  calNothingPlannedHint: 'Натисніть «+», щоб додати зустріч або завдання',
+  calSectionSprints: 'Спринти',
+  calSectionDeadlines: 'Дедлайни',
+  calSectionMeetings: 'Зустрічі',
+  calSprintA11y: 'Спринт №',
+  calA11yTask: 'Завдання',
+  calA11yTasks: 'завдань',
+  calA11yMeetings: 'зустрічей',
+  calA11ySprints: 'ще спринтів',
+  calRecordAudio: 'Аудіозапис зустрічі',
+  calUndatedSprints: 'Спринти без дат:',
+  calUndatedSprintsHint: 'вкажіть дати спринту, щоб побачити його в календарі',
+  calDeleteMeetingTitle: 'Видалити зустріч?',
+  calDeleteMeetingBody: 'Цю дію не можна скасувати.',
+  calRecPkgTitle: 'Потрібен пакет',
+  calRecPkgBody: 'Встановіть: npx expo install expo-av',
+  calRecNoPermTitle: 'Немає дозволу',
+  calRecNoPermBody: 'Дозвольте доступ до мікрофону в налаштуваннях.',
+  calRecErrorTitle: 'Помилка запису',
+  calRecDeleteTitle: 'Видалити запис?',
+  calRecRecording: 'Запис...',
+  calRecAudio: 'Аудіозапис',
+  calRecStop: 'Зупинити',
+  calRecStart: 'Почати запис',
+  gcalAuthTitle: 'Потрібна авторизація',
+  gcalAuthBody: 'Підключіть Google Calendar.',
+  gcalSyncErrorTitle: 'Помилка синхронізації',
+  gcalTryLater: 'Спробуйте пізніше.',
+  gcalOfflineTitle: 'Офлайн',
+  gcalOfflineBody: 'Недоступно в офлайн-режимі',
+  gcalConnectErrorTitle: 'Помилка підключення',
+  gcalTryAgain: 'Спробуйте ще раз.',
+  gcalDisconnectTitle: 'Відключити Google Calendar?',
+  gcalDisconnectBody: 'Вже імпортовані зустрічі залишаться.',
+  gcalDisconnect: 'Відключити',
+  gcalConnected: 'Підключено',
+  gcalClientIdSet: 'Client ID налаштовано',
+  gcalSetup: 'Налаштуйте підключення',
+  gcalStep1: 'Відкрийте console.cloud.google.com',
+  gcalStep2: 'Увімкніть Google Calendar API',
+  gcalStep3: 'Створіть OAuth 2.0 Client ID\n(тип: iOS, Bundle ID: com.casper3.f-tracking-app)',
+  gcalStep4: 'Скопіюйте Client ID і вставте нижче',
+  gcalSaveClientId: 'Зберегти Client ID',
+  gcalConnectHint: 'Підключіть Google Calendar, щоб автоматично імпортувати зустрічі.',
+  gcalConnectGoogle: 'Підключити Google',
+  gcalChangeClientId: 'Змінити Client ID',
+  gcalLastSync: 'Остання синхронізація',
+  gcalNewCount: '+{n} нових',
+  gcalSyncNow: 'Синхронізувати зараз',
+  // m-card
+  cardTabMain: 'Основне',
+  cardTabDetails: 'Деталі',
+  cardTabTeam: 'Команда',
+  cardTabActivity: 'Активність',
+  cardRenameHint: 'Торкніться, щоб перейменувати',
+  cardDescPlaceholder: 'Додати опис…',
+  cardNotSet: 'Не вказано',
+  cardDone: 'Готово',
+  cardSelectedCount: 'Обрано: {n}',
+  cardClearDate: 'Прибрати дату',
+  cardPriorityHint: 'P0 — найвищий, P5 — найнижчий.',
+  cardHourShort: 'год',
+  cardMinShort: 'хв',
+  cardStartDate: 'Дата початку',
+  cardCreated: 'Створено',
+  cardRepeat: 'Повторення',
+  cardRepeatNone: 'Не повторюється',
+  cardRepeatOff: 'Вимкнути',
+  cardRepeatDaily: 'Щодня',
+  cardRepeatWeekly: 'Щотижня',
+  cardRepeatMonthly: 'Щомісяця',
+  cardRepeatYearly: 'Щороку',
+  cardRepeatEvery: 'Кожні',
+  cardRepeatEnds: 'Закінчення',
+  cardRepeatNever: 'Ніколи',
+  cardRepeatUntil: 'До дати',
+  cardRepeatNeedsDeadline: 'Повторення спрацює, коли в завдання буде дедлайн.',
+  cardUnitDays: 'дн.',
+  cardUnitWeeks: 'тиж.',
+  cardUnitMonths: 'міс.',
+  cardUnitYears: 'р.',
+  cardQuickPlaceholder: 'Що потрібно зробити?',
+  cardTitleRequired: 'Вкажіть назву завдання',
+  cardMore: 'Детальніше',
+  cardMoreHint: 'Створює завдання й відкриває повну картку',
+  cardTeamResponsibility: 'Відповідальність',
+  cardTeamReview: 'Перевірка',
+  cardTeamReviewRequired: 'Потрібна перевірка',
+  cardTeamReviewer: 'Перевіряльник',
+  cardTeamObstacles: 'Перешкоди й залежності',
+  cardTeamBlocked: 'Заблоковано',
+  cardTeamBlockReason: 'Причина перешкоди',
+  cardTeamBlockedBy: 'Від кого очікується дія',
+  cardTeamDependencies: 'Залежить від',
+  cardTeamDepWarn: 'Ще не завершено: {title}. Починати роботу можна.',
+  cardTeamResult: 'Результат',
+  cardTeamRequiredResult: 'Обовʼязковий результат',
+  cardTeamReqSummary: 'Опис',
+  cardTeamReqLink: 'Посилання',
+  cardTeamReqFile: 'Файл',
+  cardTeamResultSummary: 'Опишіть результат роботи…',
+  cardTeamResultLinks: 'Посилання на результат (кожне з нового рядка)',
+  cardTeamTake: 'Взяти собі',
+  cardTeamStart: 'Почати роботу',
+  cardTeamSubmitReview: 'Передати на перевірку',
+  cardTeamComplete: 'Завершити завдання',
+  cardTeamRecall: 'Відкликати з перевірки',
+  cardTeamApprove: 'Прийняти результат',
+  cardTeamReturn: 'Повернути на доопрацювання',
+  cardTeamReopen: 'Повернути в роботу',
+  cardTeamFeedback: 'Що потрібно доопрацювати',
+  cardTeamPending: 'Очікує перевірки',
+  cardTeamApproved: 'Результат прийнято',
+  cardTeamChangesRequested: 'Повернуто на доопрацювання',
+  cardTeamRemarks: 'Зауваження',
+  cardTeamErrBlockReason: 'Поясніть перешкоду — без причини блокування не зберігається.',
+  cardTeamErrFeedback: 'Поясніть, що доопрацювати.',
+  cardTeamLoadUnknown: 'Доступність виконавця не вказана',
+  cardTeamLoadLeft: 'Вільно цього тижня: {h} год',
+  cardTeamOverload: 'Перевантаження — перевірте строки',
+  // m-scaffold
+  navSidebarExpand: 'Розгорнути бічне меню',
+  navSidebarCollapse: 'Згорнути бічне меню',
+  // m-screens-b
+  discussionsSelectHint: 'Оберіть обговорення ліворуч, щоб відкрити його тут',
+  // m-tasks
+  tasksOpenCalendarHint: 'Відкриває календар з дедлайнами, зустрічами й спринтами',
+  projectNoTasksInGroup: 'Тут поки порожньо',
+  todayPaneActivity: 'Активність дня',
+  todayPaneTracked: 'Відстежено',
+  todayPaneNoTracked: 'Відстеженого часу сьогодні ще немає — запустіть таймер завдання чи зустрічі',
+  todayPaneNow: 'Зараз',
+  todayPaneMeetings: 'Зустрічі сьогодні',
+  todayPaneNoMeetings: 'Зустрічей на сьогодні немає',
+  todayPaneOpenCalendar: 'Відкрити календар',
+  // time
+  timeStartTimerTitle: 'Почати таймер',
+  timeStartTimerSearch: 'Знайти задачу',
+  timeStartTimerA11y: 'Почати таймер: {task}',
+  timeStartTimerNothingFound: 'Нічого не знайдено',
+  timeStartTimerNoTasks: 'Немає незавершених задач',
+  timeStartTimerMore: 'Ще {count} — уточніть пошук',
+  timeStartTimerMeetingHint: 'Таймер зустрічі — з картки зустрічі в календарі.',
+  timeStartTimerFailed: 'Не вдалося запустити таймер. Спробуйте ще раз.',
+  timeNothingRunning: 'Зараз нічого не йде',
+  timeMoreFilters: 'Ще фільтри',
+  // ── area: m-finance ──
+  finTabMore: 'Ще',
+  finMoreSections: 'Інші розділи фінансів',
+  finTodayDue: 'Сьогодні до оплати',
+  finShowOperations: 'Показати операції',
+  finAccountFilterChip: 'Рахунок: {name}',
+  finPeriodFlow: 'Оборот за період',
+  finBalances: 'Залишки',
+  finOpenAccounts: 'Усі рахунки',
+  // ── end area: m-finance ──
+  // ── area: m-calendar ──
+  calSearch: 'Пошук у календарі',
+  calSearchPlaceholder: 'Зустрічі й завдання…',
+  calSearchHint: 'Шукайте зустрічі (і минулі теж) та завдання з дедлайном за назвою, нотатками чи місцем',
+  calSearchEmpty: 'Нічого не знайдено',
+  calSearchClear: 'Очистити пошук',
+  calSearchUpcoming: 'Найближчі',
+  calSearchPast: 'Історія',
+  calJoin: 'Приєднатися',
+  calProjectAdd: 'Додати в календар проєкту',
+  // ── end area: m-calendar ──
+  // ── area: m-tasks ──
+  taskToggleDoneA11y: 'Позначити виконаним: {title}',
+  subtaskMoveUp: 'Перемістити вгору',
+  subtaskMoveDown: 'Перемістити вниз',
+  subtaskRemoveReminder: 'Видалити нагадування',
+  taskWatch: 'Стежити',
+  taskUnwatch: 'Не стежити',
+  taskCardDiscussions: 'Обговорення',
+  taskMovedToProject: 'Завдання перенесено в «{project}»',
+  projectViewList: 'Вигляд: список',
+  projectViewBoard: 'Вигляд: дошка',
+  projectTasksMine: 'Лише призначені мені',
+  projectTasksMenu: 'Дії із завданнями',
+  projectTasksSearch: 'Пошук завдань',
+  projectBoardShowAll: 'Усі завдання колонки — у списку',
+  projectHomePage: 'Стартовий екран',
+  projectHomeMyWork: 'Відкривати з «Моєї роботи»',
+  projectHomeOverview: 'Відкривати з «Огляду»',
+  projectAllTasks: 'Усі завдання проєкту',
+  projectWorkMenu: 'Дії',
+  // ── end area: m-tasks ──
+  // ── area: m-misc ──
+  inviteAlreadyMemberTitle: 'Ви вже в цьому проєкті',
+  inviteAlreadyMemberMsg: 'Приєднуватися вдруге не потрібно — проєкт уже є у вашому списку.',
+  inviteAlreadyMemberRole: 'Ваша роль: {role}',
+  projectMembersUsesLeftOne: 'Лишилось {n} використання',
+  projectMembersUsesLeftFew: 'Лишилось {n} використання',
+  projectMembersUsesLeftMany: 'Лишилось {n} використань',
+  projectMembersUsedOne: 'Використано {n} раз',
+  projectMembersUsedFew: 'Використано {n} рази',
+  projectMembersUsedMany: 'Використано {n} разів',
+  // ── end area: m-misc ──
+  // ── area: m-audit-p2 ──
+  finTxTypeLabel: 'Тип операцій',
+  taskToggleUndoneA11y: 'Позначити невиконаним: {title}',
+  subPayNow: 'Оплатити',
+  subNotifOverdueBodyPay: '{name}: {amount}. Натисніть «Оплатити», коли оплатите.',
+  // ── end area: m-audit-p2 ──
+  // ── area: wf-1007 ──
+  healthTabBodyShort: 'Тіло',
+  menu: {
+    tabsLabel: 'Розділи меню',
+    switchSpace: 'Обрати групу меню',
+    spacesTitle: 'Групи меню',
+    dayDishes: 'Страв: {n}',
+    dayEmpty: 'Нічого не заплановано',
+  },
+  settingsHub: {
+    sectionLookNotify: 'Вигляд і сповіщення',
+    serverTransfer: 'Обмін із сервером',
+    profileGuest: 'Ви не увійшли',
+  },
+  // ── end area: wf-1007 ──
+  // ── area: project-team-ui ──
+  projectAppearance: {
+    title: 'Вигляд проєкту', colorA11y: 'Колір {hex}', hexSuffix: 'HEX', spectrumSuffix: 'спектр', markLabel: 'Позначка проєкту',
+    lightTheme: 'Світла тема', darkTheme: 'Темна тема', background: 'Фон', surface: 'Поверхні', accent: 'Акцент',
+    reset: 'Відновити палітри Flowi', save: 'Зберегти вигляд', invalidColor: 'Введіть колір у форматі #RRGGBB', saved: 'Вигляд збережено',
+  },
+  teamResultFiles: {
+    title: 'Файли результату', open: 'Відкрити файл {n}', remove: 'Прибрати файл', add: 'Додати файл до 1 МБ',
+    tooBig: 'Максимум 1 МБ. Для більшого файлу додайте посилання.',
+  },
+  teamOffline: {
+    pending: 'Є зміни, що очікують синхронізації.', conflict: 'Колега змінив «{title}». Показано серверну версію.', recordFallback: 'запис',
+    fieldTitle: 'Назва', fieldDescription: 'Опис', fieldComment: 'Коментар', fieldResult: 'Результат',
+    fieldDeadline: 'Дедлайн', fieldPriority: 'Пріоритет', rejected: 'Зміну не застосовано: {detail}', rejectedFallback: 'перевірте права та стан завдання',
+  },
+  // ── end area: project-team-ui ──
 };
 
 const en: Translations = {
@@ -6117,6 +6955,126 @@ const en: Translations = {
   statusTypeInProgress: 'In progress',
   statusTypeDone: 'Done',
   projectExitToPersonal: 'Personal',
+  twInviteHint: 'Project created. Invite your team or skip this step.',
+  twInvite: 'Invite members',
+  twSkipInvite: 'Skip',
+  twMilestones: 'Milestones',
+  twMilestoneTitle: 'Milestone title',
+  twMilestoneDate: 'Date (YYYY-MM-DD)',
+  twMilestoneTasks: 'Milestone tasks',
+  twAddMilestone: 'Add milestone',
+  twNoDeadline: 'No deadline',
+  twNoTasks: 'No tasks',
+  twSaveAvailability: 'Save availability',
+  projectOpeningA11y: 'Opening project',
+  projectReassignTitle: 'Who should take over unfinished tasks and reviews?',
+  projectLeaveUnassigned: 'Leave unassigned',
+  twTeamProgress: 'Team progress',
+  twCounts: 'Done {done}/{total} · In review {pending} · Blocked {blocked} · Overdue {overdue}',
+  twQueueReviews: 'Waiting for my review',
+  twQueueBlockers: 'Waiting on me',
+  twQueueAssigned: 'My tasks',
+  twQueueAvailable: 'Available to pick up',
+  twAllActive: 'All active tasks',
+  twWorkloadHint: 'Current week and overdue work. Tasks without a deadline are shown separately.',
+  twMyAvailability: 'My availability, hours per week',
+  twActiveCount: 'Active tasks: {n}',
+  twAvgTime: 'Average time: {avg} · Sample: {n}',
+  twForecast: 'Forecast: {value}',
+  twMinutesShort: '{n} min',
+  twHoursShort: '{n} h',
+  twMemberAvailability: 'Availability, h/week',
+  twSaveMemberAvailability: 'Save member availability',
+  projectBackToProjects: 'All projects',
+  projectBackToProjectsA11y: 'Back to the projects list',
+  projectSidebarCollapse: 'Collapse sidebar',
+  projectSidebarExpand: 'Expand sidebar',
+  projectNavGroupTasks: 'Tasks',
+  projectNavGroupWork: 'Work',
+  projectNavGroupTeam: 'Team',
+  projectSwitchProjectA11y: 'Project {name}. Switch project',
+  projectThemeToLight: 'Light theme',
+  projectThemeToDark: 'Dark theme',
+  sprintArchive: 'Archive sprint',
+  sprintUnarchive: 'Unarchive sprint',
+  sprintArchivedBadge: 'Archived',
+  sprintArchiveHint: 'Only a closed sprint can be archived',
+  sprintShowArchived: 'Show archived',
+  sprintArchivedCount: 'Archived · {n}',
+  sprintListMenu: 'Sprint sorting and filters',
+  sprintSortStartDesc: 'Newest first',
+  sprintSortStartAsc: 'Oldest first',
+  sprintSortName: 'By name',
+  sprintSortProgress: 'By status and progress',
+  sprintStatusFilterA11y: 'Filter sprints by status',
+  sprintStatusAll: 'All',
+  sprintStatusPlanned: 'Planned',
+  sprintStatusActive: 'Active',
+  sprintStatusCompleted: 'Completed',
+  sprintExpandAll: 'Expand all',
+  sprintCollapseAll: 'Collapse all',
+  sprintNoMatch: 'No sprints match this filter',
+  sprintResetFilters: 'Reset filter',
+  pbSection: 'Section',
+  pbIdeas: 'Ideas',
+  pbBugs: 'Bugs',
+  pbIdea: 'Idea',
+  pbBug: 'Bug',
+  pbSearch: 'Search',
+  pbAssignedToMe: 'Assigned to me',
+  pbSprint: 'Sprint',
+  pbAllSprints: 'All sprints',
+  pbNoSprint: 'No sprint',
+  pbAssignee: 'Assignee',
+  pbAll: 'All',
+  pbUnassigned: 'Unassigned',
+  pbPriority: 'Priority',
+  pbNoPriority: 'No priority',
+  pbSort: 'Sort',
+  pbNewest: 'Newest',
+  pbOldest: 'Oldest',
+  pbName: 'Name',
+  pbDoneFrom: 'Completed from (YYYY-MM-DD)',
+  pbDoneTo: 'Completed to (YYYY-MM-DD)',
+  pbResetFilters: 'Reset filters',
+  pbNewIdea: 'New idea',
+  pbNewBug: 'New bug',
+  pbMoveToSprint: 'Move to sprint',
+  pbToTask: 'Convert to task',
+  pbStartWork: 'Start work',
+  pbEmpty: 'Nothing here',
+  pbIdeaTitle: 'Idea title',
+  pbBugTitle: 'Bug title',
+  pbIdeaBody: 'Idea and expected benefit',
+  pbBugBody: 'Problem description',
+  pbBugSteps: 'Steps to reproduce',
+  pbBugExpected: 'Expected result',
+  pbBugActual: 'Actual result',
+  pbSeverity: 'Severity',
+  pbSeverityLow: 'Low',
+  pbSeverityNormal: 'Normal',
+  pbSeverityHigh: 'High',
+  pbSeverityCritical: 'Critical',
+  pbStepsPrefix: 'Steps',
+  pbExpectedPrefix: 'Expected',
+  pbActualPrefix: 'Actual',
+  pbFilters: 'Filters',
+  pdSearch: 'Search discussions',
+  pdAll: 'All',
+  pdTopics: 'Topics',
+  pdChats: 'Chats',
+  pdArchive: 'Archive',
+  pdTopic: 'Topic',
+  pdChat: 'Chat',
+  pdNew: 'New discussion',
+  pdEdit: 'Edit',
+  pdArchiveAction: 'Archive',
+  pdRestore: 'Restore',
+  pdCreateTask: 'Create a task from topic',
+  pdLinkedTasks: 'Linked tasks',
+  pdTitle: 'Discussion title',
+  pdBody: 'Description',
+  pdTaskFallback: 'Task',
   projectSwitcherTitle: 'Projects',
   projectSwitcherRecent: 'Recent',
   projectSwitcherAll: 'All projects',
@@ -6881,6 +7839,306 @@ const en: Translations = {
   tlHealthDeleteEntryMsg: 'The entry will disappear from history on all devices. An automatic Health entry will not come back through sync.',
   tlTrainingStreakTitle: 'Workout still ahead',
   tlTrainingStreakBody: '{title} is planned for today — there is still time to keep your streak.',
+  // invite-clients
+  roleManager: 'Manager',
+  inviteAccept: 'Accept',
+  inviteDecline: 'Decline',
+  inviteDeclineConfirmTitle: 'Decline the invitation?',
+  inviteDeclineConfirmMsg: 'The project owner will be told you declined. To join later you will need a new invitation.',
+  inviteAcceptedShort: 'You joined the project',
+  inviteDeclinedShort: 'Invitation declined',
+  inviteForEmail: 'Invitation for {email}',
+  inviteUnavailableTitle: 'This invitation is no longer valid',
+  inviteInvalidTitle: 'Invalid link',
+  inviteWrongAccountTitle: 'Invitation is for another account',
+  inviteWrongAccount: 'This invitation was sent to a different email. Sign in with the account that received it.',
+  inviteReasonExpired: 'The invitation has expired. Ask the project owner for a new one.',
+  inviteReasonUsedUp: 'This link has reached its usage limit. Ask for a new link.',
+  inviteReasonRevoked: 'The project owner revoked this link.',
+  inviteReasonCancelled: 'The project owner cancelled this invitation.',
+  inviteReasonAccepted: 'This invitation has already been accepted.',
+  inviteReasonDeclined: 'This invitation has already been declined.',
+  inviteReasonProjectDeleted: 'The project you were invited to was deleted.',
+  invitesTitle: 'Invitations',
+  invitesLoadError: 'Could not load invitations.',
+  invitesEmptyTitle: 'No invitations',
+  invitesEmptySub: 'When someone invites you to a project, it will appear here and in notifications.',
+  projectMembersEmailInvalid: 'Check the email address.',
+  projectMembersInviteAlreadyPending: 'An invitation to this email was already pending — role updated and sent again.',
+  projectMembersInviteNotified: 'Invitation sent to {email}. They will see it in notifications and can accept or decline.',
+  projectMembersInvitePendingCreated: 'Invitation for {email} created and waiting for a reply.',
+  projectMembersInviteNoAccount: 'There is no account with {email} yet. The invitation will wait: once they sign up or sign in with this email, they will see it.',
+  projectMembersInviteEmailSent: 'Invitation email sent.',
+  projectMembersInviteEmailFailed: 'The email could not be sent — they will see the invitation in the app.',
+  projectMembersInviteEmailNotConfigured: 'No email sent: mail is not configured on the server. They will see the invitation in the app after signing in with this email.',
+  projectMembersInviteEmailHint: 'They get an invitation with Accept / Decline buttons. They can create an account later.',
+  projectMembersInviteEmailHintNoSmtp: 'They get the invitation in the app (notification and push) with Accept / Decline. No email is sent — mail is not configured on the server.',
+  projectMembersPendingSection: 'PENDING',
+  projectMembersInviteSentAt: 'sent {date}',
+  projectMembersInviteExpiredShort: 'expired — send again',
+  projectMembersInviteNoAccountShort: 'No account yet — will see it after signing up',
+  projectMembersInviteResend: 'Send again',
+  projectMembersInviteResent: 'Invitation sent again',
+  projectMembersInviteResendTooSoon: 'Just sent. Try again in a minute.',
+  projectMembersInviteNotPending: 'This invitation has already been answered.',
+  projectMembersInviteCancel: 'Cancel invitation',
+  projectMembersInviteCancelConfirm: 'Cancel the invitation for {email}? It will disappear from their notifications.',
+  // m-calendar
+  calViewMonth: 'Month',
+  calViewWeek: 'Week',
+  calViewDay: 'Day',
+  calPrevPeriod: 'Previous period',
+  calNextPeriod: 'Next period',
+  calFilterAll: 'All',
+  calFilterPersonal: 'Personal',
+  calFilterDone: 'Completed',
+  calFilterMine: 'Only mine',
+  calAllDay: 'All day',
+  calMore: 'More',
+  calCreateAt: 'Create at',
+  calCreateTitle: 'Create',
+  calCreateMeeting: 'Meeting',
+  calCreateMeetingHint: 'An event with a time and duration',
+  calCreateTask: 'Task',
+  calCreateTaskHint: 'Due on this day',
+  calAddToDay: 'Add to this day',
+  calNothingPlanned: 'Nothing planned',
+  calNothingPlannedHint: 'Tap “+” to add a meeting or a task',
+  calSectionSprints: 'Sprints',
+  calSectionDeadlines: 'Deadlines',
+  calSectionMeetings: 'Meetings',
+  calSprintA11y: 'Sprint #',
+  calA11yTask: 'Task',
+  calA11yTasks: 'tasks',
+  calA11yMeetings: 'meetings',
+  calA11ySprints: 'more sprints',
+  calRecordAudio: 'Record meeting audio',
+  calUndatedSprints: 'Sprints without dates:',
+  calUndatedSprintsHint: 'set the sprint dates to see it on the calendar',
+  calDeleteMeetingTitle: 'Delete meeting?',
+  calDeleteMeetingBody: 'This cannot be undone.',
+  calRecPkgTitle: 'Package required',
+  calRecPkgBody: 'Install it: npx expo install expo-av',
+  calRecNoPermTitle: 'No permission',
+  calRecNoPermBody: 'Allow microphone access in Settings.',
+  calRecErrorTitle: 'Recording error',
+  calRecDeleteTitle: 'Delete recording?',
+  calRecRecording: 'Recording...',
+  calRecAudio: 'Audio recording',
+  calRecStop: 'Stop',
+  calRecStart: 'Start recording',
+  gcalAuthTitle: 'Authorization required',
+  gcalAuthBody: 'Connect Google Calendar.',
+  gcalSyncErrorTitle: 'Sync error',
+  gcalTryLater: 'Please try again later.',
+  gcalOfflineTitle: 'Offline',
+  gcalOfflineBody: 'Not available in offline mode',
+  gcalConnectErrorTitle: 'Connection error',
+  gcalTryAgain: 'Please try again.',
+  gcalDisconnectTitle: 'Disconnect Google Calendar?',
+  gcalDisconnectBody: 'Meetings already imported will stay.',
+  gcalDisconnect: 'Disconnect',
+  gcalConnected: 'Connected',
+  gcalClientIdSet: 'Client ID configured',
+  gcalSetup: 'Set up the connection',
+  gcalStep1: 'Open console.cloud.google.com',
+  gcalStep2: 'Enable the Google Calendar API',
+  gcalStep3: 'Create an OAuth 2.0 Client ID\n(type: iOS, Bundle ID: com.casper3.f-tracking-app)',
+  gcalStep4: 'Copy the Client ID and paste it below',
+  gcalSaveClientId: 'Save Client ID',
+  gcalConnectHint: 'Connect Google Calendar to import meetings automatically.',
+  gcalConnectGoogle: 'Connect Google',
+  gcalChangeClientId: 'Change Client ID',
+  gcalLastSync: 'Last sync',
+  gcalNewCount: '+{n} new',
+  gcalSyncNow: 'Sync now',
+  // m-card
+  cardTabMain: 'Main',
+  cardTabDetails: 'Details',
+  cardTabTeam: 'Team',
+  cardTabActivity: 'Activity',
+  cardRenameHint: 'Tap to rename',
+  cardDescPlaceholder: 'Add a description…',
+  cardNotSet: 'Not set',
+  cardDone: 'Done',
+  cardSelectedCount: '{n} selected',
+  cardClearDate: 'Clear date',
+  cardPriorityHint: 'P0 is the highest, P5 the lowest.',
+  cardHourShort: 'h',
+  cardMinShort: 'min',
+  cardStartDate: 'Start date',
+  cardCreated: 'Created',
+  cardRepeat: 'Repeat',
+  cardRepeatNone: 'Doesn\'t repeat',
+  cardRepeatOff: 'Turn off',
+  cardRepeatDaily: 'Daily',
+  cardRepeatWeekly: 'Weekly',
+  cardRepeatMonthly: 'Monthly',
+  cardRepeatYearly: 'Yearly',
+  cardRepeatEvery: 'Every',
+  cardRepeatEnds: 'Ends',
+  cardRepeatNever: 'Never',
+  cardRepeatUntil: 'Until',
+  cardRepeatNeedsDeadline: 'Repeating starts once the task has a deadline.',
+  cardUnitDays: 'days',
+  cardUnitWeeks: 'weeks',
+  cardUnitMonths: 'months',
+  cardUnitYears: 'years',
+  cardQuickPlaceholder: 'What needs to be done?',
+  cardTitleRequired: 'Enter a task title',
+  cardMore: 'More details',
+  cardMoreHint: 'Creates the task and opens its full card',
+  cardTeamResponsibility: 'Responsibility',
+  cardTeamReview: 'Review',
+  cardTeamReviewRequired: 'Review required',
+  cardTeamReviewer: 'Reviewer',
+  cardTeamObstacles: 'Blockers and dependencies',
+  cardTeamBlocked: 'Blocked',
+  cardTeamBlockReason: 'Reason for the blocker',
+  cardTeamBlockedBy: 'Waiting on',
+  cardTeamDependencies: 'Depends on',
+  cardTeamDepWarn: 'Not finished yet: {title}. You can still start.',
+  cardTeamResult: 'Result',
+  cardTeamRequiredResult: 'Required result',
+  cardTeamReqSummary: 'Summary',
+  cardTeamReqLink: 'Link',
+  cardTeamReqFile: 'File',
+  cardTeamResultSummary: 'Describe the result…',
+  cardTeamResultLinks: 'Result links (one per line)',
+  cardTeamTake: 'Take it',
+  cardTeamStart: 'Start work',
+  cardTeamSubmitReview: 'Submit for review',
+  cardTeamComplete: 'Complete task',
+  cardTeamRecall: 'Withdraw from review',
+  cardTeamApprove: 'Approve result',
+  cardTeamReturn: 'Request changes',
+  cardTeamReopen: 'Reopen',
+  cardTeamFeedback: 'What needs to change',
+  cardTeamPending: 'Waiting for review',
+  cardTeamApproved: 'Result approved',
+  cardTeamChangesRequested: 'Changes requested',
+  cardTeamRemarks: 'Remarks',
+  cardTeamErrBlockReason: 'Explain the blocker — it isn\'t saved without a reason.',
+  cardTeamErrFeedback: 'Explain what needs to change.',
+  cardTeamLoadUnknown: 'Assignee availability not set',
+  cardTeamLoadLeft: 'Free this week: {h} h',
+  cardTeamOverload: 'Overloaded — check the deadlines',
+  // m-scaffold
+  navSidebarExpand: 'Expand sidebar',
+  navSidebarCollapse: 'Collapse sidebar',
+  // m-screens-b
+  discussionsSelectHint: 'Select a discussion on the left to open it here',
+  // m-tasks
+  tasksOpenCalendarHint: 'Opens the calendar with deadlines, meetings and sprints',
+  projectNoTasksInGroup: 'Nothing here yet',
+  todayPaneActivity: 'Day activity',
+  todayPaneTracked: 'Tracked',
+  todayPaneNoTracked: 'No time tracked yet today — start a task or meeting timer',
+  todayPaneNow: 'Now',
+  todayPaneMeetings: 'Today\'s meetings',
+  todayPaneNoMeetings: 'No meetings today',
+  todayPaneOpenCalendar: 'Open calendar',
+  // time
+  timeStartTimerTitle: 'Start a timer',
+  timeStartTimerSearch: 'Find a task',
+  timeStartTimerA11y: 'Start timer: {task}',
+  timeStartTimerNothingFound: 'Nothing found',
+  timeStartTimerNoTasks: 'No open tasks',
+  timeStartTimerMore: '{count} more — refine the search',
+  timeStartTimerMeetingHint: 'Meeting timers start from the meeting card in the calendar.',
+  timeStartTimerFailed: 'Couldn\'t start the timer. Please try again.',
+  timeNothingRunning: 'Nothing is running',
+  timeMoreFilters: 'More filters',
+  // ── area: m-finance ──
+  finTabMore: 'More',
+  finMoreSections: 'More finance sections',
+  finTodayDue: 'Due today',
+  finShowOperations: 'Show transactions',
+  finAccountFilterChip: 'Account: {name}',
+  finPeriodFlow: 'Period turnover',
+  finBalances: 'Balances',
+  finOpenAccounts: 'All accounts',
+  // ── end area: m-finance ──
+  // ── area: m-calendar ──
+  calSearch: 'Search calendar',
+  calSearchPlaceholder: 'Meetings and tasks…',
+  calSearchHint: 'Find meetings (past ones too) and tasks with a deadline by title, notes or location',
+  calSearchEmpty: 'Nothing found',
+  calSearchClear: 'Clear search',
+  calSearchUpcoming: 'Upcoming',
+  calSearchPast: 'History',
+  calJoin: 'Join',
+  calProjectAdd: 'Add to project calendar',
+  // ── end area: m-calendar ──
+  // ── area: m-tasks ──
+  taskToggleDoneA11y: 'Mark as done: {title}',
+  subtaskMoveUp: 'Move up',
+  subtaskMoveDown: 'Move down',
+  subtaskRemoveReminder: 'Delete reminder',
+  taskWatch: 'Watch',
+  taskUnwatch: 'Unwatch',
+  taskCardDiscussions: 'Discussions',
+  taskMovedToProject: 'Task moved to “{project}”',
+  projectViewList: 'View: list',
+  projectViewBoard: 'View: board',
+  projectTasksMine: 'Assigned to me only',
+  projectTasksMenu: 'Task actions',
+  projectTasksSearch: 'Search tasks',
+  projectBoardShowAll: 'All column tasks — in the list',
+  projectHomePage: 'Start page',
+  projectHomeMyWork: 'Open on “My work”',
+  projectHomeOverview: 'Open on “Overview”',
+  projectAllTasks: 'All project tasks',
+  projectWorkMenu: 'Actions',
+  // ── end area: m-tasks ──
+  // ── area: m-misc ──
+  inviteAlreadyMemberTitle: 'You are already in this project',
+  inviteAlreadyMemberMsg: 'No need to join again — the project is already in your list.',
+  inviteAlreadyMemberRole: 'Your role: {role}',
+  projectMembersUsesLeftOne: '{n} use left',
+  projectMembersUsesLeftFew: '{n} uses left',
+  projectMembersUsesLeftMany: '{n} uses left',
+  projectMembersUsedOne: 'Used {n} time',
+  projectMembersUsedFew: 'Used {n} times',
+  projectMembersUsedMany: 'Used {n} times',
+  // ── end area: m-misc ──
+  // ── area: m-audit-p2 ──
+  finTxTypeLabel: 'Transaction type',
+  taskToggleUndoneA11y: 'Mark as not done: {title}',
+  subPayNow: 'Pay',
+  subNotifOverdueBodyPay: '{name}: {amount}. Tap “Pay” once paid.',
+  // ── end area: m-audit-p2 ──
+  // ── area: wf-1007 ──
+  healthTabBodyShort: 'Body',
+  menu: {
+    tabsLabel: 'Menu sections',
+    switchSpace: 'Switch menu group',
+    spacesTitle: 'Menu groups',
+    dayDishes: 'Dishes: {n}',
+    dayEmpty: 'Nothing planned',
+  },
+  settingsHub: {
+    sectionLookNotify: 'Appearance & notifications',
+    serverTransfer: 'Server transfer',
+    profileGuest: 'You\'re not signed in',
+  },
+  // ── end area: wf-1007 ──
+  // ── area: project-team-ui ──
+  projectAppearance: {
+    title: 'Project appearance', colorA11y: 'Colour {hex}', hexSuffix: 'HEX', spectrumSuffix: 'spectrum', markLabel: 'Project marker',
+    lightTheme: 'Light theme', darkTheme: 'Dark theme', background: 'Background', surface: 'Surfaces', accent: 'Accent',
+    reset: 'Restore Flowi palettes', save: 'Save appearance', invalidColor: 'Enter a colour as #RRGGBB', saved: 'Appearance saved',
+  },
+  teamResultFiles: {
+    title: 'Result files', open: 'Open file {n}', remove: 'Remove file', add: 'Add file up to 1 MB',
+    tooBig: 'Maximum 1 MB. For a larger file, add a link.',
+  },
+  teamOffline: {
+    pending: 'Some changes are waiting to sync.', conflict: 'A teammate changed “{title}”. Showing the server version.', recordFallback: 'record',
+    fieldTitle: 'Title', fieldDescription: 'Description', fieldComment: 'Comment', fieldResult: 'Result',
+    fieldDeadline: 'Deadline', fieldPriority: 'Priority', rejected: 'Change not applied: {detail}', rejectedFallback: 'check your permissions and the task state',
+  },
+  // ── end area: project-team-ui ──
 };
 
 export const allTranslations: Record<Lang, Translations> = { uk, en };

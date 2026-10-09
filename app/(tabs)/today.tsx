@@ -17,6 +17,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ContainerSearchPanel } from '@/components/containers/ContainerSearchPanel';
 import { UpcomingPaymentsCard, useUpcomingPayments } from '@/components/finance/UpcomingPaymentsCard';
 import { MeetingProjectChip } from '@/components/meetings/MeetingProjectChip';
+import { useInPlaceProjectTask } from '@/components/projects/ProjectTaskSheet';
 import { RingCell } from '@/components/health/RingCell';
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { PressableScale } from '@/components/shared/PressableScale';
@@ -51,13 +52,15 @@ import {
 } from '@/utils/healthTheme';
 import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, calcCalorieDay, computeGoals, lastForDay, sumForDay } from '@/utils/healthUtils';
 import { Habit, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
-import { Task, isOverdue } from '@/utils/taskUtils';
+import { Task, isMyTask, isOverdue } from '@/utils/taskUtils';
 import { haptic } from '@/utils/haptics';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { formatDuration } from '@/utils/durationFormat';
 import { BUILTIN_CURRENCIES, formatCurrency, type Currency } from '@/utils/financeUtils';
-import { useScreenWidth } from '@/hooks/use-responsive';
-import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
+import { Layout } from '@/constants/tokens';
+import { TODAY_SECTION_GAP, TodaySectionGrid, type TodaySectionEntry } from '@/components/today/TodaySectionGrid';
+import { orderTodaySections } from '@/components/today/sectionOrder';
 import { masonryColumnCount } from '@/utils/masonry';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
@@ -94,8 +97,9 @@ const TODAY_PREVIEW_LIMIT = 3;
  * новий тип компонента при кожному рендері, і React перемонтовує всі
  * вісім секцій — разом з їхніми анімаціями появи.
  *
- * На широкому екрані секції розкладає MasonryColumns (2–3 незалежні
- * колонки). Дашборд із восьми карток в одну колонку на планшеті — це смуга
+ * На широкому екрані секції розкладає TodaySectionGrid (2–3 незалежні
+ * masonry-колонки; кожна секція — у найкоротшу, тож порядок за верхнім
+ * краєм карток лишається правилом власника). Дашборд із восьми карток в одну колонку на планшеті — це смуга
  * контенту посеред порожнечі, а прокрутка вдвічі довша за потрібну.
  *
  * `animate` — лише під час першої появи екрана: masonry зрідка переносить
@@ -122,8 +126,16 @@ const INTRO_ANIMATION_MS = 800;
 export default function TodayScreen() {
   const tabBarInset = useTabBarInset();
   // Колонки дашборду — від ширини самого екрана (вікно мінус сайдбар).
-  const columnCount = masonryColumnCount(useScreenWidth());
+  // Стеля Layout.wideMaxWidth: на 13" iPad у ландшафті дашборд інакше
+  // розтягувався на ~1130pt, і три колонки ставали надто широкими для
+  // коротких карток. Колонки рахуємо від уже обмеженої ширини (пороги
+  // masonryColumnCount задані для ширини екрана, поля в них уже враховано).
+  const { sizeClass } = useResponsive();
+  const gutter = Layout.gutter[sizeClass];
+  const columnCount = masonryColumnCount(Math.min(useScreenWidth(), Layout.wideMaxWidth));
   const isDark = useColorScheme() === 'dark';
+  // Задача ПРОЄКТУ — карткою проєкту тут же, а не в особистому редакторі.
+  const { openProjectTask, projectTaskSheet } = useInPlaceProjectTask(isDark);
   const router = useRouter();
   const { tr, lang } = useI18n();
   const { user } = useAuth();
@@ -288,7 +300,6 @@ export default function TodayScreen() {
 
   // Tasks
   const activeCount  = tasks.filter(t => t.status === 'active').length;
-  const overdueCount = tasks.filter(task => isOverdue(task)).length;
 
   /**
    * Незавершені завдання на сьогодні — прострочені та з дедлайном сьогодні,
@@ -304,6 +315,13 @@ export default function TodayScreen() {
   // (§3.7 «Особисте агрегує»); з попереднім особистим-only списком задача
   // проєкту в «У процесі» завжди показувалась як звичайне «До роботи».
   const projectRoles = useProjectRoles();
+  // Той самий набір, що й секція «Прострочені» на «Завданнях»: лише МОЇ
+  // задачі (§3.7, isMyTask — без беклогу й чужих задач проєктів). Раніше Home
+  // рахував усі сирі задачі й казав «3 прострочено», а Завдання — 2 (P2
+  // аудиту 2026-10).
+  const overdueCount = tasks.filter(task =>
+    isOverdue(task) && (user?.id === undefined || isMyTask(task, user.id, projectRoles)),
+  ).length;
   const todayGroups = useMemo(
     () => groupTodayTasks(tasks, statusColumns, today, TODAY_PREVIEW_LIMIT, user?.id, projectRoles),
     [tasks, statusColumns, today, user?.id, projectRoles],
@@ -421,8 +439,10 @@ export default function TodayScreen() {
 
 
   const openTaskDetails = useCallback((id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (task && openProjectTask(task)) return;
     router.push({ pathname: '/', params: { open: id } });
-  }, [router]);
+  }, [router, tasks, openProjectTask]);
 
   // ─── Formatters ────────────────────────────────────────────────────────────
 
@@ -439,235 +459,71 @@ export default function TodayScreen() {
 
   // ─── Секції дашборду ───────────────────────────────────────────────────────
 
-  // У кількох колонках секції без власної анімації появи: MasonryColumns
-  // переносить секцію в іншу колонку (перемонтування) просто під час
+  // У кількох колонках секції без власної анімації появи: раніше masonry
+  // переносив секцію в іншу колонку (перемонтування) просто під час
   // вступної анімації, і на Fabric Reanimated лишав «привида» старої копії
-  // поверх сусідньої картки, а нова застрягала невидимою — звідси
-  // накладання й порожня діра в колонці. Сітку й так проявляє сам
-  // MasonryColumns (opacity після першого виміру).
+  // поверх сусідньої картки. Masonry знову може перенести секцію (коли
+  // висота суттєво змінилась), тож на планшеті анімацію появи вимкнено —
+  // і для секцій, і для рядків завдань усередині.
   const animateIntro = !introDone && columnCount === 1;
 
-  const sections: MasonryEntry[] = [];
+  let sections: TodaySectionEntry[] = [];
 
-  // 1. Завдання на сьогодні
-  if (moduleOn('tasks')) sections.push({
-    key: 'tasks',
+  // 1. Здоровʼя (hero-стрічка кілець) + швидкі дії — одна секція: за
+  // правилом власника вони йдуть парою одразу після пошуку речей, і на
+  // планшеті не мають розходитись по різних клітинках сітки.
+  //
+  // Швидкі дії: ряд з чотирьох плиток веде в чотири різні модулі (завдання,
+  // фінанси, здоров'я, час), а `QuickActions` приймає рівно чотири
+  // обов'язкові дії — відфільтрувати ОДНУ плитку звідси неможливо. Тому ряд
+  // зникає лише тоді, коли вимкнено всі чотири. Плитка вимкненого модуля
+  // веде на заглушку «Ви вимкнули цю функцію» (app/(tabs)/_layout.tsx).
+  const showHealthCard = moduleOn('health');
+  const showQuickActions = moduleOn('tasks') || moduleOn('finance') || moduleOn('health') || moduleOn('time');
+  if (showHealthCard || showQuickActions) sections.push({
+    key: 'health-quick',
     node: (
       <Section index={0} animate={animateIntro} motion={motion}>
-        <View style={{ marginBottom: 12 }}>
-          <View style={s.sectionRow}>
-            <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayTasks}</Text>
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              {overdueCount > 0 && (
-                <View style={[s.badge, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}>
-                  <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
-                    {overdueCount} {tr.todayOverdue}
-                  </Text>
-                </View>
-              )}
-              <View style={[s.badge, { backgroundColor: ACCENT_TASK + '18', borderColor: ACCENT_TASK + '35' }]}>
-                <Text style={{ color: ACCENT_TASK, fontSize: 11, fontWeight: '700' }}>
-                  {activeCount} {tr.todayActive}
-                </Text>
+        <View style={{ gap: TODAY_SECTION_GAP }}>
+        {showHealthCard && (
+          <PressableScale
+            onPress={() => router.push('/health')}
+            accessibilityRole="button"
+            accessibilityLabel={tr.tabHealth}>
+            <BlurView
+              intensity={isDark ? 22 : 42}
+              tint={isDark ? 'dark' : 'light'}
+              style={[s.card, { borderColor: c.border }]}>
+              <View style={s.cardHead}>
+                <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.tabHealth}</Text>
+                <IconSymbol name="chevron.right" size={12} color={c.sub} />
               </View>
-            </View>
-          </View>
-          {/* Групи за статусом. «У процесі» йде першою і не обрізається:
-              на екрані дня спершу те, що робиться просто зараз. Заголовок
-              групи показуємо лише коли груп справді кілька — над єдиним
-              списком він був би шумом. */}
-          {todayGroups.groups.map(group => (
-            <View key={group.id}>
-              {todayGroups.groups.length > 1 && (
-                <View style={s.groupRow}>
-                  <View style={[s.groupDot, { backgroundColor: group.color }]} />
-                  <Text style={[s.groupName, { color: c.sub }]}>{group.name}</Text>
-                  <Text style={[s.groupCount, { color: c.sub }]}>{group.tasks.length}</Text>
-                </View>
-              )}
-              <TodayTaskRow
-                tasks={group.tasks}
-                isDark={isDark}
-                c={c}
-                tr={tr}
-                onToggle={handleToggleTask}
-                onOpen={openTaskDetails}
-                projects={projects}
-              />
-            </View>
-          ))}
-          {todayGroups.hidden > 0 && (
-            <ShowAllRow
-              label={tr.showAllCount.replace('{count}', String(todayGroups.total))}
-              color={ACCENT_TASK}
-              c={c}
-              onPress={() => router.push('/')}
-            />
-          )}
-          {todayGroups.total === 0 && (
-            <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
-          )}
+              <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
+                <RingCell pct={calDay.pct} color={ACCENT_CAL} label={tr.calories} value={`${calDay.consumed}кк`} />
+                <RingCell pct={steps / goals.steps} color={ACCENT_STEPS} label={tr.steps} value={steps >= 1000 ? `${(steps / 1000).toFixed(1)}т` : `${steps}`} />
+                <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={water >= 1000 ? `${(water / 1000).toFixed(1)}л` : `${water}мл`} />
+                <RingCell pct={sleep ? sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep} value={sleep ? fmtSleep(sleep) : '—'} />
+              </View>
+            </BlurView>
+          </PressableScale>
+        )}
+        {showQuickActions && (
+          <QuickActions
+            isDark={isDark}
+            c={c}
+            tr={tr}
+            onAddTask={() => router.push({ pathname: '/', params: { create: '1' } })}
+            onAddExpense={() => router.push({ pathname: '/explore', params: { create: '1' } })}
+            onAddWater={handleAddWater}
+            onTimer={() => router.push('/time')}
+          />
+        )}
         </View>
       </Section>
     ),
   });
 
-  // 2. Зустрічі сьогодні
-  if (moduleOn('meetings') && todayMeetings.length > 0) {
-    sections.push({
-      key: 'meetings',
-      node: (
-        <Section index={1} animate={animateIntro} motion={motion}>
-          <View style={{ marginBottom: 12 }}>
-            <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayMeetings}</Text>
-            {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(({ meeting: m, phase }) => (
-              <PressableScale
-                key={m.id}
-                onPress={() => openMeeting(m)}
-                accessibilityRole="button"
-                accessibilityLabel={`${m.time} ${m.title}`}
-                style={{ marginBottom: 6, opacity: phase === 'past' ? 0.5 : 1 }}>
-                <BlurView
-                  intensity={isDark ? 18 : 36}
-                  tint={isDark ? 'dark' : 'light'}
-                  style={[s.meetingRow, { borderColor: c.border }]}>
-                  <View style={[s.meetingBar, { backgroundColor: m.color || ACCENT_TASK }]} />
-                  <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
-                  <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
-                  <MeetingProjectChip project={meetingProject(m, projects)} textColor={c.sub} maxWidth={110} />
-                </BlurView>
-              </PressableScale>
-            ))}
-            {todayMeetings.length > TODAY_PREVIEW_LIMIT && (
-              <ShowAllRow
-                label={tr.showAllCount.replace('{count}', String(todayMeetings.length))}
-                color="#6366F1"
-                c={c}
-                onPress={() => router.push('/meetings')}
-              />
-            )}
-          </View>
-        </Section>
-      ),
-    });
-  }
-
-  // 2б. Найближчі оплати / прострочені підписки
-  if (moduleOn('subscriptions') && upcomingPayments.items.length > 0) {
-    sections.push({
-      key: 'payments',
-      node: (
-        <Section index={1} animate={animateIntro} motion={motion}>
-          <UpcomingPaymentsCard data={upcomingPayments} isDark={isDark} c={c} tr={tr} lang={lang} />
-        </Section>
-      ),
-    });
-  }
-
-  // 3. Здоровʼя — hero-стрічка кілець
-  if (moduleOn('health')) sections.push({
-    key: 'health',
-    node: (
-      <Section index={2} animate={animateIntro} motion={motion}>
-        <PressableScale
-          onPress={() => router.push('/health')}
-          accessibilityRole="button"
-          accessibilityLabel={tr.tabHealth}
-          style={{ marginBottom: 12 }}>
-          <BlurView
-            intensity={isDark ? 22 : 42}
-            tint={isDark ? 'dark' : 'light'}
-            style={[s.card, { borderColor: c.border }]}>
-            <View style={s.cardHead}>
-              <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.tabHealth}</Text>
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </View>
-            <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
-              <RingCell pct={calDay.pct} color={ACCENT_CAL} label={tr.calories} value={`${calDay.consumed}кк`} />
-              <RingCell pct={steps / goals.steps} color={ACCENT_STEPS} label={tr.steps} value={steps >= 1000 ? `${(steps / 1000).toFixed(1)}т` : `${steps}`} />
-              <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={water >= 1000 ? `${(water / 1000).toFixed(1)}л` : `${water}мл`} />
-              <RingCell pct={sleep ? sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep} value={sleep ? fmtSleep(sleep) : '—'} />
-            </View>
-          </BlurView>
-        </PressableScale>
-      </Section>
-    ),
-  });
-
-  // 4. Швидкі дії
-  //
-  // Ряд з чотирьох плиток веде в чотири різні модулі (завдання, фінанси,
-  // здоров'я, час), а `QuickActions` приймає рівно чотири обов'язкові дії —
-  // відфільтрувати ОДНУ плитку звідси неможливо. Тому секція зникає лише
-  // тоді, коли вимкнено всі чотири: сховати весь ряд через вимкнений
-  // «Трекер часу» означало б забрати і «+ Завдання». Плитка вимкненого
-  // модуля веде на заглушку «Ви вимкнули цю функцію» (app/(tabs)/_layout.tsx),
-  // тобто в глухий кут не заводить — див. followups про проп `actions`.
-  if (moduleOn('tasks') || moduleOn('finance') || moduleOn('health') || moduleOn('time')) sections.push({
-    key: 'quick',
-    node: (
-      <Section index={3} animate={animateIntro} motion={motion}>
-        <QuickActions
-          isDark={isDark}
-          c={c}
-          tr={tr}
-          onAddTask={() => router.push({ pathname: '/', params: { create: '1' } })}
-          onAddExpense={() => router.push({ pathname: '/explore', params: { create: '1' } })}
-          onAddWater={handleAddWater}
-          onTimer={() => router.push('/time')}
-        />
-      </Section>
-    ),
-  });
-
-  // 5. Звички — це модуль «Профілактика» всередині «Здоров'я»: на вебі це
-  // окремі перемикачі, тож вимкнення будь-якого з двох прибирає секцію.
-  if (moduleOn('health', 'prevention') && habits.length > 0) {
-    sections.push({
-      key: 'habits',
-      node: (
-        <Section index={4} animate={animateIntro} motion={motion}>
-          <View style={{ marginBottom: 12 }}>
-            <Text style={[s.sectionTitle, { color: c.sub, marginBottom: 6 }]}>{tr.todayHabits}</Text>
-            {habits.map(h => {
-              const done   = habitDoneToday(h);
-              const streak = habitStreak(h);
-              return (
-                <PressableScale
-                  key={h.id}
-                  onPress={() => handleToggleHabit(h.id)}
-                  style={{ marginBottom: 6 }}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: done }}
-                  accessibilityLabel={h.title}>
-                  <BlurView
-                    intensity={isDark ? 18 : 36}
-                    tint={isDark ? 'dark' : 'light'}
-                    style={[s.habitRow, { borderColor: c.border }]}>
-                    <View style={[s.habitBar, { backgroundColor: h.color || ACCENT }]} />
-                    <AnimatedCheck
-                      checked={done}
-                      size={20}
-                      color={h.color || ACCENT}
-                      borderColor={c.sub}
-                    />
-                    <Text style={[s.habitTitle, { color: c.text }]} numberOfLines={1}>{h.title}</Text>
-                    {streak > 0 && (
-                      <Text style={[s.streakBadge, { color: h.color || ACCENT }]}>
-                        🔥{streak}
-                      </Text>
-                    )}
-                  </BlurView>
-                </PressableScale>
-              );
-            })}
-          </View>
-        </Section>
-      ),
-    });
-  }
-
-  // 6. Фінанси + Час — сітка 2 колонки
+  // 2. Фінанси (+ плитка Часу поруч) — ряд з 2 плиток
   //
   // Плитки з РІЗНИХ модулів, тож фільтруються поокремо: кожна має flex:1,
   // тому та, що лишилась сама, просто займає весь ряд. Ряд без жодної
@@ -675,10 +531,10 @@ export default function TodayScreen() {
   const showFinanceTile = moduleOn('finance');
   const showTimeTile = moduleOn('time');
   if (showFinanceTile || showTimeTile) sections.push({
-    key: 'stats',
+    key: 'finance',
     node: (
-      <Section index={5} animate={animateIntro} motion={motion}>
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+      <Section index={1} animate={animateIntro} motion={motion}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
           {showFinanceTile && (
           <StatTile
             c={c} isDark={isDark}
@@ -731,25 +587,186 @@ export default function TodayScreen() {
     ),
   });
 
-  // Порядок секцій ОДИН для телефона і планшета: завдання → зустрічі → оплати
-  // → здоров'я → швидкі дії → звички → зведення. Раніше на телефоні (одна
-  // колонка) завдання й оплати зсувались під «Фінанси + Час», і день
-  // починався зі статистики, а не з того, що треба зробити; на планшеті ж
-  // порядок був інший, тож два пристрої показували різні екрани з тих самих
-  // даних. На планшеті лишається masonry — він лише розкладає цей самий
-  // порядок по колонках.
-  // («Спільне» плитка тут стояла раніше — прибрана: WORKSPACE_PROJECTS_PLAN.md
-  // §4, «Спільне» зливається в проєкти, жорсткий перехід.)
-  //
-  // Фільтр вимкнених модулів цього порядку не змінює: секції додаються тим
-  // самим ланцюжком push'ів, вимкнена просто не додається, а решта лишається
-  // на своїх місцях і в тій же послідовності.
+  // 3. Звички — це модуль «Профілактика» всередині «Здоров'я»: на вебі це
+  // окремі перемикачі, тож вимкнення будь-якого з двох прибирає секцію.
+  if (moduleOn('health', 'prevention') && habits.length > 0) {
+    sections.push({
+      key: 'habits',
+      node: (
+        <Section index={2} animate={animateIntro} motion={motion}>
+          <View style={{ gap: 6 }}>
+            <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayHabits}</Text>
+            {habits.map(h => {
+              const done   = habitDoneToday(h);
+              const streak = habitStreak(h);
+              return (
+                <PressableScale
+                  key={h.id}
+                  onPress={() => handleToggleHabit(h.id)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: done }}
+                  accessibilityLabel={h.title}>
+                  <BlurView
+                    intensity={isDark ? 18 : 36}
+                    tint={isDark ? 'dark' : 'light'}
+                    style={[s.habitRow, { borderColor: c.border }]}>
+                    <View style={[s.habitBar, { backgroundColor: h.color || ACCENT }]} />
+                    <AnimatedCheck
+                      checked={done}
+                      size={20}
+                      color={h.color || ACCENT}
+                      borderColor={c.sub}
+                    />
+                    <Text style={[s.habitTitle, { color: c.text }]} numberOfLines={1}>{h.title}</Text>
+                    {streak > 0 && (
+                      <Text style={[s.streakBadge, { color: h.color || ACCENT }]}>
+                        🔥{streak}
+                      </Text>
+                    )}
+                  </BlurView>
+                </PressableScale>
+              );
+            })}
+          </View>
+        </Section>
+      ),
+    });
+  }
+
+  // 4. Завдання на сьогодні
+  if (moduleOn('tasks')) sections.push({
+    key: 'tasks',
+    node: (
+      <Section index={3} animate={animateIntro} motion={motion}>
+        <View>
+          <View style={s.sectionRow}>
+            <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayTasks}</Text>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {overdueCount > 0 && (
+                <View style={[s.badge, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}>
+                  <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
+                    {overdueCount} {tr.todayOverdue}
+                  </Text>
+                </View>
+              )}
+              <View style={[s.badge, { backgroundColor: ACCENT_TASK + '18', borderColor: ACCENT_TASK + '35' }]}>
+                <Text style={{ color: ACCENT_TASK, fontSize: 11, fontWeight: '700' }}>
+                  {activeCount} {tr.todayActive}
+                </Text>
+              </View>
+            </View>
+          </View>
+          {/* Групи за статусом. «У процесі» йде першою і не обрізається:
+              на екрані дня спершу те, що робиться просто зараз. Заголовок
+              групи показуємо лише коли груп справді кілька — над єдиним
+              списком він був би шумом. */}
+          {todayGroups.groups.map(group => (
+            <View key={group.id}>
+              {todayGroups.groups.length > 1 && (
+                <View style={s.groupRow}>
+                  <View style={[s.groupDot, { backgroundColor: group.color }]} />
+                  <Text style={[s.groupName, { color: c.sub }]}>{group.name}</Text>
+                  <Text style={[s.groupCount, { color: c.sub }]}>{group.tasks.length}</Text>
+                </View>
+              )}
+              <TodayTaskRow
+                tasks={group.tasks}
+                isDark={isDark}
+                c={c}
+                tr={tr}
+                onToggle={handleToggleTask}
+                onOpen={openTaskDetails}
+                projects={projects}
+                animate={columnCount === 1}
+              />
+            </View>
+          ))}
+          {todayGroups.hidden > 0 && (
+            <ShowAllRow
+              label={tr.showAllCount.replace('{count}', String(todayGroups.total))}
+              color={ACCENT_TASK}
+              c={c}
+              onPress={() => router.push('/')}
+            />
+          )}
+          {todayGroups.total === 0 && (
+            <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
+          )}
+        </View>
+      </Section>
+    ),
+  });
+
+  // 5. Зустрічі сьогодні
+  if (moduleOn('meetings') && todayMeetings.length > 0) {
+    sections.push({
+      key: 'meetings',
+      node: (
+        <Section index={4} animate={animateIntro} motion={motion}>
+          <View style={{ gap: 6 }}>
+            <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayMeetings}</Text>
+            {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(({ meeting: m, phase }) => (
+              <PressableScale
+                key={m.id}
+                onPress={() => openMeeting(m)}
+                accessibilityRole="button"
+                accessibilityLabel={`${m.time} ${m.title}`}
+                style={{ opacity: phase === 'past' ? 0.5 : 1 }}>
+                <BlurView
+                  intensity={isDark ? 18 : 36}
+                  tint={isDark ? 'dark' : 'light'}
+                  style={[s.meetingRow, { borderColor: c.border }]}>
+                  <View style={[s.meetingBar, { backgroundColor: m.color || ACCENT_TASK }]} />
+                  <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
+                  <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
+                  <MeetingProjectChip project={meetingProject(m, projects)} textColor={c.sub} maxWidth={110} />
+                </BlurView>
+              </PressableScale>
+            ))}
+            {todayMeetings.length > TODAY_PREVIEW_LIMIT && (
+              <ShowAllRow
+                label={tr.showAllCount.replace('{count}', String(todayMeetings.length))}
+                color="#6366F1"
+                c={c}
+                onPress={() => router.push('/calendar' as never)}
+              />
+            )}
+          </View>
+        </Section>
+      ),
+    });
+  }
+
+  // 6. Найближчі оплати / прострочені підписки
+  if (moduleOn('subscriptions') && upcomingPayments.items.length > 0) {
+    sections.push({
+      key: 'payments',
+      node: (
+        <Section index={5} animate={animateIntro} motion={motion}>
+          {/* Власний marginBottom картки (потрібний на «Фінансах») тут гасимо:
+              відступ між секціями дає сітка. */}
+          <UpcomingPaymentsCard data={upcomingPayments} isDark={isDark} c={c} tr={tr} lang={lang} style={{ marginBottom: 0 }} />
+        </Section>
+      ),
+    });
+  }
+
+  // Порядок секцій — ПРАВИЛО ВЛАСНИКА (CLAUDE.md → «Правила екранів»):
+  // пошук речей → здоров'я + швидкі кнопки → фінанси → звички → завдання →
+  // зустрічі → оплати. Змінювати лише з дозволу власника. Джерело правди —
+  // TODAY_SECTION_ORDER (components/today/sectionOrder.ts); push'і вище
+  // йдуть у тому самому порядку, а orderTodaySections нижче — страховка.
+  // Порядок ОДИН для телефона і планшета: на телефоні — одна колонка в
+  // цьому порядку, на планшеті TodaySectionGrid кладе секції по черзі в
+  // найкоротшу masonry-колонку (здоров'я — завжди перша зліва вгорі).
+  // Вимкнений модуль просто не додає секцію — решта не переставляється.
 
   // Вимкнено геть усе: порожній екран мовчить про причину, тож кажемо її
   // прямо й ведемо туди, де модулі вмикають назад.
   if (sections.length === 0) {
     sections.push({
       key: 'all-modules-off',
+      fullWidth: true,
       node: (
         <Section index={0} animate={animateIntro} motion={motion}>
           <PressableScale
@@ -758,8 +775,7 @@ export default function TodayScreen() {
             // приймають рядкову константу, лише літерал.
             onPress={() => router.push(MODULE_SETTINGS_ROUTE as never)}
             accessibilityRole="button"
-            accessibilityLabel={tr.modulesOpenSettings}
-            style={{ marginBottom: 12 }}>
+            accessibilityLabel={tr.modulesOpenSettings}>
             <BlurView
               intensity={isDark ? 22 : 42}
               tint={isDark ? 'dark' : 'light'}
@@ -780,7 +796,7 @@ export default function TodayScreen() {
     });
   }
 
-  if (loaded && sections.length > 0) sections.splice(1, 0, { key: 'sponsor', node: <AdSlot slot="M1" /> });
+  sections = orderTodaySections(sections);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -799,7 +815,13 @@ export default function TodayScreen() {
         />
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarInset + 24 }}
+          contentContainerStyle={{
+            paddingHorizontal: gutter,
+            paddingBottom: tabBarInset + 24,
+            width: '100%',
+            maxWidth: Layout.wideMaxWidth,
+            alignSelf: 'center',
+          }}
           showsVerticalScrollIndicator={false}
           // Тап по результату пошуку речей при відкритій клавіатурі має
           // спрацювати з першого разу, а не лише сховати клавіатуру.
@@ -809,7 +831,7 @@ export default function TodayScreen() {
           {/* Пошук речей у контейнерах (containers.md §7.2) — під шапкою.
               Сам ховається, коли модуль вимкнено; обгортка — лише для відступу. */}
           {isModuleEnabled(disabledModules, 'containers') ? (
-            <View style={{ marginBottom: 12 }}>
+            <View style={{ marginBottom: TODAY_SECTION_GAP }}>
               <ContainerSearchPanel />
             </View>
           ) : null}
@@ -824,11 +846,19 @@ export default function TodayScreen() {
           )}
 
           {loaded && (
-            <MasonryColumns items={sections} columnCount={columnCount} />
+            <TodaySectionGrid items={sections} columnCount={columnCount} />
           )}
+
+          {/* Реклама — окремим рядком на всю ширину ПІСЛЯ всіх секцій правила
+              (після «оплат»): між «здоров'ям» і «фінансами» вона ламала
+              правило власника. Без обгортки й поза сіткою: порожній AdSlot
+              повертає null і не лишає ні рядка, ні відступу; власний
+              marginVertical у банера є. */}
+          {loaded && sections.length > 0 && <AdSlot slot="M1" />}
 
         </ScrollView>
       </View>
+      {projectTaskSheet}
     </View>
   );
 }

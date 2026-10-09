@@ -1,0 +1,17 @@
+# P0 regression: on a phone, switching project tabs via the bottom tab bar
+# must keep the project id (Завдання must list the project's own tasks).
+# Precondition: signed-in local account with a project named "Календар QA"
+# that has at least one task "Погодити банери". Local server only.
+appId: host.exp.Exponent
+---
+- launchApp
+- tapOn: "Проєкти"
+- tapOn: "Календар QA.*"
+- assertVisible: "Огляд"
+- tapOn:
+    text: "Завдання"
+    index: -1
+- assertVisible: "Погодити банери"
+- assertNotVisible: "Задач ще немає"
+- tapOn: "Моя робота"
+- assertNotVisible: "Seed alpha"

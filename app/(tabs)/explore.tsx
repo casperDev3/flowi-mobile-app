@@ -20,11 +20,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { FinanceSummary, KIND_COLOR, KIND_ICON } from '@/components/finance/FinanceSummary';
+import { KIND_COLOR, KIND_ICON, PeriodFlowCard } from '@/components/finance/FinanceSummary';
+import { OperationsSummary } from '@/components/finance/OperationsSummary';
 import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
 import { createSheetHandoff, openAfterModalExit } from '@/components/finance/sheetHandoff';
 import { UpcomingPaymentsCard, useUpcomingPayments } from '@/components/finance/UpcomingPaymentsCard';
 import { TransactionGroup } from '@/components/finance/TransactionGroup';
+import { FAB_LIST_CLEARANCE } from '@/components/tasks/AddTaskButton';
 import { PickerField, type PickerOption } from '@/components/shared/PickerField';
 import { PressableScale } from '@/components/shared/PressableScale';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
@@ -60,7 +62,9 @@ import { useMotion } from '@/hooks/use-motion';
 import { isSameDay } from '@/utils/dateUtils';
 import { haptic } from '@/utils/haptics';
 import { useResponsive } from '@/hooks/use-responsive';
-import { sheetColumnStyle } from '@/hooks/use-content-width';
+import { CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
+import { wideModalStyles } from '@/components/finance/wideModal';
+import { detailColumnWidthFor } from '@/constants/tokens';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import {
   DEFAULT_CATEGORIES_EN, DEFAULT_CATEGORIES_UK, categoryNameIssue, categoryOptions,
@@ -72,7 +76,6 @@ import { categoryGroupLabel, costKindLabel, type FinColors } from '@/components/
 import { AccountsTab } from '@/components/finance/AccountsTab';
 import { CategoryMetaEditor } from '@/components/finance/CategoryMetaEditor';
 import { FinanceFilterBar, FinanceTabBar } from '@/components/finance/FinanceSectionBar';
-import { OverviewTab } from '@/components/finance/OverviewTab';
 import { ReportsTab } from '@/components/finance/ReportsTab';
 import { useFinanceExtras } from '@/components/finance/useFinanceExtras';
 import { useFinanceFilter } from '@/components/finance/useFinanceFilter';
@@ -85,7 +88,7 @@ import {
 } from '@/utils/finance/classify';
 import { inRange, monthsOf, resolvePeriod } from '@/utils/finance/period';
 import { calcPeriodTotalsByCurrency } from '@/utils/financePeriod';
-import { parseFinanceTab, visibleFinanceTabs, type FinanceTab } from '@/utils/financeTabs';
+import { parseFinanceTab, reportsFabHidden, visibleFinanceTabs, type FinanceTab } from '@/utils/financeTabs';
 import { formatSubscriptionMoney, parseDateKey } from '@/utils/subscriptions';
 
 /**
@@ -145,19 +148,32 @@ function chunk<T>(arr: T[], n: number): T[][] {
 
 export default function FinanceScreen() {
   const tabBarInset = useTabBarInset();
-  const { height, isExpanded, isWide } = useResponsive();
+  const { width, height, isExpanded, isWide } = useResponsive();
+  // Рукописні модалки (календар, валюта, категорії) — діалогом на планшеті,
+  // як і SheetModal-и цього ж екрана.
+  const wm = wideModalStyles(isWide);
   const isDark = useColorScheme() === 'dark';
   useScreenView('finance');
   const insets = useSafeAreaInsets();
   /**
    * Вкладка розділу (finance-revamp.md §2). Живе в параметрі `?tab=`: сайдбар,
    * deep link і «Змінити підписки» з попередження відкривають потрібну
-   * вкладку адресою. Прихована (вимкнений підмодуль) чи невідома → «Огляд».
+   * вкладку адресою. Прихована (вимкнений підмодуль) чи невідома → «Операції»
+   * (типова вкладка — рішення власника 2026-10).
    */
   const searchParams = useLocalSearchParams<{ create?: string; tab?: string }>();
   const { disabledModules } = useUiModules();
   const visibleTabs = useMemo(() => visibleFinanceTabs(disabledModules), [disabledModules]);
   const [tab, setTab] = useState<FinanceTab>(() => parseFinanceTab(searchParams.tab, visibleTabs));
+  // «Звіти»: FAB ховається, поки стрічку гортають униз (накривав відсотки).
+  const [reportsFabOff, setReportsFabOff] = useState(false);
+  const reportsScrollY = useRef(0);
+  const onReportsScroll = useCallback((y: number) => {
+    const prev = reportsScrollY.current;
+    reportsScrollY.current = y;
+    setReportsFabOff(h => reportsFabHidden(prev, y, h));
+  }, []);
+  useEffect(() => { reportsScrollY.current = 0; setReportsFabOff(false); }, [tab]);
   useEffect(() => {
     setTab(prev => {
       const next = searchParams.tab ? parseFinanceTab(searchParams.tab, visibleTabs) : prev;
@@ -170,7 +186,7 @@ export default function FinanceScreen() {
     router.setParams({ tab: next });
   }, []);
   const { tr, lang } = useI18n();
-  // Найближчі й прострочені оплати підписок — блок під зведенням рахунків.
+  // Оплати підписок. На «Операціях» показуємо лише СЬОГОДНІШНІ (todayOnly).
   const upcomingPayments = useUpcomingPayments();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const DEFAULT_CATEGORIES = lang === 'uk' ? DEFAULT_CATEGORIES_UK : DEFAULT_CATEGORIES_EN;
@@ -532,7 +548,10 @@ export default function FinanceScreen() {
     (catName: string, type: CatType): IconSymbolName =>
       cats[type].find(c => c.name === catName)?.icon ??
       DEFAULT_CATEGORIES[type].find(c => c.name === catName)?.icon ??
-      (type === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'),
+      // P2: 'arrow.up.trend'/'arrow.down.trend' не існують у SF Symbols —
+      // на iOS категорія без запису (Продукти, Кафе…) малювала порожній
+      // квадрат. 'tag.fill' є і в SF Symbols, і в мапі Material.
+      'tag.fill',
     [cats, DEFAULT_CATEGORIES],
   );
 
@@ -620,6 +639,16 @@ export default function FinanceScreen() {
     [totalsSource, period, accounts],
   );
 
+  /** Оборот періоду для вкладки «Рахунки» — без фільтра стрічки по рахунку. */
+  const flowTotalsByCurrency = useMemo(
+    () => calcPeriodTotalsByCurrency(
+      scope === 'all' ? txs : txs.filter(t => matchesMoneyScope(t, scope)),
+      period,
+      t => resolveTxCurrency(t, accounts),
+    ),
+    [txs, scope, period, accounts],
+  );
+
   const filtered = useMemo(() => monthTxs.filter(t => {
     if (filter !== 'all' && t.type !== filter) return false;
     if (unassignedOnly && !unassignedIds.has(t.id)) return false;
@@ -700,11 +729,26 @@ export default function FinanceScreen() {
    * даними. useCallback — не косметика: функція йде в шапку стрічки, і нова
    * ідентичність щорендера робила б мемоізацію шапки безглуздою (PERF-4).
    */
+  const accountDefaultPendingRef = useRef(false);
+  useEffect(() => {
+    if (!accountDefaultPendingRef.current) return;
+    if (!showAdd || editingId) { accountDefaultPendingRef.current = false; return; }
+    const accId = defaultAccountId(accounts, lastAccountRef.current);
+    if (!accId) return;
+    accountDefaultPendingRef.current = false;
+    setFormAccountId(prev => prev ?? accId);
+  }, [accounts, showAdd, editingId]);
+
   const openAdd = useCallback((mode: FormType = 'expense') => {
     setEditingId(null);
     setTxType(mode);
     setAmount(''); setCategory(''); setNote(''); setToAmount('');
-    setFormAccountId(defaultAccountId(accounts, lastAccountRef.current));
+    const accId = defaultAccountId(accounts, lastAccountRef.current);
+    setFormAccountId(accId);
+    // Диплінк `?create=1` відкриває форму ДО того, як рахунки дочитались, і
+    // поле «Рахунок» лишалось порожнім навіть з єдиним рахунком. Ефект нижче
+    // підставить типовий, щойно рахунки з'являться.
+    accountDefaultPendingRef.current = !accId;
     setFormToAccountId(null);
     setShowAdd(true);
   }, [accounts]);
@@ -917,10 +961,16 @@ export default function FinanceScreen() {
       lines.push('', `${tr.breakdownFuture.replace('{n}', String(b.futureCount))} (${b.future > 0 ? '+' : ''}${fmtCur(b.future, cur)})`);
     }
     Alert.alert(`${tr.balanceBreakdown} · ${account.name}`, lines.join('\n'), [
+      // Стрічка карток рахунків пішла з «Операцій» — фільтр стрічки по
+      // рахунку тепер вмикається звідси.
+      {
+        text: tr.finShowOperations,
+        onPress: () => { setAccountFilter(account.id); changeTab('transactions'); },
+      },
       { text: tr.reconcileBalance, onPress: () => openAccountForm(account) },
       { text: tr.close, style: 'cancel' },
     ]);
-  }, [overview.breakdowns, fmtCur, curOf, tr, openAccountForm]);
+  }, [overview.breakdowns, fmtCur, curOf, tr, openAccountForm, changeTab]);
 
   /**
    * «Звірити з реальним залишком»: людина вводить, скільки РЕАЛЬНО лежить на
@@ -1211,6 +1261,58 @@ export default function FinanceScreen() {
     motion, primaryCurrency, shouldAnimateGroup, tr,
   ]);
 
+  /** Суми «Залишків» — тією самою точністю валюти, що й стрічка. */
+  const fmtCode = useCallback((n: number, code: string) => fmtCur(n, curOf(code)), [fmtCur, curOf]);
+  // «Рахунки» сховано (вимкнено підмодуль «Банки») → список рахунків у модалці:
+  // «Огляду» з балансами більше немає, а порожнього переходу не має бути.
+  const openAccountsTab = useCallback(() => {
+    if (visibleTabs.includes('accounts')) { changeTab('accounts'); return; }
+    setAccForm(null);
+    setShowAccounts(true);
+  }, [changeTab, visibleTabs]);
+  const accountFilterName = accountFilter ? (accountById(accounts, accountFilter)?.name ?? null) : null;
+  /** Чи є оплата з датою сьогодні — інакше блок не малюємо зовсім. */
+  const hasTodayDue = useMemo(() => upcomingPayments.items.some(i => i.daysUntil === 0), [upcomingPayments.items]);
+  /**
+   * «Залишки» (рішення власника): у «Операціях» одразу видно і стрічку, і
+   * скільки грошей. Рахунки й оборот місяця — у вкладці «Рахунки».
+   */
+  const opsSummary = useMemo(() => (
+    <OperationsSummary
+      totals={overview.totalByCurrency}
+      periodTotals={totalsByCurrency}
+      primaryCode={primaryCurrency}
+      hasAccounts={visibleAccounts.length > 0}
+      fmt={fmtCode}
+      c={finColors}
+      tr={tr}
+      onOpenAccounts={openAccountsTab}
+      onNewAccount={() => openAccountForm(null)}
+      unassignedLabel={overview.unassigned.count > 0
+        ? tr.unassignedTxWarning.replace('{n}', String(overview.unassigned.count))
+        : null}
+      unassignedActive={unassignedOnly}
+      onPressUnassigned={() => { haptic.light(); setUnassignedOnly(v => !v); }}
+      accountFilterName={accountFilterName}
+      onClearAccountFilter={() => { haptic.light(); setAccountFilter(null); }}
+    />
+  ), [
+    overview.totalByCurrency, overview.unassigned.count, totalsByCurrency, primaryCurrency,
+    visibleAccounts.length, fmtCode, finColors, tr, openAccountsTab, openAccountForm,
+    unassignedOnly, accountFilterName,
+  ]);
+  const todayDueCard = useCallback((style: object) => (
+    <UpcomingPaymentsCard
+      data={upcomingPayments}
+      todayOnly
+      isDark={isDark}
+      c={{ text: c.text, sub: c.sub, border: c.border }}
+      tr={tr}
+      lang={lang}
+      style={style}
+    />
+  ), [upcomingPayments, isDark, c.text, c.sub, c.border, tr, lang]);
+
   // Шапка списку: фільтри, баланси, порожній стан. Мемоізуємо, щоб FlatList
   // не перебудовував її на кожен символ, надрукований у формі операції
   // (PERF-4): у змінній без useMemo вона перестворювалась щорендера, попри
@@ -1251,76 +1353,37 @@ export default function FinanceScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Стрічка рахунків + оборот місяця */}
-            <FinanceSummary
-              accounts={visibleAccounts}
-              balances={accountBalances}
-              selectedAccountId={accountFilter}
-              onSelectAccount={id => {
-                haptic.light();
-                // Повторний тап знімає фільтр — інакше з нього нема виходу.
-                setAccountFilter(prev => (prev === id ? null : id));
-              }}
-              onNewAccount={() => openAccountForm(null)}
-              kindLabel={kindLabel}
-              currencies={allCurrencies}
-              totalsByCurrency={totalsByCurrency}
-              primaryCode={primaryCurrency}
-              onPickPrimary={() => setShowPrimaryPicker(true)}
-              fmt={fmtCur}
-              isDark={isDark}
-              c={{ border: c.border, sub: c.sub, text: c.text, dim: c.dim, accent: c.accent, green: c.green, red: c.red }}
-              incomeLabel={tr.incomes}
-              expenseLabel={tr.expenses}
-              savingsLabel={tr.savings}
-              accountsLabel={tr.accounts}
-              newAccountLabel={tr.newAccount}
-              noAccountsLabel={tr.noAccounts}
-              noAccountsHint={tr.noAccountsHint}
-              transfersNoteLabel={tr.transfersNotCounted}
-              showTransfersNote={monthHasTransfers}
-              accountTotals={overview.totalByCurrency}
-              totalLabel={tr.totalOnAccounts}
-              onLongPressAccount={showBreakdown}
-              breakdownHint={tr.balanceBreakdown}
-              unassignedLabel={overview.unassigned.count > 0
-                ? tr.unassignedTxWarning.replace('{n}', String(overview.unassigned.count))
-                : null}
-              unassignedActive={unassignedOnly}
-              onPressUnassigned={() => { haptic.light(); setUnassignedOnly(v => !v); }}
-            />
+            {/* Залишки + «Сьогодні до оплати» над стрічкою. На ландшафті
+                планшета (≥840) вони — у бічній колонці (див. DetailPane нижче). */}
+            {!isExpanded && (
+              <View style={isWide ? s.summaryRow : undefined}>
+                <View style={isWide ? s.summaryCell : undefined}>{opsSummary}</View>
+                {hasTodayDue ? (
+                  <View style={isWide ? s.summaryCell : undefined}>
+                    {todayDueCard({ marginTop: isWide ? 0 : 14, marginBottom: 0 })}
+                  </View>
+                ) : null}
+              </View>
+            )}
 
-            {/* Найближчі оплати / прострочені підписки. Операцій не створюють —
-                лише нагадують; тап веде на екран підписок. */}
-            <UpcomingPaymentsCard
-              data={upcomingPayments}
-              isDark={isDark}
-              c={{ text: c.text, sub: c.sub, border: c.border }}
-              tr={tr}
-              lang={lang}
-              style={{ marginTop: 16, marginBottom: 0 }}
-            />
-
-            {/* Filters. Вибраний стан передавався ВИКЛЮЧНО кольором тла, тож
-                VoiceOver читав три однакові кнопки, а дальтонік не відрізняв їх
-                зовсім (A11Y-04). Звідси role=tab + state.selected на кнопках і
-                tablist на самому ряду. */}
-            <View
-              accessibilityRole="tablist"
-              style={[s.filterRow, { backgroundColor: c.card, borderColor: c.border, marginTop: 16, marginBottom: 22 }]}>
-              {(['all', 'income', 'expense'] as const).map(f => (
+            {/* Заголовок стрічки. Перемикач Всі/Доходи/Витрати переїхав у
+                фільтр-чип ряду періоду (FinanceFilterBar): під табами й
+                періодом він був третім рядом контролів (P2 аудиту 2026-10). */}
+            <View style={[s.feedHead, { marginTop: isExpanded ? 4 : 18 }]}>
+              <Text style={[s.feedTitle, { color: c.text }]} accessibilityRole="header">{tr.finTabTransactions}</Text>
+              {filter !== 'all' ? (
                 <TouchableOpacity
-                  key={f}
-                  onPress={() => setFilter(f)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: filter === f }}
-                  accessibilityLabel={f === 'all' ? tr.all : f === 'income' ? tr.incomes : tr.expenses}
-                  style={[s.filterBtn, filter === f && { backgroundColor: f === 'income' ? c.green : f === 'expense' ? c.red : c.accent }]}>
-                  <Text style={[s.filterLabel, { color: filter === f ? '#fff' : c.sub }]}>
-                    {f === 'all' ? tr.all : f === 'income' ? tr.incomes : tr.expenses}
+                  onPress={() => setFilter('all')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${filter === 'income' ? tr.incomes : tr.expenses}, ${tr.all}`}
+                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  style={[s.dateChip, { marginBottom: 0, backgroundColor: (filter === 'income' ? c.green : c.red) + '20', borderColor: (filter === 'income' ? c.green : c.red) + '60' }]}>
+                  <Text style={{ color: filter === 'income' ? c.green : c.red, fontSize: 12, fontWeight: '600' }}>
+                    {filter === 'income' ? tr.incomes : tr.expenses}
                   </Text>
+                  <IconSymbol name="xmark" size={12} color={filter === 'income' ? c.green : c.red} style={{ marginLeft: 4 }} />
                 </TouchableOpacity>
-              ))}
+              ) : null}
             </View>
 
             {/* Empty state with CTA */}
@@ -1344,11 +1407,9 @@ export default function FinanceScreen() {
 
     </>
   ), [
-    accountBalances, accountFilter, allCurrencies, c.accent, c.border, c.card, c.dim,
-    c.green, c.red, c.sub, c.text, dateFilter, filter, fmtCur, groups.length, initialized,
-    isDark, kindLabel, lang, loadFailed, locale, monthHasTransfers, openAccountForm, openAdd,
-    primaryCurrency, retryLoad, totalsByCurrency, tr, upcomingPayments, visibleAccounts,
-    overview.totalByCurrency, overview.unassigned.count, showBreakdown, unassignedOnly,
+    c.accent, c.green, c.red, c.sub, c.text, dateFilter, filter,
+    groups.length, initialized, isDark, isExpanded, isWide, lang, loadFailed, locale, openAdd,
+    retryLoad, tr, todayDueCard, opsSummary, hasTodayDue,
   ]);
 
   // Той самий вміст показується модалкою на телефоні й колонкою на
@@ -1524,7 +1585,10 @@ export default function FinanceScreen() {
               </HeaderButton>
             </>
           }>
-          <FinanceTabBar tabs={visibleTabs} active={tab} onChange={changeTab} c={finColors} tr={tr} />
+          {/* Один ряд навігації: сегменти вкладок (+ «Ще») і, на планшеті,
+              фільтр періоду поруч. Раніше тут було три ряди «табів». */}
+          <View style={isWide ? s.navRowWide : undefined}>
+          <FinanceTabBar tabs={visibleTabs} active={tab} onChange={changeTab} c={finColors} tr={tr} stretch={!isWide} />
           <FinanceFilterBar
             filter={finFilter.filter}
             currencies={filterCurrencies}
@@ -1532,15 +1596,18 @@ export default function FinanceScreen() {
             onCurrency={code => finFilter.setCurrency(code === primaryCurrency ? null : code)}
             onScope={finFilter.setScope}
             showScope={tab !== 'accounts' && tab !== 'subscriptions'}
+            txType={tab === 'transactions' ? filter : undefined}
+            onTxType={tab === 'transactions' ? setFilter : undefined}
             c={finColors}
             tr={tr}
             locale={locale}
             isDark={isDark}
           />
+          </View>
         </ScreenHeader>
 
-        {tab === 'overview' ? (
-          <OverviewTab
+        {tab === 'reports' ? (
+          <ReportsTab
             transactions={txs}
             accounts={accounts}
             categoryRows={extras.categoryRows}
@@ -1548,32 +1615,15 @@ export default function FinanceScreen() {
             recurringIncomes={extras.recurringIncomes}
             filter={finFilter.filter}
             primary={primaryCurrency}
-            overview={overview}
             money={money}
             c={finColors}
             tr={tr}
             locale={locale}
             isWide={isWide}
             bottomInset={tabBarInset + 64}
-            onOpenUnassigned={() => { setUnassignedOnly(true); changeTab('transactions'); }}
-            onOpenSubscriptions={() => changeTab(visibleTabs.includes('subscriptions') ? 'subscriptions' : 'overview')}
-            onOpenAccount={showBreakdown}
-          />
-        ) : tab === 'reports' ? (
-          <ReportsTab
-            transactions={txs}
-            accounts={accounts}
-            categoryRows={extras.categoryRows}
-            subscriptions={extras.subscriptions}
-            filter={finFilter.filter}
-            primary={primaryCurrency}
-            money={money}
-            c={finColors}
-            tr={tr}
-            locale={locale}
-            isWide={isWide}
-            bottomInset={tabBarInset + 64}
+            onScrollY={onReportsScroll}
             onAssignCategories={() => { setCatTab('expense'); setShowCats(true); }}
+            onOpenSubscriptions={visibleTabs.includes('subscriptions') ? () => changeTab('subscriptions') : undefined}
           />
         ) : tab === 'budget' ? (
           <BudgetPanel
@@ -1604,12 +1654,37 @@ export default function FinanceScreen() {
             onEditAccount={account => openAccountForm(account)}
             onNewAccount={() => openAccountForm(null)}
             onOpenBanks={() => router.push('/banks' as never)}
+            header={
+              <PeriodFlowCard
+                currencies={allCurrencies}
+                totalsByCurrency={flowTotalsByCurrency}
+                primaryCode={primaryCurrency}
+                onPickPrimary={() => setShowPrimaryPicker(true)}
+                fmt={fmtCur}
+                isDark={isDark}
+                c={{ border: c.border, sub: c.sub, text: c.text, dim: c.dim, accent: c.accent, green: c.green, red: c.red }}
+                incomeLabel={tr.incomes}
+                expenseLabel={tr.expenses}
+                savingsLabel={tr.savings}
+                transfersNoteLabel={tr.transfersNotCounted}
+                showTransfersNote={monthHasTransfers}
+                title={tr.finPeriodFlow}
+              />
+            }
           />
         ) : (
         <FlatList
           data={groups}
           keyExtractor={group => group.dateStr}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }}
+          // На планшеті стрічка операцій — колонка для читання по центру:
+          // рядок «категорія … сума» на всю ширину ландшафту розносить
+          // назву й суму так далеко, що око губить, що до чого.
+          contentContainerStyle={[
+            // P1: FAB «+» більше не накриває суму останнього рядка — той самий
+            // запас, що й у списку Задач.
+            { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + FAB_LIST_CLEARANCE },
+            isWide && { width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
           ListHeaderComponent={listHeader}
@@ -1620,7 +1695,7 @@ export default function FinanceScreen() {
 
       {/* FAB «+ Операція». На «Бюджеті» й «Підписках» у вкладки своя дія
           «додати», і друга кнопка поверх неї лише заступала б список. */}
-      {tab !== 'budget' && tab !== 'subscriptions' ? (
+      {tab !== 'budget' && tab !== 'subscriptions' && !(tab === 'reports' && reportsFabOff) ? (
       <PressableScale
         onPress={() => { haptic.medium(); openAdd(); }}
         accessibilityRole="button"
@@ -1632,9 +1707,15 @@ export default function FinanceScreen() {
       ) : null}
       </View>
 
+      {/* Колонка деталі операції — лише на вкладці «Операції». На інших
+          вкладках вона була порожньою колонкою «оберіть операцію» на 380pt,
+          а на «Підписках» стояла ДРУГОЮ поруч із колонкою деталі підписки.
+          На телефоні деталь — модалка, її показуємо завжди (вибір живе). */}
+      {tab === 'transactions' || !isExpanded ? (
       <DetailPane
         open={!!selected}
         wide={isExpanded}
+        columnWidth={detailColumnWidthFor(width)}
         onClose={() => setSelected(null)}
         isDark={isDark}
         sheetColor={c.sheet}
@@ -1642,14 +1723,22 @@ export default function FinanceScreen() {
         maxHeight={height * 0.88}
         scrollRef={txDetailScrollRef}
         empty={
-          <>
-            <IconSymbol name="banknote" size={40} color={c.sub} />
-            <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginTop: 12 }}>{tr.txEmptyTitle}</Text>
-            <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 6 }}>{tr.txEmptyHint}</Text>
-          </>
+          // Ландшафт планшета: «список + бічне зведення». Поки операцію не
+          // вибрано, колонка показує залишки й сьогоднішні оплати; вибір
+          // підміняє її деталлю, «×» повертає зведення.
+          <ScrollView style={s.sidePane} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+            {opsSummary}
+            {todayDueCard({ marginTop: 16, marginBottom: 0 })}
+            <View style={{ alignItems: 'center', marginTop: 32 }}>
+              <IconSymbol name="banknote" size={32} color={c.sub} />
+              <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginTop: 10 }}>{tr.txEmptyTitle}</Text>
+              <Text style={{ color: c.sub, fontSize: 12, textAlign: 'center', marginTop: 4 }}>{tr.txEmptyHint}</Text>
+            </View>
+          </ScrollView>
         }>
         {txDetailBody}
       </DetailPane>
+      ) : null}
       </View>
 
 
@@ -1700,35 +1789,8 @@ export default function FinanceScreen() {
 
               <View style={[s.menuDivider, { backgroundColor: c.border }]} />
 
-              {/* Бюджет */}
-              <TouchableOpacity
-                onPress={() => { setShowMenu(false); router.push('/budget'); }}
-                style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: '#0EA5E9' + '25' }]}>
-                  <IconSymbol name="chart.pie.fill" size={15} color="#0EA5E9" />
-                </View>
-                {/* Через tr.*, а не рядком: підпис того самого розділу вже
-                    розійшовся з сайдбаром і Налаштуваннями саме тому, що жив
-                    у трьох місцях, а перекладався в одному. */}
-                <Text style={[s.menuLabel, { color: c.text }]}>{tr.navBudget}</Text>
-                <IconSymbol name="chevron.right" size={13} color={c.sub} />
-              </TouchableOpacity>
-
-              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-              {/* Підписки — регулярні платежі. Операцій не створюють, тож
-                  живуть окремим екраном поруч із бюджетом. */}
-              <TouchableOpacity
-                onPress={() => { setShowMenu(false); router.push('/subscriptions'); }}
-                style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: '#8B5CF625' }]}>
-                  <IconSymbol name="repeat" size={15} color="#8B5CF6" />
-                </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>{tr.navSubscriptions}</Text>
-                <IconSymbol name="chevron.right" size={13} color={c.sub} />
-              </TouchableOpacity>
-
-              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+              {/* Бюджет і Підписки тут більше не дублюються: це вкладки
+                  розділу (меню «Ще»), і вимкнений підмодуль ховає їх там. */}
 
               {/* Рахунки. Замінили «розподіл балансу»: початковий залишок
                   тепер живе в самому рахунку, а не окремою поправкою. */}
@@ -1786,13 +1848,13 @@ export default function FinanceScreen() {
       {/* ─── Calendar Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setShowCal(false)}>
+          <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setShowCal(false)}>
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
-              style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+              style={[s.sheetWrapper, wm.column]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
 
                 <View style={s.handleRow}>
@@ -2063,13 +2125,13 @@ export default function FinanceScreen() {
 
       {/* ─── Primary Currency Picker ─── */}
       <Modal visible={showPrimaryPicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowPrimaryPicker(false)}>
-        <Pressable accessible={false} style={s.overlay} onPress={() => setShowPrimaryPicker(false)}>
+        <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setShowPrimaryPicker(false)}>
           <Pressable
             onPress={e => e.stopPropagation()}
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"
-            style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+            style={[s.sheetWrapper, wm.column]}>
             <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
@@ -2128,13 +2190,13 @@ export default function FinanceScreen() {
       {/* ─── Categories Modal ─── */}
       <Modal visible={showCats} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { setShowCats(false); setShowAddCat(false); }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => { setShowCats(false); setShowAddCat(false); }}>
+          <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => { setShowCats(false); setShowAddCat(false); }}>
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
-              style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
+              style={[s.sheetWrapper, wm.column]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
@@ -2628,9 +2690,14 @@ function InfoRow({ icon, label, value, color, text, sub, border, last }: any) {
 
 const s = StyleSheet.create({
   dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
-  filterRow:   { flexDirection: 'row', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 3 },
-  filterBtn:   { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
-  filterLabel: { fontSize: 12, fontWeight: '600' },
+  feedHead:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 },
+  feedTitle:   { fontSize: 17, fontWeight: Atlas.type.headingWeight, flexShrink: 1 },
+  summaryRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' },
+  summaryCell: { flexGrow: 1, flexBasis: 260, minWidth: 0 },
+  // Планшет: вкладки ліворуч, період і «Фільтри (N)» праворуч — один ряд.
+  // wrap лишається лише страховкою для найвужчого medium-вікна.
+  navRowWide:  { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 12 },
+  sidePane:    { alignSelf: 'stretch', flex: 1 },
   groupLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   fab:         { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

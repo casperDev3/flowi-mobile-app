@@ -15,10 +15,12 @@ import { Atlas } from '@/constants/atlas';
  * число тут збігається з «Всі (N)», а список лишається живим — синк чи
  * сусідній екран, що записав 'tasks', одразу видно й тут.
  *
- * Екран лише для перегляду: тап відкриває ту саму деталь, що й на екрані
- * завдань (через ?open=), довгий тап — меню з копіюванням.
+ * Екран лише для перегляду: тап по особистій задачі відкриває ту саму деталь,
+ * що й на екрані завдань (через ?open=), по задачі проєкту — картку проєкту
+ * тут же, аркушем (ProjectTaskSheet); довгий тап — меню з копіюванням.
  */
 import { LinearGradient } from 'expo-linear-gradient';
+import { useInPlaceProjectTask } from '@/components/projects/ProjectTaskSheet';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -76,6 +78,7 @@ export default function TaskGroupScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<Record<string, string>>();
   const isDark = useColorScheme() === 'dark';
+  const { openProjectTask, projectTaskSheet } = useInPlaceProjectTask(isDark);
   const { tr, lang } = useI18n();
   const { user } = useAuth();
   const today = useToday();
@@ -189,8 +192,9 @@ export default function TaskGroupScreen() {
   const data = group?.tasks ?? [];
 
   const openTask = useCallback((task: Task) => {
+    if (openProjectTask(task)) return;
     router.push({ pathname: '/(tabs)', params: { open: task.id } });
-  }, [router]);
+  }, [router, openProjectTask]);
 
   const copyTask = useCallback((task: Task) => {
     const text = taskToMarkdown(task, { projects, sprints, columns }, taskMarkdownLabels(tr));
@@ -276,6 +280,7 @@ export default function TaskGroupScreen() {
       />
 
       {toastElement}
+      {projectTaskSheet}
     </View>
   );
 }

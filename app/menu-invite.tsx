@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Text } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/store/auth";
 import { menuApi } from "@/store/menu-api";
 import {
@@ -11,14 +12,17 @@ import {
   setWorkspaceConfig,
 } from "@/store/workspace";
 import { saveData } from "@/store/storage";
-import { GroupScreenShell } from "@/components/training/GroupScreenShell";
-import { Card, PrimaryButton } from "@/components/training/TrainingBits";
-import { useTrainingColors } from "@/components/training/theme";
+import { ContentContainer } from "@/components/shared/ContentContainer";
+import { ScreenHeader } from "@/components/shared/ScreenHeader";
+import { menuBits } from "@/components/menu/MenuBits";
+import { MENU_ERR, useMenuColors } from "@/components/menu/theme";
+import { useI18n } from "@/store/i18n";
 export default function MenuInviteScreen() {
   const { ws, t } = useLocalSearchParams<{ ws?: string; t?: string }>();
   const { status, switchWorkspace } = useAuth();
   const router = useRouter(),
-    c = useTrainingColors();
+    c = useMenuColors(),
+    { tr } = useI18n();
   const [name, setName] = useState(""),
     [error, setError] = useState(""),
     [ready, setReady] = useState(false),
@@ -79,54 +83,59 @@ export default function MenuInviteScreen() {
     await saveData("pending_menu_invite", { ws: normalized.origin, t });
     router.push(register ? "/register" : "/login");
   }
+  // Той самий вигляд, що й екран меню: ScreenHeader, фон і картки модуля.
+  const { btn, panel } = menuBits(c, busy);
   return (
-    <GroupScreenShell c={c} title="Запрошення до меню">
-      <Card c={c}>
-        {!!error && (
-          <Text accessibilityRole="alert" style={{ color: "#EF4444" }}>
-            {error}
-          </Text>
-        )}
-        {!ready ? (
-          <>
-            <Text style={{ color: c.text }}>
-              Відкрити workspace {ws}?{" "}
-              {status === "authed"
-                ? "Перехід до іншого workspace потребує виходу з поточного акаунта."
-                : ""}
-            </Text>
-            <PrimaryButton
-              label="Продовжити"
-              disabled={busy}
-              onPress={() => void connect()}
-            />
-          </>
-        ) : (
-          <>
-            <Text style={{ color: c.text, fontSize: 20, fontWeight: "700" }}>
-              {name}
-            </Text>
-            <Text style={{ color: c.sub, marginVertical: 12 }}>
-              Переглядайте меню та надсилайте пропозиції або скарги автору.
-            </Text>
-            {status === "authed" ? (
-              <PrimaryButton
-                label="Приєднатися"
-                disabled={busy}
-                onPress={() => void join()}
-              />
-            ) : (
-              <>
-                <PrimaryButton label="Увійти" onPress={() => void login()} />
-                <PrimaryButton
-                  label="Створити акаунт"
-                  onPress={() => void login(true)}
-                />
-              </>
-            )}
-          </>
-        )}
-      </Card>
-    </GroupScreenShell>
+    <View style={{ flex: 1, backgroundColor: c.bg1 }}>
+      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <ScreenHeader
+        title="Запрошення до меню"
+        color={c.text}
+        back={{
+          onPress: () => (router.canGoBack() ? router.back() : router.replace("/")),
+          label: tr.back,
+          style: { backgroundColor: c.dim, borderColor: c.border },
+        }}
+      />
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
+        <ContentContainer variant="reading" style={{ paddingTop: 6 }}>
+          {panel(
+            <>
+              {!!error && (
+                <Text accessibilityRole="alert" style={{ color: MENU_ERR }}>
+                  {error}
+                </Text>
+              )}
+              {!ready ? (
+                <>
+                  <Text style={{ color: c.text, fontSize: 15, lineHeight: 22 }}>
+                    Відкрити workspace {ws}?{" "}
+                    {status === "authed"
+                      ? "Перехід до іншого workspace потребує виходу з поточного акаунта."
+                      : ""}
+                  </Text>
+                  {btn("Продовжити", () => void connect(), true)}
+                </>
+              ) : (
+                <>
+                  <Text style={{ color: c.text, fontSize: 20, fontWeight: "700" }}>{name}</Text>
+                  <Text style={{ color: c.sub, fontSize: 15, lineHeight: 22 }}>
+                    Переглядайте меню та надсилайте пропозиції або скарги автору.
+                  </Text>
+                  {status === "authed" ? (
+                    btn("Приєднатися", () => void join(), true)
+                  ) : (
+                    <>
+                      {btn("Увійти", () => void login(), true)}
+                      {btn("Створити акаунт", () => void login(true))}
+                    </>
+                  )}
+                </>
+              )}
+            </>,
+          )}
+        </ContentContainer>
+      </ScrollView>
+    </View>
   );
 }

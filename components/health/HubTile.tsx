@@ -1,5 +1,4 @@
 import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -21,10 +20,12 @@ import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
  * збільшеному системному шрифті другий рядок (те, заради чого плитку й
  * читають) обрізався: на XXXL запас 1.7pt, на AX1 рядок розрізано навпіл.
  * Тепер це `minHeight` — коробка росте разом із текстом, — а заголовку
- * дозволено два рядки. `overflow:'hidden'` лишається: він тут тримає
- * заокруглення BlurView, а не ріже текст, бо стеля висоти знята.
+ * дозволено два рядки.
+ *
+ * 07.10: плитка суцільна (фон картки, як на Фінансах), а не BlurView без фону —
+ * тож і `overflow:'hidden'` для заокруглення розмиття більше не потрібен.
  */
-export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark, border, text, sub }: {
+export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark, border, text, sub, card }: {
   title: string;
   /** Типізовано: рядок пропускав назви, яких немає в маппінгу. */
   icon: IconSymbolName;
@@ -37,6 +38,8 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
   border: string;
   text: string;
   sub: string;
+  /** Суцільний фон плитки (c.card); без нього — той самий, що в getHealthColors. */
+  card?: string;
 }) {
   const detail = stat ?? hint;
   return (
@@ -47,8 +50,9 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
       accessibilityRole="button"
       accessibilityLabel={[title, detail, badge != null && badge > 0 ? String(badge) : null].filter(Boolean).join(', ')}
     >
-      <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-        style={{ borderRadius: Atlas.radius.xlarge, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14, minHeight: 112 }}>
+      <View
+        style={{ borderRadius: Atlas.radius.xlarge, borderWidth: 1, borderColor: border, padding: 14, minHeight: 112,
+          backgroundColor: card ?? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)') }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name={icon as any} size={19} color={color} />
@@ -63,7 +67,7 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
         <Text numberOfLines={2} style={{ color: text, fontSize: 15, fontWeight: Atlas.type.headingWeight, marginTop: 12 }}>{title}</Text>
         {stat ? <Text numberOfLines={2} style={{ color, fontSize: 13, fontWeight: '700', marginTop: 3 }}>{stat}</Text>
               : hint ? <Text numberOfLines={2} style={{ color: sub, fontSize: 11, fontWeight: '600', marginTop: 3 }}>{hint}</Text> : null}
-      </BlurView>
+      </View>
     </TouchableOpacity>
   );
 }

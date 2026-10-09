@@ -19,7 +19,7 @@ import type { ProjectModules } from '@/utils/projectUtils';
 
 export type ProjectRole = 'owner' | 'manager' | 'member' | 'viewer';
 export type ProjectSectionKey =
-  | 'backlog' | 'archive' | 'calendar' | 'my-work' | 'discussions' | 'workload' | 'members' | 'overview' | 'tasks' | 'meetings' | 'notes' | 'time' | 'budget' | 'sprints' | 'settings';
+  | 'backlog' | 'archive' | 'calendar' | 'my-work' | 'discussions' | 'workload' | 'members' | 'overview' | 'tasks' | 'notes' | 'time' | 'budget' | 'sprints' | 'settings';
 
 export interface ProjectNavItem {
   key: ProjectSectionKey;
@@ -32,7 +32,7 @@ export interface ProjectNavItem {
 }
 
 export const PROJECT_NAV_ITEMS: readonly ProjectNavItem[] = [
-  { key: 'my-work', icon: 'checklist', labelKey: 'projectMyWork' },
+  { key: 'my-work', icon: 'person.crop.circle', labelKey: 'projectMyWork' },
   { key: 'tasks',    icon: 'checklist',             labelKey: 'tabTasks' },
   { key: 'calendar', icon: 'calendar', labelKey: 'calendar' },
   { key: 'backlog', icon: 'list.bullet', labelKey: 'projectBacklogNav' },
@@ -41,7 +41,6 @@ export const PROJECT_NAV_ITEMS: readonly ProjectNavItem[] = [
   { key: 'members', icon: 'person.2.fill', labelKey: 'projectTeam' },
   { key: 'workload', icon: 'chart.pie.fill', labelKey: 'projectWorkload' },
   { key: 'overview', icon: 'square.grid.2x2.fill', labelKey: 'projectNavOverview' },
-  { key: 'meetings', icon: 'calendar',              labelKey: 'navMeetings' },
   { key: 'notes',    icon: 'note.text',             labelKey: 'notes',             moduleKey: 'notes' },
   { key: 'time',     icon: 'timer',                 labelKey: 'navTime',           moduleKey: 'time' },
   { key: 'budget',   icon: 'chart.pie.fill',        labelKey: 'navBudget',         moduleKey: 'budget', ownerOnly: true },
@@ -109,7 +108,7 @@ export function projectTabCapacity(width: number): number {
  * не ховати щоденне заради рідкісного.
  */
 const PROJECT_TAB_PRIORITY: readonly ProjectSectionKey[] = [
-  'my-work', 'tasks', 'calendar', 'meetings', 'overview', 'backlog', 'archive', 'discussions', 'members', 'workload', 'time', 'notes', 'sprints', 'budget', 'settings',
+  'my-work', 'tasks', 'calendar', 'overview', 'backlog', 'archive', 'discussions', 'members', 'workload', 'time', 'notes', 'sprints', 'budget', 'settings',
 ];
 
 export interface ProjectNavSplit {
@@ -180,4 +179,14 @@ export function projectSectionFromPathname(pathname: string): ProjectSectionKey 
   const match = /^\/project\/[^/]+\/([^/]+)/.exec(pathname);
   const key = match?.[1];
   return (PROJECT_NAV_ITEMS.some(item => item.key === key) ? key : null) as ProjectSectionKey | null;
+}
+
+/**
+ * «Назад» з простору проєкту — до СПИСКУ проєктів (`/projects`), а не в
+ * Особисте (вихід в Особисте — перший рядок свічера). `navigate` повертає до
+ * списку, якщо він уже в стеку, і не нашаровує нову копію; `push` — запасний
+ * шлях для спрощених роутерів (тести).
+ */
+export function goProjectsList(router: { navigate?: (href: never) => void; push?: (href: never) => void }) {
+  (router.navigate ?? router.push)?.('/projects' as never);
 }

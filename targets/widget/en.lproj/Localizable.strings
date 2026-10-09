@@ -1,0 +1,9 @@
+/* Ключі — український текст; тут — англійський переклад. */
+"Дія" = "Action";
+"Завдання" = "Task";
+"Витрата" = "Expense";
+"Подія" = "Event";
+"Нотатка" = "Note";
+"Віджет Flowi" = "Flowi widget";
+"Оберіть дію для малого віджета." = "Choose the action for the small widget.";
+"Швидкі дії, а у великому розмірі — кільця дня." = "Quick actions; the large size also shows today's rings.";

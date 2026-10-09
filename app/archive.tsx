@@ -33,7 +33,8 @@ import {
   type PriorityLevel,
   type TaskPriority,
 } from '@/utils/taskUtils';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { useBreakpointValue } from '@/hooks/use-responsive';
 
 type Status = 'active' | 'done';
 
@@ -56,6 +57,8 @@ function deadlineLabel(iso: string): string {
 }
 
 type SortBy = 'newest' | 'oldest' | 'priority' | 'name';
+/** Елемент сітки архіву: завдання або порожня комірка-добивка рядка. */
+type GridItem = Task | { padId: string };
 
 
 interface Palette {
@@ -110,9 +113,9 @@ const ArchiveCard = React.memo(function ArchiveCard({
           </Text>
         </View>
 
-        {/* Badge row */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginLeft: 27 }}>
-          <PriorityBadge level={prioLevel} />
+        {/* Badge row: мета зліва, пріоритет — у правому нижньому куті
+            (рішення власника, п. 4 — як в особистих картках списку). */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginLeft: 27 }}>
           {task.subtasks.length > 0 && (
             <View style={[ar.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
               <IconSymbol name="list.bullet" size={10} color={c.sub} />
@@ -127,6 +130,11 @@ const ArchiveCard = React.memo(function ArchiveCard({
               <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>
                 {deadlineLabel(task.deadline)}
               </Text>
+            </View>
+          )}
+          {prioLevel !== null && (
+            <View style={{ marginLeft: 'auto' }}>
+              <PriorityBadge level={prioLevel} />
             </View>
           )}
         </View>
@@ -155,8 +163,21 @@ const ArchiveCard = React.memo(function ArchiveCard({
   );
 });
 
+/** Проміжок між картками архіву (і між рядками, і між колонками). */
+const CARD_GAP = 8;
+
 export default function ArchiveScreen() {
-  const contentWidth = useContentWidth();
+  const readingWidth = useContentWidth();
+  /**
+   * Планшет (рішення 6): картки архіву короткі, тож портрет — дві в ряд,
+   * ландшафт — три, у ширшій колонці (Layout.wideMaxWidth). Телефон — одна
+   * колонка в стелі для читання, як і було.
+   */
+  const columns = useBreakpointValue({ compact: 1, medium: 2, expanded: 3 });
+  const contentWidth = useMemo(
+    () => (columns > 1 ? { ...readingWidth, maxWidth: WIDE_CONTENT_MAX_WIDTH } : readingWidth),
+    [columns, readingWidth],
+  );
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr } = useI18n();
@@ -280,7 +301,22 @@ export default function ArchiveScreen() {
     dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
   }), [isDark]);
 
-  const renderItem = useCallback(({ item }: { item: Task }) => (
+  /**
+   * Неповний останній рядок сітки добиваємо порожніми комірками: інакше
+   * одинока картка (flex:1) розтягнулась би на всю ширину рядка.
+   */
+  const gridData = useMemo<GridItem[]>(() => {
+    const rest = columns > 1 ? (columns - (done.length % columns)) % columns : 0;
+    if (rest === 0) return done;
+    return [...done, ...Array.from({ length: rest }, (_, i) => ({ padId: `__pad${i}` }))];
+  }, [done, columns]);
+
+  const renderItem = useCallback(({ item }: { item: GridItem }) => ('padId' in item ? (
+    <View style={ar.gridCell} accessible={false} importantForAccessibility="no-hide-descendants" />
+  ) : (
+    // У сітці комірка ділить рядок порівну (flex:1); minWidth:0 — щоб довга
+    // назва не розпирала колонку. На телефоні обгортка нічого не змінює.
+    <View style={columns > 1 ? ar.gridCell : undefined}>
     <ArchiveCard
       task={item}
       isDark={isDark}
@@ -290,7 +326,8 @@ export default function ArchiveScreen() {
       onRestore={restore}
       onDelete={deleteForever}
     />
-  ), [isDark, c, tr.restore, tr.delete, restore, deleteForever]);
+    </View>
+  )), [isDark, c, tr.restore, tr.delete, restore, deleteForever, columns]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -327,8 +364,8 @@ export default function ArchiveScreen() {
           ) : undefined}
         />
 
-        {/* Filter by priority */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
+        {/* Filter by priority — у тій самій колонці, що й картки нижче. */}
+        <View style={[contentWidth, { paddingHorizontal: 20, marginBottom: 8 }]}>
           <PriorityFilterChips
             value={filterPriorities}
             onChange={setFilterPriorities}
@@ -337,7 +374,7 @@ export default function ArchiveScreen() {
         </View>
 
         {/* Sort */}
-        <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 12 }}>
+        <View style={[contentWidth, { flexDirection: 'row', gap: 6, paddingHorizontal: 20, marginBottom: 12 }]}>
           {([
             { key: 'newest',   label: 'Нові',      icon: 'arrow.down.circle' },
             { key: 'oldest',   label: 'Старі',     icon: 'arrow.up.circle' },
@@ -362,11 +399,16 @@ export default function ArchiveScreen() {
         {/* Архів росте без стелі — список віртуалізований, інакше
             кількасот BlurView-карток монтуються всі одразу. */}
         <FlatList
-          data={done}
-          keyExtractor={task => task.id}
+          // numColumns не можна міняти «на льоту» — при повороті планшета
+          // список перемонтовується з новим ключем.
+          key={`archive-cols-${columns}`}
+          data={gridData}
+          keyExtractor={item => ('padId' in item ? item.padId : item.id)}
+          numColumns={columns}
+          columnWrapperStyle={columns > 1 ? { gap: CARD_GAP } : undefined}
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          ItemSeparatorComponent={ArchiveSeparator}
           renderItem={renderItem}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 72 }}>
@@ -383,7 +425,12 @@ export default function ArchiveScreen() {
   );
 }
 
+function ArchiveSeparator() {
+  return <View style={{ height: CARD_GAP }} />;
+}
+
 const ar = StyleSheet.create({
+  gridCell:   { flex: 1, minWidth: 0, maxWidth: '100%' },
   countBadge: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
   chip:       { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
   emptyIcon:  { width: 80, height: 80, borderRadius: Atlas.radius.xlarge, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

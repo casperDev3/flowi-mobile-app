@@ -1,11 +1,50 @@
 import React from "react";
-import { ScrollView, Alert } from "react-native";
+import { Alert } from "react-native";
 import { FormField } from "@/components/shared/FormField";
 import WeeklyMenu from "@/app/menu";
 
 jest.mock("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
+// Клас вікна керує розкладкою (телефон: один день; планшет: список + день).
+let mockSize: "compact" | "medium" | "expanded" = "compact";
+jest.mock("@/hooks/use-responsive", () => {
+  const widths = { compact: 390, medium: 744, expanded: 1194 };
+  const responsive = () => ({
+    width: widths[mockSize],
+    height: 900,
+    sizeClass: mockSize,
+    isCompact: mockSize === "compact",
+    isMedium: mockSize === "medium",
+    isExpanded: mockSize === "expanded",
+    isWide: mockSize !== "compact",
+    landscape: false,
+  });
+  return {
+    useResponsive: responsive,
+    useScreenWidth: () => widths[mockSize] - (mockSize === "compact" ? 0 : 76),
+    useBreakpointValue: (v: any) => v[mockSize] ?? v.compact,
+  };
+});
+// Нові рядки модуля чекають інтеграції в store/translations.ts; до того —
+// беремо їх із файлу хвилі, щоб екран рендерився з tr.menu.*.
+jest.mock("@/store/i18n", () => {
+  const { allTranslations } = jest.requireActual("@/store/translations");
+  const uk = allTranslations.uk;
+  let menu = uk.menu;
+  if (!menu) {
+    menu = {};
+    try {
+      const rows = require("../../.wf-i18n-1007/m-menu.json");
+      for (const r of rows) menu[r.path.split(".")[1]] = r.uk;
+    } catch {
+      // Файлу вже немає — ключі мали потрапити в translations.ts.
+    }
+  }
+  const tr = { ...uk, menu };
+  return { useI18n: () => ({ lang: "uk", setLang: () => {}, tr }) };
+});
 jest.mock("expo-image-picker", () => ({}));
 jest.mock("expo-image-manipulator", () => ({}));
 jest.mock("@/hooks/use-color-scheme", () => ({
@@ -27,6 +66,7 @@ jest.mock("expo-router", () => ({
     React.useEffect(fn, [fn]);
   },
   Stack: { Screen: () => null },
+  usePathname: () => "/menu",
 }));
 let mockMenu: any;
 const mockSave = jest.fn(async (...args: unknown[]) => ({ args }));
@@ -102,26 +142,39 @@ beforeEach(() => {
   };
 });
 afterEach(() => {
+  mockSize = "compact";
   if (tree) act(() => tree.unmount());
   jest.restoreAllMocks();
 });
-test("phone starts at today; tablet changes layout from actual content width", async () => {
+test("phone shows one selected day; tablet shows day list + selected day", async () => {
+  mockSize = "compact";
   await act(async () => {
     tree = create(<WeeklyMenu />);
   });
   expect(allText(tree.toJSON())).toContain("Суп сьогодні");
   expect(allText(tree.toJSON())).not.toContain("Риба завтра");
-  const scroller = tree.root
-    .findAllByType(ScrollView)
-    .find((n: any) => n.props.onLayout);
-  act(() =>
-    scroller.props.onLayout({ nativeEvent: { layout: { width: 1100 } } }),
-  );
-  expect(allText(tree.toJSON())).toContain("Риба завтра");
-  act(() =>
-    scroller.props.onLayout({ nativeEvent: { layout: { width: 600 } } }),
-  );
-  expect(allText(tree.toJSON())).not.toContain("Риба завтра");
+  await act(async () => {
+    tree.unmount();
+  });
+  mockSize = "medium";
+  await act(async () => {
+    tree = create(<WeeklyMenu />);
+  });
+  // Ліворуч — список днів зі зведенням (страва завтра видна у рядку дня),
+  // праворуч — сьогоднішній день повністю (з описом страви).
+  const txt = allText(tree.toJSON());
+  expect(txt).toContain("Риба завтра");
+  expect(txt).toContain("Овочевий");
+  const tuesday = tree.root.findAll(
+    (n: any) =>
+      typeof n.props.accessibilityLabel === "string" &&
+      n.props.accessibilityLabel.startsWith("Вівторок") &&
+      typeof n.props.onPress === "function",
+  )[0];
+  act(() => tuesday.props.onPress());
+  // Тепер праворуч вівторок: кнопка страви «Риба завтра» стала натисканою.
+  expect(button("Риба завтра")).toBeDefined();
+  expect(button("Суп сьогодні")).toBeUndefined();
 });
 test("dish editor prefills existing dish and saves it by id/version", async () => {
   await act(async () => {

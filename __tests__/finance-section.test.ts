@@ -10,7 +10,9 @@ import { budgetMonthRows } from '@/utils/budgetMonths';
 import { buildProjectTransaction, projectMoneyTotals, projectTransactions } from '@/utils/budgetProject';
 import { resolvePeriod } from '@/utils/finance/period';
 import { calcPeriodTotalsByCurrency } from '@/utils/financePeriod';
-import { FINANCE_TABS, parseFinanceTab, visibleFinanceTabs } from '@/utils/financeTabs';
+import {
+  activeFinanceFilterCount, FINANCE_TABS, parseFinanceTab, reportsFabHidden, reportsRows, reportsSections, splitFinanceTabs, visibleFinanceTabs,
+} from '@/utils/financeTabs';
 import { calcTotalsByCurrency, type Transaction } from '@/utils/financeUtils';
 import { budgetSpentTotal } from '@/utils/projectOverview';
 
@@ -24,20 +26,74 @@ const tx = (p: Partial<Transaction> & Pick<Transaction, 'id' | 'type' | 'amount'
 });
 
 describe('вкладки розділу', () => {
-  test('порядок фіксований, типова — «Огляд»', () => {
-    expect(FINANCE_TABS).toEqual(['overview', 'transactions', 'reports', 'budget', 'subscriptions', 'accounts']);
-    expect(parseFinanceTab(undefined)).toBe('overview');
+  test('порядок фіксований, типова — «Операції»; «Огляду» більше немає', () => {
+    expect(FINANCE_TABS).toEqual(['transactions', 'accounts', 'reports', 'budget', 'subscriptions']);
+    expect(parseFinanceTab(undefined)).toBe('transactions');
     expect(parseFinanceTab('reports')).toBe('reports');
     expect(parseFinanceTab(['budget'])).toBe('budget');
-    expect(parseFinanceTab('nope')).toBe('overview');
+    expect(parseFinanceTab('nope')).toBe('transactions');
+  });
+
+  test('старе посилання ?tab=overview веде у «Звіти»', () => {
+    expect(parseFinanceTab('overview')).toBe('reports');
+    expect(parseFinanceTab(['overview'])).toBe('reports');
+    expect(parseFinanceTab('overview', visibleFinanceTabs(['budget', 'banks']))).toBe('reports');
   });
 
   test('вимкнений підмодуль ховає вкладку, а не розділ', () => {
     const visible = visibleFinanceTabs(['budget', 'banks']);
-    expect(visible).toEqual(['overview', 'transactions', 'reports', 'subscriptions']);
+    expect(visible).toEqual(['transactions', 'reports', 'subscriptions']);
     // Прихована вкладка через адресу → типова.
-    expect(parseFinanceTab('budget', visible)).toBe('overview');
-    expect(visibleFinanceTabs(['budget', 'subscriptions', 'banks'])).toEqual(['overview', 'transactions', 'reports']);
+    expect(parseFinanceTab('budget', visible)).toBe('transactions');
+    expect(visibleFinanceTabs(['budget', 'subscriptions', 'banks'])).toEqual(['transactions', 'reports']);
+  });
+
+  test('один ряд скрізь: Операції · Рахунки · Звіти · Ще (Бюджет, Підписки)', () => {
+    expect(splitFinanceTabs(FINANCE_TABS)).toEqual({
+      inline: ['transactions', 'accounts', 'reports'],
+      more: ['budget', 'subscriptions'],
+    });
+    // Один пункт у «Ще» — показуємо просто вкладкою.
+    expect(splitFinanceTabs(visibleFinanceTabs(['budget']))).toEqual({
+      inline: ['transactions', 'accounts', 'reports', 'subscriptions'],
+      more: [],
+    });
+    expect(splitFinanceTabs(visibleFinanceTabs(['budget', 'subscriptions']))).toEqual({
+      inline: ['transactions', 'accounts', 'reports'],
+      more: [],
+    });
+  });
+
+  test('«Звіти» — одна стрічка за змістом, попередження зверху', () => {
+    expect(reportsSections(false)).toEqual(['pnl', 'structure', 'cashflow', 'forecast']);
+    expect(reportsSections(true)).toEqual(['shortfall', 'pnl', 'structure', 'cashflow', 'forecast']);
+  });
+
+  test('планшет: ряди «Звітів» по дві у порядку стрічки (Cash flow перед Прогнозом)', () => {
+    const feed = reportsSections(false);
+    expect(reportsRows(feed, 2)).toEqual([['pnl', 'structure'], ['cashflow', 'forecast']]);
+    expect(reportsRows(feed, 1)).toEqual([['pnl'], ['structure'], ['cashflow'], ['forecast']]);
+    expect(reportsRows(['a', 'b', 'c'], 2)).toEqual([['a', 'b'], ['c']]);
+    expect(reportsRows(feed, 0)).toHaveLength(4);
+  });
+
+  test('FAB на «Звітах» ховається при прокрутці вниз і вертається вгору/біля верху', () => {
+    expect(reportsFabHidden(100, 200, false)).toBe(true);
+    expect(reportsFabHidden(200, 150, true)).toBe(false);
+    expect(reportsFabHidden(200, 204, true)).toBe(true);
+    expect(reportsFabHidden(200, 196, false)).toBe(false);
+    expect(reportsFabHidden(10, 30, true)).toBe(false);
+  });
+
+  test('чип «Фільтри (N)» рахує лише відхилення від типових', () => {
+    const base = { currency: 'UAH', primaryCurrency: 'UAH', scope: 'all', showScope: true, txType: 'all' };
+    expect(activeFinanceFilterCount(base)).toBe(0);
+    expect(activeFinanceFilterCount({ ...base, currency: 'USD' })).toBe(1);
+    expect(activeFinanceFilterCount({ ...base, currency: 'USD', scope: 'personal', txType: 'expense' })).toBe(3);
+    // Ракурс не показано (Рахунки, Підписки) — і не рахується.
+    expect(activeFinanceFilterCount({ ...base, scope: 'personal', showScope: false })).toBe(0);
+    // Тип є лише на «Операціях».
+    expect(activeFinanceFilterCount({ ...base, txType: undefined })).toBe(0);
   });
 });
 

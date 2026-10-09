@@ -40,9 +40,11 @@ import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
 import { PressableScale } from '@/components/shared/PressableScale';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { wideModalStyles } from '@/components/finance/wideModal';
+import { Layout } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useBreakpointValue, useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { loadDataResult, retryStorageRead, saveData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
@@ -85,6 +87,8 @@ const KIND_ICON: Record<AccountKind, IconSymbolName> = {
  */
 const FAB_BOTTOM = Platform.OS === 'ios' ? 48 : 28;
 const FAB_SIZE = 52;
+/** Проміжок між картками сітки скарбничок. */
+const JAR_GAP = 12;
 
 /** Останній рахунок-джерело поповнення. Локальний — синхронізувати нічого. */
 const LAST_SOURCE_KEY = 'banks_last_source';
@@ -127,8 +131,17 @@ function warn(where: string, e: unknown) {
 }
 
 export default function BanksScreen() {
-  const contentWidth = useContentWidth();
-  const { height, isWide } = useResponsive();
+  const readingWidth = useContentWidth();
+  const { height, isWide, isExpanded } = useResponsive();
+  const screenWidth = useScreenWidth();
+  // Сітка скарбничок у ландшафті — ширша колонка (3 картки в ряд), форми й
+  // діалоги лишаються вузькими.
+  const contentWidth = useMemo(
+    () => (isExpanded ? { ...readingWidth, maxWidth: WIDE_CONTENT_MAX_WIDTH } : readingWidth),
+    [isExpanded, readingWidth],
+  );
+  // Форма й поповнення — діалогом посеред екрана на планшеті.
+  const wm = wideModalStyles(isWide);
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
 
@@ -147,8 +160,16 @@ export default function BanksScreen() {
   const [customCurrencies, setCustomCurrencies] = useState<Currency[]>([]);
   const [lastSource, setLastSource] = useState('');
 
-  // Картка заощадження вузька, тож на планшеті їх поміщається дві в ряд.
-  const columns = isWide ? 2 : 1;
+  // Картка заощадження вузька: портрет планшета — дві в ряд, ландшафт — три.
+  const columns = useBreakpointValue({ compact: 1, medium: 2, expanded: 3 });
+  /**
+   * Точна ширина картки в сітці. Відсоткова стеля (maxWidth: 50%) не
+   * враховувала проміжок між картками, і одинока картка в останньому ряду
+   * виходила ширшою за сусідні рядом вище.
+   */
+  const cardWidth = columns > 1
+    ? (Math.min(screenWidth, isExpanded ? Layout.wideMaxWidth : Layout.readingMaxWidth) - 40 - JAR_GAP * (columns - 1)) / columns
+    : undefined;
 
   const [showForm, setShowForm] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -424,12 +445,12 @@ export default function BanksScreen() {
         depositLabel={tr.deposit}
         doneLabel={tr.donePiggy}
         editLabel={tr.edit}
-        grow={columns > 1}
+        width={cardWidth}
         onEdit={openEdit}
         onDeposit={openDeposit}
       />
     ),
-    [balances, c, isDark, fmt, multiCurrency, tr.deposit, tr.donePiggy, tr.edit, columns, openEdit, openDeposit],
+    [balances, c, isDark, fmt, multiCurrency, tr.deposit, tr.donePiggy, tr.edit, cardWidth, openEdit, openDeposit],
   );
 
   const formValid = !!name.trim() && isPositive(parseAmount(goal));
@@ -468,7 +489,7 @@ export default function BanksScreen() {
           data={savings}
           keyExtractor={account => account.id}
           numColumns={columns}
-          columnWrapperStyle={columns > 1 ? { gap: 12 } : undefined}
+          columnWrapperStyle={columns > 1 ? { gap: JAR_GAP } : undefined}
           ItemSeparatorComponent={JarSeparator}
           renderItem={renderJar}
           contentContainerStyle={[contentWidth, {
@@ -542,13 +563,13 @@ export default function BanksScreen() {
       {/* ─── Add / Edit Modal ─── */}
       <Modal visible={showForm} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowForm(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setShowForm(false)}>
+          <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setShowForm(false)}>
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
-              style={[s.sheetWrapper, contentWidth]}>
+              style={[s.sheetWrapper, readingWidth, wm.column]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={s.handleRow}>
@@ -708,13 +729,13 @@ export default function BanksScreen() {
       {/* ─── Deposit Modal — переказ між рахунками ─── */}
       <Modal visible={showDeposit} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowDeposit(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setShowDeposit(false)}>
+          <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setShowDeposit(false)}>
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
-              style={[s.sheetWrapper, contentWidth]}>
+              style={[s.sheetWrapper, readingWidth, wm.column]}>
               {depositAccount && (
                 <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
                   <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -877,7 +898,7 @@ function JarSeparator() {
  * усі BlurView разом із прогресами.
  */
 const JarCard = React.memo(function JarCard({
-  account, balance, c, isDark, fmt, showCurrency, depositLabel, doneLabel, editLabel, grow, onEdit, onDeposit,
+  account, balance, c, isDark, fmt, showCurrency, depositLabel, doneLabel, editLabel, width, onEdit, onDeposit,
 }: {
   account: Account;
   /** Накопичене = баланс рахунку, порахований із транзакцій. */
@@ -891,8 +912,8 @@ const JarCard = React.memo(function JarCard({
   doneLabel: string;
   /** Підпис кнопки-олівця: сама іконка скрінрідеру нічого не каже (A11Y-01). */
   editLabel: string;
-  /** У сітці на планшеті картка ділить рядок навпіл. */
-  grow: boolean;
+  /** Ширина комірки сітки на планшеті; на телефоні — undefined (на всю ширину). */
+  width?: number;
   onEdit: (account: Account) => void;
   onDeposit: (account: Account) => void;
 }) {
@@ -904,8 +925,7 @@ const JarCard = React.memo(function JarCard({
     <BlurView
       intensity={isDark ? 18 : 35}
       tint={isDark ? 'dark' : 'light'}
-      // maxWidth не дає одинокій картці в останньому ряду розтягнутися на дві колонки
-      style={[s.jarCard, grow && { flex: 1, maxWidth: '50%' }, { borderColor: done ? color + '60' : c.border }]}>
+      style={[s.jarCard, width !== undefined && { width }, { borderColor: done ? color + '60' : c.border }]}>
       {/* Top row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
         <View style={[s.jarIcon, { backgroundColor: color + (isDark ? '22' : '18') }]}>

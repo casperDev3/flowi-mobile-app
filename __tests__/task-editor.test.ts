@@ -231,7 +231,7 @@ describe('createdByAfterProjectChange', () => {
 
 // §4.5 — підпис виконавця на компактній картці (TaskCompactCard, task-group,
 // project/[id]/tasks). Чиста функція: та сама, що вже показує «Я»/ім'я в
-// пікері TaskEditForm, лише винесена, щоб її бачили й списки, де редактора
+// пікері виконавця картки задачі, лише винесена, щоб її бачили й списки, де редактора
 // нема.
 describe('assigneeDisplayName', () => {
   const members = [

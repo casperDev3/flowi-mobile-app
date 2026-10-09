@@ -20,6 +20,7 @@ import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
 import { ACCENT_CAL, type HealthColors, getHealthColors } from '@/utils/healthTheme';
 import { VACCINES_KEY, Vaccine, genId } from '@/utils/preventionUtils';
+import { useWideModal } from '@/components/health/HealthLayout';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { localDateInputToIso, localDateKey } from '@/utils/dateUtils';
 import { LoadErrorNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
@@ -27,6 +28,7 @@ import { LoadErrorNotice, useSheetScreenMinHeight } from '@/components/health/He
 export default function VaccinesScreen() {
   const contentWidth = useContentWidth();
   const sheetSurface = useSheetSurface();
+  const wm = useWideModal();
   const sheetScreenMinHeight = useSheetScreenMinHeight();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -132,8 +134,8 @@ export default function VaccinesScreen() {
 
       <Modal visible={add} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setAdd(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={s.overlay} onPress={() => setAdd(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={s.sheetWrap} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setAdd(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrap, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addVaccine}</Text>

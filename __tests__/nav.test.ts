@@ -4,8 +4,11 @@ import {
   sidebarVisible,
   DEFAULT_COLLAPSED_GROUP_IDS,
   NAV_GROUPS,
+  groupHasActiveItem,
   isGroupCollapsed,
   isRouteActive,
+  sanitizeCollapsedGroupIds,
+  toggleCollapsedGroupId,
   menuNavGroups,
   moduleForPathname,
   disabledModuleForPathname,
@@ -70,21 +73,59 @@ describe('згортання груп сайдбара', () => {
 
   it('групи без id не згортаються ніколи', () => {
     // Робота (найчастіші розділи) й Налаштування — те, заради чого сайдбар існує.
-    expect(isGroupCollapsed(top, ['more', 'dev', 'personal', undefined as never], '/')).toBe(false);
+    expect(isGroupCollapsed(top, ['more', 'dev', 'personal', undefined as never])).toBe(false);
   });
 
   it('за замовчуванням згорнуті «Ще» й «Розробка», «Особисте» — ні', () => {
-    expect(isGroupCollapsed(more, DEFAULT_COLLAPSED_GROUP_IDS, '/')).toBe(true);
-    expect(isGroupCollapsed(dev, DEFAULT_COLLAPSED_GROUP_IDS, '/')).toBe(true);
-    expect(isGroupCollapsed(personal, DEFAULT_COLLAPSED_GROUP_IDS, '/')).toBe(false);
+    expect(isGroupCollapsed(more, DEFAULT_COLLAPSED_GROUP_IDS)).toBe(true);
+    expect(isGroupCollapsed(dev, DEFAULT_COLLAPSED_GROUP_IDS)).toBe(true);
+    expect(isGroupCollapsed(personal, DEFAULT_COLLAPSED_GROUP_IDS)).toBe(false);
   });
 
-  it('група з поточним розділом розгортається попри згорнутість', () => {
-    // Інакше на екрані «Ідеї та баги» жоден пункт не підсвічений, і незрозуміло, де ви.
-    expect(isGroupCollapsed(dev, ['dev'], '/feedback')).toBe(false);
-    expect(isGroupCollapsed(more, ['more'], '/containers')).toBe(false);
-    // Розділ із СУСІДНЬОЇ групи такої поблажки не дає.
-    expect(isGroupCollapsed(more, ['more'], '/projects')).toBe(true);
+  it('група з поточним розділом ЗГОРТАЄТЬСЯ (раніше тап мовчки нічого не робив)', () => {
+    expect(isGroupCollapsed(more, ['more'])).toBe(true);
+    expect(isGroupCollapsed(dev, ['dev'])).toBe(true);
+    // Розгорнути назад — той самий тап.
+    const once = toggleCollapsedGroupId([], 'more');
+    expect(isGroupCollapsed(more, once)).toBe(true);
+    expect(isGroupCollapsed(more, toggleCollapsedGroupId(once, 'more'))).toBe(false);
+  });
+
+  it('крапка активного розділу: лише для групи, де він лежить', () => {
+    expect(groupHasActiveItem(more, '/containers')).toBe(true);
+    expect(groupHasActiveItem(dev, '/feedback')).toBe(true);
+    expect(groupHasActiveItem(more, '/projects')).toBe(false);
+  });
+
+  // Баг «Ще» на планшеті: 'nav_collapsed_groups' зі сховища не масив →
+  // `.includes` / `.filter` кидали TypeError у рендері й на тапі.
+  it.each([null, undefined, 'more', 42, true, { length: 2 }])('зіпсоване значення %p не кидає', raw => {
+    expect(() => isGroupCollapsed(more, raw)).not.toThrow();
+    expect(isGroupCollapsed(more, raw)).toBe(false);
+    expect(() => toggleCollapsedGroupId(raw, 'more')).not.toThrow();
+    expect(toggleCollapsedGroupId(raw, 'more')).toContain('more');
+  });
+
+  it('sanitizeCollapsedGroupIds: не масив → дефолт, масив → лише непорожні рядки без дублів', () => {
+    expect(sanitizeCollapsedGroupIds(null)).toEqual([...DEFAULT_COLLAPSED_GROUP_IDS]);
+    expect(sanitizeCollapsedGroupIds('more')).toEqual([...DEFAULT_COLLAPSED_GROUP_IDS]);
+    expect(sanitizeCollapsedGroupIds(7)).toEqual([...DEFAULT_COLLAPSED_GROUP_IDS]);
+    expect(sanitizeCollapsedGroupIds([])).toEqual([]);
+    expect(sanitizeCollapsedGroupIds(['more', 'more', '', ' dev ', null, 3, {}])).toEqual(['more', 'dev']);
+    // Старий формат-об'єкт.
+    expect(sanitizeCollapsedGroupIds({ more: true, dev: false })).toEqual(['more']);
+  });
+
+  it('toggleCollapsedGroupId: порожній id нічого не змінює', () => {
+    expect(toggleCollapsedGroupId(['dev'], '')).toEqual(['dev']);
+    expect(toggleCollapsedGroupId(['dev'], 'more')).toEqual(['dev', 'more']);
+    expect(toggleCollapsedGroupId(['dev', 'more'], 'dev')).toEqual(['more']);
+  });
+
+  it('сайдбар не мутує збережений стан при перемиканні', () => {
+    const prev = Object.freeze(['more']) as readonly string[];
+    expect(() => toggleCollapsedGroupId(prev, 'dev')).not.toThrow();
+    expect(prev).toEqual(['more']);
   });
 
   it('дефолт складається з наявних id, а не з вигаданих', () => {

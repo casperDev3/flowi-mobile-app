@@ -131,7 +131,9 @@ function ProjectLayout() {
   // видалення/вихід) скасовує таймер лише тоді, коли запис таки з'явився.
   useEffect(() => {
     if (loading || !id || project) return;
-    const timer = setTimeout(() => router.replace('/(tabs)'), 800);
+    // Не в Особисте, а до списку проєктів — туди ж веде «назад» шапки й
+    // сайдбару: проєкт зник, але людина лишається в розділі «Проєкти».
+    const timer = setTimeout(() => router.replace('/projects' as never), 800);
     return () => clearTimeout(timer);
   }, [loading, id, project, router]);
 
@@ -209,8 +211,14 @@ function ProjectLayout() {
           <Tabs.Screen
             key={item.key}
             name={item.key}
+            // P0: без initialParams натискання таба на телефоні відкривало
+            // екран БЕЗ `id` — Завдання/Моя робота/Календар падали в
+            // особистий простір. Явно прокидаємо id проєкту кожному табу.
+            initialParams={{ id }}
             options={{
               title: String(tr[item.labelKey]),
+              // NAT-05: явний підпис — без нього VoiceOver читав «calendar, calendar, Календар».
+              tabBarAccessibilityLabel: String(tr[item.labelKey]),
               href: visibleKeys.has(item.key) ? undefined : null,
               tabBarLabel: tabLabel(String(tr[item.labelKey])),
               tabBarIcon: ({ color }) => <IconSymbol size={24} name={item.icon} color={color} />,
@@ -225,8 +233,10 @@ function ProjectLayout() {
         */}
         <Tabs.Screen
           name="more"
+          initialParams={{ id }}
           options={{
             title: tr.navGroupMore,
+            tabBarAccessibilityLabel: tr.navGroupMore,
             href: overflow.length > 0 ? undefined : null,
             tabBarLabel: tabLabel(tr.navGroupMore),
             tabBarIcon: ({ color }) => <IconSymbol size={24} name="ellipsis" color={color} />,
@@ -242,8 +252,10 @@ function ProjectLayout() {
           `time` у (tabs)/_layout — файл лишається на місці, просто
           без кнопки в барі.
         */}
-        <Tabs.Screen name="index" options={{ href: null, headerShown: false }} />
-        <Tabs.Screen name="activity" options={{ href: null, headerShown: false }} />
+        <Tabs.Screen name="index" initialParams={{ id }} options={{ href: null, headerShown: false }} />
+        <Tabs.Screen name="activity" initialParams={{ id }} options={{ href: null, headerShown: false }} />
+        {/* Редирект на «Календар» (наради живуть там) — без кнопки в барі. */}
+        <Tabs.Screen name="meetings" initialParams={{ id }} options={{ href: null, headerShown: false }} />
       </Tabs>
       <ActiveTimersBar />
     </View>

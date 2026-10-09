@@ -18,7 +18,7 @@ import { Atlas } from '@/constants/atlas';
  */
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import type { Account, AccountKind } from '@/utils/accounts';
 import type { Currency, CurrencyTotals } from '@/utils/financeUtils';
@@ -99,14 +99,6 @@ export function FinanceSummary({
 }: FinanceSummaryProps) {
   const curOf = (code: string): Currency =>
     currencies.find(cu => cu.code === code) ?? { code, symbol: code, kind: 'fiat', decimals: 2 };
-
-  // Валюти з рухом за місяць. Основна йде першою — на неї дивляться найчастіше.
-  const flowCodes = Object.keys(totalsByCurrency)
-    .filter(code => {
-      const t = totalsByCurrency[code];
-      return t && (t.income !== 0 || t.expense !== 0);
-    })
-    .sort((a, b) => (a === primaryCode ? -1 : b === primaryCode ? 1 : a.localeCompare(b)));
 
   const totalCodes = Object.keys(accountTotals ?? {})
     .sort((a, b) => (a === primaryCode ? -1 : b === primaryCode ? 1 : a.localeCompare(b)));
@@ -240,15 +232,67 @@ export function FinanceSummary({
         </ScrollView>
       )}
 
-      {/* ─── Оборот місяця ─── */}
+      <PeriodFlowCard
+        currencies={currencies}
+        totalsByCurrency={totalsByCurrency}
+        primaryCode={primaryCode}
+        onPickPrimary={onPickPrimary}
+        fmt={fmt}
+        isDark={isDark}
+        c={c}
+        incomeLabel={incomeLabel}
+        expenseLabel={expenseLabel}
+        savingsLabel={savingsLabel}
+        transfersNoteLabel={transfersNoteLabel}
+        showTransfersNote={showTransfersNote}
+        style={{ marginTop: 14 }}
+      />
+    </View>
+  );
+}
+
+/**
+ * Оборот періоду (доходи / витрати / % заощаджень) по валютах. Окремо від
+ * стрічки рахунків, щоб жити у вкладці «Рахунки» (рішення власника: рахунки
+ * й місячні надходження — не в «Операціях»).
+ */
+export function PeriodFlowCard({
+  currencies, totalsByCurrency, primaryCode = 'UAH', onPickPrimary, fmt, isDark, c,
+  incomeLabel, expenseLabel, savingsLabel, transfersNoteLabel, showTransfersNote, title, style,
+}: {
+  currencies: Currency[];
+  totalsByCurrency: Record<string, CurrencyTotals>;
+  primaryCode?: string;
+  onPickPrimary?: () => void;
+  fmt: (n: number, cur: Currency) => string;
+  isDark: boolean;
+  c: Colors;
+  incomeLabel: string;
+  expenseLabel: string;
+  savingsLabel: string;
+  transfersNoteLabel: string;
+  showTransfersNote?: boolean;
+  /** Підпис картки зліва від вибору основної валюти. */
+  title?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const curOf = (code: string): Currency =>
+    currencies.find(cu => cu.code === code) ?? { code, symbol: code, kind: 'fiat', decimals: 2 };
+  const flowCodes = Object.keys(totalsByCurrency)
+    .filter(code => {
+      const t = totalsByCurrency[code];
+      return t && (t.income !== 0 || t.expense !== 0);
+    })
+    .sort((a, b) => (a === primaryCode ? -1 : b === primaryCode ? 1 : a.localeCompare(b)));
+  return (
       <BlurView
         intensity={isDark ? 25 : 45}
         tint={isDark ? 'dark' : 'light'}
-        style={[s.card, { borderColor: c.border, marginTop: 14 }]}>
+        style={[s.card, { borderColor: c.border }, style]}>
 
         {onPickPrimary && (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <View style={{ flex: 1 }} />
+            {title ? <Text style={[s.sectionLabel, { color: c.sub, flex: 1 }]}>{title}</Text> : <View style={{ flex: 1 }} />}
             <TouchableOpacity
               onPress={onPickPrimary}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -311,7 +355,6 @@ export function FinanceSummary({
           </Text>
         )}
       </BlurView>
-    </View>
   );
 }
 

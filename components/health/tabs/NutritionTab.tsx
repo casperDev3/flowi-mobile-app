@@ -6,28 +6,28 @@ import { Atlas } from '@/constants/atlas';
  * вода, нагадування і журнал їжі. Формули не чіпались — велике число й смужка
  * міряють ЗʼЇДЕНЕ проти ліміту їжі, а спалене лишається окремим числом.
  */
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { Linking, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
-import { CalStat, SectionHeader } from '@/components/health/HealthBits';
+import { CalStat, HealthAddButton, HealthCard } from '@/components/health/HealthBits';
 import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
 import { LoadErrorNotice, ReminderBlockedNotice } from '@/components/health/HealthNotices';
 import { MetricTrend } from '@/components/health/MetricTrend';
+import { useHealthTabGrid } from '@/components/health/HealthLayout';
 import type { HealthTabProps } from '@/components/health/tabs/types';
+import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useContentWidth } from '@/hooks/use-content-width';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { isSameDay } from '@/utils/dateUtils';
 import {
-  ACCENT, ACCENT_CAL, ACCENT_PROT, ACCENT_PULSE, ACCENT_STEPS, ModalKey, getHealthColors,
+  ACCENT, ACCENT_CAL, ACCENT_PULSE, ACCENT_STEPS, ModalKey, getHealthColors,
 } from '@/utils/healthTheme';
 
 export function NutritionTab({ h }: HealthTabProps) {
-  const contentWidth = useContentWidth();
+  const grid = useHealthTabGrid();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
@@ -46,27 +46,13 @@ export function NutritionTab({ h }: HealthTabProps) {
 
   const foodToday = h.entries.filter(e => e.type === 'calories' && isSameDay(new Date(e.date), new Date()));
 
-  return (
-    <>
-      <ScrollView
-        contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: tabBarInset + 32 }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
-
-        {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
-        {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
-
-        {/* Калорії */}
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}>
-            <SectionHeader title={tr.calories} icon="flame.fill" color={ACCENT_CAL} textColor={c.text} top={8} />
-          </View>
-          <TouchableOpacity onPress={() => setModal('calories')} accessibilityRole="button" accessibilityLabel={tr.add}
-            style={[s.addBtn, { backgroundColor: ACCENT_CAL }]}>
-            <IconSymbol name="plus" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+  // Картки вкладки в порядку читання (телефон — саме так, згори вниз;
+  // планшет — дві masonry-колонки без дір).
+  const items: MasonryEntry[] = [
+    {
+      key: 'calories',
+      node: (
+        <HealthCard c={c} title={tr.calories} right={<HealthAddButton onPress={() => setModal('calories')} label={tr.add} />}>
           {/* Велике число — ЗʼЇДЕНЕ, і смужка міряє теж його. Спалене сюди не
               входить: день без їжі й із 500 спаленими має показувати нуль
               зʼїдених, а не «500 / 2200». Вплив тренувань видно в залишку. */}
@@ -98,32 +84,39 @@ export function NutritionTab({ h }: HealthTabProps) {
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {[200, 350, 500, 700].map(kk => (
               <TouchableOpacity key={kk} onPress={() => h.addQuick('calories', kk)}
-                style={[s.chip, { borderColor: ACCENT_CAL + '50', backgroundColor: ACCENT_CAL + '12' }]}>
-                <Text style={{ color: ACCENT_CAL, fontSize: 11, fontWeight: '700' }}>+{kk} кк</Text>
+                accessibilityRole="button" accessibilityLabel={`+${kk} кк`}
+                style={[s.chip, { borderColor: c.border, backgroundColor: c.dim }]}>
+                <Text style={{ color: c.text, fontSize: 11, fontWeight: '700' }}>+{kk} кк</Text>
               </TouchableOpacity>
             ))}
           </View>
-        </BlurView>
-
-        {/* Динаміка калорій */}
-        <View style={{ marginTop: 14 }}>
-          <MetricTrend entries={h.entries} type="calories" agg="sum" color={ACCENT_CAL} goal={goals.calories}
-            format={v => `${Math.round(v)} кк`} isDark={isDark} c={c} tr={tr} />
-        </View>
-
-        {/* Білок */}
-        <SectionHeader title={tr.protein} icon="bolt.fill" color={ACCENT_PROT} textColor={c.text} />
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+        </HealthCard>
+      ),
+    },
+    {
+      key: 'calories-trend',
+      node: (
+        <MetricTrend entries={h.entries} type="calories" agg="sum" color={ACCENT_CAL} goal={goals.calories}
+          title={`${tr.calories} · ${tr.dynamics}`}
+          format={v => `${Math.round(v)} кк`} c={c} tr={tr} />
+      ),
+    },
+    {
+      key: 'protein',
+      node: (
+        <HealthCard c={c} title={tr.protein}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
             <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{Math.round(today.protein)}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>/ {goals.protein} г</Text>
             <View style={{ flex: 1 }} />
-            <View style={[s.badge, { backgroundColor: ACCENT_PROT + '20', borderColor: ACCENT_PROT + '40' }]}>
-              <Text style={{ color: ACCENT_PROT, fontSize: 11, fontWeight: '700' }}>{Math.round(Math.min(today.protein / goals.protein, 1) * 100)}%</Text>
+            {/* Рішення 07.10: один зелений акцент розділу — фіолетовий «Білків»
+                виглядав як чужий модуль (аудит iPad/iPhone). */}
+            <View style={[s.badge, { backgroundColor: ACCENT + '20', borderColor: ACCENT + '40' }]}>
+              <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>{Math.round(Math.min(today.protein / goals.protein, 1) * 100)}%</Text>
             </View>
           </View>
           <View style={[s.track, { backgroundColor: c.track, marginBottom: 6 }]}>
-            <LinearGradient colors={[ACCENT_PROT + 'AA', ACCENT_PROT]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            <LinearGradient colors={[ACCENT + 'AA', ACCENT]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={[s.fill, { width: `${Math.round(Math.min(today.protein / goals.protein, 1) * 100)}%` as any }]} />
           </View>
           {/* Рядок лишається українським, як і був: окремого ключа під нього в
@@ -132,11 +125,13 @@ export function NutritionTab({ h }: HealthTabProps) {
           <Text style={{ color: c.sub, fontSize: 11 }}>
             {today.protein < goals.protein ? `Залишилось ${Math.round(goals.protein - today.protein)} г білка` : 'Норму білка досягнуто 💪'}
           </Text>
-        </BlurView>
-
-        {/* Вода */}
-        <SectionHeader title={tr.water} icon="drop.fill" color={ACCENT} textColor={c.text} />
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
+        </HealthCard>
+      ),
+    },
+    {
+      key: 'water',
+      node: (
+        <HealthCard c={c} title={tr.water}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 }}>
             <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>
               {today.water >= 1000 ? `${(today.water / 1000).toFixed(1)} л` : `${today.water} мл`}
@@ -150,25 +145,27 @@ export function NutritionTab({ h }: HealthTabProps) {
           <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
             {Array.from({ length: 8 }, (_, i) => {
               const threshold = ((i + 1) / 8) * goals.water;
-              return <View key={i} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: today.water >= threshold ? ACCENT : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)') }} />;
+              return <View key={i} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: today.water >= threshold ? ACCENT : c.track }} />;
             })}
           </View>
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {[150, 250, 350, 500].map(ml => (
               <TouchableOpacity key={ml} onPress={() => h.addQuick('water', ml)}
-                style={[s.chip, { borderColor: ACCENT + '50', backgroundColor: ACCENT + '12' }]}>
-                <Text style={{ color: ACCENT, fontSize: 11, fontWeight: '700' }}>+{ml} мл</Text>
+                accessibilityRole="button" accessibilityLabel={`+${ml} мл`}
+                style={[s.chip, { borderColor: c.border, backgroundColor: c.dim }]}>
+                <Text style={{ color: c.text, fontSize: 11, fontWeight: '700' }}>+{ml} мл</Text>
               </TouchableOpacity>
             ))}
           </View>
-        </BlurView>
-
-        {/* Нагадування про воду */}
-        <SectionHeader title={tr.reminders} icon="bell.fill" color={ACCENT} textColor={c.text} />
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, paddingVertical: 6 }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-            <IconSymbol name="drop.fill" size={16} color={ACCENT} />
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 10 }}>{tr.waterReminder}</Text>
+        </HealthCard>
+      ),
+    },
+    {
+      key: 'reminders',
+      node: (
+        <HealthCard c={c} title={tr.reminders}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{tr.waterReminder}</Text>
             <Switch
               value={h.reminders.water}
               disabled={!h.remindersLoaded || h.reminderBusy !== null}
@@ -178,37 +175,55 @@ export function NutritionTab({ h }: HealthTabProps) {
               trackColor={{ true: ACCENT }} />
           </View>
           {reminderBlocked && (
-            <ReminderBlockedNotice lang={lang} c={c} isDark={isDark}
-              onOpenSettings={() => { void Linking.openSettings(); }}
-              onDismiss={() => setReminderBlocked(false)} />
-          )}
-        </BlurView>
-
-        {/* Журнал їжі */}
-        {foodToday.length > 0 && (
-          <>
-            <SectionHeader title={tr.todayLabel} icon="list.bullet" color={ACCENT_CAL} textColor={c.text} />
-            <View style={{ gap: 8 }}>
-              {foodToday.map(e => (
-                <BlurView key={e.id} intensity={isDark ? 18 : 38} tint={isDark ? 'dark' : 'light'}
-                  style={[s.logRow, { borderColor: c.border }]}>
-                  <View style={{ width: 34, height: 34, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
-                    <IconSymbol name="flame.fill" size={15} color={ACCENT_CAL} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>
-                      {e.value} кк{e.protein ? ` · ${e.protein}${tr.proteinShort}` : ''}
-                    </Text>
-                    {e.note ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{e.note}</Text> : null}
-                  </View>
-                  <Text style={{ color: c.sub, fontSize: 11 }}>
-                    {new Date(e.date).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                </BlurView>
-              ))}
+            <View style={{ marginTop: 8 }}>
+              <ReminderBlockedNotice lang={lang} c={c} isDark={isDark}
+                onOpenSettings={() => { void Linking.openSettings(); }}
+                onDismiss={() => setReminderBlocked(false)} />
             </View>
-          </>
-        )}
+          )}
+        </HealthCard>
+      ),
+    },
+  ];
+  // Журнал їжі за сьогодні — одна картка з рядками, а не стос дрібних карток:
+  // у masonry стос розлетівся б по колонках.
+  if (foodToday.length > 0) {
+    items.push({
+      key: 'food-log',
+      node: (
+        <HealthCard c={c} title={`${tr.todayLabel} · ${tr.nutrition}`} style={{ paddingBottom: 8 }}>
+          {foodToday.map((e, i) => (
+            <View key={e.id} style={[s.logRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
+              <View style={{ width: 34, height: 34, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT_CAL + '20', alignItems: 'center', justifyContent: 'center' }}>
+                <IconSymbol name="flame.fill" size={15} color={ACCENT_CAL} />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>
+                  {e.value} кк{e.protein ? ` · ${e.protein}${tr.proteinShort}` : ''}
+                </Text>
+                {e.note ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{e.note}</Text> : null}
+              </View>
+              <Text style={{ color: c.sub, fontSize: 11 }}>
+                {new Date(e.date).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
+          ))}
+        </HealthCard>
+      ),
+    });
+  }
+
+  return (
+    <>
+      <ScrollView
+        contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+
+        {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
+        {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
+
+        <MasonryColumns items={items} columnCount={grid.columnCount} columnGap={12} />
       </ScrollView>
 
       <HealthEntryModal modalKey={modal} onClose={() => setModal(null)} onSubmit={onSubmit} isDark={isDark} tr={tr} />
@@ -217,11 +232,10 @@ export function NutritionTab({ h }: HealthTabProps) {
 }
 
 const s = StyleSheet.create({
-  addBtn: { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  card:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 12, overflow: 'hidden', marginBottom: 2 },
   track:  { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill:   { height: '100%', borderRadius: 4 },
-  chip:   { flex: 1, borderRadius: 11, borderWidth: 1.5, paddingVertical: 7, alignItems: 'center' },
+  // Швидкі кнопки — нейтральні, як вторинні кнопки Фінансів: колір розділу лишається на даних.
+  chip:   { flex: 1, minHeight: 36, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   badge:  { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  logRow: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 10, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  logRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
 });

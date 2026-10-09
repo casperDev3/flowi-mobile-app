@@ -102,16 +102,32 @@ export function txCurrency(t: Transaction): string {
   return t.currency || 'UAH';
 }
 
+/**
+ * Скільки знаків після коми показати для фіатної суми — ОДНЕ правило для всіх
+ * екранів (P2 аудиту 2026-10: «Операції → Залишки» й Home округлювали до
+ * гривні, а «Рахунки» показували копійки, тож той самий рахунок був
+ * 38 150 ₴ і 38 149,5 ₴). Ціла сума — без дробової частини; будь-які копійки
+ * — повна точність валюти (38 149,50 ₴), без «,5».
+ */
+export function fiatFractionDigits(n: number, decimals = 2): number {
+  const d = Math.max(0, Math.min(2, decimals));
+  if (d === 0 || !Number.isFinite(n)) return 0;
+  const scaled = Math.round(Math.abs(n) * 10 ** d);
+  return scaled % 10 ** d === 0 ? 0 : d;
+}
+
 export function formatCurrency(n: number, cur: Currency, locale: string): string {
   if (cur.kind === 'fiat') {
+    const digits = fiatFractionDigits(n, cur.decimals ?? 2);
     try {
       return n.toLocaleString(locale, {
         style: 'currency',
         currency: cur.code,
-        maximumFractionDigits: 0,
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
       });
     } catch {
-      return `${cur.symbol}${Math.round(n).toLocaleString(locale)}`;
+      return `${cur.symbol}${n.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
     }
   }
   const abs = Math.abs(n);

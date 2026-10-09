@@ -26,15 +26,71 @@ function fill(template: string, values: Record<string, string>): string {
 }
 
 /** Значення поля для показу в шаблоні status_changed — сирі не-рядкові дані показуємо як є. */
-function fieldValue(value: unknown): string {
-  if (value == null) return '—';
-  return String(value);
+function fieldValue(value: unknown, resolve?: (id: string) => string | undefined): string {
+  if (value == null || value === '') return '—';
+  const raw = String(value);
+  return resolve?.(raw) ?? raw;
+}
+
+/**
+ * Контекст для «людських» підписів (P1 аудиту 2026-10): без нього стрічка
+ * показувала сирий `st-<uuid>` замість назви колонки й «Хтось» замість
+ * автора, у якого не заповнене імʼя.
+ */
+export interface ActivityContext {
+  /** id колонки статусу → назва (`mergeTaskStatusColumns(saved, projectId)`). */
+  statusNames?: ReadonlyMap<string, string> | Record<string, string>;
+  /** id користувача → імʼя з учасників проєкту. */
+  memberNames?: ReadonlyMap<number, string> | Record<number, string>;
+}
+
+function lookup<K extends string | number>(
+  source: ReadonlyMap<K, string> | Record<K, string> | undefined,
+  key: K,
+): string | undefined {
+  if (!source) return undefined;
+  if (source instanceof Map) return source.get(key) || undefined;
+  return (source as Record<K, string>)[key] || undefined;
+}
+
+/** Імʼя автора: імʼя з запису → імʼя учасника → локальна частина пошти → «Хтось». */
+export function activityActorName(entry: ActivityEntry, tr: Pick<ActivityStrings, 'projectActivityUnknownActor'>, ctx?: ActivityContext): string {
+  const ref = entry.actor;
+  if (!ref) return tr.projectActivityUnknownActor;
+  const own = ref.name?.trim();
+  if (own) return own;
+  const member = lookup(ctx?.memberNames, ref.id)?.trim();
+  if (member) return member;
+  const local = ref.email?.split('@')[0]?.trim();
+  return local || tr.projectActivityUnknownActor;
+}
+
+/**
+ * Зливає поспіль однакові записи (той самий автор, дія, обʼєкт і зміни) в
+ * один — інакше кілька автозбережень картки давали «оновив(ла)» тричі
+ * підряд. Лишається найновіший (перший у списку, сервер віддає новіші
+ * першими).
+ */
+export function mergeConsecutiveActivity(entries: readonly ActivityEntry[]): ActivityEntry[] {
+  const out: ActivityEntry[] = [];
+  let prevKey: string | null = null;
+  for (const entry of entries) {
+    const key = [
+      entry.actor?.id ?? '', entry.verb, entry.collection, entry.local_id, entry.title,
+      entry.verb === 'updated' ? '' : JSON.stringify(entry.changes ?? []),
+    ].join('|');
+    if (key === prevKey) continue;
+    prevKey = key;
+    out.push(entry);
+  }
+  return out;
 }
 
 /** Рядок для одного запису стрічки — готовий для `<Text>`. */
-export function formatActivityMessage(entry: ActivityEntry, tr: ActivityStrings): string {
-  const actor = entry.actor?.name || tr.projectActivityUnknownActor;
+export function formatActivityMessage(entry: ActivityEntry, tr: ActivityStrings, ctx?: ActivityContext): string {
+  const actor = activityActorName(entry, tr, ctx);
   const title = entry.title || '—';
+  const statusName = (id: string) => lookup(ctx?.statusNames, id);
 
   switch (entry.verb) {
     case 'created':
@@ -45,7 +101,7 @@ export function formatActivityMessage(entry: ActivityEntry, tr: ActivityStrings)
       const change = entry.changes.find(c => c.field === 'status' || c.field === 'kanbanColumnId');
       if (change) {
         return fill(tr.projectActivityStatusChanged, {
-          actor, title, from: fieldValue(change.from), to: fieldValue(change.to),
+          actor, title, from: fieldValue(change.from, statusName), to: fieldValue(change.to, statusName),
         });
       }
       return fill(tr.projectActivityUpdated, { actor, title });

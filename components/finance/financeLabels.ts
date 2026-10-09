@@ -24,7 +24,6 @@ export interface FinColors {
 
 export function financeTabLabel(tab: FinanceTab, tr: Translations): string {
   switch (tab) {
-    case 'overview': return tr.finTabOverview;
     case 'transactions': return tr.finTabTransactions;
     case 'reports': return tr.finTabReports;
     case 'budget': return tr.finTabBudget;

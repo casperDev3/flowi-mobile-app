@@ -27,8 +27,9 @@ import {
   BUILTIN_CURRENCIES, formatCurrency, type Currency, type Transaction,
 } from '@/utils/financeUtils';
 import { type Account, type AccountKind } from '@/utils/accounts';
-import { useResponsive } from '@/hooks/use-responsive';
-import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
+import { wideModalStyles } from '@/components/finance/wideModal';
+import { CONTENT_MAX_WIDTH, WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { defaultCategories, type CategoryDef } from '@/utils/financeCategories';
 
 /**
@@ -224,8 +225,21 @@ const SparkLine = React.memo(function SparkLine({ data, color, height = 64, widt
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export default function FinanceStatsScreen() {
-  const contentWidth = useContentWidth();
-  const { width, isWide } = useResponsive();
+  const readingWidth = useContentWidth();
+  const { isWide, isExpanded } = useResponsive();
+  const screenWidth = useScreenWidth();
+  /**
+   * Ландшафт планшета: картки статистики у дві колонки в ширшій колонці
+   * (Layout.wideMaxWidth). Одна колонка на 720pt посеред 950pt екрана
+   * давала вдвічі довшу прокрутку, ніж потрібно.
+   */
+  const twoCol = isExpanded;
+  const contentWidth = useMemo(
+    () => (twoCol ? { ...readingWidth, maxWidth: WIDE_CONTENT_MAX_WIDTH } : readingWidth),
+    [twoCol, readingWidth],
+  );
+  // Календар періоду — діалогом посеред екрана на планшеті.
+  const wm = wideModalStyles(isWide);
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
   // I18N-03: підписи осей і календаря — зі словника, а не з локальних масивів.
@@ -522,10 +536,13 @@ export default function FinanceStatsScreen() {
   );
 
   const trendColor = balance >= 0 ? c.green : c.red;
-  // Графік живе всередині колонки, обмеженої CONTENT_MAX_WIDTH: на планшеті
-  // ширина вікна значно більша, і без стелі лінія вилазила б за картку.
-  // 76 = поля прокрутки (20+20) + внутрішні поля картки (18+18).
-  const SPARK_W = Math.min(width, CONTENT_MAX_WIDTH) - 76;
+  // Графік живе всередині колонки, обмеженої CONTENT_MAX_WIDTH (або широкої
+  // колонки у двоколонковому ландшафті): без стелі лінія вилазила б за
+  // картку. Ширина — від ЕКРАНА (вікно мінус сайдбар), не від вікна.
+  // 40 = поля прокрутки (20+20), 36 = внутрішні поля картки (18+18),
+  // 16 = проміжок між колонками.
+  const columnInner = Math.min(screenWidth, twoCol ? WIDE_CONTENT_MAX_WIDTH : CONTENT_MAX_WIDTH) - 40;
+  const SPARK_W = Math.max(0, (twoCol ? (columnInner - 16) / 2 : columnInner) - 36);
 
   const summaryCards = [
     { label: 'Доходи',       value: fmt(income),      color: c.green },
@@ -657,6 +674,8 @@ export default function FinanceStatsScreen() {
             </View>
           )}
 
+          <View style={twoCol ? s.split : undefined}>
+          <View style={twoCol ? s.splitCol : undefined}>
           {/* ── Balance trend ── */}
           {trendData.length >= 2 && (
             <>
@@ -787,6 +806,9 @@ export default function FinanceStatsScreen() {
             </BlurView>
           )}
 
+          </View>
+
+          <View style={twoCol ? s.splitCol : undefined}>
           {/* ── Витрати в розрізі рахунків ── */}
           {accountStats.length > 0 && (
             <>
@@ -922,6 +944,8 @@ export default function FinanceStatsScreen() {
               })}
             </BlurView>
           )}
+          </View>
+          </View>
 
           </>
           )}
@@ -931,13 +955,13 @@ export default function FinanceStatsScreen() {
 
       {/* ─── Calendar Range Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
-        <Pressable accessible={false} style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.28)', justifyContent: 'flex-end' }} onPress={() => setShowCal(false)}>
+        <Pressable accessible={false} style={[{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.28)', justifyContent: 'flex-end' }, wm.overlay]} onPress={() => setShowCal(false)}>
           <Pressable
             onPress={e => e.stopPropagation()}
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"
-            style={[{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }, contentWidth]}>
+            style={[{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }, readingWidth, wm.column]}>
             <BlurView intensity={isDark ? 55 : 72} tint={isDark ? 'dark' : 'light'} style={[s.calSheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,16,30,0.97)' : 'rgba(245,248,255,0.97)' }]}>
 
               {/* Handle + close */}
@@ -1128,6 +1152,8 @@ const LegendDot = React.memo(function LegendDot({ color, label, sub }: { color: 
 });
 
 const s = StyleSheet.create({
+  split:        { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+  splitCol:     { flex: 1, minWidth: 0 },
   // Заголовок 20pt, не спільні 32: у шапці поруч живуть лічильники
   // періоду, і більший кегль лишав би їм пів рядка.
   title:        { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },

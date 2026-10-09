@@ -13,15 +13,16 @@ import { Atlas } from '@/constants/atlas';
  * finance_currencies) — суто для показу, нічого не пише, тож звичайний
  * `loadData` + `useStorageRefresh` замість `useSyncedList`.
  */
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
 import { ProjectSyncIndicator } from '@/components/projects/ProjectSyncIndicator';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { projectRoute } from '@/constants/projectNav';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { useProjectContentStyle } from '@/components/projects/ProjectLayout';
+import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
+import { useProjectRouteId } from '@/hooks/use-project-route-id';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useProject } from '@/hooks/use-project';
 import { useProjectRole } from '@/hooks/use-project-role';
@@ -37,7 +38,8 @@ import { formatDuration } from '@/utils/durationFormat';
 import type { Currency, Transaction } from '@/utils/financeUtils';
 import { formatSubscriptionMoney } from '@/utils/subscriptions';
 import { projectMeetingSections, type Meeting } from '@/utils/meetings';
-import { activityIcon, formatActivityMessage } from '@/utils/projectActivity';
+import { activityIcon, formatActivityMessage, mergeConsecutiveActivity } from '@/utils/projectActivity';
+import { useActivityContext } from '@/hooks/use-activity-context';
 import { projectStats } from '@/utils/projectStats';
 import { budgetSpentTotal, hoursThisWeekSeconds, type ProjectTimeEntryLike } from '@/utils/projectOverview';
 import { taskProjectMap } from '@/utils/timeEntries';
@@ -73,10 +75,11 @@ function StatCard({ label, value, color, sub }: { label: string; value: string; 
 }
 
 export default function ProjectOverviewScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const id = useProjectRouteId() as string;
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
-  const contentWidth = useContentWidth();
+  // Дашборд: на планшеті — широка стеля, наради й активність поруч.
+  const contentStyle = useProjectContentStyle('wide');
   const tabBarInset = useTabBarInset();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
@@ -98,6 +101,7 @@ export default function ProjectOverviewScreen() {
   // storage-ключів вище: активність не синкається й не лежить у сховищі).
   const [recentActivity, setRecentActivity] = useState<ActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
+  const activityCtx = useActivityContext(id);
 
   // Остання ЗАПИТАНА активність: відповідь попереднього проєкту (перемкнули
   // свічер, поки запит летів) не має лягати поверх нового.
@@ -106,8 +110,8 @@ export default function ProjectOverviewScreen() {
     activityRequestRef.current = projectId;
     setActivityLoading(true);
     try {
-      const page = await fetchProjectActivity(projectId, { limit: 5 });
-      if (activityRequestRef.current === projectId) setRecentActivity(page.results);
+      const page = await fetchProjectActivity(projectId, { limit: 15 });
+      if (activityRequestRef.current === projectId) setRecentActivity(mergeConsecutiveActivity(page.results).slice(0, 5));
     } catch {
       /* активність — не критично: лишаємо попередню стрічку */
     } finally {
@@ -252,7 +256,7 @@ export default function ProjectOverviewScreen() {
       title={tr.projectNavOverview}
       actions={<ProjectSyncIndicator projectId={project.id} accent={c.accent} subColor={c.sub} dimColor={c.dim} />}>
       <ScrollView
-        contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
+        contentContainerStyle={[contentStyle, { paddingBottom: tabBarInset + 40 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
 
@@ -317,9 +321,10 @@ export default function ProjectOverviewScreen() {
           ) : null}
         </View>
 
+        <ResponsiveGrid minItemWidth={340} maxColumns={2} gap={20}>
         {/* Найближчі наради */}
         {modules.meetings ? (
-          <>
+          <View key="meetings">
             <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', letterSpacing: 0.4, marginBottom: 8 }}>
               {tr.overviewUpcomingMeetings}
             </Text>
@@ -330,7 +335,7 @@ export default function ProjectOverviewScreen() {
                 {upcomingMeetings.map(({ meeting, date, time }) => (
                   <TouchableOpacity
                     key={`${meeting.id}_${date}`}
-                    onPress={() => router.push(projectRoute(project.id, 'meetings') as never)}
+                    onPress={() => router.push({ pathname: '/project/[id]/calendar', params: { id: project.id, open: meeting.id } } as never)}
                     activeOpacity={0.75}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 10 }}>
                     <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: meeting.color }} />
@@ -345,9 +350,10 @@ export default function ProjectOverviewScreen() {
                 ))}
               </View>
             )}
-          </>
+          </View>
         ) : null}
 
+        <View key="activity">
         {/* Активність (§4.6) — останні кілька записів; повна стрічка з пагінацією — окремий екран. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
           <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', letterSpacing: 0.4, flex: 1 }}>
@@ -370,12 +376,14 @@ export default function ProjectOverviewScreen() {
                   <IconSymbol name={activityIcon(entry)} size={11} color={project.color} />
                 </View>
                 <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontSize: 12.5, lineHeight: 17 }}>
-                  {formatActivityMessage(entry, tr)}
+                  {formatActivityMessage(entry, tr, activityCtx)}
                 </Text>
               </View>
             ))}
           </View>
         )}
+        </View>
+        </ResponsiveGrid>
         <TeamWorkspace mode="overview" embedded/>
       </ScrollView>
     </ProjectScreenShell>

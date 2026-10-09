@@ -1,11 +1,8 @@
-import {loadData,saveData} from '@/store/storage';
-import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/ProjectSidebar.tsx
  *
  * Сайдбар планшета/широкого екрана ВСЕРЕДИНІ простору проєкту
- * (WORKSPACE_PROJECTS_PLAN.md §3: «планшет/веб: сайдбар стає сайдбаром
- * проєкту з «← Особисте» вгорі і свічером»).
+ * (WORKSPACE_PROJECTS_PLAN.md §3: сайдбар проєкту зі свічером).
  *
  * Малює його `app/_layout.tsx` ЗАМІСТЬ NavSidebar, поки `pathname` лежить у
  * `/project/{id}/...` — та сама умова, що ховає особистий сайдбар на
@@ -15,6 +12,17 @@ import { Atlas } from '@/constants/atlas';
  * Розділи — з того самого маніфесту `constants/projectNav.ts`, що й нижні
  * таби телефону (`app/project/[id]/_layout.tsx`): інакше набір розділів
  * розійшовся б між формфакторами для того самого проєкту.
+ *
+ * Верх сайдбара — у БУДЬ-ЯКОМУ стані (і згорнутому теж):
+ *   1. «‹ Усі проєкти» — назад до списку проєктів (`/projects`), а не в
+ *      Особисте: вихід в Особисте лишився першим рядком свічера.
+ *   2. Ідентичність проєкту — кольорова плитка з ініціалом + назва; тап
+ *      відкриває свічер проєктів. Згорнутий сайдбар показує саму плитку, тож
+ *      «в якому я проєкті» видно завжди.
+ *   3. Кнопка згортання (іконка сайдбара) — поруч із назвою / під плиткою.
+ *
+ * Ширина згорнутого — та сама рейка, що в особистого (Layout.railWidth), і
+ * її знає useScreenWidth() через sidebar-mode: сітки екранів розширюються.
  */
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -22,15 +30,30 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActiveTimersSidebarCard } from '@/components/time/ActiveTimersSidebarCard';
-import { ProjectSwitcherList } from '@/components/projects/ProjectSwitcherSheet';
+import { ProjectSwitcherSheet } from '@/components/projects/ProjectSwitcherSheet';
+import {
+  projectSidebarWidthFor, setProjectSidebarCollapsed, useProjectSidebarCollapsed,
+} from '@/components/shared/sidebar-mode';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { SIDEBAR_WIDTH } from '@/constants/nav';
-import { projectRoute, visibleProjectNavItems } from '@/constants/projectNav';
+import { Atlas } from '@/constants/atlas';
+import { goProjectsList, projectRoute, visibleProjectNavItems, type ProjectSectionKey } from '@/constants/projectNav';
 import { useProject } from '@/hooks/use-project';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useI18n } from '@/store/i18n';
-import { addRecentProject } from '@/store/project-sync';
+import { loadData, saveData } from '@/store/storage';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
+
+const COLLAPSED_KEY = 'project-sidebar-collapsed';
+const GROUPS_KEY = 'project-sidebar-groups';
+
+/** Групи розділів. Перша — без заголовка (щоденне), решта згортаються. */
+const GROUPS: { id: string; labelKey: 'projectNavGroupTasks' | 'projectNavGroupWork' | 'projectNavGroupTeam' | null; keys: ProjectSectionKey[] }[] = [
+  { id: 'main', labelKey: null, keys: ['my-work', 'tasks', 'calendar'] },
+  // id груп — старі підписи: так лишаються чинними вже збережені згортання.
+  { id: 'Завдання', labelKey: 'projectNavGroupTasks', keys: ['overview', 'backlog', 'archive', 'sprints'] },
+  { id: 'Робота', labelKey: 'projectNavGroupWork', keys: ['notes', 'time', 'budget'] },
+  { id: 'Команда', labelKey: 'projectNavGroupTeam', keys: ['discussions', 'workload', 'members'] },
+];
 
 export function ProjectSidebar({
   projectId, pathname, isDark,
@@ -45,10 +68,22 @@ export function ProjectSidebar({
   const { project } = useProject(projectId);
   const role = useProjectRole(projectId);
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const [collapsed,setCollapsed]=useState(false),[closed,setClosed]=useState<string[]>([]);
-  useEffect(()=>{void loadData<boolean>('project-sidebar-collapsed',false).then(setCollapsed);void loadData<string[]>('project-sidebar-groups',[]).then(setClosed);},[]);
-  const toggle=()=>{setCollapsed(!collapsed);void saveData('project-sidebar-collapsed',!collapsed);};
-  const toggleGroup=(name:string)=>{const next=closed.includes(name)?closed.filter(n=>n!==name):[...closed,name];setClosed(next);void saveData('project-sidebar-groups',next);};
+  const collapsed = useProjectSidebarCollapsed();
+  const [closed, setClosed] = useState<string[]>([]);
+  useEffect(() => {
+    void loadData<boolean>(COLLAPSED_KEY, false).then(v => setProjectSidebarCollapsed(!!v));
+    void loadData<string[]>(GROUPS_KEY, []).then(v => setClosed(Array.isArray(v) ? v : []));
+  }, []);
+  const toggle = () => {
+    const next = !collapsed;
+    setProjectSidebarCollapsed(next);
+    void saveData(COLLAPSED_KEY, next);
+  };
+  const toggleGroup = (id: string) => {
+    const next = closed.includes(id) ? closed.filter(n => n !== id) : [...closed, id];
+    setClosed(next);
+    void saveData(GROUPS_KEY, next);
+  };
 
   const modules = project ? projectModules(project) : MODULES_BY_TEMPLATE.work;
   const items = visibleProjectNavItems(modules, role);
@@ -63,95 +98,134 @@ export function ProjectSidebar({
     activeBg: isDark ? accent + '22' : accent + '18',
   };
 
-  const goPersonal = () => router.replace('/(tabs)/today');
   const goSection = (route: string) => router.push(route as never);
-  const goProject = (id: string) => {
-    setSwitcherOpen(false);
-    if (id === projectId) return;
-    void addRecentProject(id);
-    router.replace(projectRoute(id, 'overview') as never);
+  const name = project?.name ?? '';
+  const initial = name.trim().charAt(0).toUpperCase() || '•';
+  const collapseLabel = collapsed ? tr.projectSidebarExpand : tr.projectSidebarCollapse;
+
+  const navRow = (key: ProjectSectionKey, icon: React.ComponentProps<typeof IconSymbol>['name'], label: string, route: string) => {
+    const active = pathname === route || pathname.startsWith(route + '/');
+    return (
+      <TouchableOpacity
+        key={key}
+        onPress={() => goSection(route)}
+        accessibilityRole="menuitem"
+        accessibilityState={{ selected: active }}
+        accessibilityLabel={label}
+        style={[st.row, collapsed && st.rowCollapsed, active && { backgroundColor: c.activeBg }]}>
+        <IconSymbol name={icon} size={19} color={active ? c.accent : c.sub} />
+        {!collapsed && (
+          <Text numberOfLines={1} style={{ color: active ? c.accent : c.text, fontSize: 14, fontWeight: active ? '700' : '500', flex: 1 }}>
+            {label}
+          </Text>
+        )}
+      </TouchableOpacity>
+    );
   };
 
   return (
     <View
-      style={[st.root, { width: collapsed?64:SIDEBAR_WIDTH, backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 14 }]}
+      style={[st.root, { width: projectSidebarWidthFor(collapsed), backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 10 }]}
       accessibilityRole="menu">
-      <TouchableOpacity onPress={toggle} accessibilityRole="button" accessibilityLabel={collapsed?'Розгорнути сайдбар':'Згорнути сайдбар'} style={st.row}><IconSymbol name="list.bullet" size={18} color={c.sub}/>{!collapsed&&<Text style={{color:c.sub}}>Згорнути сайдбар</Text>}</TouchableOpacity>
-      <TouchableOpacity onPress={goPersonal} accessibilityRole="button" style={st.exitRow}>
-        <IconSymbol name="chevron.left" size={14} color={c.sub} />
-        {!collapsed&&<Text style={{ color: c.sub, fontSize: 13, fontWeight: '700' }}>{tr.projectExitToPersonal}</Text>}
+      {/* 1. Назад до списку проєктів — завжди, і в рейці теж. */}
+      <TouchableOpacity
+        onPress={() => goProjectsList(router as never)}
+        accessibilityRole="link"
+        accessibilityLabel={tr.projectBackToProjectsA11y}
+        style={[st.row, collapsed && st.rowCollapsed]}>
+        <IconSymbol name="chevron.left" size={15} color={c.sub} />
+        {!collapsed && <Text numberOfLines={1} style={{ color: c.sub, fontSize: 13, fontWeight: '700', flex: 1 }}>{tr.projectBackToProjects}</Text>}
       </TouchableOpacity>
 
-      {project && !collapsed ? (
-        <View style={st.header}>
-          <View style={[st.dot, { backgroundColor: project.color }]} />
-          <Text numberOfLines={1} style={[st.brand, { color: c.text }]}>{project.name}</Text>
-        </View>
-      ) : null}
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-        {[
-          {label:'',keys:['my-work','tasks','calendar','meetings']},
-          {label:'Завдання',keys:['overview','backlog','archive','sprints']},
-          {label:'Робота',keys:['notes','time','budget']},
-          {label:'Команда',keys:['discussions','workload','members']},
-        ].map(group=><View key={group.label} style={{marginBottom:collapsed?2:12}}>{!collapsed&&!!group.label&&<TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:!closed.includes(group.label)}} onPress={()=>toggleGroup(group.label)} style={st.groupHead}><Text style={{color:c.sub}}>{closed.includes(group.label)?'▸':'▾'} {group.label}</Text></TouchableOpacity>}{(collapsed||!closed.includes(group.label))&&items.filter(item=>group.keys.includes(item.key)).map(item => {
-          const route = projectRoute(projectId, item.key);
-          const active = pathname === route || pathname.startsWith(route + '/');
-          return (
-            <TouchableOpacity
-              key={item.key}
-              onPress={() => goSection(route)}
-              accessibilityRole="menuitem"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={String(tr[item.labelKey])}
-              style={[st.row, collapsed&&{minHeight:36,justifyContent:'center'}, active && { backgroundColor: c.activeBg }]}>
-              <IconSymbol name={item.icon} size={19} color={active ? c.accent : c.sub} />
-              {!collapsed&&<Text
-                numberOfLines={1}
-                style={{ color: active ? c.accent : c.text, fontSize: 14, fontWeight: active ? '700' : '500', flex: 1 }}>
-                {String(tr[item.labelKey])}
-              </Text>}
-            </TouchableOpacity>
-          );
-        })}</View>)}
-
-        {!collapsed&&<TouchableOpacity
-          onPress={() => setSwitcherOpen(v => !v)}
+      {/* 2–3. Ідентичність проєкту (тап — свічер) + згортання. */}
+      <View style={[st.identity, collapsed && st.identityCollapsed, { borderBottomColor: c.border }]}>
+        <TouchableOpacity
+          onPress={() => setSwitcherOpen(true)}
           accessibilityRole="button"
-          accessibilityState={{ expanded: switcherOpen }}
-          style={[st.groupHead, { marginTop: 18 }]}>
-          <IconSymbol name={switcherOpen ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
-          <Text style={[st.groupTitle, { color: c.sub, flex: 1, marginLeft: 4 }]}>
-            {tr.projectSwitcherTitle.toUpperCase()}
-          </Text>
-        </TouchableOpacity>}
-        {switcherOpen && !collapsed ? (
-          <ProjectSwitcherList
-            currentProjectId={projectId}
-            isDark={isDark}
-            c={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent, dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
-            onNavigate={goProject}
-            onExit={goPersonal}
-          />
-        ) : null}
+          accessibilityLabel={tr.projectSwitchProjectA11y.replace('{name}', name)}
+          style={[st.identityBtn, collapsed && st.identityBtnCollapsed]}>
+          <View style={[st.avatar, { backgroundColor: accent }]}>
+            <Text style={st.avatarText}>{initial}</Text>
+          </View>
+          {collapsed ? (
+            // Рейка: під плиткою — коротка назва, щоб проєкт упізнавався не лише за кольором.
+            <Text numberOfLines={1} style={[st.brandCollapsed, { color: c.sub }]}>{name}</Text>
+          ) : (
+            <>
+              <Text numberOfLines={2} style={[st.brand, { color: c.text }]}>{name}</Text>
+              <IconSymbol name="chevron.down" size={11} color={c.sub} />
+            </>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={toggle}
+          accessibilityRole="button"
+          accessibilityLabel={collapseLabel}
+          accessibilityState={{ expanded: !collapsed }}
+          style={st.iconBtn}>
+          <IconSymbol name="sidebar.left" size={18} color={c.sub} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, paddingBottom: 16 }}>
+        {GROUPS.map((group, index) => {
+          const groupItems = items.filter(item => group.keys.includes(item.key));
+          if (!groupItems.length) return null;
+          const groupClosed = !collapsed && !!group.labelKey && closed.includes(group.id);
+          const label = group.labelKey ? tr[group.labelKey] : '';
+          return (
+            <View key={group.id} style={{ marginBottom: collapsed ? 4 : 10 }}>
+              {collapsed && index > 0 ? <View style={[st.sep, { backgroundColor: c.border }]} /> : null}
+              {!collapsed && group.labelKey ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ expanded: !groupClosed }}
+                  onPress={() => toggleGroup(group.id)}
+                  style={st.groupHead}>
+                  <Text style={[st.groupTitle, { color: c.sub }]}>{label.toUpperCase()}</Text>
+                  <IconSymbol name={groupClosed ? 'chevron.right' : 'chevron.down'} size={10} color={c.sub} />
+                </TouchableOpacity>
+              ) : null}
+              {!groupClosed && groupItems.map(item =>
+                navRow(item.key, item.icon, String(tr[item.labelKey]), projectRoute(projectId, item.key)))}
+            </View>
+          );
+        })}
       </ScrollView>
 
-      <View style={{ paddingBottom: insets.bottom + 10 }}>
-        {!collapsed&&<ActiveTimersSidebarCard colors={{ border: c.border, text: c.text, sub: c.sub, accent: c.accent, activeBg: c.activeBg }} />}
-        <TouchableOpacity accessibilityRole="menuitem" accessibilityLabel={tr.tabOptions} onPress={()=>goSection(projectRoute(projectId,'settings'))} style={st.row}><IconSymbol name="gearshape.fill" size={19} color={c.sub}/>{!collapsed&&<Text style={{color:c.text}}>{tr.tabOptions}</Text>}</TouchableOpacity>
+      <View style={{ paddingBottom: insets.bottom + 10, gap: 4 }}>
+        {!collapsed && <ActiveTimersSidebarCard projectId={projectId} colors={{ border: c.border, text: c.text, sub: c.sub, accent: c.accent, activeBg: c.activeBg }} />}
+        {navRow('settings', 'gearshape.fill', tr.tabOptions, projectRoute(projectId, 'settings'))}
       </View>
+
+      {project ? (
+        <ProjectSwitcherSheet
+          visible={switcherOpen}
+          onClose={() => setSwitcherOpen(false)}
+          currentProjectId={project.id}
+          isDark={isDark}
+          accent={accent}
+        />
+      ) : null}
     </View>
   );
 }
 
 const st = StyleSheet.create({
   root:       { borderRightWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10 },
-  exitRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingHorizontal: 10, marginBottom: 8 },
-  header:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 14 },
-  dot:        { width: 12, height: 12, borderRadius: 6 },
-  brand:      { fontSize: 18, fontWeight: Atlas.type.headingWeight, flex: 1 },
-  groupHead:  { flexDirection: 'row', alignItems: 'center', minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.small },
+  identity:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: 10, marginBottom: 2, borderBottomWidth: StyleSheet.hairlineWidth },
+  identityCollapsed: { flexDirection: 'column', gap: 2 },
+  identityBtn:{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 6, borderRadius: Atlas.radius.medium },
+  identityBtnCollapsed: { flex: 0, alignSelf: 'stretch', flexDirection: 'column', justifyContent: 'center', gap: 3, paddingHorizontal: 0, paddingVertical: 4 },
+  brandCollapsed: { fontSize: 10, fontWeight: '600', maxWidth: '100%', textAlign: 'center' },
+  avatar:     { width: 32, height: 32, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  brand:      { fontSize: 16, fontWeight: Atlas.type.headingWeight, flex: 1 },
+  iconBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium },
+  groupHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.small },
   groupTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
+  sep:        { height: StyleSheet.hairlineWidth, marginHorizontal: 8, marginVertical: 6 },
   row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
+  rowCollapsed: { justifyContent: 'center', paddingHorizontal: 0 },
 });

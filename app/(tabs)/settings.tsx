@@ -37,6 +37,11 @@ import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { useResponsive } from '@/hooks/use-responsive';
+import { wideModalStyles } from '@/components/finance/wideModal';
+import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
+import { ProfileCard } from '@/components/settings/ProfileCard';
+import { ToolTiles } from '@/components/settings/ToolTiles';
+import { settingsColumnCount, settingsSectionLayout, type SettingsSectionId } from '@/components/settings/model';
 
 /**
  * Натискання рядка йде через один спільний колбек, а маршрут приходить
@@ -57,7 +62,8 @@ const TOOL_ROWS: readonly {
   labelKey: keyof Translations;
   module: ModuleId;
 }[] = [
-  { route: '/meetings',      icon: 'calendar',         iconColor: '#6366F1', labelKey: 'meetings',         module: 'meetings' },
+  // `as never`: типи маршрутів згенеруються з новим /calendar лише на `expo start`.
+  { route: '/calendar' as never, icon: 'calendar',         iconColor: '#6366F1', labelKey: 'calendar',         module: 'meetings' },
   { route: '/menu',          icon: 'fork.knife',       iconColor: '#F59E0B', labelKey: 'menuNavLabel',     module: 'menu' },
   { route: '/(tabs)/time',   icon: 'timer',            iconColor: '#6366F1', labelKey: 'navTimeTracker',   module: 'time' },
   { route: '/budget',        icon: 'chart.pie.fill',   iconColor: '#0EA5E9', labelKey: 'navBudget',        module: 'budget' },
@@ -72,7 +78,10 @@ export default function SettingsScreen() {
   const sheetSurface = useSheetSurface();
   const topInset = useTopInset();
   const tabBarInset = useTabBarInset();
-  const { isWide } = useResponsive();
+  const { isWide, isExpanded } = useResponsive();
+  // Тема й мова — діалогом посеред екрана на планшеті (як SheetModal), а не
+  // смугою на всю ширину, притиснутою до низу.
+  const wm = wideModalStyles(isWide);
   const cs = useColorScheme();
   useScreenView('settings');
   const isDark = cs === 'dark';
@@ -98,6 +107,10 @@ export default function SettingsScreen() {
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showLangModal, setShowLangModal] = useState(false);
   const [scheduledCount, setScheduledCount] = useState(0);
+  // «Завантажити все на сервер / з сервера» — рідкісні важкі дії; сховані під
+  // одним розкривним рядком біля «Управління даними», щоб не захаращувати «Дані».
+  const [showTransfer, setShowTransfer] = useState(false);
+  const toggleTransfer = useCallback(() => setShowTransfer(v => !v), []);
 
   useFocusEffect(useCallback(() => {
     getAllScheduledNotifications().then(list => {
@@ -229,10 +242,316 @@ export default function SettingsScreen() {
     return undefined;
   }, [online, status, syncState, pendingCount, lastSyncAt, lang, tr]);
 
-  // На планшеті секції лягають у дві колонки: список налаштувань інакше
-  // перетворюється на вузьку стрічку посеред порожнього екрана.
-  const gridStyle = isWide ? st.grid : undefined;
-  const colStyle = isWide ? st.col : undefined;
+  const authed = status === 'authed' && !!user;
+  const openTool = useCallback((key: string) => {
+    const tool = TOOL_ROWS.find(t => t.module === key);
+    if (tool) router.push(tool.route);
+  }, [router]);
+  const tiles = useMemo(
+    () => visibleTools.map(tool => ({
+      key: tool.module, icon: tool.icon, iconColor: tool.iconColor, label: String(tr[tool.labelKey]),
+    })),
+    [visibleTools, tr],
+  );
+  const goAccount = useCallback(() => router.push('/account'), [router]);
+  const goLogin = useCallback(() => router.push('/login'), [router]);
+  const goRegister = useCallback(() => router.push('/register'), [router]);
+
+  const blur = { intensity: isDark ? 20 : 40, tint: (isDark ? 'dark' : 'light') as 'dark' | 'light' };
+
+  // ── Секції (порядок — components/settings/model.ts) ────────────────────────
+  const renderSection = (id: SettingsSectionId): React.ReactNode => {
+    switch (id) {
+      case 'look':
+        return (
+          <View>
+            <SectionLabel label={tr.settingsHub.sectionLookNotify} color={c.sub} />
+            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+              <SettingRow
+                icon="paintbrush"
+                iconColor="#8B5CF6"
+                label={tr.theme}
+                value={THEME_LABELS[theme]}
+                onPress={openThemeModal}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              <SettingRow
+                icon="globe"
+                iconColor="#0EA5E9"
+                label={tr.language}
+                value={LANG_LABELS[lang]}
+                onPress={openLangModal}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              {/* Модулі стоять у «Вигляді», а не в «Даних», свідомо:
+                  вимкнення нічого не видаляє — воно змінює те, що видно. */}
+              <SettingRow
+                icon="square.grid.2x2"
+                iconColor="#10B981"
+                label={tr.modulesSettingsRow}
+                value={disabledCount ? String(disabledCount) : undefined}
+                route={MODULE_SETTINGS_ROUTE as Href}
+                onPress={go}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              <NotifRow
+                label={tr.notifications}
+                scheduledCount={scheduledCount}
+                route="/notifications"
+                onPress={go}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                accent={c.accent}
+                last={false}
+              />
+              <SettingRow
+                icon="slider.horizontal.3"
+                iconColor="#F59E0B"
+                label={tr.ncSettingsTitle}
+                route={'/settings-notifications' as Href}
+                onPress={go}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              <ToggleRow
+                icon="checklist"
+                iconColor="#7C3AED"
+                label={tr.taskReminders}
+                value={taskReminders}
+                onChange={handleTaskRemindersToggle}
+                text={c.text}
+                border={c.border}
+                last
+              />
+            </BlurView>
+          </View>
+        );
+      case 'data':
+        return (
+          <View>
+            <SectionLabel label={tr.sectionData} color={c.sub} />
+            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+              <SettingRow
+                icon="arrow.triangle.2.circlepath"
+                iconColor="#7C3AED"
+                label={tr.sync}
+                value={syncValue}
+                route="/sync"
+                onPress={go}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              <SettingRow
+                icon="arrow.triangle.2.circlepath"
+                iconColor="#10B981"
+                label={tr.syncNow}
+                value={syncState === 'syncing' ? '…' : undefined}
+                onPress={handleSyncNow}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              {/* Режим роботи — §2 плану: «офлайн» тепер лише тимчасова
+                  відсутність мережі, не ручний вибір, тож перемикача немає —
+                  лише поточний стан. */}
+              <StatusRow
+                icon={online ? 'wifi' : 'icloud.slash'}
+                iconColor="#0EA5E9"
+                label={`${tr.workMode}: ${online ? tr.modeOnline : tr.modeOffline}`}
+                text={c.text}
+                border={c.border}
+                last={false}
+              />
+              <SettingRow
+                icon="externaldrive"
+                iconColor="#6366F1"
+                label={tr.dataManagement}
+                route="/data"
+                onPress={go}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              <DisclosureRow
+                icon="arrow.up.arrow.down"
+                iconColor="#0EA5E9"
+                label={tr.settingsHub.serverTransfer}
+                open={showTransfer}
+                onToggle={toggleTransfer}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={!showTransfer}
+              />
+              {showTransfer && (
+                <>
+                  <SettingRow
+                    icon="arrow.up.circle"
+                    iconColor="#0EA5E9"
+                    label={tr.syncPushAll}
+                    onPress={handlePushAll}
+                    text={c.text}
+                    sub={c.sub}
+                    border={c.border}
+                    indent
+                    last={false}
+                  />
+                  <SettingRow
+                    icon="arrow.down.circle"
+                    iconColor="#F59E0B"
+                    label={tr.syncPullAll}
+                    onPress={handlePullAll}
+                    text={c.text}
+                    sub={c.sub}
+                    border={c.border}
+                    indent
+                    last
+                  />
+                </>
+              )}
+            </BlurView>
+            {/* NAT-15: підпис мусить відповідати стану — інакше під «Онлайн»
+                стояло б «дані лише на пристрої». */}
+            <Text style={[st.hint, { color: c.sub }]}>
+              {online ? tr.onlineDesc : tr.offlineDesc}
+            </Text>
+          </View>
+        );
+      case 'support':
+        return (
+          <View>
+            <SectionLabel label={tr.sectionSupport} color={c.sub} />
+            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+              {/* Ідеї й баги — один екран (feedback-inbox.md §10.1). */}
+              <SettingRow
+                icon="lightbulb.fill"
+                iconColor="#8B5CF6"
+                label={tr.fbTitle}
+                route={'/feedback' as Href}
+                onPress={go}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              <SettingRow
+                icon="paperplane.fill"
+                iconColor="#0EA5E9"
+                label={tr.sendFeedback}
+                onPress={handleInDevelopment}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              <SettingRow
+                icon="star.fill"
+                iconColor="#F59E0B"
+                label={tr.rateApp}
+                onPress={handleInDevelopment}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              <SettingRow
+                icon="heart.fill"
+                iconColor="#EF4444"
+                label={tr.donate}
+                value="PayPal · Donatello"
+                route="/donate"
+                onPress={go}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last
+              />
+            </BlurView>
+            <AdvertisingSettings />
+            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+              <SettingRow
+                icon="person.fill"
+                iconColor="#7C3AED"
+                label={tr.developer}
+                value="Igor Lialiuk"
+                route="/developer"
+                onPress={go}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last
+              />
+            </BlurView>
+          </View>
+        );
+      case 'account':
+        if (!user) return null;
+        return (
+          <View>
+            <SectionLabel label={tr.sectionAccount} color={c.sub} />
+            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+              <SettingRow
+                icon="person.crop.circle"
+                iconColor="#7C3AED"
+                label={tr.accountManage}
+                route="/account"
+                onPress={go}
+                text={c.text}
+                sub={c.sub}
+                border={c.border}
+                last={false}
+              />
+              {user.isAdmin && (
+                <SettingRow
+                  icon="person.badge.key.fill"
+                  iconColor="#0EA5E9"
+                  label={tr.settingsAdminWorkspace}
+                  route="/admin-workspace"
+                  onPress={go}
+                  text={c.text}
+                  sub={c.sub}
+                  border={c.border}
+                  last={false}
+                />
+              )}
+              <TouchableOpacity
+                onPress={handleLogout}
+                accessibilityRole="button"
+                accessibilityLabel={tr.authLogout}
+                style={st.row}>
+                <View style={[st.iconBox, { backgroundColor: '#EF444420' }]}>
+                  <IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color="#EF4444" />
+                </View>
+                <Text style={[st.rowLabel, { color: '#EF4444', flex: 1 }]}>{tr.authLogout}</Text>
+              </TouchableOpacity>
+            </BlurView>
+          </View>
+        );
+    }
+  };
+
+  const sectionLayout = settingsSectionLayout(authed);
+  const sectionEntries: MasonryEntry[] = sectionLayout.columns.map(id => ({
+    key: id,
+    // Відступ між картками в колонці — справа самих карток (MasonryColumns).
+    node: <View style={st.sectionCell}>{renderSection(id)}</View>,
+  }));
 
   return (
     <View style={{ flex: 1 }}>
@@ -248,368 +567,42 @@ export default function SettingsScreen() {
        */}
       <View style={{ flex: 1, paddingTop: topInset }}>
         <ScrollView
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 16 }]}
+          // Ландшафт: дві колонки секцій у 720pt — це ~330pt на рядок, і
+          // підписи обрізались. На expanded колонці даємо 960.
+          contentContainerStyle={[contentWidth, isExpanded && st.wideColumn, { paddingHorizontal: 20, paddingBottom: tabBarInset + 16 }]}
           showsVerticalScrollIndicator={false}>
 
-          <View style={{ marginTop: 10, marginBottom: 28 }}>
+          <View style={{ marginTop: 10, marginBottom: 20 }}>
             <Text style={[st.pageTitle, { color: c.text }]}>{tr.settings}</Text>
           </View>
 
-          <AdvertisingSettings />
-          <View style={gridStyle}>
+          {/* 1. Профіль */}
+          <ProfileCard
+            user={authed ? user : null}
+            online={online}
+            isDark={isDark}
+            colors={c}
+            onManage={goAccount}
+            onLogin={goLogin}
+            onRegister={goRegister}
+          />
 
-            {/* Акаунт */}
-            <View style={colStyle}>
-              <SectionLabel label={tr.sectionAccount} color={c.sub} />
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                {status === 'authed' && user ? (
-                  <>
-                    <View style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                      <View style={[st.iconBox, { backgroundColor: '#7C3AED20' }]}>
-                        <IconSymbol name="person.fill" size={17} color="#7C3AED" />
-                      </View>
-                      <Text style={[st.rowLabel, { color: c.text, flex: 1 }]} numberOfLines={1}>{user.email}</Text>
-                    </View>
-                    <SettingRow
-                      icon="person.crop.circle"
-                      iconColor="#7C3AED"
-                      label={tr.accountManage}
-                      route="/account"
-                      onPress={go}
-                      text={c.text}
-                      sub={c.sub}
-                      border={c.border}
-                      last={false}
-                    />
-                    {user.isAdmin && (
-                      <SettingRow
-                        icon="person.badge.key.fill"
-                        iconColor="#0EA5E9"
-                        label={tr.settingsAdminWorkspace}
-                        route="/admin-workspace"
-                        onPress={go}
-                        text={c.text}
-                        sub={c.sub}
-                        border={c.border}
-                        last={false}
-                      />
-                    )}
-                    <TouchableOpacity
-                      onPress={handleLogout}
-                      style={st.row}>
-                      <View style={[st.iconBox, { backgroundColor: '#EF444420' }]}>
-                        <IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color="#EF4444" />
-                      </View>
-                      <Text style={[st.rowLabel, { color: '#EF4444', flex: 1 }]}>{tr.authLogout}</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    <SettingRow
-                      icon="person.fill"
-                      iconColor="#7C3AED"
-                      label={tr.authLogin}
-                      route="/login"
-                      onPress={go}
-                      text={c.text}
-                      sub={c.sub}
-                      border={c.border}
-                      last={false}
-                    />
-                    <SettingRow
-                      icon="person.badge.plus"
-                      iconColor="#0EA5E9"
-                      label={tr.authRegister}
-                      route="/register"
-                      onPress={go}
-                      text={c.text}
-                      sub={c.sub}
-                      border={c.border}
-                      last
-                    />
-                  </>
-                )}
-              </BlurView>
-            </View>
-
-            {/* Режим роботи — §2 плану: «офлайн» тепер лише тимчасова
-                відсутність мережі, не ручний вибір користувача, тож
-                перемикача тут більше немає — лише поточний стан. */}
-            <View style={colStyle}>
-              <SectionLabel label={tr.workMode} color={c.sub} />
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <StatusRow
-                  icon={online ? 'wifi' : 'icloud.slash'}
-                  iconColor="#0EA5E9"
-                  label={online ? tr.modeOnline : tr.modeOffline}
-                  text={c.text}
-                  border={c.border}
-                  last
-                />
-              </BlurView>
-              {/* NAT-15: підпис ішов безумовно офлайновий, тобто в режимі
-                  «Онлайн» екран сам собі суперечив — людина читала «дані лише
-                  на пристрої» під рядком «Онлайн». */}
-              <Text style={{ color: c.sub, fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 6, marginBottom: 18 }}>
-                {online ? tr.onlineDesc : tr.offlineDesc}
-              </Text>
-            </View>
-
-            {/* Support — first */}
-            <View style={colStyle}>
-              <SectionLabel label={tr.sectionSupport} color={c.sub} />
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <SettingRow
-                  icon="heart.fill"
-                  iconColor="#EF4444"
-                  label={tr.donate}
-                  value="PayPal · Donatello"
-                  route="/donate"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="person.fill"
-                  iconColor="#7C3AED"
-                  label={tr.developer}
-                  value="Igor Lialiuk"
-                  route="/developer"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last
-                />
-              </BlurView>
-            </View>
-
-            {/* Розробка */}
-            <View style={colStyle}>
-              <SectionLabel label={tr.sectionDev} color={c.sub} />
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                {/* Ідеї й баги — один екран (feedback-inbox.md §10.1);
-                    /bugs і /ideas лишились редиректами на один реліз. */}
-                <SettingRow
-                  icon="lightbulb.fill"
-                  iconColor="#8B5CF6"
-                  label={tr.fbTitle}
-                  route={'/feedback' as Href}
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last
-                />
-              </BlurView>
-            </View>
-
-            {/* Appearance */}
-            <View style={colStyle}>
-              <SectionLabel label={tr.sectionAppearance} color={c.sub} />
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <SettingRow
-                  icon="paintbrush"
-                  iconColor="#8B5CF6"
-                  label={tr.theme}
-                  value={THEME_LABELS[theme]}
-                  onPress={openThemeModal}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="globe"
-                  iconColor="#0EA5E9"
-                  label={tr.language}
-                  value={LANG_LABELS[lang]}
-                  onPress={openLangModal}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                {/* Модулі стоять у «Вигляді», а не в «Даних», свідомо:
-                    вимкнення нічого не видаляє — воно змінює те, що видно. */}
-                <SettingRow
-                  icon="square.grid.2x2"
-                  iconColor="#10B981"
-                  label={tr.modulesSettingsRow}
-                  value={disabledCount ? String(disabledCount) : undefined}
-                  route={MODULE_SETTINGS_ROUTE as Href}
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last
-                />
-              </BlurView>
-            </View>
-
-            {/* Notifications */}
-            <View style={colStyle}>
-              <SectionLabel label={tr.sectionNotifications} color={c.sub} />
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <NotifRow
-                  label={tr.notifications}
-                  scheduledCount={scheduledCount}
-                  route="/notifications"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  accent={c.accent}
-                  last={false}
-                />
-                <SettingRow
-                  icon="slider.horizontal.3"
-                  iconColor="#F59E0B"
-                  label={tr.ncSettingsTitle}
-                  route={'/settings-notifications' as Href}
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <ToggleRow
-                  icon="checklist"
-                  iconColor="#7C3AED"
-                  label={tr.taskReminders}
-                  value={taskReminders}
-                  onChange={handleTaskRemindersToggle}
-                  text={c.text}
-                  border={c.border}
-                  last
-                />
-              </BlurView>
-            </View>
-
-            {/* Tools — лише входи в УВІМКНЕНІ модулі; усе вимкнено — секції немає. */}
-            {visibleTools.length ? (
-            <View style={colStyle}>
+          {/* 2. Інструменти — лише входи в УВІМКНЕНІ модулі; усе вимкнено — секції немає. */}
+          {tiles.length ? (
+            <View>
               <SectionLabel label={tr.navGroupTools} color={c.sub} />
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                {visibleTools.map((tool, index) => (
-                  <SettingRow
-                    key={tool.module}
-                    icon={tool.icon}
-                    iconColor={tool.iconColor}
-                    label={String(tr[tool.labelKey])}
-                    route={tool.route}
-                    onPress={go}
-                    text={c.text}
-                    sub={c.sub}
-                    border={c.border}
-                    last={index === visibleTools.length - 1}
-                  />
-                ))}
-              </BlurView>
+              <ToolTiles tools={tiles} onPress={openTool} isDark={isDark} text={c.text} border={c.border} />
             </View>
-            ) : null}
+          ) : null}
 
-            {/* Data */}
-            <View style={colStyle}>
-              <SectionLabel label={tr.sectionData} color={c.sub} />
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <SettingRow
-                  icon="arrow.triangle.2.circlepath"
-                  iconColor="#7C3AED"
-                  label={tr.sync}
-                  value={syncValue}
-                  route="/sync"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="arrow.triangle.2.circlepath"
-                  iconColor="#10B981"
-                  label={tr.syncNow}
-                  value={syncState === 'syncing' ? '…' : undefined}
-                  onPress={handleSyncNow}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="arrow.up.circle"
-                  iconColor="#0EA5E9"
-                  label={tr.syncPushAll}
-                  onPress={handlePushAll}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="arrow.down.circle"
-                  iconColor="#F59E0B"
-                  label={tr.syncPullAll}
-                  onPress={handlePullAll}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="externaldrive"
-                  iconColor="#6366F1"
-                  label={tr.dataManagement}
-                  route="/data"
-                  onPress={go}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last
-                />
-              </BlurView>
-            </View>
+          {/* 3–6. Секції: телефон — одна колонка; планшет — масонрі у дві,
+              без «дірок» сітки flexWrap 48%. */}
+          <MasonryColumns items={sectionEntries} columnCount={settingsColumnCount(isWide)} columnGap={16} />
 
-            {/* About */}
-            <View style={colStyle}>
-              <SectionLabel label={tr.sectionAbout} color={c.sub} />
-              <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-                <InfoRow
-                  icon="info"
-                  iconColor={c.sub}
-                  label={tr.version}
-                  value="0.0.1"
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="heart.fill"
-                  iconColor="#EF4444"
-                  label={tr.rateApp}
-                  onPress={handleInDevelopment}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last={false}
-                />
-                <SettingRow
-                  icon="paperplane.fill"
-                  iconColor="#0EA5E9"
-                  label={tr.sendFeedback}
-                  onPress={handleInDevelopment}
-                  text={c.text}
-                  sub={c.sub}
-                  border={c.border}
-                  last
-                />
-              </BlurView>
-            </View>
-
-          </View>
+          {/* 6. Акаунт — завжди останній, на всю ширину (не в колонці масонрі). */}
+          {sectionLayout.tail.map(id => (
+            <View key={id} style={st.sectionCell}>{renderSection(id)}</View>
+          ))}
 
           {/* App footer */}
           <View style={[st.footerCard, { opacity: 0.45 }]}>
@@ -630,12 +623,12 @@ export default function SettingsScreen() {
       {/* ─── Theme Modal ─── */}
       <Modal visible={showThemeModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeThemeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={st.overlay} onPress={closeThemeModal}>
+          <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={closeThemeModal}>
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
-              style={st.sheetWrapper}>
+              style={[st.sheetWrapper, wm.column]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -674,12 +667,12 @@ export default function SettingsScreen() {
       {/* ─── Language Modal ─── */}
       <Modal visible={showLangModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeLangModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={st.overlay} onPress={closeLangModal}>
+          <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={closeLangModal}>
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
-              style={st.sheetWrapper}>
+              style={[st.sheetWrapper, wm.column]}>
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -731,10 +724,12 @@ interface SettingRowProps {
   sub: string;
   border: string;
   last?: boolean;
+  /** Вкладений рядок (під розкривним) — зсунутий праворуч. */
+  indent?: boolean;
 }
 
 const SettingRow = React.memo(function SettingRow(
-  { icon, iconColor, label, value, route, onPress, text, sub, border, last }: SettingRowProps,
+  { icon, iconColor, label, value, route, onPress, text, sub, border, last, indent }: SettingRowProps,
 ) {
   const handlePress = useCallback(() => onPress(route), [onPress, route]);
   return (
@@ -742,14 +737,17 @@ const SettingRow = React.memo(function SettingRow(
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+      style={[st.row, indent && st.rowIndent, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
-      <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
+      {/* iPad portrait 2 колонки: довге значення («Синхронізовано 5 хв тому…»)
+          раніше стискало підпис з flex:1 (basis 0) і «Синхронізація» ламалась
+          посеред слова. Підпис тепер не стискається, обрізається значення. */}
+      <Text style={[st.rowLabel, st.rowLabelFixed, { color: text }]}>{label}</Text>
+      <View style={st.rowValueBox}>
         {value && (
-          <Text style={[st.rowValue, { color: sub }]} numberOfLines={1} ellipsizeMode="tail">
+          <Text style={[st.rowValue, { color: sub, flexShrink: 1 }]} numberOfLines={1} ellipsizeMode="tail">
             {value}
           </Text>
         )}
@@ -862,43 +860,56 @@ const NotifRow = React.memo(function NotifRow(
   );
 });
 
-interface InfoRowProps {
+interface DisclosureRowProps {
   icon: IconSymbolName;
   iconColor: string;
   label: string;
-  value: string;
+  open: boolean;
+  onToggle: () => void;
   text: string;
   sub: string;
   border: string;
   last?: boolean;
 }
 
-const InfoRow = React.memo(function InfoRow(
-  { icon, iconColor, label, value, text, sub, border, last }: InfoRowProps,
+/** Рядок-розкривач: показує/ховає вкладені рядки під собою. */
+const DisclosureRow = React.memo(function DisclosureRow(
+  { icon, iconColor, label, open, onToggle, text, sub, border, last }: DisclosureRowProps,
 ) {
   return (
-    <View style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
-      <View style={[st.iconBox, { backgroundColor: iconColor + '18' }]}>
+    <TouchableOpacity
+      onPress={onToggle}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ expanded: open }}
+      style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+      <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
-      <Text style={[st.rowValue, { color: sub }]}>{value}</Text>
-    </View>
+      <IconSymbol name={open ? 'chevron.up' : 'chevron.down'} size={16} color={sub} />
+    </TouchableOpacity>
   );
 });
 
 const st = StyleSheet.create({
   pageTitle:   { fontSize: 34, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.8 },
   sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 20, marginLeft: 4 },
-  // Дві колонки вмикаються лише на широкому екрані; на телефоні обгортки
-  // лишаються без стилю й розкладка не змінюється.
-  grid:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  col:         { width: '48%' },
+  // Нижній відступ секції — справа самої картки: MasonryColumns вертикальних
+  // проміжків не додає.
+  sectionCell: { paddingBottom: 4 },
+  hint:        { fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 6 },
+  wideColumn:  { maxWidth: 960 },
   card:        { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden' },
   row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
+  rowIndent:   { paddingLeft: 30 },
   iconBox:     { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   rowLabel:    { fontSize: 14, fontWeight: '500' },
   rowValue:    { fontSize: 13, fontWeight: '500' },
+  // Підпис рядка займає вільне місце, але не стискається нижче власної
+  // ширини — стискається (й обрізається «…») лише значення праворуч.
+  rowLabelFixed: { flexGrow: 1, flexShrink: 0 },
+  rowValueBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, flexShrink: 1, minWidth: 0 },
   footerCard:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28, marginBottom: 8 },
   footerLogo:  { width: 26, height: 26, borderRadius: 7 },
   footerName:  { fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 },

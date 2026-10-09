@@ -17,10 +17,20 @@ import { Atlas } from '@/constants/atlas';
  * звичне), з «Обрізати до …» одним дотиком. Рядок бере той самий звіт
  * `detectAnomalies`, що й блок, тож вони не розходяться.
  *
+ * Компонування за шириною (рішення 5 аудиту планшета):
+ *  • телефон — одна колонка, як і було;
+ *  • портрет планшета (medium, 600–839) — одна колонка, але активні таймери
+ *    сіткою у 2 колонки (KPI і так стоять рядком у 4);
+ *  • широко (expanded і ≥720pt вмісту поруч із сайдбаром) — KPI рядком угорі,
+ *    під ними дві колонки: зліва історія з фільтрами, справа липка панель
+ *    «таймери → почати таймер → перевірка → розподіл». Правка запису
+ *    відкривається В ЦІЙ ПАНЕЛІ, а не аркушем: список лишається видно.
+ *
  * Чого тут навмисно НЕМАЄ:
- *  • блоку «Новий таймер» — таймер стартує лише із задачі або зустрічі, бо
+ *  • вільного секундоміра — таймер стартує лише із задачі або зустрічі, бо
  *    вільний секундомір лишав час, не привʼязаний ні до чого, і його однаково
- *    доводилось потім переписувати руками;
+ *    доводилось потім переписувати руками. «Почати таймер» у правій панелі
+ *    широкого екрана — це вибір МОЄЇ задачі, а не секундомір;
  *  • поділу на ранок/день/вечір/ніч — жоден звіт за ним не будувався.
  */
 
@@ -29,6 +39,9 @@ import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   SectionList,
   StyleSheet,
   Text,
@@ -42,17 +55,23 @@ import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { AnomalyPanel, anomalyReasonText } from '@/components/time/AnomalyPanel';
 import { TimerProjectTag } from '@/components/time/ActiveTimerRow';
 import { FullscreenTimers } from '@/components/time/FullscreenTimers';
+import { StartTimerCard } from '@/components/time/StartTimerCard';
+import { TimeEntryForm } from '@/components/time/TimeEntryForm';
 import { TimeEntrySheet } from '@/components/time/TimeEntrySheet';
 import { TimeFilterSheet } from '@/components/time/TimeFilterSheet';
-import { TimeKpi } from '@/components/time/TimeKpi';
+import { TimeKpi, TimeKpiTiles, TimeProjectBreakdown } from '@/components/time/TimeKpi';
+import type { TimerCandidateTask } from '@/components/time/timerCandidates';
 import { useTimerProjects } from '@/components/time/useTimerProjects';
 import { timeColors } from '@/components/time/TimePalette';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { Layout, detailColumnWidthFor } from '@/constants/tokens';
+import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useProjectRoles } from '@/hooks/use-project-roles';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
+import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
 import { loadData } from '@/store/storage';
@@ -62,6 +81,7 @@ import type { ActiveTimer, TimerProject } from '@/utils/activeTimers';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
 import { elapsedSince } from '@/utils/taskTimer';
+import { isMyTask } from '@/utils/taskUtils';
 import {
   anomalyMap,
   anomalySeverity,
@@ -110,13 +130,29 @@ interface Section {
  */
 let migrationRan = false;
 
+/**
+ * Від цієї ширини ВМІСТУ (вікно мінус сайдбар) — дві колонки. Рахуємо від
+ * вмісту, а не від класу вікна: на 840pt з повним сайдбаром лишається ~600pt,
+ * і дві колонки там були б тісніші за одну.
+ */
+const TWO_PANE_MIN = 720;
+
+type PanelState = { mode: 'none' } | { mode: 'new' } | { mode: 'edit'; entry: TimeRecord };
+
 export default function TimeScreen() {
   const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
-  const { height, isWide } = useResponsive();
+  const { width, height, isWide, isExpanded } = useResponsive();
+  const screenWidth = useScreenWidth();
+  /** Широко: KPI рядком, історія зліва, панель справа. */
+  const twoPane = isExpanded && screenWidth >= TWO_PANE_MIN;
+  /** Портрет планшета: одна колонка, таймери сіткою в 2. */
+  const timerColumns = isWide && !twoPane ? 2 : 1;
+  const { user } = useAuth();
+  const projectRoles = useProjectRoles();
   const isDark = useColorScheme() === 'dark';
   useScreenView('time');
-  const { activeTimers, stopTimer, tasksRevision, timeEntriesRevision } = useTimerContext();
+  const { activeTimers, stopTimer, startTaskTimer, tasksRevision, timeEntriesRevision } = useTimerContext();
   // Мітка проєкту в рядку таймера — та сама, що в панелі над табами й сайдбарі.
   const projectOf = useTimerProjects(activeTimers);
   const { tr, lang } = useI18n();
@@ -133,6 +169,8 @@ export default function TimeScreen() {
   const [taskProjects, setTaskProjects] = useState<TaskProjects>(() => new Map());
   /** Задачі для вибору у формі запису (id, назва, проєкт). */
   const [taskChoices, setTaskChoices] = useState<EditableTask[]>([]);
+  /** Задачі для «Почати таймер» (лише широка панель). */
+  const [timerTasks, setTimerTasks] = useState<TimerCandidateTask[]>([]);
   const [timerSubtasks, setTimerSubtasks] = useState<Record<string, RowSubtask[]>>({});
   const [initialized, setInitialized] = useState(false);
 
@@ -146,6 +184,9 @@ export default function TimeScreen() {
   const [fsOpen, setFsOpen] = useState(false);
   const [sheetEntry, setSheetEntry] = useState<TimeRecord | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  /** Права панель широкого екрана: таймери або форма запису. */
+  const [panel, setPanel] = useState<PanelState>({ mode: 'none' });
+  const panelScrollRef = React.useRef<ScrollView>(null);
 
   /**
    * «Сьогодні» перераховується, поки екран відкритий.
@@ -184,13 +225,21 @@ export default function TimeScreen() {
     try {
       const stored = await loadData<ProjectLike[]>('projects', []);
       setProjects(stored.filter(p => p?.id));
-      const tasks = await loadData<{ id: string; title?: string; projectId?: string }[]>('tasks', []);
+      // 'tasks' читаємо ОДИН раз на подію й виводимо з нього все: проєкти
+      // задач, кандидатів таймера і підзавдання для рядків активних таймерів
+      // (раніше — окреме читання й парсинг усього списку на кожну ревізію).
+      const tasks = await loadData<(Omit<TimerCandidateTask, 'title'> & { title?: string; subtasks?: RowSubtask[] })[]>('tasks', []);
       setTaskProjects(taskProjectMap(tasks));
-      setTaskChoices(
-        tasks
-          .filter(t => t?.id && typeof t.title === 'string' && t.title.trim())
-          .map(t => ({ id: t.id, title: t.title as string, projectId: t.projectId })),
+      const subtaskMap: Record<string, RowSubtask[]> = {};
+      for (const task of tasks) {
+        if (task?.id && task.subtasks?.length) subtaskMap[task.id] = task.subtasks;
+      }
+      setTimerSubtasks(subtaskMap);
+      const titled = tasks.filter(
+        (t): t is TimerCandidateTask => !!t?.id && typeof t.title === 'string' && !!t.title.trim(),
       );
+      setTaskChoices(titled.map(t => ({ id: t.id, title: t.title, projectId: t.projectId })));
+      setTimerTasks(titled);
     } catch (e) {
       if (__DEV__) console.warn('[time] проєкти не прочитались:', e);
     }
@@ -228,9 +277,10 @@ export default function TimeScreen() {
       setEntries(next);
       setInitialized(true);
     })();
-    void reloadProjects();
+    // Проєкти й задачі читає useFocusEffect нижче — він спрацьовує і на
+    // першому фокусі, тож окремий виклик тут лише дублював читання.
     return () => { cancelled = true; };
-  }, [reloadProjects]);
+  }, []);
 
   // Стор зупинки таймера дописує завершену сесію в 'time_entries' сам, повз наш
   // стан — лічилка стору єдиний сигнал, що дзеркало сесії дописане.
@@ -242,24 +292,13 @@ export default function TimeScreen() {
     if (initialized) void saveSynced('time_entries', entries);
   }, [entries, initialized]);
 
-  // Підзавдання для рядків активних таймерів. 'tasks' читаємо ЛИШЕ коли серед
-  // активних є таймер задачі.
-  const hasTaskTimers = activeTimers.some(t => t.taskId);
-  const reloadTimerSubtasks = useCallback(async () => {
-    if (!hasTaskTimers) { setTimerSubtasks({}); return; }
-    try {
-      const stored = await loadData<{ id: string; subtasks?: RowSubtask[] }[]>('tasks', []);
-      const map: Record<string, RowSubtask[]> = {};
-      for (const task of stored) {
-        if (task?.id && task.subtasks?.length) map[task.id] = task.subtasks;
-      }
-      setTimerSubtasks(map);
-    } catch (e) {
-      if (__DEV__) console.warn('[time] підзавдання активних таймерів не прочитались:', e);
-    }
-  }, [hasTaskTimers]);
-
-  useEffect(() => { void reloadTimerSubtasks(); }, [reloadTimerSubtasks, tasksRevision]);
+  // Підзавдання для рядків активних таймерів — з того ж читання 'tasks',
+  // що й проєкти (reloadProjects).
+  // Старт таймера з панелі переносить задачу в «У процесі» — список
+  // кандидатів мусить це побачити, а не тримати старий порядок.
+  useEffect(() => {
+    if (tasksRevision > 0) void reloadProjects();
+  }, [tasksRevision, reloadProjects]);
 
   useFocusEffect(useCallback(() => {
     refreshNow();
@@ -352,16 +391,68 @@ export default function TimeScreen() {
       {
         text: tr.delete,
         style: 'destructive',
-        onPress: () => setEntries(prev => prev.filter(e => e.id !== entry.id)),
+        onPress: () => {
+          setEntries(prev => prev.filter(e => e.id !== entry.id));
+          // Запис, відкритий у панелі, щойно зник — форма над ним уже ні до чого.
+          setPanel(current => (current.mode === 'edit' && current.entry.id === entry.id ? { mode: 'none' } : current));
+        },
       },
     ]);
   }, [tr.cancel, tr.cannotUndo, tr.delete, tr.deletePermanently]);
 
   const openEntry = useCallback((entry: TimeRecord | null) => {
     haptic.light();
+    if (twoPane) {
+      setPanel(entry ? { mode: 'edit', entry } : { mode: 'new' });
+      return;
+    }
     setSheetEntry(entry);
     setSheetOpen(true);
-  }, []);
+  }, [twoPane]);
+
+  const closePanel = useCallback(() => setPanel({ mode: 'none' }), []);
+
+  // Нова правка — з верху панелі: форма замінює таймери, і прокрутка, що
+  // лишилась від них, ховала б заголовок і поле задачі.
+  const panelKey = panel.mode === 'edit' ? panel.entry.id : panel.mode;
+  useEffect(() => {
+    if (panel.mode !== 'none') panelScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [panelKey, panel.mode]);
+
+  // Поворот / Split View звузив екран, поки форма була в панелі: панелі більше
+  // немає, тож правка переїжджає в аркуш, а не губиться разом із набраним.
+  useEffect(() => {
+    if (twoPane || panel.mode === 'none') return;
+    setSheetEntry(panel.mode === 'edit' ? panel.entry : null);
+    setSheetOpen(true);
+    setPanel({ mode: 'none' });
+  }, [twoPane, panel]);
+
+  // «Почати таймер» — лише МОЇ задачі: трекати чужу задачу проєкту з
+  // особистого екрана означало б записати свій час під роботу колеги.
+  const myTimerTasks = useMemo(
+    () => (user?.id === undefined ? timerTasks : timerTasks.filter(t => isMyTask(t, user.id, projectRoles))),
+    [timerTasks, user?.id, projectRoles],
+  );
+  const runningTaskIds = useMemo(
+    () => new Set(activeTimers.map(t => t.taskId).filter((id): id is string => !!id)),
+    [activeTimers],
+  );
+  const startFromPanel = useCallback(async (task: TimerCandidateTask) => {
+    haptic.medium();
+    try {
+      await startTaskTimer({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        kanbanColumnId: task.kanbanColumnId,
+        projectId: task.projectId,
+      });
+    } catch (e) {
+      if (__DEV__) console.warn('[time] таймер задачі не стартував:', e);
+      Alert.alert(tr.error, tr.timeStartTimerFailed);
+    }
+  }, [startTaskTimer, tr.error, tr.timeStartTimerFailed]);
 
   const trimEntry = useCallback((entry: TimeRecord, seconds: number) => {
     haptic.medium();
@@ -406,6 +497,212 @@ export default function TimeScreen() {
     [locale],
   );
 
+  // ─── Шматки розмітки, спільні для обох компонувань ─────────────────────────
+
+  const activeTimersBlock = activeTimers.length > 0 ? (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+      {activeTimers.map(timer => (
+        <View key={timer.id} style={{ width: timerColumns === 2 ? '49%' : '100%' }}>
+          <ActiveTimerRow
+            timer={timer}
+            project={projectOf(timer)}
+            tr={tr}
+            subtasks={timer.taskId ? timerSubtasks[timer.taskId] : undefined}
+            accent={c.indigo}
+            border={c.border}
+            card={c.card}
+            text={c.text}
+            sub={c.sub}
+            stopLabel={tr.stopTimerAction}
+            onStop={stopActive}
+          />
+        </View>
+      ))}
+    </View>
+  ) : null;
+
+  const kpiProps = {
+    c,
+    isDark,
+    totalSeconds: total,
+    averageTaskSeconds: average,
+    typicalSessionSeconds: typical,
+    recordCount: filtered.length,
+    breakdown,
+    formatDuration: fmtDur,
+    tr,
+  };
+
+  const anomalyBlock = anomalies.length > 0 ? (
+    <AnomalyPanel
+      reports={anomalies}
+      c={c}
+      isDark={isDark}
+      formatDuration={fmtDur}
+      formatDate={formatEntryDate}
+      onTrim={trimEntry}
+      onEditDuration={openEntry}
+      onDelete={deleteEntry}
+      onMarkNormal={markNormal}
+      tr={tr}
+      lang={lang}
+    />
+  ) : null;
+
+  const historyTitle = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: twoPane ? 4 : 24, marginBottom: 4 }}>
+      <Text style={[s.sectionTitle, { color: c.text, flex: 1 }]} accessibilityRole="header">{tr.history}</Text>
+      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>
+        {periodLabels[period]}
+        {grouping === 'project' ? tr.timeByProjectSuffix : ''}
+      </Text>
+    </View>
+  );
+
+  const selectedId = twoPane && panel.mode === 'edit' ? panel.entry.id : null;
+
+  const renderSectionHeader = ({ section }: { section: Section }) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 14 }}>
+      {section.color && (
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: section.color, marginRight: 7 }} />
+      )}
+      <Text numberOfLines={1} style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{section.title}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+        <IconSymbol name="timer" size={11} color={c.sub} />
+        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{fmtDur(section.seconds)}</Text>
+      </View>
+    </View>
+  );
+
+  const renderItem = ({ item }: { item: TimeRecord }) => {
+    const anomaly: RowAnomaly | undefined = rowAnomalies.get(item.id);
+    const severity = anomalySeverity(anomaly?.kinds ?? []);
+    const trim = severity ? trimmedSeconds(item) : null;
+    return (
+      <EntryRow
+        entry={item}
+        selected={selectedId === item.id}
+        severity={severity}
+        reason={anomaly && severity ? anomalyReasonText(item, anomaly.kinds, anomaly.typicalSeconds, tr, lang, fmtDur) : null}
+        trimSeconds={trim}
+        trimLabel={trim !== null ? tr.anomalyTrimTo.replace('{duration}', fmtDur(trim)) : null}
+        warn={c.warn}
+        projectName={projectById.get(recordProjectId(item, taskProjects) ?? '')?.name}
+        projectColor={projectById.get(recordProjectId(item, taskProjects) ?? '')?.color}
+        accent={c.indigo}
+        border={c.border}
+        text={c.text}
+        sub={c.sub}
+        danger={c.danger}
+        duration={fmtDur(item.duration)}
+        when={formatEntryDate(item.date)}
+        tr={tr}
+        onPress={openEntry}
+        onDelete={deleteEntry}
+        onTrim={trimEntry}
+      />
+    );
+  };
+
+  const emptyList = (
+    <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+      <IconSymbol name="clock.fill" size={40} color={c.sub} />
+      <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noRecords}</Text>
+      {hasFilters ? (
+        <TouchableOpacity onPress={resetFilters} style={[s.emptyAction, { backgroundColor: c.indigo }]}>
+          <IconSymbol name="xmark" size={12} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', marginLeft: 6 }}>{tr.resetAllFilters}</Text>
+        </TouchableOpacity>
+      ) : (
+        <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>
+          {tr.timeEmptyHint}
+        </Text>
+      )}
+    </View>
+  );
+
+  const periodChips = (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }} accessibilityRole="radiogroup">
+      {(Object.keys(periodLabels) as TimePeriod[]).map(key => {
+        const active = period === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            onPress={() => { haptic.light(); setPeriod(key); }}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: active }}
+            style={[s.periodChip, { borderColor: active ? c.indigo : c.border, backgroundColor: active ? c.indigo + '20' : 'transparent' }]}>
+            <Text style={{ color: active ? c.indigo : c.text, fontSize: 13, fontWeight: active ? '700' : '500' }}>
+              {periodLabels[key]}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+      <TouchableOpacity
+        onPress={() => setShowFilters(true)}
+        accessibilityRole="button"
+        accessibilityLabel={tr.filtersAndSort}
+        style={[s.periodChip, { borderColor: hasFilters ? c.indigo : c.border, flexDirection: 'row', gap: 6 }]}>
+        <IconSymbol name="slider.horizontal.3" size={13} color={hasFilters ? c.indigo : c.sub} />
+        <Text style={{ color: hasFilters ? c.indigo : c.text, fontSize: 13, fontWeight: '600' }}>{tr.timeMoreFilters}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const rightPanel = (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ width: detailColumnWidthFor(width), flexShrink: 0 }}>
+      <ScrollView
+        ref={panelScrollRef}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: tabBarInset + 24, gap: 14 }}>
+        {panel.mode !== 'none' ? (
+          <View
+            style={[s.panelCard, { borderColor: c.border, backgroundColor: c.sheet }]}
+            accessibilityLabel={panel.mode === 'edit' ? tr.timeEditEntry : tr.timeNewEntry}>
+            <TimeEntryForm
+              active
+              entry={panel.mode === 'edit' ? panel.entry : null}
+              c={c}
+              tr={tr}
+              tasks={taskChoices}
+              projects={projects}
+              taskProjects={taskProjects}
+              onClose={closePanel}
+              onSubmit={entry => { upsertEntry(entry); closePanel(); }}
+            />
+          </View>
+        ) : (
+          <>
+            <View>
+              <Text style={[s.sectionTitle, { color: c.text, marginBottom: 10 }]} accessibilityRole="header">
+                {tr.activeTimers}{activeTimers.length > 0 ? ` (${activeTimers.length})` : ''}
+              </Text>
+              {activeTimersBlock ?? (
+                <View style={[s.panelEmpty, { borderColor: c.border }]}>
+                  <IconSymbol name="stop.fill" size={12} color={c.sub} />
+                  <Text style={{ color: c.sub, fontSize: 13, marginLeft: 8, flex: 1 }}>{tr.timeNothingRunning}</Text>
+                </View>
+              )}
+            </View>
+            <StartTimerCard
+              c={c}
+              tr={tr}
+              tasks={myTimerTasks}
+              running={runningTaskIds}
+              projectById={projectById}
+              onStart={task => { void startFromPanel(task); }}
+            />
+            {anomalyBlock}
+            <TimeProjectBreakdown {...kpiProps} />
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
@@ -426,163 +723,102 @@ export default function TimeScreen() {
                   <IconSymbol name="timer" size={17} color={c.indigo} />
                 </HeaderButton>
               )}
-              <HeaderButton
-                onPress={() => setShowFilters(true)}
-                accessibilityLabel={tr.filtersAndSort}
-                style={{
-                  backgroundColor: hasFilters ? c.indigo + '20' : c.dim,
-                  borderColor: hasFilters ? c.indigo : c.border,
-                }}>
-                <IconSymbol name="slider.horizontal.3" size={17} color={hasFilters ? c.indigo : c.sub} />
-              </HeaderButton>
+              {/* На широкому фільтри стоять над самою історією (чипи періоду +
+                  «Ще фільтри»), тож кнопка в шапці дублювала б їх. */}
+              {!twoPane && (
+                <HeaderButton
+                  onPress={() => setShowFilters(true)}
+                  accessibilityLabel={tr.filtersAndSort}
+                  style={{
+                    backgroundColor: hasFilters ? c.indigo + '20' : c.dim,
+                    borderColor: hasFilters ? c.indigo : c.border,
+                  }}>
+                  <IconSymbol name="slider.horizontal.3" size={17} color={hasFilters ? c.indigo : c.sub} />
+                </HeaderButton>
+              )}
+              {/* FAB на широкому висів би над історією посеред екрана —
+                  головна дія переїжджає в шапку. */}
+              {twoPane && (
+                <HeaderButton
+                  onPress={() => openEntry(null)}
+                  accessibilityLabel={tr.timeAddEntry}
+                  style={{ backgroundColor: c.indigo, borderColor: c.indigo }}>
+                  <IconSymbol name="plus" size={17} color="#fff" />
+                </HeaderButton>
+              )}
             </>
           }
         />
 
-        <SectionList
-          sections={sections}
-          keyExtractor={item => item.id}
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
-          showsVerticalScrollIndicator={false}
-          stickySectionHeadersEnabled={false}
-          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          renderSectionFooter={() => <View style={{ height: 6 }} />}
-          renderSectionHeader={({ section }) => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, marginTop: 14 }}>
-              {section.color && (
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: section.color, marginRight: 7 }} />
-              )}
-              <Text numberOfLines={1} style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{section.title}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <IconSymbol name="timer" size={11} color={c.sub} />
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{fmtDur(section.seconds)}</Text>
-              </View>
-            </View>
-          )}
-          renderItem={({ item }) => {
-            const anomaly: RowAnomaly | undefined = rowAnomalies.get(item.id);
-            const severity = anomalySeverity(anomaly?.kinds ?? []);
-            const trim = severity ? trimmedSeconds(item) : null;
-            return (
-              <EntryRow
-                entry={item}
-                severity={severity}
-                reason={anomaly && severity ? anomalyReasonText(item, anomaly.kinds, anomaly.typicalSeconds, tr, lang, fmtDur) : null}
-                trimSeconds={trim}
-                trimLabel={trim !== null ? tr.anomalyTrimTo.replace('{duration}', fmtDur(trim)) : null}
-                warn={c.warn}
-                projectName={projectById.get(recordProjectId(item, taskProjects) ?? '')?.name}
-                projectColor={projectById.get(recordProjectId(item, taskProjects) ?? '')?.color}
-                accent={c.indigo}
-                border={c.border}
-                text={c.text}
-                sub={c.sub}
-                danger={c.danger}
-                duration={fmtDur(item.duration)}
-                when={formatEntryDate(item.date)}
-                tr={tr}
-                onPress={openEntry}
-                onDelete={deleteEntry}
-                onTrim={trimEntry}
+        {twoPane ? (
+          <View style={[s.wideBody, { maxWidth: WIDE_CONTENT_MAX_WIDTH, paddingHorizontal: Layout.gutter.expanded }]}>
+            <TimeKpiTiles {...kpiProps} large />
+            <View style={s.wideColumns}>
+              <SectionList
+                style={{ flex: 1, minWidth: 0 }}
+                sections={sections}
+                keyExtractor={item => item.id}
+                contentContainerStyle={{ paddingTop: 4, paddingBottom: tabBarInset + 24 }}
+                showsVerticalScrollIndicator={false}
+                stickySectionHeadersEnabled={false}
+                ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+                renderSectionFooter={() => <View style={{ height: 6 }} />}
+                renderSectionHeader={renderSectionHeader}
+                renderItem={renderItem}
+                ListEmptyComponent={emptyList}
+                ListHeaderComponent={<>{historyTitle}{periodChips}</>}
               />
-            );
-          }}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-              <IconSymbol name="clock.fill" size={40} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noRecords}</Text>
-              {hasFilters ? (
-                <TouchableOpacity onPress={resetFilters} style={[s.emptyAction, { backgroundColor: c.indigo }]}>
-                  <IconSymbol name="xmark" size={12} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', marginLeft: 6 }}>{tr.resetAllFilters}</Text>
-                </TouchableOpacity>
-              ) : (
-                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>
-                  {tr.timeEmptyHint}
-                </Text>
-              )}
+              {rightPanel}
             </View>
-          }
-          ListHeaderComponent={
-            <>
-              {/* 1. Що йде ЗАРАЗ. Порожньої секції немає навмисно: заголовок
-                  «Активні (0)» щодня займав би екран ні за що. */}
-              {activeTimers.length > 0 && (
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[s.sectionTitle, { color: c.text, marginBottom: 10 }]}>
-                    {tr.activeTimers} ({activeTimers.length})
-                  </Text>
-                  {activeTimers.map(timer => (
-                    <ActiveTimerRow
-                      key={timer.id}
-                      timer={timer}
-                      project={projectOf(timer)}
-                      tr={tr}
-                      subtasks={timer.taskId ? timerSubtasks[timer.taskId] : undefined}
-                      accent={c.indigo}
-                      border={c.border}
-                      card={c.card}
-                      text={c.text}
-                      sub={c.sub}
-                      stopLabel={tr.stopTimerAction}
-                      onStop={stopActive}
-                    />
-                  ))}
-                </View>
-              )}
+          </View>
+        ) : (
+          <SectionList
+            sections={sections}
+            keyExtractor={item => item.id}
+            contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
+            showsVerticalScrollIndicator={false}
+            stickySectionHeadersEnabled={false}
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            renderSectionFooter={() => <View style={{ height: 6 }} />}
+            renderSectionHeader={renderSectionHeader}
+            renderItem={renderItem}
+            ListEmptyComponent={emptyList}
+            ListHeaderComponent={
+              <>
+                {/* 1. Що йде ЗАРАЗ. Порожньої секції немає навмисно: заголовок
+                    «Активні (0)» щодня займав би екран ні за що. */}
+                {activeTimersBlock && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={[s.sectionTitle, { color: c.text, marginBottom: 10 }]}>
+                      {tr.activeTimers} ({activeTimers.length})
+                    </Text>
+                    {activeTimersBlock}
+                  </View>
+                )}
 
-              {/* 2. KPI за обраним періодом. */}
-              <TimeKpi
-                c={c}
-                isDark={isDark}
-                totalSeconds={total}
-                averageTaskSeconds={average}
-                typicalSessionSeconds={typical}
-                recordCount={filtered.length}
-                breakdown={breakdown}
-                formatDuration={fmtDur}
-                tr={tr}
-              />
+                {/* 2. KPI за обраним періодом. */}
+                <TimeKpi {...kpiProps} />
 
-              {/* 3. Що треба перевірити. */}
-              {anomalies.length > 0 && (
-                <View style={{ marginTop: 14 }}>
-                  <AnomalyPanel
-                    reports={anomalies}
-                    c={c}
-                    isDark={isDark}
-                    formatDuration={fmtDur}
-                    formatDate={formatEntryDate}
-                    onTrim={trimEntry}
-                    onEditDuration={openEntry}
-                    onDelete={deleteEntry}
-                    onMarkNormal={markNormal}
-                    tr={tr}
-                    lang={lang}
-                  />
-                </View>
-              )}
+                {/* 3. Що треба перевірити. */}
+                {anomalyBlock && <View style={{ marginTop: 14 }}>{anomalyBlock}</View>}
 
-              {/* 4. Самі записи. */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 4 }}>
-                <Text style={[s.sectionTitle, { color: c.text, flex: 1 }]}>{tr.history}</Text>
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>
-                  {periodLabels[period]}
-                  {grouping === 'project' ? tr.timeByProjectSuffix : ''}
-                </Text>
-              </View>
-            </>
-          }
-        />
+                {/* 4. Самі записи. */}
+                {historyTitle}
+              </>
+            }
+          />
+        )}
       </View>
 
-      <PressableScale
-        onPress={() => openEntry(null)}
-        scaleTo={0.92}
-        accessibilityLabel={tr.timeAddEntry}
-        style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.indigo }]}>
-        <IconSymbol name="plus" size={26} color="#fff" />
-      </PressableScale>
+      {!twoPane && (
+        <PressableScale
+          onPress={() => openEntry(null)}
+          scaleTo={0.92}
+          accessibilityLabel={tr.timeAddEntry}
+          style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.indigo }]}>
+          <IconSymbol name="plus" size={26} color="#fff" />
+        </PressableScale>
+      )}
 
       <TimeEntrySheet
         visible={sheetOpen}
@@ -695,6 +931,8 @@ const ActiveTimerRow = React.memo(function ActiveTimerRow({
 
 interface EntryRowProps {
   entry: TimeRecord;
+  /** Запис відкритий у правій панелі широкого екрана. */
+  selected?: boolean;
   /** З `anomalySeverity`: червоне — задовга чи через північ, бурштинове — решта. */
   severity: 'red' | 'amber' | null;
   /** Готовий підпис причин («×3,1 від звичного · зазвичай 25 хв»). */
@@ -724,7 +962,7 @@ interface EntryRowProps {
  * список записів.
  */
 const EntryRow = React.memo(function EntryRow({
-  entry, severity, reason, trimSeconds, trimLabel, warn, projectName, projectColor, accent, border, text, sub, danger,
+  entry, selected = false, severity, reason, trimSeconds, trimLabel, warn, projectName, projectColor, accent, border, text, sub, danger,
   duration, when, tr, onPress, onDelete, onTrim,
 }: EntryRowProps) {
   const flag = severity === 'red' ? danger : severity === 'amber' ? warn : null;
@@ -734,10 +972,13 @@ const EntryRow = React.memo(function EntryRow({
       activeOpacity={0.75}
       onPress={() => onPress(entry)}
       accessibilityRole="button"
+      accessibilityState={{ selected }}
       accessibilityLabel={`${title}, ${duration}.${reason ? ` ${tr.timeRowAnomalyA11y.replace('{kinds}', reason)}.` : ''} ${tr.edit}`}
       style={[
         s.entryCard,
-        { borderColor: flag ? flag + '88' : border, backgroundColor: flag ? flag + '12' : 'transparent' },
+        selected
+          ? { borderColor: accent, backgroundColor: accent + '18' }
+          : { borderColor: flag ? flag + '88' : border, backgroundColor: flag ? flag + '12' : 'transparent' },
       ]}>
       {/* Смуга: колір проєкту, а в аномального запису — колір тривоги, і
           ширша, щоб її було видно краєм ока під час гортання. */}
@@ -766,7 +1007,7 @@ const EntryRow = React.memo(function EntryRow({
             accessibilityLabel={`${trimLabel}: ${title}`}
             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
             style={[s.trimBtn, { borderColor: border }]}>
-            <IconSymbol name="arrow.down.trend" size={11} color={accent} />
+            <IconSymbol name="scissors" size={11} color={accent} />
             <Text style={{ color: accent, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{trimLabel}</Text>
           </TouchableOpacity>
         ) : null}
@@ -801,5 +1042,10 @@ const s = StyleSheet.create({
   entryDur: { fontSize: 13, fontWeight: Atlas.type.headingWeight },
   trimBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6, marginTop: 7 },
   emptyAction: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 11 },
+  periodChip: { minHeight: 44, paddingHorizontal: 14, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  panelCard: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18 },
+  panelEmpty: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, borderWidth: 1, borderStyle: 'dashed', padding: 14 },
+  wideBody: { flex: 1, width: '100%', alignSelf: 'center' },
+  wideColumns: { flex: 1, flexDirection: 'row', gap: 20, marginTop: 16 },
   fab: { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
 });

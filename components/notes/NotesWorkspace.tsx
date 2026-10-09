@@ -58,10 +58,26 @@ function linkOptions(items: readonly LinkTarget[]): PickerOption[] {
  * чек-бокс і закріплення зберігаються одразу (`patchNote` + `saveSyncedChanges`),
  * а текст правиться лише після «Редагувати». Нова нотатка — одразу редактор.
  */
-export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDark: boolean }) {
+export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHandled }: {
+  projectId?: string;
+  isDark: boolean;
+  /** Відкрити редактор нової нотатки, щойно сховище прочитане (`/notes?create=1`). */
+  createRequested?: boolean;
+  /** Запит виконано — маршрут має прибрати параметр, щоб не повторити. */
+  onCreateHandled?: () => void;
+}) {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const { isExpanded } = useResponsive();
+  const { isExpanded, isWide, width } = useResponsive();
+  /**
+   * Список + читалка поруч. На expanded — завжди; на портреті iPad (medium,
+   * ≥720pt вікна) — теж, але лише в особистих нотатках: там сайдбар — рейка
+   * (76pt), і читалці лишається ~400pt. У проєкті сайдбар повний (232pt) —
+   * читалка вийшла б вужчою за телефонну, тож там як на телефоні.
+   */
+  const split = isExpanded || (!!isWide && !projectId && (width ?? 0) >= 720);
+  /** Список вужчий на портреті, ширший на дуже широкому вікні. */
+  const listWidth = !isExpanded ? 260 : (width ?? 0) >= 1180 ? 340 : 300;
   const insets = useSafeAreaInsets();
   const tabBarInset = useTabBarInset();
   const navigation = useNavigation();
@@ -203,6 +219,18 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
     const now = new Date().toISOString();
     open({ id: uuidV4(), title: '', body: '', createdAt: now, updatedAt: now, ...(projectId ? { projectId } : {}) }, true);
   };
+  // Запит «нова нотатка» з маршруту — лише коли сховище прочитане (інакше
+  // `add` мовчки нічого не зробить) і лише раз на запит.
+  const addRef = useRef(add);
+  useEffect(() => { addRef.current = add; });
+  const createHandled = useRef(false);
+  useEffect(() => {
+    if (!createRequested) { createHandled.current = false; return; }
+    if (!ready || createHandled.current) return;
+    createHandled.current = true;
+    addRef.current();
+    onCreateHandled?.();
+  }, [createRequested, ready, onCreateHandled]);
   const save = async () => {
     if (!selected || !canEdit || busy.current || readError || !ready) return;
     if (!title.trim() && !body.trim()) { setEmptyError(true); Alert.alert(tr.error, tr.notesEmptyError); return; }
@@ -407,7 +435,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
       )}
       <Text style={[s.hint, { color: c.sub }]}>{tr.notesMarkdownHint}</Text>
     </View>
-  ) : reader ?? (isExpanded ? <View style={s.empty}><Text style={{ color: c.sub }}>{tr.notesSelectHint}</Text></View> : null);
+  ) : reader ?? (split ? <View style={s.empty}><Text style={{ color: c.sub }}>{tr.notesSelectHint}</Text></View> : null);
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -416,8 +444,8 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
         <Text style={{ color: c.text }}>{tr.notesReadError}</Text>
         {button(tr.notesRetry, () => { void reload(true); }, 'notes-retry')}
       </View>}
-      <View style={[s.panes, { flexDirection: isExpanded ? 'row' : 'column', paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
-        {(isExpanded || !selected) && <View testID="notes-list" style={isExpanded ? s.listWide : s.list}>
+      <View style={[s.panes, { flexDirection: split ? 'row' : 'column', paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
+        {(split || !selected) && <View testID="notes-list" style={split ? { width: listWidth } : s.list}>
           <View style={s.toolbar}>
             {canCreate && button(tr.addNote, add, 'notes-add', !ready || readError || saving)}
             {button(sort === 'title' ? tr.notesSortTitle : sort === 'oldest' ? tr.sortOldest : tr.sortNewest, () => setSort(v => v === 'newest' ? 'oldest' : v === 'oldest' ? 'title' : 'newest'), 'notes-sort')}
@@ -476,7 +504,7 @@ export function NotesWorkspace({ projectId, isDark }: { projectId?: string; isDa
   );
 }
 const s = StyleSheet.create({
-  root: { flex: 1, paddingHorizontal: 16 }, panes: { flex: 1, gap: 16 }, list: { flex: 1 }, listWide: { width: 300 },
+  root: { flex: 1, paddingHorizontal: 16 }, panes: { flex: 1, gap: 16 }, list: { flex: 1 },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
   tagRow: { flexDirection: 'row', gap: 8, paddingVertical: 4, paddingRight: 8 },
   button: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1 },

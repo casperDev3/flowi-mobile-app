@@ -57,13 +57,12 @@ function mentionedTargetFromUrl(url: string | null | undefined): { type: 'task' 
  * контексту» (план §3) стосується й приходу з пушу так само, як звичайного
  * відкриття проєкту зі списку:
  *  - `project_invite` → Огляд проєкту.
- *  - `assigned`/`status_changed` (завжди `tasks`) → повний редактор задачі
- *    (`(tabs)?open=`) — той самий шлях, що й `openTask` з деталі проєкту;
- *    редактор сам визначає `returnToProject` з `task.projectId` і закриється
- *    назад у простір проєкту.
+ *  - `assigned`/`status_changed` (завжди `tasks`) → картка задачі В ПРОСТОРІ
+ *    ПРОЄКТУ (`/project/{pid}/tasks?open=`). Раніше вело в особистий редактор
+ *    (`(tabs)?open=`), і людина опинялась поза проєктом.
  *  - `mentioned` → тип цілі береться з `url` (сервер завжди шле
- *    `collection: 'comments'`, §7); задача → той самий редактор, нарада →
- *    екран нарад проєкту з `?open=`.
+ *    `collection: 'comments'`, §7); задача → та сама картка проєкту, нарада →
+ *    календар проєкту з `?open=` (наради живуть там).
  *
  * `null` — тип не веде нікуди в цьому релізі (registration_*, обробляються
  * окремо в `store/push.ts`) або даних недостатньо (немає `project_id`/id цілі).
@@ -77,7 +76,7 @@ export function pushTapUrl(data: PushLinkData): string | null {
 
   if (data.type === 'assigned' || data.type === 'status_changed') {
     if (!data.local_id) return null;
-    return `/(tabs)?open=${encodeURIComponent(data.local_id)}`;
+    return projectTaskUrl(data.project_id, data.local_id);
   }
 
   if (data.type === 'mentioned') {
@@ -89,12 +88,17 @@ export function pushTapUrl(data: PushLinkData): string | null {
     const targetId = fromUrl?.id ?? data.local_id ?? null;
     if (!targetType || !targetId) return null;
     if (targetType === 'meeting') {
-      return `/project/${encodeURIComponent(data.project_id)}/meetings?open=${encodeURIComponent(targetId)}`;
+      return `/project/${encodeURIComponent(data.project_id)}/calendar?open=${encodeURIComponent(targetId)}`;
     }
-    return `/(tabs)?open=${encodeURIComponent(targetId)}`;
+    return projectTaskUrl(data.project_id, targetId);
   }
 
   return null;
+}
+
+/** Картка задачі проєкту — на екрані «Завдання» САМОГО проєкту. */
+export function projectTaskUrl(projectId: string, taskId: string): string {
+  return `/project/${encodeURIComponent(projectId)}/tasks?open=${encodeURIComponent(taskId)}`;
 }
 
 
@@ -197,8 +201,8 @@ export function deepLinkRoute(url: string | null | undefined): string | null {
     case 'project': {
       if (!a) return null;
       if (!b) return `/project/${enc(a)}/overview`;
-      if (b === 'task' && c) return `/(tabs)?open=${enc(c)}`;
-      if (b === 'meeting' && c) return `/project/${enc(a)}/meetings?open=${enc(c)}`;
+      if (b === 'task' && c) return projectTaskUrl(a, c);
+      if (b === 'meeting' && c) return `/project/${enc(a)}/calendar?open=${enc(c)}`;
       if (b === 'discussions') {const topic=query.get('discussion');return `/project/${enc(a)}/discussions${topic?`?discussion=${enc(topic)}`:''}`;}
       if (b === 'workload' || b === 'my-work') return `/project/${enc(a)}/${b}`;
       if (b === 'sprint') return c ? `/project/${enc(a)}/sprints?sprint=${enc(c)}` : `/project/${enc(a)}/sprints`;
@@ -207,7 +211,8 @@ export function deepLinkRoute(url: string | null | undefined): string | null {
     case 'task':
       return a ? `/(tabs)?open=${enc(a)}` : '/(tabs)';
     case 'meeting':
-      return a ? `/meetings?open=${enc(a)}` : '/meetings';
+      // Одразу в «Календар»: /meetings — лише редирект, зайвий стрибок ні до чого.
+      return a ? `/calendar?open=${enc(a)}` : '/calendar';
     case 'subscriptions':
       return '/subscriptions';
     case 'finance':
@@ -232,6 +237,11 @@ export function deepLinkRoute(url: string | null | undefined): string | null {
       return trainingDeepLinkRoute(parts.slice(1));
     case 'admin':
       return '/admin-workspace';
+    // Запрошення в проєкт, що чекає відповіді (decision 7): `ftrackingapp://invites?invite=<id>`.
+    case 'invites': {
+      const invite = query.get('invite');
+      return invite ? `/invites?invite=${enc(invite)}` : '/invites';
+    }
     default:
       return null;
   }
@@ -271,6 +281,10 @@ function trainingDeepLinkRoute(parts: readonly string[]): string | null {
  */
 export function notificationRoute(data: PushLinkData): string | null {
   const fromUrl = deepLinkRoute(data.url);
+  // `ftrackingapp://task/{id}` проєкту не знає, а payload — знає: задача
+  // проєкту відкривається в ЙОГО просторі, а не в особистому редакторі.
+  const personalTask = fromUrl ? /^\/\(tabs\)\?open=([^&#]+)$/.exec(fromUrl) : null;
+  if (personalTask && data.project_id) return projectTaskUrl(data.project_id, decodeURIComponent(personalTask[1]));
   if (fromUrl) return fromUrl;
   if (data.type === 'registration_request' || data.event_type === 'registration.requested') return '/admin-workspace';
   return pushTapUrl(data);

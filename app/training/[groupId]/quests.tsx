@@ -8,7 +8,9 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
+import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useGroupStream, useGroupSummary, useTrainingScope } from '@/components/training/hooks';
 import { pickQuestPhoto, QuestCard } from '@/components/training/QuestCard';
 import { QuestFormSheet } from '@/components/training/QuestFormSheet';
@@ -25,6 +27,7 @@ export default function QuestsScreen() {
   const { groupId = '' } = useLocalSearchParams<{ groupId: string }>();
   const { tr } = useI18n();
   const c = useTrainingColors();
+  const { isWide } = useResponsive();
   const { userId, online } = useTrainingScope();
   const { group } = useGroupSummary(groupId);
   const stream = useGroupStream(groupId);
@@ -101,8 +104,13 @@ export default function QuestsScreen() {
       onRecompute={isCoach ? () => { void recompute(q); } : undefined}
       onEdit={isCoach ? () => setEditing(q) : undefined}
       busy={busy === q.id}
+      inGrid={isWide}
     />
   );
+  // Планшет: квести — сіткою карток під «широкою» стелею; телефон — стрічкою.
+  const list = (qs: Quest[]) => (isWide
+    ? <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={10} style={{ marginBottom: 10 }}>{qs.map(card)}</ResponsiveGrid>
+    : <>{qs.map(card)}</>);
 
   return (
     <GroupScreenShell
@@ -113,14 +121,15 @@ export default function QuestsScreen() {
       issue={stream.issue}
       gone={stream.gone}
       onRefresh={() => { void stream.sync(); }}
-      refreshing={stream.syncing}>
+      refreshing={stream.syncing}
+      wide={isWide}>
       {error ? <Notice c={c} text={error} tone="error" /> : null}
       {stream.loaded && !visible.length ? <EmptyState c={c} icon="flag.checkered" title={tr.tgNoQuests} /> : null}
-      {active.map(card)}
+      {list(active)}
       {finished.length ? (
         <>
           <SectionTitle c={c}>{tr.tgStatusCompleted}</SectionTitle>
-          {finished.map(card)}
+          {list(finished)}
         </>
       ) : null}
       {isCoach ? (

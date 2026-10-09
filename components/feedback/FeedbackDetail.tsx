@@ -9,6 +9,7 @@ import { Atlas } from '@/constants/atlas';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { ACTION, ActionBar, ActionButton } from '@/components/shared/ActionBar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 
@@ -52,10 +53,10 @@ export function FeedbackDetailHeader({
       </View>
       <View style={{ flex: 1 }} />
       <TouchableOpacity onPress={onEdit} accessibilityRole="button" accessibilityLabel={tr.edit} style={[st.iconBtn, { borderColor: c.border }]}>
-        <IconSymbol name="pencil" size={15} color={c.text} />
+        <IconSymbol name="pencil" size={ACTION.iconOnly} color={c.text} />
       </TouchableOpacity>
       <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close} style={[st.iconBtn, { borderColor: c.border }]}>
-        <IconSymbol name="xmark" size={15} color={c.text} />
+        <IconSymbol name="xmark" size={ACTION.iconOnly} color={c.text} />
       </TouchableOpacity>
     </View>
   );
@@ -96,6 +97,7 @@ export function FeedbackDetailBody({
   const ws = weightStyle(entry.kind, weight);
   const stateColor = STATE_COLOR[state.key];
   const done = isDone(entry);
+  const actionColors = { ...c, accent: KIND_COLOR[entry.kind] };
   const created = new Date(item.createdAt);
   const bug = entry.kind === 'bug' ? entry.item : null;
 
@@ -188,22 +190,19 @@ export function FeedbackDetailBody({
         </View>
       ) : null}
 
-      <View style={st.actions}>
-        <TouchableOpacity onPress={onToggleDone} accessibilityRole="button" style={[st.action, { borderColor: c.border }]}>
-          <IconSymbol name={done ? 'arrow.clockwise' : 'checkmark'} size={14} color={done ? c.text : DONE_COLOR} />
-          <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>
-            {done ? tr.fbReopen : entry.kind === 'bug' ? tr.fbMarkFixed : tr.fbMarkImplemented}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onCopy} accessibilityRole="button" style={[st.action, { borderColor: c.border }]}>
-          <IconSymbol name="doc.on.clipboard" size={14} color={c.text} />
-          <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{tr.copyText}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onDelete} accessibilityRole="button" style={[st.action, { borderColor: '#EF444440' }]}>
-          <IconSymbol name="trash" size={14} color="#EF4444" />
-          <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '600' }}>{tr.delete}</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Спільна композиція дій (ActionBar): деструктивна ліворуч, основна —
+          «Виконано/Відкрити знову» — праворуч; однакові 44pt на всіх платформах. */}
+      <ActionBar style={{ marginTop: 20 }}>
+        <ActionButton label={tr.delete} icon="trash" tone="danger" onPress={onDelete} colors={actionColors} />
+        <ActionButton label={tr.copyText} icon="doc.on.clipboard" tone="neutral" onPress={onCopy} colors={actionColors} />
+        <ActionButton
+          label={done ? tr.fbReopen : entry.kind === 'bug' ? tr.fbMarkFixed : tr.fbMarkImplemented}
+          icon={done ? 'arrow.clockwise' : 'checkmark'}
+          tone={done ? 'neutral' : 'secondary'}
+          onPress={onToggleDone}
+          colors={{ ...actionColors, accent: DONE_COLOR }}
+        />
+      </ActionBar>
     </View>
   );
 }
@@ -221,6 +220,4 @@ const st = StyleSheet.create({
   label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
   attRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 10, marginBottom: 6 },
   ctxRow:      { flexDirection: 'row', gap: 8, paddingVertical: 5, borderBottomWidth: StyleSheet.hairlineWidth },
-  actions:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20 },
-  action:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, minHeight: 44 },
 });

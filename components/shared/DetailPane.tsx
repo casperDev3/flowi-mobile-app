@@ -20,8 +20,10 @@ import React from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Layout } from '@/constants/tokens';
+
 /** Підібрано під найдовший рядок деталі («Дедлайн: 12 листопада 2026»). */
-export const DETAIL_COLUMN_WIDTH = 380;
+export const DETAIL_COLUMN_WIDTH = Layout.detailWidth;
 
 export interface DetailPaneProps {
   /** Чи є вибране завдання. */
@@ -43,11 +45,29 @@ export interface DetailPaneProps {
    * екрани без неї виглядають і поводяться як раніше.
    */
   header?: React.ReactNode;
+  /**
+   * Ширина колонки (лише wide). За замовчуванням DETAIL_COLUMN_WIDTH;
+   * ListDetailLayout передає detailColumnWidthFor(вікно).
+   */
+  columnWidth?: number;
+  /**
+   * Сталa висота модального листа (лише вузький екран). Без неї лист
+   * підлаштовується під вміст — і картка з вкладками стрибала по висоті при
+   * кожному перемиканні «Основне / Деталі / Активність». Зі сталою висотою
+   * міняється лише вміст прокрутки. Клавіатура лист стискає (flexShrink),
+   * а не виштовхує за верх екрана.
+   */
+  sheetHeight?: number;
+  /**
+   * Липкий низ (P2 аудиту 2026-10): кнопки «Видалити / Виконано» стоять ПІД
+   * прокруткою, а не в її кінці — інакше на відкритті лист різав їх навпіл.
+   */
+  footer?: React.ReactNode;
   children: React.ReactNode;
 }
 
 export function DetailPane({
-  open, wide, onClose, isDark, sheetColor, borderColor, maxHeight, scrollRef, empty, header, children,
+  open, wide, onClose, isDark, sheetColor, borderColor, maxHeight, scrollRef, empty, header, columnWidth = DETAIL_COLUMN_WIDTH, sheetHeight, footer, children,
 }: DetailPaneProps) {
   // Колонка не має власного верхнього відступу (він лишився на хедері
   // списку зліва), тож верхній виріз доводиться враховувати самій.
@@ -55,7 +75,7 @@ export function DetailPane({
 
   if (wide) {
     return (
-      <View style={[st.column, { width: DETAIL_COLUMN_WIDTH, backgroundColor: sheetColor, borderLeftColor: borderColor }]}>
+      <View style={[st.column, { width: columnWidth, backgroundColor: sheetColor, borderLeftColor: borderColor }]}>
         {open ? (
           <>
             {header ? (
@@ -66,9 +86,10 @@ export function DetailPane({
               style={st.scroll}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={[st.columnContent, { paddingTop: header ? 4 : insets.top + 20 }]}>
+              contentContainerStyle={[st.columnContent, { paddingTop: header ? 4 : insets.top + 20 }, footer ? { paddingBottom: 16 } : null]}>
               {children}
             </ScrollView>
+            {footer ? <View style={[st.columnFooter, { borderTopColor: borderColor, paddingBottom: Math.max(insets.bottom, 16) }]}>{footer}</View> : null}
           </>
         ) : (
           // Порожня колонка без пояснення читається як помилка рендеру.
@@ -82,18 +103,19 @@ export function DetailPane({
     <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <Pressable accessible={false} style={st.overlay} onPress={onClose}>
-          <Pressable accessible={false} onPress={e => e.stopPropagation()} style={st.sheetWrapper}>
+          <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[st.sheetWrapper, sheetHeight ? st.shrink : null]}>
             {open && (
               <BlurView
                 intensity={isDark ? 50 : 70}
                 tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, { maxHeight, borderColor, backgroundColor: sheetColor }]}>
+                style={[st.sheet, sheetHeight ? { height: Math.min(sheetHeight, maxHeight), flexShrink: 1 } : null, { maxHeight, borderColor, backgroundColor: sheetColor }]}>
                 {/* Шапка поза ScrollView: лист обмежений maxHeight, і
                     flexShrink у прокрутки віддає місце саме їй, а не шапці. */}
                 {header}
                 <ScrollView ref={scrollRef} style={st.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   {children}
                 </ScrollView>
+                {footer ? <View style={[st.sheetFooter, { borderTopColor: borderColor }]}>{footer}</View> : null}
               </BlurView>
             )}
           </Pressable>
@@ -107,7 +129,10 @@ const st = StyleSheet.create({
   column:        { borderLeftWidth: StyleSheet.hairlineWidth },
   columnHeader:  { paddingHorizontal: 20, paddingBottom: 4 },
   columnContent: { padding: 20, paddingBottom: 40 },
+  columnFooter:  { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  sheetFooter:   { paddingTop: 12, marginTop: 4, borderTopWidth: StyleSheet.hairlineWidth },
   scroll:        { flexShrink: 1 },
+  shrink:        { flexShrink: 1 },
   emptyBox:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:  { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },

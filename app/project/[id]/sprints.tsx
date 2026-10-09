@@ -10,16 +10,26 @@ import { Atlas } from '@/constants/atlas';
  * датованого спринта й таблиця велосіті — за docs/specs/projects-analytics.md
  * §8.4; формули — utils/projectStatsMetrics.ts, екран лише малює.
  *
- * Призначення завдання конкретному спринту (поле «Спринт») лишається на
- * повному редакторі завдання (екран «Завдання») — тут керування самими
- * спринтами (створення/перейменування/закриття) і швидке додавання нового
- * завдання просто в цей спринт.
+ * Призначення завдання конкретному спринту (поле «Спринт») лишається в
+ * картці завдання — тут керування самими спринтами (створення/
+ * перейменування/закриття/архів) і швидке додавання нового завдання просто
+ * в цей спринт. Тап по задачі відкриває ПОВНУ картку тут же, аркушем
+ * (ProjectTaskSheet), — без переходу в «Завдання» чи в особисте.
+ *
+ * Список: усі спринти ЗГОРНУТІ за замовчуванням (розгорнуте запамʼятовується
+ * до кінця сесії), сортування (новіші/старіші за початком, назва,
+ * статус+прогрес) і фільтр за станом (заплановані/активні/завершені).
+ * Архівні (`archivedAt`) приховані, доки не ввімкнути «Показати архівні».
  */
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
+import { ProjectTaskSheet } from '@/components/projects/ProjectTaskSheet';
+import { ActionButton, ActionChip, IconAction } from '@/components/shared/ActionBar';
+import { HeaderButton } from '@/components/shared/ScreenHeader';
+import { TasksHeaderMenu, TasksMenuButton, type TasksMenuItem } from '@/components/tasks/TasksHeaderMenu';
 import { SprintBurndown } from '@/components/projects/SprintBurndown';
 import { SprintVelocity } from '@/components/projects/SprintVelocity';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -37,16 +47,33 @@ import { haptic } from '@/utils/haptics';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
 import { priorityFields, DEFAULT_PRIORITY_LEVEL, type Task } from '@/utils/taskUtils';
 import {
-  assignTaskToSprint, createSprint, isSprintClosed, isSprintDated, moveOpenSprintTasks, overlappingSprints,
-  parseSprintDatesInput, renameSprint, setSprintClosed, setSprintDates, sortSprints, sprintDateInput,
-  sprintMoveTargets, sprintProgress, sprintTasks, sprintsForProject,
-  type Sprint, type SprintDatesError,
+  assignTaskToSprint, createSprint, filterSortSprints, isSprintArchived, isSprintClosed, isSprintDated,
+  moveOpenSprintTasks, overlappingSprints, parseSprintDatesInput, renameSprint, setSprintArchived, setSprintClosed,
+  setSprintDates, sprintDateInput, sprintMoveTargets, sprintProgress, sprintStatus, sprintTasks, sprintsForProject,
+  type Sprint, type SprintDatesError, type SprintSort, type SprintStatusFilter,
 } from '@/utils/sprintUtils';
 import { isSprintOverdue, sprintBurndown, velocityWindow } from '@/utils/projectStatsMetrics';
 
 /** Протермінований спринт — бурштиновий: червоний зайнятий простроченими задачами. */
 const SPRINT_OVERDUE_COLOR = '#F59E0B';
 const TABLET_MIN_WIDTH = 600;
+
+/**
+ * Вигляд списку на сесію: розгорнуті спринти, сортування, фільтр. Модульна
+ * мапа, а не стан екрана — таб проєкту перемонтовується при поверненні, і
+ * людина не мусить знову розгортати той самий спринт. Між запусками
+ * застосунку не зберігається: за замовчуванням усе згорнуто.
+ */
+interface SprintListView {
+  expanded: Record<string, boolean>;
+  sort: SprintSort;
+  status: SprintStatusFilter;
+  showArchived: boolean;
+}
+const DEFAULT_VIEW: SprintListView = { expanded: {}, sort: 'start-desc', status: 'all', showArchived: false };
+const sessionViews = new Map<string, SprintListView>();
+/** Для тестів: скинути запамʼятований вигляд. */
+export function resetSprintListViews() { sessionViews.clear(); }
 
 export default function ProjectSprintsScreen() {
   // `?sprint=<id>` — тап по сповіщенню sprint.started / sprint.closed.
@@ -74,7 +101,14 @@ export default function ProjectSprintsScreen() {
   useFocusEffect(useCallback(() => { void loadTasks(); void reloadSprints(); }, [loadTasks, reloadSprints]));
   const trackTaskWrite = useStorageRefresh(['tasks'], loadTasks);
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [view, setView] = useState<SprintListView>(() => sessionViews.get(String(projectId)) ?? DEFAULT_VIEW);
+  useEffect(() => { if (projectId) sessionViews.set(String(projectId), view); }, [projectId, view]);
+  const { expanded, sort, status: statusFilter, showArchived } = view;
+  const setExpanded = useCallback((patch: (prev: Record<string, boolean>) => Record<string, boolean>) => {
+    setView(prev => ({ ...prev, expanded: patch(prev.expanded) }));
+  }, []);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ sprint: Sprint | null } | null>(null);
   const [draftName, setDraftName] = useState('');
   const [draftStart, setDraftStart] = useState('');
@@ -100,7 +134,14 @@ export default function ProjectSprintsScreen() {
     if (!sprintParam) return;
     const id = String(sprintParam);
     if (!projectSprints.some(sp => sp.id === id)) return;
-    setExpanded(prev => ({ ...prev, [id]: true }));
+    // Архівний спринт зі сповіщення має бути видно: вмикаємо показ архіву.
+    const target = projectSprints.find(sp => sp.id === id);
+    setView(prev => ({
+      ...prev,
+      expanded: { ...prev.expanded, [id]: true },
+      status: 'all',
+      showArchived: prev.showArchived || (!!target && isSprintArchived(target)),
+    }));
     setFocusSprintId(id);
     router.setParams({ sprint: '' });
   }, [sprintParam, projectSprints, router]);
@@ -134,6 +175,19 @@ export default function ProjectSprintsScreen() {
     [projectSprints, tasks, projectId],
   );
   const hasClosed = projectSprints.some(isSprintClosed);
+  const archivedCount = projectSprints.filter(isSprintArchived).length;
+  const visibleSprints = useMemo(
+    () => filterSortSprints(projectSprints, tasks, { sort, status: statusFilter, showArchived, now }),
+    [projectSprints, tasks, sort, statusFilter, showArchived, now],
+  );
+  /** Лічильники чипів — серед неархівних (або всіх, коли архів показано). */
+  const statusCounts = useMemo(() => {
+    const pool = showArchived ? projectSprints : projectSprints.filter(sp => !isSprintArchived(sp));
+    const counts = { all: pool.length, planned: 0, active: 0, completed: 0 };
+    for (const sp of pool) counts[sprintStatus(sp, now)] += 1;
+    return counts;
+  }, [projectSprints, showArchived, now]);
+  const filtersActive = statusFilter !== 'all' || showArchived || sort !== 'start-desc';
 
   const resetDraft = () => {
     setDraft(null); setDraftName(''); setDraftStart(''); setDraftEnd(''); setDraftError(null);
@@ -231,11 +285,18 @@ export default function ProjectSprintsScreen() {
       ) : (
         <Text style={{ color: c.sub, fontSize: 11 }}>{tr.sprintDatesHint}</Text>
       )}
-      <TouchableOpacity onPress={saveDraft} style={{ backgroundColor: c.accent, borderRadius: Atlas.radius.medium, paddingVertical: 8, alignItems: 'center' }}>
-        <Text style={{ color: '#fff', fontWeight: '700' }}>{submitLabel}</Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+        <ActionButton label={tr.cancel} tone="neutral" onPress={resetDraft} colors={c} />
+        <ActionButton label={submitLabel} tone="primary" onPress={saveDraft} colors={c} />
+      </View>
     </>
   );
+
+  const toggleArchived = (sprint: Sprint) => {
+    const archived = isSprintArchived(sprint);
+    setSprints(prev => prev.map(s => (s.id === sprint.id ? setSprintArchived(s, !archived) : s)));
+    haptic.light();
+  };
 
   const reopen = (sprint: Sprint) => {
     setSprints(prev => prev.map(s => (s.id === sprint.id ? setSprintClosed(s, false) : s)));
@@ -279,11 +340,15 @@ export default function ProjectSprintsScreen() {
     }
   }, [addTitle, trackTaskWrite]);
 
-  const openTask = (task: Task) => router.push({ pathname: '/(tabs)', params: { open: task.id } } as never);
+  // Картка задачі — ТУТ, аркушем поверх спринтів (R1): ані в «Завдання»
+  // проєкту, ані тим паче в особисте людина більше не перекидається.
+  const openTask = (task: Task) => setOpenTaskId(task.id);
 
   const renderSprintRow = (sprint: Sprint) => {
     const closed = isSprintClosed(sprint);
-    const open = expanded[sprint.id] ?? !closed;
+    const archived = isSprintArchived(sprint);
+    // Усі спринти згорнуті за замовчуванням — і відкриті теж.
+    const open = expanded[sprint.id] ?? false;
     const own = sprintTasks(tasks, sprint.id);
     const progress = sprintProgress(tasks, sprint.id);
     const dated = isSprintDated(sprint);
@@ -305,29 +370,32 @@ export default function ProjectSprintsScreen() {
             accessibilityRole="button"
             accessibilityLabel={sprint.name}
             accessibilityState={{ expanded: open }}
-            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            style={{ flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <IconSymbol name={open ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
             <IconSymbol name={closed ? 'checkmark.circle' : 'flag'} size={14} color={closed ? c.sub : (project?.color ?? c.accent)} />
             <Text numberOfLines={1} style={{ flex: 1, color: closed ? c.sub : c.text, fontSize: 14, fontWeight: '700' }}>{sprint.name}</Text>
             <Text style={{ color: c.sub, fontSize: 11 }}>{progress.done}/{progress.total}</Text>
           </TouchableOpacity>
-          {canEdit && (
-            <TouchableOpacity
-              onPress={() => openRename(sprint)}
-              accessibilityRole="button"
-              accessibilityLabel={tr.sprintRename}
-              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
-              <IconSymbol name="pencil" size={14} color={c.sub} />
-            </TouchableOpacity>
+          {/* Дії рядка — однакові 44×44 IconAction (без hitSlop-латок). */}
+          {canEdit && !archived && (
+            <IconAction icon="pencil" label={tr.sprintRename} onPress={() => openRename(sprint)} colors={c} />
           )}
-          {canEdit && (
-            <TouchableOpacity
+          {canEdit && !archived && (
+            <IconAction
+              icon={closed ? 'arrow.uturn.backward' : 'flag.fill'}
+              label={closed ? tr.sprintReopen : tr.sprintClose}
+              active={closing?.id === sprint.id ? true : undefined}
               onPress={() => (closed ? reopen(sprint) : setClosing(prev => (prev?.id === sprint.id ? null : sprint)))}
-              accessibilityRole="button"
-              accessibilityLabel={closed ? tr.sprintReopen : tr.sprintClose}
-              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
-              <IconSymbol name={closed ? 'arrow.uturn.backward' : 'flag.fill'} size={14} color={c.sub} />
-            </TouchableOpacity>
+              colors={c}
+            />
+          )}
+          {canEdit && closed && (
+            <IconAction
+              icon={archived ? 'arrow.uturn.backward' : 'archivebox'}
+              label={archived ? tr.sprintUnarchive : tr.sprintArchive}
+              onPress={() => toggleArchived(sprint)}
+              colors={c}
+            />
           )}
         </View>
 
@@ -337,6 +405,15 @@ export default function ProjectSprintsScreen() {
           <Text style={{ color: c.sub, fontSize: 11 }}>
             {dated ? `${shortDate(sprint.startDate)} – ${shortDate(sprint.endDate)}` : tr.sprintUndated}
           </Text>
+          {archived ? (
+            <View style={{ borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: c.border, paddingHorizontal: 6, paddingVertical: 1 }}>
+              <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700' }}>{tr.sprintArchivedBadge}</Text>
+            </View>
+          ) : sprintStatus(sprint, now) === 'planned' ? (
+            <View style={{ borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: c.accent + '66', paddingHorizontal: 6, paddingVertical: 1 }}>
+              <Text style={{ color: c.accent, fontSize: 10, fontWeight: '700' }}>{tr.sprintStatusPlanned}</Text>
+            </View>
+          ) : null}
           {overdue ? (
             <View style={{ borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: SPRINT_OVERDUE_COLOR, paddingHorizontal: 6, paddingVertical: 1 }}>
               <Text style={{ color: SPRINT_OVERDUE_COLOR, fontSize: 10, fontWeight: '700' }}>{tr.sprintOverdue}</Text>
@@ -356,6 +433,12 @@ export default function ProjectSprintsScreen() {
           ) : null}
         </View>
 
+        {progress.total > 0 ? (
+          <View style={{ height: 4, borderRadius: 2, backgroundColor: c.border, marginTop: 8, marginLeft: 20, overflow: 'hidden' }}>
+            <View style={{ width: `${Math.round((progress.done / progress.total) * 100)}%`, height: 4, backgroundColor: closed ? c.sub : (project?.color ?? c.accent) }} />
+          </View>
+        ) : null}
+
         {burndown ? (
           <SprintBurndown burndown={burndown} color={project?.color ?? c.accent} palette={{ text: c.text, sub: c.sub, border: c.border }} />
         ) : null}
@@ -370,12 +453,12 @@ export default function ProjectSprintsScreen() {
           <View style={{ marginTop: 10, gap: 6 }}>
             <Text style={{ color: c.sub, fontSize: 12 }}>{tr.sprintMoveHint}</Text>
             {sprintMoveTargets(projectSprints, sprint).map(target => (
-              <TouchableOpacity key={target.id} onPress={() => closeSprint(sprint, target)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+              <TouchableOpacity key={target.id} onPress={() => closeSprint(sprint, target)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
                 <IconSymbol name="flag" size={13} color={c.accent} />
                 <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{target.name}</Text>
               </TouchableOpacity>
             ))}
-            <TouchableOpacity onPress={() => closeSprint(sprint, null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+            <TouchableOpacity onPress={() => closeSprint(sprint, null)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
               <IconSymbol name="tray" size={13} color={c.sub} />
               <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{tr.sprintMoveToBacklog}</Text>
             </TouchableOpacity>
@@ -391,7 +474,12 @@ export default function ProjectSprintsScreen() {
             {own.length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 12, opacity: 0.7 }}>{tr.sprintEmpty}</Text>
             ) : own.map(task => (
-              <TouchableOpacity key={task.id} onPress={() => openTask(task)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
+              <TouchableOpacity
+                key={task.id}
+                onPress={() => openTask(task)}
+                accessibilityRole="button"
+                accessibilityLabel={task.title}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: task.status === 'done' ? '#10B981' : c.sub }} />
                 <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }}>{task.title}</Text>
               </TouchableOpacity>
@@ -409,9 +497,7 @@ export default function ProjectSprintsScreen() {
                     placeholderTextColor={c.sub}
                     style={{ flex: 1, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 7, color: c.text, fontSize: 13 }}
                   />
-                  <TouchableOpacity onPress={() => addTask(sprint)} accessibilityRole="button" accessibilityLabel={tr.sprintAddTaskA11y}>
-                    <IconSymbol name="plus" size={17} color={c.accent} />
-                  </TouchableOpacity>
+                  <IconAction icon="plus" label={tr.sprintAddTaskA11y} color={c.accent} onPress={() => addTask(sprint)} colors={c} />
                 </View>
               ) : (
                 <TouchableOpacity
@@ -419,7 +505,7 @@ export default function ProjectSprintsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`${tr.sprintAddTaskA11y}: ${sprint.name}`}
                   accessibilityState={{ expanded: false }}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, minHeight: 44 }}>
                   <IconSymbol name="plus" size={13} color={c.accent} />
                   <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700' }}>{tr.projectAddTask}</Text>
                 </TouchableOpacity>
@@ -430,6 +516,37 @@ export default function ProjectSprintsScreen() {
       </View>
     );
   };
+
+  const statusLabel = (key: SprintStatusFilter) =>
+    key === 'all' ? tr.sprintStatusAll
+      : key === 'planned' ? tr.sprintStatusPlanned
+        : key === 'active' ? tr.sprintStatusActive
+          : tr.sprintStatusCompleted;
+
+  const sortItem = (key: SprintSort, label: string, separatorBefore = false): TasksMenuItem => ({
+    key: `sort-${key}`,
+    icon: 'arrow.up.arrow.down',
+    label,
+    checked: sort === key,
+    separatorBefore,
+    onPress: () => setView(prev => ({ ...prev, sort: key })),
+  });
+  const menuItems: TasksMenuItem[] = [
+    sortItem('start-desc', tr.sprintSortStartDesc),
+    sortItem('start-asc', tr.sprintSortStartAsc),
+    sortItem('name', tr.sprintSortName),
+    sortItem('progress', tr.sprintSortProgress),
+    {
+      key: 'archived', icon: 'archivebox', label: tr.sprintShowArchived, checked: showArchived, separatorBefore: true,
+      badge: archivedCount || undefined,
+      onPress: () => setView(prev => ({ ...prev, showArchived: !prev.showArchived })),
+    },
+    {
+      key: 'expand-all', icon: 'chevron.down', label: tr.sprintExpandAll, separatorBefore: true,
+      onPress: () => setExpanded(() => Object.fromEntries(visibleSprints.map(sp => [sp.id, true]))),
+    },
+    { key: 'collapse-all', icon: 'chevron.right', label: tr.sprintCollapseAll, onPress: () => setExpanded(() => ({})) },
+  ];
 
   const modules = project ? projectModules(project) : MODULES_BY_TEMPLATE.work;
   // Мінор із ревʼю: вимикач `modules.sprints` у Налаштуваннях ховає лише
@@ -450,15 +567,19 @@ export default function ProjectSprintsScreen() {
       project={project}
       isDark={isDark}
       title={tr.sprints}
-      actions={canEdit ? (
-        <TouchableOpacity
-          onPress={openCreate}
-          accessibilityRole="button"
-          accessibilityLabel={tr.sprintNew}
-          style={{ width: 36, height: 36, borderRadius: 11, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center' }}>
-          <IconSymbol name="plus" size={17} color={c.accent} />
-        </TouchableOpacity>
-      ) : undefined}>
+      actions={(
+        <>
+          {canEdit ? (
+            <HeaderButton
+              onPress={openCreate}
+              accessibilityLabel={tr.sprintNew}
+              style={{ backgroundColor: c.dim, borderColor: c.border }}>
+              <IconSymbol name="plus" size={17} color={c.accent} />
+            </HeaderButton>
+          ) : null}
+          <TasksMenuButton onPress={() => setMenuOpen(true)} label={tr.sprintListMenu} active={filtersActive} colors={c} />
+        </>
+      )}>
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
@@ -472,15 +593,61 @@ export default function ProjectSprintsScreen() {
             {renderDraftForm(tr.create)}
           </View>
         )}
+        {projectSprints.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            accessibilityLabel={tr.sprintStatusFilterA11y}
+            style={{ marginBottom: 12, flexGrow: 0 }}
+            contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+            {STATUS_FILTERS.map(key => (
+              <ActionChip
+                key={key}
+                label={statusLabel(key)}
+                count={statusCounts[key]}
+                selected={statusFilter === key}
+                onPress={() => setView(prev => ({ ...prev, status: key }))}
+                colors={c}
+              />
+            ))}
+            {archivedCount > 0 ? (
+              <ActionChip
+                icon="archivebox"
+                label={tr.sprintShowArchived}
+                count={archivedCount}
+                selected={showArchived}
+                onPress={() => setView(prev => ({ ...prev, showArchived: !prev.showArchived }))}
+                colors={c}
+              />
+            ) : null}
+          </ScrollView>
+        ) : null}
         {projectSprints.length === 0 && !draft ? (
           <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 30 }}>{tr.sprintNoSprintsHint}</Text>
-        ) : sortSprints(projectSprints).map(renderSprintRow)}
+        ) : visibleSprints.length === 0 && projectSprints.length > 0 ? (
+          <View style={{ alignItems: 'center', gap: 10, marginTop: 24 }}>
+            <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>{tr.sprintNoMatch}</Text>
+            <ActionButton
+              label={tr.sprintResetFilters}
+              tone="neutral"
+              onPress={() => setView(prev => ({ ...prev, status: 'all', showArchived: false }))}
+              colors={c}
+            />
+          </View>
+        ) : visibleSprints.map(renderSprintRow)}
 
         {/* Велосіті — внизу, під закритими спринтами (§8.4). */}
         {velocity && hasClosed ? (
           <SprintVelocity velocity={velocity} locale={locale} palette={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }} />
         ) : null}
       </ScrollView>
+      <TasksHeaderMenu visible={menuOpen} onClose={() => setMenuOpen(false)} items={menuItems} colors={c} isDark={isDark} />
+      {projectId ? (
+        <ProjectTaskSheet projectId={String(projectId)} taskId={openTaskId} onClose={() => setOpenTaskId(null)} isDark={isDark} />
+      ) : null}
     </ProjectScreenShell>
   );
 }
+
+const STATUS_FILTERS: readonly SprintStatusFilter[] = ['all', 'active', 'planned', 'completed'];

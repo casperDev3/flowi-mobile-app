@@ -8,6 +8,7 @@ import React from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
 import { ScreenHeader, type Crumb } from '@/components/shared/ScreenHeader';
+import { Layout } from '@/constants/tokens';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { trainingRoutes } from './routes';
 import { useI18n } from '@/store/i18n';
@@ -39,7 +40,7 @@ export function GroupScreenShell({
   const router = useRouter();
   const { tr } = useI18n();
   const contentWidth = useContentWidth();
-  const column = wide ? { width: '100%' as const, maxWidth: 1180, alignSelf: 'center' as const } : contentWidth;
+  const column = wide ? { width: '100%' as const, maxWidth: Layout.wideMaxWidth, alignSelf: 'center' as const } : contentWidth;
 
   const crumbs: Crumb[] = [{ label: tr.tgTitle, onPress: () => router.navigate(trainingRoutes.list()) }];
   if (groupId && groupName && title !== groupName) {

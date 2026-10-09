@@ -59,7 +59,9 @@ import {
   type TimelineBucket,
 } from '@/utils/projectStats';
 import { loadProjectListPrefs, saveProjectListPrefs } from '@/utils/projectListPrefs';
+import { wideModalStyles } from '@/components/finance/wideModal';
 import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
+import { Layout } from '@/constants/tokens';
 import { masonryColumnCount } from '@/utils/masonry';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { ProjectAnalytics } from '@/components/projects/ProjectAnalytics';
@@ -491,7 +493,11 @@ export default function ProjectsScreen() {
   // Планшет: стелю читабельної колонки (720pt) тут знято — картки лягають у
   // колонки на всю ширину екрана (вікно мінус сайдбар), як дашборд «Сьогодні».
   const { isWide } = useResponsive();
-  const columnCount = masonryColumnCount(useScreenWidth());
+  // Стеля «широкого» вмісту (Layout.wideMaxWidth): на iPad Pro у ландшафті
+  // картки інакше розтягувались до ~450pt кожна.
+  const columnCount = masonryColumnCount(Math.min(useScreenWidth(), Layout.wideMaxWidth));
+  // Форма проєкту на планшеті — центрований діалог, як SheetModal 'auto'.
+  const wm = wideModalStyles(isWide);
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
@@ -1155,7 +1161,7 @@ export default function ProjectsScreen() {
           // Планшет: колонки masonry (2 від 600pt, 3 від 1100pt) на всю ширину
           // екрана — без стелі 720pt, яка лишала пів екрана порожнім.
           <ScrollView
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+            contentContainerStyle={st.wideContent}
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
             {listHeader}
@@ -1187,8 +1193,8 @@ export default function ProjectsScreen() {
       {/* Add/Edit Modal */}
       <Modal visible={showModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={st.overlay} onPress={closeModal}>
-            <Pressable onPress={e => e.stopPropagation()} style={st.sheetWrapper} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={closeModal}>
+            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView
                 intensity={isDark ? 50 : 70}
                 tint={isDark ? 'dark' : 'light'}
@@ -1337,6 +1343,7 @@ const st = StyleSheet.create({
   progressFill:{ height: '100%', borderRadius: 2 },
   overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
+  wideContent: { width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 40 },
   // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
   // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
   // ScrollView усередині нічого не гортав (NAT-01).

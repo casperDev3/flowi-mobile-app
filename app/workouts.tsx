@@ -27,7 +27,8 @@ import { loadDataResult, retryStorageRead } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
 import { formatDuration } from '@/utils/durationFormat';
-import { useContentWidth } from '@/hooks/use-content-width';
+import { Layout } from '@/constants/tokens';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { LoadErrorNotice } from '@/components/health/HealthNotices';
 import { getHealthColors } from '@/utils/healthTheme';
@@ -549,6 +550,18 @@ function StatsModal({
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+/** Половина проміжку між картками сітки (поля комірки + відʼємні поля рядка). */
+const GRID_HALF_GAP = 6;
+
+/**
+ * Комірка сітки FlatList(numColumns): ширина — частка рядка, а не flex:1,
+ * інакше неповний останній рядок розтягнув би картку на всю ширину.
+ */
+function gridCell(cols: number, node: React.ReactElement): React.ReactElement {
+  if (cols <= 1) return node;
+  return <View style={{ width: `${100 / cols}%`, paddingHorizontal: GRID_HALF_GAP }}>{node}</View>;
+}
+
 function makeColors(isDark: boolean) {
   return {
     bg1:    isDark ? '#0C0C14' : '#F4F2FF',
@@ -745,7 +758,18 @@ const rowKey = (r: Row) => r.key;
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function WorkoutsScreen() {
-  const contentWidth = useContentWidth();
+  /*
+   * Планшет (рішення 6): бібліотека вправ і програм — сіткою карток (2 колонки,
+   * 3 від ~900pt екрана), стеля «широкого» вмісту. Стрічка тренувань лишається
+   * однією колонкою: там заголовки днів ідуть упереміш із картками, і сітка
+   * розірвала б день на шматки.
+   */
+  const { isWide } = useResponsive();
+  const screenWidth = Math.min(useScreenWidth(), Layout.wideMaxWidth);
+  const contentWidth = useMemo(
+    () => (isWide ? { width: '100%' as const, maxWidth: Layout.wideMaxWidth, alignSelf: 'center' as const } : {}),
+    [isWide],
+  );
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   // Палітра мусить бути стабільним обʼєктом: інакше кожен рендер екрана
@@ -952,6 +976,7 @@ export default function WorkoutsScreen() {
   const openNewExercise = useCallback(() => { setEditingEx(null); setShowExModal(true); }, []);
   const openNewProgram = useCallback(() => { setEditingProg(null); setShowProgModal(true); }, []);
   const goToPrograms = useCallback(() => setTab('programs'), []);
+  const gridCols = isWide && tab !== 'workouts' ? (screenWidth >= 900 ? 3 : 2) : 1;
 
   // Пласкі рядки для FlatList: заголовок дня і картки одного дня йдуть
   // поспіль, тож віртуалізація бачить однорідний список, а не вкладені мапи.
@@ -978,14 +1003,14 @@ export default function WorkoutsScreen() {
       case 'workout':
         return <WorkoutRow w={item.w} c={c} isDark={isDark} lastInGroup={item.lastInGroup} onDelete={deleteWorkout} />;
       case 'exercise':
-        return <ExerciseRow ex={item.ex} c={c} isDark={isDark} onEdit={editExercise} onDelete={deleteExercise} />;
+        return gridCell(gridCols, <ExerciseRow ex={item.ex} c={c} isDark={isDark} onEdit={editExercise} onDelete={deleteExercise} />);
       case 'program':
-        return (
+        return gridCell(gridCols, (
           <ProgramCard prog={item.prog} exercises={exercises} c={c} isDark={isDark}
             onEdit={editProgram} onDelete={deleteProgram} onStart={startFromProgram} />
-        );
+        ));
     }
-  }, [c, isDark, exercises, deleteWorkout, editExercise, deleteExercise, editProgram, deleteProgram, startFromProgram]);
+  }, [c, isDark, exercises, deleteWorkout, editExercise, deleteExercise, editProgram, deleteProgram, startFromProgram, gridCols]);
 
   const listHeader = useMemo(() => {
     if (tab === 'exercises') {
@@ -1177,6 +1202,10 @@ export default function WorkoutsScreen() {
         </View>
 
         <FlatList
+          // numColumns не можна міняти «на льоту» — FlatList вимагає новий key.
+          key={`cols-${gridCols}`}
+          numColumns={gridCols}
+          columnWrapperStyle={gridCols > 1 ? { marginHorizontal: -GRID_HALF_GAP } : undefined}
           data={rows}
           keyExtractor={rowKey}
           renderItem={renderRow}

@@ -197,3 +197,132 @@ export function sizeClassFor(width: number): SizeClass {
   if (width >= Breakpoints.medium) return 'medium';
   return 'compact';
 }
+
+// ─── Компонування для широких вікон (планшет) ────────────────────────────────
+
+/**
+ * ПРИМІТИВИ КОМПОНУВАННЯ (рішення 6: «усі екрани на планшеті»).
+ *
+ * Чисті числа й функції — без React, щоб їх могли брати і хуки, і тести.
+ * Компоненти, що на них стоять:
+ *
+ *   ContentContainer  (components/shared/ContentContainer.tsx)
+ *     Центрована колонка зі стелею ширини та бічними полями за класом вікна.
+ *     variant: 'reading' (720, форми/текст) | 'wide' (1200, дашборди/сітки) | 'full'.
+ *
+ *   ResponsiveGrid    (components/shared/ResponsiveGrid.tsx)
+ *     Картки рядами по 1/2/3 колонки за класом вікна (або за minItemWidth).
+ *
+ *   SheetModal        presentation: 'auto' | 'sheet' | 'dialog' | 'side'
+ *     На телефоні — завжди bottom-sheet. На широкому 'auto' = центрований
+ *     діалог, 'side' = панель праворуч на всю висоту.
+ *
+ *   ListDetailLayout  (components/shared/ListDetailLayout.tsx)
+ *     Список + DetailPane: на expanded деталь — постійна колонка праворуч,
+ *     вужче — модальний лист. Порожня колонка показує `empty`.
+ *
+ *   useBreakpointValue / pickBySizeClass — значення за класом вікна.
+ */
+export const Layout = {
+  /** Стеля колонки «для читання»: форми, налаштування, довгий текст. */
+  readingMaxWidth: 720,
+  /** Стеля «широкого» вмісту: дашборди, сітки карток. Далі рядок карток розповзається. */
+  wideMaxWidth: 1200,
+  /** Ширина центрованого діалогу (аркуш-форма на широкому вікні). */
+  dialogMaxWidth: 600,
+  /** Ширина бокової панелі (SheetModal presentation='side'). */
+  sidePanelWidth: 420,
+  /** Бічні поля екрана за класом вікна. */
+  gutter: { compact: 16, medium: 20, expanded: 24 } as Readonly<Record<SizeClass, number>>,
+  /** Проміжок між картками сітки. */
+  gridGap: 12,
+  /** Колонки сітки за замовчуванням: телефон / портрет планшета / ландшафт. */
+  gridColumns: { compact: 1, medium: 2, expanded: 3 } as Readonly<Record<SizeClass, number>>,
+  /** Ширина колонки деталі у list+detail на звичайному та дуже широкому вікні. */
+  detailWidth: 380,
+  detailWidthLarge: 440,
+  /** Від цієї ширини вікна колонка деталі стає ширшою. */
+  detailWideFrom: 1180,
+  /** Сайдбар-«рейка» (лише іконки) на medium. */
+  railWidth: 76,
+} as const;
+
+/** Значення за класом вікна: відсутні класи успадковують менший. */
+export type BySizeClass<T> = { compact: T; medium?: T; expanded?: T };
+
+export function pickBySizeClass<T>(sizeClass: SizeClass, values: BySizeClass<T>): T {
+  if (sizeClass === 'expanded') return values.expanded ?? values.medium ?? values.compact;
+  if (sizeClass === 'medium') return values.medium ?? values.compact;
+  return values.compact;
+}
+
+/**
+ * Кількість колонок сітки.
+ *
+ * Якщо задано minItemWidth і відома ширина контейнера — колонок стільки,
+ * скільки влазить карток не вужчих за minItemWidth (але не більше maxColumns).
+ * Інакше — за класом вікна (Layout.gridColumns або власна мапа).
+ * Мінімум завжди 1: вироджена ширина (0 у перший кадр) не ламає рендер.
+ */
+export function gridColumnsFor(opts: {
+  sizeClass: SizeClass;
+  containerWidth?: number;
+  minItemWidth?: number;
+  gap?: number;
+  columns?: BySizeClass<number>;
+  maxColumns?: number;
+}): number {
+  const max = Math.max(1, opts.maxColumns ?? 4);
+  let n: number;
+  if (opts.minItemWidth && opts.containerWidth && opts.containerWidth > 0) {
+    const gap = opts.gap ?? Layout.gridGap;
+    n = Math.floor((opts.containerWidth + gap) / (opts.minItemWidth + gap));
+  } else {
+    n = pickBySizeClass(opts.sizeClass, opts.columns ?? Layout.gridColumns);
+  }
+  return Math.min(max, Math.max(1, Math.floor(n)));
+}
+
+/** Розбиття на рядки по n елементів (останній рядок може бути неповним). */
+export function chunkRows<T>(items: readonly T[], n: number): T[][] {
+  const size = Math.max(1, Math.floor(n));
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+  return rows;
+}
+
+/** Ширина колонки деталі у list+detail для поточної ширини вікна. */
+export function detailColumnWidthFor(windowWidth: number): number {
+  return windowWidth >= Layout.detailWideFrom ? Layout.detailWidthLarge : Layout.detailWidth;
+}
+
+/**
+ * Як показати аркуш-форму.
+ *  - sheet  — bottom-sheet (телефон, або явно попросили);
+ *  - dialog — центрований діалог;
+ *  - side   — панель праворуч на всю висоту.
+ * На compact завжди 'sheet': діалог/панель на телефоні — гірший аркуш.
+ */
+export type SheetPresentation = 'auto' | 'sheet' | 'dialog' | 'side';
+export type ResolvedSheetPresentation = Exclude<SheetPresentation, 'auto'>;
+
+export function resolveSheetPresentation(
+  requested: SheetPresentation,
+  sizeClass: SizeClass,
+): ResolvedSheetPresentation {
+  if (sizeClass === 'compact') return 'sheet';
+  if (requested === 'auto') return 'dialog';
+  return requested;
+}
+
+/**
+ * Режим особистого сайдбара. На medium (600–839) повний сайдбар (232pt)
+ * з'їдав третину вікна — там за замовчуванням «рейка» з іконками; людина
+ * може розгорнути її (override). На expanded за замовчуванням повний.
+ */
+export type SidebarMode = 'full' | 'rail';
+
+export function sidebarModeFor(sizeClass: SizeClass, override: SidebarMode | null): SidebarMode {
+  if (override) return override;
+  return sizeClass === 'medium' ? 'rail' : 'full';
+}

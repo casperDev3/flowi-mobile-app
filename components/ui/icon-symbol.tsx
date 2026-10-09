@@ -154,6 +154,8 @@ const MAPPING: Record<string, MaterialIconName> = {
   'equal': 'drag-handle',
   'arrow.up.right': 'north-east',
   'arrow.down.right': 'south-east',
+  // «Обрізати до N год» (аномалії Часу): 'arrow.down.trend' не існує в SF Symbols.
+  'scissors': 'content-cut',
   // Повноекранний режим таймерів (вкладка Time).
   'arrow.up.left.and.arrow.down.right': 'fullscreen',
   'pills.fill': 'medication',
@@ -255,6 +257,8 @@ const MAPPING: Record<string, MaterialIconName> = {
   'rectangle.3.group': 'view-column',
   'stethoscope': 'medical-services',
   'syringe.fill': 'vaccines',
+  // Сайдбар проєкту: згорнути/розгорнути.
+  'sidebar.left': 'view-sidebar',
 };
 
 export type IconSymbolName = keyof typeof MAPPING;
@@ -270,5 +274,16 @@ export function IconSymbol({
   color: string | OpaqueColorValue;
   style?: StyleProp<TextStyle>;
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+  // NAT-05: декоративна іконка — підпис дає батьківський елемент.
+  return (
+    <MaterialIcons
+      color={color}
+      size={size}
+      name={MAPPING[name]}
+      style={style}
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    />
+  );
 }

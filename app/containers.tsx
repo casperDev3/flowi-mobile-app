@@ -30,11 +30,11 @@ import { QrSheet } from '@/components/containers/QrSheet';
 import { SearchHitRow } from '@/components/containers/SearchHitRow';
 import { CONTAINERS_ACCENT as ACCENT, useContainersColors } from '@/components/containers/theme';
 import { useContainersData, type PhotoTarget } from '@/components/containers/useContainersData';
-import { DETAIL_COLUMN_WIDTH, DetailPane } from '@/components/shared/DetailPane';
+import { DetailPane } from '@/components/shared/DetailPane';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { sizeClassFor } from '@/constants/tokens';
-import { CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
+import { detailColumnWidthFor, sizeClassFor } from '@/constants/tokens';
+import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { loadData, saveData } from '@/store/storage';
@@ -98,6 +98,8 @@ export default function ContainersScreen() {
   }, []);
 
   const placesMode = view === 'places';
+  /** Колонка деталі росте на дуже широкому вікні — та сама, що в DetailPane нижче. */
+  const detailWidth = detailColumnWidthFor(width);
   const treeColumn = placesMode && isExpanded;
 
   /**
@@ -105,7 +107,7 @@ export default function ContainersScreen() {
    * колонка дерева в режимі «За місцями» (§8.2).
    */
   const listWidth = Math.max(
-    screenWidth - (isExpanded ? DETAIL_COLUMN_WIDTH : 0) - (treeColumn ? TREE_COLUMN_WIDTH : 0),
+    screenWidth - (isExpanded ? detailWidth : 0) - (treeColumn ? TREE_COLUMN_WIDTH : 0),
     0,
   );
   const listClass = sizeClassFor(listWidth);
@@ -113,9 +115,16 @@ export default function ContainersScreen() {
   const cardWidth = useMemo(() => {
     // Телефон: формула дослівно та сама, що була, — нуль регресії.
     if (!isWide) return (width - 48) / 2;
-    const available = Math.min(listWidth, CONTENT_MAX_WIDTH) - 32;
+    // Стеля — «широка» (Layout.wideMaxWidth): сітка коробок — це плитки, а не
+    // текст; зі стелею 720 на великому iPad лишалась смуга порожнечі праворуч.
+    const available = Math.min(listWidth, WIDE_CONTENT_MAX_WIDTH) - 32;
     return (available - GRID_GAP * (columns - 1)) / columns;
   }, [width, listWidth, isWide, columns]);
+  /** Сітка плиток — у широкій колонці; пошук і дерево лишаються колонкою для читання. */
+  const gridWidth = useMemo(
+    () => (isWide ? { ...contentWidth, maxWidth: WIDE_CONTENT_MAX_WIDTH } : contentWidth),
+    [isWide, contentWidth],
+  );
 
   const statsById = useMemo(() => {
     const out = new Map<string, ContainerStats>();
@@ -282,7 +291,7 @@ export default function ContainersScreen() {
       data={matches}
       numColumns={columns}
       keyExtractor={m => m.container.id}
-      contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
+      contentContainerStyle={[gridWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
       columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
@@ -458,6 +467,7 @@ export default function ContainersScreen() {
         <DetailPane
           open={!!detail}
           wide={isExpanded}
+          columnWidth={detailWidth}
           onClose={() => setDetailId(null)}
           isDark={c.isDark}
           sheetColor={c.sheet}

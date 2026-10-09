@@ -106,7 +106,7 @@ export function AnomalyPanel({
                   кнопка, що нічого не робить, гірша за її відсутність. */}
               {trim !== null && (
                 <QuickAction
-                  icon="arrow.down.trend"
+                  icon="scissors"
                   label={tr.anomalyTrimTo.replace('{duration}', formatDuration(trim))}
                   color={c.indigo}
                   border={c.border}

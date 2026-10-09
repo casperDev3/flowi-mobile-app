@@ -36,6 +36,11 @@ export interface TaskHistoryEvent {
   at: string;
   type: HistoryEventType;
   note?: string;
+  /**
+   * Лише в подіях `done`: звідки задача прийшла (utils/taskCompletion.ts) —
+   * зняття «готово» повертає її туди ж і відкриває ті самі підзавдання.
+   */
+  reopen?: { columnId?: string; openSubtaskIds?: string[] };
 }
 
 export interface Task {

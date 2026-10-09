@@ -93,7 +93,8 @@ import {
   BUILTIN_CURRENCIES, formatCurrency, type Currency, type Transaction,
 } from '@/utils/financeUtils';
 import { type Account } from '@/utils/accounts';
-import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
+import { WIDE_CONTENT_MAX_WIDTH, useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
+import { wideModalStyles } from '@/components/finance/wideModal';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 
@@ -223,8 +224,17 @@ export default function BudgetScreen() {
 }
 
 export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
-  const contentWidth = useContentWidth();
-  const { isWide } = useResponsive();
+  const readingWidth = useContentWidth();
+  const { isWide, isExpanded } = useResponsive();
+  // Ландшафт планшета: підсумок ліворуч, рядки категорій праворуч — у
+  // ширшій колонці (Layout.wideMaxWidth). Портрет і телефон — одна колонка
+  // для читання, як і було.
+  const contentWidth = useMemo(
+    () => (isExpanded ? { ...readingWidth, maxWidth: WIDE_CONTENT_MAX_WIDTH } : readingWidth),
+    [isExpanded, readingWidth],
+  );
+  // Аркуші ліміту/категорії — діалогом посеред екрана на планшеті.
+  const wm = wideModalStyles(isWide, 'slide');
   const sheetSurface = useSheetSurface();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
@@ -547,6 +557,9 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
+  /** Дві колонки — лише коли є що ставити поруч: підсумок і рядки. */
+  const splitColumns = isExpanded && !multiMonth && totals.totalBudget > 0 && displayBudgets.length > 0;
+
   return (
     <View style={{ flex: 1 }}>
       {!embedded ? <Stack.Screen options={{ headerShown: false }} /> : null}
@@ -711,6 +724,10 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
           </>
         )}
 
+        {/* Ландшафт: підсумок — ліва колонка, категорії — права. На
+            вужчому вікні обидві обгортки просто стоять одна під одною. */}
+        <View style={splitColumns ? st.split : undefined}>
+        <View style={splitColumns ? st.splitAside : undefined}>
         {/* Total summary card */}
         {!multiMonth && totals.totalBudget > 0 && (
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
@@ -750,7 +767,9 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             )}
           </BlurView>
         )}
+        </View>
 
+        <View style={splitColumns ? st.splitMain : undefined}>
         {/* Category rows */}
         {!multiMonth && displayBudgets.length > 0 && (
           <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
@@ -771,6 +790,8 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             ))}
           </BlurView>
         )}
+        </View>
+        </View>
 
         {/* Empty state */}
         {!multiMonth && displayBudgets.length === 0 && !loadFailed && (
@@ -802,11 +823,11 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
       </ScrollView>
 
       {/* ── Edit Limit Modal ── */}
-      <Modal visible={showEditModal} transparent animationType="slide" statusBarTranslucent
+      <Modal visible={showEditModal} transparent animationType={wm.animation} statusBarTranslucent
         onRequestClose={() => setShowEditModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={st.overlay} onPress={() => setShowEditModal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, contentWidth]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={() => setShowEditModal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, readingWidth, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
                 <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -901,11 +922,11 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
       </Modal>
 
       {/* ── Add Category Modal ── */}
-      <Modal visible={showAddModal} transparent animationType="slide" statusBarTranslucent
+      <Modal visible={showAddModal} transparent animationType={wm.animation} statusBarTranslucent
         onRequestClose={() => setShowAddModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={st.overlay} onPress={() => setShowAddModal(false)}>
-            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, contentWidth]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
+          <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={() => setShowAddModal(false)}>
+            <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, readingWidth, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
                 style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
 
@@ -1070,6 +1091,9 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
 const st = StyleSheet.create({
   summaryCard:  { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', padding: 16, marginBottom: 16 },
   card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', marginBottom: 16 },
+  split:        { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+  splitAside:   { flex: 1, minWidth: 0 },
+  splitMain:    { flex: 1.6, minWidth: 0 },
   categoryRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   catIconBox:   { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   progressTrack:{ height: 5, borderRadius: 3, overflow: 'hidden' },

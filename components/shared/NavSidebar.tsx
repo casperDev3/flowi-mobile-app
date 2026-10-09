@@ -26,22 +26,42 @@ import { Image } from 'expo-image';
  * 'ui_preferences' (store/ui-preferences.ts) і діє на всіх пристроях. Пункт
  * вимкненого модуля зникає зі списку (visibleNavGroups); дані модуля при
  * цьому не видаляються — ховається лише вхід.
+ *
+ * РЕЙКА (рішення 6). На medium (600–839, iPad у портреті) повний сайдбар
+ * забирав 232pt із ~744 — третину екрана, і сітки карток падали в одну
+ * колонку. Там за замовчуванням «рейка» 76pt: лише іконки (підпис — у
+ * accessibilityLabel), заголовки груп — кнопки-шеврони. Кнопка вгорі
+ * розгортає/згортає сайдбар; вибір запам'ятовується окремо для кожного класу
+ * вікна (components/shared/sidebar-mode.ts — його ж читає useScreenWidth()).
  */
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NotificationBadge } from '@/components/notifications/NotificationBadge';
+import {
+  getSidebarOverrides,
+  setSidebarOverride,
+  setSidebarOverrides,
+  useNavSidebarMode,
+  type SidebarOverrides,
+} from '@/components/shared/sidebar-mode';
 import { ActiveTimersSidebarCard } from '@/components/time/ActiveTimersSidebarCard';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Layout } from '@/constants/tokens';
+import { useResponsive } from '@/hooks/use-responsive';
+import { useTimerContext } from '@/store/timer-context';
 import {
   DEFAULT_COLLAPSED_GROUP_IDS,
   SIDEBAR_WIDTH,
+  groupHasActiveItem,
   isGroupCollapsed,
   isNavItemActive,
   menuNavGroups,
   navGroupsFor,
+  sanitizeCollapsedGroupIds,
+  toggleCollapsedGroupId,
   visibleNavGroups,
 } from '@/constants/nav';
 import { useAuth } from '@/store/auth';
@@ -54,12 +74,34 @@ import { useUiModules } from '@/store/ui-preferences';
 export { SIDEBAR_WIDTH } from '@/constants/nav';
 
 const COLLAPSED_KEY = 'nav_collapsed_groups';
+/** Вибір «рейка/повний» за класом вікна — локально, як і згорнуті групи. */
+const MODE_KEY = 'nav_sidebar_mode';
 
 export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boolean }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tr } = useI18n();
   const { user } = useAuth();
+  const { sizeClass } = useResponsive();
+  const mode = useNavSidebarMode(sizeClass);
+  const rail = mode === 'rail';
+  const { activeTimers } = useTimerContext();
+
+  useEffect(() => {
+    loadData<SidebarOverrides>(MODE_KEY, {})
+      .then(saved => {
+        // Те, що людина вже перемкнула до завершення читання, — свіжіше.
+        setSidebarOverrides({ ...(saved ?? {}), ...getSidebarOverrides() });
+      })
+      .catch(e => { if (__DEV__) console.warn('[nav] режим сайдбара не прочитався:', e); });
+  }, []);
+
+  const toggleRail = useCallback(() => {
+    const next = setSidebarOverride(sizeClass, rail ? 'full' : 'rail');
+    void saveData(MODE_KEY, next).catch(e => {
+      if (__DEV__) console.warn('[nav] режим сайдбара не зберігся:', e);
+    });
+  }, [sizeClass, rail]);
 
   // Вимкнені модулі — з акаунта (синхронізований 'ui_preferences'), а не з
   // цього пристрою: користувач вимкнув розділ на телефоні, і на планшеті його
@@ -76,24 +118,37 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
   );
 
   const [collapsed, setCollapsed] = useState<readonly string[]>(DEFAULT_COLLAPSED_GROUP_IDS);
+  // Писати лише після дії людини: інакше перше ж читання записувало б себе ж.
+  const collapsedDirty = useRef(false);
 
   // До першого читання показуємо ДЕФОЛТ, а не «все розгорнуто»: інакше сайдбар
   // на мить розгортався б на повну висоту й осідав — смикання при кожному
   // старті помітніше, ніж група, що з'явилась на кадр пізніше.
   useEffect(() => {
-    loadData<string[]>(COLLAPSED_KEY, [...DEFAULT_COLLAPSED_GROUP_IDS])
-      .then(setCollapsed)
+    // Санітизація обов'язкова: у ключі бувало null / об'єкт / рядок, і
+    // `.includes` на такому стані кидав TypeError у рендері й на тапі
+    // «згорнути» (баг «Ще» на планшеті).
+    loadData<unknown>(COLLAPSED_KEY, [...DEFAULT_COLLAPSED_GROUP_IDS])
+      .then(raw => {
+        // Людина встигла натиснути до кінця читання — її вибір свіжіший.
+        if (!collapsedDirty.current) setCollapsed(sanitizeCollapsedGroupIds(raw));
+      })
       .catch(e => { if (__DEV__) console.warn('[nav] згорнуті групи не прочитались:', e); });
   }, []);
 
-  const toggleGroup = useCallback((id: string) => {
-    setCollapsed(prev => {
-      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-      void saveData(COLLAPSED_KEY, next).catch(e => {
-        if (__DEV__) console.warn('[nav] згорнуті групи не збереглись:', e);
-      });
-      return next;
+  // Запис — ефектом, а не з апдейтера setState: апдейтер має бути чистим
+  // (StrictMode викликає його двічі).
+  useEffect(() => {
+    if (!collapsedDirty.current) return;
+    void saveData(COLLAPSED_KEY, collapsed).catch(e => {
+      if (__DEV__) console.warn('[nav] згорнуті групи не збереглись:', e);
     });
+  }, [collapsed]);
+
+  const toggleGroup = useCallback((id: string | undefined) => {
+    if (!id) return;
+    collapsedDirty.current = true;
+    setCollapsed(prev => toggleCollapsedGroupId(prev, id));
   }, []);
 
   const c = {
@@ -105,37 +160,125 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
     activeBg: isDark ? 'rgba(167,139,250,0.14)' : 'rgba(124,58,237,0.10)',
   };
 
+  const toggleLabel = rail ? tr.navSidebarExpand : tr.navSidebarCollapse;
+  const toggleButton = (
+    <TouchableOpacity
+      onPress={toggleRail}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={toggleLabel}
+      accessibilityState={{ expanded: !rail }}
+      hitSlop={4}
+      style={st.iconBtn}>
+      <IconSymbol name={rail ? 'chevron.right' : 'chevron.left'} size={16} color={c.sub} />
+    </TouchableOpacity>
+  );
+
+  if (rail) {
+    return (
+      <View
+        style={[st.root, st.railRoot, { width: Layout.railWidth, backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 14 }]}
+        accessibilityRole="menu">
+        <Image source={require('@/assets/logo_app.png')} style={st.railLogo} accessible={false} />
+        {toggleButton}
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, alignItems: 'center' }}>
+          {navGroups.map((group, gi) => {
+            const hidden = isGroupCollapsed(group, collapsed);
+            const collapsible = Boolean(group.id);
+            // Згорнута група з поточним розділом — крапка на шевроні, щоб було
+            // видно, де ви, навіть коли пункт сховано.
+            const activeInside = hidden && groupHasActiveItem(group, pathname);
+            const groupTitle = group.titleKey ? String(tr[group.titleKey] ?? '') : '';
+            return (
+              <View key={group.id ?? `g${gi}`} style={[st.railGroup, gi > 0 && { borderTopColor: c.border, borderTopWidth: StyleSheet.hairlineWidth }]}>
+                {collapsible && (
+                  <TouchableOpacity
+                    onPress={() => toggleGroup(group.id)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={groupTitle}
+                    accessibilityState={{ expanded: !hidden, selected: activeInside }}
+                    style={st.iconBtn}>
+                    <IconSymbol name={hidden ? 'chevron.right' : 'chevron.down'} size={13} color={activeInside ? c.accent : c.sub} />
+                    {hidden && <Text style={[st.railCount, { color: activeInside ? c.accent : c.sub }]}>{group.items.length}</Text>}
+                    {activeInside && <View style={[st.activeDot, st.railActiveDot, { backgroundColor: c.accent }]} />}
+                  </TouchableOpacity>
+                )}
+                {!hidden && group.items.map(item => {
+                  const active = isNavItemActive(item, pathname);
+                  return (
+                    <TouchableOpacity
+                      key={item.route}
+                      onPress={() => router.push(item.route as never)}
+                      activeOpacity={0.7}
+                      accessibilityRole="menuitem"
+                      accessibilityLabel={String(tr[item.labelKey] ?? '')}
+                      accessibilityState={{ selected: active }}
+                      style={[st.railItem, active && { backgroundColor: c.activeBg }]}>
+                      <IconSymbol name={item.icon} size={21} color={active ? c.accent : c.sub} />
+                      {item.route === '/(tabs)/settings' && (
+                        <NotificationBadge variant="dot" style={st.railBadge} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            );
+          })}
+        </ScrollView>
+        {/* Повна картка таймерів у 76pt не влазить — лишаємо вхід у Трекер
+            часу з лічильником, щоб зупинити таймер можна було звідусіль. */}
+        {activeTimers.length > 0 && (
+          <View style={{ paddingBottom: insets.bottom + 10, alignItems: 'center' }}>
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/time' as never)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`${tr.navTime}: ${activeTimers.length}`}
+              style={[st.railItem, { backgroundColor: c.activeBg }]}>
+              <IconSymbol name="timer" size={21} color={c.accent} />
+              <Text style={[st.railTimerCount, { color: c.accent }]}>{activeTimers.length}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  }
+
   return (
     <View
       style={[st.root, { width: SIDEBAR_WIDTH, backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 14 }]}
       accessibilityRole="menu">
-      <View style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:12}}><Image source={require('@/assets/logo_app.png')} style={{width:34,height:34,borderRadius:Atlas.radius.medium}} accessible={false}/><Text style={[st.brand, { color: c.accent, marginBottom:0 }]}>Flowi</Text></View>
+      <View style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:12}}><Image source={require('@/assets/logo_app.png')} style={{width:34,height:34,borderRadius:Atlas.radius.medium}} accessible={false}/><Text style={[st.brand, { color: c.accent, marginBottom:0, flex: 1 }]}>Flowi</Text>{toggleButton}</View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
         {navGroups.map((group, gi) => {
-          const hidden = isGroupCollapsed(group, collapsed, pathname);
+          const hidden = isGroupCollapsed(group, collapsed);
           // Заголовок групи, яку можна згорнути, — кнопка; решта лишається
           // звичайним підписом, щоб не обіцяти дію, якої немає.
           const collapsible = Boolean(group.id);
+          const activeInside = hidden && groupHasActiveItem(group, pathname);
+          const title = group.titleKey ? String(tr[group.titleKey] ?? '').toUpperCase() : '';
 
           return (
             <View key={group.id ?? `g${gi}`} style={{ marginBottom: hidden ? 6 : 14 }}>
               {group.titleKey && (
                 collapsible ? (
                   <TouchableOpacity
-                    onPress={() => toggleGroup(group.id!)}
+                    onPress={() => toggleGroup(group.id)}
                     activeOpacity={0.7}
                     accessibilityRole="button"
-                    accessibilityState={{ expanded: !hidden }}
+                    accessibilityState={{ expanded: !hidden, selected: activeInside }}
                     style={st.groupHead}>
                     <IconSymbol
                       name={hidden ? 'chevron.right' : 'chevron.down'}
                       size={13}
-                      color={c.sub}
+                      color={activeInside ? c.accent : c.sub}
                     />
-                    <Text style={[st.groupTitle, { color: c.sub, flex: 1, marginLeft: 4 }]}>
-                      {String(tr[group.titleKey]).toUpperCase()}
+                    <Text style={[st.groupTitle, { color: activeInside ? c.accent : c.sub, flex: 1, marginLeft: 4 }]}>
+                      {title}
                     </Text>
+                    {activeInside && <View style={[st.activeDot, { backgroundColor: c.accent, marginRight: 6 }]} />}
                     {/* Лічильник лише в згорнутому стані: коли пункти видно,
                         він переказував би те, що й так на екрані. */}
                     {hidden && (
@@ -144,7 +287,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
                   </TouchableOpacity>
                 ) : (
                   <Text style={[st.groupTitle, { color: c.sub, paddingHorizontal: 10 }]}>
-                    {String(tr[group.titleKey]).toUpperCase()}
+                    {title}
                   </Text>
                 )
               )}
@@ -163,7 +306,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
                     <Text
                       numberOfLines={1}
                       style={[st.label, { color: active ? c.accent : c.text, fontWeight: active ? '700' : '500' }]}>
-                      {String(tr[item.labelKey])}
+                      {String(tr[item.labelKey] ?? '')}
                     </Text>
                     {/* Непрочитані сповіщення — на пункті «Налаштування», звідки
                         ведуть і центр сповіщень, і їхні налаштування (§11). */}
@@ -199,4 +342,18 @@ const st = StyleSheet.create({
   // бо палець тягнеться через увесь екран.
   row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
   label:      { fontSize: 14, flex: 1 },
+  // ── Рейка ──
+  railRoot:   { paddingHorizontal: 0, alignItems: 'center' },
+  railLogo:   { width: 34, height: 34, borderRadius: Atlas.radius.medium, marginBottom: 6 },
+  railGroup:  { alignItems: 'center', paddingVertical: 6, gap: 2, alignSelf: 'stretch' },
+  // 44×44 — мінімальний тач-таргет; у рейці підпису немає, тож площа кнопки —
+  // єдине, у що цілиться палець.
+  iconBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium },
+  railItem:   { width: 52, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium },
+  railBadge:  { position: 'absolute', top: 10, right: 12 },
+  railCount:  { position: 'absolute', bottom: 4, fontSize: 9, fontWeight: '700' },
+  // Крапка «поточний розділ усередині» на згорнутому заголовку групи.
+  activeDot:  { width: 6, height: 6, borderRadius: 3, marginBottom: 6 },
+  railActiveDot: { position: 'absolute', top: 9, right: 9, marginBottom: 0 },
+  railTimerCount: { position: 'absolute', bottom: 3, right: 8, fontSize: 10, fontWeight: '800' },
 });

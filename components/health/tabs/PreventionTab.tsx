@@ -10,16 +10,15 @@ import { Atlas } from '@/constants/atlas';
  * Самі списки лишаються окремими екранами-аркушами (`app/health-meds.tsx` і
  * решта): там ввід і редагування, тут — стан «що лишилось сьогодні».
  */
-import { BlurView } from 'expo-blur';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { HubTile } from '@/components/health/HubTile';
+import { useHealthTabGrid } from '@/components/health/HealthLayout';
 import type { HealthTabProps } from '@/components/health/tabs/types';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useContentWidth } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
@@ -32,7 +31,7 @@ import {
 } from '@/utils/preventionUtils';
 
 export function PreventionTab({ h }: HealthTabProps) {
-  const contentWidth = useContentWidth();
+  const grid = useHealthTabGrid();
   const tabBarInset = useTabBarInset();
   const { sizeClass } = useResponsive();
   // Дві плитки на телефоні, три на середньому вікні, чотири на широкому:
@@ -93,7 +92,7 @@ export function PreventionTab({ h }: HealthTabProps) {
 
   return (
     <ScrollView
-      contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingTop: 8, paddingBottom: tabBarInset + 32 }]}
+      contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
 
@@ -103,29 +102,29 @@ export function PreventionTab({ h }: HealthTabProps) {
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.meds} icon="pills.fill" color={HEALTH_ACCENTS.prevention}
             stat={activeMeds ? `${tr.medActive}: ${activeMeds}` : tr.medsSub} badge={medsDue}
-            onPress={() => router.push('/health-meds')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+            onPress={() => router.push('/health-meds')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={c.card} />
         </View>
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.checkups} icon="cross.case.fill" color={ACCENT_PULSE}
             stat={checkups.length ? `${checkups.length}` : tr.checkupsSub}
-            onPress={() => router.push('/health-checkups')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+            onPress={() => router.push('/health-checkups')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={c.card} />
         </View>
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.vaccines} icon="syringe" color={ACCENT_CAL}
             stat={vaccines.length ? `${vaccines.length}` : tr.vaccinesSub}
-            onPress={() => router.push('/health-vaccines')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+            onPress={() => router.push('/health-vaccines')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={c.card} />
         </View>
         <View style={[s.tileCell, { width: `${100 / tileColumns}%` }]}>
           <HubTile title={tr.habits} icon="checklist" color={ACCENT_PROT}
             stat={habits.length ? `${habitsLeft} ${tr.dueToday}` : tr.habitsSub} badge={habitsLeft}
-            onPress={() => router.push('/health-habits')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
+            onPress={() => router.push('/health-habits')} isDark={isDark} border={c.border} text={c.text} sub={c.sub} card={c.card} />
         </View>
       </View>
 
       {/* Експорт звіту для лікаря */}
-      <TouchableOpacity onPress={exportReport} activeOpacity={0.85} style={{ marginTop: 16 }}
+      <TouchableOpacity onPress={exportReport} activeOpacity={0.85} style={{ marginTop: 12 }}
         accessibilityRole="button" accessibilityLabel={tr.exportReport}>
-        <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.report, { borderColor: ACCENT + '40' }]}>
+        <View style={[s.report, { borderColor: c.border, backgroundColor: c.card }]}>
           <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name="square.and.arrow.up" size={18} color={ACCENT} />
           </View>
@@ -134,7 +133,7 @@ export function PreventionTab({ h }: HealthTabProps) {
             <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.reportSub}</Text>
           </View>
           <IconSymbol name="chevron.right" size={13} color={c.sub} />
-        </BlurView>
+        </View>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -143,5 +142,5 @@ export function PreventionTab({ h }: HealthTabProps) {
 const s = StyleSheet.create({
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6, marginVertical: -6 },
   tileCell: { padding: 6 },
-  report:   { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  report:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center' },
 });

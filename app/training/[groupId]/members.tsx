@@ -15,6 +15,7 @@ import { trainingRoutes } from '@/components/training/routes';
 import { TG_ERR, useTrainingColors } from '@/components/training/theme';
 import { Card, EmptyState, Notice, PrimaryButton } from '@/components/training/TrainingBits';
 import { useMembers } from '@/components/training/useMembers';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { dayKeyInZone } from '@/utils/trainingSessions';
 
@@ -28,32 +29,48 @@ export default function MembersScreen() {
   const isCoach = (stream.role ?? group?.role) === 'coach';
   const today = dayKeyInZone(new Date(), group?.timezone);
   const m = useMembers(groupId, stream, isCoach, today, group?.name ?? '');
+  // Планшет (рішення 6): у тренера склад групи ліворуч, запрошення праворуч —
+  // обидва видно одночасно; учасник має лише список, йому вистачає колонки.
+  const { isWide } = useResponsive();
+  const split = isWide && isCoach;
+
+  const membersCard = m.members.length ? (
+    <Card c={c}>
+      <MembersList
+        c={c}
+        members={m.members}
+        stats={m.stats}
+        isCoach={isCoach}
+        meId={m.userId}
+        onOpen={isCoach ? mem => router.push(trainingRoutes.member(groupId, mem.user.id)) : undefined}
+        onMenu={isCoach ? m.memberMenu : undefined}
+      />
+    </Card>
+  ) : m.issue ? null : <EmptyState c={c} icon="person.2.fill" title={tr.tgNoMembers} />;
+  const invitePanel = isCoach ? <InvitePanel c={c} groupId={groupId} onMemberAdded={() => { void m.load(); }} /> : null;
 
   return (
     <GroupScreenShell
       c={c}
       title={tr.tgMembers}
+      wide={split}
       groupId={groupId}
       groupName={group?.name}
       issue={m.issue}
       onRefresh={() => { void m.load(); void stream.sync(); }}>
       {m.error ? <Notice c={c} text={m.error} tone="error" /> : null}
       {isCoach ? <Notice c={c} text={tr.tgPrivacyNote} tone="info" /> : null}
-      {m.members.length ? (
-        <Card c={c}>
-          <MembersList
-            c={c}
-            members={m.members}
-            stats={m.stats}
-            isCoach={isCoach}
-            meId={m.userId}
-            onOpen={isCoach ? mem => router.push(trainingRoutes.member(groupId, mem.user.id)) : undefined}
-            onMenu={isCoach ? m.memberMenu : undefined}
-          />
-        </Card>
-      ) : m.issue ? null : <EmptyState c={c} icon="person.2.fill" title={tr.tgNoMembers} />}
-
-      {isCoach ? <InvitePanel c={c} groupId={groupId} onMemberAdded={() => { void m.load(); }} /> : null}
+      {split ? (
+        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+          <View style={{ flex: 3, minWidth: 0 }}>{membersCard}</View>
+          <View style={{ flex: 2, minWidth: 0 }}>{invitePanel}</View>
+        </View>
+      ) : (
+        <>
+          {membersCard}
+          {invitePanel}
+        </>
+      )}
 
       <View style={{ gap: 10, marginTop: 24 }}>
         <PrimaryButton label={tr.tgLeaveGroup} variant="soft" color={TG_ERR} onPress={m.leave} />

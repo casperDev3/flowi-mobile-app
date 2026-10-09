@@ -12,7 +12,7 @@ import { Atlas } from '@/constants/atlas';
  * `before`, без локального кешу — застарілий список активності вводив би в
  * оману більше, ніж коротка мить завантаження.
  */
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
@@ -25,10 +25,13 @@ import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { OfflineError } from '@/store/api';
 import { fetchProjectActivity, type ActivityEntry } from '@/store/project-activity';
-import { activityIcon, formatActivityMessage } from '@/utils/projectActivity';
+import { activityIcon, formatActivityMessage, mergeConsecutiveActivity } from '@/utils/projectActivity';
+import { useActivityContext } from '@/hooks/use-activity-context';
+import { useProjectRouteId } from '@/hooks/use-project-route-id';
 
 export default function ProjectActivityScreen() {
-  const { id: projectId } = useLocalSearchParams<{ id: string }>();
+  const projectId = useProjectRouteId();
+  const activityCtx = useActivityContext(projectId);
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const contentWidth = useContentWidth();
@@ -106,7 +109,7 @@ export default function ProjectActivityScreen() {
           <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 40 }}>{tr.projectActivityEmpty}</Text>
         ) : (
           <>
-            {entries.map(entry => (
+            {mergeConsecutiveActivity(entries).map(entry => (
               <View key={entry.id} style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
                 <View style={{
                   width: 28, height: 28, borderRadius: 14, backgroundColor: c.accent + '1F',
@@ -115,7 +118,7 @@ export default function ProjectActivityScreen() {
                   <IconSymbol name={activityIcon(entry)} size={14} color={c.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 13, lineHeight: 18 }}>{formatActivityMessage(entry, tr)}</Text>
+                  <Text style={{ color: c.text, fontSize: 13, lineHeight: 18 }}>{formatActivityMessage(entry, tr, activityCtx)}</Text>
                   <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
                     {new Date(entry.created_at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                     {' · '}

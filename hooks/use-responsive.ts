@@ -15,9 +15,12 @@
 import { useWindowDimensions } from 'react-native';
 import { usePathname } from 'expo-router';
 
-import { SIDEBAR_WIDTH, screenContentWidth } from '@/constants/nav';
+import { screenContentWidth } from '@/constants/nav';
 
-import { type SizeClass, sizeClassFor } from '@/constants/tokens';
+import {
+  navSidebarWidthFor, projectSidebarWidthFor, useProjectSidebarCollapsed, useSidebarOverrides,
+} from '@/components/shared/sidebar-mode';
+import { type BySizeClass, type SizeClass, pickBySizeClass, sizeClassFor } from '@/constants/tokens';
 
 export interface Responsive {
   /** Поточна ширина вікна (не екрана — у Split View це різні речі). */
@@ -67,7 +70,24 @@ export function useResponsive(): Responsive {
  * responsive.width.
  */
 export function useScreenWidth(): number {
-  const { width, isWide } = useResponsive();
+  const { width, isWide, sizeClass } = useResponsive();
   const pathname = usePathname();
-  return screenContentWidth(width, isWide, pathname, SIDEBAR_WIDTH);
+  const overrides = useSidebarOverrides();
+  const projectCollapsed = useProjectSidebarCollapsed();
+  // Простір проєкту малює ProjectSidebar зі своєю шириною (232 або рейка,
+  // коли згорнутий); особистий NavSidebar на medium — рейка (див.
+  // components/shared/sidebar-mode.ts).
+  const sidebarWidth = pathname.startsWith('/project/')
+    ? projectSidebarWidthFor(projectCollapsed)
+    : navSidebarWidthFor(sizeClass, overrides);
+  return screenContentWidth(width, isWide, pathname, sidebarWidth);
+}
+
+/**
+ * Значення за класом вікна: `useBreakpointValue({ compact: 1, medium: 2, expanded: 3 })`.
+ * Відсутні класи успадковують менший (medium без значення = compact).
+ */
+export function useBreakpointValue<T>(values: BySizeClass<T>): T {
+  const { sizeClass } = useResponsive();
+  return pickBySizeClass(sizeClass, values);
 }

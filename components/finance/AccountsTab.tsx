@@ -1,7 +1,8 @@
 import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/AccountsTab.tsx — вкладка «Рахунки» (finance-revamp.md §2.1):
- * рахунки по валютах із балансами (ті самі цифри, що financeOverview),
+ * оборот періоду (доходи/витрати — з «Операцій»), рахунки по валютах із
+ * балансами (ті самі цифри, що financeOverview),
  * скарбнички (`kind='savings'`) з ціллю, вхід до легасі-«Скарбничок».
  *
  * Період і ракурс на баланс не впливають (§3.2): баланс — факт про рахунок.
@@ -9,7 +10,9 @@ import { Atlas } from '@/constants/atlas';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { WIDE_CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
 import type { Translations } from '@/store/translations';
 import type { Account, AccountKind } from '@/utils/accounts';
 import type { FinanceOverview } from '@/utils/financeOverview';
@@ -17,7 +20,7 @@ import type { FinColors } from './financeLabels';
 
 export function AccountsTab({
   accounts, overview, money, kindLabel, c, tr, isWide, bottomInset,
-  onOpenAccount, onEditAccount, onNewAccount, onOpenBanks,
+  onOpenAccount, onEditAccount, onNewAccount, onOpenBanks, header,
 }: {
   accounts: readonly Account[];
   overview: FinanceOverview;
@@ -32,6 +35,11 @@ export function AccountsTab({
   onEditAccount: (account: Account) => void;
   onNewAccount: () => void;
   onOpenBanks: () => void;
+  /**
+   * Над рахунками: оборот періоду (доходи/витрати). Переїхав сюди з
+   * «Операцій» — там лишились тільки залишки (рішення власника 2026-10).
+   */
+  header?: React.ReactNode;
 }) {
   const [showArchived, setShowArchived] = useState(false);
   const byCurrency = useMemo(() => {
@@ -93,12 +101,17 @@ export function AccountsTab({
 
   return (
     <ScrollView
-      contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: bottomInset + 24 }}
+      // На планшеті дашборд не розповзається ширше за Layout.wideMaxWidth.
+      contentContainerStyle={[
+        { paddingHorizontal: 20, paddingTop: 12, paddingBottom: bottomInset + 24 },
+        isWide && WIDE_COLUMN,
+      ]}
       showsVerticalScrollIndicator={false}>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <TouchableOpacity
           onPress={onNewAccount}
           accessibilityRole="button"
+          accessibilityLabel={tr.newAccount}
           style={[st.action, { backgroundColor: c.accent }]}>
           <IconSymbol name="plus" size={14} color="#fff" />
           <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{tr.newAccount}</Text>
@@ -112,6 +125,8 @@ export function AccountsTab({
         </TouchableOpacity>
       </View>
 
+      {header ? <View style={{ marginBottom: 12 }}>{header}</View> : null}
+
       {byCurrency.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: 48 }}>
           <IconSymbol name="banknote" size={32} color={c.accent} />
@@ -119,9 +134,12 @@ export function AccountsTab({
           <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, textAlign: 'center' }}>{tr.noAccountsHint}</Text>
         </View>
       ) : isWide ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-          {cards.map((card, i) => <View key={i} style={{ flexBasis: '48%', flexGrow: 1, minWidth: 0 }}>{card}</View>)}
-        </View>
+        // Колонок стільки, скільки влазить карток валют не вужчих за 300pt:
+        // портрет планшета — 2, ландшафт — 3. Неповний ряд не розтягує
+        // одиноку картку на всю ширину (ResponsiveGrid добиває порожніми).
+        <ResponsiveGrid minItemWidth={300} maxColumns={3}>
+          {cards.map((card, i) => <React.Fragment key={i}>{card}</React.Fragment>)}
+        </ResponsiveGrid>
       ) : cards}
 
       {archived.length > 0 ? (
@@ -143,11 +161,13 @@ export function AccountsTab({
   );
 }
 
+const WIDE_COLUMN = { width: '100%', maxWidth: WIDE_CONTENT_MAX_WIDTH, alignSelf: 'center' } as const;
+
 const st = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: Atlas.radius.xlarge, padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase' },
   row: { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 6 },
   bar: { height: 5, borderRadius: 3, marginTop: 6, overflow: 'hidden' },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: Atlas.radius.medium },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: Atlas.radius.medium },
 });

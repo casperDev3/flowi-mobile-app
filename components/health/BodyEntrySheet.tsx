@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
+import { useWideModal } from '@/components/health/HealthLayout';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ACCENT_WEIGHT, getHealthColors } from '@/utils/healthTheme';
 import { EntryType } from '@/utils/healthUtils';
@@ -34,6 +35,7 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
 }) {
   const c = getHealthColors(isDark);
   const sheetSurface = useSheetSurface();
+  const wm = useWideModal();
   const [vals, setVals] = useState<Record<string, string>>({});
   const canSave = FIELDS.some(field => {
     const value = parseFloat((vals[field.type] ?? '').replace(',', '.'));
@@ -66,10 +68,10 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <Pressable accessible={false} style={s.overlay} onPress={onClose}>
+        <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={onClose}>
           <Pressable
             onPress={e => e.stopPropagation()}
-            style={s.sheetWrap}
+            style={[s.sheetWrap, wm.column]}
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"

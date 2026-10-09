@@ -130,6 +130,7 @@ export default function TabLayout() {
                 name="today"
                 options={{
                     title: tr.tabToday,
+                    tabBarAccessibilityLabel: tr.tabToday,
                     tabBarLabel: tabLabel(tr.tabToday),
                     tabBarIcon: ({color}) => <IconSymbol size={26} name="house.fill" color={color}/>,
                 }}
@@ -138,6 +139,7 @@ export default function TabLayout() {
                 name="index"
                 options={{
                     title: tr.tabTasks,
+                    tabBarAccessibilityLabel: tr.tabTasks,
                     tabBarLabel: tabLabel(tr.tabTasks),
                     tabBarIcon: ({color}) => <IconSymbol size={26} name="checklist" color={color}/>,
                 }}
@@ -146,6 +148,7 @@ export default function TabLayout() {
                 name="explore"
                 options={{
                     title: tr.tabFinance,
+                    tabBarAccessibilityLabel: tr.tabFinance,
                     tabBarLabel: tabLabel(tr.tabFinance),
                     tabBarIcon: ({color}) => <IconSymbol size={26} name="banknote" color={color}/>,
                 }}
@@ -154,6 +157,7 @@ export default function TabLayout() {
                 name="health"
                 options={{
                     title: tr.tabHealth,
+                    tabBarAccessibilityLabel: tr.tabHealth,
                     tabBarLabel: tabLabel(tr.tabHealth),
                     tabBarIcon: ({color}) => <IconSymbol size={26} name="figure.run" color={color}/>,
                 }}
@@ -162,6 +166,7 @@ export default function TabLayout() {
                 name="settings"
                 options={{
                     title: tr.tabOptions,
+                    tabBarAccessibilityLabel: tr.tabOptions,
                     tabBarLabel: tabLabel(tr.tabOptions),
                     // Крапка непрочитаних сповіщень (notifications-module.md §11). Бейдж
                     // сам тримає лічильник живим — на старті й після фону.

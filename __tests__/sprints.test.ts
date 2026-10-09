@@ -391,3 +391,66 @@ describe('поле «Спринт» у формі задачі', () => {
     expect('sprintId' in vanished).toBe(false);
   });
 });
+
+describe('архів спринта (archivedAt) і список екрана Спринтів', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const su = require('@/utils/sprintUtils') as typeof import('@/utils/sprintUtils');
+  const NOW = new Date(2026, 8, 15, 12);
+  const base = (id: string, extra: Record<string, unknown> = {}) =>
+    ({ id, projectId: 'p1', name: id, createdAt: new Date(2026, 0, 1).toISOString(), ...extra }) as import('@/utils/sprintUtils').Sprint;
+  const at = (m: number, d: number) => new Date(2026, m, d).toISOString();
+
+  test('setSprintArchived ставить ISO і саме ВИДАЛЯЄ ключ при поверненні', () => {
+    const archived = su.setSprintArchived(base('a', { closedAt: at(0, 2), extra: 1 }), true, NOW);
+    expect(archived.archivedAt).toBe(NOW.toISOString());
+    expect((archived as any).extra).toBe(1);
+    const back = su.setSprintArchived(archived, false);
+    expect('archivedAt' in back).toBe(false);
+    expect(back.closedAt).toBe(at(0, 2));
+  });
+
+  test('як на вебі: відкритий не архівується, повтор не переставляє дату, reopen знімає архів', () => {
+    const open = base('o');
+    expect(su.setSprintArchived(open, true, NOW)).toBe(open);
+    const archived = su.setSprintArchived(base('a', { closedAt: at(0, 2) }), true, NOW);
+    expect(su.setSprintArchived(archived, true, new Date(2027, 0, 1))).toBe(archived);
+    const reopened = su.setSprintClosed(archived, false);
+    expect('archivedAt' in reopened).toBe(false);
+    expect('closedAt' in reopened).toBe(false);
+  });
+
+  test('sprintStatus: закритий — completed, майбутній старт — planned, решта — active', () => {
+    expect(su.sprintStatus(base('c', { closedAt: at(8, 1) }), NOW)).toBe('completed');
+    expect(su.sprintStatus(base('p', { startDate: at(8, 20), endDate: at(8, 30) }), NOW)).toBe('planned');
+    expect(su.sprintStatus(base('t', { startDate: at(8, 15), endDate: at(8, 30) }), NOW)).toBe('active');
+    expect(su.sprintStatus(base('u'), NOW)).toBe('active');
+  });
+
+  test('filterSortSprints: архівні приховані, фільтр стану, сортування', () => {
+    const list = [
+      base('old', { startDate: at(6, 1), endDate: at(6, 14), closedAt: at(6, 15) }),
+      base('cur', { startDate: at(8, 10), endDate: at(8, 24) }),
+      base('next', { startDate: at(9, 1), endDate: at(9, 14) }),
+      base('arch', { startDate: at(5, 1), endDate: at(5, 14), closedAt: at(5, 15), archivedAt: at(6, 1) }),
+    ];
+    const ids = (opts: Partial<import('@/utils/sprintUtils').SprintListOptions>) =>
+      su.filterSortSprints(list, [], { sort: 'start-desc', status: 'all', showArchived: false, now: NOW, ...opts }).map(s => s.id);
+    expect(ids({})).toEqual(['next', 'cur', 'old']);
+    expect(ids({ showArchived: true })).toEqual(['next', 'cur', 'old', 'arch']);
+    expect(ids({ sort: 'start-asc' })).toEqual(['old', 'cur', 'next']);
+    expect(ids({ sort: 'name' })).toEqual(['cur', 'next', 'old']);
+    expect(ids({ sort: 'progress' })).toEqual(['cur', 'next', 'old']);
+    expect(ids({ status: 'planned' })).toEqual(['next']);
+    expect(ids({ status: 'completed', showArchived: true })).toEqual(['old', 'arch']);
+  });
+
+  test('архівний спринт не пропонується в жодному виборі', () => {
+    const open = base('o');
+    const archivedOpen = base('ao', { archivedAt: at(1, 1) });
+    const all = [open, archivedOpen];
+    expect(su.openSprintsForProject(all, 'p1').map(s => s.id)).toEqual(['o']);
+    expect(su.sprintMoveTargets(all, base('x')).map(s => s.id)).toEqual(['o']);
+    // Поточний спринт задачі лишається видимим у полі — інакше поле збрехало б.
+    expect(su.sprintOptionsForTask(all, 'p1', 'ao').map(o => o.id)).toEqual(['o', 'ao']);
+  });
+});

@@ -31,8 +31,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useMotion } from '@/hooks/use-motion';
 import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/shared/MeetingFormSheet';
-import { PressableScale } from '@/components/shared/PressableScale';
-import { SheetModal } from '@/components/shared/SheetModal';
+import { SheetHandle, SheetModal } from '@/components/shared/SheetModal';
 import { SkeletonRow } from '@/components/shared/Skeleton';
 import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -52,8 +51,12 @@ import {
 import { MeetingDetailBody, MeetingDetailHeader } from '@/components/meetings/MeetingDetail';
 import { MeetingProjectChip } from '@/components/meetings/MeetingProjectChip';
 import {isLead,taskRights} from '@/utils/teamwork';
-import { TeamTaskPanel } from '@/components/projects/TeamTaskPanel';
-import { TaskDetailHeader } from '@/components/tasks/TaskDetailHeader';
+import { TeamTaskPanel, hasTeamContext } from '@/components/projects/TeamTaskPanel';
+import { TaskDetailHeader, type TaskDetailTab } from '@/components/tasks/TaskDetailHeader';
+import { TaskCardActivity, TaskCardDetails, TaskCardMain } from '@/components/tasks/card/TaskCardSections';
+import { OptionField, ReminderSheet } from '@/components/tasks/card/fields';
+import { TaskQuickCreate } from '@/components/tasks/card/TaskQuickCreate';
+import { estimateDraft, recurrenceDraft } from '@/components/tasks/card/draftParts';
 import { CommentsSection } from '@/components/shared/CommentsSection';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
@@ -104,43 +107,43 @@ import {
   scopedColumnFor, scopedTaskStatusColumn, subtaskToggleTransition,
 } from '@/utils/taskStatuses';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
+import { reopenColumnId, reopenSubtasks, withReopenInfo } from '@/utils/taskCompletion';
 import { haptic } from '@/utils/haptics';
 import { nextProjectColor } from '@/utils/projectColors';
 import { projectQuickAction } from '@/utils/projectQuickCreate';
 import { applyProjectQuickAction, type ProjectQuickApplyResult } from '@/utils/projectQuickApply';
 import type { Project } from '../projects';
 import { projectRoute } from '@/constants/projectNav';
-import { applyFormSprint, retargetTaskProject, type Sprint } from '@/utils/sprintUtils';
+import { useInPlaceProjectTask } from '@/components/projects/ProjectTaskSheet';
+import { projectTaskUrl } from '@/utils/pushLink';
+import { applyFormSprint, retargetTaskProject, sprintFieldVisible, sprintOptionLabel, sprintOptionsForTask, type Sprint } from '@/utils/sprintUtils';
 import { useResponsive } from '@/hooks/use-responsive';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { useToday } from '@/hooks/use-today';
-import { useCalendarNav } from '@/hooks/use-calendar-nav';
-import { draftEstimatedMinutes, draftRecurrence, editedDraftFields, useTaskEditor } from '@/hooks/use-task-editor';
+import { draftEstimatedMinutes, draftRecurrence, editedDraftFields, taskToDraft, useTaskEditor, type TaskDraft } from '@/hooks/use-task-editor';
 import { useAllProjectMembers, useProjectMembers } from '@/hooks/use-project-members';
 import type { MemberOut } from '@/store/project-team';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { DetailPane } from '@/components/shared/DetailPane';
+import { detailColumnWidthFor } from '@/constants/tokens';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
-import { ElapsedClock } from '@/components/tasks/ElapsedClock';
-import { PickerField, type PickerCreateOption } from '@/components/shared/PickerField';
+import type { PickerCreateOption } from '@/components/shared/PickerField';
 import { TaskHistoryTab, type HistoryEventType } from '@/components/tasks/TaskHistoryTab';
+import { TaskTimerButton } from '@/components/tasks/TaskTimerButton';
 import { TaskTimerTab } from '@/components/tasks/TaskTimerTab';
-import { TaskEditForm } from '@/components/tasks/TaskEditForm';
 import { CalendarGrid } from '@/components/tasks/CalendarGrid';
-import { TaskReminderRow } from '@/components/tasks/TaskReminderRow';
 import { TaskSubtasks } from '@/components/tasks/TaskSubtasks';
-import { TaskCalendarView } from '@/components/tasks/TaskCalendarView';
+import { AddTaskFab, AddTaskHeaderButton, FAB_LIST_CLEARANCE } from '@/components/tasks/AddTaskButton';
+import { TASK_CARD_SHEET_RATIO } from '@/components/tasks/card/primitives';
+import { TasksTodayPane } from '@/components/tasks/TasksTodayPane';
 import { appendHistory, makeHistoryEvent } from '@/utils/taskHistory';
-import { totalSecondsIncludingActive } from '@/utils/taskTimer';
 import { monthGrid } from '@/utils/dateUtils';
-import { initialReminderDraft, resolveReminderMoment } from '@/utils/reminderTime';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
 
-type ViewMode = 'list' | 'calendar';
 
 /**
  * Завдання цього екрана = спільний тип (utils/taskUtils.ts) + поля, які поки
@@ -219,7 +222,14 @@ const EMPTY_MEMBERS_LIST: MemberOut[] = [];
 
 export default function TasksScreen() {
   const tabBarInset = useTabBarInset();
-  const { height, isExpanded, isWide } = useResponsive();
+  const { width, height, isExpanded, isMedium, isWide } = useResponsive();
+  /**
+   * Скільки карток у ряд. Портретний планшет (medium, 600–839): картка
+   * відкривається листом, тож місце праворуч ніщо не займає — список іде у
+   * дві колонки. На expanded праворуч постійна колонка картки, і список
+   * лишається одноколонковим.
+   */
+  const cardColumns = isMedium ? 2 : 1;
   // Деталь стає колонкою лише на expanded (≥840). На medium сайдбар уже
   // займає 232pt, і колонка вийшла б вужчою за 260pt — гірше, ніж на
   // весь екран. Там деталь лишається модалкою.
@@ -260,12 +270,6 @@ export default function TasksScreen() {
     { key: 'newest',    label: tr.sortNewest,    icon: 'arrow.down.circle' },
     { key: 'oldest',    label: tr.sortOldest,    icon: 'arrow.up.circle' },
     { key: 'name',      label: tr.sortAZ,        icon: 'textformat.abc' },
-  ];
-  const DEADLINE_PRESETS = [
-    { label: tr.dateToday,   days: 0 },
-    { label: tr.dateTomorrow, days: 1 },
-    { label: tr.datePlus3,   days: 3 },
-    { label: tr.datePlus7,   days: 7 },
   ];
   const MONTHS_UA = tr.months;
   const WEEKDAYS_SHORT = tr.weekdays;
@@ -327,7 +331,6 @@ export default function TasksScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('active');
   const [sort, setSort] = useState<SortBy>('status');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
   /**
    * Що показує вкладка: денну роботу чи весь список.
    *
@@ -355,10 +358,21 @@ export default function TasksScreen() {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const [showAdd, setShowAdd] = useState(false);
+  /**
+   * «Детальніше» у швидкому створенні: id щойно створеної задачі, чию картку
+   * треба відкрити, щойно аркуш створення зникне (NEW-02: SheetModal ще ~150 мс
+   * тримає себе змонтованим, і друга модалка в тому ж тіку не показалась би).
+   */
+  const [openAfterCreate, setOpenAfterCreate] = useState<string | null>(null);
 
   // Recurrence for add task
 
   const [selected, setSelected] = useState<Task | null>(null);
+  /**
+   * Задача ПРОЄКТУ (з `projectId`) не відкривається в особистому редакторі
+   * (`selected`): її картка — карткою проєкту тут же, аркушем ProjectTaskSheet.
+   */
+  const { openProjectTask, projectTaskSheet } = useInPlaceProjectTask(isDark);
   const [newSubtask, setNewSubtask] = useState('');
   const detailScrollRef = useRef<ScrollView>(null);
 
@@ -366,9 +380,6 @@ export default function TasksScreen() {
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
   const [dateFilter, setDateFilter] = useState<string | null>(null);
-
-  // Calendar view state
-  const [calPopupDate, setCalPopupDate] = useState<Date | null>(null);
 
   // Meetings state
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -390,15 +401,9 @@ export default function TasksScreen() {
   const [editingSubId, setEditingSubId] = useState<string | null>(null);
   const [editingSubText, setEditingSubText] = useState('');
 
-  // Форма редагування завдання — цілісний стан, див. use-task-editor.
-  const editor = useTaskEditor(ACTIVE_COLUMN_ID, today);
   // Створення нового завдання користується тією самою формою й тим самим
   // станом, що й редагування — це той самий набір полів.
   const composer = useTaskEditor(ACTIVE_COLUMN_ID, today);
-  // Учасники проєкту, обраного ПРОСТО ЗАРАЗ у кожній з двох форм (контракт
-  // §4.5) — пікер «Виконавець» у TaskEditForm; порожній список ховає поле.
-  const editorMembers = useProjectMembers(editor.draft.projectId);
-  const composerMembers = useProjectMembers(composer.draft.projectId);
   // Увесь кеш команд одразу (не один проєкт) — картки списку показують
   // завдання з РІЗНИХ проєктів одночасно, підпис виконавця (§4.5) шукається
   // по projectId кожного окремого завдання.
@@ -409,15 +414,14 @@ export default function TasksScreen() {
     return assigneeDisplayName(task.assigneeId, members, user?.id, tr.taskAssigneeMe);
   }, [allProjectMembers, user?.id, tr.taskAssigneeMe]);
 
-  // Reminder picker state (shown inline in detail modal)
-  const [showReminderPicker, setShowReminderPicker] = useState(false);
-  const [reminderPickerTarget, setReminderPickerTarget] = useState<{ taskId: string; subtaskId?: string } | null>(null);
-  const [reminderHours, setReminderHours] = useState('');
-  const [reminderMins, setReminderMins] = useState('');
-  const [reminderDate, setReminderDate] = useState<string | null>(null);
+  // Нагадування ПІДЗАВДАННЯ (з меню «…» рядка). Нагадування самої задачі —
+  // рядок у вкладці «Деталі» зі своїм аркушем.
+  const [subReminder, setSubReminder] = useState<{ taskId: string; subtaskId: string } | null>(null);
 
   // Detail tab + timer display
-  const [detailTab, setDetailTab] = useState<'info' | 'timer' | 'history' | 'comments'>('info');
+  const [detailTab, setDetailTab] = useState<TaskDetailTab>('main');
+  /** Вкладка, з якої відкрити наступну картку (напр. «Команда» для здачі на перевірку). */
+  const pendingDetailTab = useRef<TaskDetailTab | null>(null);
 
   const loadOthers = useCallback(async () => {
     const [p, m, statuses, s] = await Promise.all([
@@ -503,6 +507,10 @@ export default function TasksScreen() {
         : ACTIVE_COLUMN_ID;
       composerReset(statusId, { projectId: projectParam, sprintId: sprintParam || null, ...(deadlineParam ? {deadline:deadlineParam} : {}) });
       setReturnToProject(projectParam);
+    } else if (deadlineParam) {
+      // Створення з «Календаря» без проєкту: день, з якого натиснули «+», —
+      // одразу дедлайном у формі.
+      composerReset(ACTIVE_COLUMN_ID, { deadline: deadlineParam });
     }
     setShowAdd(true);
     router.setParams({ create: '', projectId: '', sprintId: '', statusId: '', deadline:'' });
@@ -512,11 +520,11 @@ export default function TasksScreen() {
   useEffect(() => {
     if (!openParam || !initialized) return;
     const t = tasks.find(x => x.id === openParam);
-    if (t) {
-      setSelected(t);
-      if (t.projectId) setReturnToProject(t.projectId);
-    }
     router.setParams({ open: '' });
+    // Задача проєкту (deep link `ftrackingapp://task/{id}`) — у просторі
+    // ЇЇ проєкту, картка там же; особистий редактор — лише для особистих.
+    if (t?.projectId) router.push(projectTaskUrl(t.projectId, t.id) as never);
+    else if (t) setSelected(t);
     // `tasks` у deps чесно: ефект усе одно виконується один раз — перший же
     // прохід гасить `openParam` через router.setParams, а далі спрацьовує
     // ранній вихід. Було в eslint-disable, який вимикав React Compiler на
@@ -529,12 +537,12 @@ export default function TasksScreen() {
   // назад лишає скрол/стан того екрана як був; `router.replace` — запасний
   // шлях, якщо стека раптом нема (наприклад, deep link).
   useEffect(() => {
-    if (!returnToProject || selected || showAdd) return;
+    if (!returnToProject || selected || showAdd || openAfterCreate) return;
     const target = returnToProject;
     setReturnToProject(null);
     if (router.canGoBack()) router.back();
     else router.replace(projectRoute(target, 'tasks') as never);
-  }, [returnToProject, selected, showAdd, router]);
+  }, [returnToProject, selected, showAdd, openAfterCreate, router]);
 
   // Стор пише 'tasks' повз наш стан: старт таймера дописує історію і рухає
   // колонку, зупинка — додає завершену сесію. Підписка useSyncedList це вже
@@ -582,7 +590,7 @@ export default function TasksScreen() {
   useEffect(() => { storedTaskStatusesRef.current = storedTaskStatuses; }, [storedTaskStatuses]);
 
   // Undo-тост (таб — над таб-баром)
-  const { show: showUndo, element: undoElement } = useUndoToast(true);
+  const { show: showUndo, element: undoElement, visible: undoVisible } = useUndoToast(true);
 
   // Reset detail tab when opening a different task
   // Ключ — саме id, а не об'єкт: інакше будь-яке оновлення задачі (синк,
@@ -591,8 +599,9 @@ export default function TasksScreen() {
   // чесні без eslint-disable, який глушив React Compiler (PERF-2).
   const selectedId = selected?.id;
   useEffect(() => {
-    setDetailTab('info');
-    setShowReminderPicker(false);
+    setDetailTab(pendingDetailTab.current ?? 'main');
+    pendingDetailTab.current = null;
+    setSubReminder(null);
     // Панель деталі одна на задачу й зустріч: відкрита задача витісняє зустріч.
     if (selectedId) setSelectedMeeting(null);
   }, [selectedId]);
@@ -607,13 +616,24 @@ export default function TasksScreen() {
   // Tasks due today (deadline = today) — both done and not done
   // Лише МОЄ (isMyTask): у шапці не має рахуватись робота інших учасників
   // проєктів, якої немає в самому списку нижче.
-  const dueTodayTasks   = tasks.filter(t => t.deadline && new Date(t.deadline).toDateString() === todayStr
-    && (user?.id === undefined || isMyTask(t, user.id, projectRoles)));
-  const doneCount       = dueTodayTasks.filter(t => t.status === 'done').length;
-  const activeCount     = dueTodayTasks.filter(t => t.status === 'active').length;
-  // Efficiency based on subtasks (if task has subtasks, count subtask progress; otherwise count task status)
-  const effTotalUnits   = dueTodayTasks.reduce((acc, t) => acc + (t.subtasks.length > 0 ? t.subtasks.length : 1), 0);
-  const effDoneUnits    = dueTodayTasks.reduce((acc, t) => acc + (t.subtasks.length > 0 ? t.subtasks.filter(s => s.done).length : (t.status === 'done' ? 1 : 0)), 0);
+  // Один memo на всю статистику дня: екран рендериться на кожне натискання
+  // клавіші, а тут — Date + рядок на кожне завдання.
+  const userId = user?.id;
+  const { dueTodayTasks, doneCount, activeCount, effTotalUnits, effDoneUnits, totalSubtasks, doneSubtasks } = useMemo(() => {
+    const due = tasks.filter(t => t.deadline && new Date(t.deadline).toDateString() === todayStr
+      && (userId === undefined || isMyTask(t, userId, projectRoles)));
+    return {
+      dueTodayTasks: due,
+      doneCount: due.filter(t => t.status === 'done').length,
+      activeCount: due.filter(t => t.status === 'active').length,
+      // Efficiency based on subtasks (if task has subtasks, count subtask progress; otherwise count task status)
+      effTotalUnits: due.reduce((acc, t) => acc + (t.subtasks.length > 0 ? t.subtasks.length : 1), 0),
+      effDoneUnits: due.reduce((acc, t) => acc + (t.subtasks.length > 0 ? t.subtasks.filter(s => s.done).length : (t.status === 'done' ? 1 : 0)), 0),
+      // Subtasks of tasks due today
+      totalSubtasks: due.reduce((acc, t) => acc + t.subtasks.length, 0),
+      doneSubtasks: due.reduce((acc, t) => acc + t.subtasks.filter(s => s.done).length, 0),
+    };
+  }, [tasks, todayStr, userId, projectRoles]);
   // Today's meetings — past meetings count as completed units in efficiency
   // Екземпляри повторів теж рахуються — так само, як у секції зустрічей нижче.
   const todayMeetings     = useMemo(() => meetingsOnDate(meetings, today), [meetings, today]);
@@ -624,9 +644,6 @@ export default function TasksScreen() {
   const efficiency = (effTotalUnits + todayMeetings.length) > 0
     ? Math.round(((effDoneUnits + pastMeetingsCount) / (effTotalUnits + todayMeetings.length)) * 100)
     : 0;
-  // Subtasks of tasks due today
-  const totalSubtasks   = dueTodayTasks.reduce((acc, t) => acc + t.subtasks.length, 0);
-  const doneSubtasks    = dueTodayTasks.reduce((acc, t) => acc + t.subtasks.filter(s => s.done).length, 0);
 
   const markedDays = useMemo(() => {
     const set = new Set<string>();
@@ -679,8 +696,8 @@ export default function TasksScreen() {
 
   // Overdue tasks pulled into a dedicated top section (list view, active/all filter only)
   const overdueItems = useMemo(
-    () => overdueForList(filtered, filter, viewMode === 'list'),
-    [filtered, filter, viewMode],
+    () => overdueForList(filtered, filter, true),
+    [filtered, filter],
   );
 
   // For groups we exclude overdue tasks when the overdue section is shown
@@ -710,9 +727,9 @@ export default function TasksScreen() {
   const hasFiltersBesidesSearch = filter !== 'active' || sort !== 'status' || !!dateFilter || !!filterProject || filterPriorities.length > 0;
   const hasActiveFilters = filter !== 'active' || sort !== 'status' || !!dateFilter || !!filterProject || filterPriorities.length > 0 || !!search.trim();
 
-  const addTask = useCallback(() => {
+  const addTask = useCallback((): Task | null => {
     const draft = composer.draft;
-    if (!draft.title.trim()) return;
+    if (!draft.title.trim()) return null;
     const pickedStatus = taskStatuses.find(column => column.id === draft.statusId) ?? taskStatuses[0];
     // Пікер форми пропонує ОСОБИСТІ статуси незалежно від обраного проєкту
     // (§3.7); еквівалент у ЦЬОМУ проєкті — інакше нова задача проєкту
@@ -762,7 +779,29 @@ export default function TasksScreen() {
     composer.reset(ACTIVE_COLUMN_ID);
     setShowAdd(false);
     haptic.success();
+    return created;
   }, [composer, taskStatuses, storedTaskStatuses, today, sprints, setTasks, user, scope, noDeadline, selectScope]);
+
+  /** «Детальніше»: створити задачу й одразу відкрити її повну картку. */
+  const createAndOpen = useCallback(() => {
+    const created = addTask();
+    if (!created) return;
+    // Колонка планшета — не модалка, її можна показати в тому ж тіку.
+    // Задача проєкту — аркушем проєкту, а він, як і модалка, чекає, поки
+    // зникне аркуш створення.
+    if (showDetailColumn && !created.projectId) setSelected(created);
+    else setOpenAfterCreate(created.id);
+  }, [addTask, showDetailColumn]);
+  useEffect(() => {
+    if (!openAfterCreate || showAdd) return;
+    const id = openAfterCreate;
+    const timer = setTimeout(() => {
+      setOpenAfterCreate(null);
+      const created = tasksRef.current.find(t => t.id === id);
+      if (created && !openProjectTask(created)) setSelected(created);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [openAfterCreate, showAdd, openProjectTask]);
 
   const deleteTask = useCallback((id: string, title?: string) => {
     const taskToDelete = tasksRef.current.find(t => t.id === id);
@@ -818,13 +857,14 @@ export default function TasksScreen() {
       if (t.id !== id) return t;
       if (scopedTaskStatusColumn(t, storedTaskStatusesRef.current).id === column.id && t.kanbanColumnId === column.id) return t;
       const status: Status = column.isDone ? 'done' : 'active';
+      const history = appendHistory(t, column.isDone ? 'done' : 'active', column.name);
       return closeSubtasksOnDone(t, {
         ...t,
         status,
         kanbanColumnId: column.id,
         // Назва колонки в нотатці: інакше в історії видно лише «активне», без
         // того, КУДИ саме перенесли завдання.
-        history: appendHistory(t, column.isDone ? 'done' : 'active', column.name),
+        history: column.isDone ? withReopenInfo(history, t) : history,
       });
     }));
   }, [getTimerForTask, setTasks]);
@@ -870,7 +910,7 @@ export default function TasksScreen() {
     // Contract §4.1: глядач не відмічає проєктну задачу готовою.
     if (prevTask?.projectId) {
       if(!taskRights(prevTask,projectRoles[prevTask.projectId]??'owner',String(user?.id??'')).execute)return;
-      if(prevTask.reviewRequired || prevTask.resultRequirements?.length){setSelected(prevTask);return;}
+      if(prevTask.reviewRequired || prevTask.resultRequirements?.length){openProjectTask(prevTask,'team');return;}
     }
     haptic.light();
     const becomingDone = prevTask?.status === 'active';
@@ -882,15 +922,20 @@ export default function TasksScreen() {
       // ставив особистий status-active/status-done, і задача проєкту після
       // відмітки «готово» лишалась у своїй дошці в колонці «todo» назавжди
       // (review finding: «quick-toggle changes status but not kanbanColumnId»).
-      const kanbanColumnId = scopedColumnFor(storedTaskStatuses, t.projectId, status === 'done' ? 'done' : 'todo')?.id
+      const fallbackColumnId = scopedColumnFor(storedTaskStatuses, t.projectId, status === 'done' ? 'done' : 'todo')?.id
         ?? (status === 'done' ? DONE_COLUMN_ID : ACTIVE_COLUMN_ID);
+      // Зняття «готово» повертає задачу туди, звідки її завершили, і
+      // відкриває лише ті підзавдання, що були відкриті (utils/taskCompletion.ts).
+      const kanbanColumnId = status === 'done'
+        ? fallbackColumnId
+        : reopenColumnId(t, mergeTaskStatusColumns(storedTaskStatuses, t.projectId), fallbackColumnId) ?? fallbackColumnId;
       const histType: HistoryEventType = status === 'done' ? 'done' : 'active';
       // timeEntries тут не чіпаємо: завершену сесію допише стор при зупинці —
       // він єдиний знає, коли вона почалась.
       return {
         ...t, status, kanbanColumnId,
-        subtasks: t.subtasks.map(s => ({ ...s, done: status === 'done' })),
-        history: appendHistory(t, histType),
+        subtasks: status === 'done' ? t.subtasks.map(s => ({ ...s, done: true })) : reopenSubtasks(t),
+        history: status === 'done' ? withReopenInfo(appendHistory(t, histType), t) : appendHistory(t, histType),
       };
     };
 
@@ -948,7 +993,7 @@ export default function TasksScreen() {
         setSelected(prev => prev?.id === id ? restore(prev) : prev);
       });
     }
-  }, [showUndo, tr.taskMarkedDone, getTimerForTask, setTasks, storedTaskStatuses, projectRoles, user?.id]);
+  }, [showUndo, tr.taskMarkedDone, getTimerForTask, setTasks, storedTaskStatuses, projectRoles, user?.id, openProjectTask]);
 
   const addSubtask = useCallback((taskId: string) => {
     if (!newSubtask.trim()) return;
@@ -1038,14 +1083,6 @@ export default function TasksScreen() {
     setEditingSubId(null);
   }, [setTasks]);
 
-  const updateTaskProject = useCallback((taskId: string, projectId: string | null) => {
-    // retargetTaskProject, а не просто підміна поля: разом із проєктом задача
-    // виходить зі спринта, бо спринт належав старому проєкту.
-    const patch = (t: Task): Task => t.id !== taskId ? t : retargetTaskProject(t, projectId ?? undefined);
-    setTasks(p => p.map(patch));
-    setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-  }, [setTasks]);
-
   // Стабільні посилання: інакше React.memo на картках нічого не дає.
   const sections = useMemo(
     // key, а не позиція в масиві: групи зʼявляються й зникають разом зі своїм
@@ -1053,11 +1090,13 @@ export default function TasksScreen() {
     // кожній зміні складу.
     // Секція показує не більше TASK_GROUP_LIMIT завдань; решту відкриває
     // «Всі (N)» у футері секції — окремий екран лише цієї групи.
+    // Елемент секції — РЯД карток (1 на телефоні/expanded, 2 на medium):
+    // SectionList сам по собі колонок не вміє.
     () => groups.map(group => {
       const { visible, total } = limitGroupTasks(group.tasks);
-      return { key: group.key, title: group.label, data: visible, total };
+      return { key: group.key, title: group.label, data: chunkRows(visible, cardColumns), total };
     }),
-    [groups],
+    [groups, cardColumns],
   );
   const overdueLimited = useMemo(() => limitGroupTasks(overdueItems), [overdueItems]);
 
@@ -1223,28 +1262,37 @@ export default function TasksScreen() {
     [projects, tr, quickCreateProject],
   );
 
-  const handleSelectTask = useCallback((task: Task) => setSelected(task), []);
+  const handleSelectTask = useCallback((task: Task) => {
+    if (!openProjectTask(task)) setSelected(task);
+  }, [openProjectTask]);
+  /** Єдина точка «додати завдання» на екрані: FAB (телефон) / кнопка в шапці (планшет). */
+  const openAddTask = useCallback(() => setShowAdd(true), []);
   const handleToggleTask = useCallback((task: Task) => toggleTask(task.id), [toggleTask]);
 
-  const saveTaskEdit = useCallback(() => {
-    if (!editor.draft.title.trim() || !selected) return;
-    const draft = editor.draft;
-    // Лише поля, які людина змінила в цій формі: поки форма була відкрита,
-    // завдання могли змінити деінде (веб, інший пристрій), і список уже показує
-    // ті зміни. Незмінене поле форми — це старе значення, писати його назад
-    // означало б відкотити чужу правку.
-    const edited = editedDraftFields(editor.initial, draft);
+  /**
+   * Застосувати правку картки. Картка править на місці, по одному полю, але
+   * правила запису ті самі, що були у формі: проєкт тягне за собою спринт,
+   * колонку й виконавця, статус — еквівалент у ВЛАСНОМУ проєкті, done —
+   * зупинку таймера. Тому правка йде через чернетку: `initial` — задача як є,
+   * `draft` — з однією зміною, і editedDraftFields бачить рівно її. Пишуться
+   * лише змінені поля — паралельна правка з вебу іншого поля не відкочується.
+   */
+  const applyDraftEdit = useCallback((taskId: string, initial: TaskDraft, draft: TaskDraft) => {
+    const edited = editedDraftFields(initial, draft);
+    if (edited.size === 0) return;
+    // Порожня назва не пишеться: задача без назви в списку — дірка.
+    if (edited.has('title') && !draft.title.trim()) return;
     const estimatedMinutes = draftEstimatedMinutes(draft);
     const recurrence = draftRecurrence(draft);
     const column = taskStatuses.find(item => item.id === draft.statusId) ?? taskStatuses[0];
     // Вибір done-статусу в редакторі — теж завершення завдання, і таймер на
     // ньому далі йти не має.
-    if (edited.has('status') && column.isDone && getTimerForTask(selected.id)) {
-      pendingTimerStops.current.push(selected.id);
+    if (edited.has('status') && column.isDone && getTimerForTask(taskId)) {
+      pendingTimerStops.current.push(taskId);
     }
 
     const patch = (t: Task): Task => {
-      if (t.id !== selected.id) return t;
+      if (t.id !== taskId) return t;
       // Спринт зникає разом зі зміною проєкту — див. retargetTaskProject.
       // Проєкт застосовується разом з рештою форми, а не миттєво при виборі:
       // інакше «Скасувати» повертало б усе, крім нього.
@@ -1294,36 +1342,37 @@ export default function TasksScreen() {
       return closeSubtasksOnDone(t, next);
     };
     setTasks(p => p.map(patch));
-    setSelected(prev => prev?.id === selected.id ? patch(prev) : prev);
-    editor.finish();
-    // Чернетка тепер один об'єкт, тож і залежність одна замість тринадцяти.
-  }, [editor, selected, taskStatuses, storedTaskStatuses, getTimerForTask, sprints, setTasks, user]);
+    setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
+  }, [taskStatuses, storedTaskStatuses, getTimerForTask, sprints, setTasks, user]);
 
-  const openReminderPicker = useCallback((taskId: string, subtaskId?: string) => {
-    const task = tasks.find(t => t.id === taskId);
+  /** Одне поле картки → правка через чернетку (див. applyDraftEdit). */
+  const editTaskFields = useCallback((taskId: string, part: Partial<TaskDraft>) => {
+    const task = tasksRef.current.find(t => t.id === taskId);
     if (!task) return;
-    const existing = subtaskId
-      ? task.subtasks.find(s => s.id === subtaskId)?.reminderAt
-      : task.reminderAt;
-    const draft = initialReminderDraft(existing);
-    setReminderHours(draft.hours);
-    setReminderMins(draft.mins);
-    setReminderDate(draft.date);
-    setReminderPickerTarget({ taskId, subtaskId });
-    setShowReminderPicker(true);
-  }, [tasks]);
+    // Contract §4.1: глядач не редагує проєктну задачу — і тут, а не лише в UI.
+    if (!canEditProjectItem(task.projectId, projectRoles)) return;
+    const initial = taskToDraft(task, personalDisplayColumn(task, storedTaskStatusesRef.current).id);
+    applyDraftEdit(taskId, initial, { ...initial, ...part });
+  }, [applyDraftEdit, projectRoles]);
 
-  const saveReminder = useCallback(async () => {
-    if (!reminderPickerTarget) return;
-    const { taskId, subtaskId } = reminderPickerTarget;
-    const base = resolveReminderMoment({ date: reminderDate, hours: reminderHours, mins: reminderMins });
-    const isoDate = base.toISOString();
-    const task = tasks.find(t => t.id === taskId);
+  /** Поля поза чернеткою (дата початку) — прямий запис з подією історії. */
+  const patchTaskDirect = useCallback((taskId: string, fields: Partial<Task>) => {
+    const task = tasksRef.current.find(t => t.id === taskId);
+    if (!task || !canEditProjectItem(task.projectId, projectRoles)) return;
+    const patch = (t: Task): Task => t.id !== taskId ? t : { ...t, ...fields, history: appendHistory(t, 'edited') };
+    setTasks(p => p.map(patch));
+    setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
+  }, [projectRoles, setTasks]);
+
+  /** Поставити нагадування задачі або підзавдання на конкретну мить. */
+  const setTaskReminder = useCallback(async (taskId: string, subtaskId: string | undefined, moment: Date) => {
+    const task = tasksRef.current.find(t => t.id === taskId);
     if (!task) return;
+    const isoDate = moment.toISOString();
     const name = subtaskId
       ? task.subtasks.find(s => s.id === subtaskId)?.title ?? task.title
       : task.title;
-    await scheduleReminder({ type: subtaskId ? 'subtask' : 'task', taskId, subtaskId, title: name }, base);
+    await scheduleReminder({ type: subtaskId ? 'subtask' : 'task', taskId, subtaskId, title: name }, moment);
     const patch = (t: Task): Task => {
       if (t.id !== taskId) return t;
       if (subtaskId) {
@@ -1333,9 +1382,7 @@ export default function TasksScreen() {
     };
     setTasks(p => p.map(patch));
     setSelected(prev => prev?.id === taskId ? patch(prev) : prev);
-    setShowReminderPicker(false);
-    setReminderPickerTarget(null);
-  }, [reminderPickerTarget, reminderHours, reminderMins, reminderDate, tasks, setTasks]);
+  }, [setTasks]);
 
   const removeReminder = useCallback(async (taskId: string, subtaskId?: string) => {
     await cancelReminder(taskId, subtaskId);
@@ -1357,13 +1404,13 @@ export default function TasksScreen() {
       { text: tr.subtaskDuplicate, onPress: () => duplicateSubtask(taskId, sub) },
       ...(idx > 0 ? [{ text: lang === 'uk' ? 'Перемістити вгору' : 'Move up', onPress: () => moveSubtask(taskId, sub.id, 'up') }] : []),
       ...(idx < total - 1 ? [{ text: lang === 'uk' ? 'Перемістити вниз' : 'Move down', onPress: () => moveSubtask(taskId, sub.id, 'down') }] : []),
-      { text: sub.reminderAt ? `Нагадування: ${new Date(sub.reminderAt).toLocaleString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : tr.reminderDate, onPress: () => openReminderPicker(taskId, sub.id) },
+      { text: sub.reminderAt ? `${tr.reminderAtLabel}: ${new Date(sub.reminderAt).toLocaleString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : tr.reminderDate, onPress: () => setSubReminder({ taskId, subtaskId: sub.id }) },
       ...(sub.reminderAt ? [{ text: lang === 'uk' ? 'Видалити нагадування' : 'Delete reminder', onPress: () => removeReminder(taskId, sub.id) }] : []),
       { text: tr.delete, style: 'destructive' as const, onPress: () => deleteSubtask(taskId, sub.id) },
       { text: tr.cancel, style: 'cancel' as const },
     ];
     Alert.alert(sub.title, undefined, buttons);
-  }, [duplicateSubtask, moveSubtask, deleteSubtask, openReminderPicker, removeReminder, tr, lang]);
+  }, [duplicateSubtask, moveSubtask, deleteSubtask, removeReminder, tr, lang]);
 
   const startTimer = useCallback(() => {
     if (!selected) return;
@@ -1415,36 +1462,10 @@ export default function TasksScreen() {
   // Три календарі — фільтр, дедлайн нового завдання, дедлайн у редагуванні —
   // будували сітку місяця трьома однаковими копіями. Тепер monthGrid.
   const calWeeks    = useMemo(() => monthGrid(calYear, calMonth), [calYear, calMonth]);
-  const dlWeeks     = useMemo(() => monthGrid(composer.calYear, composer.calMonth), [composer.calYear, composer.calMonth]);
-  const editDlWeeks = useMemo(() => monthGrid(editor.calYear, editor.calMonth), [editor.calYear, editor.calMonth]);
 
-  // ─── Календар ─────────────────────────────────────────────────────────────
-  const calendarLabels = useMemo(
-    () => ({ locale, months: MONTHS_UA, quarters: tr.quarters }),
-    [locale, MONTHS_UA, tr.quarters],
-  );
-  const cal = useCalendarNav(calendarLabels);
-
-  const tasksByDate = useMemo(() => {
-    const map: Record<string, Task[]> = {};
-    tasks.forEach(t => {
-      if (!t.deadline) return;
-      const key = new Date(t.deadline).toDateString();
-      if (!map[key]) map[key] = [];
-      map[key].push(t);
-    });
-    return map;
-  }, [tasks]);
-
-  // ─── Meetings computed ──────────────────────────────────────────────────────
-  const meetingsByDate = useMemo(() => {
-    const map: Record<string, Meeting[]> = {};
-    meetings.forEach(m => {
-      if (!map[m.date]) map[m.date] = [];
-      map[m.date].push(m);
-    });
-    return map;
-  }, [meetings]);
+  // Календаря на цьому екрані більше немає (рішення власника, п. 1): місяць
+  // із дедлайнами, зустрічами й спринтами — окремий екран /calendar, сюди
+  // веде кнопка в шапці.
 
   // Лише сьогоднішні: завтрашні події тут відволікали від того, що треба
   // зробити зараз. Повний список — на екрані зустрічей.
@@ -1460,12 +1481,6 @@ export default function TasksScreen() {
     : todayMeetings2.slice(0, TODAY_MEETINGS_PREVIEW);
 
   // ─── Meeting CRUD ────────────────────────────────────────────────────────────
-  const openAddMeeting = useCallback((presetDate?: string) => {
-    setMeetingFormInitial(null);
-    setMeetingFormPreset(presetDate);
-    setShowMeetingForm(true);
-  }, []);
-
   const openEditMeeting = useCallback((m: Meeting) => {
     setMeetingFormInitial({ id: m.id, title: m.title, date: m.date, time: m.time,
       durationMinutes: m.durationMinutes, location: m.location, link: m.link,
@@ -1511,190 +1526,166 @@ export default function TasksScreen() {
   // відмічає — ✎/✕-кнопки й чекбокс у деталі ховаються (review finding:
   // спільний редактор `(tabs)/index.tsx` раніше не питав роль ВЗАГАЛІ, тож
   // виконував будь-яку дію ще ДО того, як сервер устигав її відхилити).
-  const canEditSelectedTask = !selectedTask?.projectId || taskRights(selectedTask,selectedTaskRole,String(user?.id??'')).execute;
+  const selectedRights = selectedTask?.projectId ? taskRights(selectedTask, selectedTaskRole, String(user?.id ?? '')) : null;
+  const canEditSelectedTask = !selectedRights || selectedRights.execute;
+  // Планування (назва, опис, пріоритет, дедлайн, проєкт, повторення) — лід або
+  // автор-виконавець (utils/teamwork.ts taskRights.plan); особиста задача — завжди.
+  const canPlanSelectedTask = !selectedRights || selectedRights.plan;
+  // Вкладка «Команда» — лише задача проєкту з учасниками (або вже з командними даними).
+  const selectedMembers = useProjectMembers(selectedTask?.projectId);
+  const showTeamTab = !!selectedTask && hasTeamContext(selectedTask, selectedMembers.length);
+  const effectiveDetailTab: TaskDetailTab = detailTab === 'team' && !showTeamTab ? 'main' : detailTab;
 
-  // Вміст деталі. Однаковий для модалки й для колонки — різниться
-  // лише обрамлення, див. DetailPane.
+  // Спринт задачі проєкту: у «Команді», а для соло-проєкту зі спринтами — у «Деталях».
+  const selectedSprintSlot = selectedTask?.projectId
+    && sprintFieldVisible(sprints, selectedTask.projectId, selectedTask.sprintId ?? null) ? (
+      <OptionField
+        icon="flag.checkered"
+        label={tr.sprintField}
+        options={sprintOptionsForTask(sprints, selectedTask.projectId, selectedTask.sprintId ?? null).map(option => ({
+          id: option.id,
+          label: sprintOptionLabel(option, { closedSuffix: tr.sprintClosedSuffix, foreign: tr.sprintForeignProject }),
+          icon: 'flag' as const,
+        }))}
+        value={selectedTask.sprintId ?? null}
+        onChange={id => editTaskFields(selectedTask.id, { sprintId: id })}
+        emptyOption={{ label: tr.sprintBacklog, icon: 'tray' }}
+        disabled={!canPlanSelectedTask}
+        colors={c}
+        isDark={isDark}
+      />
+    ) : null;
+
+  // Липкий низ картки (DetailPane footer, P2 аудиту 2026-10): «Видалити /
+  // Виконано» під прокруткою, а не в її кінці, де лист різав їх навпіл.
+  const detailFooter = selectedTask && canEditSelectedTask && (!selectedTask.projectId || isLead(selectedTaskRole)) ? (
+          // Contract §4.1: глядач читає, але не видаляє/не відмічає — кнопок просто немає.
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => deleteTask(selectedTask.id, selectedTask.title)}
+              accessibilityRole="button"
+              style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
+              <IconSymbol name="trash" size={15} color="#EF4444" />
+              <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => toggleTask(selectedTask.id)}
+              accessibilityRole="button"
+              style={[s.btn, { flex: 2, backgroundColor: selectedTask.status === 'done' ? '#374151' : c.accent }]}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>{selectedTask.status === 'done' ? tr.restore : tr.completed}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null;
+
+  // Вміст картки. Однаковий для модалки й для колонки — різниться лише
+  // обрамлення, див. DetailPane. Окремого режиму редагування немає: кожне поле
+  // — рядок, що відкриває свій аркуш і пише одразу (editTaskFields).
   const detailBody = selectedTask ? (
-    <>
-                    {/* ─── Timer Tab ─── */}
-                    {!editor.editing && detailTab === 'timer' && (
-                      <TaskTimerTab
-                        task={selectedTask}
-                        running={isTimerRunning}
-                        activeStartedAt={activeTimer?.startedAt}
-                        onStart={startTimer}
-                        onStop={stopTimer}
-                        colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
-                        tr={tr}
-                        locale={locale}
-                        fmtClock={formatClock}
-                        fmtDur={fmtDurLocal}
-                      />
-                    )}
-
-                    {/* ─── History Tab ─── */}
-                    {!editor.editing && detailTab === 'history' && (
-                      <TaskHistoryTab
-                        events={selectedTask.history ?? []}
-                        textColor={c.text}
-                        subColor={c.sub}
-                        tr={tr}
-                        locale={locale}
-                      />
-                    )}
-
-                    {/* ─── Comments Tab (contract §4.4) ─── */}
-                    {!editor.editing && detailTab === 'comments' && selectedTask.projectId && (
-                      <CommentsSection
-                        projectId={selectedTask.projectId}
-                        targetType="task"
-                        targetId={selectedTask.id}
-                        isOwner={selectedTaskRole === 'owner'}
-                        currentUserId={user?.id ? String(user.id) : null}
-                        colors={c}
-                        isDark={isDark}
-                        locale={locale}
-                        tr={tr}
-                      />
-                    )}
-
-                    {editor.editing ? (
-                      <TaskEditForm
-                        submitLabel={tr.save}
-                        editor={editor}
-                        taskStatuses={taskStatuses}
-                        pickableProjects={pickableProjects}
-                        projects={projects}
-                        projectCreateOption={projectCreateOption(id => editor.patch({ projectId: id, sprintId: null }))}
-                        sprints={sprints}
-                        members={editorMembers}
-                        myUserId={user?.id}
-                        deadlineWeeks={editDlWeeks}
-                        months={MONTHS_UA}
-                        weekdays={WEEKDAYS_SHORT}
-                        deadlinePresets={DEADLINE_PRESETS}
-                        today={today}
-                        onSave={saveTaskEdit}
-                        onCancel={editor.finish}
-                        colors={c}
-                        isDark={isDark}
-                        tr={tr}
-                        locale={locale}
-                      />
-                    ) : detailTab === 'info' ? (
-                    <>
-                    {selectedTask.projectId && <TeamTaskPanel task={selectedTask} role={selectedTaskRole}/>}
-                    {selectedTask.description ? <Text style={[s.detailDesc, { color: c.sub }]}>{selectedTask.description}</Text> : null}
-
-                    {/* Статус і проєкт — однакове поле вибору: обидва
-                        відкривають аркуш зі списком. Раніше тут стояли два
-                        різні способи вибирати поруч — розсип чипів і
-                        інлайн-список, що розсовував вміст.
-                        Різниця лише в пошуку: статусів скінченна жменя, а
-                        проєкти накопичуються роками, тож у них пошук стоїть
-                        завжди (alwaysSearch), а не з шостого рядка. */}
-                    <PickerField
-                      label={tr.status}
-                      icon="rectangle.3.group"
-                      options={statusOptions}
-                      value={personalDisplayColumn(selectedTask, storedTaskStatuses).id}
-                      onSelect={id => { if (id) setTaskColumn(selectedTask.id, id); }}
-                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
-                      isDark={isDark}
-                      tr={tr}
-                    />
-
-                    {/* Meta badges */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 2 }}>
-                      <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                        <IconSymbol name="calendar" size={11} color={c.sub} />
-                        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '500', marginLeft: 4 }}>
-                          {new Date(selectedTask.createdAt).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
-                        </Text>
-                      </View>
-                      {selectedTask.deadline && (
-                        <View style={[s.badge, { backgroundColor: isOverdue(selectedTask) ? '#EF444420' : c.dim, borderColor: isOverdue(selectedTask) ? '#EF444440' : c.border }]}>
-                          <IconSymbol name="flag" size={11} color={isOverdue(selectedTask) ? '#EF4444' : c.sub} />
-                          <Text style={{ color: isOverdue(selectedTask) ? '#EF4444' : c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                            Дедлайн: {new Date(selectedTask.deadline).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long' })}
-                          </Text>
-                        </View>
-                      )}
-                      {selectedTask.estimatedMinutes && (
-                        <View style={[s.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
-                          <IconSymbol name="timer" size={11} color={c.sub} />
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                            {selectedTask.estimatedMinutes >= 60
-                              ? `${Math.floor(selectedTask.estimatedMinutes / 60)}г ${selectedTask.estimatedMinutes % 60 > 0 ? `${selectedTask.estimatedMinutes % 60}хв` : ''}`
-                              : `${selectedTask.estimatedMinutes}хв`}
-                          </Text>
-                        </View>
-                      )}
-                      {selectedTask.recurrence && (
-                        <View style={[s.badge, { backgroundColor: c.accent + '15', borderColor: c.accent + '35' }]}>
-                          <IconSymbol name="repeat" size={11} color={c.accent} />
-                          <Text style={{ color: c.accent, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
-                            {selectedTask.recurrence.freq === 'daily' ? 'Щодня' :
-                             selectedTask.recurrence.freq === 'weekly' ? 'Щотижня' :
-                             selectedTask.recurrence.freq === 'monthly' ? 'Щомісяця' : 'Щороку'}
-                            {selectedTask.recurrence.interval > 1 ? ` ×${selectedTask.recurrence.interval}` : ''}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Reminder row */}
-                    <TaskReminderRow
-                      reminderAt={selectedTask.reminderAt}
-                      open={showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId}
-                      draft={{ date: reminderDate, hours: reminderHours, mins: reminderMins }}
-                      onToggleOpen={() => {
-                        if (showReminderPicker && reminderPickerTarget?.taskId === selectedTask.id && !reminderPickerTarget.subtaskId) {
-                          setShowReminderPicker(false);
-                        } else {
-                          openReminderPicker(selectedTask.id);
-                        }
-                      }}
-                      onChangeDraft={part => {
-                        if (part.date !== undefined) setReminderDate(part.date);
-                        if (part.hours !== undefined) setReminderHours(part.hours);
-                        if (part.mins !== undefined) setReminderMins(part.mins);
-                      }}
-                      onSave={saveReminder}
-                      onRemove={() => removeReminder(selectedTask.id)}
-                      onCancel={() => setShowReminderPicker(false)}
-                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
-                      tr={tr}
-                      locale={locale}
-                    />
-
-                    {/* Поле показується ЗАВЖДИ, навіть коли живих проєктів
-                        немає. Раніше воно ховалося за `pickableProjects.length > 0`,
-                        і в порожньому застосунку перший проєкт із деталі задачі
-                        завести було нічим — а саме тут його найчастіше й
-                        заводять. */}
-                    <PickerField
-                      label={lang === 'uk' ? 'Проєкт' : 'Project'}
-                      icon="folder"
-                      options={projectOptions}
-                      value={selectedTask.projectId ?? null}
-                      onSelect={id => updateTaskProject(selectedTask.id, id)}
-                      emptyOption={{ label: tr.noProject }}
-                      // Підпис шукається в ПОВНОМУ списку, а не в звуженому:
-                      // проєкт задачі могли заархівувати вже після того, як
-                      // її туди поклали, і без цього поле показувало б
-                      // «Без проєкту» на задачі, у якої проєкт є.
-                      selectedLabel={
-                        projects.find(p => p.id === selectedTask.projectId)?.name ?? null
-                      }
-                      alwaysSearch
-                      createOption={projectCreateOption(id => updateTaskProject(selectedTask.id, id))}
-                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
-                      isDark={isDark}
-                      tr={tr}
-                    />
-
+    effectiveDetailTab === 'details' ? (
+      <TaskCardDetails
+        // Ключ на задачу: недописаний опис комітиться при розмонтуванні у
+        // СВОЮ задачу, а не в ту, яку щойно вибрали в списку (планшет).
+        key={selectedTask.id}
+        description={selectedTask.description ?? ''}
+        onDescription={text => editTaskFields(selectedTask.id, { desc: text })}
+        estimate={selectedTask.estimatedMinutes}
+        onEstimate={minutes => editTaskFields(selectedTask.id, estimateDraft(minutes))}
+        startDate={selectedTask.startDate}
+        onStartDate={iso => patchTaskDirect(selectedTask.id, { startDate: iso ?? undefined })}
+        recurrence={selectedTask.recurrence}
+        onRecurrence={rule => editTaskFields(selectedTask.id, recurrenceDraft(rule))}
+        reminderAt={selectedTask.reminderAt}
+        onSetReminder={moment => { void setTaskReminder(selectedTask.id, undefined, moment); }}
+        onRemoveReminder={() => { void removeReminder(selectedTask.id); }}
+        createdAt={selectedTask.createdAt}
+        hasDeadline={!!selectedTask.deadline}
+        sprintSlot={showTeamTab ? null : selectedSprintSlot}
+        canExecute={canEditSelectedTask}
+        canPlan={canPlanSelectedTask}
+        today={today}
+        colors={c}
+        isDark={isDark}
+        locale={locale}
+      />
+    ) : effectiveDetailTab === 'team' && selectedTask.projectId ? (
+      <TeamTaskPanel
+        key={selectedTask.id}
+        task={selectedTask}
+        role={selectedTaskRole}
+        sprintSlot={selectedSprintSlot}
+        colors={c}
+        isDark={isDark}
+      />
+    ) : effectiveDetailTab === 'activity' ? (
+      <TaskCardActivity
+        colors={c}
+        timerSlot={
+          <TaskTimerTab
+            task={selectedTask}
+            running={isTimerRunning}
+            activeStartedAt={activeTimer?.startedAt}
+            onStart={startTimer}
+            onStop={stopTimer}
+            colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim }}
+            tr={tr}
+            locale={locale}
+            fmtClock={formatClock}
+            fmtDur={fmtDurLocal}
+          />
+        }
+        historySlot={
+          <TaskHistoryTab
+            events={selectedTask.history ?? []}
+            textColor={c.text}
+            subColor={c.sub}
+            tr={tr}
+            locale={locale}
+          />
+        }
+        // Коментарі (contract §4.4) — лише задача проєкту.
+        commentsSlot={selectedTask.projectId ? (
+          <CommentsSection
+            projectId={selectedTask.projectId}
+            targetType="task"
+            targetId={selectedTask.id}
+            isOwner={selectedTaskRole === 'owner'}
+            currentUserId={user?.id ? String(user.id) : null}
+            colors={c}
+            isDark={isDark}
+            locale={locale}
+            tr={tr}
+          />
+        ) : undefined}
+      />
+    ) : (
+      <TaskCardMain
+        status={{
+          options: statusOptions,
+          value: personalDisplayColumn(selectedTask, storedTaskStatuses).id,
+          onChange: id => setTaskColumn(selectedTask.id, id),
+        }}
+        priority={normalizePriority(selectedTask)}
+        onPriority={level => editTaskFields(selectedTask.id, { priorityLevel: level })}
+        deadline={selectedTask.deadline}
+        overdue={isOverdue(selectedTask)}
+        onDeadline={iso => editTaskFields(selectedTask.id, { deadline: iso })}
+        project={{
+          options: projectOptions,
+          value: selectedTask.projectId ?? null,
+          // Підпис шукається в ПОВНОМУ списку: проєкт могли заархівувати вже
+          // після того, як у нього поклали задачу.
+          selectedLabel: projects.find(p => p.id === selectedTask.projectId)?.name ?? null,
+          onChange: id => editTaskFields(selectedTask.id, { projectId: id, sprintId: null }),
+          createOption: projectCreateOption(id => editTaskFields(selectedTask.id, { projectId: id, sprintId: null })),
+        }}
+        canExecute={canEditSelectedTask}
+        canPlan={canPlanSelectedTask}
+        today={today}
+        colors={c}
+        isDark={isDark}
+        locale={locale}
+        subtasksSlot={
+          <>
                     <TaskSubtasks
                       task={selectedTask}
                       progressPercent={getProgress(selectedTask)}
@@ -1718,90 +1709,36 @@ export default function TasksScreen() {
                       isDark={isDark}
                       tr={tr}
                     />
-
-                    {/* Quick timer launch from info tab */}
-                    {selectedTask.status === 'active' && (
-                      <TouchableOpacity
-                        onPress={() => { setDetailTab('timer'); if (!isTimerRunning) startTimer(); }}
-                        style={[s.btn, { marginTop: 14, backgroundColor: isTimerRunning ? '#6366F120' : '#6366F1EE', borderWidth: isTimerRunning ? 1 : 0, borderColor: '#6366F150' }]}>
-                        <IconSymbol name={isTimerRunning ? 'timer' : 'play.fill'} size={15} color={isTimerRunning ? '#6366F1' : '#fff'} />
-                        {/* Годинник — СУСІД підпису, а не вкладений у нього <Text>.
-                            На iOS вкладений текст не є окремою в'юхою: він згортається
-                            в атрибутований рядок батька, тож перемальовування дочірнього
-                            компонента саме по собі нічого на екрані не змінює — число
-                            оновлювалося б лише тоді, коли перемальовується батьківський
-                            <Text>. Саме так годинник і завмирав на планшеті, де панель
-                            деталі висить постійно й перемальовувати її нема з чого. */}
-                        <Text style={{ color: isTimerRunning ? '#6366F1' : '#fff', fontWeight: '700', marginLeft: 7 }}>
-                          {activeTimer ? `${tr.timerLabel}: ` : tr.startTimerAction}
-                        </Text>
-                        {activeTimer && (
-                          <ElapsedClock
-                            running
-                            seconds={now => totalSecondsIncludingActive(selectedTask, activeTimer.startedAt, now)}
-                            format={formatClock}
-                            style={{ color: '#6366F1', fontWeight: '700' }}
-                          />
-                        )}
-                        {isTimerRunning && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#6366F1', marginLeft: 6 }} />}
-                      </TouchableOpacity>
-                    )}
-
-                    {/* Contract §4.1: глядач читає, але не редагує/видаляє/
-                        відмічає — кнопки просто зникають, а не диз'юнктивно
-                        no-op'ляться (review finding). */}
-                    {canEditSelectedTask && (!selectedTask.projectId || isLead(selectedTaskRole)) && (
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                      <TouchableOpacity
-                        onPress={() => deleteTask(selectedTask.id, selectedTask.title)}
-                        style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
-                        <IconSymbol name="trash" size={15} color="#EF4444" />
-                        <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => toggleTask(selectedTask.id)}
-                        style={[s.btn, { flex: 2, backgroundColor: selectedTask.status === 'done' ? '#374151' : c.accent }]}>
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>{selectedTask.status === 'done' ? tr.restore : tr.completed}</Text>
-                      </TouchableOpacity>
-                    </View>
-                    )}
-                    </>
-                    ) : null}
-    </>
+            <ReminderSheet
+              visible={!!subReminder && subReminder.taskId === selectedTask.id}
+              title={selectedTask.subtasks.find(sub => sub.id === subReminder?.subtaskId)?.title ?? tr.reminderAtLabel}
+              reminderAt={selectedTask.subtasks.find(sub => sub.id === subReminder?.subtaskId)?.reminderAt}
+              onSave={moment => { if (subReminder) void setTaskReminder(subReminder.taskId, subReminder.subtaskId, moment); }}
+              onRemove={() => { if (subReminder) void removeReminder(subReminder.taskId, subReminder.subtaskId); }}
+              onClose={() => setSubReminder(null)}
+              today={today}
+              colors={c}
+              isDark={isDark}
+            />
+          </>
+        }
+      />
+    )
   ) : null;
 
-  // Поточний пріоритет у шапці (P0–P5). Завдання без пріоритету (напр. створені
-  // з деталі проєкту старими збірками) — без бейджа.
-  const selectedPriority = selectedTask ? normalizePriority(selectedTask) : null;
-
-  // Липка шапка деталі: ✎, назва з пріоритетом, ✕ і вкладки стоять поза
-  // прокруткою DetailPane — гортається лише тіло.
   /**
-   * Закриття деталі завдання (× у шапці, бекдроп, свайп).
-   *
-   * Форма правки живе ВСЕРЕДИНІ деталі, тож закриття деталі мовчки викидало
-   * все введене — без жодного попередження, навіть якщо людина переписала
-   * назву. Питаємо лише коли є що втрачати: `editedDraftFields` порівнює
-   * чернетку з тією, з якої почали, тож відкрив-подивився-закрив проходить
-   * без діалогу.
+   * Закриття картки (× у шапці, бекдроп, свайп). Правки картки пишуться
+   * одразу, тож питати «відкинути зміни?» більше нема про що; незбережений
+   * текст у полі, що лишилось у фокусі, поля дописують самі при демонтажі.
    */
   const closeTaskDetail = useCallback((alsoMeeting: boolean) => {
-    const close = () => {
-      setSelected(null);
-      if (alsoMeeting) setSelectedMeeting(null);
-      editor.finish();
-    };
-    // Без відкритої задачі `editing` — лише залишок закритої панелі
-    // (та сама умова, що й у openMeetingView), і питати нема про що.
-    const dirty = editor.editing && !!selected
-      && editedDraftFields(editor.initial, editor.draft).size > 0;
-    if (!dirty) { close(); return; }
-    Alert.alert(tr.discardTaskEditTitle, tr.discardTaskEditMsg, [
-      { text: tr.cancel, style: 'cancel' },
-      { text: tr.discardChanges, style: 'destructive', onPress: close },
-    ]);
-  }, [editor, selected, tr]);
+    setSelected(null);
+    if (alsoMeeting) setSelectedMeeting(null);
+  }, []);
 
+  // Липка шапка картки: назва (правиться тапом), ✕ і вкладки стоять поза
+  // прокруткою DetailPane — гортається лише тіло. Пріоритет — рядок
+  // «Основного», а не бейдж у шапці: другий показ того самого значення.
   const taskDetailHeader = selectedTask ? (
     <TaskDetailHeader
       title={selectedTask.title}
@@ -1816,16 +1753,25 @@ export default function TasksScreen() {
           hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
         />
       }
-      badge={selectedPriority !== null ? <PriorityBadge level={selectedPriority} size="md" /> : null}
-      editing={editor.editing}
-      tab={detailTab}
+      tab={effectiveDetailTab}
       onTabChange={setDetailTab}
+      showTeam={showTeamTab}
       timerRunning={isTimerRunning}
-      onEdit={canEditSelectedTask && (!selectedTask.projectId || isLead(selectedTaskRole)) ? () => editor.begin(selectedTask, personalDisplayColumn(selectedTask, storedTaskStatuses).id) : undefined}
+      // Старт таймера — у шапці під назвою: видно на кожній вкладці.
+      timerSlot={selectedTask.status === 'active' && canEditSelectedTask ? (
+        <TaskTimerButton
+          task={selectedTask}
+          running={isTimerRunning}
+          activeStartedAt={activeTimer?.startedAt}
+          onStart={startTimer}
+          onStop={stopTimer}
+          tr={tr}
+        />
+      ) : null}
+      onRename={canPlanSelectedTask ? title => editTaskFields(selectedTask.id, { title }) : undefined}
       onClose={() => closeTaskDetail(false)}
       onCopy={() => copyTask(selectedTask)}
       showHandle={!showDetailColumn}
-      showComments={!!selectedTask.projectId}
       colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent }}
       tr={tr}
     />
@@ -1855,29 +1801,17 @@ export default function TasksScreen() {
     const target = { origId: orig.id, date: mtg.date };
     const open = () => {
       setSelected(null);
-      editor.finish();
       setSelectedMeeting(target);
     };
-    // На планшеті колонка деталі може бути в режимі редагування задачі, а
-    // список зустрічей лишається доступним. Мовчки викинути введене людиною
-    // не можна — питаємо. (Без відкритої задачі editing — лише залишок
-    // закритої панелі, і питати нема про що.)
-    const guarded = () => {
-      if (!(editor.editing && selected)) { open(); return; }
-      Alert.alert(tr.discardTaskEditTitle, tr.discardTaskEditMsg, [
-        { text: tr.cancel, style: 'cancel' },
-        { text: tr.discardChanges, style: 'destructive', onPress: open },
-      ]);
-    };
-    if (fromModal && !showDetailColumn) setTimeout(guarded, 300);
-    else guarded();
-  }, [meetings, editor, showDetailColumn, selected, tr]);
+    if (fromModal && !showDetailColumn) setTimeout(open, 300);
+    else open();
+  }, [meetings, showDetailColumn]);
 
   const closeMeetingView = useCallback(() => setSelectedMeeting(null), []);
 
   /**
    * Останній `openMeetingView` — у ref, бо сам колбек міняє ідентичність на
-   * кожну зміну чернетки редактора (він залежить від `editor`).
+   * кожну зміну списку зустрічей.
    *
    * У deps ефекту нижче його ставити не можна: `openMeetingView` викликає
    * `setSelected(null)`, від чого змінюється `selected`, від чого змінюється
@@ -1947,13 +1881,25 @@ export default function TasksScreen() {
   // Стабільні колбеки замість інлайнових стрілок: SectionList інакше
   // перемальовує кожен рядок на кожен рендер екрана (а тік таймера смикає
   // його щосекунди).
-  const renderTaskItem = useCallback(({ item, index }: SectionListRenderItemInfo<Task, TaskSection>) => (
+  /**
+   * Колонка «Сьогодні» (TasksTodayPane): зустрічі дня + графік активності.
+   * Завдань там немає — вони в списку ліворуч. Джерела відстеженого часу —
+   * лише МОЄ (isMyTask), як і статистика над списком; memo — щоб тік таймера
+   * щосекунди не перебудовував графік.
+   */
+  const todayPaneActivity = useMemo(() => ({
+    tasks: user?.id === undefined ? tasks : tasks.filter(t => isMyTask(t, user.id, projectRoles)),
+    meetings,
+    timers: activeTimers,
+  }), [tasks, user?.id, projectRoles, meetings, activeTimers]);
+
+  const renderTaskCard = useCallback((task: Task, index: number) => (
     <TaskListItem
-      task={item}
+      task={task}
       index={index}
-      animate={shouldAnimateTask(item.id)}
+      animate={shouldAnimateTask(task.id)}
       motion={motion}
-      statusColumn={scopedTaskStatusColumn(item, storedTaskStatuses)}
+      statusColumn={scopedTaskStatusColumn(task, storedTaskStatuses)}
       onPress={handleSelectTask}
       onToggle={handleToggleTask}
       onLongPress={showTaskCardMenu}
@@ -1962,17 +1908,23 @@ export default function TasksScreen() {
       projects={projects}
       sprints={sprints}
       overdueLabel={tr.overdueSection}
-      priorityLabel={priorityA11y(item)}
+      priorityLabel={priorityA11y(task)}
       subtasksLabel={tr.subtasks}
-      assigneeLabel={assigneeLabelFor(item)}
+      assigneeLabel={assigneeLabelFor(task)}
     />
   ), [shouldAnimateTask, motion, storedTaskStatuses, handleSelectTask, handleToggleTask, showTaskCardMenu, c, isDark, projects, sprints, tr.overdueSection, tr.subtasks, priorityA11y, assigneeLabelFor]);
 
-  const renderSectionHeader = useCallback(({ section }: { section: SectionListData<Task, TaskSection> }) => (
+  const renderTaskItem = useCallback(({ item, index }: SectionListRenderItemInfo<Task[], TaskSection>) => (
+    <TaskCardRow columns={cardColumns}>
+      {item.map((task, j) => <React.Fragment key={task.id}>{renderTaskCard(task, index * cardColumns + j)}</React.Fragment>)}
+    </TaskCardRow>
+  ), [renderTaskCard, cardColumns]);
+
+  const renderSectionHeader = useCallback(({ section }: { section: SectionListData<Task[], TaskSection> }) => (
     <Text style={[s.groupLabel, { color: c.sub }]}>{section.title}</Text>
   ), [c.sub]);
 
-  const renderSectionFooter = useCallback(({ section }: { section: SectionListData<Task, TaskSection> }) => (
+  const renderSectionFooter = useCallback(({ section }: { section: SectionListData<Task[], TaskSection> }) => (
     section.total > TASK_GROUP_LIMIT ? (
       <GroupShowAllButton
         groupKey={section.key}
@@ -1986,18 +1938,12 @@ export default function TasksScreen() {
     ) : null
   ), [openGroup, c.accent, tr.groupShowAll, tr.groupShowAllA11y]);
 
-  // Шапка спільна для обох режимів; у списку вона стає ListHeaderComponent.
-  const listHeader = (
+  // Пошук, перемикач «Сьогодні / Тиждень / Всі» і чипи активних фільтрів.
+  // На телефоні гортаються разом зі списком (ListHeaderComponent), на
+  // планшеті стоять над списком нерухомо — «липкі» (рішення власника, п. 3):
+  // у двоколонковій розкладці список довгий, а перемикач потрібен завжди.
+  const filterBar = (
     <>
-            {/* Skeleton — перший завантаження */}
-            {!initialized && (
-              <>
-                <SkeletonRow />
-                <SkeletonRow />
-                <SkeletonRow />
-              </>
-            )}
-
             {/* Search bar */}
             <View style={[s.searchBar, { backgroundColor: c.dim, borderColor: c.border }]}>
               <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
@@ -2021,15 +1967,13 @@ export default function TasksScreen() {
 
             {/* Скоуп: денна робота чи весь список. Окремо від чипів фільтрів
                 і завжди на очах — це головний перемикач вкладки, а не одна з
-                прихованих у шторці опцій. У календарі його немає: там місяць,
-                і «сьогодні проти всього» нічого не означає.
+                прихованих у шторці опцій.
 
                 flexWrap + flexShrink нижче: при найбільшому Dynamic Type (AX5)
                 чип «Сьогодні N» виїжджав за правий край екрана, а «Всі N»
                 обрізало рамкою — ряд не мав ні куди перенестись, ні як
                 стиснутись (NAT-06). */}
-            {viewMode === 'list' && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1, backgroundColor: c.dim, borderRadius: Atlas.radius.medium, padding: 3, borderWidth: 1, borderColor: c.border }}>
                   {([
                     { key: 'today' as const, label: tr.today, count: scopeCounts.today },
@@ -2094,7 +2038,6 @@ export default function TasksScreen() {
                   />
                 </HeaderButton>
               </View>
-            )}
 
             {/* Active filter chips.
                 keyboardShouldPersistTaps: ряд стоїть просто під полем пошуку,
@@ -2172,6 +2115,22 @@ export default function TasksScreen() {
               </ScrollView>
             )}
 
+    </>
+  );
+
+  const listHeader = (
+    <>
+            {!isWide && filterBar}
+
+            {/* Skeleton — перший завантаження */}
+            {!initialized && (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            )}
+
             {/* Stats — today (deadline = today) */}
             <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
               <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
@@ -2205,13 +2164,18 @@ export default function TasksScreen() {
               )}
             </View>
 
-            {/* ── Meetings section (list view only) ── */}
-            {viewMode === 'list' && (
+            {/* ── Зустрічі дня. На expanded їх показує колонка «Сьогодні»
+                праворуч (TasksTodayPane) — другий такий самий список зліва
+                був би дублем. ── */}
+            {/* Одне правило створення (рішення власника, п. 3): у групи
+                «Зустрічі» немає власного «+» і інлайн-поля «Додати зустріч» —
+                зустріч додається з Календаря. Порожня група не показується. */}
+            {!showDetailColumn && todayMeetings2.length > 0 && (
               <View style={{ marginBottom: 20 }}>
                 {/* Header */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                   <TouchableOpacity
-                    onPress={() => router.push('/meetings')}
+                    onPress={() => router.push('/calendar' as never)}
                     activeOpacity={0.7}
                     accessibilityRole="button"
                     accessibilityLabel={tr.meetings}
@@ -2227,26 +2191,9 @@ export default function TasksScreen() {
                       <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{todayMeetings2.length}</Text>
                     </View>
                   )}
-                  <TouchableOpacity
-                    onPress={() => openAddMeeting()}
-                    accessibilityRole="button"
-                    accessibilityLabel={tr.addMeeting}
-                    // 30×30 намальовано, 44×44 натискається (Apple HIG 2.5.5):
-                    // +7 з кожного боку. Зміряно на пристрої — тут hitSlop не було.
-                    hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }}
-                    style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#6366F118', borderWidth: 1, borderColor: '#6366F130', alignItems: 'center', justifyContent: 'center' }}>
-                    <IconSymbol name="plus" size={14} color="#6366F1" />
-                  </TouchableOpacity>
                 </View>
 
-                {todayMeetings2.length === 0 ? (
-                  <TouchableOpacity onPress={() => openAddMeeting()} activeOpacity={0.7}
-                    style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 10, gap: 8 }}>
-                    <IconSymbol name="calendar.badge.plus" size={16} color={c.sub} />
-                    <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500' }}>{tr.addMeeting}</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={{ gap: 4 }}>
+                <View style={{ gap: 4 }}>
                     {visibleTodayMeetings.map(({ meeting: mtg, phase }) => {
                       // Фазу рахує orderTodayMeetings — той самий розрахунок,
                       // що задав порядок; друга копія тут розійшлася б із ним.
@@ -2323,7 +2270,6 @@ export default function TasksScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
-                )}
               </View>
             )}
 
@@ -2331,7 +2277,7 @@ export default function TasksScreen() {
                 порожній стан радив би «додати завдання» або «скинути фільтри»,
                 тоді як насправді робота є: вона просто не на сьогодні. Тому
                 тут єдина осмислена дія — показати весь список. */}
-            {todayEmpty && viewMode === 'list' && (
+            {todayEmpty && (
               <View style={{ alignItems: 'center', paddingVertical: 56 }}>
                 <IconSymbol name="checkmark.seal" size={40} color={c.sub} />
                 <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noTasksToday}</Text>
@@ -2376,7 +2322,7 @@ export default function TasksScreen() {
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
-                    onPress={() => setShowAdd(true)}
+                    onPress={openAddTask}
                     accessibilityRole="button"
                     accessibilityLabel={tr.addTask}
                     style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -2388,7 +2334,7 @@ export default function TasksScreen() {
             )}
 
             {/* Overdue section (list view, active/all filter) */}
-            {viewMode === 'list' && overdueItems.length > 0 && (
+            {overdueItems.length > 0 && (
               <View style={{ marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
                   <Text style={[s.groupLabel, { color: '#EF4444', marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
@@ -2397,34 +2343,39 @@ export default function TasksScreen() {
                   </View>
                 </View>
                 <View style={{ gap: 6 }}>
-                  {overdueLimited.visible.map((task, i) => {
-                    const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
-                    const animExiting  = motion.entering(FadeOutUp.duration(150));
-                    const animLayout   = motion.entering(LinearTransition.springify());
-                    return (
-                      <Animated.View
-                        key={task.id}
-                        entering={animEntering}
-                        exiting={animExiting}
-                        layout={animLayout}>
-                        <TaskCompactCard
-                          task={task}
-                          statusColumn={scopedTaskStatusColumn(task, storedTaskStatuses)}
-                          onPress={handleSelectTask}
-                          onToggle={handleToggleTask}
-                          onLongPress={showTaskCardMenu}
-                          c={c}
-                          isDark={isDark}
-                          projects={projects}
-                          sprints={sprints}
-                          overdueLabel={tr.overdueSection}
-                          priorityLabel={priorityA11y(task)}
-                          subtasksLabel={tr.subtasks}
-                          assigneeLabel={assigneeLabelFor(task)}
-                        />
-                      </Animated.View>
-                    );
-                  })}
+                  {chunkRows(overdueLimited.visible, cardColumns).map((row, r) => (
+                    <TaskCardRow key={row.map(t => t.id).join('|')} columns={cardColumns}>
+                      {row.map((task, j) => {
+                        const i = r * cardColumns + j;
+                        const animEntering = motion.entering(FadeInDown.duration(200).delay(Math.min(i, 10) * 40));
+                        const animExiting  = motion.entering(FadeOutUp.duration(150));
+                        const animLayout   = motion.entering(LinearTransition.springify());
+                        return (
+                          <Animated.View
+                            key={task.id}
+                            entering={animEntering}
+                            exiting={animExiting}
+                            layout={animLayout}>
+                            <TaskCompactCard
+                              task={task}
+                              statusColumn={scopedTaskStatusColumn(task, storedTaskStatuses)}
+                              onPress={handleSelectTask}
+                              onToggle={handleToggleTask}
+                              onLongPress={showTaskCardMenu}
+                              c={c}
+                              isDark={isDark}
+                              projects={projects}
+                              sprints={sprints}
+                              overdueLabel={tr.overdueSection}
+                              priorityLabel={priorityA11y(task)}
+                              subtasksLabel={tr.subtasks}
+                              assigneeLabel={assigneeLabelFor(task)}
+                            />
+                          </Animated.View>
+                        );
+                      })}
+                    </TaskCardRow>
+                  ))}
                 </View>
                 {overdueLimited.hasMore ? (
                   <GroupShowAllButton
@@ -2443,28 +2394,6 @@ export default function TasksScreen() {
     </>
   );
 
-  const calendarView = (
-    <TaskCalendarView
-      nav={cal}
-      tasksByDate={tasksByDate}
-      tasks={tasks}
-      meetingsByDate={meetingsByDate}
-      projects={projects}
-      today={today}
-      weekdays={WEEKDAYS_SHORT}
-      months={MONTHS_UA}
-      getProgress={getProgress}
-      isOverdue={isOverdue}
-      onSelectTask={handleSelectTask}
-      onToggleTask={toggleTask}
-      onOpenDay={setCalPopupDate}
-      colors={c}
-      isDark={isDark}
-      tr={tr}
-      locale={locale}
-    />
-  );
-
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
@@ -2478,15 +2407,15 @@ export default function TasksScreen() {
           color={c.text}
           actions={
             <>
-              <HeaderButton
-                onPress={() => setViewMode(v => v === 'list' ? 'calendar' : 'list')}
-                accessibilityLabel={viewMode === 'list' ? tr.calendarMode : tr.listMode}
-                style={{ backgroundColor: viewMode === 'calendar' ? c.accent + '20' : c.dim, borderColor: viewMode === 'calendar' ? c.accent : c.border }}>
-                <IconSymbol name={viewMode === 'list' ? 'calendar' : 'list.bullet'} size={17} color={viewMode === 'calendar' ? c.accent : c.sub} />
-              </HeaderButton>
+              {/* Планшет: єдина кнопка створення стоїть у шапці (на телефоні — FAB). */}
+              {isWide && (
+                <AddTaskHeaderButton label={tr.addTask} onPress={openAddTask} color={c.accent} />
+              )}
+              {/* Шапка тримає ОДНУ кнопку дій «⋯» (рішення власника, п. 5):
+                  Календар, Архів, Фільтри й сортування, Проєкти, Нотатки —
+                  у меню. Окремо видно лише створення (планшет) і пошук. */}
               {/* Кнопки фільтрів у хедері немає навмисно: вона переїхала в рядок
-                  із перемикачем «Сьогодні / Усі». Хедер лишається про режим
-                  екрана (список чи календар) і меню, а все, що звужує НАБІР
+                  із перемикачем «Сьогодні / Усі». Все, що звужує НАБІР
                   завдань, стоїть в одному рядку — і перемикач, і фільтри. */}
               <HeaderButton
                 onPress={() => setShowOptionsMenu(v => !v)}
@@ -2510,37 +2439,38 @@ export default function TasksScreen() {
           />
         </ScreenHeader>
 
-        {viewMode === 'list' ? (
-          <SectionList
-            sections={sections}
-            keyExtractor={task => task.id}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
-            showsVerticalScrollIndicator={false}
-            // Заголовки груп не липкі — так було й до віртуалізації.
-            stickySectionHeadersEnabled={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
-            ListHeaderComponent={listHeader}
-            ListFooterComponent={tasks.length >= 10 ? <AdSlot slot="M2" hidden={showAdd || showMeetingForm || showFilterSheet} /> : null}
-            renderSectionHeader={renderSectionHeader}
-            renderSectionFooter={renderSectionFooter}
-            ItemSeparatorComponent={TaskItemSeparator}
-            renderItem={renderTaskItem}
-          />
-        ) : (
-          <ScrollView
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarInset + 24 }}
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
-            {listHeader}
-            {calendarView}
-          </ScrollView>
+        {/* Планшет: пошук і перемикач скоупу — нерухомо над списком. */}
+        {isWide && (
+          <View style={[s.stickyFilters, { borderBottomColor: c.border }]}>{filterBar}</View>
         )}
+
+        <SectionList
+          sections={sections}
+          keyExtractor={row => row.map(task => task.id).join('|')}
+          // Телефон: місце під FAB (52 + відступ 20 від таб-бару) із запасом —
+          // бейдж пріоритету стоїть у правому нижньому куті картки, рівно під
+          // FAB, і без запасу останній P# ховався за «+».
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: isWide ? 12 : 0, paddingBottom: tabBarInset + (isWide ? 24 : FAB_LIST_CLEARANCE) }}
+          showsVerticalScrollIndicator={false}
+          // Заголовки груп не липкі — так було й до віртуалізації.
+          stickySectionHeadersEnabled={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+          ListHeaderComponent={listHeader}
+          ListFooterComponent={tasks.length >= 10 ? <AdSlot slot="M2" hidden={showAdd || showMeetingForm || showFilterSheet} /> : null}
+          renderSectionHeader={renderSectionHeader}
+          renderSectionFooter={renderSectionFooter}
+          ItemSeparatorComponent={TaskItemSeparator}
+          renderItem={renderTaskItem}
+        />
       </View>
 
-      {/* FAB */}
-      <PressableScale onPress={() => { haptic.medium(); setShowAdd(true); }} scaleTo={0.92} style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
-        <IconSymbol name="plus" size={26} color="#fff" />
-      </PressableScale>
+      {/* Телефон: єдина кнопка створення — FAB (на планшеті вона в шапці).
+          Поки показаний тост «Скасувати», FAB ховається — інакше «+»
+          стирчав поверх тосту. */}
+      {!isWide && !undoVisible && (
+        <AddTaskFab label={tr.addTask} onPress={openAddTask} color={c.accent} bottom={tabBarInset + 20} />
+      )}
       </View>
 
         <DetailPane
@@ -2548,17 +2478,30 @@ export default function TasksScreen() {
           wide={showDetailColumn}
           onClose={() => closeTaskDetail(true)}
           header={selectedTask ? taskDetailHeader : meetingDetailHeader}
+          footer={selectedTask ? detailFooter : undefined}
           isDark={isDark}
           sheetColor={c.sheet}
           borderColor={c.border}
           maxHeight={height * 0.88}
+          // Стала висота картки завдання на телефоні (P2): вкладки різної
+          // довжини більше не смикають лист. Перегляд зустрічі — по вмісту.
+          sheetHeight={selectedTask ? Math.round(height * TASK_CARD_SHEET_RATIO) : undefined}
           scrollRef={detailScrollRef}
+          columnWidth={detailColumnWidthFor(width)}
+          // Нічого не вибрано — колонка показує «Сьогодні»: зустрічі й
+          // графік активності дня (рішення власника, п. 3; завдання — лише
+          // в списку ліворуч), а не порожнє «Оберіть».
           empty={
-            <>
-              <IconSymbol name="checklist" size={40} color={c.sub} />
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginTop: 12 }}>{tr.detailEmptyTitle}</Text>
-              <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 6 }}>{tr.detailEmptyHint}</Text>
-            </>
+            <TasksTodayPane
+              today={today}
+              locale={locale}
+              meetings={todayMeetings2}
+              activitySources={todayPaneActivity}
+              onOpenMeeting={openMeetingView}
+              onOpenCalendar={() => router.push('/calendar' as never)}
+              colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent }}
+              tr={tr}
+            />
           }>
           {selectedTask ? detailBody : meetingDetailBody}
         </DetailPane>
@@ -2580,170 +2523,7 @@ export default function TasksScreen() {
         isProjectOwner={meetingFormRole === 'owner'}
       />
 
-      {/* ─── Calendar Day Popup ─── */}
-      <Modal
-        visible={calPopupDate !== null}
-        transparent
-        animationType="slide"
-        statusBarTranslucent
-        onRequestClose={() => setCalPopupDate(null)}>
-        <Pressable accessible={false}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'flex-end' }}
-          onPress={() => setCalPopupDate(null)}>
-          <Pressable onPress={e => e.stopPropagation()} accessible={false}>
-            <BlurView
-              intensity={isDark ? 60 : 80}
-              tint={isDark ? 'dark' : 'light'}
-              style={{
-                borderTopLeftRadius: 26,
-                borderTopRightRadius: 26,
-                borderWidth: 1,
-                borderBottomWidth: 0,
-                borderColor: c.border,
-                overflow: 'hidden',
-                paddingBottom: Platform.OS === 'ios' ? 34 : 16,
-                ...(Platform.OS === 'android' && { backgroundColor: isDark ? '#1C1A2E' : '#F4F2FF' }),
-              }}>
-              {/* Handle */}
-              <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 6 }}>
-                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
-              </View>
-              {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 14 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3, textTransform: 'capitalize' }}>
-                    {calPopupDate?.toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
-                  </Text>
-                  {calPopupDate && (() => {
-                    const tCnt = (tasksByDate[calPopupDate.toDateString()] ?? []).length;
-                    const mCnt = (meetingsByDate[localDateStr(calPopupDate)] ?? []).length;
-                    const parts = [];
-                    if (tCnt > 0) parts.push(`${tCnt} завдань`);
-                    if (mCnt > 0) parts.push(`${mCnt} зустрічей`);
-                    return parts.length > 0 ? <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{parts.join(' · ')}</Text> : null;
-                  })()}
-                </View>
-                <TouchableOpacity
-                  onPress={() => setCalPopupDate(null)}
-                  accessibilityRole="button"
-                  accessibilityLabel={tr.close}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <IconSymbol name="xmark.circle.fill" size={24} color={c.sub} />
-                </TouchableOpacity>
-              </View>
-              {/* Task + Meeting list */}
-              <ScrollView
-                style={{ maxHeight: height * 0.5 }}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 8 }}
-                showsVerticalScrollIndicator={false}>
-
-                {/* Meetings in popup */}
-                {calPopupDate && (() => {
-                  const dayMeetings = (meetingsByDate[localDateStr(calPopupDate)] ?? [])
-                    .sort((a, b) => a.time.localeCompare(b.time));
-                  if (!dayMeetings.length) return null;
-                  return (
-                    <>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                        <IconSymbol name="calendar.circle.fill" size={13} color="#6366F1" />
-                        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr.meetings.toUpperCase()}</Text>
-                      </View>
-                      {dayMeetings.map(mtg => {
-                        const durLabel = mtg.durationMinutes >= 60
-                          ? `${Math.floor(mtg.durationMinutes / 60)}г${mtg.durationMinutes % 60 ? ` ${mtg.durationMinutes % 60}хв` : ''}`
-                          : `${mtg.durationMinutes}хв`;
-                        return (
-                          <TouchableOpacity key={mtg.id} onPress={() => { setCalPopupDate(null); openMeetingView(mtg, true); }} activeOpacity={0.75}>
-                            <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
-                              style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: mtg.color + '40', padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-                              <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: mtg.color, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 }} />
-                              <View style={{ marginLeft: 6, paddingHorizontal: 6, paddingVertical: 4, borderRadius: Atlas.radius.small, backgroundColor: mtg.color + '1A', alignItems: 'center', minWidth: 44 }}>
-                                <Text style={{ color: mtg.color, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{mtg.time || '--:--'}</Text>
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>{mtg.title}</Text>
-                                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
-                                  {durLabel}{mtg.location ? ` · ${mtg.location}` : ''}
-                                </Text>
-                                {mtg.projectId ? (
-                                  <View style={{ marginTop: 4 }}>
-                                    <MeetingProjectChip project={meetingProject(mtg, projects)} textColor={c.text} maxWidth={180} />
-                                  </View>
-                                ) : null}
-                              </View>
-                              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-                            </BlurView>
-                          </TouchableOpacity>
-                        );
-                      })}
-                      <TouchableOpacity
-                        onPress={() => { setCalPopupDate(null); openAddMeeting(localDateStr(calPopupDate)); }}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 4 }}>
-                        <IconSymbol name="plus.circle" size={14} color="#6366F1" />
-                        <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '600' }}>{tr.addMeetingForDay}</Text>
-                      </TouchableOpacity>
-                      {(tasksByDate[calPopupDate.toDateString()] ?? []).length > 0 && (
-                        <View style={{ height: 1, backgroundColor: c.border, marginVertical: 4 }} />
-                      )}
-                    </>
-                  );
-                })()}
-
-                {calPopupDate && (tasksByDate[calPopupDate.toDateString()] ?? []).length === 0
-                  && (meetingsByDate[localDateStr(calPopupDate)] ?? []).length === 0 && (
-                  <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-                    <IconSymbol name="calendar.badge.checkmark" size={32} color={c.sub} />
-                    <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600', marginTop: 10 }}>{tr.noTasksAndMeetings}</Text>
-                  </View>
-                )}
-                {calPopupDate && (tasksByDate[calPopupDate.toDateString()] ?? []).length > 0 && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <IconSymbol name="checklist" size={13} color={c.accent} />
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr.tasks}</Text>
-                  </View>
-                )}
-                {calPopupDate && (tasksByDate[calPopupDate.toDateString()] ?? []).map(task => (
-                  <TouchableOpacity
-                    key={task.id}
-                    onPress={() => { setCalPopupDate(null); setSelected(task); }}
-                    activeOpacity={0.75}>
-                    <BlurView
-                      intensity={isDark ? 18 : 35}
-                      tint={isDark ? 'dark' : 'light'}
-                      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-                      <TouchableOpacity
-                        onPress={e => { e.stopPropagation(); toggleTask(task.id); }}
-                        accessibilityRole="checkbox"
-                        accessibilityLabel={task.title}
-                        accessibilityState={{ checked: task.status === 'done' }}
-                        // Єдина ціль дотику застосунку, що падала під WCAG 2.2
-                        // AA 2.5.8 (24×24): 22×22 всередині картки, яка
-                        // ВІДКРИВАЄ завдання, тобто промах дає протилежну дію.
-                        // 22 + 11×2 = рівно 44 (як у TaskCompactCard: 18 + 13).
-                        hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
-                        style={{ width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', borderColor: task.status === 'done' ? '#10B981' : c.border, backgroundColor: task.status === 'done' ? '#10B981' : 'transparent', flexShrink: 0 }}>
-                        {task.status === 'done' && <IconSymbol name="checkmark" size={11} color="#fff" />}
-                      </TouchableOpacity>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', opacity: task.status === 'done' ? 0.5 : 1, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }} numberOfLines={1}>
-                          {task.title}
-                        </Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                          {task.subtasks.length > 0 && (
-                            <Text style={{ color: c.sub, fontSize: 11 }}>· {task.subtasks.filter(s => s.done).length}/{task.subtasks.length}</Text>
-                          )}
-                        </View>
-                      </View>
-                      <PriorityBadge level={normalizePriority(task)} style={{ alignSelf: 'flex-start' }} />
-                      <IconSymbol name="chevron.right" size={12} color={c.sub} />
-                    </BlurView>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </BlurView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {projectTaskSheet}
 
       {/* ─── Options Dropdown ─── */}
       <Modal visible={showOptionsMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowOptionsMenu(false)}>
@@ -2771,55 +2551,16 @@ export default function TasksScreen() {
                 backgroundColor: isDark ? '#1C1A2E' : '#F2EFFF',
               }),
             }}>
-            {/* Notes */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/notes'); }}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#F59E0B20' }]}>
-                <IconSymbol name="note.text" size={15} color="#F59E0B" />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.notes}</Text>
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-            {/* Filters */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); setShowFilterSheet(true); }}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: hasActiveFilters ? '#F59E0B20' : c.dim }]}>
-                <IconSymbol name="line.3.horizontal.decrease" size={15} color={hasActiveFilters ? '#F59E0B' : c.sub} />
-              </View>
-              <Text style={[s.menuItemLabel, { color: hasActiveFilters ? '#F59E0B' : c.text }]}>{tr.filters}</Text>
-              {hasActiveFilters
-                ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F59E0B' }} />
-                : <IconSymbol name="chevron.right" size={12} color={c.sub} />}
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-            {/* Projects */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/projects'); }}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#0EA5E920' }]}>
-                <IconSymbol name="folder.fill" size={15} color="#0EA5E9" />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.projects}</Text>
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
             {/* Meetings */}
             <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/meetings'); }}
+              onPress={() => { setShowOptionsMenu(false); router.push('/calendar' as never); }}
+              accessibilityRole="menuitem"
+              accessibilityLabel={tr.calendar}
               style={s.menuItem}>
               <View style={[s.menuIconBox, { backgroundColor: '#6366F120' }]}>
                 <IconSymbol name="calendar.circle.fill" size={15} color="#6366F1" />
               </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.meetings}</Text>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.calendar}</Text>
               {meetings.length > 0 && (
                 <View style={{ backgroundColor: '#6366F120', borderRadius: Atlas.radius.small, paddingHorizontal: 7, paddingVertical: 2, marginRight: 4 }}>
                   <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{meetings.length}</Text>
@@ -2833,11 +2574,60 @@ export default function TasksScreen() {
             {/* Archive */}
             <TouchableOpacity
               onPress={() => { setShowOptionsMenu(false); router.push('/archive'); }}
+              accessibilityRole="menuitem"
+              accessibilityLabel={tr.archive}
               style={s.menuItem}>
               <View style={[s.menuIconBox, { backgroundColor: '#10B98120' }]}>
                 <IconSymbol name="archivebox.fill" size={15} color="#10B981" />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.archive}</Text>
+              <IconSymbol name="chevron.right" size={12} color={c.sub} />
+            </TouchableOpacity>
+
+            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+            {/* Filters */}
+            <TouchableOpacity
+              onPress={() => { setShowOptionsMenu(false); setShowFilterSheet(true); }}
+              accessibilityRole="menuitem"
+              accessibilityLabel={tr.filtersAndSort}
+              style={s.menuItem}>
+              <View style={[s.menuIconBox, { backgroundColor: hasActiveFilters ? '#F59E0B20' : c.dim }]}>
+                <IconSymbol name="line.3.horizontal.decrease" size={15} color={hasActiveFilters ? '#F59E0B' : c.sub} />
+              </View>
+              <Text style={[s.menuItemLabel, { color: hasActiveFilters ? '#F59E0B' : c.text }]}>{tr.filtersAndSort}</Text>
+              {hasActiveFilters
+                ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F59E0B' }} />
+                : <IconSymbol name="chevron.right" size={12} color={c.sub} />}
+            </TouchableOpacity>
+
+            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+            {/* Projects */}
+            <TouchableOpacity
+              onPress={() => { setShowOptionsMenu(false); router.push('/projects'); }}
+              accessibilityRole="menuitem"
+              accessibilityLabel={tr.projects}
+              style={s.menuItem}>
+              <View style={[s.menuIconBox, { backgroundColor: '#0EA5E920' }]}>
+                <IconSymbol name="folder.fill" size={15} color="#0EA5E9" />
+              </View>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.projects}</Text>
+              <IconSymbol name="chevron.right" size={12} color={c.sub} />
+            </TouchableOpacity>
+
+            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
+
+            {/* Notes */}
+            <TouchableOpacity
+              onPress={() => { setShowOptionsMenu(false); router.push('/notes'); }}
+              accessibilityRole="menuitem"
+              accessibilityLabel={tr.notes}
+              style={s.menuItem}>
+              <View style={[s.menuIconBox, { backgroundColor: '#F59E0B20' }]}>
+                <IconSymbol name="note.text" size={15} color="#F59E0B" />
+              </View>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.notes}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
             </TouchableOpacity>
           </BlurView>
@@ -3038,31 +2828,25 @@ export default function TasksScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ─── Add Task Modal ─── */}
-      <SheetModal visible={showAdd} onClose={() => setShowAdd(false)}>
+      {/* ─── Швидке створення: назва + дедлайн/пріоритет/проєкт; решта — «Детальніше» ─── */}
+      {/* handle="inside": ручка і ✕ — всередині короткої картки, а не
+          окремим рядком над нею на бекдропі (P2: рядок «висів у повітрі» і
+          стрибав разом із клавіатурою). */}
+      <SheetModal visible={showAdd} onClose={() => setShowAdd(false)} handle="inside">
         <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+          <SheetHandle />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <TaskEditForm
-              title={tr.newTask}
-              submitLabel={tr.add}
+            <TaskQuickCreate
               editor={composer}
-              taskStatuses={taskStatuses}
               pickableProjects={pickableProjects}
               projects={projects}
               projectCreateOption={projectCreateOption(id => composer.patch({ projectId: id, sprintId: null }))}
               sprints={sprints}
-              members={composerMembers}
-              myUserId={user?.id}
-              deadlineWeeks={dlWeeks}
-              months={MONTHS_UA}
-              weekdays={WEEKDAYS_SHORT}
-              deadlinePresets={DEADLINE_PRESETS}
               today={today}
               onSave={addTask}
-              onCancel={() => { composer.reset(ACTIVE_COLUMN_ID); setShowAdd(false); }}
+              onMore={createAndOpen}
               colors={c}
               isDark={isDark}
-              tr={tr}
               locale={locale}
             />
           </ScrollView>
@@ -3129,7 +2913,33 @@ const TaskListItem = React.memo(function TaskListItem({
   );
 });
 
-/** Секція списку: `data` — лише видимі (до ліміту), `total` — скільки в групі всього. */
+/** Розбити список на ряди по `size` (картки в кілька колонок). */
+function chunkRows<T>(items: readonly T[], size: number): T[][] {
+  if (size <= 1) return items.map(item => [item]);
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+  return rows;
+}
+
+/**
+ * Ряд карток. В одну колонку — просто обгортка; у дві — рівні колонки, а
+ * неповний останній ряд добивається порожнім місцем, щоб самотня картка не
+ * розтягувалась на всю ширину і стояла під своєю колонкою.
+ */
+function TaskCardRow({ columns, children }: { columns: number; children: React.ReactNode }) {
+  if (columns <= 1) return <>{children}</>;
+  const cells = React.Children.toArray(children);
+  return (
+    <View style={s.cardRow}>
+      {cells.map((cell, i) => <View key={i} style={s.cardCell}>{cell}</View>)}
+      {Array.from({ length: Math.max(0, columns - cells.length) }, (_, i) => (
+        <View key={`pad-${i}`} style={s.cardCell} />
+      ))}
+    </View>
+  );
+}
+
+/** Секція списку: `data` — ряди видимих карток (до ліміту), `total` — скільки в групі всього. */
 interface TaskSection {
   key: string;
   title: string;
@@ -3220,7 +3030,6 @@ const s = StyleSheet.create({
   pct:            { fontSize: 11, fontWeight: '600', minWidth: 30, fontVariant: ['tabular-nums'] },
   colLabel:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   emptyCol:       { borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 24, alignItems: 'center' },
-  fab:            { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
   overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper:   { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:          { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
@@ -3250,11 +3059,14 @@ const s = StyleSheet.create({
   filterSegBtn:   { paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
   viewAllBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11 },
   itemSeparator:  { height: 6 },
+  cardRow:        { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
+  cardCell:       { flex: 1, minWidth: 0 },
+  stickyFilters:  { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   groupShowAll:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginTop: 6 },
   dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
   dropdownList:   { borderRadius: Atlas.radius.medium, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
   dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 11 },
-  menuItem:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13 },
+  menuItem:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, minHeight: 48 },
   menuIconBox:    { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   menuItemLabel:  { fontSize: 14, fontWeight: '600', flex: 1 },
   menuPill:       { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },

@@ -17,7 +17,7 @@ import { fmt, TG_ACCENT, useTrainingColors } from '@/components/training/theme';
 import { Badge, Card, EmptyState, Notice, PrimaryButton } from '@/components/training/TrainingBits';
 import { TrainingSheet } from '@/components/training/TrainingSheet';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import type { PersonalProgram } from '@/utils/trainingPrograms';
 import { newTrainingId } from '@/utils/trainingSync';
@@ -30,6 +30,10 @@ export default function ProgramsScreen() {
   const { tr } = useI18n();
   const c = useTrainingColors();
   const { isWide } = useResponsive();
+  // Планшет: широка колонка (Layout.wideMaxWidth) і 3 стовпці програм, коли
+  // екрану (вікно мінус сайдбар) вистачає; інакше 2.
+  const screenWidth = useScreenWidth();
+  const programCols = !isWide ? 1 : screenWidth >= 960 ? 3 : 2;
   const { group } = useGroupSummary(groupId);
   const stream = useGroupStream(groupId);
   const isCoach = (stream.role ?? group?.role) === 'coach';
@@ -93,6 +97,7 @@ export default function ProgramsScreen() {
     <GroupScreenShell
       c={c}
       title={tr.tgPrograms}
+      wide={isWide}
       groupId={groupId}
       groupName={group?.name}
       issue={stream.issue}
@@ -103,7 +108,7 @@ export default function ProgramsScreen() {
       {stream.loaded && !programs.length ? (
         <EmptyState c={c} icon="list.bullet.clipboard" title={tr.tgNoPrograms} body={isCoach ? tr.tgNoPlanCoach : tr.tgNoProgramsMember} />
       ) : (
-        <MasonryColumns items={cards} columnCount={isWide ? 2 : 1} />
+        <MasonryColumns items={cards} columnCount={programCols} />
       )}
       {isCoach ? (
         <View style={{ gap: 10, marginTop: 8 }}>

@@ -14,24 +14,26 @@ import { Atlas } from '@/constants/atlas';
  * (`isProjectOverflowActive` — таб «Ще» світиться, поки відкритий будь-який
  * його розділ).
  */
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
 import { ScrollView, Text, TouchableOpacity } from 'react-native';
 
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { projectRoute, splitProjectNav, visibleProjectNavItems } from '@/constants/projectNav';
+import { useProjectRouteId } from '@/hooks/use-project-route-id';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useProject } from '@/hooks/use-project';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useResponsive } from '@/hooks/use-responsive';
+import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
 
 export default function ProjectMoreScreen() {
-  const { id: projectId } = useLocalSearchParams<{ id: string }>();
+  const projectId = useProjectRouteId();
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const contentWidth = useContentWidth();
@@ -57,6 +59,9 @@ export default function ProjectMoreScreen() {
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
+        {/* Планшет (рішення 6): розділи плитками у 2 колонки, коли колонці
+            вистачає місця; на телефоні — список, як було. */}
+        <ResponsiveGrid minItemWidth={300} maxColumns={2} gap={10}>
         {rows.map(item => {
           const label = String(tr[item.labelKey]);
           return (
@@ -70,7 +75,7 @@ export default function ProjectMoreScreen() {
                 flexDirection: 'row', alignItems: 'center', gap: 12,
                 minHeight: 56, paddingHorizontal: 14,
                 borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border,
-                backgroundColor: c.dim, marginBottom: 10,
+                backgroundColor: c.dim,
               }}>
               <IconSymbol name={item.icon} size={20} color={c.accent} />
               <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', flex: 1 }}>{label}</Text>
@@ -78,6 +83,7 @@ export default function ProjectMoreScreen() {
             </TouchableOpacity>
           );
         })}
+        </ResponsiveGrid>
       </ScrollView>
     </ProjectScreenShell>
   );

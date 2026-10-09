@@ -37,6 +37,7 @@ import { clearPendingInvite, getPendingInvite } from '@/store/invite-link';
 import { subscribeToStorage } from '@/store/storage';
 import { ThemeProvider } from '@/store/theme-context';
 import { TimerProvider } from '@/store/timer-context';
+import { useWidgetSnapshotWriter } from '@/store/widget-sync';
 import {
   cachedWorkspaceConfig,
   getWorkspaceIncompatibility,
@@ -339,6 +340,9 @@ function RootLayoutContent() {
   // виводить на екран, що встановлює потрібний workspace.
   useIncomingInviteLinks();
   usePendingMenuInvite();
+  // Знімок для iOS-віджета (App Group) — поза AuthGate, щоб і вихід з
+  // акаунта прибрав цифри з віджета. На Android/вебі — no-op.
+  useWidgetSnapshotWriter();
 
   // Сайдбар живе ТУТ, а не в (tabs)/_layout: інакше Stack-екрани
   // (Проєкти, Нотатки, Контейнери…) відкривалися б поверх нього, і
@@ -387,6 +391,8 @@ function RootLayoutContent() {
           <Stack.Screen name="developer" options={{ headerShown: false }} />
           <Stack.Screen name="sync" options={{ headerShown: false }} />
           <Stack.Screen name="containers" options={{ headerShown: false }} />
+          <Stack.Screen name="calendar" options={{ headerShown: false }} />
+          {/* Редирект на /calendar — «Наради» стали «Календарем» (push, deep link, закладки). */}
           <Stack.Screen name="meetings" options={{ headerShown: false }} />
           <Stack.Screen name="budget" options={{ headerShown: false }} />
           <Stack.Screen name="subscriptions" options={{ headerShown: false }} />

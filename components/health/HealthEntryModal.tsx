@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { useWideModal } from '@/components/health/HealthLayout';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   ACCENT, ACCENT_CAL, ACCENT_MOOD, ACCENT_PROT, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
@@ -54,6 +55,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
 }) {
   const c = getHealthColors(isDark);
   const sheetSurface = useSheetSurface();
+  const wm = useWideModal();
   const [val, setVal] = useState('');
   const [val2, setVal2] = useState('');
   const [note, setNote] = useState('');
@@ -85,10 +87,10 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
   return (
     <Modal visible={modalKey !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <Pressable accessible={false} style={s.overlay} onPress={onClose}>
+        <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={onClose}>
           <Pressable
             onPress={e => e.stopPropagation()}
-            style={s.sheetWrapper}
+            style={[s.sheetWrapper, wm.column]}
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"

@@ -40,8 +40,9 @@ import {
 } from '@/store/health-connect';
 import { pickHealthSource } from '@/hooks/use-health-entries';
 import type { Translations } from '@/store/translations';
-import { useResponsive } from '@/hooks/use-responsive';
-import { useContentWidth, CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
+import { HealthColumns, useHealthTabLayout } from '@/components/health/HealthLayout';
+import { Layout } from '@/constants/tokens';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { fmtSleep } from '@/utils/healthTheme';
 
 
@@ -127,9 +128,10 @@ function MiniBarChart({ values, color, maxVal, height = 48 }: { values: (number 
 }
 
 function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: string }) {
-  const { width } = useResponsive();
+  // Ширина — виміряна ширина картки, а не вікна: на планшеті картка вужча
+  // за вікно (сайдбар, стеля колонки, дві колонки), і лінія вилазила б за неї.
+  const [W_CHART, setW] = useState(0);
   if (!samples.length) return null;
-  const W_CHART = width - 64;
   const H = 56;
   const values = samples.map(s => s.value);
   const min = Math.min(...values), max = Math.max(...values, min + 1);
@@ -139,8 +141,9 @@ function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: 
   }));
 
   return (
-    <View style={{ height: H, width: W_CHART, marginVertical: 8 }}>
-      {pts.slice(1).map((pt, i) => {
+    <View style={{ height: H, alignSelf: 'stretch', marginVertical: 8 }}
+      onLayout={e => { const w = Math.round(e.nativeEvent.layout.width); setW(prev => (prev === w ? prev : w)); }}>
+      {W_CHART > 0 && pts.slice(1).map((pt, i) => {
         const prev = pts[i];
         const dx = pt.x - prev.x, dy = pt.y - prev.y;
         const len = Math.sqrt(dx * dx + dy * dy);
@@ -163,16 +166,20 @@ function HRSparkline({ samples, color }: { samples: HKHeartRateSample[]; color: 
 export default function AppleHealthScreen() {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const contentWidth = useContentWidth();
-  const { width, sizeClass } = useResponsive();
+  // Планшет (рішення 6): широка колонка, плитки «сьогодні» рядом по 3–4,
+  // пульс і тиждень — двома колонками поруч.
+  const lay = useHealthTabLayout();
+  const screenWidth = useScreenWidth();
+  const { sizeClass } = useResponsive();
   // Дві колонки на телефоні, три на середньому вікні, чотири на широкому.
   const metricColumns = sizeClass === 'expanded' ? 4 : sizeClass === 'medium' ? 3 : 2;
   // Ширина картки рахується від колонки контенту (вона обмежена 720pt), а не
   // від вікна: інакше на планшеті дві картки по пів екрана вилазили б за неї.
   const cardWidth = useMemo(() => {
-    const column = Math.min(width, CONTENT_MAX_WIDTH) - 32; // 16pt поля з боків
-    return (column - GRID_GAP * (metricColumns - 1)) / metricColumns;
-  }, [width, metricColumns]);
+    const cap = lay.twoCol ? Layout.wideMaxWidth : Layout.readingMaxWidth;
+    const column = Math.min(screenWidth, cap) - 2 * Layout.gutter[sizeClass];
+    return Math.floor((column - GRID_GAP * (metricColumns - 1)) / metricColumns);
+  }, [screenWidth, metricColumns, lay.twoCol, sizeClass]);
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
@@ -378,7 +385,7 @@ export default function AppleHealthScreen() {
             keyExtractor={workoutKey}
             renderItem={renderWorkout}
             ItemSeparatorComponent={WorkoutSeparator}
-            contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 40 }]}
+            contentContainerStyle={[lay.contentStyle, { paddingBottom: 40 }]}
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
             <>
@@ -437,6 +444,7 @@ export default function AppleHealthScreen() {
                 isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
             </View>
 
+            <HealthColumns twoCol={lay.twoCol && week.length > 0} left={<>
             {/* Heart rate */}
             <Text style={[s.sectionTitle, { color: c.text, marginTop: 24, marginBottom: 12 }]}>{tr.pulse}</Text>
             <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
@@ -466,7 +474,7 @@ export default function AppleHealthScreen() {
                 </View>
               )}
             </BlurView>
-
+            </>} right={<>
             {/* Week charts */}
             {week.length > 0 && (
               <>
@@ -494,6 +502,7 @@ export default function AppleHealthScreen() {
                 </BlurView>
               </>
             )}
+            </>} />
 
             {/* Workouts: заголовок лишається в шапці, картки віддані FlatList */}
             {workouts.length > 0 && (

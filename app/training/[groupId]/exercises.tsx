@@ -10,6 +10,7 @@ import { useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
 
+import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useGroupStream, useGroupSummary } from '@/components/training/hooks';
 import { exercisesToImport, readPersonalExercises } from '@/components/training/importPersonal';
@@ -17,6 +18,7 @@ import { fmt, TG_ACCENT, TG_ERR, useTrainingColors } from '@/components/training
 import { Card, EmptyState, Field, Notice, PrimaryButton, Stepper } from '@/components/training/TrainingBits';
 import { TrainingSheet } from '@/components/training/TrainingSheet';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { newTrainingId } from '@/utils/trainingSync';
 import type { TrainingExercise } from '@/utils/trainingTypes';
@@ -60,6 +62,9 @@ export default function GroupExercisesScreen() {
   const { groupId = '' } = useLocalSearchParams<{ groupId: string }>();
   const { tr } = useI18n();
   const c = useTrainingColors();
+  // Планшет (рішення 6): бібліотека — сіткою плиток на «широкій» колонці,
+  // а не одним довгим списком посеред екрана. Телефон — як було.
+  const { isWide } = useResponsive();
   const { group } = useGroupSummary(groupId);
   const stream = useGroupStream(groupId);
   const isCoach = (stream.role ?? group?.role) === 'coach';
@@ -90,10 +95,30 @@ export default function GroupExercisesScreen() {
     setNotice({ text: fmt(tr.tgImportedExercises, { n: fresh.length }), tone: 'info' });
   }, [exercises, stream, tr]);
 
+  const row = (ex: TrainingExercise, divider: boolean) => (
+    <TouchableOpacity
+      key={ex.id}
+      disabled={!isCoach}
+      onPress={() => setEditing(ex)}
+      accessibilityRole={isCoach ? 'button' : 'text'}
+      accessibilityLabel={ex.name}
+      style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: divider ? 1 : 0, borderTopColor: c.border }}>
+      <IconSymbol name="dumbbell.fill" size={16} color={TG_ACCENT} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{ex.name}</Text>
+        <Text style={{ color: c.sub, fontSize: 12 }}>
+          {[ex.muscleGroup, `${ex.defaultSets ?? 3}×${ex.defaultReps ?? 10}`, ex.defaultRestSec ? `${ex.defaultRestSec} s` : null].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
+      {isCoach ? <IconSymbol name="pencil" size={14} color={c.faint} /> : null}
+    </TouchableOpacity>
+  );
+
   return (
     <GroupScreenShell
       c={c}
       title={tr.tgExercises}
+      wide={isWide}
       groupId={groupId}
       groupName={group?.name}
       issue={stream.issue}
@@ -102,26 +127,15 @@ export default function GroupExercisesScreen() {
       refreshing={stream.syncing}>
       {notice ? <Notice c={c} text={notice.text} tone={notice.tone} /> : null}
       {stream.loaded && !exercises.length ? <EmptyState c={c} icon="dumbbell.fill" title={tr.tgNoExercises} /> : null}
-      {exercises.length ? (
-        <Card c={c}>
-          {exercises.map((ex, i) => (
-            <TouchableOpacity
-              key={ex.id}
-              disabled={!isCoach}
-              onPress={() => setEditing(ex)}
-              accessibilityRole={isCoach ? 'button' : 'text'}
-              accessibilityLabel={ex.name}
-              style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
-              <IconSymbol name="dumbbell.fill" size={16} color={TG_ACCENT} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{ex.name}</Text>
-                <Text style={{ color: c.sub, fontSize: 12 }}>
-                  {[ex.muscleGroup, `${ex.defaultSets ?? 3}×${ex.defaultReps ?? 10}`, ex.defaultRestSec ? `${ex.defaultRestSec} s` : null].filter(Boolean).join(' · ')}
-                </Text>
-              </View>
-              {isCoach ? <IconSymbol name="pencil" size={14} color={c.faint} /> : null}
-            </TouchableOpacity>
+      {exercises.length && isWide ? (
+        <ResponsiveGrid minItemWidth={300} maxColumns={3} gap={10}>
+          {exercises.map(ex => (
+            <Card key={ex.id} c={c} style={{ flex: 1 }}>{row(ex, false)}</Card>
           ))}
+        </ResponsiveGrid>
+      ) : exercises.length ? (
+        <Card c={c}>
+          {exercises.map((ex, i) => row(ex, i > 0))}
         </Card>
       ) : null}
       {isCoach ? (

@@ -1,8 +1,9 @@
+import { isExecutableTask } from './task-contract';
 import type {Task} from './taskUtils';
 import {totalTrackedSeconds as taskTrackedSeconds} from './taskTimer';
 /** Average per finished, timed task. Untimed tasks do not dilute the sample. */
 export function actualWorkload(tasks: readonly Task[], userId: string) {
-  const own=tasks.filter(t=>!t.backlogKind && t.assigneeId===userId);
+  const own=tasks.filter(t=>isExecutableTask(t) && t.assigneeId===userId);
   const finished=own.filter(t=>t.status==='done' && (!t.reviewRequired || t.reviewState==='approved'));
   const sample=finished.map(taskTrackedSeconds).filter(n=>n>0);
   const averageMinutes=sample.length ? sample.reduce((a,b)=>a+b,0)/sample.length/60 : null;

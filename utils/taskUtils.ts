@@ -1,3 +1,4 @@
+import { isPersonalTask } from './task-contract';
 import { isSameMonth } from './dateUtils';
 
 /** Легасі-пріоритет: досі пишеться КОЖНИМ збереженням (dual-write, CONTRACT §B). */
@@ -52,7 +53,7 @@ export interface Task {
   completedAt?: string;
   reviewRequired?: boolean;
   reviewerId?: string | null;
-  reviewState?: "none" | "pending" | "approved" | "changes_requested";
+  reviewState?: "none" | "pending" | "approved" | "changes_requested" | "needs_reviewer";
   reviewFeedback?: string;
   resultRequirements?: ("summary" | "link" | "file")[];
   resultSummary?: string;
@@ -258,19 +259,16 @@ export function getProgress(t: Task): number {
  *
  * Виняток один: проєкт, якого ще немає серед моїх ролей (`roles` передано, але
  * проєкту в ньому нема — міграція §3.6 не відпрацювала), — запис фізично
- * лежить в особистому потоці, тобто мій, як і на вебі (joinedProjectIds).
+ * лежить в особистому потоці. Беремо непризначений або призначений мені;
+ * чужий assignee виключений, як і на вебі (joinedProjectIds).
  */
 export function isMyTask(
   task: Pick<Task, 'projectId' | 'assigneeId' | 'createdBy' | 'backlogKind'>,
   myUserId: string | null | undefined,
-  /** Ролі в проєктах (useProjectRoles) — лише для винятку вище. */
+  /** Ролі й legacy-маршрутизація — contracts/task-contract.md. */
   roles?: Readonly<Record<string, string>>,
 ): boolean {
-  if (task.backlogKind) return false;
-  if (!task.projectId) return true; // особистий потік
-  if (!myUserId) return false;
-  if (roles && !(task.projectId in roles)) return !task.assigneeId || task.assigneeId === myUserId;
-  return task.assigneeId === myUserId;
+  return isPersonalTask(task, myUserId, roles);
 }
 
 /**

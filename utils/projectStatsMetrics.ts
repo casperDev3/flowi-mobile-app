@@ -1,3 +1,4 @@
+import { isExecutableTask } from './task-contract';
 /**
  * utils/projectStatsMetrics.ts — лічильники картки проєкту, портфельні KPI,
  * велосіті й burndown спринтів.
@@ -37,6 +38,7 @@ import {
  * власні інтерфейси задачі, і вимагати повний Task тут означало б касти.
  */
 export interface MetricsTaskLike {
+  backlogKind?: string; archivedAt?: string; deleted?: boolean;
   id: string;
   status: string;
   projectId?: string;
@@ -184,6 +186,7 @@ const EMPTY_COUNTERS: ProjectCounters = Object.freeze({
 export function groupTasksByProject<T extends MetricsTaskLike>(tasks: readonly T[]): Map<string, T[]> {
   const groups = new Map<string, T[]>();
   for (const task of tasks) {
+    if (!isExecutableTask(task)) continue;
     if (!task.projectId) continue;
     const bucket = groups.get(task.projectId);
     if (bucket) bucket.push(task);
@@ -202,6 +205,7 @@ function countersFor(
   const result: ProjectCounters = { ...EMPTY_COUNTERS };
   // Один for на групу (§9.2 п.2) замість шести .filter().length.
   for (const task of own) {
+    if (!isExecutableTask(task)) continue;
     if (task.projectId !== projectId) continue;
     result.total += 1;
     if (task.status === 'done') {
@@ -329,6 +333,7 @@ export function currentSprintCard(
   let total = 0;
   let done = 0;
   for (const task of tasks) {
+    if (!isExecutableTask(task)) continue;
     if (task.sprintId !== sprint.id) continue;
     total += 1;
     if (task.status === 'done') done += 1;
@@ -366,7 +371,7 @@ export function isCompletedSprint(sprint: Sprint): boolean {
  */
 export function sprintVelocity(sprint: Pick<Sprint, 'id'>, tasks: readonly MetricsTaskLike[]): number {
   let done = 0;
-  for (const task of tasks) if (task.sprintId === sprint.id && task.status === 'done') done += 1;
+  for (const task of tasks) if (isExecutableTask(task) && task.sprintId === sprint.id && task.status === 'done') done += 1;
   return done;
 }
 
@@ -440,6 +445,7 @@ export function velocityWindow(
   const doneBySprint = new Map<string, number>();
   let openInProject = 0;
   for (const task of tasks) {
+    if (!isExecutableTask(task)) continue;
     if (task.sprintId && wanted.has(task.sprintId) && task.status === 'done') {
       doneBySprint.set(task.sprintId, (doneBySprint.get(task.sprintId) ?? 0) + 1);
     }
@@ -504,6 +510,7 @@ export function sprintBurndown(
   let carriedIn = 0;
 
   for (const task of tasks) {
+    if (!isExecutableTask(task)) continue;
     if (task.sprintId !== sprint.id) continue;
     scope += 1;
     if (task.status !== 'done') continue;
@@ -591,7 +598,7 @@ export function portfolioKpi(
     overdue += own.overdue;
     unassigned += own.unassigned;
   }
-  const visibleTasks = tasks.filter(task => task.projectId !== undefined && ids.has(task.projectId));
+  const visibleTasks = tasks.filter(task => isExecutableTask(task) && task.projectId !== undefined && ids.has(task.projectId));
   const weekly = doneByWeek(
     visibleTasks.map(task => ({ id: task.id, title: '', status: task.status, history: task.history })),
     CHART_WEEKS,

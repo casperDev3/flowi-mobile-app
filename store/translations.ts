@@ -2679,6 +2679,7 @@ export interface Translations {
   cardTeamReturn: string;
   cardTeamReopen: string;
   cardTeamFeedback: string;
+  cardTeamNeedsReviewer: string;
   cardTeamPending: string;
   cardTeamApproved: string;
   cardTeamChangesRequested: string;
@@ -5347,6 +5348,7 @@ const uk: Translations = {
   cardTeamReturn: 'Повернути на доопрацювання',
   cardTeamReopen: 'Повернути в роботу',
   cardTeamFeedback: 'Що потрібно доопрацювати',
+  cardTeamNeedsReviewer: 'Перевіряльник більше недоступний. Результат збережено — керівник має обрати заміну.',
   cardTeamPending: 'Очікує перевірки',
   cardTeamApproved: 'Результат прийнято',
   cardTeamChangesRequested: 'Повернуто на доопрацювання',
@@ -8014,6 +8016,7 @@ const en: Translations = {
   cardTeamReturn: 'Request changes',
   cardTeamReopen: 'Reopen',
   cardTeamFeedback: 'What needs to change',
+  cardTeamNeedsReviewer: 'The reviewer is no longer available. Your result is saved; a project lead needs to assign a replacement.',
   cardTeamPending: 'Waiting for review',
   cardTeamApproved: 'Result approved',
   cardTeamChangesRequested: 'Changes requested',

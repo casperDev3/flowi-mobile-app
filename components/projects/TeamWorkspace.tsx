@@ -1,3 +1,4 @@
+import { isExecutableTask } from '@/utils/task-contract';
 /**
  * components/projects/TeamWorkspace.tsx — «Моя робота», «Огляд» (командний
  * прогрес, вбудовано в overview.tsx), «Обговорення», «Навантаження».
@@ -76,7 +77,7 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
   const { tr } = useI18n();
 
   const host = useProjectTaskHost(pid);
-  const tasks = useMemo(() => host.tasks.filter(t => t.projectId === pid && !t.backlogKind), [host.tasks, pid]);
+  const tasks = useMemo(() => host.tasks.filter(t => t.projectId === pid && isExecutableTask(t)), [host.tasks, pid]);
   const milestones = useProjectRecords<Milestone>('milestones').filter(t => t.projectId === pid);
   const allPrefs = useProjectRecords<TeamPreferences>('team_preferences').filter(t => t.projectId === pid);
   const prefs = allPrefs.find(p => p.userId === uid);
@@ -96,7 +97,8 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
     () => apiFetch<{ results: WorkloadRow[] }>(`/projects/${encodeURIComponent(pid)}/workload/`).then(r => setLoads(r.results)),
     [pid],
   );
-  useEffect(() => { if (isLead(role)) void refreshLoad().catch(() => {}); }, [refreshLoad, role]);
+  const workloadKey = JSON.stringify([tasks, prefs]);
+  useEffect(() => { if (isLead(role)) void refreshLoad().catch(() => {}); }, [refreshLoad, role, workloadKey]);
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true); setError('');
     try { await action(); void syncProject(pid); } catch (e) { setError(String(e)); } finally { setBusy(false); }
@@ -105,7 +107,7 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
     saveProjectRecord('team_preferences', { ...prefs, id: teamPreferencesId(pid, uid), userId: uid, projectId: pid, ...patch });
 
   // myWork лише фільтрує вхідний масив — елементи лишаються тими самими Task.
-  const mine = myWork(tasks, uid) as unknown as Record<'assigned' | 'reviews' | 'blockers' | 'available', Task[]>;
+  const mine = myWork(tasks, uid, role) as unknown as Record<'assigned' | 'reviews' | 'blockers' | 'available', Task[]>;
   const counts = progress(mode === 'my-work' ? tasks.filter(t => t.assigneeId === uid) : tasks);
   const selectedTask = selected ? tasks.find(t => t.id === selected) ?? null : null;
   const canCreate = role !== 'viewer' && (mode === 'my-work' || mode === 'overview');

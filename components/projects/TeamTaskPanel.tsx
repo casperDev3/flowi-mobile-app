@@ -183,10 +183,10 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
   // ── Дії, що рухають задачу (вгорі: це те, заради чого вкладку відкривають)
   const actions: { key: string; label: string; icon: IconSymbolName; onPress: () => void; tone?: 'primary' | 'danger' }[] = [];
   if (rights.take) actions.push({ key: 'take', label: tr.cardTeamTake, icon: 'person.badge.plus', onPress: () => void commit({ assigneeId: uid }) });
-  if (rights.execute && startColumn && task.kanbanColumnId !== startColumn && task.status !== 'done' && task.reviewState !== 'pending') {
+  if (rights.execute && startColumn && task.kanbanColumnId !== startColumn && task.status !== 'done' && task.reviewState !== 'pending' && task.reviewState !== 'needs_reviewer') {
     actions.push({ key: 'start', label: tr.cardTeamStart, icon: 'play.fill', onPress: () => void commit({ kanbanColumnId: startColumn }) });
   }
-  if (rights.submit && task.status !== 'done' && task.reviewState !== 'pending') {
+  if (rights.submit && task.status !== 'done' && task.reviewState !== 'pending' && task.reviewState !== 'needs_reviewer') {
     actions.push(task.reviewRequired
       ? { key: 'submit', label: tr.cardTeamSubmitReview, icon: 'paperplane.fill', tone: 'primary', onPress: () => void commit({ reviewState: 'pending', status: 'active' }) }
       : { key: 'done', label: tr.cardTeamComplete, icon: 'checkmark.circle.fill', tone: 'primary', onPress: () => void commit({ status: 'done' }) });
@@ -202,7 +202,8 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
     actions.push({ key: 'reopen', label: tr.cardTeamReopen, icon: 'arrow.counterclockwise', onPress: () => void commit({ status: 'active', reviewState: 'none' }) });
   }
 
-  const reviewBanner = task.reviewState === 'pending' ? { text: tr.cardTeamPending, color: '#F59E0B', icon: 'clock' as const }
+  const reviewBanner = task.reviewState === 'needs_reviewer' ? { text: tr.cardTeamNeedsReviewer, color: '#F59E0B', icon: 'clock' as const }
+    : task.reviewState === 'pending' ? { text: tr.cardTeamPending, color: '#F59E0B', icon: 'clock' as const }
     : task.reviewState === 'approved' ? { text: tr.cardTeamApproved, color: '#10B981', icon: 'checkmark.seal' as const }
     : task.reviewState === 'changes_requested' ? { text: tr.cardTeamChangesRequested, color: '#EF4444', icon: 'exclamationmark.circle' as const }
     : null;
@@ -291,7 +292,7 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
           icon="checkmark.seal"
           label={tr.cardTeamReviewRequired}
           value={!!task.reviewRequired}
-          onChange={v => void commit({ reviewRequired: v })}
+          onChange={v => void commit({ reviewRequired: v, ...(!v ? { reviewerId: null, reviewState: 'none' as const } : {}) })}
           disabled={!rights.lead || busy}
           colors={c}
         />
@@ -302,7 +303,7 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
             options={reviewerOptions}
             value={task.reviewerId ?? null}
             selectedLabel={memberName(task.reviewerId)}
-            onChange={id => void commit({ reviewerId: id })}
+            onChange={id => void commit({ reviewerId: id, ...(task.reviewState === 'needs_reviewer' && id ? { reviewState: 'pending' as const } : {}) })}
             emptyOption={{ label: tr.taskAssigneeUnassigned, icon: 'person.slash' }}
             disabled={!rights.lead || busy}
             colors={c}

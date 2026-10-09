@@ -1,9 +1,11 @@
+import { isExecutableTask } from './task-contract';
 export type TeamRole = 'owner' | 'manager' | 'member' | 'viewer';
 export interface TeamTask {
+  backlogKind?: string; archivedAt?: string | null; deleted?: boolean;
   id: string; title: string; projectId?: string; status: string;
   assigneeId?: string | null; createdBy?: string; deadline?: string; priorityLevel?: number | null;
   estimatedMinutes?: number; reviewRequired?: boolean; reviewerId?: string | null;
-  reviewState?: 'none' | 'pending' | 'approved' | 'changes_requested'; reviewFeedback?: string;
+  reviewState?: 'none' | 'pending' | 'approved' | 'changes_requested' | 'needs_reviewer'; reviewFeedback?: string;
   resultRequirements?: ('summary' | 'link' | 'file')[]; resultSummary?: string;
   resultLinks?: string[]; resultFiles?: string[]; blocked?: boolean; blockReason?: string;
   blockedById?: string | null; dependencyIds?: string[];
@@ -28,14 +30,15 @@ export function resultProblem(task: TeamTask): string | null {
   }
   return null;
 }
-export function myWork(tasks: readonly TeamTask[], userId: string) {
-  const open = tasks.filter(t => !isComplete(t));
+export function myWork(tasks: readonly TeamTask[], userId: string, role: TeamRole = 'member') {
+  const open = role === 'viewer' ? [] : tasks.filter(t => isExecutableTask(t) && !isComplete(t));
   return { assigned: open.filter(t => t.assigneeId === userId).sort((a,b) => (a.priorityLevel ?? 9) - (b.priorityLevel ?? 9) || (a.deadline ?? 'z').localeCompare(b.deadline ?? 'z')),
     reviews: open.filter(t => t.reviewerId === userId && t.reviewState === 'pending'),
-    blockers: open.filter(t => t.blocked && t.blockedById === userId),
+    blockers: open.filter(t => (t.blocked && t.blockedById === userId) || (isLead(role) && t.reviewState === 'needs_reviewer')),
     available: open.filter(t => !t.assigneeId) };
 }
 export function progress(tasks: readonly TeamTask[], now = new Date()) {
+  tasks = tasks.filter(isExecutableTask);
   const active = tasks.filter(t => !isComplete(t));
   return { total: tasks.length, done: tasks.length - active.length,
     blocked: active.filter(t => t.blocked).length,
@@ -59,6 +62,6 @@ export function teamPreferencesId(projectId: string, userId: string): string {
 export function projectedRemaining(row: WorkloadRow, before: TeamTask, after: TeamTask, now = new Date()): number | null {
   if (row.remainingMinutes === null) return null;
   const end = new Date(now); end.setDate(end.getDate() + (7 - ((end.getDay() + 6) % 7))); end.setHours(0,0,0,0);
-  const minutes = (task: TeamTask) => task.assigneeId === row.userId && !isComplete(task) && task.deadline && new Date(task.deadline).getTime() < end.getTime() ? (task.estimatedMinutes ?? 0) : 0;
+  const minutes = (task: TeamTask) => isExecutableTask(task) && task.assigneeId === row.userId && !isComplete(task) && task.deadline && new Date(task.deadline).getTime() < end.getTime() ? (task.estimatedMinutes ?? 0) : 0;
   return row.remainingMinutes + minutes(before) - minutes(after);
 }

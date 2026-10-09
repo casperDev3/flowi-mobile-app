@@ -1,3 +1,4 @@
+import { isExecutableTask } from './task-contract';
 /**
  * utils/projectCharts.ts — агрегації для аналітики проєктів.
  *
@@ -39,6 +40,7 @@ import type { Status } from './taskUtils';
  * projectStats.ts.
  */
 export interface ChartTaskLike {
+  backlogKind?: string; archivedAt?: string; deleted?: boolean;
   id: string;
   title: string;
   status: string;
@@ -156,7 +158,7 @@ export function tasksForProjects<T extends ChartTaskLike>(
   projectIds: Iterable<string>,
 ): T[] {
   const wanted = new Set(projectIds);
-  return tasks.filter(task => task.projectId !== undefined && wanted.has(task.projectId));
+  return tasks.filter(task => isExecutableTask(task) && task.projectId !== undefined && wanted.has(task.projectId));
 }
 
 // ─── 1. Розподіл задач за колонками дошки ────────────────────────────────────
@@ -195,6 +197,7 @@ export function columnDistribution(
 ): ColumnSlice[] {
   const counts = new Map<string, number>();
   for (const task of tasks) {
+    if (!isExecutableTask(task)) continue;
     // Каст, а не зведення до 'active' | 'done': status тут рядок, бо екрани
     // тримають власні звужені типи задачі, а віддати taskColumnId уже
     // «випрямлене» значення означало б вирішити за нього. Веб на цьому місці
@@ -279,6 +282,7 @@ export function doneByWeek(
   let undated = 0;
 
   for (const task of tasks) {
+    if (!isExecutableTask(task)) continue;
     if (task.status !== 'done') continue;
     const at = doneAt(task);
     if (!at) {
@@ -344,6 +348,7 @@ export function timeByProject(
 ): ProjectTimeSlice[] {
   const seconds = new Map<string, number>();
   for (const task of tasks) {
+    if (!isExecutableTask(task)) continue;
     if (!task.projectId) continue;
     const value = trackedSeconds(task);
     if (!value) continue;
@@ -413,6 +418,7 @@ export function deadlineLoad(
   let undated = 0;
 
   for (const task of tasks) {
+    if (!isExecutableTask(task)) continue;
     if (task.status === 'done') continue;
     const at = parseDate(task.deadline);
     if (!at) {
@@ -634,6 +640,7 @@ export function buildGantt(
   const raw: RawRow[] = [];
   let skipped = 0;
   for (const task of tasks) {
+    if (!isExecutableTask(task)) continue;
     const built = ganttRow(task, colors.get(task.projectId ?? '') ?? fallbackColor, nowAt);
     if (built) raw.push(built);
     else skipped += 1;

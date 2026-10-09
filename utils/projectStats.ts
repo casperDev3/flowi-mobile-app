@@ -1,3 +1,4 @@
+import { isExecutableTask } from './task-contract';
 /**
  * utils/projectStats.ts — метрики проєкту.
  *
@@ -31,6 +32,7 @@ export interface ProjectLike {
 }
 
 export interface ProjectTaskLike {
+  backlogKind?: string; archivedAt?: string; deleted?: boolean;
   id: string;
   projectId?: string;
   status: string;
@@ -113,7 +115,7 @@ export function projectStats(
   now: Date = new Date(),
   activeSessions: ActiveSessionLike[] = [],
 ): ProjectStats {
-  const own = tasks.filter(task => task.projectId === project.id);
+  const own = tasks.filter(task => isExecutableTask(task) && task.projectId === project.id);
   const done = own.filter(task => task.status === 'done').length;
   const today = dayNumber(now);
 
@@ -121,6 +123,7 @@ export function projectStats(
   let nearest: { iso: string; at: number } | null = null;
   let activity = laterIso(null, project.updatedAt ?? project.createdAt);
   for (const task of own) {
+    if (!isExecutableTask(task)) continue;
     activity = laterIso(activity, task.updatedAt ?? task.createdAt);
     if (task.status === 'done') continue;
     const at = deadlineTime(task);
@@ -353,7 +356,7 @@ export function projectTimeline(
   tasks: ProjectTaskLike[],
   now: Date = new Date(),
 ): TimelineBucket[] {
-  const own = tasks.filter(task => task.projectId === project.id);
+  const own = tasks.filter(task => isExecutableTask(task) && task.projectId === project.id);
   const stamped = own.flatMap(task => {
     const at = deadlineTime(task);
     return at === null ? [] : [{ at, done: task.status === 'done' }];

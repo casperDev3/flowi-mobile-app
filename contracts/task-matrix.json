@@ -1,0 +1,278 @@
+{
+  "version": 1,
+  "now": "2026-10-09T00:00:00Z",
+  "tasks": [
+    {
+      "id": "personal",
+      "title": "Personal",
+      "status": "active"
+    },
+    {
+      "id": "assigned",
+      "title": "assigned",
+      "projectId": "p",
+      "status": "active",
+      "assigneeId": "u",
+      "estimatedMinutes": 60,
+      "deadline": "2026-10-08"
+    },
+    {
+      "id": "review",
+      "title": "review",
+      "projectId": "p",
+      "status": "active",
+      "assigneeId": "v",
+      "reviewerId": "u",
+      "reviewRequired": true,
+      "reviewState": "pending",
+      "estimatedMinutes": 20
+    },
+    {
+      "id": "blocker",
+      "title": "blocker",
+      "projectId": "p",
+      "status": "active",
+      "assigneeId": "v",
+      "blocked": true,
+      "blockReason": "Input",
+      "blockedById": "u",
+      "estimatedMinutes": 15
+    },
+    {
+      "id": "unassigned",
+      "title": "unassigned",
+      "projectId": "p",
+      "status": "active",
+      "createdBy": "u"
+    },
+    {
+      "id": "legacy",
+      "title": "Legacy",
+      "status": "active",
+      "projectId": "local-old"
+    },
+    {
+      "id": "idea",
+      "title": "idea",
+      "projectId": "p",
+      "status": "active",
+      "backlogKind": "idea",
+      "assigneeId": "u",
+      "estimatedMinutes": 100,
+      "deadline": "2020-01-01"
+    },
+    {
+      "id": "bug",
+      "title": "bug",
+      "projectId": "p",
+      "status": "active",
+      "backlogKind": "bug",
+      "assigneeId": "u",
+      "estimatedMinutes": 200,
+      "deadline": "2020-01-01"
+    },
+    {
+      "id": "converted",
+      "title": "converted",
+      "projectId": "p",
+      "status": "active",
+      "assigneeId": "u",
+      "estimatedMinutes": 30,
+      "deadline": "2026-10-09"
+    },
+    {
+      "id": "archived",
+      "title": "archived",
+      "projectId": "p",
+      "status": "active",
+      "assigneeId": "u",
+      "archivedAt": "2026-10-01",
+      "estimatedMinutes": 400
+    },
+    {
+      "id": "done",
+      "title": "done",
+      "projectId": "p",
+      "status": "done",
+      "assigneeId": "u",
+      "reviewRequired": true,
+      "reviewState": "approved"
+    },
+    {
+      "id": "needs",
+      "title": "needs",
+      "projectId": "p",
+      "status": "active",
+      "assigneeId": "v",
+      "reviewRequired": true,
+      "reviewState": "needs_reviewer",
+      "resultSummary": "Retained result"
+    }
+  ],
+  "cases": [
+    {
+      "name": "owner",
+      "userId": "u",
+      "roles": {
+        "p": "owner"
+      },
+      "personal": [
+        "personal",
+        "assigned",
+        "legacy",
+        "converted",
+        "done"
+      ],
+      "queues": {
+        "assigned": [
+          "assigned",
+          "converted"
+        ],
+        "reviews": [
+          "review"
+        ],
+        "blockers": [
+          "blocker",
+          "needs"
+        ],
+        "available": [
+          "unassigned"
+        ]
+      }
+    },
+    {
+      "name": "manager",
+      "userId": "u",
+      "roles": {
+        "p": "manager"
+      },
+      "personal": [
+        "personal",
+        "assigned",
+        "legacy",
+        "converted",
+        "done"
+      ],
+      "queues": {
+        "assigned": [
+          "assigned",
+          "converted"
+        ],
+        "reviews": [
+          "review"
+        ],
+        "blockers": [
+          "blocker",
+          "needs"
+        ],
+        "available": [
+          "unassigned"
+        ]
+      }
+    },
+    {
+      "name": "member",
+      "userId": "u",
+      "roles": {
+        "p": "member"
+      },
+      "personal": [
+        "personal",
+        "assigned",
+        "legacy",
+        "converted",
+        "done"
+      ],
+      "queues": {
+        "assigned": [
+          "assigned",
+          "converted"
+        ],
+        "reviews": [
+          "review"
+        ],
+        "blockers": [
+          "blocker"
+        ],
+        "available": [
+          "unassigned"
+        ]
+      }
+    },
+    {
+      "name": "viewer",
+      "userId": "u",
+      "roles": {
+        "p": "viewer"
+      },
+      "personal": [
+        "personal",
+        "legacy"
+      ],
+      "queues": {
+        "assigned": [],
+        "reviews": [],
+        "blockers": [],
+        "available": []
+      }
+    }
+  ],
+  "projectProgress": {
+    "total": 7,
+    "done": 1,
+    "blocked": 1,
+    "pending": 1,
+    "overdue": 1
+  },
+  "workloadU": {
+    "activeCount": 2,
+    "plannedMinutes": 90
+  },
+  "legacyCases": [
+    {
+      "task": {
+        "id": "known-owner",
+        "title": "known-owner",
+        "projectId": "p",
+        "status": "active",
+        "createdBy": "u"
+      },
+      "roles": {
+        "p": "owner"
+      },
+      "expected": false
+    },
+    {
+      "task": {
+        "id": "unknown-other",
+        "title": "unknown-other",
+        "projectId": "local-old",
+        "status": "active",
+        "assigneeId": "v"
+      },
+      "roles": {},
+      "expected": false
+    },
+    {
+      "task": {
+        "id": "unknown-self",
+        "title": "unknown-self",
+        "projectId": "local-old",
+        "status": "active",
+        "assigneeId": "u"
+      },
+      "roles": {},
+      "expected": true
+    },
+    {
+      "task": {
+        "id": "unloaded",
+        "title": "unloaded",
+        "projectId": "p",
+        "status": "active",
+        "assigneeId": "v"
+      },
+      "expected": false
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 import {
   endOfMonth, formatMonthYear, isInMonth, isSameDay, isSameMonth, localDateKey, nextMonth,
   parseLocalDateInput, prevMonth, resolveTimelineDatePatch, startOfMonth,
@@ -59,10 +61,12 @@ describe('resolveTimelineDatePatch (review finding: Таймлайн проєк�
   test('localDateKey зберігає той самий день, що показувала форма, для UTC-північі попереднього дня', () => {
     // 2026-09-20 00:00 у UTC+3 — це збережений ISO `2026-09-19T21:00:00.000Z`.
     // Стара `.slice(0, 10)` показала б «2026-09-19» — на день раніше.
-    const storedUtcMidnightOfPrevDay = new Date('2026-09-19T21:00:00.000Z');
-    expect(localDateKey(storedUtcMidnightOfPrevDay)).not.toBe(
-      storedUtcMidnightOfPrevDay.toISOString().slice(0, 10),
-    );
+    const script = `import { localDateKey } from ${JSON.stringify(path.resolve(__dirname, '../utils/dateUtils.ts'))}; const date = new Date('2026-09-19T21:00:00.000Z'); console.log(JSON.stringify([localDateKey(date), date.toISOString().slice(0,10)]));`;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env, TZ: 'Etc/GMT-3' }, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+    const [local, utc] = JSON.parse(result.stdout);
+    expect(local).toBe('2026-09-20');
+    expect(local).not.toBe(utc);
   });
 
   test('«Зберегти» без правок — patch порожній (ні startDate, ні deadline), навіть round-trip того самого дня', () => {

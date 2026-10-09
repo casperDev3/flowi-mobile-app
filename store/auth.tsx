@@ -28,6 +28,7 @@ import {
   apiFetch,
   clearTokens,
   onSessionExpired,
+  changePasswordSession,
   REFRESH_SECURE_KEY,
   setTokens,
 } from './api';
@@ -821,12 +822,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── changePassword ─────────────────────────────────────────────────────────
   const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
-    const data = await apiFetch<{ access: string; refresh: string }>(
-      '/auth/password/change/',
-      { method: 'POST', body: { old_password: oldPassword, new_password: newPassword } },
-    );
-    // Зберігаємо нові токени, що повертає сервер після зміни пароля
-    await setTokens(data.access, data.refresh);
+    await changePasswordSession(oldPassword, newPassword);
   }, []);
 
   // ── deleteAccount ──────────────────────────────────────────────────────────

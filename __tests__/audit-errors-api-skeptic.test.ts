@@ -1,5 +1,5 @@
 /**
- * ERR-02: чи справді тимчасова відмова /auth/refresh/ (5xx) вбиває живу сесію
+ * ERR-02: регресія: тимчасова відмова /auth/refresh/ (5xx) не вбиває живу сесію
  * в apiFetch, хоч performRefresh повертає 'retry'.
  */
 
@@ -32,7 +32,7 @@ const json = (body: unknown, status = 200) => ({
   json: async () => body,
 });
 
-it('ERR-02: 401 на запиті + 503 на /auth/refresh/ → токени стерто, session-expired', async () => {
+it('ERR-02: 401 на запиті + 503 на /auth/refresh/ → network, токени збережено', async () => {
   const { api, store } = loadApi();
   global.fetch = (async (url: string) => {
     const path = String(url).replace(/^https?:\/\/[^/]+/, '').replace(/^\/api/, '');
@@ -42,13 +42,13 @@ it('ERR-02: 401 на запиті + 503 на /auth/refresh/ → токени с�
 
   let expired = false;
   const off = api.onSessionExpired(() => { expired = true; });
-  await expect(api.apiFetch('/tasks/')).rejects.toMatchObject({ code: 'session_expired' });
+  await expect(api.apiFetch('/tasks/')).rejects.toMatchObject({ code: 'network' });
   off();
 
-  // Живий refresh-токен знищено через тимчасову відмову сервера:
-  expect(store.flowi_refresh).toBeUndefined();
-  expect(store.flowi_access).toBeUndefined();
-  expect(expired).toBe(true);
+  // Тимчасова відмова не є доказом відкликання сесії:
+  expect(store.flowi_refresh).toBe('refresh-live');
+  expect(store.flowi_access).toBe('access-old');
+  expect(expired).toBe(false);
 });
 
 it('контрольний зразок: refreshSession на 503 токени НЕ чіпає', async () => {

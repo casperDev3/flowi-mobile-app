@@ -203,3 +203,34 @@ describe('токен для сокета', () => {
     expect(store.flowi_refresh).toBe('refresh-old');
   });
 });
+
+it('late rejected refresh cannot erase a newly signed-in session', async () => {
+  const { api, store } = loadApi();
+  let reply!: (value: unknown) => void;
+  let started!: () => void;
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  global.fetch = jest.fn(() => { started(); return new Promise(resolve => { reply = resolve; }); }) as unknown as typeof fetch;
+  const expired = jest.fn(); const unsubscribe = api.onSessionExpired(expired);
+  const refreshing = api.refreshSession(); await ready;
+  await api.setTokens('new-login', 'new-refresh');
+  reply(json({}, 401));
+  expect(await refreshing).toBe('ok');
+  expect(store.flowi_access).toBe('new-login');
+  expect(expired).not.toHaveBeenCalled(); unsubscribe();
+});
+
+it('WS refresh during password change waits for the returned new pair', async () => {
+  const { api, store } = loadApi();
+  let reply!: (value: unknown) => void;
+  let started!: () => void;
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  global.fetch = jest.fn(() => { started(); return new Promise(resolve => { reply = resolve; }); }) as unknown as typeof fetch;
+  const changing = api.changePasswordSession('old-password', 'new-password');
+  await ready;
+  const refreshing = api.refreshSession();
+  reply(json({ access: 'changed-access', refresh: 'changed-refresh' }));
+  await changing;
+  expect(await refreshing).toBe('ok');
+  expect(store.flowi_access).toBe('changed-access');
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});

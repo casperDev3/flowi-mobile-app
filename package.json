@@ -61,7 +61,9 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.5.1"
+    "react-native-worklets": "0.5.1",
+    "decode-uri-component": "file:./vendor/decode-uri-component",
+    "image-size": "file:./vendor/image-size"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -87,8 +89,8 @@
     "@bacons/xcode": {
       "uuid": "11.1.1"
     },
-    "image-size": "file:./vendor/image-size",
-    "decode-uri-component": "file:./vendor/decode-uri-component",
+    "image-size": "$image-size",
+    "decode-uri-component": "$decode-uri-component",
     "shell-quote": "1.12.0",
     "source-map-js": "1.2.2"
   }

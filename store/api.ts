@@ -23,6 +23,8 @@ export const REFRESH_SECURE_KEY = 'flowi_refresh';
 
 // ─── Кеш access-токена в пам'яті ────────────────────────────────────────────
 let _accessCache: string | null = null;
+let tokenRevision = 0;
+let passwordChangeInFlight: Promise<void> | null = null;
 
 export async function getAccessToken(): Promise<string | null> {
   if (_accessCache) return _accessCache;
@@ -32,12 +34,14 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 export async function setTokens(access: string, refresh: string): Promise<void> {
+  tokenRevision++;
   _accessCache = access;
   await SecureStore.setItemAsync(ACCESS_KEY, access);
   await SecureStore.setItemAsync(REFRESH_SECURE_KEY, refresh);
 }
 
 export async function clearTokens(): Promise<void> {
+  tokenRevision++;
   _accessCache = null;
   await SecureStore.deleteItemAsync(ACCESS_KEY);
   await SecureStore.deleteItemAsync(REFRESH_SECURE_KEY);
@@ -144,6 +148,7 @@ export type RefreshOutcome = 'ok' | 'invalid' | 'retry';
 
 /** Спроба оновити access-токен через /auth/refresh/. */
 async function performRefresh(): Promise<RefreshOutcome> {
+  const revision = tokenRevision;
   try {
     const refresh = await SecureStore.getItemAsync(REFRESH_SECURE_KEY);
     if (!refresh) return 'invalid';
@@ -158,9 +163,12 @@ async function performRefresh(): Promise<RefreshOutcome> {
     } catch {
       return 'retry';
     }
+    if (passwordChangeInFlight) await passwordChangeInFlight.catch(() => {});
+    if (revision !== tokenRevision) return _accessCache ? 'ok' : 'invalid';
     if (!res.ok) return res.status === 401 || res.status === 400 ? 'invalid' : 'retry';
 
     const data = (await res.json()) as { access: string; refresh: string };
+    if (revision !== tokenRevision) return _accessCache ? 'ok' : 'invalid';
     await setTokens(data.access, data.refresh);
     return 'ok';
   } catch {
@@ -171,6 +179,7 @@ async function performRefresh(): Promise<RefreshOutcome> {
 let _refreshInFlight: Promise<RefreshOutcome> | null = null;
 
 function tryRefresh(): Promise<RefreshOutcome> {
+  if (passwordChangeInFlight) return passwordChangeInFlight.then(() => 'ok' as const, () => performRefresh());
   if (_refreshInFlight) return _refreshInFlight;
   const run = performRefresh().finally(() => {
     // Порівняння з run, а не безумовне обнулення: інакше запізніла відповідь
@@ -186,8 +195,9 @@ function tryRefresh(): Promise<RefreshOutcome> {
  * lib/api.ts refreshSession). Мертва сесія прибирається так само, як в apiFetch.
  */
 export async function refreshSession(): Promise<RefreshOutcome> {
+  const revision = tokenRevision;
   const outcome = await tryRefresh();
-  if (outcome === 'invalid') {
+  if (outcome === 'invalid' && revision === tokenRevision) {
     await clearTokens();
     emitSessionExpired();
   }
@@ -272,8 +282,9 @@ export async function apiFetch<T>(
 
   // 401 + auth → одна спроба refresh (спільна на всі паралельні запити) → повтор
   if (res.status === 401 && auth) {
-    const refreshed = (await tryRefresh()) === 'ok';
-    if (refreshed) {
+    const outcome = await tryRefresh();
+    if (outcome === 'retry') throw new ApiError(0, 'network', 'Server temporarily unavailable');
+    if (outcome === 'ok') {
       // Читаємо токен саме ТУТ, після await: якщо оновлення робив хтось інший,
       // у headers лежить уже мертвий токен, з яким повтор дасть 401 і вихід.
       const newToken = await getAccessToken();
@@ -284,8 +295,10 @@ export async function apiFetch<T>(
 
   // Після другої спроби все ще 401 → сесія мертва
   if (res.status === 401 && auth) {
-    await clearTokens();
-    emitSessionExpired();
+    if ((headers as Record<string, string>)['Authorization'] === `Bearer ${await getAccessToken()}`) {
+      await clearTokens();
+      emitSessionExpired();
+    }
     throw new ApiError(401, 'session_expired', 'Session expired');
   }
 
@@ -305,4 +318,20 @@ export async function apiFetch<T>(
   if (res.status === 204 || res.status === 205) return undefined as unknown as T;
 
   return res.json() as Promise<T>;
+}
+
+/** Serialize password replacement with WS-triggered refresh so the new pair survives. */
+export async function changePasswordSession(oldPassword: string, newPassword: string): Promise<void> {
+  if (passwordChangeInFlight) throw new Error('Password change already in progress');
+  if (!isOnlineMode()) throw new OfflineError();
+  await getFreshAccessToken();
+  const headers = await buildHeaders(true);
+  const operation = (async () => {
+    const response = await doFetch('/auth/password/change/', { method: 'POST', headers, body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }) });
+    if (!response.ok) throw await parseErrorBody(response);
+    const data = await response.json() as { access: string; refresh: string };
+    await setTokens(data.access, data.refresh);
+  })();
+  passwordChangeInFlight = operation;
+  try { await operation; } finally { if (passwordChangeInFlight === operation) passwordChangeInFlight = null; }
 }

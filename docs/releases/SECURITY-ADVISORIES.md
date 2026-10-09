@@ -26,3 +26,7 @@ After compatible overrides: 0 critical, 45 high, 5 moderate nodes; direct high r
 ## Reproduced test failure
 
 The apparent finance-feed/tablet failure was order-dependent: task-card.test mounted a running ElapsedClock and never unmounted it. The shared interval fired after Jest tore down that file, causing an import-after-teardown followed by React's window.dispatchEvent error in the next suite. Fix: track every renderer in task-card.test and unmount in afterEach inside act. Assertions remain unchanged; no forceExit, skipped test or mocked-out clock was introduced. Full suite after fix: 214 suites / 2876 tests passed.
+
+Clean Linux CI also exposed stale relative `file:` overrides in the npm lockfile (vendor paths nested under query-string/metro). Both shims are now root file dependencies referenced by `$dependency` overrides, so npm ci resolves checked-in vendor directories consistently. The date regression now runs its UTC+3 fixture in a child process with an explicit timezone instead of depending on the runner timezone.
+
+Session client tests additionally cover a delayed old refresh after a new login and a WS refresh racing password change. Temporary refresh 503 now retains tokens (the old audit reproduction is converted into an assertion of the corrected behavior); no auth assertions were removed.

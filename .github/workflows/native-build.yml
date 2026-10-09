@@ -12,7 +12,7 @@ jobs:
         with: {node-version: '22', cache: npm}
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - run: npm ci
       - run: npx expo prebuild --platform android --no-install
       - run: cd android && ./gradlew assembleRelease --no-daemon

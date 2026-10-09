@@ -11,7 +11,7 @@ Scope: account-wide access/refresh revocation and live WS revalidation; logout-a
 ## Clean reproduction
 
 1. Clone the repository into an empty directory, checkout the exact candidate SHA from the cross-repository manifest. Do not copy `.env`, `node_modules`, local databases or generated native directories.
-2. Server: Python 3.13+, `pip install -r requirements.lock.txt`, provide a new non-production SECRET_KEY and temporary DATABASE_URL. Run `manage.py check`, `makemigrations --check --dry-run`, `test --noinput`, `migrate --noinput`, `collectstatic --noinput`.
+2. Server: Python 3.13+, `pip install -r requirements.lock.txt`, provide a new non-production SECRET_KEY and temporary DATABASE_URL and `STATIC_ROOT=/tmp/flowi-ci-static` (generated assets must stay outside the checkout). Run `manage.py check`, `makemigrations --check --dry-run`, `test --noinput`, `migrate --noinput`, `collectstatic --noinput`.
 3. Web: Node 22, `npm ci`, `npm run ci:release`. Core Playwright requires the candidate server, a separate disposable database and explicit FLOWI_E2E_API_PORT / FLOWI_E2E_WEB_PORT. Run the complete default Playwright configuration.
 4. Mobile: Node 22, `npm ci`, `npm run typecheck`, `npm run lint`, `npm test -- --ci --runInBand`, `npx expo export --platform ios --platform android --source-maps --output-dir artifacts/export`, `node scripts/audit-gate.mjs`.
 5. Native builds use fresh Expo prebuild in an isolated checkout. iOS simulator Release build is not App Store signing or physical-device evidence. Android APK build is not push-delivery or physical-device evidence.

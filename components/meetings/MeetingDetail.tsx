@@ -1,3 +1,5 @@
+import { MeetingAudio } from './MeetingAudio';
+import { MeetingWorkspace } from './MeetingWorkspace';
 import { Atlas } from '@/constants/atlas';
 /**
  * components/meetings/MeetingDetail.tsx — ПЕРЕГЛЯД зустрічі.
@@ -17,8 +19,9 @@ import { Atlas } from '@/constants/atlas';
  * таймер, протрекований час і записи — властивість оригіналу, бо копії
  * повторів існують лише в памʼяті.
  */
-import React from 'react';
-import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { MeetingComments } from './MeetingComments';
+import { AccessibilityInfo, LayoutAnimation, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { MeetingProjectChip, type MeetingChipProject } from '@/components/meetings/MeetingProjectChip';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
@@ -149,6 +152,21 @@ export function MeetingDetailBody({
   meeting, original, project, timer, onToggleTimer, onEdit, onRecord, onPlayRecording, onDeleteRecording, playingUri,
   colors: c, tr, locale,
 }: MeetingDetailBodyProps) {
+  const [tab, setTab] = useState('info');
+  const reduceMotion = useRef(true);
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active) reduceMotion.current = value; });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', value => { reduceMotion.current = value; });
+    return () => { active = false; subscription.remove(); };
+  }, []);
+  const selectTab = (next: string) => {
+    if (next === tab) return;
+    if (!reduceMotion.current) LayoutAnimation.configureNext({ ...LayoutAnimation.Presets.easeInEaseOut, duration: 200 });
+    setTab(next);
+  };
+  const en = locale.startsWith('en');
+  const tabs = [{ id: 'info', label: en ? 'Info' : 'Інформація' }, { id: 'agenda', label: en ? 'Agenda' : 'Порядок денний' }, { id: 'notes', label: en ? 'Notes' : 'Нотатки' }, { id: 'media', label: en ? 'Media' : 'Медіа' }, { id: 'comments', label: en ? 'Comments' : 'Коментарі' }];
   const units = durationUnits(tr);
   const tracked = meetingTrackedSeconds(original);
   const recordings = original.recordings ?? [];
@@ -172,6 +190,10 @@ export function MeetingDetailBody({
         </View>
       ) : null}
 
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6 }}>
+        {tabs.map(item => <TouchableOpacity key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => selectTab(item.id)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: Atlas.radius.medium, backgroundColor: tab === item.id ? ACCENT + '20' : c.dim }}><Text style={{ color: tab === item.id ? ACCENT : c.text, fontWeight: Atlas.type.headingWeight }}>{item.label}</Text></TouchableOpacity>)}
+      </ScrollView>
+      <View style={{ display: tab === 'info' ? 'flex' : 'none' }}>
       {/* Date */}
       <View style={[st.row, { backgroundColor: c.dim }]}>
         <IconSymbol name="calendar" size={15} color={c.sub} />
@@ -209,6 +231,8 @@ export function MeetingDetailBody({
         </View>
       ) : null}
 
+      </View>
+      <View style={{ display: tab === 'media' ? 'flex' : 'none' }}>
       {/* Recordings */}
       {showRecordings ? (
         <View style={{ marginBottom: 8 }}>
@@ -240,6 +264,14 @@ export function MeetingDetailBody({
           ))}
         </View>
       ) : null}
+
+      <MeetingAudio key={`audio-${original.id}`} meeting={original} colors={c} />
+      </View>
+      <View style={{ display: tab === 'agenda' || tab === 'notes' ? 'flex' : 'none' }}>
+        <MeetingWorkspace key={`workspace-${original.id}`} meeting={original} date={meeting.date} colors={c} section={tab === 'notes' ? 'notes' : 'agenda'} />
+      </View>
+      <View style={{ display: tab === 'comments' ? 'flex' : 'none' }}><MeetingComments meeting={original} colors={c} tr={tr} locale={locale} /></View>
+      <View style={{ display: tab === 'info' ? 'flex' : 'none' }}>
 
       {/* Таймер наради. Реєстр той самий, що у завдань (active_timers), тому
           запущена звідси нарада видно й на вкладці «Час», і в повноекранній
@@ -303,13 +335,14 @@ export function MeetingDetailBody({
           <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{tr.edit}</Text>
         </TouchableOpacity>
       </View>
+      </View>
     </View>
   );
 }
 
 const st = StyleSheet.create({
   headerWrap:   { paddingBottom: 14 },
-  handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+  handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   headerRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
   colorBar:     { width: 4, alignSelf: 'stretch', minHeight: 44, borderRadius: 2 },
   title:        { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4 },

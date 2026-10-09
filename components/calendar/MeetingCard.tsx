@@ -1,3 +1,4 @@
+import { copyMeeting } from '@/utils/meetingSharing';
 /**
  * components/calendar/MeetingCard.tsx — картка зустрічі у списку дня календаря.
  *
@@ -45,7 +46,7 @@ export const MeetingCard = React.memo(function MeetingCard({
   deleteLabel: string;
   recordLabel: string;
 }) {
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const dur = meetingDurationLabel(mtg.durationMinutes, { hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute });
   const mtgDt = new Date(`${mtg.date}T${mtg.time || '00:00'}`);
   const now = new Date();
@@ -94,6 +95,9 @@ export const MeetingCard = React.memo(function MeetingCard({
               ) : null}
             </View>
           </View>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={lang === 'en' ? 'Copy meeting details' : 'Копіювати інформацію про зустріч'} onPress={e => { e.stopPropagation(); void copyMeeting(mtg, lang === 'en'); }} style={[st.iconBtn, { backgroundColor: c.dim }]}>
+            <IconSymbol name="doc.on.doc" size={16} color={c.sub} />
+          </TouchableOpacity>
           {onRecord && (
             <TouchableOpacity
               onPress={e => { e.stopPropagation(); onRecord(mtg); }}

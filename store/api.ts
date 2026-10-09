@@ -83,7 +83,7 @@ export class ApiError extends Error {
 // ─── Внутрішні хелпери ───────────────────────────────────────────────────────
 async function doFetch(path: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  const timeoutId = setTimeout(() => controller.abort(), typeof FormData !== 'undefined' && init.body instanceof FormData ? 120_000 : 15_000);
   try {
     return await fetch(`${getApiBase()}${path}`, { ...init, signal: controller.signal });
   } catch (e) {
@@ -260,10 +260,12 @@ export async function apiFetch<T>(
       (headers as Record<string, string>)[name] = value;
     }
   }
+  const multipart = typeof FormData !== 'undefined' && body instanceof FormData;
+  if (multipart) delete (headers as Record<string, string>)['Content-Type'];
   const init: RequestInit = {
     method,
     headers,
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    ...(body !== undefined ? { body: multipart ? body as FormData : JSON.stringify(body) } : {}),
   };
 
   let res = await doFetch(path, init);

@@ -48,9 +48,9 @@ const GROUPS_KEY = 'project-sidebar-groups';
 
 /** Групи розділів. Перша — без заголовка (щоденне), решта згортаються. */
 const GROUPS: { id: string; labelKey: 'projectNavGroupTasks' | 'projectNavGroupWork' | 'projectNavGroupTeam' | null; keys: ProjectSectionKey[] }[] = [
-  { id: 'main', labelKey: null, keys: ['my-work', 'tasks', 'calendar'] },
+  { id: 'main', labelKey: null, keys: ['overview', 'my-work', 'tasks', 'calendar'] },
   // id груп — старі підписи: так лишаються чинними вже збережені згортання.
-  { id: 'Завдання', labelKey: 'projectNavGroupTasks', keys: ['overview', 'backlog', 'archive', 'sprints'] },
+  { id: 'Завдання', labelKey: 'projectNavGroupTasks', keys: ['backlog', 'archive', 'sprints'] },
   { id: 'Робота', labelKey: 'projectNavGroupWork', keys: ['notes', 'time', 'budget'] },
   { id: 'Команда', labelKey: 'projectNavGroupTeam', keys: ['discussions', 'workload', 'members'] },
 ];
@@ -169,7 +169,7 @@ export function ProjectSidebar({
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 8, paddingBottom: 16 }}>
         {GROUPS.map((group, index) => {
-          const groupItems = items.filter(item => group.keys.includes(item.key));
+          const groupItems = group.keys.flatMap(key => items.filter(item => item.key === key));
           if (!groupItems.length) return null;
           const groupClosed = !collapsed && !!group.labelKey && closed.includes(group.id);
           const label = group.labelKey ? tr[group.labelKey] : '';

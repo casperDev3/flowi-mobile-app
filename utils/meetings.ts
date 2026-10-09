@@ -32,6 +32,7 @@ export interface Meeting {
   location?: string;
   link?: string;
   notes?: string;
+  agenda?: { id: string; text: string; done: boolean }[];
   color: string;
   recurrence?: RecurrenceRule;
   /** Google Calendar event ID — за ним імпорт впізнає вже завантажене. */

@@ -51,6 +51,7 @@ export interface CommentsSectionProps {
   targetId: string;
   isOwner: boolean;
   currentUserId: string | null;
+  readOnly?: boolean;
   colors: CommentsSectionColors;
   isDark: boolean;
   locale: string;
@@ -69,7 +70,7 @@ function initials(name: string): string {
 }
 
 export function CommentsSection({
-  projectId, targetType, targetId, isOwner, currentUserId, colors: c, isDark, locale, tr,
+  projectId, targetType, targetId, isOwner, currentUserId, readOnly = false, colors: c, isDark, locale, tr,
 }: CommentsSectionProps) {
   const [all, setAll] = useState<Comment[]>([]);
   const [members, setMembers] = useState<MemberOut[]>([]);
@@ -122,7 +123,7 @@ export function CommentsSection({
 
   const submit = useCallback(async () => {
     const body = draft.trim();
-    if (!body || !currentUserId || busy) return;
+    if (readOnly || !body || !currentUserId || busy) return;
     setBusy(true);
     try {
       await trackWrite(async () => {
@@ -138,7 +139,7 @@ export function CommentsSection({
     } finally {
       setBusy(false);
     }
-  }, [draft, currentUserId, busy, trackWrite, projectId, targetType, targetId]);
+  }, [draft, currentUserId, busy, trackWrite, projectId, targetType, targetId, readOnly]);
 
   const startEdit = useCallback((comment: Comment) => {
     setEditingId(comment.id);
@@ -185,8 +186,8 @@ export function CommentsSection({
         <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginVertical: 16 }}>{tr.commentsEmpty}</Text>
       ) : (
         comments.map(comment => {
-          const editable = !!currentUserId && canEditComment(comment, currentUserId);
-          const deletable = !!currentUserId && canDeleteComment(comment, currentUserId, isOwner);
+          const editable = !readOnly && !!currentUserId && canEditComment(comment, currentUserId);
+          const deletable = !readOnly && !!currentUserId && canDeleteComment(comment, currentUserId, isOwner);
           const when = new Date(comment.createdAt);
           return (
             <View key={comment.id} style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
@@ -255,7 +256,7 @@ export function CommentsSection({
         })
       )}
 
-      {mentionCandidates.length > 0 ? (
+      {!readOnly && mentionCandidates.length > 0 ? (
         <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: Atlas.radius.medium, marginBottom: 6, overflow: 'hidden' }}>
           {mentionCandidates.map(m => (
             <TouchableOpacity
@@ -268,7 +269,7 @@ export function CommentsSection({
         </View>
       ) : null}
 
-      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+      {!readOnly ? <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
         <TextInput
           value={draft}
           onChangeText={setDraft}
@@ -297,7 +298,7 @@ export function CommentsSection({
             <IconSymbol name="paperplane.fill" size={16} color={draft.trim() ? '#fff' : c.sub} />
           )}
         </TouchableOpacity>
-      </View>
+      </View> : null}
     </View>
   );
 }

@@ -1,3 +1,4 @@
+import { copyMeeting } from '@/utils/meetingSharing';
 import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TasksTodayPane.tsx — права колонка екрана Завдань на
@@ -111,6 +112,7 @@ export function TasksTodayPane({
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                       {phase === 'current' && <View style={[st.nowDot, { backgroundColor: meeting.color }]} />}
                       <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '700' }}>{meeting.title}</Text>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.copyText} onPress={event => { event.stopPropagation(); void copyMeeting(meeting, locale.startsWith('en')); }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><IconSymbol name="doc.on.doc" size={15} color={c.sub} /></TouchableOpacity>
                     </View>
                     <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
                       {duration}{meeting.location ? ` · ${meeting.location}` : ''}

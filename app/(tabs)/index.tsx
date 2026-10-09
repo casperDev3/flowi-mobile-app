@@ -1,3 +1,4 @@
+import { copyMeeting } from '@/utils/meetingSharing';
 import { Atlas } from '@/constants/atlas';
 import { AdSlot } from '@/components/advertising/Advertising';
 import { BlurView } from 'expo-blur';
@@ -2220,6 +2221,7 @@ export default function TasksScreen() {
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                 {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />}
                                 <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
+                                <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.copyText} onPress={event => { event.stopPropagation(); void copyMeeting(mtg, locale.startsWith('en')); }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><IconSymbol name="doc.on.doc" size={15} color={c.sub} /></TouchableOpacity>
                               </View>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                 <MeetingProjectChip project={meetingProject(mtg, projects)} textColor={c.text} maxWidth={120} />

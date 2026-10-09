@@ -1,3 +1,7 @@
+jest.mock('@/components/meetings/MeetingComments', () => ({ MeetingComments: () => null }));
+// Workspace behavior is covered separately; these tests isolate the detail shell.
+jest.mock('@/components/meetings/MeetingWorkspace', () => ({ MeetingWorkspace: () => null }));
+jest.mock('@/components/meetings/MeetingAudio', () => ({ MeetingAudio: () => null }));
 /**
  * __tests__/detail-headers.test.tsx — липка шапка деталі й перегляд зустрічі.
  *

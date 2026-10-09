@@ -35,7 +35,13 @@ const { create, act } = require('react-test-renderer') as any;
 const C = { text: '#111', sub: '#666', border: '#DDD', dim: '#EEE', accent: '#7C3AED', sheet: '#FFF' };
 const TODAY = new Date(2026, 9, 6, 9, 0);
 
-const render = (el: React.ReactElement) => { let tree: any; act(() => { tree = create(el); }); return tree; };
+// Unmount real clock subscribers before Jest tears down this environment.
+// Otherwise a live interval throws during the next test file.
+const mountedTrees: any[] = [];
+afterEach(async () => {
+  await act(async () => { mountedTrees.splice(0).forEach(tree => tree.unmount()); });
+});
+const render = (el: React.ReactElement) => { let tree: any; act(() => { tree = create(el); mountedTrees.push(tree); }); return tree; };
 const pressByLabel = (tree: any, prefix: string) => {
   const node = tree.root.findAll((n: any) => n.type === TouchableOpacity
     && typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.startsWith(prefix))[0];

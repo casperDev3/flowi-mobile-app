@@ -126,7 +126,7 @@ interface AuthCtx {
    * `force` не передано — виклик мусить спитати користувача, як і
    * `switchWorkspace`).
    */
-  logout: (force?: boolean) => Promise<void>;
+  logout: (force?: boolean, allDevices?: boolean) => Promise<void>;
   /**
    * Контракт §2.3 — вихід + очищення локальних даних цього workspace.
    * `force=true` — продовжити навіть якщо непорожній outbox не досинхронізувався
@@ -671,7 +671,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * що й у `switchWorkspace`, виклик (`app/(tabs)/settings.tsx`) ловить її й
    * питає користувача явно.
    */
-  const logout = useCallback(async (force = false) => {
+  const logout = useCallback(async (force = false, allDevices = false) => {
     try {
       const outbox = await loadOutbox();
       if (outbox.length > 0 && isOnlineMode()) {
@@ -694,9 +694,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Знімаємо push-токен, поки ще авторизовані (контракт §2.8).
     await unregisterPushToken();
 
+    if (allDevices) await apiFetch('/auth/logout-all/', { method: 'POST' });
+
     // Намагаємось повідомити сервер (ігноруємо будь-яку помилку)
     try {
-      if (isOnlineMode()) {
+      if (isOnlineMode() && !allDevices) {
         const refresh = await SecureStore.getItemAsync(REFRESH_SECURE_KEY);
         if (refresh) {
           await apiFetch('/auth/logout/', { method: 'POST', body: { refresh } });

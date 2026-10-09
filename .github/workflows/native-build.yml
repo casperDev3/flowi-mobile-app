@@ -1,0 +1,32 @@
+name: Native build gates
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['package*.json', 'app.json', 'app.config.*', 'plugins/**', 'targets/**', 'modules/**', '.github/workflows/native-build.yml']
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22', cache: npm}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      - run: cd android && ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ github.sha }}
+          path: android/app/build/outputs/apk/release/*.apk
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22', cache: npm}
+      - run: npm ci
+      - run: npx expo prebuild --platform ios --no-install
+      - run: cd ios && pod install
+      - run: xcodebuild -workspace ios/Flowi.xcworkspace -scheme Flowi -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build

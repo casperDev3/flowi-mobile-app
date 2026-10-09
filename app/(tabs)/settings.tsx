@@ -8,6 +8,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -129,23 +130,23 @@ export default function SettingsScreen() {
   // — кидає UnsyncedOutboxError замість мовчки стерти. Той самий патерн
   // «попередити → на «Продовжити» повторити з force», що й у зміні workspace
   // (app/account.tsx, app/workspace.tsx).
-  const runLogout = useCallback((force: boolean) => {
-    logout(force).catch(e => {
+  const runLogout = useCallback((force: boolean, allDevices = false) => {
+    logout(force, allDevices).catch(e => {
       if (e instanceof UnsyncedOutboxError) {
         Alert.alert(tr.workspaceSwitchSyncFailedTitle, tr.workspaceSwitchSyncFailedMsg, [
           { text: tr.cancel, style: 'cancel' },
           // Замикання того самого `runLogout`: до моменту натискання кнопки
           // ця const уже присвоєна (виклик асинхронний, синхронне
           // оголошення завершилось раніше).
-          { text: tr.workspaceSwitchProceedAnyway, style: 'destructive', onPress: () => runLogout(true) },
+          { text: tr.workspaceSwitchProceedAnyway, style: 'destructive', onPress: () => runLogout(true, allDevices) },
         ]);
         return;
       }
-      if (__DEV__) console.warn('[settings] logout failed:', e);
+      Alert.alert(tr.authLogout, lang === 'en' ? 'Could not end sessions. Check your connection and retry.' : 'Не вдалося завершити сесії. Перевірте з’єднання та повторіть.');
     });
-  }, [logout, tr]);
+  }, [logout, tr, lang]);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback((allDevices = false) => {
     // pendingCount — той самий лічильник, що й рядок «Синхронізація» нижче:
     // попереджаємо про непровштовхнуті зміни ДО підтвердження, а не лише
     // постфактум у діалозі помилки синку.
@@ -153,14 +154,14 @@ export default function SettingsScreen() {
       ? `${tr.workspaceSwitchOutboxWarning}\n\n${tr.logoutConfirm}`
       : tr.logoutConfirm;
     Alert.alert(
-      tr.authLogout,
+      allDevices ? (lang === 'en' ? 'Sign out all devices' : 'Вийти з усіх пристроїв') : tr.authLogout,
       message,
       [
         { text: tr.cancel, style: 'cancel' },
-        { text: tr.authLogout, style: 'destructive', onPress: () => runLogout(false) },
+        { text: tr.authLogout, style: 'destructive', onPress: () => runLogout(false, allDevices) },
       ],
     );
-  }, [tr, runLogout, pendingCount]);
+  }, [tr, runLogout, pendingCount, lang]);
 
   // Гейт для ручних синк-дій: потрібні онлайн-режим і акаунт.
   const guardSync = useCallback((fn: () => void | Promise<void>) => {
@@ -437,6 +438,7 @@ export default function SettingsScreen() {
         return (
           <View>
             <SectionLabel label={tr.sectionSupport} color={c.sub} />
+            <View style={{ gap: 4, marginBottom: 12 }}>{[['privacy', lang === 'en' ? 'Privacy' : 'Приватність'], ['terms', lang === 'en' ? 'Terms' : 'Умови'], ['contact', lang === 'en' ? 'Contact' : 'Контакти']].map(([path, label]) => <TouchableOpacity key={path} accessibilityRole="link" onPress={() => void Linking.openURL(`https://flowi-web-app.vercel.app/${path}`)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: c.text }}>{label}</Text></TouchableOpacity>)}</View>
             <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
               {/* Ідеї й баги — один екран (feedback-inbox.md §10.1). */}
               <SettingRow
@@ -530,8 +532,11 @@ export default function SettingsScreen() {
                   last={false}
                 />
               )}
+              <TouchableOpacity accessibilityRole="button" onPress={() => handleLogout(true)} style={st.row}>
+                <Text style={[st.rowLabel, { color: c.text }]}>{lang === 'en' ? 'Sign out all devices' : 'Вийти з усіх пристроїв'}</Text>
+              </TouchableOpacity>
               <TouchableOpacity
-                onPress={handleLogout}
+                onPress={() => handleLogout()}
                 accessibilityRole="button"
                 accessibilityLabel={tr.authLogout}
                 style={st.row}>

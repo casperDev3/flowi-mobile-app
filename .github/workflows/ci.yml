@@ -1,31 +1,26 @@
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
+name: Mobile release gates
+on: [push, pull_request, workflow_dispatch]
 jobs:
   quality:
-    name: Typecheck · Lint · Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22'
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test -- --ci
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- --ci --runInBand
+      - name: Build both production JS bundles and reachability evidence
+        run: npx expo export --platform ios --platform android --source-maps --output-dir artifacts/export
+      - name: Security gate (unknown high/critical always fail)
+        run: node scripts/audit-gate.mjs
+      - run: python3 scripts/release_manifest.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-candidate-${{ github.sha }}
+          path: |
+            artifacts/release-manifest.json
+            artifacts/npm-audit.json

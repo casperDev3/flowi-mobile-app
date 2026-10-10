@@ -1,3 +1,4 @@
+import {uniqueRecords} from './recordIdentity';
 /**
  * utils/timeEntries.ts — форма запису часу, фільтри, сортування і KPI екрана
  * «Час».
@@ -117,7 +118,7 @@ export function filterRecords(
   taskProjects?: TaskProjects,
 ): TimeRecord[] {
   const from = periodStartMs(filters.period, now);
-  return (records ?? []).filter(entry => {
+  return uniqueTimeRecords(records).filter(entry => {
     if (!entry) return false;
     if (from !== null && recordTimeMs(entry) < from) return false;
     if (filters.projectId && recordProjectId(entry, taskProjects) !== filters.projectId) return false;
@@ -127,7 +128,7 @@ export function filterRecords(
 }
 
 export function sortRecords(records: readonly TimeRecord[], sort: TimeSort): TimeRecord[] {
-  const list = [...(records ?? [])];
+  const list = [...uniqueTimeRecords(records)];
   // Стабільний добір за id: без нього два записи з однаковою міткою часу
   // міняються місцями на кожному перерахунку і список «мерехтить».
   const tie = (a: TimeRecord, b: TimeRecord) => String(a.id).localeCompare(String(b.id));
@@ -143,8 +144,10 @@ export function sortRecords(records: readonly TimeRecord[], sort: TimeSort): Tim
   }
 }
 
+export const uniqueTimeRecords = uniqueRecords<TimeRecord>;
+
 export function totalSeconds(records: readonly TimeRecord[]): number {
-  return (records ?? []).reduce((sum, entry) => sum + recordSeconds(entry), 0);
+  return uniqueTimeRecords(records).reduce((sum, entry) => sum + recordSeconds(entry), 0);
 }
 
 /**
@@ -188,7 +191,7 @@ function collectByProject(
 ): ProjectGroup[] {
   const byId = new Map((projects ?? []).map(project => [project.id, project]));
   const groups = new Map<string, ProjectGroup>();
-  for (const entry of records ?? []) {
+  for (const entry of uniqueTimeRecords(records)) {
     const key = recordProjectId(entry, taskProjects) ?? '';
     let group = groups.get(key);
     if (!group) {
@@ -256,7 +259,7 @@ export function dayKey(ms: number): string {
 export function groupByDay(records: readonly TimeRecord[]): DayGroup[] {
   const groups: DayGroup[] = [];
   const index = new Map<string, DayGroup>();
-  for (const entry of records ?? []) {
+  for (const entry of uniqueTimeRecords(records)) {
     const ms = recordTimeMs(entry);
     const key = dayKey(ms);
     let group = index.get(key);
@@ -280,7 +283,7 @@ export interface TaskOption {
 /** Задачі, що є у вибірці, — для фільтра «за задачею». */
 export function taskOptions(records: readonly TimeRecord[]): TaskOption[] {
   const map = new Map<string, TaskOption>();
-  for (const entry of records ?? []) {
+  for (const entry of uniqueTimeRecords(records)) {
     const key = recordTaskKey(entry);
     const option = map.get(key);
     if (option) option.seconds += recordSeconds(entry);

@@ -1,3 +1,4 @@
+import { preserveRecoveryDraft } from './recovery-drafts';
 import { purgeProjectNotifications } from '@/api/notifications';
 /**
  * store/project-sync.ts — синк потоків проєктів (WORKSPACE_PROJECTS_CONTRACT §3.4–3.5, §5.1).
@@ -687,6 +688,11 @@ async function applyProjectPull(
       // збій нативного модуля) — а курсор проєкту після цього все одно
       // зсувався, і ці рядки вже ніколи не приїхали б повторно. `Checked`
       // прокидає помилку: обмін падає, курсор лишається там, де був.
+      if (collection === 'tasks' || collection === 'comments') {
+        const bases=await loadData<Record<string,Record<string,unknown>>>(`recovery_base:${projectId}:${collection}`,{});
+        for(const row of rows)if(!freshDirty.has(syncRecordKey(collection,row.local_id)))bases[row.local_id]=row.data;
+        await saveDataChecked(`recovery_base:${projectId}:${collection}`,bases);
+      }
       await saveDataChecked(collection, applyPullItems(local as { id: string }[], rows, freshDirty, collection));
     });
   }
@@ -735,12 +741,26 @@ async function exchangeProject(
     }
     role = response.role;
 
+    for(const conflict of response.conflicts){
+      if(!['tasks','comments'].includes(conflict.collection))continue;
+      const bases=await loadData<Record<string,Record<string,unknown>>>(`recovery_base:${projectId}:${conflict.collection}`,{});
+      const base=bases[conflict.local_id];
+      if(base||!conflict.client.base_revision)await preserveRecoveryDraft(conflict.mutation_id,conflict.client.data,base??{});
+    }
     const rejections = response.rejected ?? [];
     const finishedIds = new Set([
       ...response.acknowledged.map(i => i.mutation_id),
       ...response.conflicts.map(i => i.mutation_id),
       ...rejections.map(i => i.mutation_id),
     ]);
+    for(const rejection of rejections){
+      const mutation=mutations.find(m=>m.mutation_id===rejection.mutation_id);
+      if(mutation && ['tasks','comments'].includes(mutation.collection)){
+        const bases=await loadData<Record<string,Record<string,unknown>>>(`recovery_base:${projectId}:${mutation.collection}`,{});
+        const base=bases[mutation.local_id];
+        if(base||!mutation.base_revision)await preserveRecoveryDraft(mutation.mutation_id,mutation.data,base??{});
+      }
+    }
     if(rejections.length){
       const previous=await loadData<any[]>('team_rejected_drafts',[]);
       const drafts=rejections.map(rejection=>({projectId,rejection,mutation:mutations.find(m=>m.mutation_id===rejection.mutation_id)}));
@@ -819,6 +839,18 @@ setProjectSyncsIdleWaiter(waitForAllProjectSyncsIdle);
  */
 async function wipeLocalProject(projectId: string): Promise<void> {
   const stream = projectStreamId(projectId);
+  // Persist only authored text differences before security cleanup removes caches.
+  const pending=await loadOutbox();
+  for(const collection of ['tasks','comments']) {
+    const bases=await loadData<Record<string,Record<string,unknown>>>(`recovery_base:${projectId}:${collection}`,{});
+    const local=await loadData<Record<string,unknown>[]>(collection,[]);
+    for(const mutation of pending.filter(m=>m.stream===stream&&m.collection===collection&&!m.deleted)) {
+      const row=local.find(r=>String(r.id)===mutation.local_id);
+      if(row && bases[mutation.local_id])await preserveRecoveryDraft(mutation.mutation_id??mutation.local_id,row,bases[mutation.local_id]);
+      else if(row && !(await getProjectSyncState())[projectId]?.revisions?.[syncRecordKey(collection,mutation.local_id)])await preserveRecoveryDraft(mutation.mutation_id??mutation.local_id,row,{});
+    }
+    await saveDataChecked(`recovery_base:${projectId}:${collection}`,{});
+  }
   for (const collection of PROJECT_COLLECTIONS) {
     if (collection === 'projects' || collection === 'project_budgets') continue; // local_id == projectId, окремо нижче
     await withStorageLock(collection, async () => {
@@ -838,6 +870,10 @@ async function wipeLocalProject(projectId: string): Promise<void> {
   }
   await removeOutboxByStream(stream);
   await purgeRejectedProjectDrafts(projectId);
+  await withStorageLock('sync_pending_conflicts',async()=>{
+    const conflicts=await loadData<SyncConflict[]>('sync_pending_conflicts',[]);
+    await saveDataChecked('sync_pending_conflicts',conflicts.filter(c=>c.local?.projectId!==projectId&&c.remote?.projectId!==projectId));
+  });
   await purgeProjectNotifications(projectId);
 
   const stateMap = await getProjectSyncState();
@@ -871,6 +907,11 @@ async function purgeRejectedProjectDrafts(projectId: string, budgetOnly = false)
 /** Стирає лише бюджетні колекції проєкту — даунгрейд з owner (§3.4), доступ до решти лишається. */
 async function wipeProjectBudgetData(projectId: string): Promise<void> {
   await purgeRejectedProjectDrafts(projectId, true);
+  await withStorageLock('sync_pending_conflicts',async()=>{
+    const budget=new Set(['transactions','subscriptions','recurring_incomes','project_budgets']);
+    const conflicts=await loadData<SyncConflict[]>('sync_pending_conflicts',[]);
+    await saveDataChecked('sync_pending_conflicts',conflicts.filter(c=>!budget.has(c.dataKey)||(c.local?.projectId!==projectId&&c.remote?.projectId!==projectId&&c.local?.id!==projectId)));
+  });
   await purgeProjectNotifications(projectId, true);
   const budget = new Set(['transactions', 'subscriptions', 'recurring_incomes', 'project_budgets']);
   await removeOutboxByStream(projectStreamId(projectId), budget);
@@ -1049,7 +1090,8 @@ async function runProjectSync(projectId: string): Promise<void> {
         if (conflict.server) await applyProjectPull(projectId, [conflict.server]);
 
       }
-      if (needsUser.length) await appendConflicts(needsUser);
+      const visibleConflicts=result.role==='owner'?needsUser:needsUser.filter(c=>!['transactions','subscriptions','recurring_incomes','project_budgets'].includes(c.dataKey));
+      if (visibleConflicts.length) await appendConflicts(visibleConflicts);
     }
   } catch (error) {
     // Контракт §3.4 називає конкретний код — `404 project_not_found`. Будь-який

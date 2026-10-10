@@ -389,3 +389,21 @@ describe('ERR-06: відхилена сервером мутація проєк�
     expect(typeof quarantined[0].quarantined_at).toBe('number');
   });
 });
+
+
+test('offline restart then revoke preserves only authored text and never resubmits',async()=>{
+ seed('projects',[{id:'revoke-s2',name:'Secret project'}]);
+ seed('workspace_projects',[summary({id:'revoke-s2',cursor:3})]);
+ seed('project_sync_state_v1',{'revoke-s2':{cursor:3,revisions:{'tasks:t':3},role:'member',lastSyncedAt:1}});
+ seed('tasks',[{id:'t',projectId:'revoke-s2',title:'Private title',description:'My local result',resultAttachments:['private-file']}]);
+ seed('recovery_base:revoke-s2:tasks',{'t':{id:'t',projectId:'revoke-s2',title:'Private title',description:'Old',resultAttachments:['private-file']}});
+ seed('sync_outbox',[{mutation_id:'draft-s2',collection:'tasks',local_id:'t',stream:'project:revoke-s2',deleted:false,queued_at:1}]);
+ mockApiFetch.mockImplementation(async(path:string)=>{if(path==='/projects/')return {results:[]};throw new Error('Must not resubmit revoked data');});
+ await syncAllMyProjects();
+ expect(read('tasks',[])).toEqual([]);
+ expect(read('sync_outbox',[])).toEqual([]);
+ const drafts=read<{text:Record<string,string>}[]>('local_recovery_drafts',[]);
+ expect(drafts[0].text).toEqual({description:'My local result'});
+ expect(JSON.stringify(drafts)).not.toContain('private-file');
+ expect(read('recovery_base:revoke-s2:tasks',{})).toEqual({});
+});

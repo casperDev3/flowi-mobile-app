@@ -1,3 +1,4 @@
+import {uniqueRecords} from './recordIdentity';
 /**
  * utils/financeUtils.ts — операції та підсумки.
  *
@@ -294,7 +295,7 @@ export function calcTotalsByCurrency(
     return out[code];
   };
 
-  for (const t of allTxs) {
+  for (const t of uniqueRecords(allTxs)) {
     if (t.type === 'transfer') continue;
     const code = currencyOf(t);
     const d = new Date(t.date);

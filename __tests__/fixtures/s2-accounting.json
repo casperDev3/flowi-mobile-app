@@ -1,0 +1,8 @@
+[
+ {"name":"timer mirror retry","rows":[{"id":"a","duration":60},{"id":"a","duration":60}],"seconds":60},
+ {"name":"latest revision wins","rows":[{"id":"a","duration":60,"updatedAt":"2026-10-10T09:00:00Z"},{"id":"a","duration":90,"updatedAt":"2026-10-10T10:00:00Z"}],"seconds":90},
+ {"name":"fractional seconds and invalid duration","rows":[{"id":"a","duration":1.9},{"id":"b","duration":-3},{"id":"c","duration":"bad"}],"seconds":1},
+ {"name":"same local ID in separate projects","rows":[{"id":"a","projectId":"p1","duration":30},{"id":"a","projectId":"p2","duration":45}],"seconds":75},
+ {"name":"DST repeated local hour, distinct sessions","rows":[{"id":"a","duration":3600,"date":"2026-10-25T03:30:00+03:00"},{"id":"b","duration":3600,"date":"2026-10-25T03:30:00+02:00"}],"seconds":7200},
+ {"name":"timezone crossing midnight","rows":[{"id":"a","duration":120,"date":"2026-10-10T23:59:00-04:00"},{"id":"a","duration":120,"date":"2026-10-11T03:59:00Z"}],"seconds":120}
+]

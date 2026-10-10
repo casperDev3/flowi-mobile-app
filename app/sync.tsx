@@ -1,3 +1,5 @@
+import * as Clipboard from 'expo-clipboard';
+import {loadRecoveryDrafts,dismissRecoveryDraft,type RecoveryDraft} from '@/store/recovery-drafts';
 import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -64,6 +66,7 @@ export default function SyncScreen() {
     lastError, oldestPendingAt, rejectedCount, syncNow,
   } = useSync();
 
+  const [recovery,setRecovery]=useState<RecoveryDraft[]>([]);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [rejected, setRejected] = useState<SyncRejection[]>([]);
   const [localOnly, setLocalOnly] = useState<LocalOnlyReport>(EMPTY_LOCAL_ONLY);
@@ -84,6 +87,7 @@ export default function SyncScreen() {
   const refreshConflicts = useCallback(async () => {
     setConflicts(await loadConflicts());
     setRejected(await loadRejected());
+    setRecovery(await loadRecoveryDrafts());
   }, []);
 
   useEffect(() => { refreshConflicts(); }, [refreshConflicts, rejectedCount]);
@@ -205,6 +209,12 @@ export default function SyncScreen() {
           contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: 48 }]}
           showsVerticalScrollIndicator={false}>
 
+            {recovery.map(row=><View key={row.id} style={{padding:12,marginBottom:12,borderWidth:1,borderColor:c.border,borderRadius:12}}>
+              <Text style={{color:c.text}}>Локальна чернетка: права змінилися, ваш текст збережено.</Text>
+              <Text selectable style={{color:c.text,marginVertical:8}}>{Object.values(row.text).join('\n\n')}</Text>
+              <TouchableOpacity accessibilityRole="button" onPress={()=>void Clipboard.setStringAsync(Object.values(row.text).join('\n\n'))}><Text style={{color:c.accent}}>Копіювати текст</Text></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" onPress={()=>void dismissRecoveryDraft(row.id).then(refreshConflicts)}><Text style={{color:c.sub}}>Видалити чернетку</Text></TouchableOpacity>
+            </View>)}
             {/* ── CLOUD SYNC CARD ── */}
             <Text style={[st.sectionLabel, { color: c.sub, marginBottom: 8 }]}>
               {tr.cloudSync.toUpperCase()}

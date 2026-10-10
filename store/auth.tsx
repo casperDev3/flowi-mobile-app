@@ -244,6 +244,7 @@ const WORKSPACE_SWITCH_STORAGE_KEYS = [
   'sync_known_collections_v2',
   'sync_pending_conflicts',
   'team_rejected_drafts',
+  'local_recovery_drafts',
   'discussions',
   'milestones',
   'team_preferences',
@@ -297,6 +298,7 @@ const WORKSPACE_SWITCH_STORAGE_KEYS = [
  * містять id групи/сесії, тож перелічити їх заздалегідь неможливо.
  */
 const WORKSPACE_SWITCH_STORAGE_PREFIXES = [
+  'recovery_base:',
   'training_group_v1:',
   'training_groups_cache_v1:',
   'training_session_draft_v1:',

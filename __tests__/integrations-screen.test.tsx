@@ -10,7 +10,7 @@ const mockPush=jest.fn(),mockReplace=jest.fn();
 jest.mock('expo-router',()=>({router:{push:(...args:unknown[])=>mockPush(...args),replace:(...args:unknown[])=>mockReplace(...args)},useFocusEffect:(fn:()=>void)=>require('react').useEffect(fn,[fn])}));
 jest.mock('react-native-safe-area-context',()=>({useSafeAreaInsets:()=>({top:24,bottom:0,left:0,right:0})}));
 const api=apiFetch as jest.Mock;
-const listing={can_manage:true,connections:[],providers:[{id:'trello',label:'Trello',kind:'tasks',fields:['key','token']},{id:'google',label:'Google Calendar',kind:'calendar',fields:[]}]};
+const listing={can_manage:true,connections:[],providers:[{id:'worksection',label:'Worksection',kind:'tasks',fields:['host','key']},{id:'trello',label:'Trello',kind:'tasks',fields:['key','token']},{id:'google',label:'Google Calendar',kind:'calendar',fields:[]}]};
 beforeEach(()=>{mockPush.mockReset();mockReplace.mockReset();api.mockReset();api.mockResolvedValue(listing);});
 it('scopes the API to the project and hides management from members',async()=>{
  api.mockResolvedValue({...listing,can_manage:false});
@@ -40,7 +40,7 @@ it.each([undefined,'project-a'])('opens settings and returns within the same sco
  const base=projectId?`/project/${projectId}/integrations`:'/integrations';
  const overview=await render(<IntegrationsScreen projectId={projectId}/>);
  expect(JSON.stringify(overview.toJSON())).not.toContain('Нове підключення');
- await press(overview,'Налаштування інтеграцій');
+ await press(overview,'Підключити сервіс');
  expect(mockPush).toHaveBeenCalledWith(`${base}/settings`);
  await act(async()=>overview.unmount());
  const settings=await render(<IntegrationsScreen projectId={projectId} mode="settings"/>);
@@ -54,5 +54,24 @@ it('settings remain read-only for a project member',async()=>{
  const screen=await render(<IntegrationsScreen projectId="project-a" mode="settings"/>);
  expect(JSON.stringify(screen.toJSON())).not.toContain('Нове підключення');
  expect(JSON.stringify(screen.toJSON())).toContain('Налаштування доступні власнику або менеджеру проєкту.');
+ await act(async()=>screen.unmount());
+});
+
+
+it('connects Worksection from native settings and clears the API key', async () => {
+ api.mockImplementation(async (path:string, options?:{method?:string}) => {
+  if(path.endsWith('/sources/')) return {sources:[]};
+  if(options?.method==='POST') return {id:'ws',provider:'worksection',label:'Worksection',sources:[],state:'draft'};
+  return listing;
+ });
+ const screen=await render(<IntegrationsScreen mode="settings"/>);
+ await press(screen,'Worksection');
+ await act(async()=>{
+  screen.root.findByProps({accessibilityLabel:'Адреса сервісу'}).props.onChangeText('https://qa.worksection.com');
+  screen.root.findByProps({accessibilityLabel:'Ключ API'}).props.onChangeText('test-key');
+ });
+ await press(screen,'Підключити');
+ expect(api).toHaveBeenCalledWith('/integrations/',{method:'POST',body:{provider:'worksection',credentials:{host:'https://qa.worksection.com',key:'test-key'},project:undefined}});
+ expect(screen.root.findAllByProps({accessibilityLabel:'Ключ API'})).toHaveLength(0);
  await act(async()=>screen.unmount());
 });

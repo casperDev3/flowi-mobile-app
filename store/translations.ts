@@ -1914,6 +1914,7 @@ export interface Translations {
   // ─── Модулі інтерфейсу (було moduleText() в store/ui-preferences.ts) ─────────
   modulesTitle: string;
   modulesSubtitle: string;
+  integrationsModuleHint: string;
   modulesSystemNote: string;
   modulesDisabledTitle: string;
   modulesDisabledBody: string;
@@ -4583,6 +4584,7 @@ const uk: Translations = {
 
   // Модулі інтерфейсу (було moduleText())
   modulesTitle: 'Модулі',
+  integrationsModuleHint: 'Показувати розділ. Налаштована синхронізація продовжує працювати.',
   modulesSubtitle: 'Вимкнені модулі зникають із меню, дашборда і сповіщень. Дані лишаються на місці — увімкніть назад, і все повернеться.',
   // пункт 10: базові розділи, що не вимикаються (ALWAYS_ON у store/ui-preferences.ts)
   modulesSystemNote: '«Сьогодні», «Налаштування» з профілем та «Ідеї та баги» вимкнути не можна: звідси модулі вмикають назад і повідомляють про проблеми.',
@@ -7253,6 +7255,7 @@ const en: Translations = {
 
   // Interface modules (was moduleText())
   modulesTitle: 'Modules',
+  integrationsModuleHint: 'Show this section. Configured synchronization keeps running.',
   modulesSubtitle: 'Disabled modules disappear from the menu, dashboard and notifications. The data stays — turn a module back on and everything returns.',
   // пункт 10: базові розділи, що не вимикаються (ALWAYS_ON у store/ui-preferences.ts)
   modulesSystemNote: 'Today, Settings with your profile, and Ideas & bugs cannot be turned off: this is where you turn modules back on and report problems.',

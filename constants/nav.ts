@@ -49,7 +49,7 @@ import type { Translations } from '@/store/translations';
  * як є).
  */
 export type ModuleId =
-  | 'tasks' | 'projects' | 'meetings' | 'time' | 'notes'
+  | 'tasks' | 'projects' | 'meetings' | 'time' | 'notes' | 'integrations'
   | 'finance' | 'budget' | 'subscriptions' | 'banks' | 'health'
   | 'health_summary' | 'health_profile' | 'prevention' | 'workouts' | 'training'
   | "menu"
@@ -136,7 +136,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // старий /meetings редиректить сюди й теж підсвічує пункт.
       { route: '/calendar',       icon: 'calendar',     labelKey: 'calendar',     module: 'meetings', activeOn: ['/meetings'] },
       { route: '/(tabs)/time',    icon: 'timer',        labelKey: 'navTime',      module: 'time' },
-      { route: '/integrations', icon: 'link', labelKey: 'integrations' },
+      { route: '/integrations', icon: 'link', labelKey: 'integrations', module: 'integrations' },
       { route: '/notes',          icon: 'note.text',    labelKey: 'notes',        module: 'notes' },
     ],
   },
@@ -381,6 +381,7 @@ export const TAB_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.free
  */
 export const STACK_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.freeze({
   '/projects': 'projects',
+  '/integrations': 'integrations',
   '/calendar': 'meetings',
   '/meetings': 'meetings',
   '/notes': 'notes',
@@ -402,6 +403,7 @@ export const STACK_ROUTE_MODULES: Readonly<Record<string, ModuleId>> = Object.fr
 /** Префікси Stack-маршрутів: простір проєкту і сторінки хаба «Здоров'я». */
 const STACK_PREFIX_MODULES: readonly (readonly [string, ModuleId])[] = [
   ['/project/', 'projects'],
+  ['/integrations/', 'integrations'],
   ['/health-', 'health'],
 ];
 

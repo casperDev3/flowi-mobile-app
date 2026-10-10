@@ -123,7 +123,7 @@ export default function SettingsModulesScreen() {
                     <View style={[st.iconBox, { backgroundColor: ACCENT + '20' }]}>
                       <IconSymbol name={item.icon} size={17} color={ACCENT} />
                     </View>
-                    <Text style={[st.rowLabel, { color: c.text, flex: 1 }]}>{label}</Text>
+                    <View style={{ flex: 1 }}><Text style={[st.rowLabel, { color: c.text }]}>{label}</Text>{item.module === 'integrations' && <Text style={{ color: c.sub, fontSize: 12, marginTop: 4 }}>{tr.integrationsModuleHint}</Text>}</View>
                     {/* Ім'я — на самому Switch, а не на обгортці: обгортка з
                         accessible склеїла б рядок в один елемент і сховала
                         керований контрол від скрінрідера. */}

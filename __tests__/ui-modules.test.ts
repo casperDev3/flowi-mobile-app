@@ -16,6 +16,7 @@ jest.mock('@/store/synced-storage', () => ({
 
 import {
   NAV_GROUPS,
+  disabledModuleForPathname,
   disabledModuleCount,
   moduleSections,
   navGroupsFor,
@@ -186,4 +187,15 @@ describe('disabledModuleCount (пункт 10)', () => {
     expect(disabledModuleCount(['finance', 'health_summary', 'time_records', 'ideas'])).toBe(1);
     expect(disabledModuleCount([])).toBe(0);
   });
+});
+
+
+it('integration module toggles navigation and nested settings access', () => {
+  expect(moduleSections().flatMap(s => s.items).some(i => i.module === 'integrations')).toBe(true);
+  const off = withModuleEnabled(parseUiPreferences({ disabledModules: ['finance'] }), 'integrations', false);
+  expect(off.disabledModules).toEqual(['finance', 'integrations']);
+  expect(disabledModuleForPathname('/integrations/settings', off.disabledModules, 'stack')).toBe('integrations');
+  const on = withModuleEnabled(off, 'integrations', true);
+  expect(on.disabledModules).toEqual(['finance']);
+  expect(disabledModuleForPathname('/integrations/settings', on.disabledModules, 'stack')).toBeNull();
 });

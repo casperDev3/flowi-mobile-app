@@ -1,28 +1,39 @@
-// Абстракція crash/error-репортингу.
-// Зараз: no-op + dev-лог. Щоб увімкнути Sentry:
-//   npx expo install @sentry/react-native
-//   у initReporting() → Sentry.init({ dsn }); і розкоментувати виклики нижче.
+import * as Sentry from '@sentry/react-native';
+import { redactEvent } from './reporting-redaction';
 
 type Extra = Record<string, unknown>;
-
-let _initialized = false;
+let initialized = false;
 
 export function initReporting(): void {
-  if (_initialized) return;
-  _initialized = true;
-  // Sentry.init({ dsn: process.env.EXPO_PUBLIC_SENTRY_DSN, tracesSampleRate: 0.1 });
+  if (initialized) return;
+  const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+  if (!dsn) return;
+  initialized = true;
+  Sentry.init({
+    dsn,
+    release: process.env.EXPO_PUBLIC_FLOWI_RELEASE,
+    environment: __DEV__ ? 'development' : 'production',
+    sendDefaultPii: false,
+    enableNative: true,
+    enableNativeCrashHandling: true,
+    enableAutoSessionTracking: false,
+    tracesSampleRate: 0,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 0,
+    beforeBreadcrumb: () => null,
+    beforeSend: (event) => redactEvent(event) as typeof event,
+    attachScreenshot: false,
+    attachViewHierarchy: false,
+  });
 }
 
-export function captureException(error: unknown, extra?: Extra): void {
-  if (__DEV__) console.error('[reporting] exception:', error, extra ?? '');
-  // Sentry.captureException(error, { extra });
+export function captureException(error: unknown, _extra?: Extra): void {
+  if (initialized) Sentry.captureException(error);
 }
 
-export function captureMessage(message: string, extra?: Extra): void {
-  if (__DEV__) console.warn('[reporting] message:', message, extra ?? '');
-  // Sentry.captureMessage(message, { extra });
+export function captureMessage(_message: string, _extra?: Extra): void {
+  if (initialized) Sentry.captureMessage('Flowi operational event');
 }
 
-export function setUser(id: string | null): void {
-  // Sentry.setUser(id ? { id } : null);
-}
+// Deliberately no user identifier in error telemetry.
+export function setUser(_id: string | null): void {}

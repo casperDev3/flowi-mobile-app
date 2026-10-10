@@ -275,6 +275,7 @@ describe('syncProject — прямий виклик на непідтвердж�
   it('стирає проєкт на 404, якщо він РАНІШЕ вже синкався успішно (справжня втрата доступу)', async () => {
     seed('projects', [{ id: 'p-revoked', name: 'Revoked', color: '#000', createdAt: new Date().toISOString() }]);
     seed('tasks', [{ id: 't-revoked', projectId: 'p-revoked', title: 'x' }]);
+    seed('team_rejected_drafts', [{ projectId: 'p-revoked', mutation: { collection: 'tasks' } }, { projectId: 'p-other', mutation: { collection: 'tasks' } }]);
     seed('project_sync_state_v1', {
       'p-revoked': { cursor: 3, revisions: {}, role: 'owner', lastSyncedAt: Date.now() - 60_000 },
     });
@@ -293,6 +294,7 @@ describe('syncProject — прямий виклик на непідтвердж�
     expect(read<{ id: string; projectId?: string }[]>('tasks', [])).toEqual([]);
     const state = await getProjectSyncState();
     expect(state['p-revoked']).toBeUndefined();
+    expect(read('team_rejected_drafts', [])).toEqual([{ projectId: 'p-other', mutation: { collection: 'tasks' } }]);
   });
 });
 

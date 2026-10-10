@@ -655,6 +655,20 @@ function statusForError(error: unknown): CenterStatus {
 }
 
 let inboxInFlight: Promise<void> | null = null;
+let accessEpoch = 0;
+
+/** Remove project snippets as soon as sync confirms access loss. */
+export async function purgeProjectNotifications(projectId: string, budgetOnly = false): Promise<void> {
+  accessEpoch += 1;
+  await hydrateNotificationCenter();
+  const finance = new Set(['transactions', 'subscriptions', 'recurring_incomes', 'project_budgets']);
+  const items = inbox.items.filter(item => item.project?.id !== projectId ||
+    (budgetOnly && !finance.has(item.collection) && !/^(budget|finance)\./.test(item.event_type)));
+  const removedUnread = inbox.items.filter(item => !item.read_at && !items.includes(item)).length;
+  setInbox({ items, serverUnread: Math.max(0, inbox.serverUnread - removedUnread), syncedAt: null });
+  await persistInbox();
+}
+
 
 /**
  * Підтягнути верхню сторінку інбоксу. Одна сторінка, а не `?after=cursor`:
@@ -672,7 +686,9 @@ export function refreshInbox(): Promise<void> {
     }
     if (inbox.status !== 'ready') setInbox({ status: 'loading' });
     try {
+      const epoch = accessEpoch;
       const page = await fetchInboxPage({ limit: 50 });
+      if (epoch !== accessEpoch) return;
       const items = applyTopPage(inbox.items, page);
       const keepTail = page.has_more && inbox.items.length > page.items.length;
       setInbox({
@@ -698,7 +714,9 @@ export async function loadMoreInbox(): Promise<void> {
   if (!inbox.hasMore || inbox.loadingMore || inbox.nextBefore === null) return;
   setInbox({ loadingMore: true });
   try {
+    const epoch = accessEpoch;
     const page = await fetchInboxPage({ before: inbox.nextBefore, limit: 50 });
+    if (epoch !== accessEpoch) { setInbox({ loadingMore: false }); return; }
     setInbox({
       items: mergeInboxItems(inbox.items, page.items, Number.MAX_SAFE_INTEGER),
       nextBefore: page.next_before,

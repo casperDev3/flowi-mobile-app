@@ -269,10 +269,10 @@ export async function removeFromOutbox(keys: Set<string>): Promise<void> {
  * мутації того потоку більше нікуди слати, інакше вони лежали б у черзі
  * назавжди й тримали б лічильник pending ненульовим.
  */
-export async function removeOutboxByStream(stream: string): Promise<void> {
+export async function removeOutboxByStream(stream: string, collections?: ReadonlySet<string>): Promise<void> {
   await withStorageLock(OUTBOX_KEY, async () => {
     const current = await loadOutbox();
-    const filtered = current.filter(item => item.stream !== stream);
+    const filtered = current.filter(item => item.stream !== stream || (collections && !collections.has(item.collection)));
     if (filtered.length !== current.length) await saveOutbox(filtered);
   });
 }

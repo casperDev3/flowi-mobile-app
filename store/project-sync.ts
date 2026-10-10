@@ -1,3 +1,4 @@
+import { purgeProjectNotifications } from '@/api/notifications';
 /**
  * store/project-sync.ts — синк потоків проєктів (WORKSPACE_PROJECTS_CONTRACT §3.4–3.5, §5.1).
  *
@@ -836,6 +837,8 @@ async function wipeLocalProject(projectId: string): Promise<void> {
     });
   }
   await removeOutboxByStream(stream);
+  await purgeRejectedProjectDrafts(projectId);
+  await purgeProjectNotifications(projectId);
 
   const stateMap = await getProjectSyncState();
   delete stateMap[projectId];
@@ -856,8 +859,21 @@ async function wipeLocalProject(projectId: string): Promise<void> {
   _statusByProject.delete(projectId);
 }
 
+async function purgeRejectedProjectDrafts(projectId: string, budgetOnly = false): Promise<void> {
+  await withStorageLock('team_rejected_drafts', async () => {
+    const rows = await loadData<{ projectId?: string; mutation?: { collection?: string } }[]>('team_rejected_drafts', []);
+    const budget = new Set(['transactions', 'subscriptions', 'recurring_incomes', 'project_budgets']);
+    await saveDataChecked('team_rejected_drafts', rows.filter(row =>
+      row.projectId !== projectId || (budgetOnly && !budget.has(row.mutation?.collection ?? ''))));
+  });
+}
+
 /** Стирає лише бюджетні колекції проєкту — даунгрейд з owner (§3.4), доступ до решти лишається. */
 async function wipeProjectBudgetData(projectId: string): Promise<void> {
+  await purgeRejectedProjectDrafts(projectId, true);
+  await purgeProjectNotifications(projectId, true);
+  const budget = new Set(['transactions', 'subscriptions', 'recurring_incomes', 'project_budgets']);
+  await removeOutboxByStream(projectStreamId(projectId), budget);
   for (const collection of ['transactions', 'subscriptions', 'recurring_incomes'] as const) {
     await withStorageLock(collection, async () => {
       const rows = await loadData<{ id: string; projectId?: string }[]>(collection, []);

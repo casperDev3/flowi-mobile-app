@@ -54,6 +54,7 @@ import {
   parseCapability,
   parseHm,
   refreshInbox,
+  purgeProjectNotifications,
   resetNotificationCenter,
   serverReminderEvents,
   visibleUnreadCount,
@@ -309,5 +310,24 @@ describe('стан центру', () => {
     expect(JSON.parse(mockStore.get(INBOX_CACHE_KEY)!)).toBeNull();
     expect(JSON.parse(mockStore.get(PREFERENCES_CACHE_KEY)!)).toBeNull();
     expect(JSON.parse(mockStore.get(SERVER_REMINDERS_KEY)!)).toBeNull();
+  });
+});
+
+
+describe('access revocation purges persisted snippets', () => {
+  it('downgrade removes finance and revoke removes remaining project items, preserving other projects', async () => {
+    const project = { id: 'p1', name: 'private', color: '#000' };
+    mockApiFetch.mockImplementation(async () => page([
+      item(3, { project, collection: 'transactions', body: 'PRIVATE BUDGET' }),
+      item(2, { project, body: 'PRIVATE TASK' }),
+      item(1, { project: { ...project, id: 'p2' } }),
+    ]));
+    await refreshInbox();
+    await purgeProjectNotifications('p1', true);
+    expect(getInboxState().items.map(i => i.id)).toEqual(['n-2', 'n-1']);
+    expect(mockStore.get(INBOX_CACHE_KEY)).not.toContain('PRIVATE BUDGET');
+    await purgeProjectNotifications('p1');
+    expect(getInboxState().items.map(i => i.id)).toEqual(['n-1']);
+    expect(mockStore.get(INBOX_CACHE_KEY)).not.toContain('PRIVATE TASK');
   });
 });

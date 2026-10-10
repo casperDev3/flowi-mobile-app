@@ -14,7 +14,7 @@
       "appleTeamId": "D28SUT8PH4",
       "buildNumber": "1",
       "associatedDomains": [
-        "applinks:flowi-web-app.vercel.app"
+        "applinks:api.flowi.casperdev.site"
       ],
       "entitlements": {
         "com.apple.security.application-groups": [
@@ -49,7 +49,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "flowi-web-app.vercel.app",
+              "host": "api.flowi.casperdev.site",
               "path": "/invite"
             }
           ],
@@ -124,7 +124,8 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "@sentry/react-native/expo"
     ],
     "experiments": {
       "typedRoutes": true,

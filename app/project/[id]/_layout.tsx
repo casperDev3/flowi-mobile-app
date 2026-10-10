@@ -252,6 +252,7 @@ function ProjectLayout() {
           `time` у (tabs)/_layout — файл лишається на місці, просто
           без кнопки в барі.
         */}
+        <Tabs.Screen name="integrations/settings" initialParams={{ id }} options={{ href: null, headerShown: false }} />
         <Tabs.Screen name="index" initialParams={{ id }} options={{ href: null, headerShown: false }} />
         <Tabs.Screen name="activity" initialParams={{ id }} options={{ href: null, headerShown: false }} />
         {/* Редирект на «Календар» (наради живуть там) — без кнопки в барі. */}

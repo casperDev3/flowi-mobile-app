@@ -411,6 +411,8 @@ function RootLayoutContent() {
           <Stack.Screen name="health-vaccines" options={SHEET_OPTIONS} />
           <Stack.Screen name="health-habits" options={SHEET_OPTIONS} />
           <Stack.Screen name="notifications" options={{ headerShown: false }} />
+          <Stack.Screen name="integrations" options={{ headerShown: false }} />
+          <Stack.Screen name="integrations/settings" options={{ headerShown: false }} />
           <Stack.Screen name="settings-notifications" options={{ headerShown: false }} />
           <Stack.Screen name="settings-modules" options={{ headerShown: false }} />
           <Stack.Screen name="training" options={{ headerShown: false }} />

@@ -1743,6 +1743,7 @@ export default function TasksScreen() {
   const taskDetailHeader = selectedTask ? (
     <TaskDetailHeader
       title={selectedTask.title}
+      externalSource={selectedTask.integration}
       leading={
         <AnimatedCheck
           checked={selectedTask.status === 'done'}

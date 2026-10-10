@@ -45,6 +45,8 @@ export interface TaskHistoryEvent {
 }
 
 export interface Task {
+  integrationArchived?: boolean;
+  integration?: { provider: string; linkId: string; state: string; url?: string };
   backlogKind?: 'idea' | 'bug';
   bugSteps?: string;
   bugExpected?: string;

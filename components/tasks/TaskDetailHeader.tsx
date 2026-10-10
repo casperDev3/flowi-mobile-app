@@ -16,7 +16,7 @@ import { Atlas } from '@/constants/atlas';
  * не гортається, тож «Старт таймера» під рукою на будь-якій вкладці.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ACTION } from '@/components/shared/actionMetrics';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -32,6 +32,7 @@ export function taskDetailTabs(showTeam: boolean): TaskDetailTab[] {
 
 export interface TaskDetailHeaderProps {
   title: string;
+  externalSource?: {provider:string;url?:string};
   /** Що стоїть перед назвою — напр. позначка «виконано». */
   leading?: React.ReactNode;
   /** Бейдж праворуч від назви (пріоритет). */
@@ -62,7 +63,7 @@ export interface TaskDetailHeaderProps {
 
 export function TaskDetailHeader({
   title, leading, badge, tab, onTabChange, showTeam = false, timerRunning, onRename, onClose, onCopy, actions,
-  timerSlot, showHandle, colors: c, tr,
+  timerSlot, showHandle, externalSource, colors: c, tr,
 }: TaskDetailHeaderProps) {
   const tabs = taskDetailTabs(showTeam);
   const [renaming, setRenaming] = useState(false);
@@ -99,6 +100,7 @@ export function TaskDetailHeader({
 
   return (
     <View style={st.wrap}>
+      {externalSource?.url && /^https?:\/\//.test(externalSource.url) && <TouchableOpacity accessibilityRole="link" onPress={()=>void Linking.openURL(externalSource.url!)} style={{paddingVertical:8}}><Text style={{color:c.accent}}>Відкрити у вихідному сервісі · {externalSource.provider}</Text></TouchableOpacity>}
       {showHandle ? <View style={[st.handle, { backgroundColor: c.border }]} /> : null}
 
       <View style={st.titleRow}>

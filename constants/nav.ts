@@ -136,6 +136,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // старий /meetings редиректить сюди й теж підсвічує пункт.
       { route: '/calendar',       icon: 'calendar',     labelKey: 'calendar',     module: 'meetings', activeOn: ['/meetings'] },
       { route: '/(tabs)/time',    icon: 'timer',        labelKey: 'navTime',      module: 'time' },
+      { route: '/integrations', icon: 'link', labelKey: 'integrations' },
       { route: '/notes',          icon: 'note.text',    labelKey: 'notes',        module: 'notes' },
     ],
   },

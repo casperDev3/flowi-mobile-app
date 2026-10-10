@@ -24,6 +24,8 @@ import { type ActiveTimer } from './activeTimers';
 import { totalTrackedSeconds, type TimeEntry } from './taskTimer';
 
 export interface Meeting {
+  integrationCancelled?: boolean;
+  integrationOccurrences?: { date: string; time: string; durationMinutes: number }[];
   id: string;
   title: string;
   date: string;          // 'YYYY-MM-DD'
@@ -241,6 +243,7 @@ function dayDiff(from: Date, to: Date): number {
  * поступу.
  */
 export function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date): Meeting[] {
+  if (meeting.integrationCancelled) return [];
   if (!meeting.recurrence) return [meeting];
   const { freq, daysOfWeek, until } = meeting.recurrence;
   const interval = Math.max(1, Math.floor(Number(meeting.recurrence.interval)) || 1);
@@ -314,6 +317,7 @@ export function expandRecurring(meeting: Meeting, fromDate: Date, toDate: Date):
 export function expandMeetings(meetings: Meeting[], from: Date, to: Date): Meeting[] {
   const result: Meeting[] = [];
   for (const m of meetings) {
+    if (m.integrationCancelled) continue;
     if (!m.recurrence) result.push(m);
     else for (const inst of expandRecurring(m, from, to)) result.push(inst);
   }
@@ -327,6 +331,7 @@ export function meetingsOnDate(meetings: Meeting[], day: Date): Meeting[] {
   const to = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999);
   const result: Meeting[] = [];
   for (const m of meetings) {
+    if (m.integrationCancelled) continue;
     if (!m.recurrence) {
       if (m.date === key) result.push(m);
       continue;

@@ -651,6 +651,7 @@ export function taskVisibleInList(
   now: Date = new Date(),
   scope: 'today' | 'all' = 'all',
 ): boolean {
+  if (task.integrationArchived) return false;
   if (task.status !== 'done') {
     // Будь-який незавершений статус — активний. Веб колись писав
     // 'todo'/'in_progress'; дослівне `task.status === filter` ховало такі

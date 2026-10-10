@@ -52,7 +52,7 @@ const GROUPS: { id: string; labelKey: 'projectNavGroupTasks' | 'projectNavGroupW
   // id груп — старі підписи: так лишаються чинними вже збережені згортання.
   { id: 'Завдання', labelKey: 'projectNavGroupTasks', keys: ['backlog', 'archive', 'sprints'] },
   { id: 'Робота', labelKey: 'projectNavGroupWork', keys: ['notes', 'time', 'budget'] },
-  { id: 'Команда', labelKey: 'projectNavGroupTeam', keys: ['discussions', 'workload', 'members'] },
+  { id: 'Команда', labelKey: 'projectNavGroupTeam', keys: ['discussions', 'workload', 'members', 'integrations'] },
 ];
 
 export function ProjectSidebar({

@@ -40,6 +40,7 @@ type Status = 'active' | 'done';
 
 interface SubTask { id: string; title: string; done: boolean; }
 interface Task {
+  integrationArchived?: boolean;
   // priority може бути відсутнім: задачі, створені з деталі проєкту старими
   // збірками, його не мали (CONTRACT §D.4.4) — і такі записи вже є в даних.
   id: string; title: string; description: string; priority?: LegacyPriority; priorityLevel?: TaskPriority; status: Status;
@@ -207,7 +208,7 @@ export default function ArchiveScreen() {
   useStorageRefresh(['tasks', 'task_statuses'], reloadTasks);
 
   const done = useMemo(() => tasks
-    .filter(t => t.status === 'done' && matchesPriorityFilter(t, filterPriorities))
+    .filter(t => (t.status === 'done' || t.integrationArchived) && matchesPriorityFilter(t, filterPriorities))
     .sort((a, b) => {
       if (sort === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       if (sort === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();

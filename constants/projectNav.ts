@@ -19,7 +19,7 @@ import type { ProjectModules } from '@/utils/projectUtils';
 
 export type ProjectRole = 'owner' | 'manager' | 'member' | 'viewer';
 export type ProjectSectionKey =
-  | 'backlog' | 'archive' | 'calendar' | 'my-work' | 'discussions' | 'workload' | 'members' | 'overview' | 'tasks' | 'notes' | 'time' | 'budget' | 'sprints' | 'settings';
+  | 'integrations' | 'backlog' | 'archive' | 'calendar' | 'my-work' | 'discussions' | 'workload' | 'members' | 'overview' | 'tasks' | 'notes' | 'time' | 'budget' | 'sprints' | 'settings';
 
 export interface ProjectNavItem {
   key: ProjectSectionKey;
@@ -45,6 +45,7 @@ export const PROJECT_NAV_ITEMS: readonly ProjectNavItem[] = [
   { key: 'time',     icon: 'timer',                 labelKey: 'navTime',           moduleKey: 'time' },
   { key: 'budget',   icon: 'chart.pie.fill',        labelKey: 'navBudget',         moduleKey: 'budget', ownerOnly: true },
   { key: 'sprints',  icon: 'flag.checkered',        labelKey: 'sprints',           moduleKey: 'sprints' },
+  { key: 'integrations', icon: 'link', labelKey: 'integrations' },
   { key: 'settings', icon: 'gearshape.fill',        labelKey: 'tabOptions' },
 ] as const;
 

@@ -358,6 +358,7 @@ export function useProjectTaskCard({
   const header = (
     <TaskDetailHeader
       title={task.title}
+      externalSource={task.integration}
       leading={
         <AnimatedCheck
           checked={task.status === 'done'}

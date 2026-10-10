@@ -1,6 +1,7 @@
 export type Lang = 'uk' | 'en';
 
 export interface Translations {
+  integrations: string;
   // Tabs
   tabTasks: string;
   tabFinance: string;
@@ -2805,6 +2806,7 @@ export interface Translations {
 }
 
 const uk: Translations = {
+  integrations: 'Інтеграції',
   navGroupMain: 'Головне',
   navGroupTools: 'Інструменти',
   navGroupMore: 'Ще',
@@ -5477,6 +5479,7 @@ const uk: Translations = {
 };
 
 const en: Translations = {
+  integrations: 'Integrations',
   navGroupMain: 'Main',
   navGroupTools: 'Tools',
   navGroupMore: 'More',

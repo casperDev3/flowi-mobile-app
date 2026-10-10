@@ -22,12 +22,12 @@ describe('розділи простору проєкту', () => {
 
   it('проєкт «Робочий» (усі модулі) показує всі розділи', () => {
     const items = visibleProjectNavItems(MODULES_BY_TEMPLATE.work, 'owner');
-    expect(items.map(i => i.key)).toEqual(['my-work', 'tasks', 'calendar', 'backlog', 'archive', 'discussions', 'members', 'workload', 'overview', 'notes', 'time', 'budget', 'sprints', 'settings']);
+    expect(items.map(i => i.key)).toEqual(['my-work', 'tasks', 'calendar', 'backlog', 'archive', 'discussions', 'members', 'workload', 'overview', 'notes', 'time', 'budget', 'sprints', 'integrations', 'settings']);
   });
 
   it('проєкт «Простий» (лише Огляд/Завдання) ховає модульні розділи', () => {
     const items = visibleProjectNavItems(MODULES_BY_TEMPLATE.simple, 'owner');
-    expect(items.map(i => i.key)).toEqual(['my-work', 'tasks', 'calendar', 'backlog', 'archive', 'discussions', 'members', 'workload', 'overview', 'settings']);
+    expect(items.map(i => i.key)).toEqual(['my-work', 'tasks', 'calendar', 'backlog', 'archive', 'discussions', 'members', 'workload', 'overview', 'integrations', 'settings']);
   });
 
   it('Бюджет бачить лише власник (contract §4.1), навіть коли модуль увімкнено', () => {

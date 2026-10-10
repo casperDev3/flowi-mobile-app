@@ -25,6 +25,9 @@ export function initReporting(): void {
     attachScreenshot: false,
     attachViewHierarchy: false,
   });
+  if (__DEV__ && process.env.EXPO_PUBLIC_NATIVE_CRASH_PROBE === '1') {
+    void import('./reporting-probe').then(module => module.runNativeReportingProbe());
+  }
 }
 
 export function captureException(error: unknown, _extra?: Extra): void {

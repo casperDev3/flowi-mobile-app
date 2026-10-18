@@ -12,7 +12,7 @@
  * й «Створити» синк міг переписати нотатку, і патч від старої копії
  * відкотив би чужу правку.
  */
-import { flushAttachmentMoves, queueAttachmentMove } from '@/components/notes/noteAttachmentsApi';
+import { flushAttachmentMoves, purgeNoteAttachments, queueAttachmentMove } from '@/components/notes/noteAttachmentsApi';
 import { loadData, loadDataResult } from '@/store/storage';
 import { saveSyncedChanges } from '@/store/synced-storage';
 import {
@@ -42,6 +42,10 @@ export async function persistNote(prev: Note | null, next: Note): Promise<Note[]
 
 export async function deleteNoteRecord(note: Note): Promise<Note[] | null> {
   const result = await saveSyncedChanges<Note>('notes', [note], [], { checked: true });
+  // Файли — після локального видалення (не лишити нотатку з битими посиланнями,
+  // якщо запис не вдався) і поки видалення ще не доїхало синком: сервер
+  // приймає запит лише для живої нотатки. Не чекаємо — це найкраща спроба.
+  void purgeNoteAttachments(note);
   return result ? normalizeNotes(result) : null;
 }
 
@@ -111,6 +115,8 @@ export async function createMeetingFromNote(note: Note, draft: NoteToMeetingDraf
   return { meetingId: draft.id, note: linked };
 }
 
+const MOVE_RETRY_DELAYS_MS = [4000, 20000, 60000];
+
 /** Перенести нотатку між «Особистими» й проєктом (той самий id). */
 export async function moveNoteRecord(note: Note, projectId: string | null): Promise<Note> {
   const fresh = (await readNoteById(note.id)) ?? note;
@@ -119,7 +125,9 @@ export async function moveNoteRecord(note: Note, projectId: string | null): Prom
   if (fresh.attachments?.length) {
     // Файли їдуть окремим викликом, коли нотатка вже буде на сервері в новому місці.
     await queueAttachmentMove(fresh.id, fresh.projectId ?? null, next.projectId ?? null);
-    setTimeout(() => { void flushAttachmentMoves(); }, 4000);
+    // Синк нової копії може забрати від секунд до хвилини — кілька спроб;
+    // решту доробить наступне відкриття нотаток (черга на диску).
+    for (const delay of MOVE_RETRY_DELAYS_MS) setTimeout(() => { void flushAttachmentMoves(); }, delay);
   }
   return next;
 }

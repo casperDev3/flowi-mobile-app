@@ -36,7 +36,7 @@ const ALL_KEYS = [
   { key: 'transactions',      label: 'Транзакції',  icon: 'banknote',           color: '#0EA5E9' },
   { key: 'accounts',          label: 'Рахунки',     icon: 'creditcard.fill',    color: '#0EA5E9' },
   { key: 'time_entries',      label: 'Записи часу', icon: 'timer',              color: '#6366F1' },
-  { key: 'notes',             label: 'Нотатки',     icon: 'note.text',          color: '#F59E0B' },
+  { key: 'notes',             label: 'Нотатки',     icon: 'note.text',          color: '#A855F7' },
   { key: 'projects',          label: 'Проекти',     icon: 'folder.fill',        color: '#10B981' },
   // Плитка потрібна не лише заради лічильника: файловий експорт нижче
   // збирає payload САМЕ по ALL_KEYS, тож ключ, якого тут немає, у файл не

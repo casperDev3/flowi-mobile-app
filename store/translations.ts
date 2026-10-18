@@ -1933,6 +1933,7 @@ export interface Translations {
   notesAttachFile: string;
   notesAttachError: string;
   notesAttachTooLarge: string;
+  notesAttachQuota: string;
   notesAttachOffline: string;
   notesAttachNotSynced: string;
   notesAttachOpenError: string;
@@ -4670,6 +4671,7 @@ const uk: Translations = {
   notesAttachFile: 'Файл',
   notesAttachError: 'Не вдалося вкласти файл. Спробуйте ще раз.',
   notesAttachTooLarge: 'Файл більший за 25 МБ.',
+  notesAttachQuota: 'Місце для файлів закінчилось: видаліть старі вкладення.',
   notesAttachOffline: 'Вкладення доступні лише в онлайн-режимі.',
   notesAttachNotSynced: 'Нотатка ще синхронізується — спробуйте за хвилину.',
   notesAttachOpenError: 'Не вдалося відкрити файл.',
@@ -7406,6 +7408,7 @@ const en: Translations = {
   notesAttachFile: 'File',
   notesAttachError: 'Could not attach the file. Please retry.',
   notesAttachTooLarge: 'The file is larger than 25 MB.',
+  notesAttachQuota: 'File storage is full: delete old attachments first.',
   notesAttachOffline: 'Attachments are available in online mode only.',
   notesAttachNotSynced: 'The note is still syncing. Try again in a minute.',
   notesAttachOpenError: 'Could not open the file.',

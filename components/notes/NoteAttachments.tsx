@@ -18,6 +18,7 @@ import { addNoteAttachment, normalizeAttachments, removeNoteAttachment, type Not
 
 import {
   AttachmentNotSyncedError,
+  AttachmentQuotaError,
   AttachmentTooLargeError,
   attachmentsAvailable,
   deleteNoteAttachment,
@@ -56,6 +57,7 @@ export const NoteAttachmentsSection = forwardRef<NoteAttachmentsHandle, {
 
   const explain = (error: unknown) => {
     const message = error instanceof AttachmentTooLargeError ? tr.notesAttachTooLarge
+      : error instanceof AttachmentQuotaError ? tr.notesAttachQuota
       : error instanceof OfflineError ? tr.notesAttachOffline
         : error instanceof AttachmentNotSyncedError ? tr.notesAttachNotSynced
           : tr.notesAttachError;

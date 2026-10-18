@@ -65,14 +65,24 @@ export function NoteCaptureSheet({
     if (!visible) return;
     // Новий запуск — нова нотатка.
     textRef.current = ''; setText('');
-    savedRef.current = null; pending.current = null; idRef.current = uuidV4();
+    savedRef.current = null; pending.current = null; inFlight.current = null; idRef.current = uuidV4();
     setConvert(null);
     setSheetOpen(true);
   }, [visible]);
 
-  /** Зберегти (один раз). null — нічого зберігати. */
-  const save = async (): Promise<Note | null> => {
-    if (savedRef.current) return savedRef.current;
+  /**
+   * Зберегти (один раз). null — нічого зберігати. Запис, що вже йде, спільний:
+   * дія й свайп-закриття під час неї не створюють два записи з одним id.
+   */
+  const inFlight = useRef<Promise<Note | null> | null>(null);
+  const save = (): Promise<Note | null> => {
+    if (savedRef.current) return Promise.resolve(savedRef.current);
+    if (inFlight.current) return inFlight.current;
+    const run = saveOnce().finally(() => { inFlight.current = null; });
+    inFlight.current = run;
+    return run;
+  };
+  const saveOnce = async (): Promise<Note | null> => {
     const note = captureTextToNote(textRef.current, new Date().toISOString(), {
       id: idRef.current,
       linkedTaskId: initialLinks?.taskId,

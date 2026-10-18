@@ -129,7 +129,7 @@ import type { MemberOut } from '@/store/project-team';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { DetailPane } from '@/components/shared/DetailPane';
-import { detailColumnWidthFor } from '@/constants/tokens';
+import { detailColumnWidthFor, getScreenColors } from '@/constants/tokens';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import type { PickerCreateOption } from '@/components/shared/PickerField';
 import { TaskHistoryTab, type HistoryEventType } from '@/components/tasks/TaskHistoryTab';
@@ -2638,8 +2638,8 @@ export default function TasksScreen() {
               accessibilityRole="menuitem"
               accessibilityLabel={tr.notes}
               style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#F59E0B20' }]}>
-                <IconSymbol name="note.text" size={15} color="#F59E0B" />
+              <View style={[s.menuIconBox, { backgroundColor: `${getScreenColors('notes', isDark).accent}20` }]}>
+                <IconSymbol name="note.text" size={15} color={getScreenColors('notes', isDark).accent} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.notes}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />

@@ -40,6 +40,9 @@ export interface LocalAttachmentFile {
 export class AttachmentTooLargeError extends Error {
   constructor() { super('attachment-too-large'); this.name = 'AttachmentTooLargeError'; }
 }
+export class AttachmentQuotaError extends Error {
+  constructor() { super('attachment-quota'); this.name = 'AttachmentQuotaError'; }
+}
 export class AttachmentNotSyncedError extends Error {
   constructor() { super('attachment-note-not-synced'); this.name = 'AttachmentNotSyncedError'; }
 }
@@ -76,6 +79,8 @@ export async function uploadNoteAttachment(
       return await apiFetch<ServerNoteAttachment>(attachmentsPath(note), { method: 'POST', body: form });
     } catch (error) {
       if (error instanceof ApiError && error.status === 400 && error.code === 'invalid_size') throw new AttachmentTooLargeError();
+      // 413 storage_quota_exceeded — квота людини/проєкту; 400 quota — 100 МБ на нотатку.
+      if (error instanceof ApiError && (error.status === 413 || (error.status === 400 && error.code === 'quota'))) throw new AttachmentQuotaError();
       if (error instanceof ApiError && error.status === 404) {
         if (attempt >= attempts) throw new AttachmentNotSyncedError();
         await wait(delayMs);
@@ -94,6 +99,18 @@ export async function deleteNoteAttachment(note: NoteRef, attachmentId: string):
     if (error instanceof ApiError && error.status === 404) return;
     throw error;
   }
+}
+
+/**
+ * Видалення нотатки: прибрати її файли з сервера (інакше вони лишаються на
+ * «надгробку» синку й назавжди займають квоту). Найкраща спроба — офлайн чи
+ * помилка не заважають видалити саму нотатку.
+ */
+export async function purgeNoteAttachments(note: NoteRef & { attachments?: readonly { id: string }[] }): Promise<void> {
+  if (!note.attachments?.length || !isOnlineMode()) return;
+  await Promise.all(note.attachments.map(item => deleteNoteAttachment(note, item.id).catch(error => {
+    if (__DEV__) console.warn('[notes] attachment purge failed', error);
+  })));
 }
 
 /** Вміст файлу (base64) — для перегляду фото чи передачі в «Поділитися». */

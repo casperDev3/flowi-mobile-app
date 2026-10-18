@@ -291,6 +291,8 @@ const WORKSPACE_SWITCH_STORAGE_KEYS = [
   'media_upload_queue',
   'containers_migrated_v2',
   'containers_open_counts',
+  // Черга переносу файлів нотаток між потоками — id нотаток попереднього акаунта.
+  'notes_attachment_moves_v1',
 ] as const;
 
 /**

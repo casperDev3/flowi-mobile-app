@@ -102,6 +102,8 @@ export async function wipeLocalSyncedData(): Promise<void> {
   // `containers_backup_v1` (резервна копія до міграції) свідомо не чіпаємо.
   await removeData('media_upload_queue');
   await removeData('containers_open_counts');
+  // Нотатки: черга переносу файлів між потоками — записи попереднього власника.
+  await removeData('notes_attachment_moves_v1');
 }
 
 interface RemoteSyncChange {

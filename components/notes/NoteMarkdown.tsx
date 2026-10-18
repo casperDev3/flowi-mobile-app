@@ -13,7 +13,7 @@ import { Atlas } from '@/constants/atlas';
  * рядка вручну.
  */
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { parseInlineSpans, parseNoteMarkdown, type NoteBlock } from '@/utils/notes';
 
@@ -54,6 +54,8 @@ export function NoteMarkdown({
   onToggle,
   onCreateTask,
   createTaskLabel,
+  onTapLine,
+  editLabel,
 }: {
   body: string;
   colors: NoteMarkdownColors;
@@ -63,16 +65,35 @@ export function NoteMarkdown({
   /** Відсутній — дії «створити задачу» в рядках немає. */
   onCreateTask?: (line: number) => void;
   createTaskLabel: string;
+  /**
+   * Тап по тексту рядка — увійти в редагування саме там (single-mode
+   * редактор). `line` — індекс рядка; -1 — тап у порожню нотатку.
+   */
+  onTapLine?: (line: number) => void;
+  /** Підпис для читалки екрана: «редагувати рядок». */
+  editLabel?: string;
 }) {
   const blocks = parseNoteMarkdown(body);
   if (!blocks.some(block => block.kind !== 'empty')) {
+    if (onTapLine) {
+      return (
+        <Pressable testID="notes-preview-empty" accessibilityRole="button" accessibilityLabel={editLabel ?? emptyLabel}
+          onPress={() => onTapLine(-1)} style={s.emptyTap}>
+          <Text style={{ color: c.sub, fontSize: 17, lineHeight: 26 }}>{emptyLabel}</Text>
+        </Pressable>
+      );
+    }
     return <Text style={{ color: c.sub }}>{emptyLabel}</Text>;
   }
 
   return (
     <View testID="notes-preview-body">
       {blocks.map(block => {
-        if (block.kind === 'empty') return <View key={block.line} style={s.gap} />;
+        if (block.kind === 'empty') {
+          return onTapLine
+            ? <Pressable key={block.line} accessible={false} onPress={() => onTapLine(block.line)} style={s.gap} />
+            : <View key={block.line} style={s.gap} />;
+        }
         const actionable = Boolean(onCreateTask) && block.text.length > 0;
         return (
           <View key={block.line} style={s.row}>
@@ -83,6 +104,7 @@ export function NoteMarkdown({
                 accessibilityState={{ checked: block.done, disabled: !onToggle }}
                 accessibilityLabel={block.text}
                 disabled={!onToggle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 onPress={() => onToggle?.(block.line)}
                 style={[s.box, { borderColor: block.done ? c.accent : c.border, backgroundColor: block.done ? c.accent : 'transparent' }]}>
                 <Text style={{ color: block.done ? c.panel : 'transparent', fontWeight: '700' }}>✓</Text>
@@ -90,7 +112,13 @@ export function NoteMarkdown({
             )}
             {block.kind === 'bullet' && <Text style={[s.marker, { color: c.sub }]}>•</Text>}
             {block.kind === 'quote' && <View style={[s.bar, { backgroundColor: c.border }]} />}
-            <Line block={block} color={block.kind === 'quote' ? c.sub : c.text} />
+            {onTapLine ? (
+              <Pressable testID={`note-line-${block.line}`} accessibilityRole="button"
+                accessibilityLabel={editLabel ? `${editLabel}: ${block.text}` : block.text}
+                onPress={() => onTapLine(block.line)} style={s.tapLine}>
+                <Line block={block} color={block.kind === 'quote' ? c.sub : c.text} />
+              </Pressable>
+            ) : <Line block={block} color={block.kind === 'quote' ? c.sub : c.text} />}
             {actionable && (
               <TouchableOpacity
                 testID={`note-line-task-${block.line}`}
@@ -119,4 +147,6 @@ const s = StyleSheet.create({
   box: { width: 24, height: 24, marginTop: 2, borderRadius: Atlas.radius.small, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   action: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: -8 },
   code: { fontFamily: 'Courier', fontSize: 15 },
+  tapLine: { flex: 1, flexDirection: 'row' },
+  emptyTap: { minHeight: 120 },
 });

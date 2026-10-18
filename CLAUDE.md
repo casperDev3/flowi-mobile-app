@@ -138,6 +138,11 @@ api/
                              notifications_changed (handleNotificationsSignal з store/sync-engine.tsx)
 
 components/
+  notes/                   — нотатки: NotesWorkspace (екран: список|сітка + редактор, iPad — поруч),
+                             NoteEditor (один режим, автозбереження ~600 мс, панель форматування —
+                             InputAccessoryView на iOS), NoteCaptureSheet (швидкий запис, експорт для
+                             «+ Нотатка»), NoteConvertSheet (нотатка → задача/зустріч), NoteAttachments
+                             (+ noteAttachmentsApi: /api/notes/<id>/attachments/), notesTheme (токени)
   feedback/                — FeedbackForm/Card/Detail, model.ts (стани звернення, resolveState)
   notifications/           — NotificationBadge (таб «Налаштування», сайдбар), рядки інбоксу, матриця
   containers/              — модуль контейнерів v2 (місця, речі, фото, QR, ContainerSearchPanel на «Сьогодні»)
@@ -281,6 +286,8 @@ constants/
 | `'feedback_queue_v1'` / `'feedback_files_v1'` / `'feedback_status_cache_v1'` | локальні | Черга подання, шляхи файлів вкладень, кеш статусів — у бекапи не йдуть |
 | `'training_group_v1:*'` / `'training_groups_cache_v1:*'` / `'training_session_draft_v1:*'` | локальні | Кеші груп тренувань і чернетки сесій (стираються при виході за префіксом) |
 | `'health_auto_state'` / `'health_auto_suppressed'` / `'health_weight_cleanup_v1'` | локальні | Стан автоданих здоровʼя пристрою — не синхронізуються й не бекапляться |
+| `'notes_view_mode_v1'` | локальний | «Список» / «Сітка» екрана нотаток на цьому пристрої (components/notes/noteActions.ts): не синхронізується, не бекапиться, при виході не стирається |
+| `'notes_attachment_moves_v1'` | локальний | Черга `POST /notes/<id>/attachments/move/` після переміщення нотатки з файлами між «Особистими» й проєктом (components/notes/noteAttachmentsApi.ts); стирається при виході |
 | `'projects_list_prefs_v1'` | локальний | Сортування й фільтр статусу екрана «Проєкти» на цьому пристрої (utils/projectListPrefs.ts): не синхронізується, не бекапиться, при виході не стирається — даних акаунта не містить |
 
 SecureStore (не AsyncStorage): `flowi_access`, `flowi_refresh`, `flowi_registration_token`.

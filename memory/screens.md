@@ -48,7 +48,7 @@
 |------|-------------|---------|
 | `containers.tsx` | Контейнери/зберігання речей. Помаранчевий #F97316. | `containers` |
 | `archive.tsx` | Архів завдань. Зелений #10B981. | (фільтр над `tasks`) |
-| `notes.tsx` | Нотатник. Фіолетовий #A855F7. | `notes` |
+| `notes.tsx` | Нотатник. Фіолетовий #A855F7 (токени `getScreenColors('notes')` → `components/notes/notesTheme.ts`). Параметри: `?create=1` (нова), `?capture=1` (швидкий запис), `?open=<id>`. Редактор без «Редагувати/Зберегти» — автозбереження; архів, переміщення, вкладення, «→ Задача/Зустріч». | `notes` |
 | `projects.tsx` | Проєкти. | `projects` |
 | `meetings.tsx` | Наради + Google Calendar + аудіо записи. | `meetings` |
 | `subtasks.tsx` | Підзавдання | (вкладено в `tasks`) |

@@ -259,6 +259,15 @@ const MAPPING: Record<string, MaterialIconName> = {
   'syringe.fill': 'vaccines',
   // Сайдбар проєкту: згорнути/розгорнути.
   'sidebar.left': 'view-sidebar',
+  // Нотатки: панель форматування й вкладення.
+  'paperclip': 'attach-file',
+  'bold': 'format-bold',
+  'textformat.size': 'title',
+  'checkmark.square': 'check-box',
+  'pin.fill': 'push-pin',
+  'keyboard.chevron.compact.down': 'keyboard-hide',
+  'photo': 'image',
+  'camera': 'photo-camera',
 };
 
 export type IconSymbolName = keyof typeof MAPPING;

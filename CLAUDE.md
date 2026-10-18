@@ -221,7 +221,7 @@ constants/
 | `'tasks'` | `Task[]` | Завдання (опційні `startDate`, `projectId`, `assigneeId`, `createdBy`) |
 | `'transactions'` | `Transaction[]` | Фінансові транзакції (опційний `projectId` — бюджет проєкту, бачить лише owner) |
 | `'time_entries'` | `TimeEntry[]` | Записи трекера часу (опційний `projectId`) |
-| `'notes'` | `Note[]` | Нотатки (опційний `projectId`) |
+| `'notes'` | `Note[]` | Нотатки (опційні `projectId`, `tags`, `pinned`, `linkedTaskId`, `linkedMeetingId`, `archived`/`archivedAt`, `attachments: {id,name,size,type}[]`); правила — `utils/notes.ts` (паритет із веб `lib/notes.ts`) |
 | `'containers'` | `Container[]` | Контейнери зі списком речей |
 | `'projects'` | `Project[]` | Проєкти: `{id,name,color,template:'work'\|'simple',modules:{meetings,notes,time,budget,sprints},…}` — розділи вмикаються шаблоном/налаштуваннями, Огляд і Завдання завжди |
 | `'health_entries_v2'` | `HealthEntry[]` | Записи здоров'я (calories=їжа, calories_out=спалені, +макроси) |
@@ -328,14 +328,14 @@ const onRefresh = useCallback(() => { setRefreshing(true); loadXxx().finally(() 
 - Час: `#6366F1` (індиго)
 - Здоров'я: `#10B981` (зелений)
 - Контейнери: `#F97316` (помаранчевий)
-- Нотатки: `#F59E0B` (бурштиновий)
+- Нотатки: `#A855F7` (фіолетовий, окремий від Завдань `#7C3AED`)
 - Архів: `#10B981` (зелений)
 
 ### Фони по екранах (bg1 / bg2)
 - Завдання / Архів: `#0C0C14 / #14121E` dark · `#F4F2FF / #EAE6FF` light
 - Фінанси: `#080E18 / #0F1A2E` dark · `#EFF5FF / #E0ECFF` light
 - Час: `#0A0C18 / #121525` dark · `#EEF0FF / #E2E5FF` light
-- Нотатки: `#100D08 / #1A1510` dark · `#FFFBF4 / #FFF3DC` light
+- Нотатки: `#120A1A / #1C1226` dark · `#FAF5FF / #F3E8FF` light
 - Контейнери: `#100A00 / #1A1200` dark · `#FFF7ED / #FFEDD5` light
 
 ### Опції-дропдаун (Tasks screen)

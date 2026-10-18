@@ -37,7 +37,7 @@
 - `containers` → `Container[]` з вкладеними `items` (text, tags, note).
 
 ### Інші
-- `notes` → `Note[]`
+- `notes` → `Note[]` (`title`, `body` markdown, опц. `projectId`, `tags`, `pinned`, `linkedTaskId`, `linkedMeetingId`, `archived`/`archivedAt`, `attachments: {id,name,size,type}[]`) — `utils/notes.ts`
 - `projects` → `Project[]`
 - `ideas` → `Idea[]`
 - `bugs` → `Bug[]`

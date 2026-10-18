@@ -1,68 +1,1698 @@
 {
   "about": "Паритет правил екрана нотаток (пункт 2). Побайтова копія: web lib/notes-parity.json == mobile __tests__/notes-parity.json.",
   "notes": [
-    { "id": "personal-a", "title": "A", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z" },
-    { "id": "beta-1", "title": "B1", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z", "projectId": "p1" },
-    { "id": "alpha-1", "title": "C1", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z", "projectId": "p2" },
-    { "id": "personal-b", "title": "D", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z" },
-    { "id": "unknown-1", "title": "E", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z", "projectId": "zeta-id" },
-    { "id": "beta-2", "title": "F", "body": "", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z", "projectId": "p1" }
+    {
+      "id": "personal-a",
+      "title": "A",
+      "body": "",
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "updatedAt": "2026-09-01T00:00:00.000Z"
+    },
+    {
+      "id": "beta-1",
+      "title": "B1",
+      "body": "",
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "updatedAt": "2026-09-01T00:00:00.000Z",
+      "projectId": "p1"
+    },
+    {
+      "id": "alpha-1",
+      "title": "C1",
+      "body": "",
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "updatedAt": "2026-09-01T00:00:00.000Z",
+      "projectId": "p2"
+    },
+    {
+      "id": "personal-b",
+      "title": "D",
+      "body": "",
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "updatedAt": "2026-09-01T00:00:00.000Z"
+    },
+    {
+      "id": "unknown-1",
+      "title": "E",
+      "body": "",
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "updatedAt": "2026-09-01T00:00:00.000Z",
+      "projectId": "zeta-id"
+    },
+    {
+      "id": "beta-2",
+      "title": "F",
+      "body": "",
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "updatedAt": "2026-09-01T00:00:00.000Z",
+      "projectId": "p1"
+    }
   ],
-  "projectNames": { "p1": "Beta", "p2": "Alpha" },
+  "projectNames": {
+    "p1": "Beta",
+    "p2": "Alpha"
+  },
   "scope": {
-    "all": ["personal-a", "beta-1", "alpha-1", "personal-b", "unknown-1", "beta-2"],
-    "personal": ["personal-a", "personal-b"],
-    "projects": ["beta-1", "alpha-1", "unknown-1", "beta-2"]
+    "all": [
+      "personal-a",
+      "beta-1",
+      "alpha-1",
+      "personal-b",
+      "unknown-1",
+      "beta-2"
+    ],
+    "personal": [
+      "personal-a",
+      "personal-b"
+    ],
+    "projects": [
+      "beta-1",
+      "alpha-1",
+      "unknown-1",
+      "beta-2"
+    ]
   },
   "groups": [
-    { "projectId": null, "name": null, "ids": ["personal-a", "personal-b"] },
-    { "projectId": "p2", "name": "Alpha", "ids": ["alpha-1"] },
-    { "projectId": "p1", "name": "Beta", "ids": ["beta-1", "beta-2"] },
-    { "projectId": "zeta-id", "name": null, "ids": ["unknown-1"] }
+    {
+      "projectId": null,
+      "name": null,
+      "ids": [
+        "personal-a",
+        "personal-b"
+      ]
+    },
+    {
+      "projectId": "p2",
+      "name": "Alpha",
+      "ids": [
+        "alpha-1"
+      ]
+    },
+    {
+      "projectId": "p1",
+      "name": "Beta",
+      "ids": [
+        "beta-1",
+        "beta-2"
+      ]
+    },
+    {
+      "projectId": "zeta-id",
+      "name": null,
+      "ids": [
+        "unknown-1"
+      ]
+    }
   ],
-  "roles": { "p1": "viewer", "p2": "member", "p3": "owner" },
+  "roles": {
+    "p1": "viewer",
+    "p2": "member",
+    "p3": "owner"
+  },
   "canEdit": [
-    { "why": "особиста нотатка — завжди своя", "projectId": null, "limit": true, "expected": true },
-    { "why": "глядач проєкту не править", "projectId": "p1", "limit": true, "expected": false },
-    { "why": "учасник править", "projectId": "p2", "limit": true, "expected": true },
-    { "why": "власник править", "projectId": "p3", "limit": true, "expected": true },
-    { "why": "проєкт без відомої ролі (соло-фаза) — як власник", "projectId": "p9", "limit": true, "expected": true },
-    { "why": "верхня межа екрана перекриває все", "projectId": null, "limit": false, "expected": false }
+    {
+      "why": "особиста нотатка — завжди своя",
+      "projectId": null,
+      "limit": true,
+      "expected": true
+    },
+    {
+      "why": "глядач проєкту не править",
+      "projectId": "p1",
+      "limit": true,
+      "expected": false
+    },
+    {
+      "why": "учасник править",
+      "projectId": "p2",
+      "limit": true,
+      "expected": true
+    },
+    {
+      "why": "власник править",
+      "projectId": "p3",
+      "limit": true,
+      "expected": true
+    },
+    {
+      "why": "проєкт без відомої ролі (соло-фаза) — як власник",
+      "projectId": "p9",
+      "limit": true,
+      "expected": true
+    },
+    {
+      "why": "верхня межа екрана перекриває все",
+      "projectId": null,
+      "limit": false,
+      "expected": false
+    }
   ],
   "dirtyBase": {
-    "id": "d1", "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true,
-    "linkedTaskId": "t1", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-01T00:00:00.000Z"
+    "id": "d1",
+    "title": "Назва",
+    "body": "- [ ] пункт",
+    "tags": [
+      "Сайт"
+    ],
+    "pinned": true,
+    "linkedTaskId": "t1",
+    "createdAt": "2026-09-01T00:00:00.000Z",
+    "updatedAt": "2026-09-01T00:00:00.000Z"
   },
   "dirty": [
-    { "why": "без змін", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": false },
-    { "why": "пробіли по краях назви не зберігаються", "draft": { "title": " Назва ", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": false },
-    { "why": "регістр і решітка тега — той самий тег", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["#сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": false },
-    { "why": "змінено текст", "draft": { "title": "Назва", "body": "- [x] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": true },
-    { "why": "додано тег", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт", "звіт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": true },
-    { "why": "відкріплено", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": false, "linkedTaskId": "t1", "linkedMeetingId": null }, "expected": true },
-    { "why": "прибрано зв'язок із задачею", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": null, "linkedMeetingId": null }, "expected": true },
-    { "why": "додано зустріч", "draft": { "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"], "pinned": true, "linkedTaskId": "t1", "linkedMeetingId": "m1" }, "expected": true }
+    {
+      "why": "без змін",
+      "draft": {
+        "title": "Назва",
+        "body": "- [ ] пункт",
+        "tags": [
+          "Сайт"
+        ],
+        "pinned": true,
+        "linkedTaskId": "t1",
+        "linkedMeetingId": null
+      },
+      "expected": false
+    },
+    {
+      "why": "пробіли по краях назви не зберігаються",
+      "draft": {
+        "title": " Назва ",
+        "body": "- [ ] пункт",
+        "tags": [
+          "Сайт"
+        ],
+        "pinned": true,
+        "linkedTaskId": "t1",
+        "linkedMeetingId": null
+      },
+      "expected": false
+    },
+    {
+      "why": "регістр і решітка тега — той самий тег",
+      "draft": {
+        "title": "Назва",
+        "body": "- [ ] пункт",
+        "tags": [
+          "#сайт"
+        ],
+        "pinned": true,
+        "linkedTaskId": "t1",
+        "linkedMeetingId": null
+      },
+      "expected": false
+    },
+    {
+      "why": "змінено текст",
+      "draft": {
+        "title": "Назва",
+        "body": "- [x] пункт",
+        "tags": [
+          "Сайт"
+        ],
+        "pinned": true,
+        "linkedTaskId": "t1",
+        "linkedMeetingId": null
+      },
+      "expected": true
+    },
+    {
+      "why": "додано тег",
+      "draft": {
+        "title": "Назва",
+        "body": "- [ ] пункт",
+        "tags": [
+          "Сайт",
+          "звіт"
+        ],
+        "pinned": true,
+        "linkedTaskId": "t1",
+        "linkedMeetingId": null
+      },
+      "expected": true
+    },
+    {
+      "why": "відкріплено",
+      "draft": {
+        "title": "Назва",
+        "body": "- [ ] пункт",
+        "tags": [
+          "Сайт"
+        ],
+        "pinned": false,
+        "linkedTaskId": "t1",
+        "linkedMeetingId": null
+      },
+      "expected": true
+    },
+    {
+      "why": "прибрано зв'язок із задачею",
+      "draft": {
+        "title": "Назва",
+        "body": "- [ ] пункт",
+        "tags": [
+          "Сайт"
+        ],
+        "pinned": true,
+        "linkedTaskId": null,
+        "linkedMeetingId": null
+      },
+      "expected": true
+    },
+    {
+      "why": "додано зустріч",
+      "draft": {
+        "title": "Назва",
+        "body": "- [ ] пункт",
+        "tags": [
+          "Сайт"
+        ],
+        "pinned": true,
+        "linkedTaskId": "t1",
+        "linkedMeetingId": "m1"
+      },
+      "expected": true
+    }
   ],
   "leave": [
-    { "state": { "dirty": false, "busy": false }, "expected": "leave" },
-    { "state": { "dirty": true, "busy": false }, "expected": "confirm" },
-    { "state": { "dirty": true, "busy": true }, "expected": "stay" },
-    { "state": { "dirty": false, "busy": true }, "expected": "stay" }
+    {
+      "state": {
+        "dirty": false,
+        "busy": false
+      },
+      "expected": "leave"
+    },
+    {
+      "state": {
+        "dirty": true,
+        "busy": false
+      },
+      "expected": "confirm"
+    },
+    {
+      "state": {
+        "dirty": true,
+        "busy": true
+      },
+      "expected": "stay"
+    },
+    {
+      "state": {
+        "dirty": false,
+        "busy": true
+      },
+      "expected": "stay"
+    }
   ],
   "patch": {
     "now": "2026-09-23T12:00:00.000Z",
-    "change": { "body": "- [x] пункт" },
+    "change": {
+      "body": "- [x] пункт"
+    },
     "expected": {
-      "id": "d1", "title": "Назва", "body": "- [x] пункт", "tags": ["Сайт"], "pinned": true,
-      "linkedTaskId": "t1", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-23T12:00:00.000Z"
+      "id": "d1",
+      "title": "Назва",
+      "body": "- [x] пункт",
+      "tags": [
+        "Сайт"
+      ],
+      "pinned": true,
+      "linkedTaskId": "t1",
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "updatedAt": "2026-09-23T12:00:00.000Z"
     }
   },
   "patchPin": {
     "now": "2026-09-23T12:00:00.000Z",
-    "change": { "pinned": false },
+    "change": {
+      "pinned": false
+    },
     "expected": {
-      "id": "d1", "title": "Назва", "body": "- [ ] пункт", "tags": ["Сайт"],
-      "linkedTaskId": "t1", "createdAt": "2026-09-01T00:00:00.000Z", "updatedAt": "2026-09-23T12:00:00.000Z"
+      "id": "d1",
+      "title": "Назва",
+      "body": "- [ ] пункт",
+      "tags": [
+        "Сайт"
+      ],
+      "linkedTaskId": "t1",
+      "createdAt": "2026-09-01T00:00:00.000Z",
+      "updatedAt": "2026-09-23T12:00:00.000Z"
     }
+  },
+  "rework": {
+    "about": "Доробка нотаток: швидкий запис, перетворення, архів, вкладення. `now` без Z — місцевий час (неділя).",
+    "now": "2026-10-18T10:20:00",
+    "phrases": [
+      {
+        "why": "відносний день + «о ГГ:ХХ»",
+        "text": "завтра о 15:00",
+        "expected": {
+          "date": "2026-10-19",
+          "time": "15:00",
+          "spans": [
+            [
+              0,
+              6
+            ],
+            [
+              7,
+              14
+            ]
+          ]
+        }
+      },
+      {
+        "why": "сьогодні, час уже минув — все одно сьогодні (день названо явно)",
+        "text": "сьогодні 9:30",
+        "expected": {
+          "date": "2026-10-18",
+          "time": "09:30",
+          "spans": [
+            [
+              0,
+              8
+            ],
+            [
+              9,
+              13
+            ]
+          ]
+        }
+      },
+      {
+        "why": "скорочений день тижня поруч із часом",
+        "text": "пт 14:00",
+        "expected": {
+          "date": "2026-10-23",
+          "time": "14:00",
+          "spans": [
+            [
+              0,
+              2
+            ],
+            [
+              3,
+              8
+            ]
+          ]
+        }
+      },
+      {
+        "why": "ДД.ММ + «о ГГ»",
+        "text": "25.10 о 10",
+        "expected": {
+          "date": "2026-10-25",
+          "time": "10:00",
+          "spans": [
+            [
+              0,
+              5
+            ],
+            [
+              6,
+              10
+            ]
+          ]
+        }
+      },
+      {
+        "why": "англійською, 12-годинний формат",
+        "text": "tomorrow 3pm",
+        "expected": {
+          "date": "2026-10-19",
+          "time": "15:00",
+          "spans": [
+            [
+              0,
+              8
+            ],
+            [
+              9,
+              12
+            ]
+          ]
+        }
+      },
+      {
+        "why": "повна назва дня англійською",
+        "text": "Friday at 10:30am",
+        "expected": {
+          "date": "2026-10-23",
+          "time": "10:30",
+          "spans": [
+            [
+              0,
+              6
+            ],
+            [
+              7,
+              17
+            ]
+          ]
+        }
+      },
+      {
+        "why": "лише день — час не знайдено",
+        "text": "в п'ятницю",
+        "expected": {
+          "date": "2026-10-23",
+          "time": null,
+          "spans": [
+            [
+              0,
+              10
+            ]
+          ]
+        }
+      },
+      {
+        "why": "апостроф ʼ замість '",
+        "text": "у пʼятницю о 9",
+        "expected": {
+          "date": "2026-10-23",
+          "time": "09:00",
+          "spans": [
+            [
+              0,
+              10
+            ],
+            [
+              11,
+              14
+            ]
+          ]
+        }
+      },
+      {
+        "why": "повна назва дня з прийменником",
+        "text": "в понеділок 9:00",
+        "expected": {
+          "date": "2026-10-19",
+          "time": "09:00",
+          "spans": [
+            [
+              0,
+              11
+            ],
+            [
+              12,
+              16
+            ]
+          ]
+        }
+      },
+      {
+        "why": "післязавтра — не «завтра»",
+        "text": "післязавтра",
+        "expected": {
+          "date": "2026-10-20",
+          "time": null,
+          "spans": [
+            [
+              0,
+              11
+            ]
+          ]
+        }
+      },
+      {
+        "why": "day after tomorrow",
+        "text": "day after tomorrow at 8",
+        "expected": {
+          "date": "2026-10-20",
+          "time": "08:00",
+          "spans": [
+            [
+              0,
+              18
+            ],
+            [
+              19,
+              23
+            ]
+          ]
+        }
+      },
+      {
+        "why": "день + назва місяця",
+        "text": "25 жовтня о 18:30",
+        "expected": {
+          "date": "2026-10-25",
+          "time": "18:30",
+          "spans": [
+            [
+              0,
+              9
+            ],
+            [
+              10,
+              17
+            ]
+          ]
+        }
+      },
+      {
+        "why": "місяць + день англійською",
+        "text": "Oct 25",
+        "expected": {
+          "date": "2026-10-25",
+          "time": null,
+          "spans": [
+            [
+              0,
+              6
+            ]
+          ]
+        }
+      },
+      {
+        "why": "дата без року, що вже минула, — наступного року",
+        "text": "10.10",
+        "expected": {
+          "date": "2027-10-10",
+          "time": null,
+          "spans": [
+            [
+              0,
+              5
+            ]
+          ]
+        }
+      },
+      {
+        "why": "явний рік",
+        "text": "25.10.2027 14:00",
+        "expected": {
+          "date": "2027-10-25",
+          "time": "14:00",
+          "spans": [
+            [
+              0,
+              10
+            ],
+            [
+              11,
+              16
+            ]
+          ]
+        }
+      },
+      {
+        "why": "дворічний рік",
+        "text": "01.11.26",
+        "expected": {
+          "date": "2026-11-01",
+          "time": null,
+          "spans": [
+            [
+              0,
+              8
+            ]
+          ]
+        }
+      },
+      {
+        "why": "лише час, ще попереду — сьогодні",
+        "text": "15:00",
+        "expected": {
+          "date": "2026-10-18",
+          "time": "15:00",
+          "spans": [
+            [
+              0,
+              5
+            ]
+          ]
+        }
+      },
+      {
+        "why": "лише час, уже минув — завтра",
+        "text": "о 10",
+        "expected": {
+          "date": "2026-10-19",
+          "time": "10:00",
+          "spans": [
+            [
+              0,
+              4
+            ]
+          ]
+        }
+      },
+      {
+        "why": "сьогоднішній день тижня, час попереду — сьогодні",
+        "text": "нд 11:00",
+        "expected": {
+          "date": "2026-10-18",
+          "time": "11:00",
+          "spans": [
+            [
+              0,
+              2
+            ],
+            [
+              3,
+              8
+            ]
+          ]
+        }
+      },
+      {
+        "why": "сьогоднішній день тижня, час минув — через тиждень",
+        "text": "нд 9:00",
+        "expected": {
+          "date": "2026-10-25",
+          "time": "09:00",
+          "spans": [
+            [
+              0,
+              2
+            ],
+            [
+              3,
+              7
+            ]
+          ]
+        }
+      },
+      {
+        "why": "неіснуюча дата — нічого",
+        "text": "31.02",
+        "expected": null
+      },
+      {
+        "why": "одноцифровий місяць — не дата",
+        "text": "1.5 кг",
+        "expected": null
+      },
+      {
+        "why": "скорочення дня без часу поруч — не дата",
+        "text": "I sat 3 times",
+        "expected": null
+      },
+      {
+        "why": "скорочення дня поруч із часом — дата",
+        "text": "sat 3pm",
+        "expected": {
+          "date": "2026-10-24",
+          "time": "15:00",
+          "spans": [
+            [
+              0,
+              3
+            ],
+            [
+              4,
+              7
+            ]
+          ]
+        }
+      },
+      {
+        "why": "нічого",
+        "text": "post-mortem",
+        "expected": null
+      },
+      {
+        "why": "нічого",
+        "text": "купити молоко",
+        "expected": null
+      },
+      {
+        "why": "фраза посеред назви",
+        "text": "Дзвінок з Іваном завтра о 15:00",
+        "expected": {
+          "date": "2026-10-19",
+          "time": "15:00",
+          "spans": [
+            [
+              17,
+              23
+            ],
+            [
+              24,
+              31
+            ]
+          ]
+        }
+      },
+      {
+        "why": "час перед датою",
+        "text": "meeting 23:59 tomorrow",
+        "expected": {
+          "date": "2026-10-19",
+          "time": "23:59",
+          "spans": [
+            [
+              8,
+              13
+            ],
+            [
+              14,
+              22
+            ]
+          ]
+        }
+      },
+      {
+        "why": "неіснуючий час — нічого",
+        "text": "25:00",
+        "expected": null
+      }
+    ],
+    "nextFullHour": [
+      {
+        "now": "2026-10-18T10:20:00",
+        "expected": {
+          "date": "2026-10-18",
+          "time": "11:00"
+        }
+      },
+      {
+        "now": "2026-10-18T10:00:00",
+        "expected": {
+          "date": "2026-10-18",
+          "time": "11:00"
+        }
+      },
+      {
+        "now": "2026-10-18T23:40:00",
+        "expected": {
+          "date": "2026-10-19",
+          "time": "00:00"
+        }
+      },
+      {
+        "now": "2026-12-31T23:05:00",
+        "expected": {
+          "date": "2027-01-01",
+          "time": "00:00"
+        }
+      }
+    ],
+    "capture": [
+      {
+        "why": "перший рядок — назва, решта — тіло",
+        "text": "Ідея для сайту\nкнопка зверху\n- [ ] макет",
+        "opts": {},
+        "expected": {
+          "id": "",
+          "title": "Ідея для сайту",
+          "body": "кнопка зверху\n- [ ] макет",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        }
+      },
+      {
+        "why": "порожні рядки по краях зникають, «# » знімається з назви",
+        "text": "\n\n# Ідея\n\nрядок 2\n  \n",
+        "opts": {
+          "id": "n2"
+        },
+        "expected": {
+          "id": "n2",
+          "title": "Ідея",
+          "body": "рядок 2",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        }
+      },
+      {
+        "why": "лише назва",
+        "text": "  Подзвонити мамі  ",
+        "opts": {
+          "id": "n3"
+        },
+        "expected": {
+          "id": "n3",
+          "title": "Подзвонити мамі",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        }
+      },
+      {
+        "why": "перший рядок — чек-лист: назви немає, все в тіло",
+        "text": "- [ ] молоко\n- [x] хліб",
+        "opts": {
+          "id": "n4"
+        },
+        "expected": {
+          "id": "n4",
+          "title": "",
+          "body": "- [ ] молоко\n- [x] хліб",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        }
+      },
+      {
+        "why": "«+ Нотатка» із задачі — зв'язок, але без проєкту",
+        "text": "Нотатка до задачі",
+        "opts": {
+          "id": "n5",
+          "linkedTaskId": "t1"
+        },
+        "expected": {
+          "id": "n5",
+          "title": "Нотатка до задачі",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z",
+          "linkedTaskId": "t1"
+        }
+      },
+      {
+        "why": "«+ Нотатка» із зустрічі",
+        "text": "Підсумок\nдомовились",
+        "opts": {
+          "id": "n6",
+          "linkedMeetingId": "m1"
+        },
+        "expected": {
+          "id": "n6",
+          "title": "Підсумок",
+          "body": "домовились",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z",
+          "linkedMeetingId": "m1"
+        }
+      },
+      {
+        "why": "CRLF",
+        "text": "Назва\r\nрядок",
+        "opts": {
+          "id": "n7"
+        },
+        "expected": {
+          "id": "n7",
+          "title": "Назва",
+          "body": "рядок",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        }
+      },
+      {
+        "why": "порожній текст — нічого не зберігаємо",
+        "text": "  \n \n",
+        "opts": {
+          "id": "n8"
+        },
+        "expected": null
+      }
+    ],
+    "taskDraft": [
+      {
+        "why": "проєктна нотатка: проєкт і автор, опис без чек-листа",
+        "note": {
+          "id": "a",
+          "title": "Підготувати реліз",
+          "body": "Контекст релізу\n- [ ] **змерджити** PR\n- [x] оновити changelog\n\n\n\nПримітка в кінці\n* пункт списку",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z",
+          "projectId": "p1"
+        },
+        "opts": {
+          "id": "t9",
+          "now": "2026-10-18T10:20:00.000Z",
+          "createdBy": "42",
+          "deadline": "2026-10-20",
+          "priorityLevel": 1
+        },
+        "expected": {
+          "id": "t9",
+          "title": "Підготувати реліз",
+          "status": "active",
+          "subtasks": [
+            {
+              "id": "t9-s1",
+              "title": "змерджити PR",
+              "done": false
+            },
+            {
+              "id": "t9-s2",
+              "title": "оновити changelog",
+              "done": true
+            }
+          ],
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z",
+          "description": "Контекст релізу\n\nПримітка в кінці\n* пункт списку",
+          "projectId": "p1",
+          "createdBy": "42",
+          "deadline": "2026-10-20",
+          "priorityLevel": 1
+        }
+      },
+      {
+        "why": "проєкт змінено на особисті — createdBy не пишеться",
+        "note": {
+          "id": "a",
+          "title": "Підготувати реліз",
+          "body": "Контекст релізу\n- [ ] **змерджити** PR\n- [x] оновити changelog\n\n\n\nПримітка в кінці\n* пункт списку",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z",
+          "projectId": "p1"
+        },
+        "opts": {
+          "id": "t9",
+          "now": "2026-10-18T10:20:00.000Z",
+          "projectId": null,
+          "createdBy": "42"
+        },
+        "expected": {
+          "id": "t9",
+          "title": "Підготувати реліз",
+          "status": "active",
+          "subtasks": [
+            {
+              "id": "t9-s1",
+              "title": "змерджити PR",
+              "done": false
+            },
+            {
+              "id": "t9-s2",
+              "title": "оновити changelog",
+              "done": true
+            }
+          ],
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z",
+          "description": "Контекст релізу\n\nПримітка в кінці\n* пункт списку"
+        }
+      },
+      {
+        "why": "особиста нотатка в проєкт",
+        "note": {
+          "id": "b",
+          "title": "",
+          "body": "\nКупити продукти\n- [ ] молоко\n- [ ]   \n",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        },
+        "opts": {
+          "id": "t8",
+          "now": "2026-10-18T10:20:00.000Z",
+          "projectId": "p2",
+          "createdBy": "42",
+          "priorityLevel": null
+        },
+        "expected": {
+          "id": "t8",
+          "title": "Купити продукти",
+          "status": "active",
+          "subtasks": [
+            {
+              "id": "t8-s1",
+              "title": "молоко",
+              "done": false
+            }
+          ],
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z",
+          "projectId": "p2",
+          "createdBy": "42",
+          "priorityLevel": null
+        }
+      },
+      {
+        "why": "без назви: назва з першого рядка, порожній пункт пропускається",
+        "note": {
+          "id": "b",
+          "title": "",
+          "body": "\nКупити продукти\n- [ ] молоко\n- [ ]   \n",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        },
+        "opts": {
+          "id": "t8",
+          "now": "2026-10-18T10:20:00.000Z"
+        },
+        "expected": {
+          "id": "t8",
+          "title": "Купити продукти",
+          "status": "active",
+          "subtasks": [
+            {
+              "id": "t8-s1",
+              "title": "молоко",
+              "done": false
+            }
+          ],
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        }
+      },
+      {
+        "why": "лише чек-лист — назва порожня (лист попросить ввести)",
+        "note": {
+          "id": "c",
+          "title": "   ",
+          "body": "- [ ] лише чек-лист",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        },
+        "opts": {
+          "id": "t7",
+          "now": "2026-10-18T10:20:00.000Z"
+        },
+        "expected": {
+          "id": "t7",
+          "title": "",
+          "status": "active",
+          "subtasks": [
+            {
+              "id": "t7-s1",
+              "title": "лише чек-лист",
+              "done": false
+            }
+          ],
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        }
+      }
+    ],
+    "meetingDraft": [
+      {
+        "why": "фраза в назві вирізається; чек-лист і список → порядок денний",
+        "note": {
+          "id": "m",
+          "title": "Дзвінок з Іваном завтра о 15:00",
+          "body": "Обговорити:\n- [ ] бюджет\n- [x] сайт\n* терміни\n1. ризики\n\nДовідка тут",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        },
+        "opts": {
+          "id": "mt1"
+        },
+        "expected": {
+          "id": "mt1",
+          "title": "Дзвінок з Іваном",
+          "date": "2026-10-19",
+          "time": "15:00",
+          "durationMinutes": 30,
+          "agenda": [
+            {
+              "id": "mt1-a1",
+              "text": "бюджет",
+              "done": false
+            },
+            {
+              "id": "mt1-a2",
+              "text": "сайт",
+              "done": true
+            },
+            {
+              "id": "mt1-a3",
+              "text": "терміни",
+              "done": false
+            },
+            {
+              "id": "mt1-a4",
+              "text": "ризики",
+              "done": false
+            }
+          ],
+          "notes": "Обговорити:\n\nДовідка тут"
+        }
+      },
+      {
+        "why": "фраза в тексті лишається в нотатках; проєкт із нотатки",
+        "note": {
+          "id": "m2",
+          "title": "Планування",
+          "body": "Домовились на пт 14:00\n- оцінки",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z",
+          "projectId": "p1"
+        },
+        "opts": {
+          "id": "mt2"
+        },
+        "expected": {
+          "id": "mt2",
+          "title": "Планування",
+          "date": "2026-10-23",
+          "time": "14:00",
+          "durationMinutes": 30,
+          "agenda": [
+            {
+              "id": "mt2-a1",
+              "text": "оцінки",
+              "done": false
+            }
+          ],
+          "notes": "Домовились на пт 14:00",
+          "projectId": "p1"
+        }
+      },
+      {
+        "why": "без дати — наступна повна година; проєкт обрано в листі",
+        "note": {
+          "id": "m3",
+          "title": "Ретро",
+          "body": "без дати",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        },
+        "opts": {
+          "id": "mt3",
+          "projectId": "p3",
+          "durationMinutes": 45
+        },
+        "expected": {
+          "id": "mt3",
+          "title": "Ретро",
+          "date": "2026-10-18",
+          "time": "11:00",
+          "durationMinutes": 45,
+          "agenda": [],
+          "notes": "без дати",
+          "projectId": "p3"
+        }
+      },
+      {
+        "why": "лише день, не сьогодні — 09:00",
+        "note": {
+          "id": "m4",
+          "title": "Ретро в п'ятницю",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        },
+        "opts": {
+          "id": "mt4"
+        },
+        "expected": {
+          "id": "mt4",
+          "title": "Ретро",
+          "date": "2026-10-23",
+          "time": "09:00",
+          "durationMinutes": 30,
+          "agenda": []
+        }
+      },
+      {
+        "why": "назва — сама фраза: назва лишається як є",
+        "note": {
+          "id": "m5",
+          "title": "завтра о 10",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        },
+        "opts": {
+          "id": "mt5",
+          "projectId": ""
+        },
+        "expected": {
+          "id": "mt5",
+          "title": "завтра о 10",
+          "date": "2026-10-19",
+          "time": "10:00",
+          "durationMinutes": 30,
+          "agenda": []
+        }
+      },
+      {
+        "why": "лише «сьогодні» — наступна повна година; назва з першого рядка",
+        "note": {
+          "id": "m6",
+          "title": "",
+          "body": "Синк по дизайну сьогодні\n- макети",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        },
+        "opts": {
+          "id": "mt6"
+        },
+        "expected": {
+          "id": "mt6",
+          "title": "Синк по дизайну",
+          "date": "2026-10-18",
+          "time": "11:00",
+          "durationMinutes": 30,
+          "agenda": [
+            {
+              "id": "mt6-a1",
+              "text": "макети",
+              "done": false
+            }
+          ]
+        }
+      }
+    ],
+    "normalize": [
+      {
+        "why": "архів і вкладення читаються",
+        "raw": {
+          "id": "x1",
+          "title": "t",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "archived": true,
+          "archivedAt": "2026-10-18T10:20:00.000Z",
+          "attachments": [
+            {
+              "id": "f1",
+              "name": "фото.jpg",
+              "size": 1234.4,
+              "type": "image/jpeg"
+            },
+            {
+              "id": "f1",
+              "name": "дубль"
+            },
+            {
+              "name": "без id"
+            },
+            {
+              "id": 7,
+              "size": -3
+            },
+            "сміття"
+          ]
+        },
+        "expected": {
+          "id": "x1",
+          "title": "t",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z",
+          "archived": true,
+          "archivedAt": "2026-10-18T10:20:00.000Z",
+          "attachments": [
+            {
+              "id": "f1",
+              "name": "фото.jpg",
+              "size": 1234,
+              "type": "image/jpeg"
+            },
+            {
+              "id": "7",
+              "name": "7",
+              "size": 0,
+              "type": "application/octet-stream"
+            }
+          ]
+        }
+      },
+      {
+        "why": "archived не true — не в архіві, archivedAt без archived ігнорується",
+        "raw": {
+          "id": "x2",
+          "title": "t",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "archived": "yes",
+          "archivedAt": "2026-10-18T10:20:00.000Z",
+          "attachments": "nope"
+        },
+        "expected": {
+          "id": "x2",
+          "title": "t",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        }
+      },
+      {
+        "why": "порожній список вкладень не пишеться",
+        "raw": {
+          "id": "x3",
+          "title": "t",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "attachments": []
+        },
+        "expected": {
+          "id": "x3",
+          "title": "t",
+          "body": "",
+          "createdAt": "2026-10-18T10:20:00.000Z",
+          "updatedAt": "2026-10-18T10:20:00.000Z"
+        }
+      }
+    ],
+    "pool": [
+      {
+        "id": "p1",
+        "title": "Активна",
+        "body": "",
+        "createdAt": "2026-10-18T10:20:00.000Z",
+        "updatedAt": "2026-10-01T00:00:00.000Z",
+        "linkedTaskId": "t1"
+      },
+      {
+        "id": "p2",
+        "title": "Архівна",
+        "body": "",
+        "createdAt": "2026-10-18T10:20:00.000Z",
+        "updatedAt": "2026-10-03T00:00:00.000Z",
+        "archived": true,
+        "archivedAt": "2026-10-18T10:20:00.000Z",
+        "linkedTaskId": "t1",
+        "linkedMeetingId": "m1"
+      },
+      {
+        "id": "p3",
+        "title": "Друга",
+        "body": "",
+        "createdAt": "2026-10-18T10:20:00.000Z",
+        "updatedAt": "2026-10-02T00:00:00.000Z",
+        "linkedMeetingId": "m1"
+      },
+      {
+        "id": "p4",
+        "title": "Без зв'язків",
+        "body": "",
+        "createdAt": "2026-10-18T10:20:00.000Z",
+        "updatedAt": "2026-10-04T00:00:00.000Z"
+      }
+    ],
+    "archiveFilter": {
+      "active": [
+        "p1",
+        "p3",
+        "p4"
+      ],
+      "archived": [
+        "p2"
+      ],
+      "all": [
+        "p1",
+        "p2",
+        "p3",
+        "p4"
+      ]
+    },
+    "selectDefault": [
+      "p4",
+      "p3",
+      "p1"
+    ],
+    "selectArchived": [
+      "p2"
+    ],
+    "linked": [
+      {
+        "target": {
+          "taskId": "t1"
+        },
+        "expected": [
+          "p2",
+          "p1"
+        ]
+      },
+      {
+        "target": {
+          "meetingId": "m1"
+        },
+        "expected": [
+          "p2",
+          "p3"
+        ]
+      },
+      {
+        "target": {
+          "taskId": "nope"
+        },
+        "expected": []
+      },
+      {
+        "target": {
+          "taskId": ""
+        },
+        "expected": []
+      }
+    ],
+    "base": {
+      "id": "w",
+      "title": "Нотатка",
+      "body": "текст",
+      "text": "легасі",
+      "createdAt": "2026-10-18T10:20:00.000Z",
+      "updatedAt": "2026-10-18T10:20:00.000Z",
+      "projectId": "p1",
+      "linkedTaskId": "t1"
+    },
+    "later": "2026-10-19T08:00:00.000Z",
+    "archive": {
+      "id": "w",
+      "title": "Нотатка",
+      "body": "текст",
+      "createdAt": "2026-10-18T10:20:00.000Z",
+      "updatedAt": "2026-10-19T08:00:00.000Z",
+      "projectId": "p1",
+      "linkedTaskId": "t1",
+      "archived": true,
+      "archivedAt": "2026-10-19T08:00:00.000Z"
+    },
+    "unarchive": {
+      "id": "w",
+      "title": "Нотатка",
+      "body": "текст",
+      "createdAt": "2026-10-18T10:20:00.000Z",
+      "updatedAt": "2026-10-19T08:00:00.000Z",
+      "projectId": "p1",
+      "linkedTaskId": "t1"
+    },
+    "moveToPersonal": {
+      "id": "w",
+      "title": "Нотатка",
+      "body": "текст",
+      "createdAt": "2026-10-18T10:20:00.000Z",
+      "updatedAt": "2026-10-19T08:00:00.000Z",
+      "linkedTaskId": "t1"
+    },
+    "moveToProject": {
+      "id": "w",
+      "title": "Нотатка",
+      "body": "текст",
+      "createdAt": "2026-10-18T10:20:00.000Z",
+      "updatedAt": "2026-10-19T08:00:00.000Z",
+      "projectId": "p9",
+      "linkedTaskId": "t1"
+    },
+    "link": {
+      "id": "w",
+      "title": "Нотатка",
+      "body": "текст",
+      "createdAt": "2026-10-18T10:20:00.000Z",
+      "updatedAt": "2026-10-19T08:00:00.000Z",
+      "projectId": "p1",
+      "linkedMeetingId": "m5"
+    },
+    "attachAdd": {
+      "id": "w",
+      "title": "Нотатка",
+      "body": "текст",
+      "createdAt": "2026-10-18T10:20:00.000Z",
+      "updatedAt": "2026-10-19T08:00:00.000Z",
+      "projectId": "p1",
+      "linkedTaskId": "t1",
+      "attachments": [
+        {
+          "id": "f1",
+          "name": "a.pdf",
+          "size": 10,
+          "type": "application/pdf"
+        },
+        {
+          "id": "f2",
+          "name": "b.png",
+          "size": 20,
+          "type": "image/png"
+        }
+      ]
+    },
+    "attachReplace": {
+      "id": "w",
+      "title": "Нотатка",
+      "body": "текст",
+      "createdAt": "2026-10-18T10:20:00.000Z",
+      "updatedAt": "2026-10-19T08:00:00.000Z",
+      "projectId": "p1",
+      "linkedTaskId": "t1",
+      "attachments": [
+        {
+          "id": "f1",
+          "name": "a2.pdf",
+          "size": 11,
+          "type": "application/pdf"
+        },
+        {
+          "id": "f2",
+          "name": "b.png",
+          "size": 20,
+          "type": "image/png"
+        }
+      ]
+    },
+    "attachRemoveAll": {
+      "id": "w",
+      "title": "Нотатка",
+      "body": "текст",
+      "createdAt": "2026-10-18T10:20:00.000Z",
+      "updatedAt": "2026-10-19T08:00:00.000Z",
+      "projectId": "p1",
+      "linkedTaskId": "t1"
+    },
+    "lineIndexAt": [
+      {
+        "body": "a\nb\nc",
+        "offset": 0,
+        "expected": 0
+      },
+      {
+        "body": "a\nb\nc",
+        "offset": 2,
+        "expected": 1
+      },
+      {
+        "body": "a\nb\nc",
+        "offset": 3,
+        "expected": 1
+      },
+      {
+        "body": "a\nb\nc",
+        "offset": 99,
+        "expected": 2
+      },
+      {
+        "body": "",
+        "offset": 0,
+        "expected": 0
+      }
+    ],
+    "lineFormat": [
+      {
+        "body": "текст",
+        "line": 0,
+        "format": "todo",
+        "expected": "- [ ] текст"
+      },
+      {
+        "body": "- [ ] пункт",
+        "line": 0,
+        "format": "todo",
+        "expected": "пункт"
+      },
+      {
+        "body": "- [x] пункт",
+        "line": 0,
+        "format": "bullet",
+        "expected": "- пункт"
+      },
+      {
+        "body": "  - пункт",
+        "line": 0,
+        "format": "todo",
+        "expected": "  - [ ] пункт"
+      },
+      {
+        "body": "- пункт",
+        "line": 0,
+        "format": "bullet",
+        "expected": "пункт"
+      },
+      {
+        "body": "# Заголовок",
+        "line": 0,
+        "format": "heading",
+        "expected": "Заголовок"
+      },
+      {
+        "body": "- [ ] пункт",
+        "line": 0,
+        "format": "heading",
+        "expected": "# пункт"
+      },
+      {
+        "body": "a\nb",
+        "line": 1,
+        "format": "bullet",
+        "expected": "a\n- b"
+      },
+      {
+        "body": "a",
+        "line": 5,
+        "format": "todo",
+        "expected": "a"
+      },
+      {
+        "body": "1. пункт",
+        "line": 0,
+        "format": "bullet",
+        "expected": "- пункт"
+      }
+    ],
+    "wrap": [
+      {
+        "body": "ab cd",
+        "start": 3,
+        "end": 5,
+        "marker": "**",
+        "expected": {
+          "text": "ab **cd**",
+          "start": 5,
+          "end": 7
+        }
+      },
+      {
+        "body": "ab **cd**",
+        "start": 5,
+        "end": 7,
+        "marker": "**",
+        "expected": {
+          "text": "ab cd",
+          "start": 3,
+          "end": 5
+        }
+      },
+      {
+        "body": "ab",
+        "start": 1,
+        "end": 1,
+        "marker": "**",
+        "expected": {
+          "text": "a****b",
+          "start": 3,
+          "end": 3
+        }
+      },
+      {
+        "body": "ab",
+        "start": 2,
+        "end": 0,
+        "marker": "_",
+        "expected": {
+          "text": "_ab_",
+          "start": 1,
+          "end": 3
+        }
+      }
+    ],
+    "toggle": [
+      {
+        "body": "- [ ] a\n- [x] b",
+        "line": 0,
+        "expected": "- [x] a\n- [x] b"
+      },
+      {
+        "body": "- [ ] a\n- [x] b",
+        "line": 1,
+        "expected": "- [ ] a\n- [ ] b"
+      },
+      {
+        "body": "текст",
+        "line": 0,
+        "expected": "текст"
+      },
+      {
+        "body": "- [ ] a",
+        "line": 4,
+        "expected": "- [ ] a"
+      }
+    ]
   }
 }

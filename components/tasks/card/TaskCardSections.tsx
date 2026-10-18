@@ -139,6 +139,8 @@ export interface TaskCardDetailsProps {
   hasDeadline: boolean;
   /** Спринт соло-проєкту — коли вкладки «Команда» немає, а спринти є. */
   sprintSlot?: React.ReactNode;
+  /** Повʼязані нотатки + «+ Нотатка» (components/notes/LinkedNotesSection) — одразу під описом. */
+  notesSlot?: React.ReactNode;
   canExecute: boolean;
   /** Право планувати (опис, дата початку, повторення). */
   canPlan: boolean;
@@ -150,7 +152,7 @@ export interface TaskCardDetailsProps {
 
 export function TaskCardDetails({
   description, onDescription, estimate, onEstimate, startDate, onStartDate, recurrence, onRecurrence, reminderAt, onSetReminder,
-  onRemoveReminder, createdAt, hasDeadline, sprintSlot, canExecute, canPlan, today, colors: c, isDark, locale,
+  onRemoveReminder, createdAt, hasDeadline, sprintSlot, notesSlot, canExecute, canPlan, today, colors: c, isDark, locale,
 }: TaskCardDetailsProps) {
   const { tr } = useI18n();
   return (
@@ -166,6 +168,8 @@ export function TaskCardDetails({
         minHeight={64}
         colors={c}
       />
+
+      {notesSlot ?? null}
 
       <PropertyGroup colors={c}>
         <EstimateField value={estimate} onChange={onEstimate} disabled={!canExecute} colors={c} isDark={isDark} />

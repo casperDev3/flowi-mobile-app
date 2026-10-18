@@ -1,0 +1,43 @@
+# Швидкий запис нотатки → задача (точки входу нотаток, частина 2).
+#
+# Deep link віджетів `ftrackingapp:///notes?capture=1` відкриває міні-аркуш
+# ПОВЕРХ поточного екрана (app/+native-intent.tsx → GlobalNoteCapture), а не
+# повний екран нотаток. «→ Задача» зберігає нотатку й відкриває лист
+# перетворення; після «Створити задачу» нотатка лишається й має звʼязок.
+#
+# Передумова: Release-збірка на симуляторі (docs/AUDIT_RUNBOOK.md), увійдено
+# в ЛОКАЛЬНИЙ тестовий акаунт (127.0.0.1:8000). НІКОЛИ не на продакшн-акаунті.
+# Прибирання: створена задача «Maestro capture» і нотатка лишаються —
+# видаліть їх вручну або скидайте стенд.
+appId: com.casper3.f-tracking-app
+---
+- launchApp
+- openLink: "ftrackingapp:///notes?capture=1"
+- extendedWaitUntil:
+    visible:
+      id: "notes-capture-sheet"
+    timeout: 10000
+# Аркуш поверх головного екрана, а не екран «Нотатки».
+- assertNotVisible:
+    id: "notes-list"
+- tapOn:
+    id: "notes-capture-input"
+- inputText: "Maestro capture\n- [ ] Перший крок\n- [x] Готовий крок"
+- tapOn:
+    id: "notes-capture-task"
+- extendedWaitUntil:
+    visible:
+      id: "notes-convert-sheet"
+    timeout: 5000
+- assertVisible: "Перший крок"
+- assertVisible: "Готовий крок"
+- tapOn:
+    id: "notes-convert-create"
+- extendedWaitUntil:
+    notVisible:
+      id: "notes-convert-sheet"
+    timeout: 5000
+# Нотатка лишилась і привʼязана до задачі.
+- openLink: "ftrackingapp:///notes"
+- assertVisible: "Maestro capture"
+- assertVisible: "→ Задача"

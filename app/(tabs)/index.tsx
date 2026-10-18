@@ -58,6 +58,7 @@ import { TaskCardActivity, TaskCardDetails, TaskCardMain } from '@/components/ta
 import { OptionField, ReminderSheet } from '@/components/tasks/card/fields';
 import { TaskQuickCreate } from '@/components/tasks/card/TaskQuickCreate';
 import { estimateDraft, recurrenceDraft } from '@/components/tasks/card/draftParts';
+import { LinkedNotesSection } from '@/components/notes/LinkedNotesSection';
 import { CommentsSection } from '@/components/shared/CommentsSection';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
@@ -1601,6 +1602,15 @@ export default function TasksScreen() {
         createdAt={selectedTask.createdAt}
         hasDeadline={!!selectedTask.deadline}
         sprintSlot={showTeamTab ? null : selectedSprintSlot}
+        // Повʼязані нотатки: нова — завжди особиста, з linkedTaskId (навіть для задачі проєкту).
+        notesSlot={
+          <LinkedNotesSection
+            target={{ taskId: selectedTask.id }}
+            isDark={isDark}
+            colors={c}
+            beforeOpen={showDetailColumn ? undefined : () => closeTaskDetail(true)}
+          />
+        }
         canExecute={canEditSelectedTask}
         canPlan={canPlanSelectedTask}
         today={today}
@@ -1873,6 +1883,7 @@ export default function TasksScreen() {
       timer={viewedMeetingTimer}
       onToggleTimer={toggleViewedMeetingTimer}
       onEdit={editViewedMeeting}
+      onBeforeOpenNote={showDetailColumn ? undefined : () => closeTaskDetail(true)}
       colors={meetingDetailColors}
       tr={tr}
       locale={locale}

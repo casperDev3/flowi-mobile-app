@@ -369,5 +369,6 @@ struct FlowiWidget: Widget {
 struct FlowiWidgetBundle: WidgetBundle {
   var body: some Widget {
     FlowiWidget()
+    FlowiCaptureWidget()
   }
 }

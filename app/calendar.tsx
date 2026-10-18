@@ -816,6 +816,7 @@ export default function CalendarScreen() {
                 onPlayRecording={uri => { void playRecording(uri); }}
                 onDeleteRecording={uri => deleteRecording(selectedOrig.id, uri)}
                 playingUri={playingUri}
+                onBeforeOpenNote={showSideColumn ? undefined : () => setSelectedKey(null)}
                 colors={c}
                 tr={tr}
                 locale={locale}

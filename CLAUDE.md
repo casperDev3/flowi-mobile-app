@@ -46,6 +46,8 @@ app/
   containers.tsx           — Контейнери/зберігання (Stack, ~580 lines)
   archive.tsx              — Архів завдань (Stack)
   notes.tsx                — Нотатник (Stack)
+  +native-intent.tsx       — redirectSystemPath: `notes?capture=1` / `notes?create=1` ззовні (віджети)
+                             → міні-аркуш швидкого запису поверх поточного екрана, без навігації
   projects.tsx             — Проєкти (Stack)
   meetings.tsx             — Наради (Stack)
   subtasks.tsx             — Підзавдання (Stack)
@@ -97,6 +99,10 @@ utils/
 store/
   timer-context.tsx        — контекст Tasks→Time (pendingTask)
   storage.ts               — loadData<T>(key, fallback) / saveData(key, data)
+  note-capture.ts          — глобальний запит швидкого запису (requestNoteCapture / isNoteCaptureLink)
+  quick-actions.ts         — дія іконки застосунку «Нова нотатка» через НЕОБОВʼЯЗКОВИЙ пакет
+                             `expo-quick-actions` (поки не встановлено — no-op; потрібні
+                             `npx expo install expo-quick-actions` + новий нативний білд EAS)
   i18n.tsx                 — I18nContext: lang, setLang, tr (translations object)
   translations.ts          — всі рядки uk/en (~1200 lines)
   theme-context.tsx        — ThemeContext
@@ -143,6 +149,9 @@ components/
                              InputAccessoryView на iOS), NoteCaptureSheet (швидкий запис, експорт для
                              «+ Нотатка»), NoteConvertSheet (нотатка → задача/зустріч), NoteAttachments
                              (+ noteAttachmentsApi: /api/notes/<id>/attachments/), notesTheme (токени)
+                             GlobalNoteCapture (корінь, app/_layout.tsx: аркуш за store/note-capture.ts +
+                             дія іконки «Нова нотатка»), LinkedNotesSection («Нотатки» + «+ Нотатка» у деталі
+                             задачі/зустрічі; нова нотатка — особиста, лише з linkedTaskId/linkedMeetingId)
   feedback/                — FeedbackForm/Card/Detail, model.ts (стани звернення, resolveState)
   notifications/           — NotificationBadge (таб «Налаштування», сайдбар), рядки інбоксу, матриця
   containers/              — модуль контейнерів v2 (місця, речі, фото, QR, ContainerSearchPanel на «Сьогодні»)

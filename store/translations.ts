@@ -1961,6 +1961,11 @@ export interface Translations {
   notesConvertNoteStays: string;
   notesDetails: string;
   notesOpenLinked: string;
+  /** Секція «Нотатки» в деталі задачі/зустрічі (повʼязані нотатки). */
+  notesLinkedTitle: string;
+  notesAddLinked: string;
+  notesLinkedEmpty: string;
+  notesLinkedOpenA11y: string;
   notesFilterLabel: string;
 
   // ─── Оплата підписки (було PAY_LABELS в UpcomingPaymentsCard) ────────────────
@@ -4693,6 +4698,10 @@ const uk: Translations = {
   notesConvertNoteStays: 'Нотатка лишиться на місці й отримає посилання.',
   notesDetails: 'Звʼязки й теги',
   notesOpenLinked: 'Відкрити',
+  notesLinkedTitle: 'Нотатки',
+  notesAddLinked: '+ Нотатка',
+  notesLinkedEmpty: 'Повʼязаних нотаток ще немає.',
+  notesLinkedOpenA11y: 'Відкрити нотатку «{title}»',
   notesFilterLabel: 'Фільтри нотаток',
 
   // Оплата підписки (було PAY_LABELS)
@@ -7425,6 +7434,10 @@ const en: Translations = {
   notesConvertNoteStays: 'The note stays where it is and gets a link.',
   notesDetails: 'Links and tags',
   notesOpenLinked: 'Open',
+  notesLinkedTitle: 'Notes',
+  notesAddLinked: '+ Note',
+  notesLinkedEmpty: 'No linked notes yet.',
+  notesLinkedOpenA11y: 'Open note “{title}”',
   notesFilterLabel: 'Note filters',
 
   // Subscription payment (was PAY_LABELS)

@@ -21,6 +21,7 @@ import { Atlas } from '@/constants/atlas';
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { MeetingComments } from './MeetingComments';
+import { LinkedNotesSection } from '@/components/notes/LinkedNotesSection';
 import { AccessibilityInfo, LayoutAnimation, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { MeetingProjectChip, type MeetingChipProject } from '@/components/meetings/MeetingProjectChip';
@@ -143,6 +144,11 @@ export interface MeetingDetailBodyProps {
   onPlayRecording?: (uri: string) => void;
   onDeleteRecording?: (uri: string) => void;
   playingUri?: string | null;
+  /**
+   * Деталь — модал (телефон): закрити її перед переходом у редактор
+   * повʼязаної нотатки. На широкому (колонка) — не передавати.
+   */
+  onBeforeOpenNote?: () => void;
   colors: MeetingDetailColors;
   tr: Translations;
   locale: string;
@@ -150,7 +156,7 @@ export interface MeetingDetailBodyProps {
 
 export function MeetingDetailBody({
   meeting, original, project, timer, onToggleTimer, onEdit, onRecord, onPlayRecording, onDeleteRecording, playingUri,
-  colors: c, tr, locale,
+  onBeforeOpenNote, colors: c, tr, locale,
 }: MeetingDetailBodyProps) {
   const [tab, setTab] = useState('info');
   const reduceMotion = useRef(true);
@@ -269,6 +275,11 @@ export function MeetingDetailBody({
       </View>
       <View style={{ display: tab === 'agenda' || tab === 'notes' ? 'flex' : 'none' }}>
         <MeetingWorkspace key={`workspace-${original.id}`} meeting={original} date={meeting.date} colors={c} section={tab === 'notes' ? 'notes' : 'agenda'} />
+        {/* Нотатки з linkedMeetingId серії (оригіналу) + «+ Нотатка» — особиста, лише зі звʼязком. */}
+        {tab === 'notes' ? (
+          <LinkedNotesSection key={`linked-notes-${original.id}`} target={{ meetingId: original.id }}
+            colors={c} beforeOpen={onBeforeOpenNote} />
+        ) : null}
       </View>
       <View style={{ display: tab === 'comments' ? 'flex' : 'none' }}><MeetingComments meeting={original} colors={c} tr={tr} locale={locale} /></View>
       <View style={{ display: tab === 'info' ? 'flex' : 'none' }}>

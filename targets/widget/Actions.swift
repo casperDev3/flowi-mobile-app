@@ -12,6 +12,7 @@ struct FlowiStrings {
   var addExpense: String { en ? "Add expense" : "Додати витрату" }
   var addEvent: String { en ? "Add event" : "Додати подію" }
   var addNote: String { en ? "Take a note" : "Зробити нотатку" }
+  var newNote: String { en ? "New note" : "Нова нотатка" }
   var finance: String { en ? "Finance" : "Фінанси" }
   var steps: String { en ? "Steps" : "Кроки" }
   var tasks: String { en ? "Tasks" : "Завдання" }
@@ -48,7 +49,7 @@ enum FlowiAction: String, AppEnum, CaseIterable {
     case .task: return URL(string: "ftrackingapp:///?create=1")!
     case .expense: return URL(string: "ftrackingapp:///explore?create=1")!
     case .event: return URL(string: "ftrackingapp:///calendar?create=meeting")!
-    case .note: return URL(string: "ftrackingapp:///notes?create=1")!
+    case .note: return FlowiLinks.noteCapture
     }
   }
 
@@ -66,7 +67,7 @@ enum FlowiAction: String, AppEnum, CaseIterable {
     case .task: return Color(red: 0x63 / 255, green: 0x66 / 255, blue: 0xF1 / 255)   // #6366F1
     case .expense: return Color(red: 0xEF / 255, green: 0x44 / 255, blue: 0x44 / 255) // #EF4444
     case .event: return Color(red: 0x0E / 255, green: 0xA5 / 255, blue: 0xE9 / 255)   // #0EA5E9
-    case .note: return Color(red: 0x7C / 255, green: 0x3A / 255, blue: 0xED / 255)    // #7C3AED
+    case .note: return Color(red: 0xA8 / 255, green: 0x55 / 255, blue: 0xF7 / 255)    // #A855F7 (акцент нотаток)
     }
   }
 
@@ -110,4 +111,6 @@ enum FlowiLinks {
   static let steps = URL(string: "ftrackingapp:///health-activity")!
   static let tasks = URL(string: "ftrackingapp:///")!
   static let time = URL(string: "ftrackingapp:///time")!
+  /// Швидкий запис нотатки: міні-аркуш поверх поточного екрана (app/+native-intent.tsx).
+  static let noteCapture = URL(string: "ftrackingapp:///notes?capture=1")!
 }

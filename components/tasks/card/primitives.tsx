@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/card/primitives.tsx — цеглинки картки завдання.
  *
@@ -10,6 +9,9 @@ import { Atlas } from '@/constants/atlas';
  *
  * Той самий тригер уміє бути й чипом (`variant="chip"`) — для короткої форми
  * створення, де поруч стоять лише дедлайн, пріоритет і проєкт.
+ *
+ * DS v2: група — вкладений блок (subtle, радіус 16) без рамки; чипи й кнопки —
+ * pill; вибраний чип / головна кнопка — action.primary + text.onAction.
  */
 import React from 'react';
 import {
@@ -28,6 +30,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
+import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
+import { glassOf, glassRim, glassRimFor } from '@/components/shared/dsTheme';
 
 export interface CardColors {
   text: string;
@@ -63,7 +69,7 @@ export function PropertyGroup({ title, children, colors: c }: {
   return (
     <View style={st.groupWrap}>
       {title ? <Text style={[st.groupTitle, { color: c.sub }]}>{title}</Text> : null}
-      <View style={[st.group, { borderColor: c.border, backgroundColor: c.dim }]}>
+      <View style={[st.group, { backgroundColor: c.dim }]}>
         {items.map((child, i) => (
           <View key={i} style={i > 0 ? [st.sep, { borderTopColor: c.border }] : undefined}>{child}</View>
         ))}
@@ -98,11 +104,13 @@ export function FieldTrigger({
   const empty = !value;
   const shown = value || placeholder || '';
   const danger = tone === 'danger';
-  const valueTint = danger ? '#EF4444' : empty ? c.sub : (valueColor ?? c.text);
+  const { t } = useDS();
+  const valueTint = danger ? t.status.danger : empty ? c.sub : (valueColor ?? c.text);
 
   if (variant === 'chip') {
     const on = !empty;
-    const tint = danger ? '#EF4444' : on ? (valueColor ?? c.accent) : c.sub;
+    // Заповнений чип — pill action.primary; прострочений — coral-тінт.
+    const fg = danger ? t.text.primary : on ? t.text.onAction : c.sub;
     return (
       <TouchableOpacity
         onPress={onPress}
@@ -111,11 +119,11 @@ export function FieldTrigger({
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${shown}`}
         style={[st.chip, {
-          borderColor: on ? tint + '66' : c.border,
-          backgroundColor: on ? tint + '18' : c.dim,
+          borderColor: danger ? t.accent.coral : 'transparent',
+          backgroundColor: danger ? t.accent.coral + '1F' : on ? t.action.primary : c.dim,
         }]}>
-        {dotColor ? <View style={[st.dot, { backgroundColor: dotColor }]} /> : <IconSymbol name={icon} size={13} color={tint} />}
-        <Text numberOfLines={1} style={{ color: on ? tint : c.sub, fontSize: 13, fontWeight: '600', maxWidth: 150 }}>
+        {dotColor ? <View style={[st.dot, { backgroundColor: dotColor }]} /> : <IconSymbol name={icon} size={13} color={danger ? t.accent.coral : fg} />}
+        <Text numberOfLines={1} style={{ color: fg, fontSize: 13, fontFamily: fontFamily.semibold, maxWidth: 150 }}>
           {on ? value : label}
         </Text>
       </TouchableOpacity>
@@ -124,13 +132,13 @@ export function FieldTrigger({
 
   const content = (
     <>
-      <View style={[st.iconBox, { backgroundColor: c.border }]}>
-        <IconSymbol name={icon} size={14} color={danger ? '#EF4444' : c.sub} />
+      <View style={[st.iconBox, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+        <IconSymbol name={icon} size={14} color={danger ? t.status.danger : c.sub} />
       </View>
       <Text numberOfLines={1} style={[st.rowLabel, { color: c.sub }]}>{label}</Text>
       <View style={st.valueBox}>
         {dotColor && !empty ? <View style={[st.dot, { backgroundColor: dotColor }]} /> : null}
-        <Text numberOfLines={1} style={[st.rowValue, { color: valueTint, fontWeight: empty ? '500' : '600' }]}>
+        <Text numberOfLines={1} style={[st.rowValue, { color: valueTint, fontFamily: empty ? fontFamily.medium : fontFamily.semibold }]}>
           {shown}
         </Text>
       </View>
@@ -166,6 +174,7 @@ export function ToggleRow({ icon, label, value, onChange, disabled, colors: c }:
   disabled?: boolean;
   colors: CardColors;
 }) {
+  const { t } = useDS();
   return (
     <TouchableOpacity
       onPress={() => onChange(!value)}
@@ -175,12 +184,12 @@ export function ToggleRow({ icon, label, value, onChange, disabled, colors: c }:
       accessibilityLabel={label}
       accessibilityState={{ checked: value, disabled: !!disabled }}
       style={[st.row, disabled && { opacity: 0.6 }]}>
-      <View style={[st.iconBox, { backgroundColor: c.border }]}>
-        <IconSymbol name={icon} size={14} color={value ? c.accent : c.sub} />
+      <View style={[st.iconBox, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+        <IconSymbol name={icon} size={14} color={value ? c.text : c.sub} />
       </View>
       <Text numberOfLines={1} style={[st.rowLabel, { color: c.text, flex: 1, maxWidth: undefined }]}>{label}</Text>
-      <View style={[st.track, { backgroundColor: value ? c.accent : c.border }]}>
-        <View style={[st.knob, { alignSelf: value ? 'flex-end' : 'flex-start' }]} />
+      <View style={[st.track, { backgroundColor: value ? t.action.primary : t.text.muted }]}>
+        <View style={[st.knob, { backgroundColor: value ? t.text.onAction : '#FFFFFF', alignSelf: value ? 'flex-end' : 'flex-start' }]} />
       </View>
     </TouchableOpacity>
   );
@@ -195,7 +204,7 @@ export function ToggleRow({ icon, label, value, onChange, disabled, colors: c }:
  * Свій Modal (як і PickerField): у деталі на телефоні він відкривається поверх
  * модального листа деталі — цей шлях уже перевірений у застосунку.
  */
-export function PropertySheet({ visible, title, onClose, children, colors: c, isDark, footer }: {
+export function PropertySheet({ visible, title, onClose, children, colors: c, footer }: {
   visible: boolean;
   title: string;
   onClose: () => void;
@@ -208,20 +217,21 @@ export function PropertySheet({ visible, title, onClose, children, colors: c, is
   const insets = useSafeAreaInsets();
   const { isWide, height } = useResponsive();
   const { tr } = useI18n();
+  const { t } = useDS();
   return (
     <Modal visible={visible} transparent animationType={isWide ? 'fade' : 'slide'} statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <View style={[st.overlay, isWide && st.overlayWide]}>
           <Pressable
             accessible={false}
-            style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.28)' }]}
+            style={[StyleSheet.absoluteFill, { backgroundColor: t.surface.overlay }]}
             onPress={onClose}
           />
           <View
             accessibilityViewIsModal
             style={[
               st.sheet,
-              { backgroundColor: c.sheet, borderColor: c.border, maxHeight: height * (isWide ? 0.8 : 0.86) },
+              { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong'), maxHeight: height * (isWide ? 0.8 : 0.86) },
               isWide
                 ? st.sheetWide
                 : { paddingBottom: Math.max(insets.bottom, 12) + 4 },
@@ -255,7 +265,8 @@ export function OptionRow({ label, active, onPress, color, icon, colors: c, sub 
   sub?: string;
   colors: CardColors;
 }) {
-  const tint = color ?? c.accent;
+  const tint = color ?? c.text;
+  const { t } = useDS();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -263,15 +274,15 @@ export function OptionRow({ label, active, onPress, color, icon, colors: c, sub 
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}
-      style={[st.option, { borderColor: active ? tint : c.border, backgroundColor: active ? tint + '14' : 'transparent' }]}>
+      style={[st.option, { borderColor: active ? t.action.primary : 'transparent', backgroundColor: active ? glassOf(t).surface : c.dim }]}>
       {icon
         ? <IconSymbol name={icon} size={15} color={active ? tint : c.sub} />
         : color ? <View style={[st.dot, { backgroundColor: color }]} /> : null}
       <View style={{ flex: 1 }}>
-        <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? tint : c.text }}>{label}</Text>
-        {sub ? <Text numberOfLines={1} style={{ fontSize: 12, color: c.sub, marginTop: 1 }}>{sub}</Text> : null}
+        <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: active ? fontFamily.semibold : fontFamily.medium, color: c.text }}>{label}</Text>
+        {sub ? <Text numberOfLines={1} style={{ fontSize: 12, fontFamily: fontFamily.regular, color: c.sub, marginTop: 1 }}>{sub}</Text> : null}
       </View>
-      {active ? <IconSymbol name="checkmark" size={14} color={tint} /> : null}
+      {active ? <IconSymbol name="checkmark" size={14} color={c.text} /> : null}
     </TouchableOpacity>
   );
 }
@@ -282,14 +293,15 @@ export function SheetButtons({ secondary, primary, colors: c }: {
   primary?: { label: string; onPress: () => void; disabled?: boolean };
   colors: CardColors;
 }) {
+  const { t } = useDS();
   return (
     <View style={{ flexDirection: 'row', gap: 8 }}>
       {secondary ? (
         <TouchableOpacity
           onPress={secondary.onPress}
           accessibilityRole="button"
-          style={[st.btn, { flex: 1, backgroundColor: secondary.destructive ? 'rgba(239,68,68,0.1)' : c.dim }]}>
-          <Text style={{ color: secondary.destructive ? '#EF4444' : c.sub, fontWeight: '600' }}>{secondary.label}</Text>
+          style={[st.btn, { flex: 1, backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+          <Text style={{ color: secondary.destructive ? t.status.danger : t.action.secondaryText, fontFamily: fontFamily.semibold }}>{secondary.label}</Text>
         </TouchableOpacity>
       ) : null}
       {primary ? (
@@ -298,8 +310,8 @@ export function SheetButtons({ secondary, primary, colors: c }: {
           disabled={primary.disabled}
           accessibilityRole="button"
           accessibilityState={{ disabled: !!primary.disabled }}
-          style={[st.btn, { flex: 2, backgroundColor: c.accent, opacity: primary.disabled ? 0.5 : 1 }]}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>{primary.label}</Text>
+          style={[st.btn, { flex: 2, backgroundColor: primary.disabled ? t.state.disabledBg : t.action.primary }]}>
+          <Text style={{ color: primary.disabled ? t.state.disabledText : t.text.onAction, fontFamily: fontFamily.semibold }}>{primary.label}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -312,33 +324,33 @@ export function SectionTitle({ children, color }: { children: React.ReactNode; c
 }
 
 export const cardStyles = StyleSheet.create({
-  btn: { minHeight: Atlas.controlHeight, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', paddingHorizontal: 14 },
-  chip: { flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, gap: 6 },
+  btn: { minHeight: Atlas.controlHeight, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', paddingHorizontal: 18 },
+  chip: { flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, gap: 6 },
 });
 
 const st = StyleSheet.create({
   groupWrap:  { marginTop: 14 },
-  groupTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 7, marginLeft: 2 },
-  group:      { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden' },
+  groupTitle: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 7, marginLeft: 2 },
+  group:      { borderRadius: radius.nested, overflow: 'hidden' },
   sep:        { borderTopWidth: StyleSheet.hairlineWidth },
-  row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingHorizontal: 12, gap: 10 },
-  iconBox:    { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  rowLabel:   { fontSize: 14, fontWeight: '500', flexShrink: 0, maxWidth: '45%' },
+  row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingHorizontal: 14, gap: 10 },
+  iconBox:    { width: 28, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  rowLabel:   { fontSize: 14, fontFamily: fontFamily.medium, flexShrink: 0, maxWidth: '45%' },
   valueBox:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
   rowValue:   { fontSize: 14, textAlign: 'right', flexShrink: 1 },
   dot:        { width: 9, height: 9, borderRadius: 5 },
   track:      { width: 40, height: 24, borderRadius: 12, justifyContent: 'center', paddingHorizontal: 2 },
-  knob:       { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
-  chip:     { flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, gap: 6 },
+  knob:       { width: 20, height: 20, borderRadius: 10 },
+  chip:     { flexDirection: 'row', alignItems: 'center', minHeight: 40, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, gap: 6 },
   overlay:    { flex: 1, justifyContent: 'flex-end' },
   overlayWide:{ justifyContent: 'center', alignItems: 'center', padding: 24 },
-  sheet:      { borderTopLeftRadius: Atlas.radius.xlarge, borderTopRightRadius: Atlas.radius.xlarge, borderWidth: 1, paddingHorizontal: 16, paddingTop: 10 },
-  sheetWide:  { width: '100%', maxWidth: 460, borderRadius: Atlas.radius.xlarge, paddingBottom: 16, paddingTop: 16 },
+  sheet:      { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, paddingHorizontal: 20, paddingTop: 10 },
+  sheetWide:  { width: '100%', maxWidth: 460, borderRadius: radius.card, paddingBottom: 20, paddingTop: 20 },
   handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
   sheetHead:  { flexDirection: 'row', alignItems: 'center', marginBottom: 12, minHeight: 32 },
-  sheetTitle: { flex: 1, fontSize: 17, fontWeight: '700' },
+  sheetTitle: { flex: 1, fontSize: 17, fontFamily: fontFamily.semibold },
   closeBtn:   { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  option:     { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, gap: 10, marginBottom: 7 },
+  option:     { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: radius.nestedCompact, borderWidth: 1.5, paddingHorizontal: 14, gap: 10, marginBottom: 8 },
   footer:     { paddingTop: 12 },
-  btn:        { minHeight: Atlas.controlHeight, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', paddingHorizontal: 14 },
+  btn:        { minHeight: Atlas.controlHeight, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', paddingHorizontal: 18 },
 });

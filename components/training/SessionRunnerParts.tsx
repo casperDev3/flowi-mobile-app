@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/training/SessionRunnerParts.tsx — частини виконавця сесії
  * (training-module.md §10.1): рядок підходу, таймер відпочинку, аркуш
@@ -17,7 +16,8 @@ import type { LogSet, LogStatus } from '@/utils/trainingTypes';
 
 import { Field, Notice, PrimaryButton } from './TrainingBits';
 import { TrainingSheet } from './TrainingSheet';
-import { fmt, TG_ACCENT, TG_OK, TG_XP, type TrainingColors } from './theme';
+import { fmt, TG_OK, type TrainingColors } from './theme';
+import { fontFamily } from '@/constants/theme';
 
 function NumberCell({ c, value, onCommit, label, width = 64, decimal }: {
   c: TrainingColors;
@@ -39,8 +39,8 @@ function NumberCell({ c, value, onCommit, label, width = 64, decimal }: {
       accessibilityLabel={label}
       selectTextOnFocus
       style={{
-        width, minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.input,
-        color: c.text, fontSize: 16, fontWeight: '700', textAlign: 'center',
+        width, minHeight: 44, borderRadius: 12, backgroundColor: c.input,
+        color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], textAlign: 'center',
       }}
     />
   );
@@ -56,7 +56,7 @@ export function SetRow({ c, set, onChange, readOnly }: {
   const n = set.setIndex;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}>
-      <Text style={{ color: c.sub, fontSize: 13, fontWeight: '700', width: 64 }}>{fmt(tr.tgSetN, { n })}</Text>
+      <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.bold, width: 64 }}>{fmt(tr.tgSetN, { n })}</Text>
       {readOnly ? (
         <Text style={{ color: c.text, fontSize: 15, flex: 1 }}>
           {`${set.reps} × ${formatKg(set.weightG)} ${tr.tgUnitKg}${set.rpe ? ` · RPE ${set.rpe}` : ''}`}
@@ -103,10 +103,10 @@ export function SetRow({ c, set, onChange, readOnly }: {
         accessibilityState={{ checked: set.done, disabled: !!readOnly }}
         accessibilityLabel={set.done ? fmt(tr.tgSetDone, { n }) : fmt(tr.tgSetNotDone, { n })}
         style={{
-          width: 44, height: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
-          backgroundColor: set.done ? TG_OK : c.chip, borderWidth: 1, borderColor: set.done ? TG_OK : c.border,
+          width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: set.done ? c.t.action.primary : c.chip,
         }}>
-        {set.done ? <IconSymbol name="checkmark" size={18} color="#fff" /> : null}
+        {set.done ? <IconSymbol name="checkmark" size={18} color={c.t.text.onAction} /> : null}
       </TouchableOpacity>
     </View>
   );
@@ -137,13 +137,13 @@ export function RestTimerBar({ c, endsAt, onAdd, onSkip, onDone }: {
     <View
       accessibilityLiveRegion="polite"
       style={{
-        flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: Atlas.radius.large,
-        backgroundColor: c.isDark ? '#1C2A3A' : '#E0F2FE', borderWidth: 1, borderColor: TG_ACCENT + '66',
+        flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16,
+        ...c.gl.card,
       }}>
-      <IconSymbol name="timer" size={20} color={TG_ACCENT} />
+      <IconSymbol name="timer" size={20} color={c.sub} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700' }}>{tr.tgRestTimer}</Text>
-        <Text accessibilityLabel={`${tr.tgRestTimer} ${mmss(left)}`} style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, fontVariant: ['tabular-nums'] }}>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>{tr.tgRestTimer}</Text>
+        <Text accessibilityLabel={`${tr.tgRestTimer} ${mmss(left)}`} style={{ color: c.text, fontSize: 40, lineHeight: 44, letterSpacing: -0.8, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'] }}>
           {mmss(left)}
         </Text>
       </View>
@@ -164,7 +164,7 @@ export function ElapsedClock({ c, startedAt }: { c: TrainingColors; startedAt: s
   const h = Math.floor(sec / 3600);
   const label = h > 0 ? `${h}:${mmss(sec - h * 3600).padStart(5, '0')}` : mmss(sec);
   return (
-    <Text accessibilityLabel={`${tr.tgElapsed} ${label}`} style={{ color: c.sub, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+    <Text accessibilityLabel={`${tr.tgElapsed} ${label}`} style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.bold, fontVariant: ['tabular-nums'] }}>
       {`⏱ ${label}`}
     </Text>
   );
@@ -222,7 +222,7 @@ export function FinishSheet({ c, visible, onClose, onConfirm, status, done, tota
         </>
       )}>
       {status === 'completed' ? (
-        <Text style={{ color: TG_XP, fontSize: 22, fontWeight: Atlas.type.headingWeight, marginBottom: 12 }}>{fmt(tr.tgXpEstimate, { n: xpEstimate })}</Text>
+        <Text style={{ color: c.text, fontSize: 28, fontFamily: fontFamily.light, letterSpacing: -0.56, fontVariant: ['tabular-nums'], marginBottom: 12 }}>{fmt(tr.tgXpEstimate, { n: xpEstimate })}</Text>
       ) : (
         <Notice c={c} text={fmt(tr.tgFinishPartial, { done, total })} />
       )}

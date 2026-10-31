@@ -76,15 +76,19 @@ export interface CategoryLook {
   color: string;
 }
 
-/** Кольори — акценти відповідних розділів (CLAUDE.md, «Кольори»). */
+/**
+ * Кольори — акценти відповідних розділів у DS v2 (constants/tokens.ts →
+ * SCREEN_ACCENT): завдання — глибока лаванда, фінанси — status.info,
+ * здоров'я — status.success, система — accent.amber.
+ */
 const CATEGORY_LOOK: Record<string, CategoryLook> = {
-  tasks_projects: { icon: 'checklist', color: '#7C3AED' },
-  meetings_finance: { icon: 'calendar', color: '#0EA5E9' },
-  training_health: { icon: 'heart.fill', color: '#10B981' },
-  system: { icon: 'info.circle.fill', color: '#F59E0B' },
+  tasks_projects: { icon: 'checklist', color: '#6D4CF5' },
+  meetings_finance: { icon: 'calendar', color: '#4F7CF7' },
+  training_health: { icon: 'heart.fill', color: '#22A55B' },
+  system: { icon: 'info.circle.fill', color: '#F6B93B' },
 };
 
-const DEFAULT_LOOK: CategoryLook = { icon: 'bell.fill', color: '#7C3AED' };
+const DEFAULT_LOOK: CategoryLook = { icon: 'bell.fill', color: '#6D4CF5' };
 
 export function categoryLook(category: string): CategoryLook {
   return CATEGORY_LOOK[category] ?? DEFAULT_LOOK;

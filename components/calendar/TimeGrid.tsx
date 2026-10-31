@@ -21,6 +21,7 @@ import {
 } from './calendarModel';
 import { pct } from './MonthGrid';
 import type { CalendarColors } from './palette';
+import { fontFamily, theme } from '@/constants/theme';
 
 const GUTTER = 48;
 const HEADER_HEIGHT = 48;
@@ -150,11 +151,11 @@ export function TimeGrid({
               accessibilityState={{ selected: isSel }}
               accessibilityLabel={`${tr.weekdaysFull[(d.getDay() + 6) % 7]}, ${d.getDate()} ${tr.monthsGenitive[d.getMonth()]}`}
               style={[st.dayHead, { flex: 1 }]}>
-              <Text style={{ color: isToday ? c.accent : c.sub, fontSize: 11, fontWeight: '700' }}>
+              <Text style={{ color: isToday ? c.text : c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>
                 {single ? tr.weekdaysFull[(d.getDay() + 6) % 7] : tr.weekdays[(d.getDay() + 6) % 7]}
               </Text>
-              <View style={[st.dayNum, isToday && { backgroundColor: c.accent }, !isToday && isSel && { borderWidth: 1.5, borderColor: c.accent }]}>
-                <Text style={{ color: isToday ? '#fff' : c.text, fontSize: 15, fontWeight: '800' }}>{d.getDate()}</Text>
+              <View style={[st.dayNum, isToday && { backgroundColor: c.action }, !isToday && isSel && { backgroundColor: c.dim }]}>
+                <Text style={{ color: isToday ? c.onAction : c.text, fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{d.getDate()}</Text>
               </View>
             </TouchableOpacity>
           );
@@ -165,7 +166,7 @@ export function TimeGrid({
       {allDayHeight > 0 && (
         <View style={[st.allDayRow, { borderBottomColor: c.grid }]}>
           <View style={[st.gutterCell, { width: GUTTER }]}>
-            <Text style={{ color: c.sub, fontSize: 9, fontWeight: '700', textAlign: 'center' }}>{tr.calAllDay}</Text>
+            <Text style={{ color: c.sub, fontSize: 9, fontFamily: fontFamily.semibold, textAlign: 'center' }}>{tr.calAllDay}</Text>
           </View>
           <View style={{ flex: 1, height: allDayHeight }}>
             {segments.map(seg => (
@@ -185,7 +186,7 @@ export function TimeGrid({
                     borderLeftWidth: seg.continuesLeft ? 0 : 3, borderLeftColor: seg.bar.project.color,
                     borderRadius: 4,
                   }}>
-                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontWeight: '700' }}>
+                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontFamily: fontFamily.semibold }}>
                     №{seg.bar.number} · {seg.bar.sprint.name} · {seg.bar.project.name}
                   </Text>
                 </TouchableOpacity>
@@ -204,7 +205,7 @@ export function TimeGrid({
                         accessibilityLabel={`${tr.calA11yTask}: ${item.task.title}${item.done ? `, ${tr.done}` : ''}`}
                         hitSlop={{ top: 2, bottom: 2 }}
                         style={[st.taskChip, { borderLeftColor: item.color, backgroundColor: item.color + '1F', opacity: item.done ? 0.5 : 1 }]}>
-                        <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontWeight: '600', textDecorationLine: item.done ? 'line-through' : 'none' }}>
+                        <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontFamily: fontFamily.semibold, textDecorationLine: item.done ? 'line-through' : 'none' }}>
                           {item.task.title}
                         </Text>
                       </TouchableOpacity>
@@ -212,7 +213,7 @@ export function TimeGrid({
                     {items.length > maxTaskChips ? (
                       <TouchableOpacity onPress={() => onSelectDay(day)} accessibilityRole="button"
                         accessibilityLabel={`${tr.calMore} ${items.length - maxTaskChips}`}>
-                        <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700', paddingHorizontal: 4 }}>+{items.length - maxTaskChips}</Text>
+                        <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold, paddingHorizontal: 4 }}>+{items.length - maxTaskChips}</Text>
                       </TouchableOpacity>
                     ) : null}
                   </View>
@@ -272,17 +273,17 @@ export function TimeGrid({
                         width: pct((1 / p.cols) * 100),
                       }]}>
                       <View style={{
-                        flex: 1, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, overflow: 'hidden',
+                        flex: 1, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2, overflow: 'hidden',
                         backgroundColor: m.color + (sel ? '55' : '2E'), borderLeftWidth: 3, borderLeftColor: m.color,
                       }}>
                         {/* Рядки рахуються від реальної висоти: 45-хвилинна
                             подія (≈37pt) раніше брала два рядки назви + рядок
                             часу, і час обрізався навпіл. */}
-                        <Text numberOfLines={height < EVENT_STACK_MIN ? 1 : height < EVENT_TWO_LINE_MIN ? 1 : 2} style={{ color: c.text, fontSize: 11, fontWeight: '700' }}>
+                        <Text numberOfLines={height < EVENT_STACK_MIN ? 1 : height < EVENT_TWO_LINE_MIN ? 1 : 2} style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold }}>
                           {height < EVENT_STACK_MIN && m.time ? `${m.time} ` : ''}{m.title}
                         </Text>
                         {height >= EVENT_STACK_MIN && m.time ? (
-                          <Text numberOfLines={1} style={{ color: c.sub, fontSize: 10, fontWeight: '600' }}>{m.time}</Text>
+                          <Text numberOfLines={1} style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold }}>{m.time}</Text>
                         ) : null}
                       </View>
                     </TouchableOpacity>
@@ -315,9 +316,10 @@ const st = StyleSheet.create({
   dayNum: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   allDayRow: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
   gutterCell: { justifyContent: 'center', paddingHorizontal: 2 },
-  taskChip: { height: 20, justifyContent: 'center', borderLeftWidth: 3, borderRadius: 4, paddingHorizontal: 4 },
-  hourLabel: { position: 'absolute', right: 6, fontSize: 10, fontWeight: '600' },
+  taskChip: { height: 20, justifyContent: 'center', borderLeftWidth: 3, borderRadius: 6, paddingHorizontal: 4 },
+  hourLabel: { position: 'absolute', right: 6, fontSize: 10, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
   event: { position: 'absolute', paddingHorizontal: 1, paddingVertical: 1 },
-  nowLine: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: '#EF4444' },
-  nowDot: { position: 'absolute', left: -4, top: -3, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
+  // «Зараз» — тонкий coral-тік (DS: accent.coral для індикаторів).
+  nowLine: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: theme.light.accent.coral },
+  nowDot: { position: 'absolute', left: -4, top: -3, width: 8, height: 8, borderRadius: 4, backgroundColor: theme.light.accent.coral },
 });

@@ -16,7 +16,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { TaskQuickCreate, type QuickCreateProject } from '@/components/tasks/card/TaskQuickCreate';
 import { SheetModal } from '@/components/shared/SheetModal';
-import { Atlas } from '@/constants/atlas';
+import { radius } from '@/constants/theme';
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive } from '@/hooks/use-responsive';
 import { draftEstimatedMinutes, draftRecurrence, useTaskEditor, type TaskDraft } from '@/hooks/use-task-editor';
@@ -29,6 +29,7 @@ import {
 import { assigneeForPersonalProjectTask, priorityFields, type Task } from '@/utils/taskUtils';
 
 import type { CalendarColors } from './palette';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 /**
  * Нове завдання з чернетки — ті самі правила, що й `addTask` на екрані
@@ -126,7 +127,7 @@ export function CalendarTaskCreate({
     <SheetModal visible={visible} onClose={onClose}>
       <View
         testID="calendar-task-create"
-        style={[st.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+        style={[st.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <TaskQuickCreate
             editor={editor}
@@ -147,5 +148,5 @@ export function CalendarTaskCreate({
 }
 
 const st = StyleSheet.create({
-  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet: { borderRadius: radius.card, padding: 24, overflow: 'hidden' },
 });

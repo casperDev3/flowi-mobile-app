@@ -118,10 +118,10 @@ describe('NAT-03 (P0) — модальні аркуші не злипаютьс�
    * зникає сам контроль. Тест нижче (`перелік винятків не протух») стежить,
    * щоб кожен маркер і далі знаходив РІВНО один тег.
    */
-  const NOT_BACKDROPS: { rel: string; marker: string; why: string }[] = [
-    { rel: 'app/workouts.tsx', marker: 'toggleDay(idx)', why: 'перемикачі днів тижня для нагадування' },
-    { rel: 'app/workouts.tsx', marker: 'setTab(t.key)', why: 'вкладки всередині екрана тренувань' },
-  ];
+  // DS v2: перемикачі днів і вкладки в app/workouts.tsx більше не мають тла
+  // `rgba(0,0,0,0.0…)` (тепер токени surface/action), тож під евристику не
+  // підпадають — обидва винятки зняті. Перелік лишається для майбутніх.
+  const NOT_BACKDROPS: { rel: string; marker: string; why: string }[] = [];
 
   const isKnownNotBackdrop = (rel: string, attrs: string) =>
     NOT_BACKDROPS.some(exception => exception.rel === rel && attrs.includes(exception.marker));

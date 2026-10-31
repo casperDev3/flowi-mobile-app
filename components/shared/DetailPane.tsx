@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/shared/DetailPane.tsx
  *
@@ -15,12 +14,13 @@ import { Atlas } from '@/constants/atlas';
  * широкому екрані. На `medium` (600–840) сайдбар уже займає 232pt, і
  * деталь вийшла б вужчою за 260pt — читалася б гірше, ніж на весь екран.
  */
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Layout } from '@/constants/tokens';
+import { radius, space } from '@/constants/theme';
+import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
 
 /** Підібрано під найдовший рядок деталі («Дедлайн: 12 листопада 2026»). */
 export const DETAIL_COLUMN_WIDTH = Layout.detailWidth;
@@ -72,10 +72,13 @@ export function DetailPane({
   // Колонка не має власного верхнього відступу (він лишився на хедері
   // списку зліва), тож верхній виріз доводиться враховувати самій.
   const insets = useSafeAreaInsets();
+  // DS v2: колонка — surface.card, лист — surface.elevated; без блюру й рамки.
+  const t = dsTheme(isDark);
+  void sheetColor; void borderColor;
 
   if (wide) {
     return (
-      <View style={[st.column, { width: columnWidth, backgroundColor: sheetColor, borderLeftColor: borderColor }]}>
+      <View style={[st.column, { width: columnWidth, backgroundColor: glassOf(t).surfaceStrong, ...glassRim(t, 'strong') }]}>
         {open ? (
           <>
             {header ? (
@@ -89,7 +92,7 @@ export function DetailPane({
               contentContainerStyle={[st.columnContent, { paddingTop: header ? 4 : insets.top + 20 }, footer ? { paddingBottom: 16 } : null]}>
               {children}
             </ScrollView>
-            {footer ? <View style={[st.columnFooter, { borderTopColor: borderColor, paddingBottom: Math.max(insets.bottom, 16) }]}>{footer}</View> : null}
+            {footer ? <View style={[st.columnFooter, { borderTopColor: t.border.hairline, paddingBottom: Math.max(insets.bottom, 16) }]}>{footer}</View> : null}
           </>
         ) : (
           // Порожня колонка без пояснення читається як помилка рендеру.
@@ -102,21 +105,19 @@ export function DetailPane({
   return (
     <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <Pressable accessible={false} style={st.overlay} onPress={onClose}>
+        <Pressable accessible={false} style={[st.overlay, { backgroundColor: t.surface.overlay }]} onPress={onClose}>
           <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[st.sheetWrapper, sheetHeight ? st.shrink : null]}>
             {open && (
-              <BlurView
-                intensity={isDark ? 50 : 70}
-                tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, sheetHeight ? { height: Math.min(sheetHeight, maxHeight), flexShrink: 1 } : null, { maxHeight, borderColor, backgroundColor: sheetColor }]}>
+              <View
+                style={[st.sheet, sheetHeight ? { height: Math.min(sheetHeight, maxHeight), flexShrink: 1 } : null, { maxHeight, backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
                 {/* Шапка поза ScrollView: лист обмежений maxHeight, і
                     flexShrink у прокрутки віддає місце саме їй, а не шапці. */}
                 {header}
                 <ScrollView ref={scrollRef} style={st.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   {children}
                 </ScrollView>
-                {footer ? <View style={[st.sheetFooter, { borderTopColor: borderColor }]}>{footer}</View> : null}
-              </BlurView>
+                {footer ? <View style={[st.sheetFooter, { borderTopColor: t.border.hairline }]}>{footer}</View> : null}
+              </View>
             )}
           </Pressable>
         </Pressable>
@@ -126,15 +127,15 @@ export function DetailPane({
 }
 
 const st = StyleSheet.create({
-  column:        { borderLeftWidth: StyleSheet.hairlineWidth },
-  columnHeader:  { paddingHorizontal: 20, paddingBottom: 4 },
-  columnContent: { padding: 20, paddingBottom: 40 },
-  columnFooter:  { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  column:        {},
+  columnHeader:  { paddingHorizontal: space.cardPadding, paddingBottom: 4 },
+  columnContent: { padding: space.cardPadding, paddingBottom: 40 },
+  columnFooter:  { paddingHorizontal: space.cardPadding, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   sheetFooter:   { paddingTop: 12, marginTop: 4, borderTopWidth: StyleSheet.hairlineWidth },
   scroll:        { flexShrink: 1 },
   shrink:        { flexShrink: 1 },
   emptyBox:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  overlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay:       { flex: 1, justifyContent: 'flex-end' },
   sheetWrapper:  { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:         { borderRadius: radius.card, padding: space.cardPaddingCompact, overflow: 'hidden' },
 });

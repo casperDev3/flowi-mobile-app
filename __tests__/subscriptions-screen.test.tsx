@@ -313,12 +313,13 @@ test('«Оплачено»: створює витрату з підписки й
   expect(created).toMatchObject({
     type: 'expense', amount: 12.5, accountId: 'acc-usd', currency: 'USD', note: 'Netflix',
   });
-  // Операція датується днем ЦИКЛУ, за який заплатили, а не «сьогодні».
+  // Операція датується днем фактичної оплати.
   // Порівнюємо ЛОКАЛЬНИЙ день, а не префікс ISO: `dateKeyAtTime` кладе в
   // `date` момент із поточним часом доби, тож у поясі UTC+3 між 00:00 і 03:00
   // UTC-префікс рядка — це вчора. Фінанси теж групують за локальним днем
   // (`new Date(t.date)` в utils/financeUtils.ts), тож перевіряємо так само.
-  expect(dateKeyOf(new Date(created.date))).toBe(NETFLIX.nextPaymentDate);
+  // Витрата лягає на день фактичної оплати (сьогодні), а не на день циклу.
+  expect(dateKeyOf(new Date(created.date))).toBe(dateKeyOf(new Date()));
   // Стара операція на місці — запис read-modify-write, а не перезапис масиву.
   expect(txs.some(t => t.id === 'tx1')).toBe(true);
 });

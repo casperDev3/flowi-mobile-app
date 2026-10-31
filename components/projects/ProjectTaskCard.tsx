@@ -59,6 +59,8 @@ import {
 import type { ProjectLike } from '@/utils/projectUtils';
 import { isLead, taskRights, teamPreferencesId, type Discussion, type TeamPreferences, type TeamRole } from '@/utils/teamwork';
 import { updateSynced } from '@/store/synced-storage';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
 
 type CardTask = Task & { recurrence?: RecurrenceRule };
 
@@ -362,8 +364,8 @@ export function useProjectTaskCard({
       leading={
         <AnimatedCheck
           checked={task.status === 'done'}
-          color="#10B981"
-          borderColor={c.border}
+          color={dsTokens(isDark).status.success}
+          borderColor={c.sub}
           size={22}
           radius={7}
           onPress={canExecute ? toggleDone : undefined}
@@ -456,9 +458,9 @@ export function useProjectTaskCard({
               onPress={() => openDiscussion(d.id)}
               accessibilityRole="link"
               accessibilityLabel={`${tr.taskCardDiscussions}: ${d.title}`}
-              style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim }}>
-              <IconSymbol name="bubble.left.and.bubble.right.fill" size={15} color={c.accent} />
-              <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{d.title}</Text>
+              style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderRadius: radius.nestedCompact, backgroundColor: c.dim }}>
+              <IconSymbol name="bubble.left.and.bubble.right.fill" size={15} color={c.sub} />
+              <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{d.title}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
             </TouchableOpacity>
           ))}

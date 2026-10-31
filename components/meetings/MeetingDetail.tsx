@@ -1,6 +1,7 @@
 import { MeetingAudio } from './MeetingAudio';
 import { MeetingWorkspace } from './MeetingWorkspace';
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius, theme } from '@/constants/theme';
+import { dsTokensForText } from '@/components/tasks/dsTokensForText';
 /**
  * components/meetings/MeetingDetail.tsx — ПЕРЕГЛЯД зустрічі.
  *
@@ -32,10 +33,12 @@ import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { localDateKey } from '@/utils/dateUtils';
 import { meetingTrackedSeconds, type Meeting } from '@/utils/meetings';
 import { elapsedSince } from '@/utils/taskTimer';
+import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
 
-const ACCENT = '#6366F1';
-const GREEN = '#10B981';
-const RED = '#EF4444';
+// DS v2: глибока лаванда (акцент tasks) і статусні токени замість легасі #6366F1/#10B981/#EF4444.
+// Тема — за кольором тексту палітри (без хуків: компонент рендериться в тестах).
+// DS v2.1: акцент зустрічей — info (ink на склі, ≥ 4.5:1 в обох темах).
+const accentFor = (dark: boolean) => dsGlass(dark).accent.info.ink;
 const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
 
 export interface MeetingDetailColors {
@@ -98,7 +101,7 @@ export function MeetingDetailHeader({ meeting, original, onEdit, onClose, isExpa
             {meeting.title}
           </Text>
           <View style={st.timeRow}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: meeting.color }}>{meeting.time || '--:--'}</Text>
+            <Text style={{ fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], color: meeting.color }}>{meeting.time || '--:--'}</Text>
             <Text style={{ fontSize: 13, color: c.sub }}>·</Text>
             <Text style={{ fontSize: 13, color: c.sub }}>{dur}</Text>
             {recurring ? (
@@ -152,6 +155,10 @@ export function MeetingDetailBody({
   meeting, original, project, timer, onToggleTimer, onEdit, onRecord, onPlayRecording, onDeleteRecording, playingUri,
   colors: c, tr, locale,
 }: MeetingDetailBodyProps) {
+  const t = dsTokensForText(c.text);
+  const ACCENT = accentFor(t === theme.dark);
+  const GREEN = t.status.success;
+  const RED = t.status.danger;
   const [tab, setTab] = useState('info');
   const reduceMotion = useRef(true);
   useEffect(() => {
@@ -191,7 +198,7 @@ export function MeetingDetailBody({
       ) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ gap: 6 }}>
-        {tabs.map(item => <TouchableOpacity key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => selectTab(item.id)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: Atlas.radius.medium, backgroundColor: tab === item.id ? ACCENT + '20' : c.dim }}><Text style={{ color: tab === item.id ? ACCENT : c.text, fontWeight: Atlas.type.headingWeight }}>{item.label}</Text></TouchableOpacity>)}
+        {tabs.map(item => <TouchableOpacity key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} onPress={() => selectTab(item.id)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: tab === item.id ? t.action.primary : glassOf(t).surfaceSubtle }}><Text style={{ color: tab === item.id ? t.text.onAction : c.text, fontFamily: fontFamily.medium }}>{item.label}</Text></TouchableOpacity>)}
       </ScrollView>
       <View style={{ display: tab === 'info' ? 'flex' : 'none' }}>
       {/* Date */}
@@ -215,9 +222,9 @@ export function MeetingDetailBody({
           accessibilityRole="link"
           accessibilityLabel={tr.meetingOpenLink}
           activeOpacity={0.75}
-          style={[st.row, { backgroundColor: ACCENT + '12', borderWidth: 1, borderColor: ACCENT + '30' }]}>
+          style={[st.row, { backgroundColor: c.dim }]}>
           <IconSymbol name="link" size={15} color={ACCENT} />
-          <Text style={[st.rowText, { color: ACCENT, flex: 1, fontWeight: '600' }]} numberOfLines={1}>
+          <Text style={[st.rowText, { color: ACCENT, flex: 1, fontFamily: fontFamily.semibold }]} numberOfLines={1}>
             {meeting.link}
           </Text>
         </TouchableOpacity>
@@ -227,7 +234,7 @@ export function MeetingDetailBody({
       {meeting.notes ? (
         <View style={[st.row, { backgroundColor: c.dim, alignItems: 'flex-start', paddingTop: 12, paddingBottom: 12 }]}>
           <IconSymbol name="note.text" size={15} color={c.sub} />
-          <Text style={{ fontSize: 13, color: c.sub, marginLeft: 10, flex: 1, lineHeight: 19 }}>{meeting.notes}</Text>
+          <Text style={{ fontSize: 13, fontFamily: fontFamily.regular, color: c.sub, marginLeft: 10, flex: 1, lineHeight: 19 }}>{meeting.notes}</Text>
         </View>
       ) : null}
 
@@ -240,7 +247,7 @@ export function MeetingDetailBody({
             {tr.meetingRecordings.replace('{n}', String(recordings.length))}
           </Text>
           {recordings.map((uri, idx) => (
-            <View key={uri} style={[st.row, { backgroundColor: ACCENT + '10', marginBottom: 6, borderWidth: 1, borderColor: ACCENT + '25' }]}>
+            <View key={uri} style={[st.row, { backgroundColor: c.dim, marginBottom: 6 }]}>
               <IconSymbol name="waveform" size={15} color={ACCENT} />
               <Text style={[st.rowText, { color: c.text, flex: 1, fontSize: 13 }]}>
                 {tr.meetingRecordingItem.replace('{n}', String(idx + 1))}
@@ -248,7 +255,7 @@ export function MeetingDetailBody({
               <TouchableOpacity
                 onPress={() => onPlayRecording?.(uri)}
                 accessibilityRole="button"
-                style={[st.smallBtn, { backgroundColor: ACCENT + '20' }]}>
+                style={[st.smallBtn, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
                 <IconSymbol name={playingUri === uri ? 'pause.fill' : 'play.fill'} size={12} color={ACCENT} />
               </TouchableOpacity>
               {onDeleteRecording ? (
@@ -256,7 +263,7 @@ export function MeetingDetailBody({
                   onPress={() => onDeleteRecording(uri)}
                   accessibilityRole="button"
                   accessibilityLabel={tr.delete}
-                  style={[st.smallBtn, { backgroundColor: RED + '15', marginLeft: 4 }]}>
+                  style={[st.smallBtn, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card'), marginLeft: 4 }]}>
                   <IconSymbol name="trash" size={12} color={RED} />
                 </TouchableOpacity>
               ) : null}
@@ -277,8 +284,7 @@ export function MeetingDetailBody({
           запущена звідси нарада видно й на вкладці «Час», і в повноекранній
           сітці. Завершена сесія лягає в timeEntries ОРИГІНАЛУ. */}
       <View style={[st.row, {
-        backgroundColor: timer ? GREEN + '12' : c.dim,
-        borderWidth: timer ? 1 : 0, borderColor: GREEN + '40',
+        backgroundColor: c.dim,
       }]}>
         <IconSymbol name="timer" size={15} color={timer ? GREEN : c.sub} />
         <View style={{ flex: 1, marginLeft: 10 }}>
@@ -287,15 +293,15 @@ export function MeetingDetailBody({
               running
               seconds={now => elapsedSince(timer.startedAt, now)}
               format={formatClock}
-              style={{ fontSize: 15, fontWeight: Atlas.type.headingWeight, color: GREEN }}
+              style={{ fontSize: 20, fontFamily: fontFamily.light, letterSpacing: -0.4, fontVariant: ['tabular-nums'], color: c.text }}
             />
           ) : (
-            <Text style={{ fontSize: 14, color: c.text }}>
+            <Text style={{ fontSize: 14, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], color: c.text }}>
               {tracked > 0 ? formatDuration(tracked, units) : tr.meetingNotTracked}
             </Text>
           )}
           {timer && tracked > 0 ? (
-            <Text style={{ fontSize: 11, color: c.sub, marginTop: 2 }}>
+            <Text style={{ fontSize: 12, fontFamily: fontFamily.regular, color: c.sub, marginTop: 2 }}>
               {tr.meetingTrackedBefore.replace('{time}', formatDuration(tracked, units))}
             </Text>
           ) : null}
@@ -306,11 +312,10 @@ export function MeetingDetailBody({
           accessibilityLabel={timer ? tr.meetingTimerStopA11y : tr.meetingTimerStartA11y}
           style={[st.btn, {
             paddingHorizontal: 14, gap: 6,
-            backgroundColor: (timer ? RED : GREEN) + '18',
-            borderWidth: 1, borderColor: (timer ? RED : GREEN) + '40',
+            backgroundColor: timer ? glassOf(t).surfaceSubtle : t.action.primary,
           }]}>
-          <IconSymbol name={timer ? 'stop.fill' : 'play.fill'} size={13} color={timer ? RED : GREEN} />
-          <Text style={{ color: timer ? RED : GREEN, fontSize: 13, fontWeight: '700' }}>
+          <IconSymbol name={timer ? 'stop.fill' : 'play.fill'} size={13} color={timer ? RED : t.text.onAction} />
+          <Text style={{ color: timer ? t.action.secondaryText : t.text.onAction, fontSize: 13, fontFamily: fontFamily.semibold }}>
             {timer ? tr.meetingTimerStop : tr.meetingTimerStart}
           </Text>
         </TouchableOpacity>
@@ -322,17 +327,17 @@ export function MeetingDetailBody({
           <TouchableOpacity
             onPress={onRecord}
             accessibilityRole="button"
-            style={[st.btn, { flex: 1, gap: 6, backgroundColor: ACCENT + '18', borderWidth: 1, borderColor: ACCENT + '40' }]}>
-            <IconSymbol name="mic.fill" size={16} color={ACCENT} />
-            <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '700' }}>{tr.meetingRecord}</Text>
+            style={[st.btn, { flex: 1, gap: 6, backgroundColor: t.action.primary }]}>
+            <IconSymbol name="mic.fill" size={16} color={t.text.onAction} />
+            <Text style={{ color: t.text.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.meetingRecord}</Text>
           </TouchableOpacity>
         ) : null}
         <TouchableOpacity
           onPress={onEdit}
           accessibilityRole="button"
-          style={[st.btn, { flex: 1, gap: 6, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
-          <IconSymbol name="pencil" size={16} color={c.text} />
-          <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{tr.edit}</Text>
+          style={[st.btn, { flex: 1, gap: 6, backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+          <IconSymbol name="pencil" size={16} color={t.action.secondaryText} />
+          <Text style={{ color: t.action.secondaryText, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.edit}</Text>
         </TouchableOpacity>
       </View>
       </View>
@@ -345,12 +350,12 @@ const st = StyleSheet.create({
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   headerRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
   colorBar:     { width: 4, alignSelf: 'stretch', minHeight: 44, borderRadius: 2 },
-  title:        { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4 },
+  title:        { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.4 },
   timeRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  headerBtn:    { width: 28, alignItems: 'center', justifyContent: 'center' },
-  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderRadius: Atlas.radius.medium, marginBottom: 8 },
-  rowText:      { fontSize: 14, marginLeft: 10 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  smallBtn:     { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  btn:          { paddingVertical: 11, borderRadius: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  headerBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.nestedCompact, marginBottom: 8 },
+  rowText:      { fontSize: 14, fontFamily: fontFamily.regular, marginLeft: 10 },
+  sectionLabel: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 },
+  smallBtn:     { width: 30, height: 30, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  btn:          { minHeight: 44, paddingVertical: 11, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

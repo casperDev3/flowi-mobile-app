@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -11,7 +11,7 @@ import { containerPlaceLabel, selectContainers } from '@/utils/containers';
 import { fill } from './i18n';
 import { QrScannerModal } from './QrScannerModal';
 import { SearchHitRow } from './SearchHitRow';
-import { CONTAINERS_ACCENT, useContainersColors } from './theme';
+import { useContainersColors } from './theme';
 import { useContainersData } from './useContainersData';
 
 const MAX_RESULTS = 8;
@@ -49,7 +49,7 @@ export function ContainerSearchPanel({ renderResults }: {
 
   const results = search.trim() ? (
     <View style={{ gap: 8 }} accessibilityLiveRegion="polite">
-      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 }}>
         {data.status === 'failed' ? tr.ctrReadFailed : matches.length ? fill(tr.ctrFound, { n: matches.length }) : tr.ctrNothingFound}
       </Text>
       {matches.slice(0, MAX_RESULTS).map(match => (
@@ -59,7 +59,7 @@ export function ContainerSearchPanel({ renderResults }: {
       {matches.length > MAX_RESULTS ? (
         <TouchableOpacity onPress={() => router.push({ pathname: '/containers', params: { q: search } })}
           accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
-          <Text style={{ color: CONTAINERS_ACCENT, fontWeight: '700' }}>{tr.ctrQuickSearchOpen}</Text>
+          <Text style={{ color: c.text, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>{tr.ctrQuickSearchOpen}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -68,12 +68,12 @@ export function ContainerSearchPanel({ renderResults }: {
   return (
     <View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1,
-          paddingHorizontal: 12, minHeight: 44, backgroundColor: c.dim, borderColor: c.border }}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.pill,
+          paddingHorizontal: 14, minHeight: 44, ...c.gl.card }}>
           <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
-          <TextInput placeholder={tr.ctrQuickSearchPlaceholder} placeholderTextColor={c.sub} value={search} onChangeText={setSearch}
+          <TextInput placeholder={tr.ctrQuickSearchPlaceholder} placeholderTextColor={c.muted} value={search} onChangeText={setSearch}
             accessibilityLabel={tr.ctrQuickSearchPlaceholder} returnKeyType="search"
-            style={{ flex: 1, fontSize: 14, fontWeight: '500', color: c.text, paddingVertical: 10 }} />
+            style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: c.text, paddingVertical: 10 }} />
           {search.length > 0 ? (
             <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel={tr.close}
               style={{ width: 36, height: 44, alignItems: 'center', justifyContent: 'center' }}>
@@ -82,9 +82,9 @@ export function ContainerSearchPanel({ renderResults }: {
           ) : null}
         </View>
         <TouchableOpacity onPress={() => setScanning(true)} accessibilityRole="button" accessibilityLabel={tr.ctrScan}
-          style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim,
+          style={{ width: 44, height: 44, borderRadius: radius.pill, ...c.gl.card,
             alignItems: 'center', justifyContent: 'center' }}>
-          <IconSymbol name="viewfinder" size={17} color={CONTAINERS_ACCENT} />
+          <IconSymbol name="viewfinder" size={17} color={c.text} />
         </TouchableOpacity>
       </View>
 

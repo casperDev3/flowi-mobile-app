@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius, type as dsType } from '@/constants/theme';
 import React, { useEffect, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -90,24 +90,24 @@ export function ItemFormSheet({
       title={request?.item ? tr.ctrEditItem : tr.ctrNewItem}
       footer={<>
         <SheetButton label={tr.cancel} onPress={onClose} c={c} />
-        <SheetButton label={tr.save} onPress={save} c={c} color={accent} disabled={!canSave} flex={2} />
+        <SheetButton label={tr.save} onPress={save} c={c} primary disabled={!canSave} flex={2} />
       </>}>
       <SheetLabel text={tr.itemName} c={c} required />
-      <TextInput value={name} onChangeText={setName} placeholder={tr.itemNamePlaceholder} placeholderTextColor={c.sub}
+      <TextInput value={name} onChangeText={setName} placeholder={tr.itemNamePlaceholder} placeholderTextColor={c.muted}
         autoFocus={!request?.item} style={input} accessibilityLabel={tr.itemName} />
 
       <SheetLabel text={tr.ctrItemQty} c={c} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <TouchableOpacity onPress={() => setQty(String(Math.max(0, count - 1)))} disabled={count <= 0}
           accessibilityRole="button" accessibilityLabel={tr.ctrQtyLess}
-          style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center', opacity: count <= 0 ? 0.4 : 1 }}>
+          style={{ width: 44, height: 44, borderRadius: radius.pill, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center', opacity: count <= 0 ? 0.4 : 1 }}>
           <IconSymbol name="minus" size={16} color={c.text} />
         </TouchableOpacity>
         <TextInput value={qty} onChangeText={t => setQty(t.replace(/[^\d]/g, ''))} keyboardType="number-pad"
           accessibilityLabel={tr.ctrItemQty}
-          style={[sheetStyles.input, { backgroundColor: c.dim, color: c.text, width: 72, textAlign: 'center' }]} />
+          style={[sheetStyles.input, { backgroundColor: c.dim, color: c.text, width: 72, textAlign: 'center', ...dsType.numeric }]} />
         <TouchableOpacity onPress={() => setQty(String(count + 1))} accessibilityRole="button" accessibilityLabel={tr.ctrQtyMore}
-          style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center' }}>
+          style={{ width: 44, height: 44, borderRadius: radius.pill, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name="plus" size={16} color={c.text} />
         </TouchableOpacity>
       </View>
@@ -116,13 +116,15 @@ export function ItemFormSheet({
       <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', gap: 6 }}>
         {ITEM_STATUSES.map(option => {
           const active = option === status;
-          const color = option === 'in_box' ? accent : STATUS_COLORS[option];
+          // Статусний колір — лише крапкою; сам сегмент — pill (активний = action.primary).
+          const color = option === 'in_box' ? c.sub : STATUS_COLORS[option];
           return (
             <TouchableOpacity key={option} onPress={() => setStatus(option)} accessibilityRole="radio"
               accessibilityState={{ checked: active }} accessibilityLabel={statusLabel(tr, option)}
-              style={{ flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
-                borderWidth: 1, borderColor: active ? color : c.border, backgroundColor: active ? color + '22' : c.dim }}>
-              <Text style={{ color: c.text, fontSize: 13, fontWeight: active ? '800' : '600' }}>{statusLabel(tr, option)}</Text>
+              style={{ flex: 1, minHeight: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+                flexDirection: 'row', gap: 6, paddingHorizontal: 6, backgroundColor: active ? c.t.action.primary : c.dim }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+              <Text numberOfLines={1} style={{ color: active ? c.t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{statusLabel(tr, option)}</Text>
             </TouchableOpacity>
           );
         })}
@@ -131,18 +133,18 @@ export function ItemFormSheet({
       {status === 'lent' ? (
         <>
           <SheetLabel text={tr.ctrLentTo} c={c} />
-          <TextInput value={lentTo} onChangeText={setLentTo} placeholder={tr.ctrLentToPlaceholder} placeholderTextColor={c.sub}
+          <TextInput value={lentTo} onChangeText={setLentTo} placeholder={tr.ctrLentToPlaceholder} placeholderTextColor={c.muted}
             autoFocus={request?.status === 'lent'} style={input} accessibilityLabel={tr.ctrLentTo} />
-          {needsLentTo ? <Text style={{ color: c.sub, fontSize: 12, marginTop: 4 }}>{tr.ctrLentNeedsName}</Text> : null}
+          {needsLentTo ? <Text style={{ color: c.t.status.danger, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 4 }}>{tr.ctrLentNeedsName}</Text> : null}
         </>
       ) : null}
 
       <SheetLabel text={tr.itemTags} c={c} />
-      <TextInput value={tags} onChangeText={setTags} placeholder={tr.ctrTagsPlaceholder} placeholderTextColor={c.sub}
+      <TextInput value={tags} onChangeText={setTags} placeholder={tr.ctrTagsPlaceholder} placeholderTextColor={c.muted}
         style={input} accessibilityLabel={tr.itemTags} />
 
       <SheetLabel text={tr.itemNote} c={c} />
-      <TextInput value={note} onChangeText={setNote} placeholder={tr.ctrNotePlaceholder} placeholderTextColor={c.sub}
+      <TextInput value={note} onChangeText={setNote} placeholder={tr.ctrNotePlaceholder} placeholderTextColor={c.muted}
         multiline style={[...input, { minHeight: 72, textAlignVertical: 'top' }]} accessibilityLabel={tr.itemNote} />
 
       {request?.item ? (

@@ -13,12 +13,14 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { MeetingProjectChip, type MeetingChipProject } from '@/components/meetings/MeetingProjectChip';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Atlas } from '@/constants/atlas';
 import { useI18n } from '@/store/i18n';
 import { formatDuration, type DurationUnits } from '@/utils/durationFormat';
 import type { Meeting } from '@/utils/meetings';
 
-import { CALENDAR_ACCENT, type CalendarColors } from './palette';
+import type { CalendarColors } from './palette';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf } from '@/components/shared/dsTheme';
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
@@ -53,6 +55,7 @@ export const MeetingCard = React.memo(function MeetingCard({
   const isPast = mtgDt < now;
   const isNow = mtgDt <= now && new Date(mtgDt.getTime() + mtg.durationMinutes * 60000) > now;
   const hasRecordings = (mtg.recordings?.length ?? 0) > 0;
+  const t = dsTokens(isDark);
 
   return (
     <TouchableOpacity
@@ -63,34 +66,40 @@ export const MeetingCard = React.memo(function MeetingCard({
       accessibilityState={{ selected }}>
       <View style={[st.card, {
         opacity: !selected && isPast && !isNow ? 0.55 : 1,
-        backgroundColor: selected ? mtg.color + '20' : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.72)',
+        // DS v2: картка surface.card без бічної смуги; колір наради — крапка
+        // біля часу, вибрана — subtle-тло з тонкою рамкою кольору наради.
+        backgroundColor: selected ? glassOf(t).surfaceSubtle : c.card,
+        borderWidth: selected ? 1.5 : 0,
+        borderColor: mtg.color,
       }]}>
-        <View style={[st.bar, { width: selected ? 5 : 3, backgroundColor: mtg.color }]} />
-        <View style={{ marginLeft: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ alignItems: 'center', minWidth: 50 }}>
-            <Text style={{ color: mtg.color, fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
-            <Text style={{ color: mtg.color + 'AA', fontSize: 10, fontWeight: '600', marginTop: 1 }}>{dur}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ alignItems: 'center', minWidth: 52 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />
+              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
+            </View>
+            <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 1 }}>{dur}</Text>
           </View>
-          <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: mtg.color + '28', marginVertical: 2 }} />
+          <View style={{ width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: c.border, marginVertical: 2 }} />
           <View style={{ flex: 1, gap: 3 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />}
-              <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
-              {isRecurring && <IconSymbol name="repeat" size={11} color={mtg.color + 'CC'} />}
-              {tracking && <IconSymbol name="timer" size={11} color="#10B981" />}
+              {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.accent.coral }} />}
+              <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
+              {isRecurring && <IconSymbol name="repeat" size={11} color={c.sub} />}
+              {tracking && <IconSymbol name="timer" size={11} color={t.status.success} />}
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
               <MeetingProjectChip project={project} textColor={c.text} />
               {mtg.location ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                   <IconSymbol name="mappin" size={10} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 11 }} numberOfLines={1}>{mtg.location}</Text>
+                  <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular }} numberOfLines={1}>{mtg.location}</Text>
                 </View>
               ) : null}
               {mtg.link ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <IconSymbol name="link" size={10} color={CALENDAR_ACCENT} />
-                  <Text style={{ color: CALENDAR_ACCENT, fontSize: 11, fontWeight: '600' }}>{tr.calJoin}</Text>
+                  <IconSymbol name="link" size={10} color={c.accent} />
+                  <Text style={{ color: c.accent, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.calJoin}</Text>
                 </View>
               ) : null}
             </View>
@@ -104,8 +113,8 @@ export const MeetingCard = React.memo(function MeetingCard({
               hitSlop={HIT}
               accessibilityRole="button"
               accessibilityLabel={recordLabel}
-              style={[st.iconBtn, { backgroundColor: hasRecordings ? 'rgba(99,102,241,0.15)' : c.dim }]}>
-              <IconSymbol name={hasRecordings ? 'waveform' : 'mic'} size={13} color={hasRecordings ? CALENDAR_ACCENT : c.sub} />
+              style={[st.iconBtn, { backgroundColor: hasRecordings ? t.accent.lavenderSoft : c.dim }]}>
+              <IconSymbol name={hasRecordings ? 'waveform' : 'mic'} size={13} color={hasRecordings ? c.accent : c.sub} />
             </TouchableOpacity>
           )}
           {onDelete && (
@@ -114,8 +123,8 @@ export const MeetingCard = React.memo(function MeetingCard({
               hitSlop={HIT}
               accessibilityRole="button"
               accessibilityLabel={deleteLabel}
-              style={[st.iconBtn, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
-              <IconSymbol name="trash" size={13} color="#EF4444" />
+              style={[st.iconBtn, { backgroundColor: c.dim }]}>
+              <IconSymbol name="trash" size={13} color={t.status.danger} />
             </TouchableOpacity>
           )}
         </View>
@@ -125,7 +134,6 @@ export const MeetingCard = React.memo(function MeetingCard({
 });
 
 const st = StyleSheet.create({
-  card: { borderRadius: Atlas.radius.medium, paddingVertical: 10, paddingHorizontal: 8, overflow: 'hidden' },
-  bar: { position: 'absolute', left: 0, top: 0, bottom: 0, borderTopLeftRadius: Atlas.radius.medium, borderBottomLeftRadius: Atlas.radius.medium },
-  iconBtn: { width: 36, height: 36, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
+  card: { borderRadius: radius.nested, paddingVertical: 12, paddingHorizontal: 12, overflow: 'hidden' },
+  iconBtn: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

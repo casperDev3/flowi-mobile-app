@@ -11,7 +11,6 @@ import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { CommentsSection } from '@/components/shared/CommentsSection';
 import { ActionBar, ActionButton, ActionChip } from '@/components/shared/ActionBar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Atlas } from '@/constants/atlas';
 import { Layout, detailColumnWidthFor } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useProject } from '@/hooks/use-project';
@@ -25,6 +24,10 @@ import { projectShellColors } from './ProjectScreenShell';
 import { ProjectTaskSheet } from './ProjectTaskSheet';
 import { TeamInput } from './TeamTaskPanel';
 import { saveProjectRecord, useProjectRecords } from './useProjectRecords';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { MeshBackground } from '@/components/ds';
 
 type Filter = 'all' | 'topic' | 'chat' | 'archive';
 
@@ -36,6 +39,7 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
   const dark = useColorScheme() === 'dark';
   const { project } = useProject(projectId);
   const c = projectShellColors(dark, project?.color ?? '#7C3AED', project?.appearance);
+  const tk = dsTokens(dark);
   const prefs = useProjectRecords<TeamPreferences>('team_preferences').find(p => p.projectId === projectId && p.userId === uid);
   const rooms = useProjectRecords<Discussion>('discussions').filter(d => d.projectId === projectId);
   const tasks = useProjectRecords<Task>('tasks').filter(t => t.projectId === projectId && !t.backlogKind);
@@ -94,7 +98,7 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
           />
         </ActionBar>
       )}
-      {!!error && <Text accessibilityRole="alert" style={{ color: '#DB4444' }}>{error}</Text>}
+      {!!error && <Text accessibilityRole="alert" style={{ color: tk.status.danger, fontFamily: fontFamily.medium }}>{error}</Text>}
       {visibleRooms.map(d => (
         <Pressable
           key={d.id}
@@ -104,21 +108,21 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
           accessibilityLabel={`${d.kind === 'chat' ? tr.pdChat : tr.pdTopic} · ${d.title}`}
           style={({ pressed }) => ({
             minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10,
-            borderRadius: Atlas.radius.large, borderWidth: 1,
-            borderColor: d.id === selected ? c.accent : c.border, backgroundColor: c.dim, opacity: pressed ? 0.7 : 1,
+            borderRadius: radius.nested, borderWidth: 1.5,
+            borderColor: d.id === selected ? tk.action.primary : 'transparent', backgroundColor: glassOf(tk).surface, opacity: pressed ? 0.7 : 1,
           })}>
-          <IconSymbol name={d.kind === 'chat' ? 'bubble.left.and.bubble.right.fill' : 'text.alignleft'} size={15} color={c.accent} />
-          <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{d.title}</Text>
-          <Text style={{ color: c.sub, fontSize: 11 }}>{d.kind === 'chat' ? tr.pdChat : tr.pdTopic}</Text>
+          <IconSymbol name={d.kind === 'chat' ? 'bubble.left.and.bubble.right.fill' : 'text.alignleft'} size={15} color={c.sub} />
+          <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{d.title}</Text>
+          <Text style={[type.caption, { color: c.sub }]}>{d.kind === 'chat' ? tr.pdChat : tr.pdTopic}</Text>
         </Pressable>
       ))}
     </>
   );
 
   const roomPart = room ? (
-    <View style={{ gap: 12, borderWidth: 1, borderColor: c.border, borderRadius: Atlas.radius.xlarge, padding: 14 }}>
-      <Text accessibilityRole="header" style={{ color: c.text, fontWeight: '700', fontSize: 20 }}>{room.title}</Text>
-      {room.body ? <Text style={{ color: c.text }}>{room.body}</Text> : null}
+    <View style={{ gap: 12, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.cardCompact, padding: 20 }}>
+      <Text accessibilityRole="header" style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 20 }}>{room.title}</Text>
+      {room.body ? <Text style={[type.body, { color: c.text }]}>{room.body}</Text> : null}
       {/* Дії теми — один рядок: вторинні ліворуч, «Створити завдання» праворуч. */}
       <ActionBar>
         <ActionButton label={watched ? tr.taskUnwatch : tr.taskWatch} icon="eye" tone={watched ? 'secondary' : 'neutral'} selected={watched} onPress={toggleWatch} colors={c} />
@@ -150,7 +154,7 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
       </ActionBar>
       {(room.taskIds ?? []).length > 0 && (
         <View style={{ gap: 6 }}>
-          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{tr.pdLinkedTasks}</Text>
+          <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.pdLinkedTasks}</Text>
           {(room.taskIds ?? []).map(id => {
             const title = tasks.find(t => t.id === id)?.title ?? tr.pdTaskFallback;
             return (
@@ -159,9 +163,9 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
                 onPress={() => setOpenTaskId(id)}
                 accessibilityRole="button"
                 accessibilityLabel={title}
-                style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, opacity: pressed ? 0.7 : 1 })}>
-                <IconSymbol name="checklist" size={15} color={c.accent} />
-                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{title}</Text>
+                style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderRadius: radius.nestedCompact, backgroundColor: c.dim, opacity: pressed ? 0.7 : 1 })}>
+                <IconSymbol name="checklist" size={15} color={c.sub} />
+                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{title}</Text>
                 <IconSymbol name="chevron.right" size={12} color={c.sub} />
               </Pressable>
             );
@@ -181,7 +185,10 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
         </View>
       ) : <>{listPart}{roomPart}</>}
       <Modal visible={!!draft} animationType="slide" onRequestClose={() => setDraft(null)}>
-        <ScrollView keyboardShouldPersistTaps="handled" style={{ backgroundColor: c.bg1 }} contentContainerStyle={{ padding: 24, paddingTop: 60, paddingBottom: 80, gap: 12, width: '100%', maxWidth: Layout.readingMaxWidth, alignSelf: 'center' }}>
+        {/* DS v2.1: повноекранна форма — на mesh, як і екрани. */}
+        <View style={{ flex: 1, backgroundColor: c.bg1 }}>
+        <MeshBackground />
+        <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ padding: 24, paddingTop: 60, paddingBottom: 80, gap: 12, width: '100%', maxWidth: Layout.readingMaxWidth, alignSelf: 'center' }}>
           {draft && <>
             <TeamInput label={tr.pdTitle} value={draft.title} onChange={v => setDraft({ ...draft, title: v })} />
             <TeamInput label={tr.pdBody} value={draft.body} onChange={v => setDraft({ ...draft, body: v })} multiline />
@@ -190,7 +197,7 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
                 <ActionChip key={kind} label={kind === 'topic' ? tr.pdTopic : tr.pdChat} selected={draft.kind === kind} onPress={() => setDraft({ ...draft, kind })} colors={c} />
               ))}
             </ActionBar>
-            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{tr.pdLinkedTasks}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.pdLinkedTasks}</Text>
             <ActionBar>
               {tasks.map(t => (
                 <ActionChip
@@ -218,6 +225,7 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
             </ActionBar>
           </>}
         </ScrollView>
+        </View>
       </Modal>
       <ProjectTaskSheet projectId={projectId} taskId={openTaskId} onClose={() => setOpenTaskId(null)} isDark={dark} />
     </View>

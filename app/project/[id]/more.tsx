@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/more.tsx — розділ «Ще» простору проєкту.
  *
@@ -31,6 +30,9 @@ import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export default function ProjectMoreScreen() {
   const projectId = useProjectRouteId();
@@ -43,6 +45,7 @@ export default function ProjectMoreScreen() {
   const { project } = useProject(projectId);
   const role = useProjectRole(projectId);
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
+  const tk = dsTokens(isDark);
 
   const modules = project ? projectModules(project) : MODULES_BY_TEMPLATE.work;
   const visible = useMemo(() => visibleProjectNavItems(modules, role), [modules, role]);
@@ -61,7 +64,7 @@ export default function ProjectMoreScreen() {
         keyboardShouldPersistTaps="handled">
         {/* Планшет (рішення 6): розділи плитками у 2 колонки, коли колонці
             вистачає місця; на телефоні — список, як було. */}
-        <ResponsiveGrid minItemWidth={300} maxColumns={2} gap={10}>
+        <ResponsiveGrid minItemWidth={300} maxColumns={2} gap={12}>
         {rows.map(item => {
           const label = String(tr[item.labelKey]);
           return (
@@ -74,11 +77,11 @@ export default function ProjectMoreScreen() {
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 12,
                 minHeight: 56, paddingHorizontal: 14,
-                borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border,
-                backgroundColor: c.dim,
+                borderRadius: radius.cardCompact,
+                backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'),
               }}>
-              <IconSymbol name={item.icon} size={20} color={c.accent} />
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', flex: 1 }}>{label}</Text>
+              <IconSymbol name={item.icon} size={20} color={c.sub} />
+              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, flex: 1 }}>{label}</Text>
               <IconSymbol name="chevron.right" size={16} color={c.sub} />
             </TouchableOpacity>
           );

@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskTimerTab.tsx
  *
@@ -28,6 +27,9 @@ import {
   totalTrackedSeconds,
   type TimedTask,
 } from '@/utils/taskTimer';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
+import { glassOf } from '@/components/shared/dsTheme';
 
 export interface TaskTimerTabProps {
   task: TimedTask & { status: 'active' | 'done' };
@@ -45,12 +47,14 @@ export interface TaskTimerTabProps {
   fmtDur: (seconds: number) => string;
 }
 
-const RUNNING = '#6366F1';
-const STOP = '#EF4444';
 
 export function TaskTimerTab({
   task, running, activeStartedAt, onStart, onStop, colors: c, tr, locale, fmtClock, fmtDur,
 }: TaskTimerTabProps) {
+  const { t } = useDS();
+  // DS v2: «іде» — lime-позначка, старт/стоп — pill action.primary
+  // (стоп вирізняє coral-іконка), годинник — display-цифри.
+  const RUNNING = t.accent.lime;
   const sessions = completedSessions(task);
   const live = running && !!activeStartedAt;
   const time = (iso: string) => new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
@@ -71,13 +75,13 @@ export function TaskTimerTab({
         />
 
         {live && activeStartedAt ? (
-          <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
+          <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 6 }]}>
             {tr.startedAtLabel} {time(activeStartedAt)}
           </Text>
         ) : null}
 
         {!live && sessions.length > 0 ? (
-          <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>
+          <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 6 }]}>
             {tr.sessionsCount}: {sessions.length}
           </Text>
         ) : null}
@@ -90,9 +94,9 @@ export function TaskTimerTab({
         <TouchableOpacity
           onPress={running ? onStop : onStart}
           accessibilityRole="button"
-          style={[st.btn, { backgroundColor: running ? STOP : RUNNING }]}>
-          <IconSymbol name={running ? 'stop.fill' : 'play.fill'} size={15} color="#fff" />
-          <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 8 }}>
+          style={[st.btn, { backgroundColor: t.action.primary }]}>
+          <IconSymbol name={running ? 'stop.fill' : 'play.fill'} size={15} color={running ? t.accent.coral : t.text.onAction} />
+          <Text style={{ color: t.text.onAction, fontFamily: fontFamily.semibold, fontSize: 15, marginLeft: 8 }}>
             {running ? tr.stopTimer : tr.startTimer}
           </Text>
         </TouchableOpacity>
@@ -103,8 +107,8 @@ export function TaskTimerTab({
           <Text style={[st.label, { color: c.sub }]}>{tr.sessions}</Text>
 
           {live && activeStartedAt ? (
-            <View style={[st.row, { borderColor: RUNNING + '40', backgroundColor: RUNNING + '08' }]}>
-              <IconSymbol name="timer" size={14} color={RUNNING} />
+            <View style={[st.row, { backgroundColor: glassOf(t).surfaceSubtle, borderWidth: 1.5, borderColor: RUNNING }]}>
+              <IconSymbol name="timer" size={14} color={c.text} />
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <ElapsedClock
                   running
@@ -112,7 +116,7 @@ export function TaskTimerTab({
                   format={fmtClock}
                   style={[st.rowValue, { color: c.text }]}
                 />
-                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
                   {day(activeStartedAt)}{' · '}{time(activeStartedAt)}
                 </Text>
               </View>
@@ -122,11 +126,11 @@ export function TaskTimerTab({
 
           {/* Найновіша сесія зверху. */}
           {[...sessions].reverse().map(entry => (
-            <View key={entry.id} style={[st.row, { borderColor: c.border, backgroundColor: c.dim }]}>
+            <View key={entry.id} style={[st.row, { backgroundColor: c.dim }]}>
               <IconSymbol name="timer" size={14} color={c.sub} />
               <View style={{ flex: 1, marginLeft: 10 }}>
                 <Text style={[st.rowValue, { color: c.text }]}>{fmtDur(entry.duration)}</Text>
-                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
                   {day(entry.startedAt)}{' · '}{time(entry.startedAt)}
                   {entry.endedAt ? ` → ${time(entry.endedAt)}` : ''}
                 </Text>
@@ -137,7 +141,7 @@ export function TaskTimerTab({
       )}
 
       {!live && sessions.length === 0 && task.status === 'active' && (
-        <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 12 }}>
+        <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 12 }]}>
           {tr.timerHint}
         </Text>
       )}
@@ -146,10 +150,10 @@ export function TaskTimerTab({
 }
 
 const st = StyleSheet.create({
-  caption:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' },
-  bigClock: { fontSize: 44, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 },
-  label:    { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  btn:      { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  row:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10, marginBottom: 7 },
-  rowValue: { fontSize: 13, fontWeight: '600' },
+  caption:  { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.6, marginBottom: 10, textTransform: 'uppercase' },
+  bigClock: { ...type.display },
+  label:    { fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
+  btn:      { minHeight: 48, paddingVertical: 13, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  row:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nestedCompact, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
+  rowValue: { fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

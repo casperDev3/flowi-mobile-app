@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/StartTimerCard.tsx — «Почати таймер» у правій панелі
  * широкого екрана «Час».
@@ -15,7 +14,9 @@ import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 import type { TimeColors } from '@/components/time/TimePalette';
 import { timerCandidates, type TimerCandidateTask } from '@/components/time/timerCandidates';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, space, touchTarget, type as dsType } from '@/constants/theme';
 import type { Translations } from '@/store/translations';
+import { GlassSurface, IconChip } from '@/components/ds';
 
 /** Скільки задач видно без пошуку: панель — підказка, а не другий список задач. */
 const PREVIEW = 5;
@@ -38,16 +39,17 @@ export function StartTimerCard({ c, tr, tasks, running, projectById, onStart }: 
   const more = candidates.length - shown.length;
 
   return (
-    <View style={[s.card, { borderColor: c.border, backgroundColor: c.card }]}>
+    <GlassSurface radius={radius.cardCompact} style={s.card}>
       <View style={s.head}>
-        <IconSymbol name="play.fill" size={13} color={c.indigo} />
+        {/* DS v2.1: icon-chip акценту модуля «Час» (amber). */}
+        <IconChip icon="play.fill" accent="amber" size="sm" />
         <Text style={[s.title, { color: c.text }]} accessibilityRole="header">{tr.timeStartTimerTitle}</Text>
       </View>
       <TextInput
         value={query}
         onChangeText={setQuery}
         placeholder={tr.timeStartTimerSearch}
-        placeholderTextColor={c.sub}
+        placeholderTextColor={c.muted}
         accessibilityLabel={tr.timeStartTimerSearch}
         autoCorrect={false}
         returnKeyType="search"
@@ -63,15 +65,15 @@ export function StartTimerCard({ c, tr, tasks, running, projectById, onStart }: 
               accessibilityRole="button"
               accessibilityLabel={tr.timeStartTimerA11y.replace('{task}', task.title)}
               style={s.row}>
-              <View style={[s.play, { backgroundColor: c.indigo + '1F' }]}>
-                <IconSymbol name="play.fill" size={11} color={c.indigo} />
+              <View style={[s.play, { backgroundColor: c.t.action.primary }]}>
+                <IconSymbol name="play.fill" size={11} color={c.t.text.onAction} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{task.title}</Text>
+                <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium }}>{task.title}</Text>
                 {project ? (
                   <View style={s.projectLine}>
                     <View style={[s.dot, { backgroundColor: project.color ?? c.indigo }]} />
-                    <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, flex: 1 }}>{project.name}</Text>
+                    <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, flex: 1 }}>{project.name}</Text>
                   </View>
                 ) : null}
               </View>
@@ -87,18 +89,18 @@ export function StartTimerCard({ c, tr, tasks, running, projectById, onStart }: 
         <Text style={[s.hint, { color: c.sub }]}>{tr.timeStartTimerMore.replace('{count}', String(more))}</Text>
       ) : null}
       <Text style={[s.hint, { color: c.sub }]}>{tr.timeStartTimerMeetingHint}</Text>
-    </View>
+    </GlassSurface>
   );
 }
 
 const s = StyleSheet.create({
-  card: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 },
-  title: { fontSize: 15, fontWeight: Atlas.type.headingWeight },
-  input: { borderRadius: Atlas.radius.medium, paddingHorizontal: 12, minHeight: 44, fontSize: 14, marginBottom: 4 },
+  card: { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  title: { ...dsType.h2 },
+  input: { borderRadius: radius.pill, paddingHorizontal: space[4], minHeight: touchTarget, fontSize: 14, fontFamily: fontFamily.regular, marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 4 },
   play: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   projectLine: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  hint: { fontSize: 11, marginTop: 8 },
+  hint: { ...dsType.caption, marginTop: 8 },
 });

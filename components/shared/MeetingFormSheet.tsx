@@ -1,5 +1,4 @@
 import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import {
   Keyboard,
@@ -18,6 +17,8 @@ import {
 import { CommentsSection } from '@/components/shared/CommentsSection';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSheetSurface } from '@/hooks/use-content-width';
+import { fontFamily } from '@/constants/theme';
+import { dsTheme as dsTokens, glassOf, glassRimFor, glassRim } from '@/components/shared/dsTheme';
 
 // ─── Exported types ────────────────────────────────────────────────────────────
 
@@ -83,6 +84,11 @@ interface CalGridProps {
 }
 
 function CalGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMonth, onSelectDay, accent, border, sub, text, lang }: CalGridProps) {
+  // DS v2: вибраний день — коло action.primary, сьогодні — обвідка text.primary.
+  // Схема — за кольором тексту з палітри батька (text.primary світлої теми = #111113).
+  const t = dsTokens(text !== dsTokens(false).text.primary);
+  const selBg = t.action.primary;
+  const selFg = t.text.onAction;
   const todayStr = toDateStr(new Date());
   const fd = (() => { const d = new Date(year, month, 1).getDay(); return d === 0 ? 6 : d - 1; })();
   const dim = new Date(year, month + 1, 0).getDate();
@@ -96,12 +102,12 @@ function CalGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMon
   const wdShort = lang === "uk" ? WD_SHORT_UK : WD_SHORT_EN;
 
   return (
-    <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, borderColor: border }}>
+    <View style={{ borderRadius: Atlas.radius.large, padding: 12, backgroundColor: border + '00' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
         <TouchableOpacity onPress={onPrevMonth} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name="chevron.left" size={18} color={sub} />
         </TouchableOpacity>
-        <Text style={{ flex: 1, textAlign: 'center', color: text, fontSize: 15, fontWeight: '700' }}>
+        <Text style={{ flex: 1, textAlign: 'center', color: text, fontSize: 15, fontFamily: fontFamily.bold }}>
           {months[month]} {year}
         </Text>
         <TouchableOpacity onPress={onNextMonth} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
@@ -110,7 +116,7 @@ function CalGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMon
       </View>
       <View style={{ flexDirection: "row", marginBottom: 4 }}>
         {wdShort.map((d) => (
-          <Text key={d} style={{ flex: 1, textAlign: 'center', color: sub, fontSize: 11, fontWeight: '600' }}>
+          <Text key={d} style={{ flex: 1, textAlign: 'center', color: sub, fontSize: 11, fontFamily: fontFamily.semibold }}>
             {d}
           </Text>
         ))}
@@ -126,10 +132,10 @@ function CalGrid({ year, month, markedDays, selectedDate, onPrevMonth, onNextMon
             return (
               <TouchableOpacity key={di} onPress={() => onSelectDay(new Date(dateStr + 'T00:00'))}
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 3 }}>
-                <View style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: isSel ? accent : 'transparent',
-                  borderWidth: !isSel && isToday ? 1.5 : 0, borderColor: accent }}>
-                  <Text style={{ color: isSel ? '#fff' : isToday ? accent : text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>
+                <View style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: isSel ? selBg : 'transparent',
+                  borderWidth: !isSel && isToday ? 1.5 : 0, borderColor: text }}>
+                  <Text style={{ color: isSel ? selFg : text, fontSize: 13, fontVariant: ['tabular-nums'], fontFamily: isToday || isSel ? fontFamily.semibold : fontFamily.regular }}>
                     {day}
                   </Text>
                 </View>
@@ -183,12 +189,15 @@ export function MeetingFormSheet({
   const isUk = lang === "uk";
   const sheetSurface = useSheetSurface();
 
+  // DS v2: аркуш — surface.elevated, поля й чипи — surface.subtle без рамок,
+  // вибраний чип — action.primary. Колір зустрічі (fColor) — лише як мітка.
+  const t = dsTokens(isDark);
   const c = {
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)',
-    dim:    isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
-    text:   isDark ? '#F2F0FF' : '#1A1830',
-    sub:    isDark ? 'rgba(210,205,255,0.62)' : 'rgba(80,70,140,0.58)',
-    sheet:  isDark ? 'rgba(18,18,32,0.96)' : 'rgba(245,244,255,0.97)',
+    border: t.border.hairline,
+    dim:    glassOf(t).surfaceSubtle,
+    text:   t.text.primary,
+    sub:    t.text.secondary,
+    sheet:  glassOf(t).sheet,
   };
 
   // ── Form state ──────────────────────────────────────────────────────────────
@@ -300,10 +309,10 @@ export function MeetingFormSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <Pressable accessible={false} style={s.overlay} onPress={onClose}>
+        <Pressable accessible={false} style={[s.overlay, { backgroundColor: t.surface.overlay }]} onPress={onClose}>
           <Pressable onPress={e => e.stopPropagation()} style={s.wrapper} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-            <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-              style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+            <View
+              style={[s.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
               {/* bounces тут був false — на обрізаному аркуші це остаточно
                   вбивало будь-який натяк на те, що вміст можна прогорнути. */}
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -331,7 +340,7 @@ export function MeetingFormSheet({
                   </View>
                   <View style={{ width: 1, height: 20, backgroundColor: fColor + '30' }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: fTitle.trim() ? c.text : c.sub, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
+                    <Text style={{ color: fTitle.trim() ? c.text : c.sub, fontSize: 13, fontFamily: fontFamily.bold }} numberOfLines={1}>
                       {fTitle.trim() || (isUk ? 'Назва зустрічі' : 'Meeting title')}
                     </Text>
                     <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }} numberOfLines={1}>
@@ -349,13 +358,13 @@ export function MeetingFormSheet({
                 {/* Title */}
                 <Text style={{ color: c.sub, marginBottom: 6 }}>
                   {isUk ? "Назва зустрічі" : "Meeting title"}{" "}
-                  <Text style={{ color: "#EF4444" }}>*</Text>
+                  <Text style={{ color: t.status.danger }}>*</Text>
                 </Text>
                 <TextInput
                   placeholder={isUk ? 'Назва зустрічі...' : 'Meeting title...'}
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={t.text.muted}
                   value={fTitle} onChangeText={setFTitle} autoFocus
-                  style={[s.inp, { color: c.text, backgroundColor: c.dim, borderColor: fTitle.trim() ? fColor + '65' : c.border, marginBottom: 7 }]}
+                  style={[s.inp, { color: c.text, backgroundColor: c.dim, borderColor: 'transparent', marginBottom: 7 }]}
                 />
 
                 {/* Date + Time */}
@@ -363,7 +372,7 @@ export function MeetingFormSheet({
                   <TouchableOpacity onPress={() => { Keyboard.dismiss(); setShowCal(v => !v); }} style={{ flex: 1 }}>
                     <View style={[s.pill, { borderColor: fDate ? fColor + '55' : c.border, backgroundColor: fDate ? fColor + '10' : c.dim }]}>
                       <IconSymbol name="calendar" size={13} color={fDate ? fColor : c.sub} />
-                      <Text style={{ color: fDate ? fColor : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1 }} numberOfLines={1}>
+                      <Text style={{ color: fDate ? fColor : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 5, flex: 1 }} numberOfLines={1}>
                         {fDate ? new Date(fDate + 'T00:00').toLocaleDateString(isUk ? 'uk-UA' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short' }) : (isUk ? 'Дата' : 'Date')}
                       </Text>
                       <IconSymbol name={showCal ? 'chevron.up' : 'chevron.down'} size={11} color={c.sub} />
@@ -372,7 +381,7 @@ export function MeetingFormSheet({
                   <View style={[s.pill, { width: 82, borderColor: c.border, backgroundColor: c.dim }]}>
                     <IconSymbol name="clock" size={13} color={fTime ? fColor : c.sub} />
                     <TextInput
-                      placeholder="09:00" placeholderTextColor={c.sub} value={fTime}
+                      placeholder="09:00" placeholderTextColor={t.text.muted} value={fTime}
                       onChangeText={v => {
                         const clean = v.replace(/[^0-9:]/g, '').slice(0, 5);
                         const digits = clean.replace(/:/g, '');
@@ -381,7 +390,7 @@ export function MeetingFormSheet({
                         } else setFTime(clean);
                       }}
                       keyboardType="numbers-and-punctuation" maxLength={5}
-                      style={{ color: fTime ? fColor : c.sub, fontSize: 13, fontWeight: '700', marginLeft: 5, flex: 1, padding: 0 }}
+                      style={{ color: fTime ? fColor : c.sub, fontSize: 13, fontFamily: fontFamily.bold, marginLeft: 5, flex: 1, padding: 0 }}
                     />
                   </View>
                 </View>
@@ -407,8 +416,8 @@ export function MeetingFormSheet({
                       return (
                         <TouchableOpacity key={d} onPress={() => { setFDuration(d); setFDurationText(String(d)); }} style={{ flex: 1 }}>
                           <View style={{ paddingVertical: 8, alignItems: 'center', borderRadius: Atlas.radius.medium,
-                            backgroundColor: on ? fColor : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                            <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>
+                            backgroundColor: on ? t.action.primary : c.dim }}>
+                            <Text style={{ color: on ? t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.bold }}>
                               {d >= 60 ? `${d / 60}г` : `${d}хв`}
                             </Text>
                           </View>
@@ -419,7 +428,7 @@ export function MeetingFormSheet({
                   <View style={[s.pill, { borderColor: !DUR_PRESETS.includes(fDuration) ? fColor + '55' : c.border, backgroundColor: !DUR_PRESETS.includes(fDuration) ? fColor + '10' : c.dim }]}>
                     <IconSymbol name="timer" size={13} color={!DUR_PRESETS.includes(fDuration) ? fColor : c.sub} />
                     <TextInput
-                      placeholder={isUk ? 'Своя тривалість' : 'Custom'} placeholderTextColor={c.sub}
+                      placeholder={isUk ? 'Своя тривалість' : 'Custom'} placeholderTextColor={t.text.muted}
                       value={fDurationText}
                       onChangeText={v => {
                         const clean = v.replace(/[^0-9]/g, '');
@@ -428,19 +437,19 @@ export function MeetingFormSheet({
                         if (!isNaN(n) && n > 0) setFDuration(n);
                       }}
                       keyboardType="number-pad"
-                      style={{ color: !DUR_PRESETS.includes(fDuration) ? fColor : c.text, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1, padding: 0 }}
+                      style={{ color: !DUR_PRESETS.includes(fDuration) ? fColor : c.text, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 5, flex: 1, padding: 0 }}
                     />
-                    <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>
                       {isUk ? "хв" : "min"}
                     </Text>
                   </View>
                 </View>
 
                 {/* Details: location / link / notes */}
-                <View style={{ borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 10 }}>
+                <View style={{ borderRadius: Atlas.radius.large, overflow: 'hidden', marginBottom: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, backgroundColor: c.dim, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }}>
                     <IconSymbol name="mappin" size={13} color={fLocation ? fColor : c.sub} />
-                    <TextInput placeholder={isUk ? 'Місце…' : 'Location…'} placeholderTextColor={c.sub} value={fLocation} onChangeText={setFLocation}
+                    <TextInput placeholder={isUk ? 'Місце…' : 'Location…'} placeholderTextColor={t.text.muted} value={fLocation} onChangeText={setFLocation}
                       style={{ color: c.text, fontSize: 13, marginLeft: 8, flex: 1, padding: 0 }} />
                     {!!fLocation && (
                       <TouchableOpacity onPress={() => setFLocation('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -450,7 +459,7 @@ export function MeetingFormSheet({
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, backgroundColor: c.dim, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }}>
                     <IconSymbol name="link" size={13} color={fLink ? fColor : c.sub} />
-                    <TextInput placeholder="Zoom / Meet…" placeholderTextColor={c.sub} value={fLink} onChangeText={setFLink}
+                    <TextInput placeholder="Zoom / Meet…" placeholderTextColor={t.text.muted} value={fLink} onChangeText={setFLink}
                       keyboardType="url" autoCapitalize="none"
                       style={{ color: c.text, fontSize: 13, marginLeft: 8, flex: 1, padding: 0 }} />
                     {!!fLink && (
@@ -461,7 +470,7 @@ export function MeetingFormSheet({
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: c.dim }}>
                     <IconSymbol name="note.text" size={13} color={fNotes ? fColor : c.sub} style={{ marginTop: 1 }} />
-                    <TextInput placeholder={isUk ? 'Нотатки…' : 'Notes…'} placeholderTextColor={c.sub} value={fNotes} onChangeText={setFNotes}
+                    <TextInput placeholder={isUk ? 'Нотатки…' : 'Notes…'} placeholderTextColor={t.text.muted} value={fNotes} onChangeText={setFNotes}
                       multiline textAlignVertical="top"
                       style={{ color: c.text, fontSize: 13, marginLeft: 8, flex: 1, padding: 0, maxHeight: 60 }} />
                   </View>
@@ -471,7 +480,7 @@ export function MeetingFormSheet({
                     друга модалка поверх неї на iOS не показується надійно. */}
                 {projectOptions.length > 0 && (
                   <View style={{ marginBottom: 10 }}>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
                       {projectLabel}
                     </Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -487,7 +496,7 @@ export function MeetingFormSheet({
                               accessibilityLabel={`${projectLabel}: ${p.name}`}
                               style={[s.chip, { borderColor: on ? (p.id ? p.color : fColor) : c.border, backgroundColor: on ? (p.id ? p.color : fColor) + '18' : c.dim }]}>
                               {p.id ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.color }} /> : null}
-                              <Text numberOfLines={1} style={{ color: on ? c.text : c.sub, fontSize: 12, fontWeight: '600', maxWidth: 160 }}>
+                              <Text numberOfLines={1} style={{ color: on ? c.text : c.sub, fontSize: 12, fontFamily: fontFamily.semibold, maxWidth: 160 }}>
                                 {p.name}
                               </Text>
                             </TouchableOpacity>
@@ -500,18 +509,18 @@ export function MeetingFormSheet({
 
                 {/* Recurrence toggle */}
                 <TouchableOpacity onPress={() => setFRepeat(v => !v)}
-                  style={[s.pill, { borderColor: fRepeat ? fColor + '55' : c.border, backgroundColor: fRepeat ? fColor + '10' : c.dim, marginBottom: 10 }]}>
-                  <IconSymbol name="repeat" size={13} color={fRepeat ? fColor : c.sub} />
-                  <Text style={{ color: fRepeat ? fColor : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 6, flex: 1 }}>
+                  style={[s.pill, { backgroundColor: c.dim, marginBottom: 10 }]}>
+                  <IconSymbol name="repeat" size={13} color={fRepeat ? c.text : c.sub} />
+                  <Text style={{ color: fRepeat ? c.text : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 6, flex: 1 }}>
                     {isUk ? 'Повторювати' : 'Repeat'}
                   </Text>
-                  <View style={{ width: 36, height: 22, borderRadius: 11, backgroundColor: fRepeat ? fColor : c.border, justifyContent: 'center', paddingHorizontal: 2 }}>
+                  <View style={{ width: 36, height: 22, borderRadius: 11, backgroundColor: fRepeat ? t.status.success : c.border, justifyContent: 'center', paddingHorizontal: 2 }}>
                     <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff', alignSelf: fRepeat ? 'flex-end' : 'flex-start' }} />
                   </View>
                 </TouchableOpacity>
 
                 {fRepeat && (
-                  <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: fColor + '40', backgroundColor: fColor + '08', padding: 12, marginBottom: 10 }}>
+                  <View style={{ borderRadius: Atlas.radius.large, backgroundColor: c.dim, padding: 14, marginBottom: 10 }}>
                     {/* Frequency chips */}
                     <View style={{ flexDirection: 'row', gap: 5, marginBottom: 10 }}>
                       {(Object.keys(FREQ_LABELS) as RecurrenceFreq[]).map(
@@ -520,8 +529,8 @@ export function MeetingFormSheet({
                           return (
                             <TouchableOpacity key={f} onPress={() => { setFRepeatFreq(f); if (f !== 'weekly') setFRepeatDays([]); }}
                             style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
-                              backgroundColor: on ? fColor : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                              <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>
+                              backgroundColor: on ? t.action.primary : c.dim }}>
+                              <Text style={{ color: on ? t.text.onAction : c.sub, fontSize: 11, fontFamily: fontFamily.bold }}>
                                 {FREQ_LABELS[f]}
                               </Text>
                             </TouchableOpacity>
@@ -532,21 +541,21 @@ export function MeetingFormSheet({
 
                     {/* Interval stepper */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
+                      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>
                         {isUk ? "Кожні" : "Every"}
                       </Text>
                       <TouchableOpacity onPress={() => setFRepeatInterval(i => Math.max(1, i - 1))}
-                        style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>−</Text>
+                        style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, lineHeight: 20 }}>−</Text>
                       </TouchableOpacity>
-                      <Text style={{ color: fColor, fontSize: 16, fontWeight: Atlas.type.headingWeight, minWidth: 24, textAlign: 'center' }}>
+                      <Text style={{ color: fColor, fontSize: 16, fontFamily: fontFamily.semibold, minWidth: 24, textAlign: 'center' }}>
                         {fRepeatInterval}
                       </Text>
                       <TouchableOpacity onPress={() => setFRepeatInterval(i => Math.min(99, i + 1))}
-                        style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: c.text, fontSize: 16, fontWeight: '600', lineHeight: 20 }}>+</Text>
+                        style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, lineHeight: 20 }}>+</Text>
                       </TouchableOpacity>
-                      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>
+                      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>
                         {intervalUnit(fRepeatInterval)}
                       </Text>
                     </View>
@@ -560,8 +569,8 @@ export function MeetingFormSheet({
                             <TouchableOpacity key={i}
                               onPress={() => setFRepeatDays(prev => on ? prev.filter(x => x !== i) : [...prev, i])}
                               style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: Atlas.radius.small,
-                                backgroundColor: on ? fColor : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                              <Text style={{ color: on ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>
+                                backgroundColor: on ? t.action.primary : c.dim }}>
+                              <Text style={{ color: on ? t.text.onAction : c.sub, fontSize: 11, fontFamily: fontFamily.bold }}>
                                 {d}
                               </Text>
                             </TouchableOpacity>
@@ -578,8 +587,8 @@ export function MeetingFormSheet({
                         return (
                           <TouchableOpacity key={type} onPress={() => setFRepeatEndType(type)}
                             style={{ flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 9,
-                              backgroundColor: on ? fColor : c.dim, borderWidth: on ? 0 : 1, borderColor: c.border }}>
-                            <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>
+                              backgroundColor: on ? t.action.primary : c.dim }}>
+                            <Text style={{ color: on ? t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.bold }}>
                               {labels[type]}
                             </Text>
                           </TouchableOpacity>
@@ -592,7 +601,7 @@ export function MeetingFormSheet({
                         <TouchableOpacity onPress={() => { Keyboard.dismiss(); setShowRepeatUntilCal(v => !v); }}
                           style={[s.pill, { borderColor: fRepeatUntil ? fColor + '55' : c.border, backgroundColor: fRepeatUntil ? fColor + '10' : c.dim }]}>
                           <IconSymbol name="calendar" size={13} color={fRepeatUntil ? fColor : c.sub} />
-                          <Text style={{ color: fRepeatUntil ? fColor : c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5, flex: 1 }}>
+                          <Text style={{ color: fRepeatUntil ? fColor : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 5, flex: 1 }}>
                             {fRepeatUntil
                               ? new Date(fRepeatUntil + 'T00:00').toLocaleDateString(isUk ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
                               : (isUk ? 'Оберіть дату' : 'Select date')}
@@ -619,7 +628,7 @@ export function MeetingFormSheet({
                 {/* Коментарі (contract §4.4) — лише збережена нарада проєкту. */}
                 {initial?.id && initial.projectId && currentUserId ? (
                   <View style={{ marginBottom: 14 }}>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
                       {tr?.commentsTitle ?? (isUk ? 'Коментарі' : 'Comments')}
                     </Text>
                     <CommentsSection
@@ -640,25 +649,25 @@ export function MeetingFormSheet({
                 <View style={{ flexDirection: "row", gap: 7 }}>
                   {onDelete && (
                     <TouchableOpacity onPress={onDelete}
-                      style={[s.btn, { backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.22)', paddingHorizontal: 13 }]}>
-                      <IconSymbol name="trash" size={14} color="#EF4444" />
+                      style={[s.btn, { backgroundColor: t.status.danger + '14', paddingHorizontal: 16 }]}>
+                      <IconSymbol name="trash" size={14} color={t.status.danger} />
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600', fontSize: 13 }}>
+                  <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+                    <Text style={{ color: t.action.secondaryText, fontFamily: fontFamily.semibold, fontSize: 13 }}>
                       {isUk ? "Скасувати" : "Cancel"}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={handleSave} disabled={!canSave}
-                    style={[s.btn, { flex: 2, backgroundColor: canSave ? fColor : c.dim }]}>
-                    <IconSymbol name="calendar.badge.checkmark" size={14} color={canSave ? '#fff' : c.sub} />
-                    <Text style={{ color: canSave ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6, fontSize: 13 }}>
+                    style={[s.btn, { flex: 2, backgroundColor: canSave ? t.action.primary : t.state.disabledBg }]}>
+                    <IconSymbol name="calendar.badge.checkmark" size={14} color={canSave ? t.text.onAction : t.state.disabledText} />
+                    <Text style={{ color: canSave ? t.text.onAction : t.state.disabledText, fontFamily: fontFamily.semibold, marginLeft: 6, fontSize: 13 }}>
                       {initial?.id ? (isUk ? 'Зберегти' : 'Save') : (isUk ? 'Додати' : 'Add')}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -667,14 +676,14 @@ export function MeetingFormSheet({
 }
 
 const s = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
   wrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
   // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
   // ScrollView усередині нічого не гортав (NAT-01).
-  sheet:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
-  inp:     { borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontWeight: '600', borderWidth: 1.5 },
-  pill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 11, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 9 },
-  chip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
-  btn:     { paddingVertical: 11, borderRadius: 11, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  sheet:   { borderRadius: Atlas.radius.xxlarge, padding: 20, overflow: 'hidden' },
+  inp:     { borderRadius: Atlas.radius.medium, minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: fontFamily.semibold, borderWidth: 0 },
+  pill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 44, paddingHorizontal: 14, paddingVertical: 9 },
+  chip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  btn:     { minHeight: 48, paddingVertical: 11, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

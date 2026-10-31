@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/activity.tsx — Стрічка активності проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §4, контракт §4.6).
@@ -28,6 +27,9 @@ import { fetchProjectActivity, type ActivityEntry } from '@/store/project-activi
 import { activityIcon, formatActivityMessage, mergeConsecutiveActivity } from '@/utils/projectActivity';
 import { useActivityContext } from '@/hooks/use-activity-context';
 import { useProjectRouteId } from '@/hooks/use-project-route-id';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export default function ProjectActivityScreen() {
   const projectId = useProjectRouteId();
@@ -40,6 +42,7 @@ export default function ProjectActivityScreen() {
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { project } = useProject(projectId);
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
+  const tk = dsTokens(isDark);
 
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,33 +96,33 @@ export default function ProjectActivityScreen() {
         onPress: () => router.back(),
         label: tr.back,
         color: c.text,
-        style: { backgroundColor: c.dim, borderColor: c.border },
+        style: { backgroundColor: glassOf(tk).surface, borderColor: 'transparent' },
       }}>
       <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={c.sub} style={{ marginTop: 40 }} />
         ) : offline ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, borderRadius: Atlas.radius.medium, padding: 12, marginTop: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.nested, padding: 14, marginTop: 8 }}>
             <IconSymbol name="exclamationmark.circle" size={14} color={c.sub} />
-            <Text style={{ color: c.sub, fontSize: 12, marginLeft: 6, flex: 1 }}>{tr.projectMembersOfflineHint}</Text>
+            <Text style={[type.caption, { color: c.sub, marginLeft: 6, flex: 1 }]}>{tr.projectMembersOfflineHint}</Text>
           </View>
         ) : error ? (
-          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 40 }}>{tr.projectActivityError}</Text>
+          <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 40 }]}>{tr.projectActivityError}</Text>
         ) : entries.length === 0 ? (
-          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 40 }}>{tr.projectActivityEmpty}</Text>
+          <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 40 }]}>{tr.projectActivityEmpty}</Text>
         ) : (
           <>
             {mergeConsecutiveActivity(entries).map(entry => (
               <View key={entry.id} style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
                 <View style={{
-                  width: 28, height: 28, borderRadius: 14, backgroundColor: c.accent + '1F',
+                  width: 28, height: 28, borderRadius: 14, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'),
                   alignItems: 'center', justifyContent: 'center', marginTop: 2,
                 }}>
-                  <IconSymbol name={activityIcon(entry)} size={14} color={c.accent} />
+                  <IconSymbol name={activityIcon(entry)} size={14} color={c.text} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 13, lineHeight: 18 }}>{formatActivityMessage(entry, tr, activityCtx)}</Text>
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                  <Text style={[type.body, { color: c.text, fontSize: 13, lineHeight: 18 }]}>{formatActivityMessage(entry, tr, activityCtx)}</Text>
+                  <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
                     {new Date(entry.created_at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                     {' · '}
                     {new Date(entry.created_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
@@ -131,11 +134,11 @@ export default function ProjectActivityScreen() {
               <TouchableOpacity
                 onPress={loadMore}
                 disabled={loadingMore}
-                style={{ alignItems: 'center', paddingVertical: 12, marginTop: 4 }}>
+                style={{ alignItems: 'center', justifyContent: 'center', alignSelf: 'center', minHeight: 44, paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, marginTop: 4 }}>
                 {loadingMore ? (
-                  <ActivityIndicator color={c.accent} />
+                  <ActivityIndicator color={c.sub} />
                 ) : (
-                  <Text style={{ color: c.accent, fontSize: 13, fontWeight: '700' }}>{tr.projectActivityLoadMore}</Text>
+                  <Text style={{ color: tk.action.secondaryText, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.projectActivityLoadMore}</Text>
                 )}
               </TouchableOpacity>
             ) : null}

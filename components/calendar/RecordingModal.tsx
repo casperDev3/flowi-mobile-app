@@ -7,10 +7,12 @@ import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'reac
 
 import { RecordingClock } from '@/components/shared/RecordingClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Atlas } from '@/constants/atlas';
 import { useI18n } from '@/store/i18n';
 
 import type { CalendarColors } from './palette';
+import { fontFamily, radius, shadow, type } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export function RecordingModal({ visible, isRecording, startedAt, onStart, onStop, onClose, isDark, c }: {
   visible: boolean;
@@ -23,33 +25,36 @@ export function RecordingModal({ visible, isRecording, startedAt, onStart, onSto
   c: CalendarColors;
 }) {
   const { tr } = useI18n();
+  const t = dsTokens(isDark);
+  // DS v2: запис — coral (алерт/індикатор), годинник — display-цифри,
+  // обидві дії — pill action.primary (coral-тло не тримає 4.5:1 з текстом),
+  // «Стоп» вирізняє coral-іконка.
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent
       onRequestClose={() => { if (isRecording) onStop(); else onClose(); }}>
-      <Pressable accessible={false} style={st.overlay} onPress={() => { if (!isRecording) onClose(); }}>
+      <Pressable accessible={false} style={[st.overlay, { backgroundColor: t.surface.overlay }]} onPress={() => { if (!isRecording) onClose(); }}>
         <Pressable accessible={false} onPress={e => e.stopPropagation()}
           accessibilityViewIsModal importantForAccessibility="yes"
-          style={[st.card, { backgroundColor: isDark ? '#12121E' : '#FFFFFF' }]}>
-          <View style={[st.circle, { backgroundColor: isRecording ? '#EF4444' + '20' : c.dim, borderColor: isRecording ? '#EF4444' : c.border }]}>
-            <IconSymbol name={isRecording ? 'stop.fill' : 'mic.fill'} size={32} color={isRecording ? '#EF4444' : c.sub} />
+          style={[st.card, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }, shadow[isDark ? 'dark' : 'light'].popover]}>
+          <View style={[st.circle, { backgroundColor: isRecording ? t.accent.coral + '1F' : c.dim }]}>
+            <IconSymbol name={isRecording ? 'stop.fill' : 'mic.fill'} size={32} color={isRecording ? t.accent.coral : c.sub} />
           </View>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: isDark ? '#fff' : '#000', marginBottom: 6 }}>
+          <Text style={[type.h2, { fontSize: 18, color: t.text.primary, marginBottom: 6 }]}>
             {isRecording ? tr.calRecRecording : tr.calRecAudio}
           </Text>
           <RecordingClock
             startedAt={startedAt}
-            style={{ fontSize: 28, fontWeight: Atlas.type.headingWeight, color: isRecording ? '#EF4444' : c.accent,
-              letterSpacing: 2, marginBottom: 24, fontVariant: ['tabular-nums'] }}
+            style={[type.displaySm, { color: isRecording ? t.accent.coral : t.text.primary, marginBottom: 24 }]}
           />
           {isRecording ? (
-            <TouchableOpacity onPress={onStop} accessibilityRole="button" style={[st.btn, { backgroundColor: '#EF4444' }]}>
-              <IconSymbol name="stop.fill" size={16} color="#fff" />
-              <Text style={st.btnText}>{tr.calRecStop}</Text>
+            <TouchableOpacity onPress={onStop} accessibilityRole="button" style={[st.btn, { backgroundColor: t.action.primary }]}>
+              <IconSymbol name="stop.fill" size={16} color={t.accent.coral} />
+              <Text style={[st.btnText, { color: t.text.onAction }]}>{tr.calRecStop}</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={onStart} accessibilityRole="button" style={[st.btn, { backgroundColor: c.accent }]}>
-              <IconSymbol name="mic.fill" size={16} color="#fff" />
-              <Text style={st.btnText}>{tr.calRecStart}</Text>
+            <TouchableOpacity onPress={onStart} accessibilityRole="button" style={[st.btn, { backgroundColor: t.action.primary }]}>
+              <IconSymbol name="mic.fill" size={16} color={t.text.onAction} />
+              <Text style={[st.btnText, { color: t.text.onAction }]}>{tr.calRecStart}</Text>
             </TouchableOpacity>
           )}
         </Pressable>
@@ -59,9 +64,9 @@ export function RecordingModal({ visible, isRecording, startedAt, onStart, onSto
 }
 
 const st = StyleSheet.create({
-  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' },
-  card: { borderRadius: Atlas.radius.xlarge, padding: 28, alignItems: 'center', width: 280, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20 },
-  circle: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 2 },
-  btn: { borderRadius: Atlas.radius.large, paddingVertical: 14, paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  card: { borderRadius: radius.card, padding: 28, alignItems: 'center', width: 300 },
+  circle: { width: 80, height: 80, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  btn: { borderRadius: radius.pill, minHeight: 48, paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  btnText: { fontSize: 15, fontFamily: fontFamily.semibold },
 });

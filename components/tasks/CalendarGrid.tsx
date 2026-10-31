@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/CalendarGrid.tsx
  *
@@ -13,6 +12,8 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokensForText } from '@/components/tasks/dsTokensForText';
 
 /**
  * Ціль дотику 44×44 навколо стрілки 36×36 — той самий прийом, що вже стоїть
@@ -33,13 +34,14 @@ export function CalendarGrid({ year, month, markedDays, selectedDate, todayDate,
   onSelectDay: (d: Date) => void; c: any;
   months: string[]; weekdays: string[];
 }) {
+  const t = dsTokensForText(c.text);
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
         <TouchableOpacity onPress={onPrevMonth} style={st.navBtn} hitSlop={CALENDAR_NAV_HIT_SLOP}>
           <IconSymbol name="chevron.left" size={20} color={c.sub} />
         </TouchableOpacity>
-        <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontWeight: '700' }}>
+        <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
           {months[month]} {year}
         </Text>
         <TouchableOpacity onPress={onNextMonth} style={st.navBtn} hitSlop={CALENDAR_NAV_HIT_SLOP}>
@@ -48,7 +50,7 @@ export function CalendarGrid({ year, month, markedDays, selectedDate, todayDate,
       </View>
       <View style={{ flexDirection: 'row', marginBottom: 6 }}>
         {weekdays.map(d => (
-          <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
+          <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>{d}</Text>
         ))}
       </View>
       {weeks.map((week, wi) => (
@@ -65,8 +67,8 @@ export function CalendarGrid({ year, month, markedDays, selectedDate, todayDate,
                 key={di}
                 onPress={() => onSelectDay(dayDate)}
                 style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}>
-                <View style={[st.dayCell, isSel && { backgroundColor: c.accent }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }]}>
-                  <Text style={{ color: isSel ? '#fff' : isToday ? c.accent : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
+                <View style={[st.dayCell, isSel && { backgroundColor: t.action.primary }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }]}>
+                  <Text style={{ color: isSel ? t.text.onAction : isToday ? c.accent : c.text, fontSize: 13, fontVariant: ['tabular-nums'], fontFamily: isToday || isSel ? fontFamily.semibold : fontFamily.regular }}>{day}</Text>
                 </View>
                 {hasMark && !isSel && <View style={[st.daydot, { backgroundColor: c.accent }]} />}
               </TouchableOpacity>
@@ -80,6 +82,6 @@ export function CalendarGrid({ year, month, markedDays, selectedDate, todayDate,
 
 const st = StyleSheet.create({
   navBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell: { width: 32, height: 32, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  dayCell: { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   daydot:  { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
 });

@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/notifications.tsx — центр сповіщень (notifications-module.md §10.4, §11).
  *
@@ -15,7 +14,6 @@ import { Atlas } from '@/constants/atlas';
  * Екранний файл тримає лише стан і розкладку: картки, вкладка нагадувань і
  * дані центру — у `components/notifications/` та `api/notifications.ts`.
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -45,15 +43,20 @@ import { useNotificationInbox, useUnreadNotificationsCount } from '@/components/
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { INVITE_EVENT_PENDING, inviteIdFromPayload, syncMyInvites } from '@/store/invite-inbox';
 import { notificationRoute } from '@/utils/pushLink';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRimFor, glassRim } from '@/components/shared/dsTheme';
+import { AccentIcon } from '@/components/shared/GlassBits';
 
 type Tab = 'inbox' | 'reminders';
 type Filter = 'all' | 'unread';
 
-const ACCENT = '#7C3AED';
+// DS v2: глибока лаванда (акцент tasks, 5.25:1 з білим) замість легасі #7C3AED
 
 export default function NotificationsScreen() {
   const contentWidth = useContentWidth();
@@ -70,16 +73,19 @@ export default function NotificationsScreen() {
   // інакше список перемальовувався б щосекунди без жодної нової події.
   const [now, setNow] = useState(() => new Date());
 
+  const k = dsTokens(isDark);
+
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: ACCENT,
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    unreadBg: isDark ? 'rgba(124,58,237,0.10)' : 'rgba(124,58,237,0.06)',
-  }), [isDark]);
+    bg1:    k.bg.canvas,
+    bg2:    k.bg.canvas,
+    border: k.border.hairline,
+    text:   k.text.primary,
+    sub:    k.text.secondary,
+    accent: glassOf(k).accent.lavender.ink, // DS v2.1: lavender ink на склі
+    dim:    glassOf(k).surfaceSubtle,
+    unreadBg: k.accent.lavenderSoft,
+    card:   glassOf(k).surface,
+  }), [k]);
 
   const rowColors: NotificationRowColors = useMemo(() => ({
     border: c.border, text: c.text, sub: c.sub, accent: c.accent, unreadBg: c.unreadBg,
@@ -161,7 +167,7 @@ export default function NotificationsScreen() {
         onPress: () => router.back(),
         label: tr.back,
         color: c.sub,
-        style: { backgroundColor: c.dim, borderColor: c.border },
+        style: { backgroundColor: c.card, borderColor: 'transparent' },
       }}
       crumbs={[
         { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
@@ -174,14 +180,14 @@ export default function NotificationsScreen() {
             <HeaderButton
               onPress={() => { void markAllNotificationsRead(); }}
               accessibilityLabel={tr.ncMarkAllRead}
-              style={{ backgroundColor: c.dim, borderColor: c.border }}>
-              <IconSymbol name="checkmark.circle" size={17} color={c.accent} />
+              style={{ backgroundColor: c.card, borderColor: 'transparent' }}>
+              <IconSymbol name="checkmark.circle" size={17} color={c.text} />
             </HeaderButton>
           ) : null}
           <HeaderButton
             onPress={() => router.push('/settings-notifications' as never)}
             accessibilityLabel={tr.ncOpenSettings}
-            style={{ backgroundColor: c.dim, borderColor: c.border }}>
+            style={{ backgroundColor: c.card, borderColor: 'transparent' }}>
             <IconSymbol name="gearshape.fill" size={16} color={c.sub} />
           </HeaderButton>
         </View>
@@ -190,7 +196,7 @@ export default function NotificationsScreen() {
   );
 
   const tabs = (
-    <View style={[st.segment, { backgroundColor: c.dim, borderColor: c.border }]} accessibilityRole="tablist">
+    <View style={[st.segment, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]} accessibilityRole="tablist">
       {([
         { key: 'inbox' as const, label: tr.ncTabInbox, count: unread },
         { key: 'reminders' as const, label: tr.ncTabReminders, count: 0 },
@@ -203,10 +209,10 @@ export default function NotificationsScreen() {
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={option.count > 0 ? `${option.label}, ${fillTemplate(tr.ncUnreadCount, { count: option.count })}` : option.label}
-            style={[st.segmentBtn, active && { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : '#fff' }]}>
-            <Text style={[st.segmentText, { color: active ? c.text : c.sub }]}>{option.label}</Text>
+            style={[st.segmentBtn, active && { backgroundColor: k.action.primary }]}>
+            <Text style={[st.segmentText, { color: active ? k.text.onAction : c.text }]}>{option.label}</Text>
             {option.count > 0 ? (
-              <View style={[st.countPill, { backgroundColor: c.accent }]}>
+              <View style={[st.countPill, { backgroundColor: k.accent.coral }]}>
                 <Text style={st.countText}>{option.count > 99 ? '99+' : option.count}</Text>
               </View>
             ) : null}
@@ -227,12 +233,12 @@ export default function NotificationsScreen() {
     <View style={{ marginTop: 10 }}>
       {tabs}
       {banner ? (
-        <View style={[st.banner, { borderColor: c.border, backgroundColor: c.dim }]}>
+        <View style={[st.banner, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
           <IconSymbol name={banner.icon} size={16} color={c.sub} />
           <Text style={[st.bannerText, { color: c.sub }]}>{banner.text}</Text>
           {banner.retry ? (
             <TouchableOpacity onPress={onRefresh} accessibilityRole="button" style={st.retryBtn}>
-              <Text style={{ color: c.accent, fontWeight: '700', fontSize: 13 }}>{tr.ncRetry}</Text>
+              <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 13, textDecorationLine: 'underline' }}>{tr.ncRetry}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -249,8 +255,8 @@ export default function NotificationsScreen() {
               onPress={() => setFilter(option.key)}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
-              style={[st.chip, { borderColor: active ? c.accent : c.border, backgroundColor: active ? c.accent + '1F' : 'transparent' }]}>
-              <Text style={{ color: active ? c.accent : c.sub, fontSize: 13, fontWeight: '700' }}>{option.label}</Text>
+              style={[st.chip, { backgroundColor: active ? k.action.primary : c.card }]}>
+              <Text style={{ color: active ? k.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{option.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -261,14 +267,12 @@ export default function NotificationsScreen() {
 
   const inboxEmpty = inbox.status === 'loading' && !inbox.items.length ? (
     <View style={{ paddingVertical: 48, alignItems: 'center' }}>
-      <ActivityIndicator color={c.accent} />
+      <ActivityIndicator color={c.sub} />
     </View>
   ) : (
     <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: 12 }}>
-      <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
-        <IconSymbol name={filter === 'unread' ? 'checkmark.circle' : 'bell'} size={32} color={c.accent} />
-      </View>
-      <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontWeight: '700', textAlign: 'center' }}>
+      <AccentIcon isDark={isDark} icon={filter === 'unread' ? 'checkmark.circle' : 'bell'} accent="lavender" size="lg" style={st.emptyIcon} />
+      <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontFamily: fontFamily.semibold, textAlign: 'center' }}>
         {filter === 'unread' ? tr.ncEmptyUnreadTitle : tr.ncEmptyTitle}
       </Text>
       {filter === 'all' ? (
@@ -282,17 +286,17 @@ export default function NotificationsScreen() {
       onPress={() => { void loadMoreInbox(); }}
       disabled={inbox.loadingMore}
       accessibilityRole="button"
-      style={[st.moreBtn, { borderColor: c.border }]}>
+      style={[st.moreBtn, { backgroundColor: glassOf(k).surfaceSubtle, ...glassRim(k, 'subtle') }]}>
       {inbox.loadingMore
-        ? <ActivityIndicator color={c.accent} />
-        : <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.ncLoadMore}</Text>}
+        ? <ActivityIndicator color={c.sub} />
+        : <Text style={{ color: k.action.secondaryText, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.ncLoadMore}</Text>}
     </TouchableOpacity>
   ) : null;
 
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <View style={contentWidth}>{header}</View>
       {tab === 'inbox' ? (
         <FlatList
@@ -302,7 +306,7 @@ export default function NotificationsScreen() {
           ListHeaderComponent={inboxHeader}
           ListEmptyComponent={inboxEmpty}
           ListFooterComponent={inboxFooter}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}
           onEndReachedThreshold={0.4}
           onEndReached={() => { if (filter === 'all') void loadMoreInbox(); }}
           style={{ flex: 1 }}
@@ -322,18 +326,18 @@ export default function NotificationsScreen() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:   { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
-  segment:     { flexDirection: 'row', borderRadius: Atlas.radius.large, borderWidth: 1, padding: 3, marginBottom: 12 },
-  segmentBtn:  { flex: 1, minHeight: 40, borderRadius: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  segmentText: { fontSize: 14, fontWeight: '700' },
+  pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
+  segment:     { flexDirection: 'row', borderRadius: 999, padding: 4, marginBottom: 12 },
+  segmentBtn:  { flex: 1, minHeight: 40, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  segmentText: { fontSize: 14, fontFamily: fontFamily.semibold },
   countPill:   { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
-  countText:   { color: '#fff', fontSize: 11, fontWeight: Atlas.type.headingWeight },
+  countText:   { color: '#fff', fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   filterRow:   { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  chip:        { minHeight: 36, paddingHorizontal: 14, borderRadius: Atlas.radius.xlarge, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  banner:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Atlas.radius.large, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
+  chip:        { minHeight: 36, paddingHorizontal: 16, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  banner:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 12 },
   bannerText:  { flex: 1, fontSize: 13, lineHeight: 18 },
   retryBtn:    { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
   hint:        { fontSize: 12, marginBottom: 10, marginHorizontal: 2 },
-  emptyIcon:   { width: 72, height: 72, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
-  moreBtn:     { minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  emptyIcon:   { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  moreBtn:     { minHeight: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
 });

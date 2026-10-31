@@ -1,5 +1,4 @@
 import {isProjectWork} from '@/utils/projectBacklog';
-import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/tasks.tsx — Завдання простору проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §3: «Завдання (Дошка / Список / Календар /
@@ -63,7 +62,6 @@ import { useUndoToast } from '@/components/shared/UndoToast';
 import { TaskQuickCreate } from '@/components/tasks/card/TaskQuickCreate';
 import { TASK_CARD_SHEET_RATIO } from '@/components/tasks/card/primitives';
 import { TasksHeaderMenu, TasksMenuButton, type TasksMenuItem } from '@/components/tasks/TasksHeaderMenu';
-import { BlurView } from 'expo-blur';
 import { ActionButton } from '@/components/shared/ActionBar';
 import { useTaskEditor } from '@/hooks/use-task-editor';
 import { useToday } from '@/hooks/use-today';
@@ -120,6 +118,9 @@ import {
 } from '@/utils/taskUtils';
 import { type Sprint } from '@/utils/sprintUtils';
 import { limitBoardColumn } from '@/utils/taskGroupLimit';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 type ViewMode = 'list' | 'board' | 'calendar' | 'timeline';
 
@@ -243,6 +244,8 @@ export default function ProjectTasksScreen() {
   }, [projectId, loadAll]);
 
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
+  // DS v2: поверхні карток/шторок — з токенів, а не з палітри оболонки.
+  const t = dsTokens(isDark);
 
   const ownTasks = useMemo(
     () => (projectId ? projectDetailTasks(tasks, sprints, projectId) : []),
@@ -647,7 +650,7 @@ export default function ProjectTasksScreen() {
   }, [tr, trackWrite, stopTimerForTask, showToast]);
 
   const selectedTask = selectedId ? tasks.find(t => t.id === selectedId) ?? null : null;
-  const cardColors = { ...c, sheet: isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)' };
+  const cardColors = { ...c, sheet: glassOf(t).sheet };
   const card = useProjectTaskCard({
     task: selectedTask,
     projectId: projectId ?? '',
@@ -707,8 +710,8 @@ export default function ProjectTasksScreen() {
       separatorBefore: index === 0,
     })) : []),
     { key: 'mine', icon: 'person.fill', label: tr.projectTasksMine, checked: mineOnly, onPress: () => setMineOnly(v => !v), separatorBefore: true },
-    { key: 'calendar', icon: 'calendar', label: tr.calendar, color: '#6366F1', onPress: () => router.push(projectRoute(projectId, 'calendar') as never), separatorBefore: true },
-    { key: 'archive', icon: 'archivebox', label: tr.projectArchive, color: '#10B981', onPress: () => router.push(projectRoute(projectId, 'archive') as never) },
+    { key: 'calendar', icon: 'calendar', label: tr.calendar, color: t.status.info, onPress: () => router.push(projectRoute(projectId, 'calendar') as never), separatorBefore: true },
+    { key: 'archive', icon: 'archivebox', label: tr.projectArchive, color: t.status.success, onPress: () => router.push(projectRoute(projectId, 'archive') as never) },
   ];
   const menuActive = mineOnly || groupBy !== 'none' || view !== 'list';
 
@@ -732,16 +735,16 @@ export default function ProjectTasksScreen() {
         // Пошук — під заголовком, нерухомо над списком (як фільтр-рядок
         // особистих Завдань на планшеті). «Лише мої» видно чипом, поки увімкнено.
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={[st.search, { borderColor: c.border, backgroundColor: c.dim }]}>
+          <View style={[st.search, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
             <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
             <TextInput
               accessibilityLabel={tr.projectTasksSearch}
               placeholder={tr.projectTasksSearch}
-              placeholderTextColor={c.sub}
+              placeholderTextColor={t.text.muted}
               value={query}
               onChangeText={setQuery}
               returnKeyType="search"
-              style={{ flex: 1, color: c.text, fontSize: 15, paddingVertical: 0 }}
+              style={{ flex: 1, color: c.text, fontSize: 15, fontFamily: fontFamily.regular, paddingVertical: 0 }}
             />
             {query ? (
               <TouchableOpacity onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel={tr.clear} style={st.clearBtn}>
@@ -754,9 +757,9 @@ export default function ProjectTasksScreen() {
               onPress={() => setMineOnly(false)}
               accessibilityRole="button"
               accessibilityLabel={`${tr.projectTasksMine}. ${tr.resetFilter}`}
-              style={[st.mineChip, { borderColor: c.accent, backgroundColor: c.accent + '18' }]}>
-              <IconSymbol name="person.fill" size={12} color={c.accent} />
-              <IconSymbol name="xmark" size={10} color={c.accent} />
+              style={[st.mineChip, { backgroundColor: t.action.primary }]}>
+              <IconSymbol name="person.fill" size={12} color={t.text.onAction} />
+              <IconSymbol name="xmark" size={10} color={t.text.onAction} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -765,7 +768,7 @@ export default function ProjectTasksScreen() {
         open={!!selectedTask}
         onClose={() => setSelectedId(null)}
         isDark={isDark}
-        sheetColor={isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)'}
+        sheetColor={glassOf(t).sheet}
         borderColor={c.border}
         maxHeight={windowHeight * 0.88}
         // Стала висота картки на телефоні — вкладки не смикають лист (P2).
@@ -836,8 +839,8 @@ export default function ProjectTasksScreen() {
                 {listGroups.map(group => (
                   <View key={group.key}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                      <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{group.label}</Text>
-                      <Text style={{ color: c.sub, fontSize: 11 }}>{group.tasks.length}</Text>
+                      <Text style={[type.h2, { color: c.text }]}>{group.label}</Text>
+                      <Text style={[type.caption, type.numeric, { color: c.sub }]}>{group.tasks.length}</Text>
                     </View>
                     <View style={{ gap: 8 }}>
                       {group.tasks.map(task => (
@@ -862,7 +865,7 @@ export default function ProjectTasksScreen() {
                       {/* Порожня секція — лише підказка, не кнопка: створення
                           має одну точку на екрані (кнопка «Додати задачу»). */}
                       {group.tasks.length === 0 && (
-                        <Text style={[st.emptyHint, { color: c.sub, borderColor: c.border }]}>{tr.projectNoTasksInGroup}</Text>
+                        <Text style={[st.emptyHint, { color: c.sub, backgroundColor: glassOf(t).surfaceSubtle }]}>{tr.projectNoTasksInGroup}</Text>
                       )}
                     </View>
                   </View>
@@ -886,15 +889,15 @@ export default function ProjectTasksScreen() {
                 boardNow,
               ).visible.slice(0,5);
               return (
-                <View key={col.id} style={[st.boardColumn, { borderColor: c.border, backgroundColor: c.dim }]}>
+                <View key={col.id} style={[st.boardColumn, { backgroundColor: isDark ? glassOf(t).surfaceSubtle : t.border.hairline }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: col.color }} />
-                    <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '700' }}>{col.name}</Text>
-                    <Text style={{ color: c.sub, fontSize: 11 }}>{colTasks.length}</Text>
+                    <Text numberOfLines={1} style={[type.h2, { flex: 1, color: c.text, fontSize: 14 }]}>{col.name}</Text>
+                    <Text style={[type.caption, type.numeric, { color: c.sub }]}>{colTasks.length}</Text>
                   </View>
                   {filtered.filter(t => boardColumnForTask(t, boardColumns, columns)?.id === col.id).length > 5 && (
                     <TouchableOpacity accessibilityRole="button" onPress={() => setView('list')} style={{ minHeight: 44, justifyContent: 'center' }}>
-                      <Text style={{ color: c.accent, fontWeight: '600' }}>{tr.projectBoardShowAll}</Text>
+                      <Text style={{ color: c.text, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>{tr.projectBoardShowAll}</Text>
                     </TouchableOpacity>
                   )}
                   {colTasks.map(task => (
@@ -921,7 +924,7 @@ export default function ProjectTasksScreen() {
                   {/* Порожня колонка — простий текст-підказка (рішення власника,
                       п. 3): створення має одну точку на екрані. */}
                   {colTasks.length === 0 && (
-                    <Text style={[st.emptyHint, { color: c.sub, borderColor: c.border }]}>{tr.projectNoTasksInGroup}</Text>
+                    <Text style={[st.emptyHint, { color: c.sub, backgroundColor: glassOf(t).surfaceSubtle }]}>{tr.projectNoTasksInGroup}</Text>
                   )}
                 </View>
               );
@@ -946,16 +949,16 @@ export default function ProjectTasksScreen() {
               <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 24 }}>{tr.projectNoTasks}</Text>
             ) : calendarGroups.map(group => (
               <View key={group.key} style={{ marginTop: 14 }}>
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{group.label}</Text>
+                <Text style={[type.caption, { color: c.sub, fontFamily: fontFamily.semibold, marginBottom: 6 }]}>{group.label}</Text>
                 {group.meetings.map(meeting => (
                   <TouchableOpacity
                     key={meeting.id}
                     onPress={() => router.push({ pathname: '/project/[id]/calendar', params: { id: projectId, open: meeting._origId ?? meeting.id } } as never)}
                     activeOpacity={0.75}
-                    style={[st.meetingRow, { borderColor: c.border, marginBottom: 6 }]}>
-                    <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: meeting.color }} />
-                    <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '600' }}>{meeting.title}</Text>
-                    {meeting.time ? <Text style={{ color: c.sub, fontSize: 11 }}>{meeting.time}</Text> : null}
+                    style={[st.meetingRow, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card'), marginBottom: 6 }]}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: meeting.color }} />
+                    <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{meeting.title}</Text>
+                    {meeting.time ? <Text style={[type.caption, type.numeric, { color: c.sub }]}>{meeting.time}</Text> : null}
                     <IconSymbol name="calendar" size={13} color={c.sub} />
                   </TouchableOpacity>
                 ))}
@@ -995,7 +998,7 @@ export default function ProjectTasksScreen() {
                   коментар угорі файлу); дати також редагуються текстом у
                   рядку під графіком (усі розміри екрана). */}
               {ganttChart ? (
-                <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginBottom: 6 }}>
+                <View style={{ borderRadius: radius.cardCompact, backgroundColor: glassOf(t).surface, ...glassRim(t, 'card'), padding: 16, marginBottom: 6 }}>
                   <ProjectGantt
                     chart={ganttChart}
                     wide={isWide}
@@ -1024,25 +1027,25 @@ export default function ProjectTasksScreen() {
                       }) : undefined}
                       accessibilityRole="button"
                       accessibilityLabel={task.title}
-                      style={[st.timelineRow, { borderColor: c.border }]}>
-                      <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '600' }}>{task.title}</Text>
+                      style={[st.timelineRow, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+                      <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{task.title}</Text>
                       <IconSymbol name="calendar" size={14} color={c.sub} />
                     </TouchableOpacity>
                     {editing ? (
-                      <View style={[st.dateEditRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+                      <View style={[st.dateEditRow, { backgroundColor: c.dim }]}>
                         <TextInput
                           placeholder={tr.dateInputFormatHint}
-                          placeholderTextColor={c.sub}
+                          placeholderTextColor={t.text.muted}
                           value={editingDates.start}
                           onChangeText={v => setEditingDates(prev => (prev ? { ...prev, start: v } : prev))}
-                          style={[st.dateInput, { color: c.text, borderColor: c.border }]}
+                          style={[st.dateInput, { color: c.text, backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}
                         />
                         <TextInput
                           placeholder={tr.dateInputFormatHint}
-                          placeholderTextColor={c.sub}
+                          placeholderTextColor={t.text.muted}
                           value={editingDates.deadline}
                           onChangeText={v => setEditingDates(prev => (prev ? { ...prev, deadline: v } : prev))}
-                          style={[st.dateInput, { color: c.text, borderColor: c.border }]}
+                          style={[st.dateInput, { color: c.text, backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}
                         />
                         <ActionButton label={tr.save} tone="primary" onPress={saveDates} colors={c} />
                       </View>
@@ -1065,10 +1068,7 @@ export default function ProjectTasksScreen() {
 
       {/* Швидке створення — та сама коротка форма, що в особистих Завданнях. */}
       <SheetModal visible={showAdd} onClose={() => setShowAdd(false)} handle="inside">
-        <BlurView
-          intensity={isDark ? 50 : 70}
-          tint={isDark ? 'dark' : 'light'}
-          style={[st.quickSheet, { maxHeight: windowHeight * 0.88, borderColor: c.border, backgroundColor: cardColors.sheet }]}>
+        <View style={[st.quickSheet, { maxHeight: windowHeight * 0.88, backgroundColor: cardColors.sheet }]}>
           <SheetHandle />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <TaskQuickCreate
@@ -1085,7 +1085,7 @@ export default function ProjectTasksScreen() {
               locale={locale}
             />
           </ScrollView>
-        </BlurView>
+        </View>
       </SheetModal>
 
       {toastElement}
@@ -1094,14 +1094,14 @@ export default function ProjectTasksScreen() {
 }
 
 const st = StyleSheet.create({
-  search: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: Atlas.radius.medium, paddingLeft: 12 },
+  search: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.pill, paddingLeft: 16 },
   clearBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  mineChip: { minWidth: 44, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 10 },
-  quickSheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  boardColumn: { width: 240, borderRadius: Atlas.radius.large, borderWidth: 1, padding: 10 },
-  timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10 },
-  meetingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 9 },
-  dateEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 8, marginTop: 6 },
-  dateInput: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12 },
-  emptyHint: { fontSize: 12, textAlign: 'center', borderWidth: 1, borderStyle: 'dashed', borderRadius: Atlas.radius.medium, paddingVertical: 18, paddingHorizontal: 10 },
+  mineChip: { minWidth: 44, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 12 },
+  quickSheet: { borderRadius: radius.card, padding: 24, overflow: 'hidden' },
+  boardColumn: { width: 260, borderRadius: radius.cardCompact, padding: 12 },
+  timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nested, padding: 12 },
+  meetingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44 },
+  dateEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nested, padding: 8, marginTop: 6 },
+  dateInput: { flex: 1, minHeight: 44, borderRadius: radius.control, paddingHorizontal: 12, paddingVertical: 6, fontSize: 13, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] },
+  emptyHint: { fontSize: 12, fontFamily: fontFamily.regular, textAlign: 'center', borderRadius: radius.nested, overflow: 'hidden', paddingVertical: 18, paddingHorizontal: 12 },
 });

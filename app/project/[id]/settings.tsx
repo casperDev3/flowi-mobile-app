@@ -1,5 +1,4 @@
 import {ProjectAppearanceForm} from '@/components/projects/ProjectAppearanceForm';
-import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/settings.tsx — Налаштування проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §3: «Налаштування (назва/колір/опис, увімкнені
@@ -11,7 +10,7 @@ import { Atlas } from '@/constants/atlas';
  */
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -35,6 +34,9 @@ import {
   applyColumnDoneChangeToTasks, mergeTaskStatusColumns, newProjectStatusId, seedProjectStatusColumns,
   type StatusType, type TaskStatusColumn,
 } from '@/utils/taskStatuses';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 /** Дебаунс запису назви статусу (мс) — див. коментар над `changeStatusName`. */
 const STATUS_NAME_COMMIT_DELAY = 500;
@@ -61,6 +63,9 @@ export default function ProjectSettingsScreen() {
   const role = useProjectRole(projectId);
   const { stopTimerForTask } = useTimerContext();
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
+  const tk = dsTokens(isDark);
+  // DS v2: поле вводу — subtle-тло без рамки.
+  const inputBase = { borderRadius: radius.control, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), paddingHorizontal: 14, paddingVertical: 10, color: c.text, fontFamily: fontFamily.regular } as const;
 
   const [name, setName] = useState('');
   const [color, setColor] = useState(PROJECT_COLORS[0]);
@@ -294,15 +299,15 @@ export default function ProjectSettingsScreen() {
 
         {/* Назва/колір/опис/термін */}
         {project&&<ProjectAppearanceForm key={project.id} project={project} canEdit={role==='owner'} textColor={c.text}/>}
-        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>{tr.projectSettingsInfo}</Text>
+        <Text style={[type.h2, { color: c.text, marginBottom: 8 }]}>{tr.projectSettingsInfo}</Text>
         <TextInput
           value={name}
           onChangeText={v => { setName(v); setDirty(true); }}
           editable={isOwner}
           placeholder={tr.projectNamePlaceholder}
           accessibilityLabel={tr.projectNamePlaceholder}
-          placeholderTextColor={c.sub}
-          style={{ borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 10 }}
+          placeholderTextColor={tk.text.muted}
+          style={[inputBase, { minHeight: 44, fontSize: 15, fontFamily: fontFamily.semibold, marginBottom: 10 }]}
         />
         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           {PROJECT_COLORS.map(clr => (
@@ -320,25 +325,25 @@ export default function ProjectSettingsScreen() {
           editable={isOwner}
           placeholder={tr.projectDescriptionPlaceholder}
           accessibilityLabel={tr.projectDescriptionPlaceholder}
-          placeholderTextColor={c.sub}
+          placeholderTextColor={tk.text.muted}
           multiline
-          style={{ borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 13, minHeight: 60, marginBottom: 10 }}
+          style={[inputBase, { fontSize: 14, minHeight: 60, marginBottom: 10 }]}
         />
         <TextInput
           value={deadline}
           onChangeText={v => { setDeadline(v); setDirty(true); }}
           editable={isOwner}
           placeholder="YYYY-MM-DD"
-          placeholderTextColor={c.sub}
-          style={{ borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 13, marginBottom: 12 }}
+          placeholderTextColor={tk.text.muted}
+          style={[inputBase, { minHeight: 44, fontSize: 14, fontVariant: ['tabular-nums'], marginBottom: 12 }]}
         />
         {isOwner && dirty ? (
-          <TouchableOpacity onPress={saveInfo} disabled={!name.trim()} style={{ backgroundColor: c.accent, borderRadius: Atlas.radius.medium, paddingVertical: 11, alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+          <TouchableOpacity onPress={saveInfo} disabled={!name.trim()} style={{ backgroundColor: name.trim() ? tk.action.primary : tk.state.disabledBg, borderRadius: radius.pill, minHeight: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+            <Text style={{ color: name.trim() ? tk.text.onAction : tk.state.disabledText, fontFamily: fontFamily.semibold, fontSize: 15 }}>{tr.save}</Text>
           </TouchableOpacity>
         ) : <View style={{ marginBottom: 12 }} />}
 
-        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 6 }}>
+        <Text style={[type.caption, { color: c.sub, marginBottom: 6 }]}>
           {tr.projectTemplateLabel}: {project?.template === 'simple' ? tr.projectTemplateSimple : tr.projectTemplateWork}
         </Text>
 
@@ -348,9 +353,9 @@ export default function ProjectSettingsScreen() {
           <TouchableOpacity
             onPress={() => router.push(`/project/${encodeURIComponent(projectId)}/members` as never)}
             accessibilityRole="button"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginTop: 4, marginBottom: 20 }}>
-            <IconSymbol name="person.2.fill" size={17} color={c.accent} />
-            <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{tr.projectSettingsMembersRow}</Text>
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), minHeight: 52, paddingHorizontal: 16, marginTop: 4, marginBottom: 12 }}>
+            <IconSymbol name="person.2.fill" size={17} color={c.sub} />
+            <Text style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.projectSettingsMembersRow}</Text>
             <IconSymbol name="chevron.right" size={14} color={c.sub} />
           </TouchableOpacity>
         ) : null}
@@ -360,9 +365,9 @@ export default function ProjectSettingsScreen() {
           <TouchableOpacity
             onPress={() => router.push(`/project/${encodeURIComponent(projectId)}/activity` as never)}
             accessibilityRole="button"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginBottom: 20 }}>
-            <IconSymbol name="clock.arrow.circlepath" size={17} color={c.accent} />
-            <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{tr.projectActivityTitle}</Text>
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), minHeight: 52, paddingHorizontal: 16, marginBottom: 20 }}>
+            <IconSymbol name="clock.arrow.circlepath" size={17} color={c.sub} />
+            <Text style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.projectActivityTitle}</Text>
             <IconSymbol name="chevron.right" size={14} color={c.sub} />
           </TouchableOpacity>
         ) : null}
@@ -370,12 +375,12 @@ export default function ProjectSettingsScreen() {
         {/* Розділи */}
         {(isOwner || role === 'manager') && (
           <>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginTop: 16, marginBottom: 6 }}>{tr.projectSettingsModules}</Text>
-            <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, marginBottom: 20 }}>
+            <Text style={[type.h2, { color: c.text, marginTop: 16, marginBottom: 8 }]}>{tr.projectSettingsModules}</Text>
+            <View style={{ borderRadius: radius.cardCompact, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 20, overflow: 'hidden' }}>
               {MODULE_ROWS.map((row, i) => (
-                <View key={row.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderBottomWidth: i < MODULE_ROWS.length - 1 ? 1 : 0, borderBottomColor: c.border }}>
-                  <IconSymbol name={row.icon} size={17} color={c.accent} />
-                  <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{String(tr[row.labelKey])}</Text>
+                <View key={row.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: i < MODULE_ROWS.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: c.border }}>
+                  <IconSymbol name={row.icon} size={17} color={c.sub} />
+                  <Text style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{String(tr[row.labelKey])}</Text>
                   <Switch
                     value={modules[row.key]}
                     onValueChange={() => toggleModule(row.key)}
@@ -384,9 +389,9 @@ export default function ProjectSettingsScreen() {
                     // «увімкнено, перемикач» без назви розділу. Ім'я беремо
                     // з того самого джерела, що й видимий підпис.
                     accessibilityLabel={String(tr[row.labelKey])}
-                    trackColor={{ false: 'rgba(128,128,128,0.3)', true: c.accent }}
-                    thumbColor="#fff"
-                    ios_backgroundColor="rgba(128,128,128,0.3)"
+                    trackColor={{ false: tk.text.muted, true: tk.action.primary }}
+                    thumbColor={modules[row.key] ? tk.text.onAction : '#FFFFFF'}
+                    ios_backgroundColor={tk.text.muted}
                   />
                 </View>
               ))}
@@ -398,19 +403,19 @@ export default function ProjectSettingsScreen() {
         {(isOwner || role === "manager") && (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 6 }}>
-              <Text style={{ flex: 1, color: c.sub, fontSize: 11, fontWeight: '700' }}>{tr.projectSettingsStatuses}</Text>
+              <Text style={[type.h2, { flex: 1, color: c.text }]}>{tr.projectSettingsStatuses}</Text>
               <TouchableOpacity onPress={addStatus} accessibilityRole="button" accessibilityLabel={tr.projectStatusAdd}>
-                <IconSymbol name="plus" size={16} color={c.accent} />
+                <IconSymbol name="plus" size={16} color={c.text} />
               </TouchableOpacity>
             </View>
             {scopedColumns.length === 0 ? (
-              <TouchableOpacity onPress={seedStatuses} style={{ borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.accent, borderStyle: 'dashed', padding: 14, alignItems: 'center', marginBottom: 20 }}>
-                <Text style={{ color: c.accent, fontWeight: '700', fontSize: 13 }}>{tr.projectStatusSeed}</Text>
+              <TouchableOpacity onPress={seedStatuses} style={{ borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, minHeight: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={{ color: tk.action.secondaryText, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.projectStatusSeed}</Text>
               </TouchableOpacity>
             ) : (
               <View style={{ marginBottom: 20 }}>
                 {scopedColumns.map((col, i) => (
-                  <View key={col.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 10, marginBottom: 6 }}>
+                  <View key={col.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 12, marginBottom: 8 }}>
                     <View style={{ flexDirection: 'row', gap: 3 }}>
                       <TouchableOpacity disabled={i === 0} onPress={() => move(col, -1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
                         <IconSymbol name="chevron.up" size={13} color={i === 0 ? c.border : c.sub} />
@@ -426,10 +431,10 @@ export default function ProjectSettingsScreen() {
                     <TextInput
                       value={nameDrafts[col.id] ?? col.name}
                       onChangeText={v => changeStatusName(col.id, v)}
-                      style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '600' }}
+                      style={{ flex: 1, color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}
                     />
-                    <TouchableOpacity onPress={() => cycleType(col)} style={{ borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: c.border, paddingHorizontal: 8, paddingVertical: 4 }}>
-                      <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700' }}>{typeLabel(col.type ?? 'todo')}</Text>
+                    <TouchableOpacity onPress={() => cycleType(col)} style={{ borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, paddingHorizontal: 10, paddingVertical: 4 }}>
+                      <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.medium }}>{typeLabel(col.type ?? 'todo')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       disabled={scopedColumns.length <= 1}
@@ -437,7 +442,7 @@ export default function ProjectSettingsScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={tr.delete}
                       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-                      <IconSymbol name="trash" size={14} color={scopedColumns.length <= 1 ? c.border : '#EF4444'} />
+                      <IconSymbol name="trash" size={14} color={scopedColumns.length <= 1 ? tk.state.disabledText : tk.status.danger} />
                     </TouchableOpacity>
                   </View>
                 ))}

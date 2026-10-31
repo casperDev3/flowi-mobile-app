@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/TimeEntrySheet.tsx — ручний запис часу: створення І правка.
  *
@@ -22,16 +21,17 @@ import { Atlas } from '@/constants/atlas';
  * пишемо.
  */
 
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { TimeEntryForm, type TimeEntryFormProject } from '@/components/time/TimeEntryForm';
 import type { TimeColors } from '@/components/time/TimePalette';
+import { radius, shadow, space } from '@/constants/theme';
 import type { Translations } from '@/store/translations';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import type { TaskProjects, TimeRecord } from '@/utils/timeEntries';
 import type { EditableTask } from '@/utils/timeEntryEdit';
+import { GlassBackdrop } from '@/components/ds';
 
 export type TimeEntrySheetProject = TimeEntryFormProject;
 
@@ -74,14 +74,12 @@ export function TimeEntrySheet({
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <Pressable accessible={false} style={s.overlay} onPress={onClose}>
+        <Pressable accessible={false} style={[s.overlay, { backgroundColor: c.t.surface.overlay }]} onPress={onClose}>
           <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
-            <BlurView
-              intensity={isDark ? 50 : 70}
-              tint={isDark ? 'dark' : 'light'}
-              style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+            <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+              <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <View style={[s.handle, { backgroundColor: c.border }]} />
+                <View style={[s.handle, { backgroundColor: c.t.text.muted }]} />
                 <TimeEntryForm
                   active={visible}
                   entry={entry}
@@ -95,7 +93,7 @@ export function TimeEntrySheet({
                   onSubmit={onSubmit}
                 />
               </ScrollView>
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -104,8 +102,8 @@ export function TimeEntrySheet({
 }
 
 const s = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet: { borderRadius: radius.card, padding: space.cardPaddingCompact, overflow: 'hidden' },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
 });

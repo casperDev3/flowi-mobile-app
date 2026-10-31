@@ -1,24 +1,46 @@
 /**
- * components/training/theme.ts — палітра модуля тренувань
- * (training-module.md §10.1): акцент `#0EA5E9` (той самий, що в
- * app/workouts.tsx), фони `#0C0C14 / #14121E` dark · `#F4F2FF / #EAE6FF` light.
+ * components/training/theme.ts — палітра модуля тренувань на токенах
+ * Design System v2 (docs/design-system-v2.md).
+ *
+ * Фон — `bg.canvas`, картки — суцільний `surface.card`, поля й чипи —
+ * `surface.subtle`, текст — `text.primary/secondary`. Акцент модуля
+ * (`TG_ACCENT`) лишився лише для іконок, бейджів і даних; головні дії —
+ * pill `action.primary` (див. PrimaryButton у TrainingBits).
+ *
+ * DS v2.1 (Liquid Glass): bg1/bg2 — основа mesh (<MeshBackground/>), card —
+ * скло glass.surface (rgba; альфу НЕ дописувати), input/chip — скло subtle.
+ * Акцент модуля — success (moduleAccent.training): `accent` — ink (текст/
+ * іконки на склі), `accentTint` — змивка для icon-chip / KPI / активного стану.
  */
 import { useMemo } from 'react';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { glass, theme, type DSTheme, type GlassTokens } from '@/constants/theme';
+import { glassStyles, type GlassStyles } from '@/components/finance/finPalette';
+import { useDS } from '@/hooks/use-ds';
 
-export const TG_ACCENT = '#0EA5E9';
-export const TG_XP = '#F59E0B';
-export const TG_OK = '#10B981';
-export const TG_WARN = '#F59E0B';
-export const TG_ERR = '#EF4444';
+/** Акцент модуля — status.info: тримає білий підпис і читається в обох темах. */
+export const TG_ACCENT = theme.light.status.info;
+/** XP / бонуси — бурштин (прогрес, gauge). */
+export const TG_XP = theme.light.accent.amber;
+export const TG_OK = theme.light.status.success;
+export const TG_WARN = theme.light.status.warning;
+export const TG_ERR = theme.light.status.danger;
 
 export interface TrainingColors {
   isDark: boolean;
+  /** Токени DS v2 поточної теми — для action/accent/state. */
+  t: DSTheme;
+  /** Токени Liquid Glass. */
+  g: GlassTokens;
+  /** Стилі скла (fill + rim). */
+  gl: GlassStyles;
+  accent: string;
+  accentTint: string;
   bg1: string;
   bg2: string;
   text: string;
   sub: string;
+  /** Лише placeholder / декоративні іконки (text.muted, < 4.5:1). */
   faint: string;
   border: string;
   card: string;
@@ -27,23 +49,32 @@ export interface TrainingColors {
   blurTint: 'dark' | 'light';
 }
 
-export function makeTrainingColors(isDark: boolean): TrainingColors {
-  return isDark
-    ? {
-      isDark, bg1: '#0C0C14', bg2: '#14121E', text: '#F5F3FF', sub: 'rgba(245,243,255,0.66)',
-      faint: 'rgba(245,243,255,0.4)', border: 'rgba(255,255,255,0.1)', card: 'rgba(255,255,255,0.05)',
-      input: 'rgba(255,255,255,0.07)', chip: 'rgba(255,255,255,0.08)', blurTint: 'dark',
-    }
-    : {
-      isDark, bg1: '#F4F2FF', bg2: '#EAE6FF', text: '#1C1830', sub: 'rgba(28,24,48,0.66)',
-      faint: 'rgba(28,24,48,0.42)', border: 'rgba(28,24,48,0.1)', card: 'rgba(255,255,255,0.6)',
-      input: 'rgba(28,24,48,0.05)', chip: 'rgba(28,24,48,0.06)', blurTint: 'light',
-    };
+export function makeTrainingColors(isDark: boolean, reduceTransparency = false): TrainingColors {
+  const t = isDark ? theme.dark : theme.light;
+  const g = isDark ? glass.dark : glass.light;
+  return {
+    isDark,
+    t,
+    g,
+    gl: glassStyles(isDark, reduceTransparency),
+    accent: g.accent.success.ink,
+    accentTint: g.accent.success.tint,
+    bg1: g.mesh.base,
+    bg2: g.mesh.base,
+    text: t.text.primary,
+    sub: t.text.secondary,
+    faint: t.text.muted,
+    border: t.border.hairline,
+    card: reduceTransparency ? g.solid.card : g.surface,
+    input: g.surfaceSubtle,
+    chip: g.surfaceSubtle,
+    blurTint: isDark ? 'dark' : 'light',
+  };
 }
 
 export function useTrainingColors(): TrainingColors {
-  const isDark = useColorScheme() === 'dark';
-  return useMemo(() => makeTrainingColors(isDark), [isDark]);
+  const { isDark, reduceTransparency } = useDS();
+  return useMemo(() => makeTrainingColors(isDark, reduceTransparency), [isDark, reduceTransparency]);
 }
 
 /** Підстановка `{name}` у рядки словника. */

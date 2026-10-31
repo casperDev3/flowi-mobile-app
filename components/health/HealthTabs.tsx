@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/health/HealthTabs.tsx — вкладки розділу «Здоровʼя».
  *
@@ -21,8 +20,10 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { Layout } from '@/constants/tokens';
+import { fontFamily, glass, theme } from '@/constants/theme';
+import { dsTokensFor } from '@/components/health/palette';
 import type { Translations } from '@/store/translations';
-import { ACCENT, type HealthColors } from '@/utils/healthTheme';
+import { type HealthColors } from '@/utils/healthTheme';
 
 /** Порядок вкладок — він же порядок у смузі. */
 export const HEALTH_TABS = ['overview', 'nutrition', 'activity', 'sleep', 'body', 'prevention'] as const;
@@ -115,13 +116,19 @@ export interface HealthTabBarProps {
 }
 
 /**
- * Смуга вкладок: контурні «пігулки», активна — зеленим акцентом розділу.
+ * Смуга вкладок: pill-чипи DS v2.1 (скло subtle), активна — скляна pill з
+ * коралом (змивка + обідок + іконка coral.ink);
+ * бейдж справ — коралом (алерт).
  *
  * На телефоні скролиться горизонтально, а не тисне шість підписів у ширину
  * екрана. На планшеті — один ряд без прокрутки.
  */
 export function HealthTabBar({ value, onChange, tr, c, preventionBadge = 0, layout }: HealthTabBarProps) {
   const lay = layout ?? { scroll: true, showIcons: true, tabWidth: 0 };
+  const k = dsTokensFor(c);
+  // DS v2.1: активна вкладка — скляна pill з коралом (акцент модуля «Здоровʼя»):
+  // змивка coral.tint + обідок і іконка coral.ink; підпис лишається text.primary.
+  const coral = glass[k === theme.dark ? 'dark' : 'light'].accent.coral;
   const tabs = HEALTH_TAB_META.map(meta => {
     const active = meta.id === value;
     const badge = meta.id === 'prevention' ? preventionBadge : 0;
@@ -135,20 +142,21 @@ export function HealthTabBar({ value, onChange, tr, c, preventionBadge = 0, layo
         accessibilityState={{ selected: active }}
         accessibilityLabel={badge > 0 ? `${meta.a11yLabel(tr)}, ${badge}` : meta.a11yLabel(tr)}
         style={[s.tab, !lay.scroll && s.tabFill, {
-          borderColor: active ? ACCENT : c.border,
-          backgroundColor: active ? ACCENT + '1F' : 'transparent',
+          backgroundColor: active ? coral.tint : c.dim,
+          borderWidth: 1,
+          borderColor: active ? coral.ink : 'transparent',
         }]}>
-        {lay.showIcons && <IconSymbol name={meta.icon} size={14} color={active ? ACCENT : c.sub} />}
+        {lay.showIcons && <IconSymbol name={meta.icon} size={14} color={active ? coral.ink : c.sub} />}
         <Text
           numberOfLines={1}
           adjustsFontSizeToFit={!lay.scroll}
           minimumFontScale={0.8}
           maxFontSizeMultiplier={1.4}
-          style={[s.label, !lay.scroll && s.labelFill, { color: active ? ACCENT : c.sub }]}>
+          style={[s.label, !lay.scroll && s.labelFill, { color: k.text.primary }]}>
           {label}
         </Text>
         {badge > 0 && (
-          <View style={[s.badge, { backgroundColor: ACCENT }]}>
+          <View style={[s.badge, { backgroundColor: k.accent.coral }]}>
             <Text style={s.badgeText}>{badge > 99 ? '99+' : badge}</Text>
           </View>
         )}
@@ -178,14 +186,14 @@ const s = StyleSheet.create({
   row:     { flexDirection: 'row', gap: 8, paddingRight: 4 },
   // Планшет: ряд на всю ширину шапки, але не ширший за стелю дашборда — і по центру.
   fillRow: { flexDirection: 'row', gap: HEALTH_TAB_GAP, width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center' },
-  tab:     { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, minHeight: 36 },
+  tab:     { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, minHeight: 40 },
   // Ширина за вмістом (flexBasis 'auto') + рівний розподіл залишку. Раніше
   // flex:1 давав УСІМ вкладкам однакову ширину, і найдовша «Профілактика» з
   // бейджем на iPad portrait стискала шрифт — помітно дрібніше за сусідів.
   // adjustsFontSizeToFit лишився запасним — лише коли ряд справді не вміщає.
   tabFill: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0, justifyContent: 'center', paddingHorizontal: 8 },
-  label:   { fontSize: 13, fontWeight: '700' },
+  label:   { fontSize: 13, fontFamily: fontFamily.semibold },
   labelFill: { flexShrink: 1 },
   badge:   { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: Atlas.type.headingWeight },
+  badgeText: { color: '#fff', fontSize: 10, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

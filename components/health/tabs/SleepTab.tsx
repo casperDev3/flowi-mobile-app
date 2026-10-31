@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/SleepTab.tsx — вкладка «Сон».
  *
@@ -14,7 +13,6 @@ import { Atlas } from '@/constants/atlas';
  * оцінка чесно підписана «за тривалістю». Бейдж тривалості (420/360 хв)
  * лишається окремо — якість його не заміняє.
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -31,15 +29,19 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import {
-  ACCENT, ACCENT_MOOD, ACCENT_PULSE, ACCENT_SLEEP, ModalKey, fmtSleep, getHealthColors,
+  ACCENT_MOOD, ACCENT_PULSE, ACCENT_SLEEP, ModalKey, fmtSleep,
 } from '@/utils/healthTheme';
+import { getHealthDSColors } from '@/components/health/palette';
+import { dsTokens } from '@/hooks/use-ds';
+import { fontFamily } from '@/constants/theme';
 
 export function SleepTab({ h }: HealthTabProps) {
   const grid = useHealthTabGrid();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
-  const c = getHealthColors(isDark);
+  const c = getHealthDSColors(isDark);
+  const k = dsTokens(isDark);
 
   const { today, goals } = h;
   const [refreshing, setRefreshing] = useState(false);
@@ -79,25 +81,24 @@ export function SleepTab({ h }: HealthTabProps) {
           {sleep ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ color: c.text, fontSize: 30, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5, flex: 1 }}>{fmtSleep(sleep)}</Text>
-                <View style={[s.badge, { backgroundColor: sleepColor + '20', borderColor: sleepColor + '40' }]}>
-                  <Text style={{ color: sleepColor, fontSize: 11, fontWeight: '700' }}>{sleepLabel}</Text>
+                <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88, flex: 1 }}>{fmtSleep(sleep)}</Text>
+                <View style={[s.badge, { backgroundColor: sleepColor + '29' }]}>
+                  <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{sleepLabel}</Text>
                 </View>
               </View>
               <View style={[s.track, { backgroundColor: c.track, marginBottom: 8 }]}>
-                <LinearGradient colors={[sleepColor + 'AA', sleepColor]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={[s.fill, { width: `${Math.round(Math.min(sleep / goals.sleep, 1) * 100)}%` as any }]} />
+                <View style={[s.fill, { backgroundColor: k.accent.amber, width: `${Math.round(Math.min(sleep / goals.sleep, 1) * 100)}%` as any }]} />
               </View>
               <MiniBarChart values={h.charts.sleep} color={ACCENT_SLEEP} height={40} />
               <View style={{ flexDirection: 'row', marginTop: 3 }}>
-                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 8, fontWeight: '600' }}>{l}</Text>)}
+                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{l}</Text>)}
               </View>
             </>
           ) : (
             <TouchableOpacity onPress={() => setModal('sleep')} accessibilityRole="button" accessibilityLabel={tr.recordSleep}
-              style={[s.empty, { borderColor: c.border, backgroundColor: c.dim }]}>
+              style={[s.empty, { backgroundColor: c.dim }]}>
               <IconSymbol name="moon.fill" size={18} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 9, flex: 1 }}>{tr.recordSleep}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 9, flex: 1 }}>{tr.recordSleep}</Text>
               <IconSymbol name="plus" size={14} color={c.sub} />
             </TouchableOpacity>
           )}
@@ -120,10 +121,10 @@ export function SleepTab({ h }: HealthTabProps) {
       node: (
         <HealthCard c={c} title={tr.hautoSleepQuality}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{quality.score}</Text>
+            <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88 }}>{quality.score}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4, flex: 1 }}>/ 100</Text>
-            <View style={[s.badge, { backgroundColor: qualityColor + '20', borderColor: qualityColor + '40' }]}>
-              <Text style={{ color: qualityColor, fontSize: 11, fontWeight: '700' }}>
+            <View style={[s.badge, { backgroundColor: qualityColor + '29' }]}>
+              <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                 {quality.byDurationOnly ? tr.hautoSleepQualityByDuration : tr.hautoSleepQualityByPhases}
               </Text>
             </View>
@@ -158,7 +159,7 @@ export function SleepTab({ h }: HealthTabProps) {
     node: (
       <HealthCard c={c} title={tr.hautoPulseRest}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-          <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{today.pulseRest ?? '—'}</Text>
+          <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88 }}>{today.pulseRest ?? '—'}</Text>
           <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>{tr.hautoBpm}</Text>
         </View>
         <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>
@@ -166,8 +167,8 @@ export function SleepTab({ h }: HealthTabProps) {
         </Text>
         {today.pulse != null && (
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 10 }}>
-            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', flex: 1 }}>{tr.hautoPulseAvg}</Text>
-            <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{today.pulse}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, flex: 1 }}>{tr.hautoPulseAvg}</Text>
+            <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{today.pulse}</Text>
             <Text style={{ color: c.sub, fontSize: 11, marginLeft: 4 }}>{tr.hautoBpm}</Text>
           </View>
         )}
@@ -180,7 +181,7 @@ export function SleepTab({ h }: HealthTabProps) {
       <ScrollView
         contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
 
         {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
         {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
@@ -194,9 +195,9 @@ export function SleepTab({ h }: HealthTabProps) {
 }
 
 const s = StyleSheet.create({
-  track:  { height: 8, borderRadius: 4, overflow: 'hidden' },
-  fill:   { height: '100%', borderRadius: 4 },
-  badge:  { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
+  track:  { height: 8, borderRadius: 999, overflow: 'hidden' },
+  fill:   { height: '100%', borderRadius: 999 },
+  badge:  { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   stack:  { height: 10, borderRadius: 5, overflow: 'hidden', flexDirection: 'row', marginTop: 10 },
-  empty:  { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 13 },
+  empty:  { flexDirection: 'row', alignItems: 'center', borderRadius: 16, padding: 16, minHeight: 44 },
 });

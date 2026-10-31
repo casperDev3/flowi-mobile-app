@@ -16,6 +16,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { parseInlineSpans, parseNoteMarkdown, type NoteBlock } from '@/utils/notes';
+import { fontFamily } from '@/constants/theme';
 
 export interface NoteMarkdownColors {
   text: string;
@@ -33,12 +34,12 @@ function Line({ block, color }: { block: NoteBlock; color: string }) {
     <Text style={[
       s.line,
       { color },
-      block.kind === 'heading' ? { fontSize: HEADING_SIZE[block.level ?? 3], fontWeight: '700' } : null,
+      block.kind === 'heading' ? { fontSize: HEADING_SIZE[block.level ?? 3], fontFamily: fontFamily.semibold } : null,
       block.kind === 'todo' && block.done ? s.done : null,
     ]}>
       {spans.length === 0 ? block.text : spans.map((span, index) => (
         <Text key={index} style={[
-          span.bold ? { fontWeight: '700' } : null,
+          span.bold ? { fontFamily: fontFamily.bold } : null,
           span.italic ? { fontStyle: 'italic' } : null,
           span.code ? s.code : null,
         ]}>{span.text}</Text>
@@ -85,7 +86,7 @@ export function NoteMarkdown({
                 disabled={!onToggle}
                 onPress={() => onToggle?.(block.line)}
                 style={[s.box, { borderColor: block.done ? c.accent : c.border, backgroundColor: block.done ? c.accent : 'transparent' }]}>
-                <Text style={{ color: block.done ? c.panel : 'transparent', fontWeight: '700' }}>✓</Text>
+                <Text style={{ color: block.done ? c.panel : 'transparent', fontFamily: fontFamily.bold }}>✓</Text>
               </TouchableOpacity>
             )}
             {block.kind === 'bullet' && <Text style={[s.marker, { color: c.sub }]}>•</Text>}
@@ -98,7 +99,7 @@ export function NoteMarkdown({
                 accessibilityLabel={`${createTaskLabel}: ${block.text}`}
                 onPress={() => onCreateTask?.(block.line)}
                 style={s.action}>
-                <Text style={{ color: c.accent, fontSize: 18, fontWeight: '700' }}>+</Text>
+                <Text style={{ color: c.accent, fontSize: 18, fontFamily: fontFamily.semibold }}>+</Text>
               </TouchableOpacity>
             )}
           </View>

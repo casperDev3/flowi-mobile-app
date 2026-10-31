@@ -13,8 +13,10 @@ import { Text, TextInput, View } from 'react-native';
 
 import { ActionButton, ACTION, type ActionTone } from '@/components/shared/ActionBar';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDS } from '@/hooks/use-ds';
 import { ProjectPaletteContext } from './ProjectPaletteContext';
+import { fontFamily, radius } from '@/constants/theme';
+import { glassOf } from '@/components/shared/dsTheme';
 
 export function TeamButton({ label, onPress, disabled = false, icon, tone = 'secondary', block = true, grow }: {
   label: string;
@@ -37,12 +39,12 @@ export function TeamInput({ label, value, onChange, editable = true, multiline =
   multiline?: boolean;
   numeric?: boolean;
 }) {
-  const dark = useColorScheme() === 'dark';
+  const { t } = useDS();
   const palette = useContext(ProjectPaletteContext);
-  const text = palette?.text ?? (dark ? '#F0EEFF' : '#302341');
+  const text = palette?.text ?? t.text.primary;
   return (
     <View style={{ gap: 5 }}>
-      <Text style={{ color: palette?.sub ?? text, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ color: palette?.sub ?? t.text.secondary, fontSize: 12, fontFamily: fontFamily.medium }}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
         value={value}
@@ -50,10 +52,11 @@ export function TeamInput({ label, value, onChange, editable = true, multiline =
         editable={editable}
         multiline={multiline}
         keyboardType={numeric ? 'decimal-pad' : 'default'}
-        placeholderTextColor="#817095"
+        placeholderTextColor={t.text.muted}
         style={{
-          borderWidth: 1, borderColor: palette?.border ?? '#9E93B2', borderRadius: ACTION.radius,
-          paddingHorizontal: 12, paddingVertical: 10, color: text, backgroundColor: palette?.dim,
+          // DS v2: поле — subtle-тло без рамки, радіус контрола.
+          borderRadius: radius.control, fontFamily: fontFamily.regular, fontSize: 14,
+          paddingHorizontal: 14, paddingVertical: 10, color: text, backgroundColor: palette?.dim ?? glassOf(t).surfaceSubtle,
           minHeight: multiline ? 80 : ACTION.height, opacity: editable ? 1 : 0.7,
           textAlignVertical: multiline ? 'top' : 'center',
         }}

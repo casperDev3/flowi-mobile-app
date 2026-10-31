@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/training/GroupSheets.tsx — створення групи й приєднання за
  * запрошенням (training-module.md §8, §8.1).
@@ -25,6 +24,7 @@ import { PROGRAM_COLORS } from '@/utils/trainingPrograms';
 import { Card, Chip, Field, Notice, PrimaryButton } from './TrainingBits';
 import { TrainingSheet } from './TrainingSheet';
 import { fmt, TG_ACCENT, type TrainingColors } from './theme';
+import { fontFamily } from '@/constants/theme';
 
 function deviceTimezone(): string {
   try {
@@ -93,13 +93,13 @@ export function CreateGroupSheet({ visible, onClose, onCreated, c, scope }: {
         required
         c={c} label={tr.tgGroupName} value={name} onChangeText={setName} placeholder={tr.tgGroupNamePlaceholder} maxLength={200} autoFocus />
       <Field c={c} label={tr.tgGroupDescription} value={description} onChangeText={setDescription} placeholder={tr.tgGroupDescriptionPlaceholder} maxLength={500} />
-      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{tr.tgColor}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginBottom: 6 }}>{tr.tgColor}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         {PROGRAM_COLORS.map(col => (
           <Chip key={col} c={c} label="●" color={col} active={color === col} onPress={() => setColor(col)} accessibilityLabel={`${tr.tgColor} ${col}`} />
         ))}
       </View>
-      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginBottom: 6 }}>
         {tr.tgWeekStart}
       </Text>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
@@ -205,7 +205,7 @@ export function JoinInvitePanel({ c, initial, onJoined }: {
       {preview && (
         <Card c={c} accent={preview.group.color || TG_ACCENT} style={{ marginTop: 12 }}>
           <Text style={{ color: c.sub, fontSize: 13 }}>{tr.tgInviteTo}</Text>
-          <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, marginTop: 4 }}>
+          <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.semibold, marginTop: 4 }}>
             {preview.group.name}
           </Text>
           <Text style={{ color: c.sub, fontSize: 13, marginTop: 6 }}>

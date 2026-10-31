@@ -1,13 +1,27 @@
 export type ProjectPalette = { background:string; surface:string; accent:string };
 export type ProjectAppearance = { light:ProjectPalette; dark:ProjectPalette };
+/** Палітра Flowi = токени DS v2 (bg.canvas / surface.card / action.primary). */
 export const DEFAULT_APPEARANCE:ProjectAppearance = {
+  light:{background:'#f1f1f3',surface:'#ffffff',accent:'#111113'},
+  dark:{background:'#0d0d0f',surface:'#17171a',accent:'#f4f4f5'},
+};
+/**
+ * Стара (до DS v2) фіолетова палітра Flowi. Проєкт, що зберіг її без змін
+ * («Зберегти вигляд» на незміненій формі), не обирав її свідомо — показуємо
+ * поточну палітру Flowi. Звіряється вся палітра режиму, а не окремі кольори.
+ */
+const LEGACY_DEFAULT:ProjectAppearance = {
   light:{background:'#f7f8fa',surface:'#ffffff',accent:'#7c3aed'},
   dark:{background:'#0f1117',surface:'#1a1e2a',accent:'#a78bfa'},
 };
+const samePalette=(a:ProjectPalette,b:ProjectPalette)=>(['background','surface','accent'] as const).every(k=>a[k].toLowerCase()===b[k].toLowerCase());
+/** Палітра Flowi без змін: глобальні токени DS v2 вже точні, перевизначати їх виведеними ступенями не треба. */
+export const isDefaultPalette=(palette:ProjectPalette)=>samePalette(palette,DEFAULT_APPEARANCE.light)||samePalette(palette,DEFAULT_APPEARANCE.dark);
 export const validColor=(value:unknown):value is string=>typeof value==='string'&&/^#[\da-f]{6}$/i.test(value);
 export function projectAppearance(value?:Partial<ProjectAppearance>):ProjectAppearance {
   const palette=(mode:'light'|'dark')=>Object.fromEntries(Object.entries(DEFAULT_APPEARANCE[mode]).map(([key,fallback])=>[key,validColor(value?.[mode]?.[key as keyof ProjectPalette])?value![mode]![key as keyof ProjectPalette]:fallback])) as ProjectPalette;
-  return {light:palette('light'),dark:palette('dark')};
+  const resolve=(mode:'light'|'dark')=>{const p=palette(mode);return samePalette(p,LEGACY_DEFAULT[mode])?{...DEFAULT_APPEARANCE[mode]}:p;};
+  return {light:resolve('light'),dark:resolve('dark')};
 }
 function channels(color:string){return [1,3,5].map(i=>parseInt(color.slice(i,i+2),16));}
 export function luminance(color:string){return channels(color).map(v=>{const c=v/255;return c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);}

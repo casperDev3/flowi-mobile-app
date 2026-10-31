@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/TimeEntryForm.tsx — поля ручного запису часу без обгортки.
  *
@@ -15,6 +14,7 @@ import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 
 import type { TimeColors } from '@/components/time/TimePalette';
 import type { Translations } from '@/store/translations';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, space, touchTarget, type as dsType } from '@/constants/theme';
 import type { TaskProjects, TimeRecord } from '@/utils/timeEntries';
 import {
   applyEntryEdit,
@@ -208,7 +208,7 @@ export function TimeEntryForm({
       <Text style={[s.label, { color: c.sub }]}>{tr.timeEntryTaskLabel}</Text>
       <TextInput
         placeholder={tr.timeEntrySearchTask}
-        placeholderTextColor={c.sub}
+        placeholderTextColor={c.muted}
         value={taskTitle}
         onChangeText={value => {
           setTaskTitle(value);
@@ -221,7 +221,7 @@ export function TimeEntryForm({
         style={[s.input, { backgroundColor: c.dim, color: c.text }]}
       />
       {showSuggestions && (
-        <View style={[s.suggestBox, { borderColor: c.border }]}>
+        <View style={[s.suggestBox, { backgroundColor: c.dim }]}>
           {suggestions.map(task => (
             <TouchableOpacity
               key={task.id}
@@ -229,12 +229,12 @@ export function TimeEntryForm({
               accessibilityRole="button"
               accessibilityLabel={`${tr.timeEntryPickTask}: ${task.title}`}
               style={s.suggestRow}>
-              <IconSymbol name="checklist" size={13} color={c.indigo} />
-              <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontWeight: '600', marginLeft: 8, flex: 1 }}>
+              <IconSymbol name="checklist" size={13} color={c.sub} />
+              <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, marginLeft: 8, flex: 1 }}>
                 {task.title}
               </Text>
               {task.projectId && projectById.get(task.projectId) ? (
-                <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, marginLeft: 8, maxWidth: '40%' }}>
+                <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginLeft: 8, maxWidth: '40%' }}>
                   {projectById.get(task.projectId)?.name}
                 </Text>
               ) : null}
@@ -244,16 +244,16 @@ export function TimeEntryForm({
       )}
       {taskId ? (
         <View style={s.linkedRow}>
-          <IconSymbol name="link" size={12} color={c.indigo} />
-          <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12, marginLeft: 6, flex: 1 }}>
+          <IconSymbol name="link" size={12} color={c.sub} />
+          <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginLeft: 6, flex: 1 }}>
             {tr.timeEntryPickTask}
           </Text>
           <TouchableOpacity
             onPress={() => pickTask(null)}
             accessibilityRole="button"
-            style={[s.chip, { borderColor: c.border }]}>
-            <IconSymbol name="xmark" size={10} color={c.sub} />
-            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>{tr.timeEntryNoTask}</Text>
+            style={[s.chip, { backgroundColor: c.dim }]}>
+            <IconSymbol name="xmark" size={10} color={c.text} />
+            <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4 }}>{tr.timeEntryNoTask}</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -276,13 +276,12 @@ export function TimeEntryForm({
                   style={[
                     s.chip,
                     {
-                      borderColor: active ? option.color : c.border,
-                      backgroundColor: active ? option.color + '22' : 'transparent',
+                      backgroundColor: active ? c.t.action.primary : c.dim,
                       opacity: disabled ? 0.4 : 1,
                     },
                   ]}>
                   <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: option.color }} />
-                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 12, fontWeight: active ? '700' : '500', marginLeft: 6, maxWidth: 160 }}>
+                  <Text numberOfLines={1} style={{ color: active ? c.t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 6, maxWidth: 160 }}>
                     {option.name}
                   </Text>
                 </TouchableOpacity>
@@ -291,14 +290,14 @@ export function TimeEntryForm({
         </View>
       </ScrollView>
       {locked ? (
-        <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>{tr.timeEntryProjectLocked}</Text>
+        <Text style={{ ...dsType.caption, color: c.sub, marginTop: 6 }}>{tr.timeEntryProjectLocked}</Text>
       ) : null}
 
       {/* ─── Коли ─── */}
       <Text style={[s.label, { color: c.sub }]}>{tr.timeEntryDateLabel}</Text>
       <TextInput
         placeholder={tr.timeEntryDatePlaceholder}
-        placeholderTextColor={c.sub}
+        placeholderTextColor={c.muted}
         value={dateText}
         onChangeText={setDateText}
         autoCorrect={false}
@@ -312,7 +311,7 @@ export function TimeEntryForm({
           <Text style={[s.label, { color: c.sub }]}>{tr.timeEntryStartLabel}</Text>
           <TextInput
             placeholder={tr.timeEntryClockPlaceholder}
-            placeholderTextColor={c.sub}
+            placeholderTextColor={c.muted}
             value={start}
             onChangeText={onStart}
             autoCorrect={false}
@@ -327,7 +326,7 @@ export function TimeEntryForm({
           </Text>
           <TextInput
             placeholder={tr.timeEntryClockPlaceholder}
-            placeholderTextColor={c.sub}
+            placeholderTextColor={c.muted}
             value={end}
             onChangeText={onEnd}
             autoCorrect={false}
@@ -339,38 +338,38 @@ export function TimeEntryForm({
       </View>
 
       <Text style={[s.label, { color: c.sub }]}>{tr.duration}</Text>
-      <View style={[s.durBlock, { backgroundColor: c.indigo + '12', borderColor: c.indigo + '30' }]}>
+      <View style={[s.durBlock, { backgroundColor: c.dim }]}>
         <View style={{ flex: 1, alignItems: 'center' }}>
           <TextInput
             placeholder="0"
-            placeholderTextColor={c.sub}
+            placeholderTextColor={c.muted}
             value={hours}
             onChangeText={value => onDuration(value, minutes)}
             keyboardType="number-pad"
             accessibilityLabel={tr.hrs}
-            style={s.durInput}
+            style={[s.durInput, { color: c.text }]}
           />
-          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.hrs}</Text>
+          <Text style={{ ...dsType.caption, color: c.sub }}>{tr.hrs}</Text>
         </View>
-        <Text style={{ color: c.sub, fontSize: 28, fontWeight: '200', alignSelf: 'center', marginBottom: 16 }}>:</Text>
+        <Text style={{ color: c.sub, fontSize: 28, fontFamily: fontFamily.light, alignSelf: 'center', marginBottom: 16 }}>:</Text>
         <View style={{ flex: 1, alignItems: 'center' }}>
           <TextInput
             placeholder="0"
-            placeholderTextColor={c.sub}
+            placeholderTextColor={c.muted}
             value={minutes}
             onChangeText={value => onDuration(hours, value)}
             keyboardType="number-pad"
             accessibilityLabel={tr.mins}
-            style={s.durInput}
+            style={[s.durInput, { color: c.text }]}
           />
-          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.mins}</Text>
+          <Text style={{ ...dsType.caption, color: c.sub }}>{tr.mins}</Text>
         </View>
       </View>
 
       <Text style={[s.label, { color: c.sub }]}>{tr.note}</Text>
       <TextInput
         placeholder={tr.timeEntryNotePlaceholder}
-        placeholderTextColor={c.sub}
+        placeholderTextColor={c.muted}
         value={note}
         onChangeText={setNote}
         multiline
@@ -379,21 +378,21 @@ export function TimeEntryForm({
       />
 
       {error && (
-        <Text style={{ color: c.danger, fontSize: 12, fontWeight: '600', marginTop: 10 }}>{error}</Text>
+        <Text style={{ color: c.danger, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 10 }}>{error}</Text>
       )}
 
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 22 }}>
-        <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-          <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+        <TouchableOpacity onPress={onClose} style={[s.btn, { ...c.gl.subtle, flex: 1 }]}>
+          <Text style={{ ...dsType.label, color: c.t.action.secondaryText }}>{tr.cancel}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={submit}
           disabled={!canSave}
           accessibilityRole="button"
           accessibilityState={{ disabled: !canSave }}
-          style={[s.btn, { flex: 2, backgroundColor: canSave ? c.indigo : c.dim }]}>
-          <IconSymbol name="checkmark" size={15} color={canSave ? '#fff' : c.sub} />
-          <Text style={{ color: canSave ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>
+          style={[s.btn, { flex: 2, backgroundColor: canSave ? c.t.action.primary : c.t.state.disabledBg }]}>
+          <IconSymbol name="checkmark" size={15} color={canSave ? c.t.text.onAction : c.t.state.disabledText} />
+          <Text style={{ ...dsType.label, color: canSave ? c.t.text.onAction : c.t.state.disabledText, marginLeft: 6 }}>
             {tr.save}
           </Text>
         </TouchableOpacity>
@@ -405,14 +404,15 @@ export function TimeEntryForm({
 const s = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   closeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -10 },
-  sheetTitle: { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 4 },
-  label: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input: { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
-  suggestBox: { borderRadius: Atlas.radius.medium, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
+  sheetTitle: { fontSize: 20, lineHeight: 26, fontFamily: fontFamily.semibold, marginBottom: 4 },
+  label: { fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
+  input: { borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 12, fontSize: 15, fontFamily: fontFamily.regular, ...dsType.numeric },
+  suggestBox: { borderRadius: radius.nestedCompact, marginTop: 6, overflow: 'hidden' },
   suggestRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, minHeight: 44 },
   linkedRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  chip: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, minHeight: 36 },
-  durBlock: { flexDirection: 'row', borderRadius: Atlas.radius.large, borderWidth: 1, padding: 16, alignItems: 'flex-start' },
-  durInput: { color: '#6366F1', fontSize: 36, fontWeight: '700', textAlign: 'center', letterSpacing: -1, alignSelf: 'stretch' },
-  btn: { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  chip: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 14, minHeight: 36 },
+  durBlock: { flexDirection: 'row', borderRadius: radius.nested, padding: 16, alignItems: 'flex-start' },
+  // Тривалість — display-цифри: тонкі, великі, табличні.
+  durInput: { ...dsType.display, fontSize: 44, lineHeight: 50, textAlign: 'center', alignSelf: 'stretch' },
+  btn: { minHeight: 48, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

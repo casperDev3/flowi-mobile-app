@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/health-profile.tsx — налаштування розділу «Здоровʼя».
  *
@@ -12,8 +11,6 @@ import { Atlas } from '@/constants/atlas';
  * підказка «заповніть профіль» і старі посилання — і всі вони мусять і далі
  * приводити саме до профілю, а не в довільну вкладку.
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -53,8 +50,14 @@ import {
   latestValue,
 } from '@/utils/healthUtils';
 import { HealthColumns, useHealthTabLayout } from '@/components/health/HealthLayout';
+import { getHealthDSColors } from '@/components/health/palette';
+import { dsTokens } from '@/hooks/use-ds';
+import { HEALTH_ACCENTS } from '@/utils/healthTheme';
+import { fontFamily } from '@/constants/theme';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { MeshBackground } from '@/components/ds';
 
-const ACCENT = '#10B981';
+const ACCENT = HEALTH_ACCENTS.water;
 
 export default function HealthProfileScreen() {
   // Планшет (рішення 6): поля профілю ліворуч, живий розрахунок цілей,
@@ -99,14 +102,9 @@ export default function HealthProfileScreen() {
 
   // Палітра — у useMemo: інакше кожен ререндер (а тут їх багато, бо
   // поля вводу пишуть у стан на кожен символ) створює новий обʼєкт.
-  const c = useMemo(() => ({
-    bg1:   isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:   isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:  isDark ? '#F0EEFF' : '#1A1433',
-    sub:   isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    dim:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  }), [isDark]);
+  const c = useMemo(() => getHealthDSColors(isDark), [isDark]);
+  const gs = useGlassStyles();
+  const k = dsTokens(isDark);
 
   const sexOpts: { key: Sex; label: string }[] = [
     { key: 'male', label: tr.male },
@@ -127,7 +125,7 @@ export default function HealthProfileScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
       <SafeAreaView style={{ flex: 1 }} edges={[]}>
@@ -160,8 +158,9 @@ export default function HealthProfileScreen() {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {sexOpts.map(o => (
                 <TouchableOpacity key={o.key} onPress={() => setProfile(p => ({ ...p, sex: o.key }))}
-                  style={[s.segBtn, { borderColor: profile.sex === o.key ? ACCENT : c.border, backgroundColor: profile.sex === o.key ? ACCENT + '20' : c.dim }]}>
-                  <Text style={{ color: profile.sex === o.key ? ACCENT : c.text, fontWeight: '700', fontSize: 14 }}>{o.label}</Text>
+                  accessibilityRole="button" accessibilityState={{ selected: profile.sex === o.key }}
+                  style={[s.segBtn, { backgroundColor: profile.sex === o.key ? k.action.primary : c.dim }]}>
+                  <Text style={{ color: profile.sex === o.key ? k.text.onAction : c.text, fontFamily: fontFamily.semibold, fontSize: 14 }}>{o.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -173,16 +172,16 @@ export default function HealthProfileScreen() {
                 <TextInput value={String(profile.age)}
                   onChangeText={t => setProfile(p => ({ ...p, age: clampInt(t, PROFILE_RANGES.age.max, p.age) }))}
                   onBlur={() => setProfile(clampProfileRanges)}
-                  keyboardType="number-pad" placeholder="30" placeholderTextColor={c.sub}
-                  style={[s.input, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]} />
+                  keyboardType="number-pad" placeholder="30" placeholderTextColor={k.text.muted}
+                  style={[s.input, { color: c.text, backgroundColor: c.dim }]} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.label, { color: c.sub }]}>{tr.heightLabel}</Text>
                 <TextInput value={String(profile.heightCm)}
                   onChangeText={t => setProfile(p => ({ ...p, heightCm: clampInt(t, PROFILE_RANGES.heightCm.max, p.heightCm) }))}
                   onBlur={() => setProfile(clampProfileRanges)}
-                  keyboardType="number-pad" placeholder="175" placeholderTextColor={c.sub}
-                  style={[s.input, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]} />
+                  keyboardType="number-pad" placeholder="175" placeholderTextColor={k.text.muted}
+                  style={[s.input, { color: c.text, backgroundColor: c.dim }]} />
               </View>
             </View>
 
@@ -191,9 +190,10 @@ export default function HealthProfileScreen() {
             <View style={{ gap: 8 }}>
               {actOpts.map(o => (
                 <TouchableOpacity key={o.key} onPress={() => setProfile(p => ({ ...p, activity: o.key }))}
-                  style={[s.rowBtn, { borderColor: profile.activity === o.key ? ACCENT : c.border, backgroundColor: profile.activity === o.key ? ACCENT + '15' : c.dim }]}>
-                  <Text style={{ color: profile.activity === o.key ? ACCENT : c.text, fontWeight: '600', fontSize: 14, flex: 1 }}>{o.label}</Text>
-                  {profile.activity === o.key && <IconSymbol name="checkmark" size={15} color={ACCENT} />}
+                  accessibilityRole="button" accessibilityState={{ selected: profile.activity === o.key }}
+                  style={[s.rowBtn, { backgroundColor: profile.activity === o.key ? k.action.primary : c.dim }]}>
+                  <Text style={{ color: profile.activity === o.key ? k.text.onAction : c.text, fontFamily: fontFamily.medium, fontSize: 14, flex: 1 }}>{o.label}</Text>
+                  {profile.activity === o.key && <IconSymbol name="checkmark" size={15} color={k.text.onAction} />}
                 </TouchableOpacity>
               ))}
             </View>
@@ -203,32 +203,34 @@ export default function HealthProfileScreen() {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {goalOpts.map(o => (
                 <TouchableOpacity key={o.key} onPress={() => setProfile(p => ({ ...p, goal: o.key }))}
-                  style={[s.segBtn, { flexDirection: 'column', gap: 4, paddingVertical: 12, borderColor: profile.goal === o.key ? ACCENT : c.border, backgroundColor: profile.goal === o.key ? ACCENT + '20' : c.dim }]}>
-                  <IconSymbol name={o.icon} size={16} color={profile.goal === o.key ? ACCENT : c.sub} />
-                  <Text style={{ color: profile.goal === o.key ? ACCENT : c.text, fontWeight: '700', fontSize: 13 }}>{o.label}</Text>
+                  accessibilityRole="button" accessibilityState={{ selected: profile.goal === o.key }}
+                  style={[s.segBtn, { flexDirection: 'column', gap: 4, paddingVertical: 12, borderRadius: 16, backgroundColor: profile.goal === o.key ? k.action.primary : c.dim }]}>
+                  <IconSymbol name={o.icon} size={16} color={profile.goal === o.key ? k.text.onAction : c.sub} />
+                  <Text style={{ color: profile.goal === o.key ? k.text.onAction : c.text, fontFamily: fontFamily.semibold, fontSize: 13 }}>{o.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             </>} right={<>
             {/* Превʼю розрахованих цілей */}
-            <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.preview, { borderColor: c.border }, lay.twoCol && { marginTop: 8 }]}>
-              <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 }}>
+            <View style={[s.preview, { ...gs.card }, lay.twoCol && { marginTop: 8 }]}>
+              <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginBottom: 12 }}>
                 {tr.todayLabel} · TDEE {tdee} кк
               </Text>
-              <PreviewRow label={tr.dailyLimit} value={`${goals.calories} кк`} color="#F97316" />
-              <PreviewRow label={tr.protein} value={`${goals.protein} г`} color="#8B5CF6" />
-              <PreviewRow label={tr.water} value={`${goals.water} мл`} color={ACCENT} />
+              <PreviewRow label={tr.dailyLimit} value={`${goals.calories} кк`} color={HEALTH_ACCENTS.cal} text={c.text} sub={c.sub} />
+              <PreviewRow label={tr.protein} value={`${goals.protein} г`} color={HEALTH_ACCENTS.weight} text={c.text} sub={c.sub} />
+              <PreviewRow label={tr.water} value={`${goals.water} мл`} color={ACCENT} text={c.text} sub={c.sub} />
               {latestWeight == null && (
-                <Text style={{ color: c.sub, fontSize: 11, marginTop: 8 }}>
+                <Text style={{ color: c.sub, fontSize: 12, marginTop: 8 }}>
                   {`ℹ️ ${tr.recordWeight} — ${FALLBACK_WEIGHT} кг (за замовч.)`}
                 </Text>
               )}
-            </BlurView>
+            </View>
 
             <TouchableOpacity onPress={save} disabled={!initialized}
-              style={[s.saveBtn, { backgroundColor: ACCENT, opacity: initialized ? 1 : 0.5 }]}>
-              <Text style={{ color: '#fff', fontWeight: Atlas.type.headingWeight, fontSize: 15 }}>{tr.saveProfile}</Text>
+              accessibilityRole="button" accessibilityState={{ disabled: !initialized }}
+              style={[s.saveBtn, { backgroundColor: initialized ? k.action.primary : k.state.disabledBg }]}>
+              <Text style={{ color: initialized ? k.text.onAction : k.state.disabledText, fontFamily: fontFamily.semibold, fontSize: 15 }}>{tr.saveProfile}</Text>
             </TouchableOpacity>
 
             {/*
@@ -246,13 +248,13 @@ export default function HealthProfileScreen() {
             {HK_AVAILABLE ? (
               <TouchableOpacity onPress={() => router.push('/apple-health')} activeOpacity={0.85}
                 accessibilityRole="button" accessibilityLabel="Apple Health"
-                style={[s.sourceRow, { borderColor: c.border, backgroundColor: c.dim }]}>
-                <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
+                style={[s.sourceRow, { ...gs.card }]}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name="heart.fill" size={16} color={ACCENT} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>Apple Health</Text>
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>
+                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>Apple Health</Text>
+                  <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
                     {lang === 'uk' ? 'Кроки, калорії, сон і пульс із HealthKit' : 'Steps, calories, sleep and pulse from HealthKit'}
                   </Text>
                 </View>
@@ -274,12 +276,12 @@ export default function HealthProfileScreen() {
   );
 }
 
-function PreviewRow({ label, value, color }: { label: string; value: string; color: string }) {
+function PreviewRow({ label, value, color, text, sub }: { label: string; value: string; color: string; text: string; sub: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 10 }} />
-      <Text style={{ color: color, fontSize: 14, fontWeight: '700', flex: 1 }}>{value}</Text>
-      <Text style={{ color: color, opacity: 0.7, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ color: text, fontSize: 24, lineHeight: 28, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.48, flex: 1 }}>{value}</Text>
+      <Text style={{ color: sub, fontSize: 12, fontFamily: fontFamily.regular }}>{label}</Text>
     </View>
   );
 }
@@ -305,13 +307,13 @@ function clampInt(text: string, max: number, fallback: number): number {
 }
 
 const s = StyleSheet.create({
-  pageTitle: { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
-  sectionTitle: { fontSize: 17, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3, marginTop: 6 },
-  sourceRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 12 },
-  label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 18 },
-  input:     { fontSize: 18, fontWeight: '700', borderRadius: Atlas.radius.large, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
-  segBtn:    { flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1.5, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
-  rowBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 13 },
-  preview:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden', marginTop: 24 },
-  saveBtn:   { borderRadius: Atlas.radius.large, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
+  pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
+  sectionTitle: { fontSize: 16, fontFamily: fontFamily.semibold, marginTop: 6 },
+  sourceRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, padding: 16, marginTop: 12 },
+  label:     { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 18 },
+  input:     { fontSize: 20, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], borderRadius: 12, minHeight: 48, paddingHorizontal: 14, paddingVertical: 12 },
+  segBtn:    { flex: 1, borderRadius: 999, minHeight: 44, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  rowBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: 14, minHeight: 48, paddingHorizontal: 16, paddingVertical: 13 },
+  preview:   { borderRadius: 20, padding: 20, marginTop: 24 },
+  saveBtn:   { borderRadius: 999, minHeight: 52, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
 });

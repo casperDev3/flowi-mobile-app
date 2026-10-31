@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/RecurringIncomesSection.tsx — «Регулярні доходи» у вкладці
  * «Підписки» (finance-revamp.md §4.2, §9.5).
@@ -19,6 +18,7 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, shadow, space, touchTarget, type as dsType } from '@/constants/theme';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
@@ -40,6 +40,8 @@ import {
 } from '@/utils/subscriptions';
 import { uuidV4 } from '@/utils/uuid';
 import type { FinColors } from './financeLabels';
+import { useFinPalette } from './finPalette';
+import { GlassBackdrop } from '@/components/ds';
 
 type RawItem = { id: string } & Record<string, unknown>;
 
@@ -49,7 +51,7 @@ function emptyDraft(today: string, currency: string, projectId?: string): Recurr
   return { ...recurringIncomeToDraft(null, { currency, today }), projectId: projectId ?? '' };
 }
 
-export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
+export function RecurringIncomesSection({ tr, lang, isDark, projectId }: {
   c: FinColors;
   tr: Translations;
   lang: 'uk' | 'en';
@@ -57,6 +59,8 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
   /** Показати лише доходи проєкту й створювати нові з цим projectId. */
   projectId?: string;
 }) {
+  // DS v2: палітра розділу з теми (проп `c` лишився в API заради сумісності).
+  const c = useFinPalette();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { isWide, height } = useResponsive();
   const [items, setItems] = useState<RecurringIncome[]>([]);
@@ -240,7 +244,7 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
     const status = recurringIncomeStatus(item, today);
     const overdue = status === 'overdue';
     return (
-      <View key={item.id} style={[st.row, { borderColor: c.border, backgroundColor: c.dim }]}>
+      <View key={item.id} style={[st.row, { ...c.gl.card }]}>
         <TouchableOpacity
           onPress={() => { setFormError(false); setForm({ editing: item, draft: draftOf(item) }); }}
           accessibilityRole="button"
@@ -250,21 +254,24 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
             <IconSymbol name={(item.icon || 'arrow.down.circle') as IconSymbolName} size={16} color={item.color || c.green} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{item.name}</Text>
-            <Text style={{ color: overdue ? c.red : c.sub, fontSize: 11, marginTop: 2, fontWeight: overdue ? '700' : '400' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {overdue ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.t.accent.coral }} /> : null}
+              <Text numberOfLines={1} style={{ ...dsType.bodyMedium, color: c.text, flexShrink: 1 }}>{item.name}</Text>
+            </View>
+            <Text style={{ ...dsType.caption, ...dsType.numeric, color: overdue ? c.text : c.sub, marginTop: 2, fontFamily: overdue ? fontFamily.semibold : fontFamily.regular }}>
               {overdue ? `${tr.subOverdue} · ` : ''}{formatDateKey(item.nextPaymentDate, locale)} · {formatPeriod(item.period, lang)}
             </Text>
           </View>
-          <Text style={{ color: c.green, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>+{money(item.amount, item.currency)}</Text>
+          <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, ...dsType.numeric }}>+{money(item.amount, item.currency)}</Text>
         </TouchableOpacity>
         {status !== 'archived' ? (
           <TouchableOpacity
             onPress={() => openReceive(item)}
             accessibilityRole="button"
             accessibilityLabel={`${tr.finRiReceived}: ${item.name}`}
-            style={[st.receiveBtn, { borderColor: c.green + '66', backgroundColor: c.green + '14' }]}>
-            <IconSymbol name="checkmark" size={12} color={c.green} />
-            <Text style={{ color: c.green, fontSize: 12, fontWeight: '700' }}>{tr.finRiReceived}</Text>
+            style={[st.receiveBtn, { ...c.gl.subtle }]}>
+            <IconSymbol name="checkmark" size={12} color={c.t.status.success} />
+            <Text style={{ color: c.t.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.finRiReceived}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -274,22 +281,23 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
   const draft = form?.draft;
   const setDraft = (patch: Partial<RecurringIncomeDraft>) =>
     setForm(prev => (prev ? { ...prev, draft: { ...prev.draft, ...patch } } : prev));
-  const inputBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+  const inputBg = c.input;
+  const popover = shadow[isDark ? 'dark' : 'light'].popover;
 
   return (
     <View style={{ marginTop: 22 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={[st.section, { color: c.sub, flex: 1 }]}>{tr.finRecurringIncomes}</Text>
+        <Text style={[st.section, { color: c.text, flex: 1 }]}>{tr.finRecurringIncomes}</Text>
         <TouchableOpacity
           onPress={() => { setFormError(false); setForm({ editing: null, draft: emptyDraft(today, primary, projectId) }); }}
           accessibilityRole="button"
           accessibilityLabel={tr.finRiNew}
-          style={st.addIcon}>
-          <IconSymbol name="plus" size={17} color={c.accent} />
+          style={[st.addIcon, { backgroundColor: c.action }]}>
+          <IconSymbol name="plus" size={17} color={c.onAction} />
         </TouchableOpacity>
       </View>
       {totals.length > 0 ? (
-        <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight, marginBottom: 8 }}>
+        <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginBottom: 8 }}>
           {formatTotalsLine(totals, 'monthly', tr.subPerMonth, currencies, locale)}
         </Text>
       ) : null}
@@ -306,7 +314,7 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
             accessibilityState={{ expanded: showArchive }}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, marginTop: 6 }}>
             <IconSymbol name={showArchive ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
-            <Text style={{ color: c.sub, fontSize: 13, fontWeight: '700' }}>
+            <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>
               {tr.subArchiveCount.replace('{count}', String(archived.length))}
             </Text>
           </TouchableOpacity>
@@ -316,10 +324,11 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
 
       {/* Форма доходу */}
       <SheetModal visible={!!form} onClose={() => setForm(null)}>
-        <View style={[st.sheet, sheetColumnStyle(isWide), { maxHeight: height * 0.88, backgroundColor: c.sheet, borderColor: c.border }]}>
+        <View style={[st.sheet, sheetColumnStyle(isWide), { ...c.gl.strong, maxHeight: height * 0.88 }, popover]}>
+          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <View style={[st.handle, { backgroundColor: c.border }]} />
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 12 }}>
+            <View style={[st.handle, { backgroundColor: c.muted }]} />
+            <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold, marginBottom: 12 }}>
               {form?.editing ? tr.finRiEdit : tr.finRiNew}
             </Text>
             {draft ? (
@@ -330,7 +339,7 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
                   onChangeText={name => setDraft({ name })}
                   accessibilityLabel={tr.finRiName}
                   placeholder={tr.finRiNamePlaceholder}
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={c.muted}
                   style={[st.input, { color: c.text, backgroundColor: inputBg }]}
                 />
                 <Text style={[st.label, { color: c.sub }]}>{tr.amount}</Text>
@@ -339,7 +348,7 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
                   onChangeText={amount => setDraft({ amount })}
                   keyboardType="decimal-pad"
                   placeholder="0"
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={c.muted}
                   accessibilityLabel={tr.amount}
                   style={[st.input, { color: c.text, backgroundColor: inputBg }]}
                 />
@@ -372,7 +381,7 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
                   value={draft.nextPaymentDate}
                   onChangeText={nextPaymentDate => setDraft({ nextPaymentDate: nextPaymentDate.trim() })}
                   placeholder={today}
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={c.muted}
                   autoCapitalize="none"
                   accessibilityLabel={tr.finRiNext}
                   style={[st.input, { color: c.text, backgroundColor: inputBg }]}
@@ -410,24 +419,24 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
                   disabled={busy}
                   accessibilityRole="button"
                   accessibilityState={{ disabled: busy }}
-                  style={[st.primary, { backgroundColor: c.accent, marginTop: 18 }]}>
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+                  style={[st.primary, { backgroundColor: c.action, marginTop: 20 }]}>
+                  <Text style={{ ...dsType.label, color: c.onAction }}>{tr.save}</Text>
                 </TouchableOpacity>
                 {form?.editing ? (
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                     <TouchableOpacity
                       onPress={() => { if (form.editing) void setArchived(form.editing, !form.editing.archivedAt); }}
                       accessibilityRole="button"
-                      style={[st.secondary, { borderColor: c.border, backgroundColor: c.dim }]}>
-                      <Text style={{ color: c.text, fontWeight: '600' }}>
+                      style={[st.secondary, { ...c.gl.subtle }]}>
+                      <Text style={{ color: c.text, fontFamily: fontFamily.semibold }}>
                         {form.editing.archivedAt ? tr.finRiRestore : tr.finRiArchive}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => { if (form.editing) remove(form.editing); }}
                       accessibilityRole="button"
-                      style={[st.secondary, { borderColor: c.red + '55', backgroundColor: c.red + '12' }]}>
-                      <Text style={{ color: c.red, fontWeight: '600' }}>{tr.delete}</Text>
+                      style={[st.secondary, { backgroundColor: c.red + '14' }]}>
+                      <Text style={{ ...dsType.label, color: c.red }}>{tr.delete}</Text>
                     </TouchableOpacity>
                   </View>
                 ) : null}
@@ -439,13 +448,14 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
 
       {/* «Отримано» */}
       <SheetModal visible={!!receive} onClose={() => setReceive(null)}>
-        <View style={[st.sheet, sheetColumnStyle(isWide), { maxHeight: height * 0.88, backgroundColor: c.sheet, borderColor: c.border }]}>
+        <View style={[st.sheet, sheetColumnStyle(isWide), { ...c.gl.strong, maxHeight: height * 0.88 }, popover]}>
+          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <View style={[st.handle, { backgroundColor: c.border }]} />
+            <View style={[st.handle, { backgroundColor: c.muted }]} />
             {receive && receiveItem ? (
               <>
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>{tr.finRiReceiveTitle}</Text>
-                <Text numberOfLines={2} style={{ color: c.text, fontSize: 19, fontWeight: Atlas.type.headingWeight, marginTop: 4 }}>{receiveItem.name}</Text>
+                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase' }}>{tr.finRiReceiveTitle}</Text>
+                <Text numberOfLines={2} style={{ color: c.text, fontSize: 19, fontFamily: fontFamily.semibold, marginTop: 4 }}>{receiveItem.name}</Text>
                 <Text style={[st.label, { color: c.sub }]}>{tr.amount} ({receiveAccount?.currency || receiveItem.currency})</Text>
                 <TextInput
                   value={receive.amount}
@@ -475,8 +485,8 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
                   <TouchableOpacity
                     onPress={() => setReceive(null)}
                     accessibilityRole="button"
-                    style={[st.secondary, { borderColor: c.border, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                    style={[st.secondary, { ...c.gl.subtle }]}>
+                    <Text style={{ color: c.sub, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => { void confirmReceive(); }}
@@ -484,8 +494,8 @@ export function RecurringIncomesSection({ c, tr, lang, isDark, projectId }: {
                     accessibilityRole="button"
                     accessibilityState={{ disabled: !receiveValid || busy }}
                     accessibilityLabel={tr.finRiReceived}
-                    style={[st.primary, { flex: 1.6, backgroundColor: receiveValid && !busy ? c.green : c.dim }]}>
-                    <Text style={{ color: receiveValid && !busy ? '#fff' : c.sub, fontWeight: '700' }}>{tr.finRiReceived}</Text>
+                    style={[st.primary, { flex: 1.6, backgroundColor: receiveValid && !busy ? c.action : c.t.state.disabledBg }]}>
+                    <Text style={{ ...dsType.label, color: receiveValid && !busy ? c.onAction : c.t.state.disabledText }}>{tr.finRiReceived}</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -507,6 +517,7 @@ function ChipRow({ items, value, onChange, c }: {
   onChange: (id: string) => void;
   c: FinColors;
 }) {
+  const ds = useFinPalette();
   return (
     <ScrollView
       horizontal
@@ -523,8 +534,8 @@ function ChipRow({ items, value, onChange, c }: {
             accessibilityRole="radio"
             accessibilityState={{ selected: on, checked: on }}
             accessibilityLabel={item.label}
-            style={[st.chip, { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent + '18' : 'transparent' }]}>
-            <Text numberOfLines={1} style={{ color: on ? c.accent : c.sub, fontSize: 12, fontWeight: '700', maxWidth: 180 }}>{item.label}</Text>
+            style={[st.chip, { backgroundColor: on ? ds.action : ds.dim }]}>
+            <Text numberOfLines={1} style={{ color: on ? ds.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, maxWidth: 180 }}>{item.label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -533,16 +544,17 @@ function ChipRow({ items, value, onChange, c }: {
 }
 
 const st = StyleSheet.create({
-  section: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
-  addIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: Atlas.radius.large, paddingHorizontal: 12, paddingVertical: 6 },
-  icon: { width: 32, height: 32, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  receiveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 10, borderRadius: Atlas.radius.medium, borderWidth: 1 },
-  sheet: { borderTopLeftRadius: Atlas.radius.xlarge, borderTopRightRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, paddingBottom: 36 },
+  section: { ...dsType.h2 },
+  // «Додати» — кругла pill-кнопка головної дії (action.primary задає тло в розмітці).
+  addIcon: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: radius.nested, paddingHorizontal: 14, paddingVertical: 8 },
+  icon: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  receiveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 12, borderRadius: radius.pill },
+  sheet: { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.cardPadding, paddingBottom: 36 },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
-  label: { fontSize: 12, fontWeight: '700', marginTop: 12, marginBottom: 6 },
-  input: { flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, fontSize: 15 },
-  chip: { minHeight: 34, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  primary: { flex: 1, minHeight: 46, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
-  secondary: { flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 14, marginBottom: 6 },
+  input: { flex: 1, minHeight: touchTarget, borderRadius: radius.control, paddingHorizontal: space[4], fontSize: 15, fontFamily: fontFamily.regular, ...dsType.numeric },
+  chip: { minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  primary: { flex: 1, minHeight: 48, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  secondary: { flex: 1, minHeight: 48, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

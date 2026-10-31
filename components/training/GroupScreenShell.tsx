@@ -14,7 +14,7 @@ import { trainingRoutes } from './routes';
 import { useI18n } from '@/store/i18n';
 
 import { Notice, ScreenBackground } from './TrainingBits';
-import { fmt, TG_ACCENT, type TrainingColors } from './theme';
+import { fmt, type TrainingColors } from './theme';
 import type { LoadIssue } from './hooks';
 
 export function GroupScreenShell({
@@ -80,7 +80,7 @@ export function GroupScreenShell({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[column, { paddingHorizontal: 16, paddingBottom: 100 }]}
           refreshControl={onRefresh ? (
-            <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={TG_ACCENT} />
+            <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={c.sub} />
           ) : undefined}>
           {notices}
           {children}

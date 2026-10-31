@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
 import { AdSlot } from '@/components/advertising/Advertising';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -36,6 +37,7 @@ import {
   type NoteScope,
 } from '@/utils/notes';
 import { uuidV4 } from '@/utils/uuid';
+import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export type { Note } from '@/utils/notes';
 
@@ -123,10 +125,23 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const canEditProject = (id: string) => canEditProjectItem(id, roles);
   const canEdit = canEditNote(current ?? (projectId ? { projectId } : null), canEditProject);
   const canCreate = canEditNote(projectId ? { projectId } : null, canEditProject);
-  const c = isDark
-    ? { bg: '#15131D', panel: '#201D29', text: '#F4F1FA', sub: '#B8B1C6', border: '#494151', accent: '#C4AAFF', dim: '#2A2634' }
-    : { bg: '#FAF8FF', panel: '#FFFFFF', text: '#241C32', sub: '#655B73', border: '#D3CBDD', accent: '#6034A8', dim: '#F0ECF8' };
-  const pickerColors = { text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.panel };
+  // DS v2.1 (Liquid Glass): тло прозоре — під ним mesh екрана; картки — скло,
+  // редактор/читач — щільне скло (довгий текст ≥ 4.5:1), акцент «Нотаток» —
+  // amber (ink на склі). `dim` — тонована amber-змивка вибраних кнопок.
+  const tk = dsTheme(isDark);
+  const gl = glassOf(tk);
+  const amber = gl.accent.amber;
+  const c = {
+    bg: 'transparent',
+    panel: gl.surface,
+    panelStrong: gl.surfaceStrong,
+    text: tk.text.primary,
+    sub: tk.text.secondary,
+    border: gl.rim,
+    accent: amber.ink,
+    dim: amber.tint,
+  };
+  const pickerColors = { text: c.text, sub: c.sub, border: tk.border.hairline, dim: gl.surfaceSubtle, accent: c.accent, sheet: gl.sheet };
 
   const reload = useCallback(async (retry = false) => {
     const version = ++readVersion.current;
@@ -346,8 +361,10 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const button = (label: string, onPress: () => void, id: string, disabled = false, active = false) => (
     <TouchableOpacity testID={id} accessibilityRole="button" accessibilityLabel={label}
       accessibilityState={{ disabled, selected: active }} disabled={disabled} onPress={onPress}
-      style={[s.button, { borderColor: active ? c.accent : c.border, backgroundColor: active ? c.dim : 'transparent', opacity: disabled ? 0.45 : 1 }]}>
-      <Text style={{ color: c.accent, fontWeight: '600' }}>{label}</Text>
+      style={[s.button, active
+        ? { borderColor: c.accent, backgroundColor: c.dim }
+        : { ...glassRim(tk, 'subtle'), backgroundColor: gl.surfaceSubtle }, { opacity: disabled ? 0.45 : 1 }]}>
+      <Text style={{ color: c.accent, fontFamily: fontFamily.semibold }}>{label}</Text>
     </TouchableOpacity>
   );
   const missingLink = (value: string | null, options: PickerOption[]) =>
@@ -361,7 +378,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const readMeeting = current ? linkLabel(current.linkedMeetingId, meetings) : null;
 
   const reader = reading && current ? (
-    <View testID="notes-reader" style={[s.editor, { backgroundColor: c.panel, borderColor: c.border }]}>
+    <View testID="notes-reader" style={[s.editor, { backgroundColor: c.panelStrong, ...glassRim(tk, 'strong') }]}>
       <View style={s.toolbar}>
         {button(tr.close, () => confirmLeave(closeEditor), 'notes-close', saving)}
         {canEdit && button(tr.edit, startEdit, 'notes-edit', saving || readError)}
@@ -381,7 +398,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
         {[readTask && `${tr.notesLinkTask}: ${readTask}`, readMeeting && `${tr.notesLinkMeeting}: ${readMeeting}`].filter(Boolean).join(' · ')}
       </Text>}
       <ScrollView style={s.previewPane} contentContainerStyle={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
-        <NoteMarkdown body={current.body} colors={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent, panel: c.panel }}
+        <NoteMarkdown body={current.body} colors={{ text: c.text, sub: c.sub, border: tk.border.hairline, accent: c.accent, panel: c.panelStrong }}
           emptyLabel={tr.notesEmptyBody} createTaskLabel={tr.notesCreateTask}
           onToggle={canEdit && !saving && !readError ? toggleReadLine : undefined}
           onCreateTask={canEdit && !saving ? line => { void createTaskFromLine(line); } : undefined} />
@@ -390,7 +407,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   ) : null;
 
   const editor = selected && !reading ? (
-    <View testID="notes-editor" style={[s.editor, { backgroundColor: c.panel, borderColor: c.border }]}>
+    <View testID="notes-editor" style={[s.editor, { backgroundColor: c.panelStrong, ...glassRim(tk, 'strong') }]}>
       <View style={s.toolbar}>
         {button(tr.close, () => confirmLeave(closeEditor), 'notes-close', saving)}
         {!isNew && button(tr.cancel, cancelEdit, 'notes-cancel-edit', saving)}
@@ -403,10 +420,10 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
       {!canEdit && <Text style={{ color: c.sub, paddingBottom: 8 }}>{tr.notesReadOnly}</Text>}
       <TextInput testID="notes-title" accessibilityLabel={tr.titlePlaceholder} placeholder={tr.titlePlaceholder}
         placeholderTextColor={c.sub} value={title} onChangeText={setTitle} editable={canEdit && !saving}
-        style={[s.title, { color: c.text, borderColor: emptyError && !title.trim() && !body.trim() ? '#EF4444' : c.border }]} />
+        style={[s.title, { color: c.text, borderColor: emptyError && !title.trim() && !body.trim() ? '#EF4444' : tk.border.hairline }]} />
       <TextInput testID="notes-tags" accessibilityLabel={tr.notesTagsLabel} placeholder={tr.notesTagsPlaceholder}
         placeholderTextColor={c.sub} value={tagsInput} onChangeText={setTagsInput} editable={canEdit && !saving}
-        autoCapitalize="none" style={[s.tagsInput, { color: c.text, borderColor: c.border }]} />
+        autoCapitalize="none" style={[s.tagsInput, { color: c.text, borderColor: tk.border.hairline }]} />
       <View style={s.links}>
         <View style={s.link}>
           <PickerField label={tr.notesLinkTask} options={tasks} value={linkedTaskId}
@@ -423,7 +440,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
       </View>
       {preview ? (
         <ScrollView style={s.previewPane} contentContainerStyle={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
-          <NoteMarkdown body={body} colors={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent, panel: c.panel }}
+          <NoteMarkdown body={body} colors={{ text: c.text, sub: c.sub, border: tk.border.hairline, accent: c.accent, panel: c.panelStrong }}
             emptyLabel={tr.notesEmptyBody} createTaskLabel={tr.notesCreateTask}
             onToggle={canEdit && !saving ? line => setBody(current => toggleChecklistAt(current, line)) : undefined}
             onCreateTask={canEdit && !saving && !isNew ? line => { void createTaskFromLine(line); } : undefined} />
@@ -452,10 +469,12 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
           </View>
           <TextInput testID="notes-search" accessibilityLabel={tr.notesSearch} placeholder={tr.notesSearch}
             placeholderTextColor={c.sub} value={query} onChangeText={setQuery}
-            style={[s.search, { color: c.text, borderColor: c.border, backgroundColor: c.panel }]} />
+            style={[s.search, { color: c.text, backgroundColor: gl.surfaceSubtle, ...glassRim(tk, 'subtle') }]} />
           {!projectId && <View style={s.toolbar}>{(['all', 'personal', 'projects'] as const).map(value => (
             <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: scope === value }}
-              testID={`notes-scope-${value}`} onPress={() => setScope(value)} style={[s.button, { borderColor: scope === value ? c.accent : c.border }]}>
+              testID={`notes-scope-${value}`} onPress={() => setScope(value)} style={[s.button, scope === value
+                ? { borderColor: c.accent, backgroundColor: c.dim }
+                : { ...glassRim(tk, 'subtle'), backgroundColor: gl.surfaceSubtle }]}>
               <Text style={{ color: c.text }}>{value === 'all' ? tr.all : value === 'personal' ? tr.notesPersonal : tr.projects}</Text>
             </TouchableOpacity>
           ))}</View>}
@@ -482,10 +501,10 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
               return <TouchableOpacity accessibilityRole="button" testID={`note-${item.id}`}
                 accessibilityLabel={`${item.pinned ? `${tr.notesPinned}, ` : ''}${item.title || tr.untitled}`}
                 accessibilityState={{ selected: selected?.id === item.id }} onPress={() => open(item)}
-                style={[s.card, { backgroundColor: c.panel, borderColor: selected?.id === item.id ? c.accent : c.border }]}>
+                style={[s.card, { backgroundColor: c.panel }, selected?.id === item.id ? { borderColor: c.accent } : glassRim(tk, 'card')]}>
                 <View style={s.cardHead}>
                   {item.pinned && <Text testID={`note-pin-${item.id}`} style={{ color: c.accent, fontSize: 15 }}>★</Text>}
-                  <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontWeight: '700', fontSize: 16 }}>{item.title || tr.untitled}</Text>
+                  <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontFamily: fontFamily.semibold, fontSize: 16 }}>{item.title || tr.untitled}</Text>
                 </View>
                 <Text numberOfLines={2} style={{ color: c.sub, marginTop: 6 }}>{notePreview(item)}</Text>
                 {chips.length > 0 && <Text numberOfLines={1} style={{ color: c.accent, fontSize: 12, marginTop: 6 }}>{chips.map(tag => `#${tag}`).join(' ')}</Text>}
@@ -509,12 +528,12 @@ const s = StyleSheet.create({
   tagRow: { flexDirection: 'row', gap: 8, paddingVertical: 4, paddingRight: 8 },
   button: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1 },
   search: { minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderRadius: Atlas.radius.medium, fontSize: 16 },
-  section: { fontWeight: '600', paddingVertical: 12 }, card: { borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 14, marginBottom: 10 },
+  section: { fontFamily: fontFamily.semibold, paddingVertical: 12 }, card: { borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 14, marginBottom: 10 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cardFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 8 },
   editor: { flex: 1, minWidth: 0, padding: 16, borderWidth: 1, borderRadius: Atlas.radius.large },
   context: { fontSize: 13, paddingVertical: 8 },
-  readTitle: { fontSize: 24, fontWeight: '700' }, title: { fontSize: 24, fontWeight: '700', minHeight: 52, borderBottomWidth: 1 },
+  readTitle: { fontSize: 24, fontFamily: fontFamily.semibold }, title: { fontSize: 24, fontFamily: fontFamily.semibold, minHeight: 52, borderBottomWidth: 1 },
   tagsInput: { minHeight: 44, fontSize: 15, borderBottomWidth: 1, paddingVertical: 8 },
   links: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 10 },
   link: { flexGrow: 1, flexShrink: 1, minWidth: 140 },

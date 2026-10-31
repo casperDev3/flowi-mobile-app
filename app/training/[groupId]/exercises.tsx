@@ -22,6 +22,7 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { newTrainingId } from '@/utils/trainingSync';
 import type { TrainingExercise } from '@/utils/trainingTypes';
+import { fontFamily } from '@/constants/theme';
 
 function ExerciseSheet({ visible, exercise, onClose, onSave, onDelete }: {
   visible: boolean;
@@ -105,7 +106,7 @@ export default function GroupExercisesScreen() {
       style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: divider ? 1 : 0, borderTopColor: c.border }}>
       <IconSymbol name="dumbbell.fill" size={16} color={TG_ACCENT} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{ex.name}</Text>
+        <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>{ex.name}</Text>
         <Text style={{ color: c.sub, fontSize: 12 }}>
           {[ex.muscleGroup, `${ex.defaultSets ?? 3}×${ex.defaultReps ?? 10}`, ex.defaultRestSec ? `${ex.defaultRestSec} s` : null].filter(Boolean).join(' · ')}
         </Text>
@@ -128,7 +129,7 @@ export default function GroupExercisesScreen() {
       {notice ? <Notice c={c} text={notice.text} tone={notice.tone} /> : null}
       {stream.loaded && !exercises.length ? <EmptyState c={c} icon="dumbbell.fill" title={tr.tgNoExercises} /> : null}
       {exercises.length && isWide ? (
-        <ResponsiveGrid minItemWidth={300} maxColumns={3} gap={10}>
+        <ResponsiveGrid minItemWidth={300} maxColumns={3} gap={12}>
           {exercises.map(ex => (
             <Card key={ex.id} c={c} style={{ flex: 1 }}>{row(ex, false)}</Card>
           ))}

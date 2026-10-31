@@ -1,11 +1,12 @@
 import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PressableScale } from '@/components/shared/PressableScale';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AccentIcon } from '@/components/shared/GlassBits';
 import type { Translations } from '@/store/translations';
+import { fontFamily, type GlassAccent } from '@/constants/theme';
+import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
 
 interface Props {
   isDark: boolean;
@@ -21,11 +22,15 @@ interface Props {
 const QUICK_LABEL_MAX_FONT_SCALE = 1.6;
 
 export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWater, onTimer }: Props) {
-  const actions = [
-    { label: tr.quickAddTask,    icon: 'plus.circle.fill' as const, color: '#7C3AED', onPress: onAddTask },
-    { label: tr.quickAddExpense, icon: 'banknote'         as const, color: '#0EA5E9', onPress: onAddExpense },
-    { label: tr.quickAddWater,   icon: 'drop.fill'        as const, color: '#10B981', onPress: onAddWater },
-    { label: tr.quickTimer,      icon: 'timer'            as const, color: '#6366F1', onPress: onTimer },
+  // DS v2.1: плитки — скло з обідком; іконка — тонований скляний кружок
+  // акценту модуля (завдання — lavender, фінанси — lime, вода/здоров'я — coral,
+  // час — amber).
+  const t = dsTheme(isDark);
+  const actions: { label: string; icon: 'plus.circle.fill' | 'banknote' | 'drop.fill' | 'timer'; accent: GlassAccent; onPress: () => void }[] = [
+    { label: tr.quickAddTask,    icon: 'plus.circle.fill', accent: 'lavender', onPress: onAddTask },
+    { label: tr.quickAddExpense, icon: 'banknote',         accent: 'lime',     onPress: onAddExpense },
+    { label: tr.quickAddWater,   icon: 'drop.fill',        accent: 'coral',    onPress: onAddWater },
+    { label: tr.quickTimer,      icon: 'timer',            accent: 'amber',    onPress: onTimer },
   ];
 
   return (
@@ -37,13 +42,9 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
           style={{ flex: 1 }}
           accessibilityRole="button"
           accessibilityLabel={a.label}>
-          <BlurView
-            intensity={isDark ? 22 : 42}
-            tint={isDark ? 'dark' : 'light'}
-            style={[s.btn, { borderColor: c.border }]}>
-            <View style={[s.iconWrap, { backgroundColor: a.color + '22' }]}>
-              <IconSymbol name={a.icon} size={16} color={a.color} />
-            </View>
+          <View
+            style={[s.btn, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+            <AccentIcon isDark={isDark} icon={a.icon} accent={a.accent} size="md" style={s.iconWrap} />
             {/* NAT-06: чотири плитки ділять ширину порівну, і при найбільшому
                 Dynamic Type (AX5) підписи зрізались до «+ З…», «Та…», «Фін…».
                 Стеля масштабування + другий рядок лишають слово читабельним;
@@ -53,7 +54,7 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
               style={[s.label, { color: c.sub }]}
               numberOfLines={2}
               maxFontSizeMultiplier={QUICK_LABEL_MAX_FONT_SCALE}>{a.label}</Text>
-          </BlurView>
+          </View>
         </PressableScale>
       ))}
     </View>
@@ -62,21 +63,13 @@ export function QuickActions({ isDark, c, tr, onAddTask, onAddExpense, onAddWate
 
 const s = StyleSheet.create({
   // Без зовнішнього marginBottom: відступ дає секція (TodaySectionGrid).
-  row: { flexDirection: 'row', gap: 8 },
+  row: { flexDirection: 'row', gap: 12 },
   btn: {
-    borderRadius: Atlas.radius.large,
-    borderWidth: 1,
-    paddingVertical: 10,
+    borderRadius: Atlas.radius.xlarge,
+    paddingVertical: 14,
     alignItems: 'center',
     overflow: 'hidden',
   },
-  iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: Atlas.radius.medium,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 5,
-  },
-  label: { fontSize: 10, fontWeight: '600', textAlign: 'center', paddingHorizontal: 4 },
+  iconWrap: { marginBottom: 6 },
+  label: { fontSize: 11, fontFamily: fontFamily.medium, textAlign: 'center', paddingHorizontal: 4 },
 });

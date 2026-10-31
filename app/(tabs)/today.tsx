@@ -1,7 +1,5 @@
 import { Atlas } from '@/constants/atlas';
 import { AdSlot, SponsorPause, advertisingActivity } from '@/components/advertising/Advertising';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -26,8 +24,8 @@ import { SkeletonCard } from '@/components/shared/Skeleton';
 import { SyncBadge } from '@/components/today/SyncBadge';
 import { QuickActions } from '@/components/today/QuickActions';
 import { TodayTaskRow } from '@/components/today/TodayTaskRow';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useMotion } from '@/hooks/use-motion';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
@@ -62,6 +60,10 @@ import { Layout } from '@/constants/tokens';
 import { TODAY_SECTION_GAP, TodaySectionGrid, type TodaySectionEntry } from '@/components/today/TodaySectionGrid';
 import { orderTodaySections } from '@/components/today/sectionOrder';
 import { masonryColumnCount } from '@/utils/masonry';
+import { fontFamily, type, type GlassAccent } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
+import { AccentDot, AccentIcon, AccentWash } from '@/components/shared/GlassBits';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -75,9 +77,9 @@ interface TodayProject {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ACCENT_TASK  = '#7C3AED';
-const ACCENT_FIN   = '#0EA5E9';
-const ACCENT_TIME  = '#6366F1';
+// DS v2.1: акценти розділів — glass.moduleAccent: здоров'я/звички — coral,
+// фінанси — lime, час — amber, завдання — lavender, зустрічі — info.
+// Один акцент на картку (крапка заголовка / icon-chip / змивка KPI).
 const QUICK_WATER  = 250;
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -133,7 +135,8 @@ export default function TodayScreen() {
   const { sizeClass } = useResponsive();
   const gutter = Layout.gutter[sizeClass];
   const columnCount = masonryColumnCount(Math.min(useScreenWidth(), Layout.wideMaxWidth));
-  const isDark = useColorScheme() === 'dark';
+  // DS v2: canvas + білі картки без рамок і блюру; KPI — тонкі великі цифри.
+  const { t, isDark } = useDSTheme();
   // Задача ПРОЄКТУ — карткою проєкту тут же, а не в особистому редакторі.
   const { openProjectTask, projectTaskSheet } = useInPlaceProjectTask(isDark);
   const router = useRouter();
@@ -490,12 +493,14 @@ export default function TodayScreen() {
             onPress={() => router.push('/health')}
             accessibilityRole="button"
             accessibilityLabel={tr.tabHealth}>
-            <BlurView
-              intensity={isDark ? 22 : 42}
-              tint={isDark ? 'dark' : 'light'}
-              style={[s.card, { borderColor: c.border }]}>
+            <View
+              style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+              <AccentWash isDark={isDark} accent="coral" strength={0.6} />
               <View style={s.cardHead}>
-                <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.tabHealth}</Text>
+                <View style={s.titleRow}>
+                  <AccentIcon isDark={isDark} icon="heart.fill" accent="coral" />
+                  <Text style={[s.cardTitle, { color: t.text.primary }]}>{tr.tabHealth}</Text>
+                </View>
                 <IconSymbol name="chevron.right" size={12} color={c.sub} />
               </View>
               <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
@@ -504,7 +509,7 @@ export default function TodayScreen() {
                 <RingCell pct={water / goals.water} color={ACCENT} label={tr.water} value={water >= 1000 ? `${(water / 1000).toFixed(1)}л` : `${water}мл`} />
                 <RingCell pct={sleep ? sleep / goals.sleep : 0} color={ACCENT_SLEEP} label={tr.sleep} value={sleep ? fmtSleep(sleep) : '—'} />
               </View>
-            </BlurView>
+            </View>
           </PressableScale>
         )}
         {showQuickActions && (
@@ -534,52 +539,52 @@ export default function TodayScreen() {
     key: 'finance',
     node: (
       <Section index={1} animate={animateIntro} motion={motion}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
           {showFinanceTile && (
           <StatTile
             c={c} isDark={isDark}
-            icon="banknote" color={ACCENT_FIN}
+            icon="banknote" accent="lime"
             title={tr.tabFinance}
             onPress={() => router.push('/explore')}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-              <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, fontWeight: '600', flexShrink: 1 }}>
+              <Text numberOfLines={1} style={{ color: t.text.secondary, fontSize: 12, fontFamily: fontFamily.regular, flexShrink: 1 }}>
                 {hasPrimaryAccounts ? tr.totalOnAccounts : tr.monthNet}
               </Text>
               {overview.unassigned.count > 0 && (
                 <View
                   accessible
                   accessibilityLabel={tr.unassignedTxWarning.replace('{n}', String(overview.unassigned.count))}>
-                  <IconSymbol name="exclamationmark.triangle.fill" size={11} color="#F59E0B" />
+                  <IconSymbol name="exclamationmark.triangle.fill" size={11} color={t.status.warning} />
                 </View>
               )}
             </View>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
-              style={{ color: headlineValue >= 0 ? '#10B981' : '#EF4444', fontSize: 20, fontWeight: Atlas.type.headingWeight, marginTop: 2 }}>
+              style={{ ...type.displaySm, fontSize: 30, lineHeight: 34, letterSpacing: -0.6, color: headlineValue >= 0 ? t.text.primary : t.status.danger, marginTop: 6 }}>
               {fmtMoney(headlineValue)}
             </Text>
             {hasPrimaryAccounts && (
-              <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: t.text.secondary, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 4 }}>
                 {tr.monthNet}: {overview.month.net > 0 ? '+' : ''}{fmtMoney(overview.month.net)}
               </Text>
             )}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 2 }}>
-              <Text style={{ color: '#10B981', fontSize: 11, fontWeight: '700' }}>↑ {fmtMoney(overview.month.income)}</Text>
-              <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>↓ {fmtMoney(overview.month.expense)}</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+              <Text style={{ color: t.status.success, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>↑ {fmtMoney(overview.month.income)}</Text>
+              <Text style={{ color: t.status.danger, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>↓ {fmtMoney(overview.month.expense)}</Text>
             </View>
           </StatTile>
           )}
           {showTimeTile && (
           <StatTile
             c={c} isDark={isDark}
-            icon="timer" color={ACCENT_TIME}
+            icon="timer" accent="amber"
             title={tr.quickTimer}
             onPress={() => router.push('/time')}>
-            <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, marginTop: 6 }}>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={{ ...type.displaySm, fontSize: 30, lineHeight: 34, letterSpacing: -0.6, color: t.text.primary, marginTop: 6 }}>
               {fmtTime(trackedSec)}
             </Text>
-            <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.todayTracked}</Text>
+            <Text style={{ color: t.text.secondary, fontSize: 12, marginTop: 4 }}>{tr.todayTracked}</Text>
           </StatTile>
           )}
         </View>
@@ -594,8 +599,11 @@ export default function TodayScreen() {
       key: 'habits',
       node: (
         <Section index={2} animate={animateIntro} motion={motion}>
-          <View style={{ gap: 6 }}>
-            <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayHabits}</Text>
+          <View style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card'), gap: 8 }]}>
+            <View style={[s.titleRow, { marginBottom: 4 }]}>
+              <AccentDot isDark={isDark} accent="coral" />
+              <Text style={[s.cardTitle, { color: t.text.primary }]}>{tr.todayHabits}</Text>
+            </View>
             {habits.map(h => {
               const done   = habitDoneToday(h);
               const streak = habitStreak(h);
@@ -606,10 +614,8 @@ export default function TodayScreen() {
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: done }}
                   accessibilityLabel={h.title}>
-                  <BlurView
-                    intensity={isDark ? 18 : 36}
-                    tint={isDark ? 'dark' : 'light'}
-                    style={[s.habitRow, { borderColor: c.border }]}>
+                  <View
+                    style={[s.habitRow, { backgroundColor: glassOf(t).surfaceSubtle }]}>
                     <View style={[s.habitBar, { backgroundColor: h.color || ACCENT }]} />
                     <AnimatedCheck
                       checked={done}
@@ -623,7 +629,7 @@ export default function TodayScreen() {
                         🔥{streak}
                       </Text>
                     )}
-                  </BlurView>
+                  </View>
                 </PressableScale>
               );
             })}
@@ -638,19 +644,22 @@ export default function TodayScreen() {
     key: 'tasks',
     node: (
       <Section index={3} animate={animateIntro} motion={motion}>
-        <View>
+        <View style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
           <View style={s.sectionRow}>
-            <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayTasks}</Text>
+            <View style={s.titleRow}>
+              <AccentDot isDark={isDark} accent="lavender" />
+              <Text style={[s.cardTitle, { color: t.text.primary }]}>{tr.todayTasks}</Text>
+            </View>
             <View style={{ flexDirection: 'row', gap: 6 }}>
               {overdueCount > 0 && (
-                <View style={[s.badge, { backgroundColor: '#EF4444' + '20', borderColor: '#EF4444' + '40' }]}>
-                  <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
+                <View style={[s.badge, { backgroundColor: dsGlass(isDark).accent.coral.tint }]}>
+                  <Text style={{ color: t.status.danger, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                     {overdueCount} {tr.todayOverdue}
                   </Text>
                 </View>
               )}
-              <View style={[s.badge, { backgroundColor: ACCENT_TASK + '18', borderColor: ACCENT_TASK + '35' }]}>
-                <Text style={{ color: ACCENT_TASK, fontSize: 11, fontWeight: '700' }}>
+              <View style={[s.badge, { backgroundColor: dsGlass(isDark).accent.lavender.tint }]}>
+                <Text style={{ color: dsGlass(isDark).accent.lavender.ink, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                   {activeCount} {tr.todayActive}
                 </Text>
               </View>
@@ -684,13 +693,13 @@ export default function TodayScreen() {
           {todayGroups.hidden > 0 && (
             <ShowAllRow
               label={tr.showAllCount.replace('{count}', String(todayGroups.total))}
-              color={ACCENT_TASK}
+              color={t.text.primary}
               c={c}
               onPress={() => router.push('/')}
             />
           )}
           {todayGroups.total === 0 && (
-            <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
+            <Text style={{ color: t.text.secondary, fontSize: 13, marginTop: 2 }}>{tr.noTasksToday}</Text>
           )}
         </View>
       </Section>
@@ -703,8 +712,11 @@ export default function TodayScreen() {
       key: 'meetings',
       node: (
         <Section index={4} animate={animateIntro} motion={motion}>
-          <View style={{ gap: 6 }}>
-            <Text style={[s.sectionTitle, { color: c.sub }]}>{tr.todayMeetings}</Text>
+          <View style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card'), gap: 8 }]}>
+            <View style={[s.titleRow, { marginBottom: 4 }]}>
+              <AccentDot isDark={isDark} accent="info" />
+              <Text style={[s.cardTitle, { color: t.text.primary }]}>{tr.todayMeetings}</Text>
+            </View>
             {todayMeetings.slice(0, TODAY_PREVIEW_LIMIT).map(({ meeting: m, phase }) => (
               <PressableScale
                 key={m.id}
@@ -712,21 +724,19 @@ export default function TodayScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`${m.time} ${m.title}`}
                 style={{ opacity: phase === 'past' ? 0.5 : 1 }}>
-                <BlurView
-                  intensity={isDark ? 18 : 36}
-                  tint={isDark ? 'dark' : 'light'}
-                  style={[s.meetingRow, { borderColor: c.border }]}>
-                  <View style={[s.meetingBar, { backgroundColor: m.color || ACCENT_TASK }]} />
+                <View
+                  style={[s.meetingRow, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+                  <View style={[s.meetingBar, { backgroundColor: m.color || dsGlass(isDark).accent.info.fill }]} />
                   <Text style={[s.meetingTime, { color: c.sub }]}>{m.time}</Text>
                   <Text style={[s.meetingTitle, { color: c.text }]} numberOfLines={1}>{m.title}</Text>
                   <MeetingProjectChip project={meetingProject(m, projects)} textColor={c.sub} maxWidth={110} />
-                </BlurView>
+                </View>
               </PressableScale>
             ))}
             {todayMeetings.length > TODAY_PREVIEW_LIMIT && (
               <ShowAllRow
                 label={tr.showAllCount.replace('{count}', String(todayMeetings.length))}
-                color="#6366F1"
+                color={t.text.primary}
                 c={c}
                 onPress={() => router.push('/calendar' as never)}
               />
@@ -776,20 +786,18 @@ export default function TodayScreen() {
             onPress={() => router.push(MODULE_SETTINGS_ROUTE as never)}
             accessibilityRole="button"
             accessibilityLabel={tr.modulesOpenSettings}>
-            <BlurView
-              intensity={isDark ? 22 : 42}
-              tint={isDark ? 'dark' : 'light'}
-              style={[s.card, { borderColor: c.border, gap: 6 }]}>
-              <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>
+            <View
+              style={[s.card, { gap: 6, backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+              <Text style={{ color: t.text.primary, fontSize: 16, fontFamily: fontFamily.semibold }}>
                 {tr.modulesDashboardEmptyTitle}
               </Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 18 }}>
                 {tr.modulesDashboardEmptyBody}
               </Text>
-              <Text style={{ color: ACCENT_TASK, fontSize: 13, fontWeight: '700' }}>
+              <Text style={{ color: t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>
                 {tr.modulesOpenSettings}
               </Text>
-            </BlurView>
+            </View>
           </PressableScale>
         </Section>
       ),
@@ -803,14 +811,14 @@ export default function TodayScreen() {
   return (
     <View style={{ flex: 1 }} onTouchStart={advertisingActivity}>
       <SponsorPause />
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <View style={{ flex: 1 }}>
         {/* Header */}
         <ScreenHeader
           title={dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}
           color={c.text}
           titleStyle={s.title}
-          eyebrow={<Text style={{ color: c.sub, fontSize: 13, fontWeight: '600' }}>{greet}</Text>}
+          eyebrow={<Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{greet}</Text>}
           actions={<SyncBadge />}
         />
 
@@ -826,7 +834,7 @@ export default function TodayScreen() {
           // Тап по результату пошуку речей при відкритій клавіатурі має
           // спрацювати з першого разу, а не лише сховати клавіатуру.
           keyboardShouldPersistTaps="handled"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.text.secondary} />}>
 
           {/* Пошук речей у контейнерах (containers.md §7.2) — під шапкою.
               Сам ховається, коли модуль вимкнено; обгортка — лише для відступу. */}
@@ -865,35 +873,35 @@ export default function TodayScreen() {
 
 // ─── StatTile — компактна плитка сітки ────────────────────────────────────────
 
-function StatTile({ c, isDark, icon, color, title, onPress, children }: {
+function StatTile({ c, isDark, icon, accent, title, onPress, children }: {
   c: any;
   isDark: boolean;
-  icon: string;
-  color: string;
+  icon: IconSymbolName;
+  /** DS v2.1: акцент модуля плитки — icon-chip + легка змивка KPI. */
+  accent: GlassAccent;
   title: string;
   onPress: () => void;
   children?: React.ReactNode;
 }) {
+  const { t } = useDSTheme();
+  void isDark; void c;
   return (
     <PressableScale
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={title}
       style={{ flex: 1 }}>
-      <BlurView
-        intensity={isDark ? 22 : 42}
-        tint={isDark ? 'dark' : 'light'}
-        style={[s.card, { borderColor: c.border }]}>
+      <View
+        style={[s.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+        <AccentWash isDark={isDark} accent={accent} strength={0.7} />
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={[s.cardIcon, { backgroundColor: color + '22' }]}>
-            <IconSymbol name={icon as any} size={15} color={color} />
-          </View>
-          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginLeft: 8, flex: 1 }} numberOfLines={1}>
+          <AccentIcon isDark={isDark} icon={icon} accent={accent} />
+          <Text style={{ color: t.text.primary, fontSize: 14, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1 }} numberOfLines={1}>
             {title}
           </Text>
         </View>
         {children}
-      </BlurView>
+      </View>
     </PressableScale>
   );
 }
@@ -903,34 +911,37 @@ function StatTile({ c, isDark, icon, color, title, onPress, children }: {
 const s = StyleSheet.create({
   // lineHeight явний: ScreenHeader задає 38 під свої 32pt, і без переозначення
   // 26-й кегль тягнув би за собою чужий міжрядковий інтервал.
-  title: { fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6, lineHeight: 32, marginTop: 2 },
-  card:  { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 14, overflow: 'hidden' },
+  title: { fontSize: 28, fontFamily: fontFamily.medium, letterSpacing: -0.28, lineHeight: 34, marginTop: 2 },
+  // DS v2: картка 20 радіус, 20 відступ, без рамки.
+  card:  { borderRadius: Atlas.radius.xlarge, padding: 20, overflow: 'hidden' },
+  cardTitle: { fontSize: 16, lineHeight: 22, fontFamily: fontFamily.semibold },
   cardHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   cardIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badge: { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
+  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   groupRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 4 },
   groupDot:   { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
-  groupName:  { flex: 1, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
-  groupCount: { fontSize: 11, fontWeight: '700', opacity: 0.7 },
+  groupName:  { flex: 1, fontSize: 12, fontFamily: fontFamily.semibold },
+  groupCount: { fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
   sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -951,7 +962,7 @@ const s = StyleSheet.create({
     bottom: 0,
     width: 4,
   },
-  focusTitle: { fontSize: 15, fontWeight: '700' },
+  focusTitle: { fontSize: 15, fontFamily: fontFamily.bold },
   playBtn: {
     width: 38,
     height: 38,
@@ -963,8 +974,8 @@ const s = StyleSheet.create({
   meetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Atlas.radius.medium,
-    borderWidth: 1,
+    borderRadius: Atlas.radius.large,
+    minHeight: 44,
     paddingVertical: 10,
     paddingLeft: 16,
     paddingRight: 12,
@@ -979,13 +990,13 @@ const s = StyleSheet.create({
     width: 3,
     borderRadius: 2,
   },
-  meetingTime: { fontSize: 13, fontWeight: '600', minWidth: 40 },
-  meetingTitle: { flex: 1, fontSize: 14, fontWeight: '500' },
+  meetingTime: { fontSize: 13, fontFamily: fontFamily.medium, minWidth: 40, fontVariant: ['tabular-nums'] },
+  meetingTitle: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium },
   habitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Atlas.radius.medium,
-    borderWidth: 1,
+    borderRadius: Atlas.radius.large,
+    minHeight: 44,
     paddingVertical: 10,
     paddingLeft: 16,
     paddingRight: 12,
@@ -1000,8 +1011,8 @@ const s = StyleSheet.create({
     width: 3,
     borderRadius: 2,
   },
-  habitTitle: { flex: 1, fontSize: 14, fontWeight: '500' },
-  streakBadge: { fontSize: 13, fontWeight: '700' },
+  habitTitle: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium },
+  streakBadge: { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });
 
 /** Рядок «показати всі» під скороченим списком. */
@@ -1025,7 +1036,7 @@ function ShowAllRow({ label, color, c, onPress }: {
         gap: 5,
         marginTop: 2,
       }}>
-      <Text style={{ color, fontSize: 13, fontWeight: '700' }}>{label}</Text>
+      <Text style={{ color, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
       <IconSymbol name="chevron.right" size={12} color={color} />
     </TouchableOpacity>
   );

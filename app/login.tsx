@@ -1,6 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -18,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
+import { dsTokens } from '@/hooks/use-ds';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
@@ -26,6 +24,9 @@ import { useI18n } from '@/store/i18n';
 import { throttleMessage } from '@/store/auth-throttle';
 import { getPendingRegistration } from '@/store/registration';
 import { haptic } from '@/utils/haptics';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
 
 // ─── Простий валідатор формату email ─────────────────────────────────────────
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -48,10 +49,13 @@ export default function LoginScreen() {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
+  const k = dsTokens(isDark);
   const c = {
     ...getScreenColors('auth', isDark),
-    errorBorder: '#EF4444',
-    red:         '#EF4444',
+    // Картка форми — суцільна поверхня DS v2.
+    card: glassOf(k).surface,
+    errorBorder: k.status.danger,
+    red:         k.status.danger,
   };
 
   const validateEmailFormat = (val: string): boolean => {
@@ -136,7 +140,7 @@ export default function LoginScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
 
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
@@ -146,7 +150,7 @@ export default function LoginScreen() {
             accessibilityRole="button"
             accessibilityLabel={tr.back}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={22} color={c.accent} />
+            <IconSymbol name="chevron.left" size={22} color={c.text} />
           </TouchableOpacity>
         </View>
 
@@ -161,10 +165,8 @@ export default function LoginScreen() {
           >
             <Text style={[st.title, { color: c.text }]}>{tr.authLogin}</Text>
 
-            <BlurView
-              intensity={isDark ? 20 : 40}
-              tint={isDark ? 'dark' : 'light'}
-              style={[st.card, { borderColor: emailError ? c.errorBorder : c.border }]}
+            <View
+              style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }, emailError ? { borderWidth: 1, borderColor: c.errorBorder } : null]}
             >
               {/* Email */}
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
@@ -177,10 +179,10 @@ export default function LoginScreen() {
                     st.input,
                     { color: c.text },
                     emailError
-                      ? { borderWidth: 1, borderColor: c.red, borderRadius: Atlas.radius.small }
+                      ? { borderWidth: 1, borderColor: c.red, borderRadius: 8 }
                       : null,
                   ]}
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={k.text.muted}
                   placeholder="you@example.com"
                   value={email}
                   onChangeText={v => { setEmail(v); if (emailError) setEmailError(''); }}
@@ -214,11 +216,11 @@ export default function LoginScreen() {
                         ? {
                             borderWidth: 1,
                             borderColor: c.red,
-                            borderRadius: Atlas.radius.small,
+                            borderRadius: 8,
                           }
                         : null,
                     ]}
-                    placeholderTextColor={c.sub}
+                    placeholderTextColor={k.text.muted}
                     placeholder="••••••••"
                     value={password}
                     onChangeText={v => { setPassword(v); if (passwordError) setPasswordError(''); }}
@@ -242,7 +244,7 @@ export default function LoginScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </BlurView>
+            </View>
 
             {passwordError ? (
               <Text style={[st.error, { color: c.red }]}>{passwordError}</Text>
@@ -252,15 +254,15 @@ export default function LoginScreen() {
             ) : null}
 
             <TouchableOpacity
-              style={[st.primaryBtn, { backgroundColor: c.accent, opacity: loading ? 0.7 : 1 }]}
+              style={[st.primaryBtn, { backgroundColor: loading ? k.action.primaryPressed : k.action.primary }]}
               activeOpacity={0.82}
               onPress={handleLogin}
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={k.text.onAction} />
               ) : (
-                <Text style={st.primaryBtnText}>{tr.authLogin}</Text>
+                <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.authLogin}</Text>
               )}
             </TouchableOpacity>
 
@@ -268,7 +270,7 @@ export default function LoginScreen() {
               style={st.linkBtn}
               onPress={() => router.push('/forgot-password')}
             >
-              <Text style={[st.linkText, { color: c.accent }]}>
+              <Text style={[st.linkText, { color: c.text, fontFamily: fontFamily.semibold }]}>
                 {tr.authForgotPassword}
               </Text>
             </TouchableOpacity>
@@ -300,28 +302,23 @@ const st = StyleSheet.create({
     paddingBottom: 60,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.4,
+    fontSize: 32,
+    fontFamily: fontFamily.medium,
+    letterSpacing: -0.32,
     marginBottom: 24,
   },
   card: {
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
+    borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
   },
   fieldWrap: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
   },
   fieldLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontFamily: fontFamily.medium,
+    letterSpacing: 0.3,
     marginBottom: 4,
   },
   fieldError: {
@@ -336,7 +333,8 @@ const st = StyleSheet.create({
   },
   input: {
     fontSize: 16,
-    paddingVertical: 2,
+    fontFamily: fontFamily.regular,
+    paddingVertical: 4,
   },
   error: {
     fontSize: 13,
@@ -345,23 +343,26 @@ const st = StyleSheet.create({
     paddingHorizontal: 4,
   },
   primaryBtn: {
-    borderRadius: Atlas.radius.large,
+    borderRadius: 999,
+    minHeight: 52,
+    justifyContent: 'center',
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 20,
   },
   primaryBtnText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fontFamily.semibold,
   },
   linkBtn: {
-    marginTop: 16,
+    marginTop: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
     paddingVertical: 8,
   },
   linkText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
 });

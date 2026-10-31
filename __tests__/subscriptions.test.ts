@@ -190,10 +190,21 @@ describe('renew / archive / restore', () => {
       id: 'tx-1', type: 'expense', category: 'Розваги', amount: 12.5,
       accountId: 'acc-1', currency: 'USD', note: 'Netflix', projectId: 'p1',
     });
-    // Датується днем ЦИКЛУ, за який заплатили, а час доби — поточний.
+    // Без paidOn — день фактичної оплати (сьогодні), а не день циклу; час доби — поточний.
     const when = new Date(transaction.date);
-    expect([when.getFullYear(), when.getMonth(), when.getDate()]).toEqual([2026, 8, 20]);
+    expect([when.getFullYear(), when.getMonth(), when.getDate()]).toEqual([2026, 8, 22]);
     expect(when.getHours()).toBe(14);
+  });
+
+  it('оплата з paidOn: витрата в день списання, історія й цикл — від якоря', () => {
+    const at = new Date('2026-09-22T09:05:00');
+    const s = sub({ nextPaymentDate: '2026-09-20' });
+    const { subscription, transaction } = paySubscription(s, {
+      id: 'tx-p', fallbackCategory: 'Інше', paidOn: '2026-09-21', now: at,
+    });
+    expect(new Date(transaction.date).getDate()).toBe(21);
+    expect(subscription.history[0].date).toBe('2026-09-20');
+    expect(subscription.nextPaymentDate).toBe(renewSubscription(s, { now: at }).nextPaymentDate);
   });
 
   it('оплата без категорії й суми бере запасні значення', () => {

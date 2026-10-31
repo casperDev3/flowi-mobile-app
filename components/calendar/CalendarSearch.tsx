@@ -13,7 +13,6 @@ import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 
 import type { MeetingChipProject } from '@/components/meetings/MeetingProjectChip';
 import { MeetingProjectChip } from '@/components/meetings/MeetingProjectChip';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Atlas } from '@/constants/atlas';
 import type { Translations } from '@/store/translations';
 import type { Meeting } from '@/utils/meetings';
 import type { Task } from '@/utils/taskUtils';
@@ -21,6 +20,9 @@ import type { Task } from '@/utils/taskUtils';
 import { keyToDate, searchCalendar, type CalendarSearchGroup, type CalendarTaskItem } from './calendarModel';
 import { MeetingCard } from './MeetingCard';
 import type { CalendarColors } from './palette';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 export interface CalendarSearchProps {
   query: string;
@@ -78,10 +80,10 @@ export function CalendarSearch({
           onPress={() => onTaskPress(item.task)}
           accessibilityRole="button"
           accessibilityLabel={`${tr.calA11yTask}: ${item.task.title}${item.done ? `, ${tr.done}` : ''}`}
-          style={[st.row, { backgroundColor: c.card, borderColor: c.border, opacity: item.done ? 0.55 : 1 }]}>
-          <IconSymbol name={item.done ? 'checkmark.circle.fill' : 'circle'} size={18} color={item.done ? '#10B981' : item.color} />
+          style={[st.row, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), opacity: item.done ? 0.55 : 1 }]}>
+          <IconSymbol name={item.done ? 'checkmark.circle.fill' : 'circle'} size={18} color={item.done ? dsTokens(isDark).status.success : item.color} />
           <View style={{ flex: 1, gap: 3 }}>
-            <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', textDecorationLine: item.done ? 'line-through' : 'none' }} numberOfLines={2}>
+            <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, textDecorationLine: item.done ? 'line-through' : 'none' }} numberOfLines={2}>
               {item.task.title}
             </Text>
             {item.project ? <MeetingProjectChip project={item.project} textColor={c.text} /> : null}
@@ -96,7 +98,7 @@ export function CalendarSearch({
   return (
     <View style={{ flex: 1 }}>
       <View style={st.barRow}>
-        <View style={[st.inputBox, { backgroundColor: c.dim, borderColor: c.border }]}>
+        <View style={[st.inputBox, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
           <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
           <TextInput
             testID="calendar-search-input"
@@ -104,11 +106,11 @@ export function CalendarSearch({
             value={query}
             onChangeText={onQueryChange}
             placeholder={tr.calSearchPlaceholder}
-            placeholderTextColor={c.sub}
+            placeholderTextColor={c.muted}
             accessibilityLabel={tr.calSearch}
             returnKeyType="search"
             autoCorrect={false}
-            style={{ flex: 1, color: c.text, fontSize: 15, paddingVertical: 0 }}
+            style={{ flex: 1, color: c.text, fontSize: 15, fontFamily: fontFamily.regular, paddingVertical: 0 }}
           />
           {query ? (
             <TouchableOpacity onPress={() => onQueryChange('')} accessibilityRole="button" accessibilityLabel={tr.calSearchClear}
@@ -118,7 +120,7 @@ export function CalendarSearch({
           ) : null}
         </View>
         <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.cancel} style={st.cancelBtn}>
-          <Text style={{ color: c.accent, fontSize: 15, fontWeight: '700' }}>{tr.cancel}</Text>
+          <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
         </TouchableOpacity>
       </View>
 
@@ -130,12 +132,12 @@ export function CalendarSearch({
         {!trimmed ? (
           <View style={st.empty}>
             <IconSymbol name="magnifyingglass" size={26} color={c.sub} />
-            <Text style={{ color: c.sub, fontSize: 13, marginTop: 8, textAlign: 'center' }}>{tr.calSearchHint}</Text>
+            <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 8, textAlign: 'center' }}>{tr.calSearchHint}</Text>
           </View>
         ) : result.total === 0 ? (
           <View style={st.empty}>
             <IconSymbol name="magnifyingglass" size={26} color={c.sub} />
-            <Text style={{ color: c.sub, fontSize: 13, marginTop: 8, textAlign: 'center' }}>{tr.calSearchEmpty}</Text>
+            <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 8, textAlign: 'center' }}>{tr.calSearchEmpty}</Text>
           </View>
         ) : (
           <>
@@ -162,15 +164,15 @@ const st = StyleSheet.create({
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginBottom: 12 },
   inputBox: {
     flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderRadius: Atlas.radius.medium, borderWidth: 1, paddingLeft: 12,
+    borderRadius: radius.pill, paddingLeft: 16,
   },
   clearBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   cancelBtn: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  section: { fontSize: 15, fontWeight: '800' },
-  dayLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  section: { fontSize: 16, fontFamily: fontFamily.semibold },
+  dayLabel: { fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
   row: {
     minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9,
+    borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 12,
   },
   empty: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 24 },
 });

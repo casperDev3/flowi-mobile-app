@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/feedback.tsx — «Ідеї та баги»: ОДИН екран замість ideas.tsx + bugs.tsx
  * (flowi-server-app/docs/specs/feedback-inbox.md §10).
@@ -19,8 +18,6 @@ import { Atlas } from '@/constants/atlas';
 import * as Clipboard from 'expo-clipboard';
 import * as Device from 'expo-device';
 import * as DocumentPicker from 'expo-document-picker';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -90,6 +87,7 @@ import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useSyncedList } from '@/hooks/use-synced-list';
@@ -97,6 +95,9 @@ import { CLIENT_VERSION, getCachedWorkspace } from '@/store/api-config';
 import { useI18n } from '@/store/i18n';
 import { hasStorageReadFailure, subscribeToStorage } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
+import { fontFamily } from '@/constants/theme';
+import { glassStyles } from '@/components/finance/finPalette';
+import { MeshBackground } from '@/components/ds';
 
 /** Між закриттям одного аркуша й відкриттям наступного (NEW-02 у CLAUDE.md). */
 const SHEET_HANDOFF_MS = 260;
@@ -143,15 +144,26 @@ export default function FeedbackScreen() {
   const reloadIdeas = ideasList.reload;
   const reloadBugs = bugsList.reload;
 
+  const k = dsTokens(isDark);
+  const g = glassTokens(isDark);
+  const { reduceTransparency } = useDS();
+
+  // DS v2.1: mesh-основа, скляні картки/аркуш (gl), акцент екрана — amber (ідеї).
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F5F0FF',
-    bg2:    isDark ? '#14121E' : '#EDE8FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-  }), [isDark]);
+    bg1:    g.mesh.base,
+    bg2:    g.mesh.base,
+    border: k.border.hairline,
+    text:   k.text.primary,
+    sub:    k.text.secondary,
+    dim:    g.surfaceSubtle,
+    sheet:  g.surfaceStrong,
+    card:   reduceTransparency ? g.solid.card : g.surface,
+    action: k.action.primary,
+    onAction: k.text.onAction,
+    accent: g.accent.amber.ink,
+    accentTint: g.accent.amber.tint,
+    gl:     glassStyles(isDark, reduceTransparency),
+  }), [k, g, isDark, reduceTransparency]);
   const cardColors = useMemo(() => ({ border: c.border, text: c.text, sub: c.sub }), [c]);
   const accent = KIND_COLOR[kind];
 
@@ -487,7 +499,7 @@ export default function FeedbackScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <View style={{ flex: 1, flexDirection: 'row' }}>
         <View style={{ flex: 1 }}>
           <ScreenHeader
@@ -500,15 +512,15 @@ export default function FeedbackScreen() {
               <HeaderButton
                 onPress={() => openForm(null)}
                 accessibilityLabel={kind === 'bug' ? tr.fbNewBug : tr.fbNewIdea}
-                style={{ backgroundColor: accent, borderColor: accent }}>
-                <IconSymbol name="plus" size={18} color="#fff" />
+                style={{ backgroundColor: c.action, borderColor: c.action }}>
+                <IconSymbol name="plus" size={18} color={c.onAction} />
               </HeaderButton>
             }
           />
 
           <View style={[contentWidth, { paddingHorizontal: 20 }]}>
             {/* Тип: Ідеї | Баги (§10.1) */}
-            <View style={[st.segment, { borderColor: c.border, backgroundColor: c.dim }]} accessibilityRole="tablist">
+            <View style={[st.segment, { ...c.gl.card }]} accessibilityRole="tablist">
               {(['idea', 'bug'] as const).map(k => {
                 const active = kind === k;
                 return (
@@ -517,9 +529,9 @@ export default function FeedbackScreen() {
                     onPress={() => setKind(k)}
                     accessibilityRole="tab"
                     accessibilityState={{ selected: active }}
-                    style={[st.segmentBtn, active && { backgroundColor: KIND_COLOR[k] }]}>
-                    <IconSymbol name={k === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={13} color={active ? '#fff' : c.sub} />
-                    <Text style={{ color: active ? '#fff' : c.sub, fontWeight: '700', fontSize: 13 }}>
+                    style={[st.segmentBtn, active && { backgroundColor: c.action }]}>
+                    <IconSymbol name={k === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={13} color={active ? c.onAction : KIND_COLOR[k]} />
+                    <Text style={{ color: active ? c.onAction : c.text, fontFamily: fontFamily.semibold, fontSize: 13 }}>
                       {k === 'bug' ? tr.fbTabBugs : tr.fbTabIdeas}
                     </Text>
                   </TouchableOpacity>
@@ -530,30 +542,32 @@ export default function FeedbackScreen() {
             <View style={st.stats}>
               {([
                 { label: tr.fbStatOpen, value: counts.open, color: accent },
-                { label: tr.fbStatDone, value: counts.done, color: '#10B981' },
-                { label: tr.fbStatSent, value: counts.sent, color: '#F59E0B' },
+                { label: tr.fbStatDone, value: counts.done, color: k.status.success },
+                { label: tr.fbStatSent, value: counts.sent, color: k.accent.amber },
               ]).map(stat => (
-                <View key={stat.label} style={[st.statCard, { backgroundColor: stat.color + '18', borderColor: stat.color + '30' }]}>
-                  <Text style={{ color: stat.color, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{stat.value}</Text>
-                  <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: stat.color, fontSize: 11, fontWeight: '600', marginTop: 2 }}>{stat.label}</Text>
+                <View key={stat.label} style={[st.statCard, { ...c.gl.card }]}>
+                  {/* KPI — тонкі великі табличні цифри; колір стану — позначкою. */}
+                  <Text style={{ color: c.text, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.64 }}>{stat.value}</Text>
+                  <View style={{ width: 14, height: 3, borderRadius: 2, backgroundColor: stat.color, marginTop: 6 }} />
+                  <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 6 }}>{stat.label}</Text>
                 </View>
               ))}
             </View>
 
-            <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'} style={[st.filterRow, { borderColor: c.border }]}>
+            <View style={[st.filterRow, { ...c.gl.card }]}>
               {(['all', 'open', 'done', 'sent'] as const).map(f => (
                 <TouchableOpacity
                   key={f}
                   onPress={() => setFilter(f)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: filter === f }}
-                  style={[st.filterBtn, filter === f && { backgroundColor: accent }]}>
-                  <Text style={{ color: filter === f ? '#fff' : c.sub, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
+                  style={[st.filterBtn, filter === f && { backgroundColor: c.action }]}>
+                  <Text style={{ color: filter === f ? c.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold }} numberOfLines={1}>
                     {filterLabels[f]}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </BlurView>
+            </View>
 
             <View style={st.sortRow}>
               {sortOptions.map(opt => (
@@ -563,17 +577,16 @@ export default function FeedbackScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: sort === opt.key }}
                   style={[st.sortChip, {
-                    backgroundColor: sort === opt.key ? accent + '20' : c.dim,
-                    borderColor: sort === opt.key ? accent : c.border,
+                    backgroundColor: sort === opt.key ? c.action : c.card,
                   }]}>
-                  <IconSymbol name={opt.icon as never} size={11} color={sort === opt.key ? accent : c.sub} />
-                  <Text style={{ color: sort === opt.key ? accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>{opt.label}</Text>
+                  <IconSymbol name={opt.icon as never} size={11} color={sort === opt.key ? c.onAction : c.sub} />
+                  <Text style={{ color: sort === opt.key ? c.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4 }}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             {forwardingOff ? (
-              <View style={[st.banner, { borderColor: c.border, backgroundColor: c.dim }]}>
+              <View style={[st.banner, { ...c.gl.card }]}>
                 <IconSymbol name="info.circle" size={14} color={c.sub} />
                 <Text style={{ color: c.sub, fontSize: 12, flex: 1 }}>{tr.fbForwardingOff}</Text>
               </View>
@@ -586,22 +599,22 @@ export default function FeedbackScreen() {
             contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }]}
             showsVerticalScrollIndicator={false}
             ItemSeparatorComponent={Separator}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accent} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}
             renderItem={renderItem}
             ListEmptyComponent={
               !loaded ? null : loadFailed ? (
                 // «Не прочиталось» і «порожньо» — різні речі (CLAUDE.md, ERR-01).
                 <View style={st.empty}>
-                  <IconSymbol name="exclamationmark.triangle.fill" size={36} color="#EF4444" />
-                  <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', textAlign: 'center' }}>{tr.fbLoadFailed}</Text>
-                  <TouchableOpacity onPress={onRefresh} accessibilityRole="button" style={[st.retryBtn, { borderColor: c.border }]}>
-                    <Text style={{ color: c.text, fontWeight: '600' }}>{tr.fbRetry}</Text>
+                  <IconSymbol name="exclamationmark.triangle.fill" size={36} color={k.status.danger} />
+                  <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, textAlign: 'center' }}>{tr.fbLoadFailed}</Text>
+                  <TouchableOpacity onPress={onRefresh} accessibilityRole="button" style={[st.retryBtn, { ...c.gl.subtle }]}>
+                    <Text style={{ color: c.text, fontFamily: fontFamily.semibold }}>{tr.fbRetry}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <View style={st.empty}>
-                  <IconSymbol name={kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={40} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 15, fontWeight: '600' }}>{kind === 'bug' ? tr.fbEmptyBugs : tr.fbEmptyIdeas}</Text>
+                  <IconSymbol name={kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={40} color={c.accent} />
+                  <Text style={{ color: c.sub, fontSize: 15, fontFamily: fontFamily.semibold }}>{kind === 'bug' ? tr.fbEmptyBugs : tr.fbEmptyIdeas}</Text>
                   <Text style={{ color: c.sub, fontSize: 13 }}>{tr.fbEmptyHint}</Text>
                 </View>
               )
@@ -680,16 +693,16 @@ function Separator() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:  { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
-  segment:    { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, marginTop: 6 },
-  segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: Atlas.radius.medium, minHeight: 40 },
-  stats:      { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 12 },
-  statCard:   { flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center' },
-  filterRow:  { flexDirection: 'row', borderRadius: 13, borderWidth: 1, padding: 3, overflow: 'hidden' },
-  filterBtn:  { flex: 1, paddingVertical: 8, borderRadius: Atlas.radius.medium, alignItems: 'center' },
+  pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
+  segment:    { flexDirection: 'row', borderRadius: 999, padding: 4, marginTop: 6 },
+  segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 999, minHeight: 40 },
+  stats:      { flexDirection: 'row', gap: 12, marginTop: 12, marginBottom: 12 },
+  statCard:   { flex: 1, borderRadius: 20, paddingVertical: 16, paddingHorizontal: 12, alignItems: 'flex-start' },
+  filterRow:  { flexDirection: 'row', borderRadius: 999, padding: 4, overflow: 'hidden' },
+  filterBtn:  { flex: 1, minHeight: 36, justifyContent: 'center', paddingVertical: 8, borderRadius: 999, alignItems: 'center' },
   sortRow:    { flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 12 },
-  sortChip:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
-  banner:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 10, marginBottom: 12 },
+  sortChip:   { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 36, paddingHorizontal: 14, paddingVertical: 7 },
+  banner:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 16, padding: 14, marginBottom: 12 },
   empty:      { alignItems: 'center', paddingTop: 60, gap: 10 },
-  retryBtn:   { borderWidth: 1, borderRadius: 11, paddingHorizontal: 16, paddingVertical: 10, minHeight: 44, justifyContent: 'center' },
+  retryBtn:   { borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10, minHeight: 44, justifyContent: 'center' },
 });

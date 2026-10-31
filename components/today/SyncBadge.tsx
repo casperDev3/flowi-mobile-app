@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -6,10 +5,12 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { Radius } from '@/constants/tokens';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useAppMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
 import { useSync } from '@/store/sync-engine';
+import { fontFamily } from '@/constants/theme';
+import { glassOf, dsGlass } from '@/components/shared/dsTheme';
 
 function fmtRelative(ms: number): string {
   const diff = Date.now() - ms;
@@ -24,7 +25,9 @@ function fmtRelative(ms: number): string {
 export function SyncBadge() {
   const { online } = useAppMode();
   const router = useRouter();
-  const isDark = useColorScheme() === 'dark';
+  // DS v2: пігулки стану — тонований status.* фон, текст — text.primary для читабельності.
+  const { t, isDark } = useDSTheme();
+  const syncAccent = dsGlass(isDark).accent.lavender.ink;
   const { tr } = useI18n();
   const { state, lastSyncAt, pendingCount, conflictsCount } = useSync();
 
@@ -38,8 +41,8 @@ export function SyncBadge() {
 
   // ── Офлайн ──────────────────────────────────────────────────────────────────
   if (!online) {
-    const offlineSubColor = isDark ? 'rgba(255,255,255,0.62)' : 'rgba(0,0,0,0.58)';
-    const offlineBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    const offlineSubColor = t.text.secondary;
+    const offlineBg = glassOf(t).surfaceSubtle;
     return (
       <TouchableOpacity
         onPress={handlePress}
@@ -59,11 +62,11 @@ export function SyncBadge() {
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={0.7}
-        style={[s.pill, { backgroundColor: '#7C3AED18' }]}
+        style={[s.pill, { backgroundColor: syncAccent + '18' }]}
         accessibilityRole="button"
         accessibilityLabel={tr.sync}>
-        <ActivityIndicator size="small" color="#7C3AED" style={{ transform: [{ scale: 0.7 }] }} />
-        <Text style={[s.text, { color: '#7C3AED', marginLeft: 4 }]}>Синхр…</Text>
+        <ActivityIndicator size="small" color={syncAccent} style={{ transform: [{ scale: 0.7 }] }} />
+        <Text style={[s.text, { color: syncAccent, marginLeft: 4 }]}>Синхр…</Text>
       </TouchableOpacity>
     );
   }
@@ -74,11 +77,11 @@ export function SyncBadge() {
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={0.7}
-        style={[s.pill, { backgroundColor: '#F59E0B18' }]}
+        style={[s.pill, { backgroundColor: t.status.warning + '24' }]}
         accessibilityRole="button"
         accessibilityLabel={tr.syncError}>
-        <IconSymbol name="exclamationmark.triangle" size={12} color="#F59E0B" />
-        <Text style={[s.text, { color: '#F59E0B', marginLeft: 4 }]}>{tr.syncError}</Text>
+        <IconSymbol name="exclamationmark.triangle" size={12} color={t.status.warning} />
+        <Text style={[s.text, { color: t.text.primary, marginLeft: 4 }]}>{tr.syncError}</Text>
       </TouchableOpacity>
     );
   }
@@ -89,13 +92,13 @@ export function SyncBadge() {
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={0.7}
-        style={[s.pill, { backgroundColor: '#EF444418' }]}
+        style={[s.pill, { backgroundColor: t.status.danger + '18' }]}
         accessibilityRole="button"
         accessibilityLabel={`${conflictsCount} ${tr.syncConflictsCount}`}>
-        <View style={[s.badge, { backgroundColor: '#EF4444' }]}>
+        <View style={[s.badge, { backgroundColor: t.status.danger }]}>
           <Text style={s.badgeText}>{conflictsCount}</Text>
         </View>
-        <Text style={[s.text, { color: '#EF4444', marginLeft: 4 }]}>{tr.syncConflictsCount}</Text>
+        <Text style={[s.text, { color: t.status.danger, marginLeft: 4 }]}>{tr.syncConflictsCount}</Text>
       </TouchableOpacity>
     );
   }
@@ -106,11 +109,11 @@ export function SyncBadge() {
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={0.7}
-        style={[s.pill, { backgroundColor: '#D9770618' }]}
+        style={[s.pill, { backgroundColor: t.status.warning + '24' }]}
         accessibilityRole="button"
         accessibilityLabel={`${pendingCount} ${tr.syncPending}`}>
-        <IconSymbol name="arrow.triangle.2.circlepath" size={12} color="#D97706" />
-        <Text style={[s.text, { color: '#D97706', marginLeft: 4 }]}>{pendingCount} {tr.syncPending}</Text>
+        <IconSymbol name="arrow.triangle.2.circlepath" size={12} color={t.status.warning} />
+        <Text style={[s.text, { color: t.text.primary, marginLeft: 4, fontVariant: ['tabular-nums'] }]}>{pendingCount} {tr.syncPending}</Text>
       </TouchableOpacity>
     );
   }
@@ -125,7 +128,7 @@ export function SyncBadge() {
       accessibilityRole="button"
       accessibilityLabel={tr.onlineBadge}>
       <View style={s.dot} />
-      <Text style={[s.text, { color: '#10B981' }]}>
+      <Text style={[s.text, { color: t.status.success, fontVariant: ['tabular-nums'] }]}>
         {timeLabel ? timeLabel : tr.onlineBadge}
       </Text>
     </TouchableOpacity>
@@ -144,12 +147,12 @@ const s = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#10B981',
+    backgroundColor: '#22A55B',
     marginRight: 4,
   },
   text: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fontFamily.semibold,
   },
   badge: {
     width: 16,
@@ -161,6 +164,6 @@ const s = StyleSheet.create({
   badgeText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: Atlas.type.headingWeight,
+    fontFamily: fontFamily.semibold,
   },
 });

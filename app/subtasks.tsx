@@ -1,5 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -28,6 +26,10 @@ import { useTimerContext } from '@/store/timer-context';
 import { subtaskToggleTransition, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { normalizePriority, type LegacyPriority, type TaskPriority } from '@/utils/taskUtils';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { fontFamily, radius, theme } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
 
 type Status = 'active' | 'done';
 interface SubTask { id: string; title: string; done: boolean; }
@@ -58,6 +60,8 @@ interface SubRowProps {
  * перемальовує весь список на кожну натиснуту літеру.
  */
 const subKey = (sub: SubTask) => sub.id;
+/** Позначка «виконано» — DS status.success. */
+const SUCCESS = theme.light.status.success;
 const SubSeparator = () => <View style={{ height: 8 }} />;
 
 const SubRow = React.memo(function SubRow({
@@ -67,14 +71,15 @@ const SubRow = React.memo(function SubRow({
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={() => onToggle(sub.id)}
-      style={[st.subRow, { backgroundColor: dimColor, borderColor: sub.done ? '#10B98130' : borderColor }]}>
-      <View style={[st.subCheck, { borderColor: sub.done ? '#10B981' : borderColor, backgroundColor: sub.done ? '#10B981' : 'transparent' }]}>
-        {sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
+      // DS v2: рядок — картка surface.card (передається як dimColor), без рамки.
+      style={[st.subRow, { backgroundColor: dimColor }]}>
+      <View style={[st.subCheck, { borderColor: sub.done ? SUCCESS : subColor, backgroundColor: sub.done ? SUCCESS : 'transparent' }]}>
+        {sub.done && <IconSymbol name="checkmark" size={10} color="#FFFFFF" />}
       </View>
       <Text style={{
         color: sub.done ? subColor : textColor,
         textDecorationLine: sub.done ? 'line-through' : 'none',
-        flex: 1, marginHorizontal: 12, fontSize: 14, fontWeight: '500',
+        flex: 1, marginHorizontal: 12, fontSize: 14, fontFamily: fontFamily.medium,
       }}>
         {sub.title}
       </Text>
@@ -112,14 +117,16 @@ export default function SubtasksScreen() {
   const [newSubtask, setNewSubtask] = useState('');
 
   // Палітра стабільна між рендерами — інакше React.memo на рядку не спрацює.
+  // DS v2: семантичні токени замість лілових відтінків.
+  const tk = dsTokens(isDark);
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: '#7C3AED',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    bg1:    dsTokens(isDark).bg.canvas,
+    bg2:    dsTokens(isDark).bg.canvas,
+    border: dsTokens(isDark).border.hairline,
+    text:   dsTokens(isDark).text.primary,
+    sub:    dsTokens(isDark).text.secondary,
+    accent: dsGlass(isDark).accent.lavender.ink, // DS v2: акцент tasks
+    dim:    glassOf(dsTokens(isDark)).surfaceSubtle,
   }), [isDark]);
 
   useEffect(() => {
@@ -185,17 +192,17 @@ export default function SubtasksScreen() {
       textColor={c.text}
       subColor={c.sub}
       borderColor={c.border}
-      dimColor={c.dim}
+      dimColor={tk.surface.card}
       onToggle={toggleSubtask}
       onDelete={deleteSubtask}
       onCopy={copySubtask}
       copyLabel={tr.copySubtask}
     />
-  ), [c, toggleSubtask, deleteSubtask, copySubtask, tr.copySubtask]);
+  ), [c, tk.surface.card, toggleSubtask, deleteSubtask, copySubtask, tr.copySubtask]);
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
       <SafeAreaView style={{ flex: 1 }} edges={[]}>
@@ -214,8 +221,8 @@ export default function SubtasksScreen() {
           back={{
             onPress: () => router.back(),
             label: tr.back,
-            color: c.accent,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            color: c.text,
+            style: { backgroundColor: glassOf(tk).surface, borderColor: 'transparent' },
           }}
           crumbs={[
             { label: tr.tabTasks, onPress: () => router.push('/(tabs)') },
@@ -223,7 +230,7 @@ export default function SubtasksScreen() {
           ]}
           crumbColor={c.sub}
           actions={task ? <PriorityBadge level={normalizePriority(task)} size="md" /> : undefined}>
-          <Text style={{ color: c.sub, fontSize: 12 }}>{doneCount}/{total} {tr.done}</Text>
+          <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] }}>{doneCount}/{total} {tr.done}</Text>
         </ScreenHeader>
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -238,28 +245,31 @@ export default function SubtasksScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={total > 0 ? (
-              <View style={{ marginBottom: 20 }}>
-                <View style={st.progressBg}>
-                  <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: c.accent }]} />
+              // DS v2: KPI-картка — тонкий великий відсоток + amber-прогрес.
+              <View style={{ marginBottom: 16, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.cardCompact, padding: 20 }}>
+                <Text style={{ color: c.text, fontSize: 40, lineHeight: 44, letterSpacing: -0.8, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'] }}>
+                  {pct}<Text style={{ color: c.sub, fontSize: 18, fontFamily: fontFamily.regular }}>% {tr.done}</Text>
+                </Text>
+                <View style={[st.progressBg, { backgroundColor: glassOf(tk).surfaceSubtle, marginTop: 12 }]}>
+                  <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: tk.accent.amber }]} />
                 </View>
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 5 }}>{pct}% {tr.done}</Text>
               </View>
             ) : null}
             ListFooterComponent={
-              <View style={[st.addSubRow, { borderColor: c.border, backgroundColor: c.dim, marginTop: sortedSubs.length > 0 ? 8 : 0 }]}>
+              <View style={[st.addSubRow, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginTop: sortedSubs.length > 0 ? 8 : 0 }]}>
                 <IconSymbol name="plus" size={15} color={c.sub} />
                 <TextInput
                   placeholder="Додати підзавдання..."
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={tk.text.muted}
                   value={newSubtask}
                   onChangeText={setNewSubtask}
                   onSubmitEditing={addSubtask}
                   returnKeyType="done"
-                  style={{ color: c.text, flex: 1, marginLeft: 10, fontSize: 14, paddingVertical: 0 }}
+                  style={{ color: c.text, flex: 1, marginLeft: 10, fontSize: 14, fontFamily: fontFamily.regular, paddingVertical: 0 }}
                 />
                 {newSubtask.trim() ? (
                   <TouchableOpacity onPress={addSubtask}>
-                    <IconSymbol name="checkmark.circle.fill" size={22} color={c.accent} />
+                    <IconSymbol name="checkmark.circle.fill" size={22} color={c.text} />
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -275,10 +285,10 @@ export default function SubtasksScreen() {
 const st = StyleSheet.create({
   // Кегль заголовка тут менший за спільні 32: у шапці стоїть назва
   // завдання, і на телефоні довга назва інакше з'їдає весь рядок.
-  title:       { fontSize: 18, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4 },
-  progressBg:  { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
-  progressFill:{ height: '100%', borderRadius: 2 },
-  subRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13 },
+  title:       { fontSize: 18, fontFamily: fontFamily.semibold, letterSpacing: -0.4 },
+  progressBg:  { height: 8, borderRadius: radius.pill, overflow: 'hidden' },
+  progressFill:{ height: '100%', borderRadius: radius.pill },
+  subRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, minHeight: 48, paddingHorizontal: 16, paddingVertical: 13 },
   subCheck:    { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  addSubRow:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 14, paddingVertical: 13 },
+  addSubRow:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, minHeight: 48, paddingHorizontal: 16, paddingVertical: 13 },
 });

@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskDetailHeader.tsx — липка шапка картки завдання.
  *
@@ -21,6 +20,8 @@ import { Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 're
 import { ACTION } from '@/components/shared/actionMetrics';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokensForText } from '@/components/tasks/dsTokensForText';
 
 export type TaskDetailTab = 'main' | 'details' | 'team' | 'activity';
 
@@ -65,6 +66,7 @@ export function TaskDetailHeader({
   title, leading, badge, tab, onTabChange, showTeam = false, timerRunning, onRename, onClose, onCopy, actions,
   timerSlot, showHandle, externalSource, colors: c, tr,
 }: TaskDetailHeaderProps) {
+  const t = dsTokensForText(c.text);
   const tabs = taskDetailTabs(showTeam);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(title);
@@ -119,7 +121,7 @@ export function TaskDetailHeader({
               blurOnSubmit
               multiline
               accessibilityLabel={tr.taskNamePlaceholder}
-              style={[st.title, st.titleInput, { color: c.text, borderColor: c.accent, backgroundColor: c.dim }]}
+              style={[st.title, st.titleInput, { color: c.text, borderColor: t.focus.ring, backgroundColor: c.dim }]}
             />
           ) : onRename ? (
             <TouchableOpacity
@@ -170,12 +172,13 @@ export function TaskDetailHeader({
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={labels[key]}
-              style={[st.tab, { backgroundColor: active ? c.accent : 'transparent' }]}>
-              <Text numberOfLines={1} style={{ color: active ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>
+              // DS v2: сегментовані таби — pill, активний — action.primary.
+              style={[st.tab, { backgroundColor: active ? t.action.primary : 'transparent' }]}>
+              <Text numberOfLines={1} style={{ color: active ? t.text.onAction : c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>
                 {labels[key]}
               </Text>
               {key === 'activity' && timerRunning ? (
-                <View style={[st.runDot, { backgroundColor: active ? '#fff' : '#6366F1' }]} />
+                <View style={[st.runDot, { backgroundColor: t.accent.lime }]} />
               ) : null}
             </TouchableOpacity>
           );
@@ -212,15 +215,15 @@ const st = StyleSheet.create({
   titleRow:   { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, gap: 8 },
   leading:    { paddingTop: 2 },
   titleBox:   { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
-  title:      { flex: 1, fontSize: 18, fontWeight: '700', lineHeight: 24 },
-  titleInput: { borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 8, paddingVertical: 4 },
+  title:      { flex: 1, fontSize: 20, fontFamily: fontFamily.semibold, lineHeight: 26, letterSpacing: -0.2 },
+  titleInput: { borderWidth: 2, borderRadius: radius.control, paddingHorizontal: 10, paddingVertical: 4 },
   badge:      { marginLeft: 8, marginTop: 2 },
   // Кнопки шапки — повні 44×44 (раніше 32 + hitSlop, що впирався в сусіда);
   // міри й розмір іконки — спільні з ActionBar, однакові на всіх платформах.
   trailing:   { flexDirection: 'row', alignItems: 'center', marginTop: -10, marginRight: -10 },
   iconBtn:    { width: ACTION.height, height: ACTION.height, borderRadius: ACTION.radius, alignItems: 'center', justifyContent: 'center' },
   timer:      { marginBottom: 10 },
-  tabs:       { flexDirection: 'row', gap: 4, borderRadius: Atlas.radius.medium, padding: 4 },
-  tab:        { flex: 1, minHeight: 36, borderRadius: 9, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 5, paddingHorizontal: 4 },
+  tabs:       { flexDirection: 'row', gap: 4, borderRadius: radius.pill, padding: 4 },
+  tab:        { flex: 1, minHeight: 36, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 5, paddingHorizontal: 4 },
   runDot:     { width: 6, height: 6, borderRadius: 3 },
 });

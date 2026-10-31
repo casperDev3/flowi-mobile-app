@@ -9,7 +9,6 @@
  * сегментованим перемикачем (як на «Фінансах»). Розмітка частин — у
  * components/menu/*, форми — MenuEditorModal + useMenuEditor.
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -48,6 +47,7 @@ import {
   type MenuEntry,
   type MenuSpace,
 } from '@/store/menu-api';
+import { fontFamily } from '@/constants/theme';
 
 export default function WeeklyMenu() {
   const c = useMenuColors(),
@@ -217,7 +217,7 @@ export default function WeeklyMenu() {
         !error &&
         panel(
           <>
-            <Text style={{ fontSize: 22, fontWeight: '700', color: c.text }}>Спільний тиждень починається тут</Text>
+            <Text style={{ fontSize: 22, fontFamily: fontFamily.semibold, color: c.text }}>Спільний тиждень починається тут</Text>
             {text(
               'Створи групу для сім’ї, співмешканців або команди. Власник затверджує меню, учасники пропонують страви.',
               true,
@@ -294,7 +294,7 @@ export default function WeeklyMenu() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg1 }]} />
       <Stack.Screen options={{ headerShown: false }} />
       <View style={st.headerBox}>
         <ScreenHeader

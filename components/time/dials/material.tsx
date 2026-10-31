@@ -30,6 +30,7 @@ import Svg, {
 } from 'react-native-svg';
 import type { SharedValue } from 'react-native-reanimated';
 
+import { fontFor } from '@/constants/theme';
 import { sunkenTextStyle, trailSteps, type DialMaterial } from '@/utils/dialMaterial';
 import { TABULAR } from './shared';
 import { SmoothArc, SmoothSpin } from './smooth';
@@ -339,7 +340,7 @@ export function SunkenLabel({ text, fontSize, color, m, weight = '700', style }:
   style?: StyleProp<TextStyle>;
 }) {
   return (
-    <Text style={[TABULAR, { color, fontSize, fontWeight: weight }, sunkenTextStyle(m, fontSize), style]}>
+    <Text style={[TABULAR, { color, fontSize, fontFamily: fontFor(weight === '800' ? '700' : weight) }, sunkenTextStyle(m, fontSize), style]}>
       {text}
     </Text>
   );

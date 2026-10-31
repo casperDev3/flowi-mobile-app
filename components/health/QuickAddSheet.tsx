@@ -1,5 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -8,10 +6,15 @@ import {
 import { useWideModal } from '@/components/health/HealthLayout';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
-  ACCENT, ACCENT_CAL, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT, getHealthColors,
+  ACCENT, ACCENT_CAL, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
 } from '@/utils/healthTheme';
+import { getHealthDSColors } from '@/components/health/palette';
+import { fontFamily } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
 import { EntryType } from '@/utils/healthUtils';
 import { useSheetSurface } from '@/hooks/use-content-width';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { GlassBackdrop } from '@/components/ds';
 
 export interface QuickRecord { type: EntryType; value: number; }
 
@@ -33,7 +36,9 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
   isDark: boolean;
   tr: any;
 }) {
-  const c = getHealthColors(isDark);
+  const c = getHealthDSColors(isDark);
+  const gs = useGlassStyles();
+  const k = dsTokens(isDark);
   const sheetSurface = useSheetSurface();
   const wm = useWideModal();
   const [vals, setVals] = useState<Record<string, string>>({});
@@ -66,7 +71,8 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
             accessibilityViewIsModal
             importantForAccessibility="yes"
           >
-            <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+            <View style={[s.sheet, sheetSurface, { ...gs.strong }]}>
+              <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -81,38 +87,38 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ maxHeight: 380 }}>
                 {FIELDS.map(f => (
                   <View key={f.type} style={[s.row, { borderColor: c.border }]}>
-                    <View style={{ width: 32, height: 32, borderRadius: Atlas.radius.medium, backgroundColor: f.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: f.color + '20', alignItems: 'center', justifyContent: 'center' }}>
                       <IconSymbol name={f.icon as any} size={16} color={f.color} />
                     </View>
-                    <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', flex: 1, marginLeft: 10 }}>{tr[f.labelKey]}</Text>
+                    <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, flex: 1, marginLeft: 10 }}>{tr[f.labelKey]}</Text>
                     <TextInput
                       accessibilityLabel={`${tr[f.labelKey]}, ${f.unit}`}
                       value={vals[f.type] ?? ''}
                       onChangeText={t => setVals(p => ({ ...p, [f.type]: t }))}
                       keyboardType="decimal-pad"
-                      placeholder="—" placeholderTextColor={c.sub}
-                      style={{ width: 84, color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, textAlign: 'right', paddingVertical: 8 }}
+                      placeholder="—" placeholderTextColor={k.text.muted}
+                      style={{ width: 96, minHeight: 44, color: c.text, fontSize: 24, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.48, textAlign: 'right', paddingVertical: 8 }}
                     />
-                    <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', width: 28, textAlign: 'right' }}>{f.unit}</Text>
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, width: 28, textAlign: 'right' }}>{f.unit}</Text>
                   </View>
                 ))}
               </ScrollView>
 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                  <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[s.btn, { ...gs.subtle, flex: 1 }]}>
+                  <Text style={{ color: k.action.secondaryText, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityState={{ disabled: !canSave }}
                   disabled={!canSave}
                   onPress={save}
-                  style={[s.btn, { flex: 2, backgroundColor: ACCENT, opacity: canSave ? 1 : 0.55 }]}
+                  style={[s.btn, { flex: 2, backgroundColor: canSave ? k.action.primary : k.state.disabledBg }]}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+                  <Text style={{ color: canSave ? k.text.onAction : k.state.disabledText, fontFamily: fontFamily.semibold }}>{tr.save}</Text>
                 </TouchableOpacity>
               </View>
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -121,14 +127,14 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
 }
 
 const s = StyleSheet.create({
-  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
+  overlay:   { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)' /* surface.overlay */, justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти — числом із useSheetSurface(); відсоток від батька з
   // height:auto не рахується і обмеження просто зникає (NAT-01).
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:     { borderRadius: 24, padding: 24 },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   handle:    { width: 36, height: 4, borderRadius: 2 },
-  title:     { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 10 },
+  title:     { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 10 },
   row:       { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 10 },
-  btn:       { paddingVertical: 14, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
+  btn:          { minHeight: 48, paddingVertical: 14, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
 });

@@ -24,14 +24,17 @@ import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } fro
 
 import { ProjectPaletteContext } from '@/components/projects/ProjectPaletteContext';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
+import { fontFamily, theme, type } from '@/constants/theme';
 import { ACTION } from './actionMetrics';
+import { glassOf, dsGlass } from '@/components/shared/dsTheme';
 
 // Міри — окремим модулем без залежностей: їх імпортують і легкі шапки
 // (TaskDetailHeader), яким не треба тягнути тему й сховище.
 export { ACTION } from './actionMetrics';
 
-export const ACTION_DANGER = '#EF4444';
+/** status.danger світлої теми; у компонентах береться t.status.danger. */
+export const ACTION_DANGER = theme.light.status.danger;
 
 export interface ActionColors {
   text: string;
@@ -45,13 +48,13 @@ export type ActionTone = 'primary' | 'secondary' | 'danger' | 'neutral';
 
 function useActionColors(colors?: ActionColors): ActionColors {
   const palette = useContext(ProjectPaletteContext);
-  const dark = useColorScheme() === 'dark';
+  const { t, isDark } = useDSTheme();
   return colors ?? palette ?? {
-    text: dark ? '#F0EEFF' : '#1A1433',
-    sub: dark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: dark ? '#C4ADFF' : '#6035B0',
-    border: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
-    dim: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    text: t.text.primary,
+    sub: t.text.secondary,
+    accent: dsGlass(isDark).accent.lavender.ink,
+    border: t.border.hairline,
+    dim: glassOf(t).surfaceSubtle,
   };
 }
 
@@ -98,9 +101,12 @@ export function ActionButton({
   accessibilityLabel, accessibilityHint, colors, style,
 }: ActionButtonProps) {
   const c = useActionColors(colors);
-  const tint = tone === 'danger' ? ACTION_DANGER : tone === 'neutral' ? c.sub : c.accent;
+  const { t } = useDSTheme();
+  // DS v2: primary — pill action.primary; secondary — subtle-pill з акцентним
+  // підписом; danger — тонований status.danger; neutral — subtle.
+  const tint = tone === 'danger' ? t.status.danger : tone === 'neutral' ? c.sub : c.accent;
   const filled = tone === 'primary';
-  const fg = filled ? '#fff' : tone === 'neutral' ? c.text : tint;
+  const fg = filled ? t.text.onAction : tone === 'neutral' ? c.text : tint;
   return (
     <Pressable
       onPress={onPress}
@@ -112,9 +118,10 @@ export function ActionButton({
       style={({ pressed }) => [
         st.btn,
         {
-          backgroundColor: filled ? tint : tone === 'neutral' ? c.dim : tint + '14',
-          borderColor: filled ? tint : tone === 'neutral' ? c.border : tint + '55',
-          opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
+          backgroundColor: filled
+            ? (pressed ? t.action.primaryPressed : t.action.primary)
+            : tone === 'danger' ? tint + '14' : glassOf(t).surfaceSubtle,
+          opacity: disabled ? 0.45 : pressed && !filled ? 0.7 : 1,
         },
         grow !== undefined && { flexGrow: grow, flexBasis: 0 },
         block && st.block,
@@ -140,6 +147,7 @@ export function IconAction({ icon, label, onPress, color, active, disabled = fal
   colors?: ActionColors;
 }) {
   const c = useActionColors(colors);
+  const { t } = useDSTheme();
   const tint = color ?? (active ? c.accent : c.sub);
   return (
     <Pressable
@@ -150,7 +158,7 @@ export function IconAction({ icon, label, onPress, color, active, disabled = fal
       accessibilityState={active === undefined ? { disabled } : { disabled, selected: active }}
       style={({ pressed }) => [
         st.icon,
-        bordered && { borderWidth: 1, borderColor: c.border, backgroundColor: c.dim },
+        bordered && { backgroundColor: glassOf(t).surfaceSubtle },
         { opacity: disabled ? 0.4 : pressed ? 0.6 : 1 },
       ]}>
       <IconSymbol name={icon} size={ACTION.iconOnly} color={tint} />
@@ -169,7 +177,9 @@ export function ActionChip({ label, selected, onPress, icon, count, colors, acce
   accessibilityLabel?: string;
 }) {
   const c = useActionColors(colors);
-  const fg = selected ? '#fff' : c.text;
+  const { t } = useDSTheme();
+  // DS v2: вибраний чип — action.primary + text.onAction.
+  const fg = selected ? t.text.onAction : c.text;
   return (
     <Pressable
       onPress={onPress}
@@ -179,11 +189,11 @@ export function ActionChip({ label, selected, onPress, icon, count, colors, acce
       hitSlop={{ top: 4, bottom: 4 }}
       style={({ pressed }) => [
         st.chip,
-        { backgroundColor: selected ? c.accent : c.dim, borderColor: selected ? c.accent : c.border, opacity: pressed ? 0.7 : 1 },
+        { backgroundColor: selected ? t.action.primary : glassOf(t).surfaceSubtle, opacity: pressed ? 0.7 : 1 },
       ]}>
-      {icon ? <IconSymbol name={icon} size={13} color={selected ? '#fff' : c.sub} /> : null}
+      {icon ? <IconSymbol name={icon} size={13} color={selected ? t.text.onAction : c.sub} /> : null}
       <Text numberOfLines={1} style={[st.chipLabel, { color: fg }]}>{label}</Text>
-      {count !== undefined ? <Text style={[st.chipCount, { color: selected ? '#fff' : c.sub }]}>{count}</Text> : null}
+      {count !== undefined ? <Text style={[st.chipCount, type.numeric, { color: selected ? t.text.onAction : c.sub }]}>{count}</Text> : null}
     </Pressable>
   );
 }
@@ -193,16 +203,16 @@ const st = StyleSheet.create({
   wrap:  { flexWrap: 'wrap' },
   end:   { justifyContent: 'flex-end' },
   btn:   {
-    minHeight: ACTION.height, borderRadius: ACTION.radius, borderWidth: 1, paddingHorizontal: ACTION.paddingX,
+    minHeight: ACTION.height, borderRadius: ACTION.radius, paddingHorizontal: ACTION.paddingX,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
   block: { alignSelf: 'stretch' },
-  label: { fontSize: ACTION.fontSize, fontWeight: '700', flexShrink: 1 },
+  label: { fontSize: ACTION.fontSize, fontFamily: fontFamily.semibold, flexShrink: 1 },
   icon:  { width: ACTION.height, height: ACTION.height, borderRadius: ACTION.radius, alignItems: 'center', justifyContent: 'center' },
   chip:  {
-    minHeight: ACTION.chipHeight, borderRadius: ACTION.radius, borderWidth: 1, paddingHorizontal: 12,
+    minHeight: ACTION.chipHeight, borderRadius: ACTION.radius, paddingHorizontal: 14,
     flexDirection: 'row', alignItems: 'center', gap: 6,
   },
-  chipLabel: { fontSize: 13, fontWeight: '600' },
-  chipCount: { fontSize: 12, fontWeight: '700' },
+  chipLabel: { fontSize: 13, fontFamily: fontFamily.semibold },
+  chipCount: { fontSize: 12, fontFamily: fontFamily.bold },
 });

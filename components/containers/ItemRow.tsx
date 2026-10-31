@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius, type as dsType } from '@/constants/theme';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -29,7 +29,7 @@ function Action({ icon, label, color, onPress, disabled }: {
   return (
     <TouchableOpacity onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
-      style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }}>
+      style={{ width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }}>
       <IconSymbol name={icon} size={14} color={color} />
     </TouchableOpacity>
   );
@@ -52,30 +52,30 @@ export const ItemRow = React.memo(function ItemRow({
   const { tr } = useI18n();
   const discarded = item.status === 'discarded';
   return (
-    <View style={{ borderRadius: Atlas.radius.large, backgroundColor: c.card, borderWidth: 1, borderColor: c.border,
-      paddingHorizontal: 12, paddingTop: 11, paddingBottom: 6, opacity: discarded ? 0.72 : 1 }}>
+    <View style={{ borderRadius: radius.nested, ...c.gl.card,
+      paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6, opacity: discarded ? 0.72 : 1 }}>
       <TouchableOpacity onPress={() => actions.onEdit(item)} activeOpacity={0.75} accessibilityRole="button"
         accessibilityLabel={`${tr.ctrEditItem}: ${item.name}`} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
         {item.photoIds?.length ? (
-          <MediaImage asset={cover} style={{ width: 40, height: 40, borderRadius: 9 }}
+          <MediaImage asset={cover} style={{ width: 40, height: 40, borderRadius: radius.control }}
             pendingLabel={tr.ctrPhotoPending} placeholderColor={c.dim} />
         ) : (
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: accent, marginTop: 6 }} />
         )}
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', textDecorationLine: discarded ? 'line-through' : 'none' }}>
+            <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, textDecorationLine: discarded ? 'line-through' : 'none' }}>
               {item.name}
             </Text>
-            {item.qty !== 1 ? <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700' }}>×{item.qty}</Text> : null}
+            {item.qty !== 1 ? <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>×{item.qty}</Text> : null}
             <StatusBadge status={item.status} lentTo={item.lentTo} textColor={c.text} />
           </View>
-          {item.note ? <Text style={{ color: c.sub, fontSize: 12, marginTop: 3, lineHeight: 17 }}>{item.note}</Text> : null}
+          {item.note ? <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 3, lineHeight: 17 }}>{item.note}</Text> : null}
           {item.tags.length > 0 ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
               {item.tags.map(tag => (
-                <View key={tag} style={{ backgroundColor: accent + '20', borderRadius: Atlas.radius.small, paddingHorizontal: 7, paddingVertical: 2 }}>
-                  <Text style={{ color: accent, fontSize: 11, fontWeight: '600' }}>#{tag}</Text>
+                <View key={tag} style={{ backgroundColor: c.dim, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 }}>
+                  <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium }}>#{tag}</Text>
                 </View>
               ))}
             </View>

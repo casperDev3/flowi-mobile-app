@@ -8,8 +8,6 @@ import { Atlas } from '@/constants/atlas';
  * авторизованим адміном не має сенсу показувати, бо кожен виклик усе одно
  * впаде на сервері `403 not_admin`.
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -29,11 +27,13 @@ import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, apiFetch as apiFetchAdmin } from '@/store/api';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
+import { fontFamily } from '@/constants/theme';
 
 interface WorkspaceAdminOut {
   name: string;
@@ -70,11 +70,13 @@ export default function AdminWorkspaceScreen() {
 
   // Той самий токен-набір, що й account.tsx/workspace.tsx/login.tsx — раніше
   // тут була окрема хардкоджена палітра, злегка розбіжна з рештою auth-екранів.
+  const k = dsTokens(isDark);
   const c = useMemo(() => ({
     ...getScreenColors('auth', isDark),
-    red: '#EF4444',
-    dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  }), [isDark]);
+    red: k.status.danger,
+    dim: k.surface.subtle,
+    card:   k.surface.card,
+  }), [isDark, k]);
 
   const [workspace, setWorkspace] = useState<WorkspaceAdminOut | null>(null);
   const [requests, setRequests] = useState<RegistrationRequestOut[]>([]);
@@ -235,7 +237,7 @@ export default function AdminWorkspaceScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg1 }]} />
       {/* CLAUDE.md: фіксований хедер — лише через ScreenHeader/HeaderButton
           (мінор із ревʼю, раніше тут стояв бесп­осередній View з ручним
           topInset — той самий back-button-у-actions патерн, що й
@@ -248,13 +250,13 @@ export default function AdminWorkspaceScreen() {
             onPress: () => router.back(),
             label: tr.back,
             color: c.text,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { backgroundColor: c.card, borderColor: 'transparent' },
           }}
         />
 
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color={c.accent} />
+            <ActivityIndicator color={c.sub} />
           </View>
         ) : loadError ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
@@ -271,11 +273,11 @@ export default function AdminWorkspaceScreen() {
           <ScrollView
             contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: 48 }]}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}
           >
             {/* Налаштування workspace */}
             <Text style={[st.sectionLabel, { color: c.sub }]}>{tr.adminSettingsSection.toUpperCase()}</Text>
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: c.card }]}>
               <View style={st.row}>
                 <Text style={[st.rowLabel, { color: c.text, flex: 1 }]}>{tr.adminRegistrationModeLabel}</Text>
                 <Text style={[st.rowSub, { color: c.sub, marginRight: 8 }]}>
@@ -284,16 +286,16 @@ export default function AdminWorkspaceScreen() {
                 <Switch
                   value={workspace?.registration_mode === 'approval'}
                   onValueChange={handleToggleRegistrationMode}
-                  trackColor={{ true: c.accent }}
+                  trackColor={{ true: k.action.primary }}
                 />
               </View>
-            </BlurView>
+            </View>
 
             {/* Заявки на реєстрацію */}
             <Text style={[st.sectionLabel, { color: c.sub, marginTop: 20 }]}>
               {tr.adminRequestsSection.toUpperCase()} {requests.length > 0 ? `(${requests.length})` : ''}
             </Text>
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: c.card }]}>
               {requests.length === 0 ? (
                 <Text style={[st.emptyText, { color: c.sub }]}>{tr.adminNoRequests}</Text>
               ) : requests.map((req, i) => (
@@ -311,9 +313,9 @@ export default function AdminWorkspaceScreen() {
                     <TouchableOpacity
                       onPress={() => handleApprove(req.id)}
                       disabled={busyId === req.id}
-                      style={[st.actionBtn, { backgroundColor: '#10B98120' }]}
+                      style={[st.actionBtn, { backgroundColor: k.status.success + '20' }]}
                     >
-                      <Text style={[st.actionBtnText, { color: '#10B981' }]}>{tr.adminApprove}</Text>
+                      <Text style={[st.actionBtnText, { color: k.status.success }]}>{tr.adminApprove}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleReject(req.id)}
@@ -327,16 +329,16 @@ export default function AdminWorkspaceScreen() {
                     value={rejectReasons[req.id] ?? ''}
                     onChangeText={v => setRejectReasons(prev => ({ ...prev, [req.id]: v }))}
                     placeholder={tr.adminRejectReasonPrompt}
-                    placeholderTextColor={c.sub}
-                    style={[st.reasonInput, { color: c.text, borderColor: c.border }]}
+                    placeholderTextColor={k.text.muted}
+                    style={[st.reasonInput, { color: c.text, backgroundColor: c.dim }]}
                   />
                 </View>
               ))}
-            </BlurView>
+            </View>
 
             {/* Користувачі */}
             <Text style={[st.sectionLabel, { color: c.sub, marginTop: 20 }]}>{tr.adminUsersSection.toUpperCase()}</Text>
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: c.card }]}>
               {users.map((row, i) => (
                 <View key={row.id} style={[st.userRow, i > 0 && { borderTopWidth: 1, borderTopColor: c.border }]}>
                   <View style={{ flex: 1 }}>
@@ -359,15 +361,15 @@ export default function AdminWorkspaceScreen() {
                   <TouchableOpacity
                     onPress={() => handleToggleActive(row)}
                     disabled={busyId === row.id || row.id === Number(user?.id)}
-                    style={[st.actionBtn, { backgroundColor: row.is_active ? c.red + '20' : '#10B98120', opacity: row.id === Number(user?.id) ? 0.4 : 1 }]}
+                    style={[st.actionBtn, { backgroundColor: row.is_active ? c.red + '20' : k.status.success + '20', opacity: row.id === Number(user?.id) ? 0.4 : 1 }]}
                   >
-                    <Text style={[st.actionBtnText, { color: row.is_active ? c.red : '#10B981' }]}>
+                    <Text style={[st.actionBtnText, { color: row.is_active ? c.red : k.status.success }]}>
                       {row.is_active ? tr.adminDeactivateUser : tr.adminActivateUser}
                     </Text>
                   </TouchableOpacity>
                 </View>
               ))}
-            </BlurView>
+            </View>
           </ScrollView>
         )}
       </View>
@@ -390,10 +392,10 @@ function describeAdminError(e: unknown, tr: Translations): string {
 }
 
 const st = StyleSheet.create({
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginLeft: 2, marginBottom: 8 },
-  card: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', marginBottom: 4 },
+  sectionLabel: { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginLeft: 2, marginBottom: 8 },
+  card: { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
-  rowLabel: { fontSize: 14, fontWeight: '600' },
+  rowLabel: { fontSize: 14, fontFamily: fontFamily.semibold },
   rowSub: { fontSize: 12, marginTop: 2 },
   emptyText: { fontSize: 13, padding: 16, textAlign: 'center' },
   requestBlock: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
@@ -402,7 +404,7 @@ const st = StyleSheet.create({
   // `requestBlock` (та вже дає горизонтальний відступ заявкам вище) —
   // без власного `paddingHorizontal` вміст торкався б країв картки.
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
-  reasonInput: { borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13 },
-  actionBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: Atlas.radius.medium },
-  actionBtnText: { fontSize: 12, fontWeight: '700' },
+  reasonInput: { borderRadius: 12, minHeight: 40, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, fontFamily: fontFamily.regular },
+  actionBtn: { paddingHorizontal: 14, paddingVertical: 7, minHeight: 36, justifyContent: 'center', borderRadius: 999 },
+  actionBtnText: { fontSize: 13, fontFamily: fontFamily.semibold },
 });

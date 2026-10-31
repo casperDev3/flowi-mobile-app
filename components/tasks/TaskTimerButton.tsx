@@ -13,15 +13,19 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
-import { Atlas } from '@/constants/atlas';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 import { formatClock } from '@/utils/durationFormat';
 import { totalSecondsIncludingActive, type TimedTask } from '@/utils/taskTimer';
+import { fontFamily, radius } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
+import { glassOf } from '@/components/shared/dsTheme';
 
-const RUNNING = '#6366F1';
-
+/**
+ * DS v2: idle — pill action.primary («Почати»), running — secondary pill
+ * (surface.subtle) з coral-стопом і годинником tabular-nums.
+ */
 export function TaskTimerButton({ task, running, activeStartedAt, onStart, onStop, tr }: {
   task: TimedTask;
   running: boolean;
@@ -31,16 +35,18 @@ export function TaskTimerButton({ task, running, activeStartedAt, onStart, onSto
   onStop: () => void;
   tr: Translations;
 }) {
+  const { t } = useDS();
+  const fg = running ? t.action.secondaryText : t.text.onAction;
   return (
     <TouchableOpacity
       onPress={running ? onStop : onStart}
       accessibilityRole="button"
       accessibilityLabel={running ? tr.stopTimer : tr.startTimerAction}
-      style={[st.btn, running ? st.btnRunning : st.btnIdle]}>
-      <IconSymbol name={running ? 'stop.fill' : 'play.fill'} size={14} color={running ? RUNNING : '#fff'} />
+      style={[st.btn, { backgroundColor: running ? glassOf(t).surfaceSubtle : t.action.primary }]}>
+      <IconSymbol name={running ? 'stop.fill' : 'play.fill'} size={14} color={running ? t.accent.coral : fg} />
       {/* Годинник — СУСІД підпису, а не вкладений <Text>: на iOS вкладений
           текст згортається в рядок батька й не перемальовується сам. */}
-      <Text style={[st.label, { color: running ? RUNNING : '#fff' }]}>
+      <Text style={[st.label, { color: fg }]}>
         {activeStartedAt ? `${tr.stopTimer} · ` : tr.startTimerAction}
       </Text>
       {activeStartedAt ? (
@@ -48,7 +54,7 @@ export function TaskTimerButton({ task, running, activeStartedAt, onStart, onSto
           running
           seconds={now => totalSecondsIncludingActive(task, activeStartedAt, now)}
           format={formatClock}
-          style={st.clock}
+          style={[st.clock, { color: fg }]}
         />
       ) : null}
     </TouchableOpacity>
@@ -56,9 +62,7 @@ export function TaskTimerButton({ task, running, activeStartedAt, onStart, onSto
 }
 
 const st = StyleSheet.create({
-  btn:        { minHeight: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  btnIdle:    { backgroundColor: RUNNING + 'EE' },
-  btnRunning: { backgroundColor: RUNNING + '20', borderWidth: 1, borderColor: RUNNING + '50' },
-  label:      { fontWeight: '700', marginLeft: 7 },
-  clock:      { color: RUNNING, fontWeight: '700' },
+  btn:        { minHeight: 44, paddingHorizontal: 16, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  label:      { fontFamily: fontFamily.semibold, marginLeft: 7 },
+  clock:      { fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

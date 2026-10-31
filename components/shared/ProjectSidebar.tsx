@@ -26,7 +26,7 @@
  */
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActiveTimersSidebarCard } from '@/components/time/ActiveTimersSidebarCard';
@@ -36,6 +36,10 @@ import {
 } from '@/components/shared/sidebar-mode';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Atlas } from '@/constants/atlas';
+import { GlassBackdrop } from '@/components/ds/Glass';
+import { fontFamily, moduleAccent, radius } from '@/constants/theme';
+import { dsTokens, glassTokens } from '@/hooks/use-ds';
+import { useReduceTransparency } from '@/hooks/use-reduce-transparency';
 import { goProjectsList, projectRoute, visibleProjectNavItems, type ProjectSectionKey } from '@/constants/projectNav';
 import { useProject } from '@/hooks/use-project';
 import { useProjectRole } from '@/hooks/use-project-role';
@@ -89,13 +93,30 @@ export function ProjectSidebar({
   const items = visibleProjectNavItems(modules, role);
   const accent = project?.color ?? '#7C3AED';
 
+  // DS v2.1 (Liquid Glass): скло над mesh, як особистий сайдбар. Активний
+  // розділ — скляна pill, тонована акцентом модуля «Проєкти» (lavender):
+  // довільний колір проєкту не гарантує контрасту іконки/підпису, тож він
+  // лишається на плитці-ідентичності й картці таймерів.
+  const t = dsTokens(isDark);
+  const g = glassTokens(isDark);
+  const reduceTransparency = useReduceTransparency();
+  const pa = g.accent[moduleAccent.projects];
   const c = {
-    bg:       isDark ? '#0E0C1A' : '#F4F0FF',
-    border:   isDark ? 'rgba(255,255,255,0.08)' : 'rgba(124,58,237,0.14)',
-    text:     isDark ? '#F0EEFF' : '#1A1433',
-    sub:      isDark ? 'rgba(240,238,255,0.55)' : 'rgba(26,20,51,0.52)',
+    bg:       reduceTransparency ? t.surface.card : g.surface,
+    border:   t.border.hairline,
+    text:     t.text.primary,
+    sub:      t.text.secondary,
     accent,
-    activeBg: isDark ? accent + '22' : accent + '18',
+    activeBg: reduceTransparency ? pa.solid : pa.tint,
+    onActive: reduceTransparency ? pa.onSolid : pa.ink,
+    activeText: reduceTransparency ? pa.onSolid : t.text.primary,
+  };
+  const activeExtra = reduceTransparency ? null : {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: g.rim,
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: pa.glow, shadowOpacity: isDark ? 0.5 : 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 3 } }
+      : null),
   };
 
   const goSection = (route: string) => router.push(route as never);
@@ -112,10 +133,10 @@ export function ProjectSidebar({
         accessibilityRole="menuitem"
         accessibilityState={{ selected: active }}
         accessibilityLabel={label}
-        style={[st.row, collapsed && st.rowCollapsed, active && { backgroundColor: c.activeBg }]}>
-        <IconSymbol name={icon} size={19} color={active ? c.accent : c.sub} />
+        style={[st.row, collapsed && st.rowCollapsed, active && { backgroundColor: c.activeBg }, active && activeExtra]}>
+        <IconSymbol name={icon} size={19} color={active ? c.onActive : c.sub} />
         {!collapsed && (
-          <Text numberOfLines={1} style={{ color: active ? c.accent : c.text, fontSize: 14, fontWeight: active ? '700' : '500', flex: 1 }}>
+          <Text numberOfLines={1} style={{ color: active ? c.activeText : c.text, fontSize: 14, fontFamily: active ? fontFamily.semibold : fontFamily.medium, flex: 1 }}>
             {label}
           </Text>
         )}
@@ -125,8 +146,15 @@ export function ProjectSidebar({
 
   return (
     <View
-      style={[st.root, { width: projectSidebarWidthFor(collapsed), backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 10 }]}
+      style={[st.root, { width: projectSidebarWidthFor(collapsed), backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 10 }]}
       accessibilityRole="menu">
+      {!reduceTransparency ? (
+        <>
+          <GlassBackdrop />
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: c.bg }]} />
+          <View pointerEvents="none" style={[st.rimRight, { backgroundColor: isDark ? g.rim : g.rimShade }]} />
+        </>
+      ) : null}
       {/* 1. Назад до списку проєктів — завжди, і в рейці теж. */}
       <TouchableOpacity
         onPress={() => goProjectsList(router as never)}
@@ -134,7 +162,7 @@ export function ProjectSidebar({
         accessibilityLabel={tr.projectBackToProjectsA11y}
         style={[st.row, collapsed && st.rowCollapsed]}>
         <IconSymbol name="chevron.left" size={15} color={c.sub} />
-        {!collapsed && <Text numberOfLines={1} style={{ color: c.sub, fontSize: 13, fontWeight: '700', flex: 1 }}>{tr.projectBackToProjects}</Text>}
+        {!collapsed && <Text numberOfLines={1} style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>{tr.projectBackToProjects}</Text>}
       </TouchableOpacity>
 
       {/* 2–3. Ідентичність проєкту (тап — свічер) + згортання. */}
@@ -195,7 +223,7 @@ export function ProjectSidebar({
       </ScrollView>
 
       <View style={{ paddingBottom: insets.bottom + 10, gap: 4 }}>
-        {!collapsed && <ActiveTimersSidebarCard projectId={projectId} colors={{ border: c.border, text: c.text, sub: c.sub, accent: c.accent, activeBg: c.activeBg }} />}
+        {!collapsed && <ActiveTimersSidebarCard projectId={projectId} colors={{ border: c.border, text: c.text, sub: c.sub, accent: c.accent, activeBg: reduceTransparency ? t.surface.subtle : g.surfaceSubtle }} />}
         {navRow('settings', 'gearshape.fill', tr.tabOptions, projectRoute(projectId, 'settings'))}
       </View>
 
@@ -213,19 +241,20 @@ export function ProjectSidebar({
 }
 
 const st = StyleSheet.create({
-  root:       { borderRightWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10 },
+  root:       { paddingHorizontal: 12 },
+  rimRight:   { position: 'absolute', top: 0, bottom: 0, right: 0, width: StyleSheet.hairlineWidth },
   identity:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: 10, marginBottom: 2, borderBottomWidth: StyleSheet.hairlineWidth },
   identityCollapsed: { flexDirection: 'column', gap: 2 },
   identityBtn:{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 6, borderRadius: Atlas.radius.medium },
   identityBtnCollapsed: { flex: 0, alignSelf: 'stretch', flexDirection: 'column', justifyContent: 'center', gap: 3, paddingHorizontal: 0, paddingVertical: 4 },
-  brandCollapsed: { fontSize: 10, fontWeight: '600', maxWidth: '100%', textAlign: 'center' },
-  avatar:     { width: 32, height: 32, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  brand:      { fontSize: 16, fontWeight: Atlas.type.headingWeight, flex: 1 },
-  iconBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium },
+  brandCollapsed: { fontSize: 10, fontFamily: fontFamily.semibold, maxWidth: '100%', textAlign: 'center' },
+  avatar:     { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: 15, fontFamily: fontFamily.bold },
+  brand:      { fontSize: 16, fontFamily: fontFamily.semibold, flex: 1 },
+  iconBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
   groupHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.small },
-  groupTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
+  groupTitle: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.6 },
   sep:        { height: StyleSheet.hairlineWidth, marginHorizontal: 8, marginVertical: 6 },
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
+  row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 14, borderRadius: radius.pill },
   rowCollapsed: { justifyContent: 'center', paddingHorizontal: 0 },
 });

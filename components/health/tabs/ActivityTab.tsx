@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/ActivityTab.tsx — вкладка «Активність і тренування».
  *
@@ -8,7 +7,6 @@ import { Atlas } from '@/constants/atlas';
  * це майбутній модуль із групами й програмами, і вкладка на нього лише
  * посилається, а не тягне його всередину здоровʼя.
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -26,8 +24,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
-import { ACCENT, ACCENT_STEPS, ModalKey, getHealthColors } from '@/utils/healthTheme';
+import { ACCENT, ACCENT_STEPS, ModalKey } from '@/utils/healthTheme';
+import { getHealthDSColors } from '@/components/health/palette';
+import { dsTokens } from '@/hooks/use-ds';
 import { stepsToKm } from '@/utils/healthUtils';
+import { fontFamily } from '@/constants/theme';
 
 /** Тренування читаються лише заради дати й калорій — решта полів тут ні до чого. */
 interface WorkoutBrief { date: string; calories?: number }
@@ -41,7 +42,8 @@ export function ActivityTab({ h }: HealthTabProps) {
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const c = getHealthColors(isDark);
+  const c = getHealthDSColors(isDark);
+  const k = dsTokens(isDark);
 
   const { today, goals, heightCm, cal } = h;
   const [refreshing, setRefreshing] = useState(false);
@@ -76,7 +78,7 @@ export function ActivityTab({ h }: HealthTabProps) {
         <HealthCard c={c} title={tr.steps} right={<HealthAddButton onPress={() => setModal('steps')} label={tr.add} />}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 }}>
             <View style={{ flex: 1, marginRight: 10 }}>
-              <Text style={{ color: c.text, fontSize: 30, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 }}>{today.steps.toLocaleString(locale)}</Text>
+              <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88 }}>{today.steps.toLocaleString(locale)}</Text>
               <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
                 {/* Справжня дистанція з телефона, коли є; інакше — оцінка з кроків (≈). */}
                 {today.distance != null
@@ -87,20 +89,19 @@ export function ActivityTab({ h }: HealthTabProps) {
             <View style={{ width: 110 }}>
               <MiniBarChart values={h.charts.steps} color={ACCENT_STEPS} goal={goals.steps} height={50} />
               <View style={{ flexDirection: 'row', marginTop: 3 }}>
-                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 8, fontWeight: '600' }}>{l}</Text>)}
+                {labels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{l}</Text>)}
               </View>
             </View>
           </View>
           <View style={[s.track, { backgroundColor: c.track, marginBottom: 8 }]}>
-            <LinearGradient colors={[ACCENT_STEPS + 'AA', ACCENT_STEPS]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={[s.fill, { width: `${Math.round(Math.min(today.steps / goals.steps, 1) * 100)}%` as any }]} />
+            <View style={[s.fill, { backgroundColor: k.accent.amber, width: `${Math.round(Math.min(today.steps / goals.steps, 1) * 100)}%` as any }]} />
           </View>
           <View style={{ flexDirection: 'row', gap: 6 }}>
             {[1000, 2000, 3000, 5000].map(st => (
               <TouchableOpacity key={st} onPress={() => h.addQuick('steps', st)}
                 accessibilityRole="button" accessibilityLabel={`+${st}`}
-                style={[s.chip, { borderColor: c.border, backgroundColor: c.dim }]}>
-                <Text style={{ color: c.text, fontSize: 11, fontWeight: '700' }}>+{st >= 1000 ? `${st / 1000}т` : st}</Text>
+                style={[s.chip, { backgroundColor: c.dim }]}>
+                <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{st >= 1000 ? `${st / 1000}т` : st}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -124,7 +125,7 @@ export function ActivityTab({ h }: HealthTabProps) {
               див. burnedForDay). Рядок нижче показує внесок тренувань, щоб
               число не розходилось із журналом записів мовчки. */}
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ color: c.text, fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{cal.burned}</Text>
+            <Text style={{ color: c.text, fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.88 }}>{cal.burned}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 4 }}>кк {tr.burned.toLowerCase()}</Text>
           </View>
           {cal.burned > today.calOut && (
@@ -150,11 +151,11 @@ export function ActivityTab({ h }: HealthTabProps) {
           accessibilityRole="button" accessibilityLabel={tr.workoutsLabel}>
           <HealthCard c={c} title={tr.workoutsLabel}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
                 <IconSymbol name="dumbbell.fill" size={18} color={ACCENT} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>
+                <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
                   {week.count > 0 ? `${week.count} · ${tr.thisWeek}` : tr.workoutsSub}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
@@ -182,7 +183,7 @@ export function ActivityTab({ h }: HealthTabProps) {
           <HealthCard c={c} style={{ flexDirection: 'row', alignItems: 'center' }}>
             <IconSymbol name="heart.fill" size={16} color={ACCENT} />
             {/* Назва сервісу не перекладається; на Android це Health Connect. */}
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', flex: 1, marginLeft: 10 }}>{h.hk.label ?? 'Apple Health'}</Text>
+            <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold, flex: 1, marginLeft: 10 }}>{h.hk.label ?? 'Apple Health'}</Text>
             <IconSymbol name="chevron.right" size={13} color={c.sub} />
           </HealthCard>
         </TouchableOpacity>
@@ -195,7 +196,7 @@ export function ActivityTab({ h }: HealthTabProps) {
       <ScrollView
         contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
 
         {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
         {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}
@@ -209,8 +210,8 @@ export function ActivityTab({ h }: HealthTabProps) {
 }
 
 const s = StyleSheet.create({
-  track:  { height: 8, borderRadius: 4, overflow: 'hidden' },
-  fill:   { height: '100%', borderRadius: 4 },
+  track:  { height: 8, borderRadius: 999, overflow: 'hidden' },
+  fill:   { height: '100%', borderRadius: 999 },
   // Швидкі кнопки — нейтральні, як вторинні кнопки Фінансів: колір розділу лишається на даних.
-  chip:   { flex: 1, minHeight: 36, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chip:   { flex: 1, minHeight: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
 });

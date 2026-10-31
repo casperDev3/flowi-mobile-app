@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/training/[groupId]/leaderboard.tsx — лідерборд (training-module.md
  * §6.4, §10.1): перемикач «Тиждень / За весь час», навігація ISO-тижнями,
@@ -12,7 +11,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useGroupSummary, useTrainingScope, type LoadIssue } from '@/components/training/hooks';
 import { LeaderboardList } from '@/components/training/LeaderboardList';
-import { fmt, TG_ACCENT, TG_XP, useTrainingColors } from '@/components/training/theme';
+import { fmt, TG_ACCENT, useTrainingColors } from '@/components/training/theme';
 import { Card, Chip, EmptyState } from '@/components/training/TrainingBits';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useI18n } from '@/store/i18n';
@@ -20,6 +19,7 @@ import { getLeaderboard, isOffline } from '@/utils/trainingApi';
 import { dayKeyInZone } from '@/utils/trainingSessions';
 import type { LeaderboardResponse } from '@/utils/trainingTypes';
 import { addDays, isoWeekLabel, isoWeekMonday } from '@/utils/trainingXp';
+import { fontFamily } from '@/constants/theme';
 
 export default function LeaderboardScreen() {
   const { groupId = '' } = useLocalSearchParams<{ groupId: string }>();
@@ -66,10 +66,10 @@ export default function LeaderboardScreen() {
       footer={data?.me ? (
         <Card c={c} accent={TG_ACCENT}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>
+            <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
               {fmt(tr.tgYourPlace, { rank: data.me.rank, xp: data.me.xp })}
             </Text>
-            {meRow ? <Text style={{ color: TG_XP, fontWeight: Atlas.type.headingWeight }}>{`🔥${meRow.streak_days}`}</Text> : null}
+            {meRow ? <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{`🔥${meRow.streak_days}`}</Text> : null}
           </View>
         </Card>
       ) : undefined}>
@@ -83,7 +83,7 @@ export default function LeaderboardScreen() {
             style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name="chevron.left" size={16} color={c.text} />
           </TouchableOpacity>
-          <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>
+          <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>
             {`${data?.from ?? weekMonday} — ${data?.to ?? addDays(weekMonday, 6)}`}
           </Text>
           <TouchableOpacity

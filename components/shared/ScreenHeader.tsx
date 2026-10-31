@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
 /**
  * components/shared/ScreenHeader.tsx
  *
@@ -35,6 +35,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type HeaderLead, headerLead } from '@/components/shared/ScreenHeaderNav';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTopInset } from '@/hooks/use-top-inset';
+import { glassRimFor, isGlassFill } from '@/components/shared/dsTheme';
 
 /**
  * Ціль дотику 44×56pt навколо кнопки 36×36.
@@ -76,6 +77,17 @@ export function HeaderButton({
   style,
   children,
 }: HeaderButtonProps) {
+  // DS v2.1: кнопка шапки — скляний кружок (заливка + спекулярний обідок).
+  // Екран може перефарбувати тло (активний стан — action.primary): тоді
+  // обідок лише для скляних заливок, суцільна кнопка лишається без рамки.
+  // Без хуків теми: ScreenHeader монтують тести без моків theme-context.
+  // Без тла від екрана — нейтральне «скло» (сірий напівпрозорий кружок +
+  // світлий верхній обідок), що читається в обох темах.
+  const flat = (StyleSheet.flatten(style) ?? {}) as ViewStyle;
+  const bg = typeof flat.backgroundColor === 'string' ? flat.backgroundColor : null;
+  const glassBase = bg == null
+    ? styles.neutralGlass
+    : isGlassFill(bg) ? glassRimFor(bg, 'card') : null;
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -84,7 +96,7 @@ export function HeaderButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
-      style={[styles.button, style]}>
+      style={[styles.button, glassBase, style]}>
       {children}
     </TouchableOpacity>
   );
@@ -299,7 +311,7 @@ const styles = StyleSheet.create({
   // заводити ще одну змінну палітри заради одного рядка.
   crumb: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fontFamily.semibold,
     letterSpacing: -0.1,
     opacity: 0.7,
   },
@@ -312,22 +324,31 @@ const styles = StyleSheet.create({
   },
   // lineHeight заданий явно: без нього великий кегль обрізається зверху
   // й знизу на Android.
+  // DS v2: H1 сторінки — 32 / Medium 500, tracking −1%.
   pageTitle: {
     fontSize: 32,
-    fontWeight: Atlas.type.headingWeight,
-    letterSpacing: -0.8,
+    fontFamily: fontFamily.medium,
+    letterSpacing: -0.32,
     lineHeight: 38,
   },
+  // DS v2.1: кругла скляна кнопка (тло — від екрана або скло за замовчуванням).
   button: {
     width: 36,
     height: 36,
-    borderRadius: 11,
-    borderWidth: 1,
+    borderRadius: 18,
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   below: {
     marginTop: 8,
+  },
+  neutralGlass: {
+    backgroundColor: 'rgba(127,127,135,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    borderTopColor: 'rgba(255,255,255,0.45)',
+    borderBottomColor: 'rgba(17,17,19,0.08)',
   },
 });

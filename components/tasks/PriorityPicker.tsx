@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/PriorityPicker.tsx
  *
@@ -16,6 +15,7 @@ import {
   priorityLabel,
   type TaskPriority,
 } from '@/utils/taskUtils';
+import { fontFamily, radius } from '@/constants/theme';
 
 export interface PriorityPickerProps {
   value: TaskPriority;
@@ -43,8 +43,9 @@ export function PriorityPicker({ value, onChange, colors: c }: PriorityPickerPro
             style={[
               s.chip,
               {
-                borderColor: selected ? color : c.border,
-                backgroundColor: selected ? (priorityBadgeBg(level) ?? (c.dim ?? c.border)) : 'transparent',
+                // DS v2: pill; невибраний — subtle-тло без рамки, вибраний — колір пріоритету.
+                borderColor: selected ? color : 'transparent',
+                backgroundColor: selected ? (priorityBadgeBg(level) ?? (c.dim ?? c.border)) : (c.dim ?? 'transparent'),
               },
             ]}>
             <Text style={[s.text, { color: selected ? color : (level === null ? c.sub : color) }]}>{label}</Text>
@@ -60,10 +61,10 @@ const s = StyleSheet.create({
   chip: {
     flex: 1,
     minHeight: 36,
-    borderRadius: Atlas.radius.small,
+    borderRadius: radius.pill,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  text: { fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  text: { fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

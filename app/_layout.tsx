@@ -1,4 +1,12 @@
 import 'react-native-get-random-values'; // полефіл crypto.getRandomValues (до будь-якого використання crypto)
+import {
+  Manrope_300Light,
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  useFonts,
+} from '@expo-google-fonts/manrope';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Redirect, router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -12,6 +20,8 @@ import { NavSidebar } from '@/components/shared/NavSidebar';
 import { ModuleGate } from '@/components/shared/ModuleGate';
 import { ProjectSidebar } from '@/components/shared/ProjectSidebar';
 import { SIDEBAR_HIDDEN_ON, sidebarVisible } from '@/constants/nav';
+import { MeshBackground } from '@/components/ds/MeshBackground';
+import { glass as dsGlass, theme as dsTheme } from '@/constants/theme';
 import { projectIdFromPathname } from '@/constants/projectNav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePendingMenuInvite } from '@/hooks/use-pending-menu-invite';
@@ -131,7 +141,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Поки не готові — показуємо порожній фон (уникаємо миготіння)
   if (!allReady) {
     return (
-      <View style={{ flex: 1, backgroundColor: isDark ? '#0C0C14' : '#F4F2FF' }} />
+      <View style={{ flex: 1, backgroundColor: dsGlass[isDark ? 'dark' : 'light'].mesh.base }}>
+        <MeshBackground />
+      </View>
     );
   }
 
@@ -329,6 +341,39 @@ function PendingInviteAutoJoin() {
  * навігація по розділах йому нікуди не веде.
  */
 
+/**
+ * Тема react-navigation на токенах DS v2: фон Stack-екранів і модалок —
+ * bg.canvas, а не дефолтний білий/чорний, інакше між переходами блимає
+ * «чужий» колір.
+ */
+const NAV_THEME_LIGHT = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: dsTheme.light.action.primary,
+    background: dsGlass.light.mesh.base,
+    card: dsTheme.light.surface.card,
+    text: dsTheme.light.text.primary,
+    border: dsTheme.light.border.hairline,
+    notification: dsTheme.light.status.danger,
+  },
+};
+const NAV_THEME_DARK = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: dsTheme.dark.action.primary,
+    background: dsGlass.dark.mesh.base,
+    card: dsTheme.dark.surface.card,
+    text: dsTheme.dark.text.primary,
+    border: dsTheme.dark.border.hairline,
+    notification: dsTheme.dark.status.danger,
+  },
+};
+
+/** Стеля очікування шрифтів: далі малюємо системним, щоб старт не завис. */
+const FONT_WAIT_MS = 2500;
+
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -354,9 +399,14 @@ function RootLayoutContent() {
   const sidebarProjectId = showSidebar ? projectIdFromPathname(pathname) : null;
 
   return (
-    <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+    <NavigationThemeProvider value={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT}>
       <AuthGate>
         <View style={{ flex: 1, flexDirection: 'row' }}>
+        {/* DS v2.1: кольоровий mesh під усім застосунком — його заломлює скляний
+            сайдбар (планшет) і він же видно між переходами. Екрани малюють свій
+            <MeshBackground/> (або <GlassScreen>) поверх — непрозоро, щоб
+            native-stack перехід не просвічував попередній екран. */}
+        <MeshBackground />
         {showSidebar && (sidebarProjectId
           ? <ProjectSidebar projectId={sidebarProjectId} pathname={pathname} isDark={isDark} />
           : <NavSidebar pathname={pathname} isDark={isDark} />)}
@@ -478,6 +528,25 @@ function SyncGate({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   useOrientationLock();
+  // Manrope (DS v2) — 300/400/500/600/700. Рендер чекає на шрифти, але не
+  // вічно: помилка завантаження або FONT_WAIT_MS — і далі йдемо із
+  // системним шрифтом (родина, якої нема, на iOS/Android мовчки падає на системну).
+  const [fontsLoaded, fontError] = useFonts({
+    Manrope_300Light,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+  });
+  const [fontWaitOver, setFontWaitOver] = useState(false);
+  useEffect(() => {
+    if (fontError && __DEV__) console.warn('[fonts] Manrope не завантажився, лишаємо системний:', fontError);
+  }, [fontError]);
+  useEffect(() => {
+    const id = setTimeout(() => setFontWaitOver(true), FONT_WAIT_MS);
+    return () => clearTimeout(id);
+  }, []);
+  if (!fontsLoaded && !fontError && !fontWaitOver) return null;
 
   return (
     <ErrorBoundary>

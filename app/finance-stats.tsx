@@ -1,6 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -18,7 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { finPalette } from '@/components/finance/finPalette';
+import { fontFamily, radius, shadow, space, type as dsType } from '@/constants/theme';
+import { ds, dsTokens, useDS } from '@/hooks/use-ds';
 import { CategoryRow, categoryRowsToMap } from '@/store/migrations';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
@@ -31,6 +30,7 @@ import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { wideModalStyles } from '@/components/finance/wideModal';
 import { CONTENT_MAX_WIDTH, WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { defaultCategories, type CategoryDef } from '@/utils/financeCategories';
+import { GlassBackdrop, GlassSurface, MeshBackground } from '@/components/ds';
 
 /**
  * Категорію мають лише дохід і витрата, тож розріз «за категоріями» знає саме
@@ -82,19 +82,16 @@ const fmtShort = (n: number) => {
  * самий об'єкт між рендерами — інакше мемоізовані картки бачать «нові»
  * кольори на кожен рендер і перемальовуються дарма.
  */
-function makeColors(isDark: boolean) {
+function makeColors(isDark: boolean, reduceTransparency = false) {
+  // Токени DS v2 (components/finance/finPalette.ts). Графіки: доходи —
+  // status.success, витрати — accent.coral, активний/виділений — accent.lime,
+  // прогрес — accent.amber. Суми — text.primary (кольорові цифри не тримають 4.5:1).
+  const p = finPalette(isDark, reduceTransparency);
   return {
-    bg1:    isDark ? '#080E18' : '#EFF5FF',
-    bg2:    isDark ? '#0F1A2E' : '#E0ECFF',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(140,180,240,0.35)',
-    text:   isDark ? '#F0F5FF' : '#0A1020',
-    sub:    isDark ? 'rgba(240,245,255,0.62)' : 'rgba(10,16,32,0.58)',
-    green:  '#10B981',
-    red:    '#EF4444',
-    accent: '#0EA5E9',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    hole:   isDark ? '#0C1420' : '#E8F0FC',
+    ...p,
+    red: p.t.accent.coral,
+    // Дірка бублика — непрозора (ховає сектори), у тон скла над mesh.
+    hole: reduceTransparency ? p.g.solid.card : isDark ? '#16161A' : '#F9F8FA',
   };
 }
 
@@ -146,7 +143,7 @@ const DonutChart = React.memo(function DonutChart({ data, size = 180, holeRatio 
   const holeSize = size * holeRatio;
   return (
     <View style={{ width: size, height: size }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, width: size, height: size, borderRadius: r, backgroundColor: 'rgba(128,128,128,0.1)' }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, width: size, height: size, borderRadius: r, backgroundColor: 'rgba(128,128,128,0.12)' }} />
       {data.map((item, i) => {
         const sweep = (item.value / total) * 360;
         const slice = <PieSlice key={i} from={cum} sweep={sweep} color={item.color} size={size} />;
@@ -217,7 +214,6 @@ const SparkLine = React.memo(function SparkLine({ data, color, height = 64, widt
         backgroundColor: color,
         left: pts[pts.length - 1].x - 4,
         top:  pts[pts.length - 1].y - 4,
-        shadowColor: color, shadowOpacity: 0.6, shadowRadius: 4,
       }} />
     </View>
   );
@@ -240,7 +236,7 @@ export default function FinanceStatsScreen() {
   );
   // Календар періоду — діалогом посеред екрана на планшеті.
   const wm = wideModalStyles(isWide);
-  const isDark = useColorScheme() === 'dark';
+  const { isDark, reduceTransparency } = useDS();
   const { tr, lang } = useI18n();
   // I18N-03: підписи осей і календаря — зі словника, а не з локальних масивів.
   const monthLabelsShort = tr.monthsShort;
@@ -341,7 +337,7 @@ export default function FinanceStatsScreen() {
     [cats, defaultCats],
   );
 
-  const c = useMemo(() => makeColors(isDark), [isDark]);
+  const c = useMemo(() => makeColors(isDark, reduceTransparency), [isDark, reduceTransparency]);
 
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
@@ -548,7 +544,7 @@ export default function FinanceStatsScreen() {
     { label: 'Доходи',       value: fmt(income),      color: c.green },
     { label: 'Витрати',      value: fmt(expense),     color: c.red },
     { label: 'Баланс',       value: fmt(balance),     color: balance >= 0 ? c.green : c.red },
-    { label: 'Заощадження',  value: `${savingsPct}%`, color: c.accent },
+    { label: 'Заощадження',  value: `${savingsPct}%`, color: c.amber },
   ];
   // На широкому екрані всі чотири підсумки вміщаються в один ряд.
   const summaryRows = isWide
@@ -557,7 +553,7 @@ export default function FinanceStatsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
       <SafeAreaView style={{ flex: 1 }} edges={[]}>
@@ -573,7 +569,7 @@ export default function FinanceStatsScreen() {
             onPress: () => router.back(),
             label: tr.back,
             color: c.sub,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { ...c.gl.card, borderColor: 'transparent' },
           }}
           crumbs={[
             { label: tr.tabFinance, onPress: () => router.push('/(tabs)/explore') },
@@ -585,10 +581,11 @@ export default function FinanceStatsScreen() {
               onPress={openCal}
               accessibilityLabel={tr.calendar}
               style={{
-                backgroundColor: hasCustomRange ? c.accent + '22' : c.dim,
-                borderColor:     hasCustomRange ? c.accent        : c.border,
+                backgroundColor: hasCustomRange ? c.action : c.card,
+                borderColor:     'transparent',
+                borderRadius:    radius.pill,
               }}>
-              <IconSymbol name="calendar" size={17} color={hasCustomRange ? c.accent : c.sub} />
+              <IconSymbol name="calendar" size={17} color={hasCustomRange ? c.onAction : c.text} />
             </HeaderButton>
           }
         />
@@ -601,14 +598,14 @@ export default function FinanceStatsScreen() {
           {hasCustomRange && (
             <TouchableOpacity
               onPress={clearRange}
-              style={[s.rangeChip, { backgroundColor: c.accent + '18', borderColor: c.accent + '50' }]}>
-              <IconSymbol name="calendar" size={12} color={c.accent} />
-              <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700', marginHorizontal: 6 }}>
+              style={[s.rangeChip, { backgroundColor: c.action }]}>
+              <IconSymbol name="calendar" size={12} color={c.onAction} />
+              <Text style={{ color: c.onAction, fontSize: 13, fontFamily: fontFamily.semibold, marginHorizontal: 6, fontVariant: ['tabular-nums'] }}>
                 {rangeStart!.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                 {' — '}
                 {rangeEnd!.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}
               </Text>
-              <IconSymbol name="xmark" size={11} color={c.accent} />
+              <IconSymbol name="xmark" size={11} color={c.onAction} />
             </TouchableOpacity>
           )}
 
@@ -616,17 +613,17 @@ export default function FinanceStatsScreen() {
             /* Порожня статистика — глухий кут: графіки нулів не пояснюють,
                що робити далі, тому веде одразу до створення транзакції. */
             <View style={{ alignItems: 'center', paddingVertical: 64 }}>
-              <View style={[s.emptyIcon, { backgroundColor: c.accent + '15' }]}>
-                <IconSymbol name="chart.bar.fill" size={34} color={c.accent} />
+              <View style={[s.emptyIcon, { ...c.gl.card }]}>
+                <IconSymbol name="chart.bar.fill" size={34} color={c.muted} />
               </View>
-              <Text style={{ color: c.text, fontSize: 17, fontWeight: '700', marginTop: 16 }}>
+              <Text style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, marginTop: 16 }}>
                 {tr.noTransactions}
               </Text>
               <TouchableOpacity
                 onPress={() => router.push({ pathname: '/explore', params: { create: '1' } })}
-                style={[s.emptyBtn, { backgroundColor: c.accent }]}>
-                <IconSymbol name="plus" size={16} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', marginLeft: 8 }}>{tr.add}</Text>
+                style={[s.emptyBtn, { backgroundColor: c.action }]}>
+                <IconSymbol name="plus" size={16} color={c.onAction} />
+                <Text style={{ ...dsType.label, fontSize: 15, color: c.onAction, marginLeft: 8 }}>{tr.add}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -634,7 +631,7 @@ export default function FinanceStatsScreen() {
 
           {/* ── Period selector (hidden when custom range active) ── */}
           {!hasCustomRange && (
-          <View style={[s.segRow, { backgroundColor: c.card, borderColor: c.border, marginBottom: 18 }]}>
+          <View style={[s.segRow, { ...c.gl.card, marginBottom: 18 }]}>
             {([
               { key: 'week',    label: 'Тиждень' },
               { key: 'month',   label: 'Місяць'  },
@@ -648,8 +645,8 @@ export default function FinanceStatsScreen() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: period === p.key }}
                 accessibilityLabel={p.label}
-                style={[s.segBtn, period === p.key && { backgroundColor: c.accent }]}>
-                <Text style={[s.segLabel, { color: period === p.key ? '#fff' : c.sub }]}>{p.label}</Text>
+                style={[s.segBtn, period === p.key && { backgroundColor: c.action }]}>
+                <Text style={[s.segLabel, { color: period === p.key ? c.onAction : c.text }]}>{p.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -666,8 +663,8 @@ export default function FinanceStatsScreen() {
 
           {/* ── Перекази в підсумки не входять ── */}
           {transferCount > 0 && (
-            <View style={[s.hintRow, { backgroundColor: c.accent + '15', borderColor: c.accent + '30' }]}>
-              <IconSymbol name="arrow.left.arrow.right" size={14} color={c.accent} />
+            <View style={[s.hintRow, { ...c.gl.card }]}>
+              <IconSymbol name="arrow.left.arrow.right" size={14} color={c.t.status.info} />
               <Text style={{ flex: 1, color: c.sub, fontSize: 12, lineHeight: 17, marginLeft: 8 }}>
                 {tr.transfersNotCounted} ({transferCount})
               </Text>
@@ -679,16 +676,18 @@ export default function FinanceStatsScreen() {
           {/* ── Balance trend ── */}
           {trendData.length >= 2 && (
             <>
-              <SectionTitle text="Тренд балансу" sub={c.sub} />
-              <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
+              <SectionTitle text="Тренд балансу" sub={c.text} />
+              <GlassSurface radius={radius.cardCompact} tint="lime" style={[s.card, { marginBottom: 18 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <View>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 2 }}>Поточний баланс</Text>
-                    <Text style={{ color: trendColor, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{fmt(balance)}</Text>
+                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 2 }}>Поточний баланс</Text>
+                    {/* KPI — display-цифри DS. */}
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, color: c.text }}>{fmt(balance)}</Text>
                   </View>
-                  <View style={[s.trendBadge, { backgroundColor: trendColor + '18', borderColor: trendColor + '30' }]}>
-                    <IconSymbol name={balance >= 0 ? 'arrow.up.trend' : 'arrow.down.trend'} size={12} color={trendColor} />
-                    <Text style={{ color: trendColor, fontSize: 11, fontWeight: '700', marginLeft: 4 }}>
+                  {/* Бейдж значення на графіку — лайм (росте) / корал-тінт (падає). */}
+                  <View style={[s.trendBadge, { backgroundColor: balance >= 0 ? c.t.accent.lime : c.red + '1F' }]}>
+                    <IconSymbol name={balance >= 0 ? 'arrow.up.trend' : 'arrow.down.trend'} size={12} color={balance >= 0 ? c.t.text.onAccent : c.red} />
+                    <Text style={{ color: balance >= 0 ? c.t.text.onAccent : c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4, fontVariant: ['tabular-nums'] }}>
                       {balance >= 0 ? '+' : ''}{savingsPct}%
                     </Text>
                   </View>
@@ -698,16 +697,16 @@ export default function FinanceStatsScreen() {
                   <Text style={{ color: c.sub, fontSize: 10 }}>Початок</Text>
                   <Text style={{ color: c.sub, fontSize: 10 }}>Зараз</Text>
                 </View>
-              </BlurView>
+              </GlassSurface>
             </>
           )}
 
           {/* ── Adaptive bar chart ── */}
           <SectionTitle
             text={period === 'week' ? 'По днях (тиждень)' : period === '3months' ? 'По місяцях (3 міс)' : period === 'year' ? 'По місяцях (рік)' : period === 'all' ? 'По місяцях' : 'Поточний місяць'}
-            sub={c.sub}
+            sub={c.text}
           />
-          <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
+          <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
             {flowTxs.length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 16 }}>Немає даних</Text>
             ) : (
@@ -717,7 +716,7 @@ export default function FinanceStatsScreen() {
                     <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 120 }}>
                       {/* Amount label for tallest bar */}
                       {(m.income > 0 || m.expense > 0) && (
-                        <Text style={{ color: c.sub, fontSize: 8, fontWeight: '600', marginBottom: 2 }} numberOfLines={1}>
+                        <Text style={{ color: c.sub, fontSize: 9, fontFamily: fontFamily.semibold, marginBottom: 2, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
                           {fmtShort(Math.max(m.income, m.expense))}
                         </Text>
                       )}
@@ -731,7 +730,7 @@ export default function FinanceStatsScreen() {
                           : <View style={{ flex: 1 }} />
                         }
                       </View>
-                      <Text style={{ color: c.sub, fontSize: 9, fontWeight: '600', marginTop: 5 }}>{m.label}</Text>
+                      <Text style={{ color: c.sub, fontSize: 9, fontFamily: fontFamily.semibold, marginTop: 5 }}>{m.label}</Text>
                     </View>
                   ))}
                 </View>
@@ -741,13 +740,13 @@ export default function FinanceStatsScreen() {
                 </View>
               </>
             )}
-          </BlurView>
+          </GlassSurface>
 
           {/* ── Income vs Expense donut ── */}
           {balanceDonutData.length > 0 && (
             <>
-              <SectionTitle text="Доходи / Витрати" sub={c.sub} />
-              <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
+              <SectionTitle text="Доходи / Витрати" sub={c.text} />
+              <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
                   {/* Donut */}
                   <View style={{ position: 'relative' }}>
@@ -758,8 +757,8 @@ export default function FinanceStatsScreen() {
                       width: 130 * 0.58, height: 130 * 0.58,
                       alignItems: 'center', justifyContent: 'center',
                     }}>
-                      <Text style={{ color: c.sub, fontSize: 9, fontWeight: '600' }}>збереж.</Text>
-                      <Text style={{ color: c.green, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{savingsPct}%</Text>
+                      <Text style={{ color: c.sub, fontSize: 9, fontFamily: fontFamily.semibold }}>збереж.</Text>
+                      <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, letterSpacing: -0.44, fontVariant: ['tabular-nums'] }}>{savingsPct}%</Text>
                     </View>
                   </View>
                   {/* Stats */}
@@ -772,8 +771,8 @@ export default function FinanceStatsScreen() {
                       <View key={item.label}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.color }} />
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', flex: 1 }}>{item.label}</Text>
-                          <Text style={{ color: item.color, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{fmt(item.value)}</Text>
+                          <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, flex: 1 }}>{item.label}</Text>
+                          <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{fmt(item.value)}</Text>
                         </View>
                         <View style={{ height: 3, backgroundColor: c.dim, borderRadius: 2, overflow: 'hidden' }}>
                           <View style={{ height: '100%', borderRadius: 2, backgroundColor: item.color, width: income + expense > 0 ? `${(item.value / (income + expense)) * 100}%` : '0%' }} />
@@ -782,28 +781,28 @@ export default function FinanceStatsScreen() {
                     ))}
                   </View>
                 </View>
-              </BlurView>
+              </GlassSurface>
             </>
           )}
 
           {/* ── Quick stats ── */}
-          <SectionTitle text="Швидка статистика" sub={c.sub} />
+          <SectionTitle text="Швидка статистика" sub={c.text} />
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
             <QuickStat icon="list.bullet.circle.fill" label="Транзакцій" value={String(txCount)} color={c.accent} border={c.border} isDark={isDark} />
             <QuickStat icon="calendar" label="Сер/день" value={avgDailyExp > 0 ? fmt(avgDailyExp) : '—'} color={c.red} border={c.border} isDark={isDark} />
           </View>
           {largestTx && (
-            <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
-              <View style={{ width: 40, height: 40, borderRadius: Atlas.radius.medium, backgroundColor: c.red + '20', alignItems: 'center', justifyContent: 'center' }}>
+            <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+              <View style={{ width: 40, height: 40, borderRadius: radius.pill, backgroundColor: c.red + '1F', alignItems: 'center', justifyContent: 'center' }}>
                 <IconSymbol name={getCatIcon(largestTx.category, 'expense')} size={18} color={c.red} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginBottom: 2 }}>Найбільша витрата</Text>
-                <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{largestTx.category}</Text>
+                <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold, marginBottom: 2 }}>Найбільша витрата</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{largestTx.category}</Text>
                 {largestTx.note ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{largestTx.note}</Text> : null}
               </View>
-              <Text style={{ color: c.red, fontSize: 16, fontWeight: Atlas.type.headingWeight }}>−{fmt(largestTx.amount)}</Text>
-            </BlurView>
+              <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>−{fmt(largestTx.amount)}</Text>
+            </GlassSurface>
           )}
 
           </View>
@@ -812,58 +811,58 @@ export default function FinanceStatsScreen() {
           {/* ── Витрати в розрізі рахунків ── */}
           {accountStats.length > 0 && (
             <>
-              <SectionTitle text={tr.accounts} sub={c.sub} />
-              <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
-                <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
+              <SectionTitle text={tr.accounts} sub={c.text} />
+              <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
+                <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
                   {tr.expenses}
                 </Text>
                 {accountStats.map((row, i) => (
                   <View key={row.account.id} style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, i > 0 && { marginTop: 12 }]}>
-                    <View style={[s.catIcon, { backgroundColor: c.accent + '20' }]}>
-                      <IconSymbol name={ACCOUNT_KIND_ICONS[row.account.kind]} size={15} color={c.accent} />
+                    <View style={[s.catIcon, { backgroundColor: c.limeTint }]}>
+                      <IconSymbol name={ACCOUNT_KIND_ICONS[row.account.kind]} size={15} color={c.lime} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
-                        <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }} numberOfLines={1}>
+                        <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }} numberOfLines={1}>
                           {row.account.name}
                         </Text>
-                        <Text style={{ color: c.red, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>
+                        <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                           {fmtIn(row.spent, row.account.currency)}
                         </Text>
                       </View>
                       <View style={{ height: 4, backgroundColor: c.dim, borderRadius: 2, overflow: 'hidden' }}>
-                        <View style={{ height: '100%', width: `${row.pct * 100}%`, backgroundColor: c.accent, borderRadius: 2 }} />
+                        <View style={{ height: '100%', width: `${row.pct * 100}%`, backgroundColor: c.limeFill, borderRadius: radius.pill }} />
                       </View>
                     </View>
                   </View>
                 ))}
-              </BlurView>
+              </GlassSurface>
             </>
           )}
 
           {/* ── Day-of-week spending ── */}
           {expenseTxs.length > 0 && (
             <>
-              <SectionTitle text="Витрати по днях тижня" sub={c.sub} />
-              <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
+              <SectionTitle text="Витрати по днях тижня" sub={c.text} />
+              <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
                 {weekdayStats.map((day, i) => (
                   <View key={i} style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, i > 0 && { marginTop: 10 }]}>
-                    <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', width: 26 }}>{day.label}</Text>
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, width: 26 }}>{day.label}</Text>
                     <View style={{ flex: 1, height: 6, backgroundColor: c.dim, borderRadius: 3, overflow: 'hidden' }}>
-                      <View style={{ height: '100%', width: `${day.pct * 100}%`, backgroundColor: day.pct > 0.75 ? c.red : day.pct > 0.4 ? c.accent : c.green, borderRadius: 3 }} />
+                      <View style={{ height: '100%', width: `${day.pct * 100}%`, backgroundColor: day.pct > 0.75 ? c.red : c.amber, borderRadius: radius.pill }} />
                     </View>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', width: 56, textAlign: 'right' }}>
+                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, width: 56, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
                       {day.total > 0 ? fmt(day.total) : '—'}
                     </Text>
                   </View>
                 ))}
-              </BlurView>
+              </GlassSurface>
             </>
           )}
 
           {/* ── Category breakdown ── */}
-          <SectionTitle text="За категоріями" sub={c.sub} />
-          <View style={[s.segRow, { backgroundColor: c.card, borderColor: c.border, marginBottom: 14 }]}>
+          <SectionTitle text="За категоріями" sub={c.text} />
+          <View style={[s.segRow, { ...c.gl.card, marginBottom: 14 }]}>
             {(['expense', 'income'] as CatType[]).map(t => (
               <TouchableOpacity
                 key={t}
@@ -871,8 +870,8 @@ export default function FinanceStatsScreen() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: catTab === t }}
                 accessibilityLabel={t === 'expense' ? tr.expenses : tr.incomes}
-                style={[s.segBtn, catTab === t && { backgroundColor: t === 'expense' ? c.red : c.green }]}>
-                <Text style={[s.segLabel, { color: catTab === t ? '#fff' : c.sub }]}>
+                style={[s.segBtn, catTab === t && { backgroundColor: c.action }]}>
+                <Text style={[s.segLabel, { color: catTab === t ? c.onAction : c.text }]}>
                   {t === 'expense' ? 'Витрати' : 'Доходи'}
                 </Text>
               </TouchableOpacity>
@@ -880,13 +879,13 @@ export default function FinanceStatsScreen() {
           </View>
 
           {categoryStats.length === 0 ? (
-            <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
+            <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
               <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingVertical: 20 }}>
                 {catTab === 'expense' ? 'Витрат немає' : 'Доходів немає'}
               </Text>
-            </BlurView>
+            </GlassSurface>
           ) : (
-            <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border, marginBottom: 18 }]}>
+            <GlassSurface radius={radius.cardCompact} style={[s.card, { marginBottom: 18 }]}>
               {/* Donut + legend side by side */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 18 }}>
                 <DonutChart
@@ -900,7 +899,7 @@ export default function FinanceStatsScreen() {
                     <View key={item.cat} style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                       <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: item.color, flexShrink: 0 }} />
                       <Text style={{ color: c.sub, fontSize: 11, flex: 1 }} numberOfLines={1}>{item.cat}</Text>
-                      <Text style={{ color: item.color, fontSize: 11, fontWeight: '700' }}>{item.pct.toFixed(0)}%</Text>
+                      <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{item.pct.toFixed(0)}%</Text>
                     </View>
                   ))}
                   {categoryStats.length > 5 && (
@@ -921,28 +920,28 @@ export default function FinanceStatsScreen() {
                 const icon = getCatIcon(item.cat, catTab);
                 return (
                   <View key={item.cat}>
-                    {idx > 0 && <View style={{ height: 1, backgroundColor: c.border, marginVertical: 10 }} />}
+                    {idx > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.border, marginVertical: 12 }} />}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <View style={[s.catIcon, { backgroundColor: item.color + '20' }]}>
                         <IconSymbol name={icon} size={15} color={item.color} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
-                          <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{item.cat}</Text>
-                          <Text style={{ color: item.color, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>{fmt(item.amt)}</Text>
+                          <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>{item.cat}</Text>
+                          <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{fmt(item.amt)}</Text>
                         </View>
                         <View style={{ height: 4, backgroundColor: c.dim, borderRadius: 2, overflow: 'hidden' }}>
                           <View style={{ height: '100%', width: `${item.pct}%`, backgroundColor: item.color, borderRadius: 2 }} />
                         </View>
                       </View>
-                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', width: 36, textAlign: 'right' }}>
+                      <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, width: 36, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
                         {item.pct.toFixed(0)}%
                       </Text>
                     </View>
                   </View>
                 );
               })}
-            </BlurView>
+            </GlassSurface>
           )}
           </View>
           </View>
@@ -955,19 +954,20 @@ export default function FinanceStatsScreen() {
 
       {/* ─── Calendar Range Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
-        <Pressable accessible={false} style={[{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.28)', justifyContent: 'flex-end' }, wm.overlay]} onPress={() => setShowCal(false)}>
+        <Pressable accessible={false} style={[{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.60)' : 'rgba(0,0,0,0.40)', justifyContent: 'flex-end' }, wm.overlay]} onPress={() => setShowCal(false)}>
           <Pressable
             onPress={e => e.stopPropagation()}
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"
             style={[{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }, readingWidth, wm.column]}>
-            <BlurView intensity={isDark ? 55 : 72} tint={isDark ? 'dark' : 'light'} style={[s.calSheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,16,30,0.97)' : 'rgba(245,248,255,0.97)' }]}>
+            <View style={[s.calSheet, { ...c.gl.strong }, shadow[isDark ? 'dark' : 'light'].popover]}>
+              <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
 
               {/* Handle + close */}
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
                 <View style={{ flex: 1 }} />
-                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, alignSelf: 'center' }} />
+                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.muted, alignSelf: 'center' }} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
                   <TouchableOpacity
                     onPress={() => setShowCal(false)}
@@ -991,18 +991,18 @@ export default function FinanceStatsScreen() {
                       key={step}
                       onPress={() => { if (step === 'end' && !rangeStart) return; setPickStep(step); }}
                       style={[s.stepPill, {
-                        backgroundColor: isActive ? c.accent + '22' : isDone ? c.green + '14' : c.dim,
-                        borderColor:     isActive ? c.accent        : isDone ? c.green + '60' : c.border,
+                        backgroundColor: isActive ? c.action : c.dim,
+                        borderColor:     'transparent',
                         flex: 1,
                       }]}>
                       <IconSymbol
                         name={isActive ? 'calendar' : isDone ? 'checkmark.circle.fill' : 'circle'}
                         size={13}
-                        color={isActive ? c.accent : isDone ? c.green : c.sub}
+                        color={isActive ? c.onAction : isDone ? c.green : c.sub}
                       />
                       <View style={{ marginLeft: 7 }}>
-                        <Text style={{ color: isActive ? c.accent : isDone ? c.green : c.sub, fontSize: 10, fontWeight: '600' }}>{label}</Text>
-                        <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>
+                        <Text style={{ color: isActive ? c.onAction : c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>{label}</Text>
+                        <Text style={{ color: isActive ? c.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                           {dateVal ? dateVal.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '—'}
                         </Text>
                       </View>
@@ -1023,7 +1023,7 @@ export default function FinanceStatsScreen() {
                   style={s.navBtn}>
                   <IconSymbol name="chevron.left" size={19} color={c.sub} />
                 </TouchableOpacity>
-                <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontWeight: '700' }}>
+                <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
                   {monthLabelsFull[calMonth]} {calYear}
                 </Text>
                 <TouchableOpacity
@@ -1038,7 +1038,7 @@ export default function FinanceStatsScreen() {
               {/* Weekday headers */}
               <View style={{ flexDirection: 'row', marginBottom: 4 }}>
                 {weekdayLabels.map(d => (
-                  <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
+                  <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>{d}</Text>
                 ))}
               </View>
 
@@ -1069,20 +1069,20 @@ export default function FinanceStatsScreen() {
                         activeOpacity={isFuture ? 1 : 0.7}>
                         <View style={[
                           s.dayCell,
-                          isStart && { backgroundColor: c.accent, borderRadius: Atlas.radius.medium },
-                          isEnd   && { backgroundColor: c.accent, borderRadius: Atlas.radius.medium },
-                          isInRange && { backgroundColor: c.accent + '22', borderRadius: 4 },
-                          !isStart && !isEnd && isToday && { borderWidth: 1.5, borderColor: c.accent },
+                          isStart && { backgroundColor: c.action, borderRadius: radius.pill },
+                          isEnd   && { backgroundColor: c.action, borderRadius: radius.pill },
+                          isInRange && { backgroundColor: c.dim, borderRadius: radius.pill },
+                          !isStart && !isEnd && isToday && { borderWidth: 1.5, borderColor: c.text },
                         ]}>
                           <Text style={{
                             fontSize: 13,
-                            fontWeight: isStart || isEnd || isToday ? '700' : '400',
-                            color: isStart || isEnd ? '#fff' : isToday ? c.accent : isFuture ? c.sub + '60' : c.text,
+                            fontFamily: isStart || isEnd || isToday ? fontFamily.semibold : fontFamily.regular,
+                            color: isStart || isEnd ? c.onAction : isFuture ? c.muted : c.text,
                             opacity: isFuture ? 0.35 : 1,
                           }}>{day}</Text>
                         </View>
                         {hasTx && !isStart && !isEnd && (
-                          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: c.accent, marginTop: 2 }} />
+                          <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: c.amber, marginTop: 2 }} />
                         )}
                       </TouchableOpacity>
                     );
@@ -1093,20 +1093,20 @@ export default function FinanceStatsScreen() {
               {/* Actions */}
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                 {hasCustomRange && (
-                  <TouchableOpacity onPress={clearRange} style={[s.calBtn, { backgroundColor: c.dim, borderWidth: 1, borderColor: c.border, flex: 1 }]}>
-                    <IconSymbol name="xmark" size={13} color={c.sub} />
-                    <Text style={{ color: c.sub, fontWeight: '600', marginLeft: 5 }}>Скинути</Text>
+                  <TouchableOpacity onPress={clearRange} style={[s.calBtn, { ...c.gl.subtle, flex: 1 }]}>
+                    <IconSymbol name="xmark" size={13} color={c.t.action.secondaryText} />
+                    <Text style={{ color: c.t.action.secondaryText, fontFamily: fontFamily.semibold, marginLeft: 5 }}>Скинути</Text>
                   </TouchableOpacity>
                 )}
                 {pickStep === 'end' && rangeStart && (
-                  <View style={[s.calBtn, { backgroundColor: c.accent + '15', borderWidth: 1, borderColor: c.accent + '40', flex: 2 }]}>
-                    <IconSymbol name="calendar" size={13} color={c.accent} />
-                    <Text style={{ color: c.accent, fontWeight: '700', marginLeft: 6 }}>Оберіть кінець діапазону</Text>
+                  <View style={[s.calBtn, { backgroundColor: c.dim, flex: 2 }]}>
+                    <IconSymbol name="calendar" size={13} color={c.sub} />
+                    <Text style={{ color: c.text, fontFamily: fontFamily.semibold, marginLeft: 6 }}>Оберіть кінець діапазону</Text>
                   </View>
                 )}
               </View>
 
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1116,29 +1116,48 @@ export default function FinanceStatsScreen() {
 
 // ─── Helper components ───────────────────────────────────────────────────────
 const SectionTitle = React.memo(function SectionTitle({ text, sub }: { text: string; sub: string }) {
-  return <Text style={[s.sectionTitle, { color: sub }]}>{text}</Text>;
+  // Заголовок секції DS (16/600); колір передає екран (text.primary).
+  // DS v2.1: крапка акценту модуля (lime fill) перед заголовком.
+  const { g } = useDS();
+  return (
+    <View style={s.sectionRow}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: g.accent.lime.fill }} />
+      <Text style={[s.sectionTitle, { color: sub, marginBottom: 0 }]}>{text}</Text>
+    </View>
+  );
 });
 
 const SummCard = React.memo(function SummCard({ label, value, color, border, isDark }: { label: string; value: string; color: string; border: string; isDark: boolean }) {
+  // DS v2: колір — лише крапкою біля підпису; число — тонке display, text.primary.
+  // DS v2.1: скляна KPI-картка (блюр на iOS).
+  const t = dsTokens(isDark);
+  void border;
   return (
-    <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.summCard, { borderColor: border, flex: 1 }]}>
-      <Text style={{ color, fontSize: 10, fontWeight: '600', marginBottom: 5, opacity: 0.55 }}>{label}</Text>
-      <Text style={{ color, fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-    </BlurView>
+    <GlassSurface radius={radius.nested} style={[s.summCard, { flex: 1 }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
+        <Text style={{ ...dsType.caption, color: t.text.secondary }}>{label}</Text>
+      </View>
+      <Text style={{ color: t.text.primary, fontSize: 24, lineHeight: 28, fontFamily: fontFamily.light, letterSpacing: -0.48, fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+    </GlassSurface>
   );
 });
 
 const QuickStat = React.memo(function QuickStat({ icon, label, value, color, border, isDark }: { icon: IconSymbolName; label: string; value: string; color: string; border: string; isDark: boolean }) {
+  const t = dsTokens(isDark);
+  void border;
   return (
-    <BlurView intensity={isDark ? 22 : 40} tint={isDark ? 'dark' : 'light'} style={[s.summCard, { borderColor: border, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-      <View style={{ width: 34, height: 34, borderRadius: Atlas.radius.medium, backgroundColor: color + '20', alignItems: 'center', justifyContent: 'center' }}>
+    <GlassSurface radius={radius.nested} style={[s.summCard, { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+      {/* Icon-chip: тонований акцентом скляний кружок. */}
+      <View style={{ width: 36, height: 36, borderRadius: radius.pill, ...ds.glass(isDark, 'subtle'), alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: color + '24' }]} />
         <IconSymbol name={icon} size={15} color={color} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color, fontSize: 10, fontWeight: '600', marginBottom: 3, opacity: 0.55 }}>{label}</Text>
-        <Text style={{ color, fontSize: 13, fontWeight: Atlas.type.headingWeight }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+        <Text style={{ ...dsType.caption, color: t.text.secondary, marginBottom: 2 }}>{label}</Text>
+        <Text style={{ color: t.text.primary, fontSize: 18, lineHeight: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
       </View>
-    </BlurView>
+    </GlassSurface>
   );
 });
 
@@ -1146,7 +1165,7 @@ const LegendDot = React.memo(function LegendDot({ color, label, sub }: { color: 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
       <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
-      <Text style={{ color: sub, fontSize: 11, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ color: sub, fontSize: 11, fontFamily: fontFamily.semibold }}>{label}</Text>
     </View>
   );
 });
@@ -1156,23 +1175,25 @@ const s = StyleSheet.create({
   splitCol:     { flex: 1, minWidth: 0 },
   // Заголовок 20pt, не спільні 32: у шапці поруч живуть лічильники
   // періоду, і більший кегль лишав би їм пів рядка.
-  title:        { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
-  segRow:       { flexDirection: 'row', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 3 },
-  segBtn:       { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
-  segLabel:     { fontSize: 11, fontWeight: '600' },
-  summCard:     { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, overflow: 'hidden' },
-  sectionTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
-  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18, overflow: 'hidden', marginBottom: 0 },
+  title:        { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.3 },
+  // Сегменти DS: біла pill-доріжка, активний — pill action.primary.
+  segRow:       { flexDirection: 'row', borderRadius: radius.pill, padding: 3 },
+  segBtn:       { flex: 1, minHeight: 36, justifyContent: 'center', borderRadius: radius.pill, alignItems: 'center' },
+  segLabel:     { fontSize: 12, fontFamily: fontFamily.semibold },
+  summCard:     { borderRadius: radius.nested, padding: space[4] },
+  sectionTitle: { ...dsType.h2, marginBottom: 10 },
+  sectionRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  card:         { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: 0 },
   legendRow:    { flexDirection: 'row', gap: 16, justifyContent: 'center' },
-  catIcon:      { width: 34, height: 34, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  trendBadge:   { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
-  rangeChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
-  calSheet:     { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  stepPill:     { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
-  navBtn:       { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell:      { width: 34, height: 34, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  calBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, paddingVertical: 11 },
-  hintRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 18 },
-  emptyIcon:    { width: 80, height: 80, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
-  emptyBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, paddingHorizontal: 24, paddingVertical: 14, marginTop: 20 },
+  catIcon:      { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  trendBadge:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  rangeChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: radius.pill, minHeight: 36, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 14 },
+  calSheet:     { borderRadius: radius.card, padding: space.cardPaddingCompact, overflow: 'hidden' },
+  stepPill:     { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 10 },
+  navBtn:       { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  dayCell:      { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  calBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, minHeight: 44 },
+  hintRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nestedCompact, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 18 },
+  emptyIcon:    { width: 80, height: 80, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  emptyBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 24, minHeight: 52, marginTop: 20 },
 });

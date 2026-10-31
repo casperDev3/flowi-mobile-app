@@ -5,16 +5,17 @@
  * в сітці) вже підставлені з обраного дня/слота й видні в підзаголовку,
  * щоб людина бачила, КУДИ саме створює запис.
  */
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { Atlas } from '@/constants/atlas';
 import type { Translations } from '@/store/translations';
 
-import type { CalendarColors } from './palette';
+import { PERSONAL_TASK_COLOR, type CalendarColors } from './palette';
+import { fontFamily, radius, shadow } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 export interface CreateChooserProps {
   visible: boolean;
@@ -38,13 +39,13 @@ export function CreateChooser({ visible, subtitle, onClose, onMeeting, onTask, i
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityHint={hint}
-      style={[st.option, { borderColor: c.border, backgroundColor: c.card }]}>
+      style={[st.option, { backgroundColor: c.dim }]}>
       <View style={[st.icon, { backgroundColor: color + '1F' }]}>
         <IconSymbol name={icon} size={20} color={color} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{title}</Text>
-        <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{hint}</Text>
+        <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{title}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 2 }}>{hint}</Text>
       </View>
       <IconSymbol name="chevron.right" size={13} color={c.sub} />
     </TouchableOpacity>
@@ -54,7 +55,7 @@ export function CreateChooser({ visible, subtitle, onClose, onMeeting, onTask, i
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable
         accessible={false}
-        style={[st.overlay, wide ? st.overlayCenter : { justifyContent: 'flex-end', paddingBottom: insets.bottom + 12 }]}
+        style={[st.overlay, { backgroundColor: dsTokens(isDark).surface.overlay }, wide ? st.overlayCenter : { justifyContent: 'flex-end', paddingBottom: insets.bottom + 12 }]}
         onPress={onClose}>
         <Pressable
           accessible={false}
@@ -62,14 +63,12 @@ export function CreateChooser({ visible, subtitle, onClose, onMeeting, onTask, i
           accessibilityViewIsModal
           importantForAccessibility="yes"
           style={wide ? { width: 420 } : { marginHorizontal: 12 }}>
-          <BlurView
-            intensity={isDark ? 50 : 70}
-            tint={isDark ? 'dark' : 'light'}
-            style={[st.sheet, { borderColor: c.border, backgroundColor: isDark ? 'rgba(10,12,22,0.97)' : 'rgba(245,244,255,0.97)' }]}>
+          {/* DS v2: непрозорий surface.elevated замість блюру — frosted лише для promo/AI. */}
+          <View style={[st.sheet, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }, shadow[isDark ? 'dark' : 'light'].popover]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text accessibilityRole="header" style={{ color: c.text, fontSize: 18, fontWeight: '800' }}>{tr.calCreateTitle}</Text>
-                <Text style={{ color: c.sub, fontSize: 13, marginTop: 2 }}>{subtitle}</Text>
+                <Text accessibilityRole="header" style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold }}>{tr.calCreateTitle}</Text>
+                <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 2 }}>{subtitle}</Text>
               </View>
               <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}
                 style={[st.close, { backgroundColor: c.dim }]}>
@@ -78,9 +77,9 @@ export function CreateChooser({ visible, subtitle, onClose, onMeeting, onTask, i
             </View>
             <View style={{ gap: 8 }}>
               {option('calendar-create-meeting', 'calendar.badge.plus', c.accent, tr.calCreateMeeting, tr.calCreateMeetingHint, onMeeting)}
-              {option('calendar-create-task', 'checklist', '#7C3AED', tr.calCreateTask, tr.calCreateTaskHint, onTask)}
+              {option('calendar-create-task', 'checklist', PERSONAL_TASK_COLOR, tr.calCreateTask, tr.calCreateTaskHint, onTask)}
             </View>
-          </BlurView>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -88,10 +87,10 @@ export function CreateChooser({ visible, subtitle, onClose, onMeeting, onTask, i
 }
 
 const st = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  overlay: { flex: 1 },
   overlayCenter: { alignItems: 'center', justifyContent: 'center' },
-  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
-  option: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: Atlas.radius.large, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
-  icon: { width: 40, height: 40, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  close: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  sheet: { borderRadius: radius.card, padding: 20 },
+  option: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: radius.nested, paddingHorizontal: 14, paddingVertical: 12 },
+  icon: { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  close: { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

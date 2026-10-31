@@ -26,7 +26,6 @@
  * Старий маршрут /meetings лишився редиректом сюди (app/meetings.tsx).
  */
 import { Audio as AVAudio } from 'expo-av';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -57,7 +56,8 @@ import { DETAIL_COLUMN_WIDTH, DetailPane } from '@/components/shared/DetailPane'
 import { MEETING_COLORS, MeetingFormSheet, type MeetingFormData } from '@/components/shared/MeetingFormSheet';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius, shadow } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useProjectRoles } from '@/hooks/use-project-roles';
@@ -78,6 +78,9 @@ import {
 import type { Sprint } from '@/utils/sprintUtils';
 import { isTaskDoneByType, type TaskStatusColumn } from '@/utils/taskStatuses';
 import type { Task } from '@/utils/taskUtils';
+import { MeshBackground } from '@/components/ds';
+import { glassFill, glassRimFor } from '@/components/shared/dsTheme';
+import { useReduceTransparency } from '@/hooks/use-reduce-transparency';
 
 /** Мінімум локального проєкту: чип, поле «Проєкт» форми, фільтр, колір смуг. */
 interface LocalProject { id: string; name: string; color: string; archivedAt?: string }
@@ -91,6 +94,7 @@ const DATA_KEYS = ['meetings', 'projects', 'workspace_projects', 'tasks', 'sprin
 export default function CalendarScreen() {
   const isDark = useColorScheme() === 'dark';
   const c = useCalendarColors(isDark);
+  const rt = useReduceTransparency();
   // Задача ПРОЄКТУ відкривається тут же, карткою проєкту — не в особистому редакторі.
   const { openProjectTask, projectTaskSheet } = useInPlaceProjectTask(isDark);
   const router = useRouter();
@@ -582,7 +586,7 @@ export default function CalendarScreen() {
   // лишав сітці годин ледь половину висоти — тепер його можна сховати (до
   // кінця сеансу екрана), а сам він — один рядок.
   const undatedHint = undated.length > 0 && !searchOpen && !undatedDismissed ? (
-    <View style={[st.hint, { borderColor: c.border, backgroundColor: c.dim, marginHorizontal: 16, paddingVertical: 0, paddingRight: 0 }]}>
+    <View style={[st.hint, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), marginHorizontal: 16, paddingVertical: 0, paddingRight: 0 }]}>
       <TouchableOpacity
         testID="calendar-undated-hint"
         onPress={openUndated}
@@ -590,7 +594,7 @@ export default function CalendarScreen() {
         accessibilityLabel={`${tr.calUndatedSprints} ${undated.length}. ${tr.calUndatedSprintsHint}`}
         style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
         <IconSymbol name="flag.checkered" size={14} color={c.sub} />
-        <Text style={{ flex: 1, color: c.sub, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
+        <Text style={{ flex: 1, color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }} numberOfLines={1}>
           {tr.calUndatedSprints} {undated.length} · {tr.calUndatedSprintsHint}
         </Text>
         <IconSymbol name="chevron.right" size={12} color={c.sub} />
@@ -634,19 +638,22 @@ export default function CalendarScreen() {
     content = (
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad + (isWide ? 24 : 72) }}
         showsVerticalScrollIndicator={false}>
-        <MonthGrid
-          rows={monthRows}
-          month={anchorDate.getMonth()}
-          todayKey={todayKey}
-          selectedKey={anchor}
-          tasksByDay={tasksByDay}
-          meetingsByDay={meetingsByDay}
-          sprintBars={sprintBars}
-          onSelectDay={setAnchor}
-          mode={isWide ? 'labels' : 'dots'}
-          c={c}
-          tr={tr}
-        />
+        {/* DS v2: сітка місяця — у білій картці на canvas. */}
+        <View style={{ backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: radius.cardCompact, padding: 12 }}>
+          <MonthGrid
+            rows={monthRows}
+            month={anchorDate.getMonth()}
+            todayKey={todayKey}
+            selectedKey={anchor}
+            tasksByDay={tasksByDay}
+            meetingsByDay={meetingsByDay}
+            sprintBars={sprintBars}
+            onSelectDay={setAnchor}
+            mode={isWide ? 'labels' : 'dots'}
+            c={c}
+            tr={tr}
+          />
+        </View>
         {!showSideColumn ? <View style={{ marginTop: 18 }}>{renderAgenda(anchor)}</View> : null}
       </ScrollView>
     );
@@ -669,7 +676,7 @@ export default function CalendarScreen() {
     );
   } else {
     content = (
-      <View style={{ flex: 1, paddingHorizontal: 16 }}>
+      <View style={{ flex: 1, marginHorizontal: 16, marginBottom: 12, backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: radius.cardCompact, overflow: 'hidden', paddingTop: 8, paddingRight: 4 }}>
         <TimeGrid
           days={range.days}
           todayKey={todayKey}
@@ -691,7 +698,8 @@ export default function CalendarScreen() {
   }
 
   return (
-    <LinearGradient colors={[c.bg1, c.bg2]} style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: c.bg1 }}>
+      <MeshBackground />
       <View style={{ flex: 1, flexDirection: showSideColumn ? 'row' : 'column' }}>
         <View style={{ flex: 1 }}>
           <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
@@ -702,36 +710,36 @@ export default function CalendarScreen() {
                 onPress: () => router.back(),
                 label: tr.back,
                 color: c.sub,
-                style: { backgroundColor: c.dim, borderColor: c.border },
+                style: { backgroundColor: c.card, borderColor: 'transparent' },
               }}
               actions={
                 <>
                   <HeaderButton
                     onPress={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
                     accessibilityLabel={tr.calSearch}
-                    style={{ borderColor: searchOpen ? c.accent + '50' : c.border, backgroundColor: searchOpen ? c.accent + '14' : c.dim }}>
-                    <IconSymbol name="magnifyingglass" size={16} color={searchOpen ? c.accent : c.sub} />
+                    style={{ borderColor: 'transparent', backgroundColor: searchOpen ? c.action : c.card }}>
+                    <IconSymbol name="magnifyingglass" size={16} color={searchOpen ? c.onAction : c.text} />
                   </HeaderButton>
                   <HeaderButton
                     onPress={() => { closeSearch(); goToday(); }}
                     accessibilityLabel={tr.today}
-                    style={{ borderColor: isCurrentPeriod ? c.accent + '50' : c.border, backgroundColor: isCurrentPeriod ? c.accent + '14' : c.dim }}>
-                    <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? c.accent : c.sub} />
+                    style={{ borderColor: 'transparent', backgroundColor: c.card }}>
+                    <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? c.accent : c.text} />
                   </HeaderButton>
                   <HeaderButton
                     onPress={() => setShowGcalSheet(true)}
                     accessibilityLabel="Google Calendar"
-                    style={{ borderColor: gcal.token ? '#34A85350' : c.border, backgroundColor: gcal.token ? '#34A85315' : c.dim }}>
+                    style={{ borderColor: 'transparent', backgroundColor: c.card }}>
                     {gcal.importing
-                      ? <ActivityIndicator size="small" color="#34A853" />
-                      : <IconSymbol name={gcal.token ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={17} color={gcal.token ? '#34A853' : c.sub} />}
+                      ? <ActivityIndicator size="small" color={dsTokens(isDark).status.success} />
+                      : <IconSymbol name={gcal.token ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={17} color={gcal.token ? dsTokens(isDark).status.success : c.text} />}
                   </HeaderButton>
                   {isWide ? (
                     <HeaderButton
                       onPress={() => openCreate({ day: anchor })}
                       accessibilityLabel={tr.calCreateTitle}
-                      style={{ borderColor: c.accent + '50', backgroundColor: c.accent + '14' }}>
-                      <IconSymbol name="plus" size={18} color={c.accent} />
+                      style={{ borderColor: 'transparent', backgroundColor: c.action }}>
+                      <IconSymbol name="plus" size={18} color={c.onAction} />
                     </HeaderButton>
                   ) : null}
                 </>
@@ -767,14 +775,14 @@ export default function CalendarScreen() {
               accessibilityRole="button"
               accessibilityLabel={tr.calCreateTitle}
               testID="calendar-fab"
-              style={[st.fab, { backgroundColor: c.accent }]}>
-              <IconSymbol name="plus" size={26} color="#fff" />
+              style={[st.fab, { backgroundColor: c.action }, shadow[isDark ? 'dark' : 'light'].popover]}>
+              <IconSymbol name="plus" size={26} color={c.onAction} />
             </TouchableOpacity>
           ) : null}
         </View>
 
         {showSideColumn && !selectedMtg ? (
-          <View style={[st.sideColumn, { width: DETAIL_COLUMN_WIDTH, borderLeftColor: c.border, backgroundColor: isDark ? 'rgba(10,10,20,0.6)' : 'rgba(255,255,255,0.45)' }]}>
+          <View style={[st.sideColumn, { width: DETAIL_COLUMN_WIDTH, borderLeftColor: c.border }, glassFill(isDark, 'card', rt)]}>
             <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
               <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                 {renderAgenda(anchor, true)}
@@ -789,7 +797,7 @@ export default function CalendarScreen() {
             wide={showSideColumn}
             onClose={() => setSelectedKey(null)}
             isDark={isDark}
-            sheetColor={isDark ? 'rgba(10,10,20,0.98)' : 'rgba(245,244,255,0.98)'}
+            sheetColor={c.sheet}
             borderColor={c.border}
             maxHeight={height * 0.86}
             scrollRef={detailScrollRef}
@@ -883,19 +891,18 @@ export default function CalendarScreen() {
       />
 
       {projectTaskSheet}
-    </LinearGradient>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
   fab: {
     position: 'absolute', right: 20, bottom: Platform.OS === 'ios' ? 48 : 28, width: 56, height: 56,
-    borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6,
+    borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
   },
   sideColumn: { borderLeftWidth: StyleSheet.hairlineWidth },
   hint: {
-    minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1,
-    borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10,
+    minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 10,
   },
 });

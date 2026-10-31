@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/training/[groupId]/program/[programId].tsx — конструктор програми
  * (training-module.md §3.3, §5, §10.1): тижневий шаблон (7 днів × блоки),
@@ -61,6 +60,7 @@ import type {
   TrainingMember,
   TrainingProgram,
 } from '@/utils/trainingTypes';
+import { fontFamily } from '@/constants/theme';
 
 /** Порядок днів у шаблоні: з понеділка, як `tr.weekdays`. */
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
@@ -233,7 +233,7 @@ export default function ProgramEditorScreen() {
       <Card c={c}>
         {readOnly ? (
           <>
-            <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{program.name}</Text>
+            <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.semibold }}>{program.name}</Text>
             <Text style={{ color: c.sub, fontSize: 13, marginTop: 4 }}>{fmt(tr.tgWeeks, { n: program.weekCount })}</Text>
             {program.notes ? <Text style={{ color: c.text, fontSize: 14, marginTop: 8 }}>{program.notes}</Text> : null}
           </>
@@ -268,10 +268,10 @@ export default function ProgramEditorScreen() {
               accessibilityState={{ selected: active }}
               accessibilityLabel={`${tr.weekdaysFull[i]}: ${training ? fmt(tr.tgExercisesCount, { n: d?.blocks.length ?? 0 }) : tr.tgRestDayShort}`}
               style={{
-                flex: 1, minHeight: 56, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 1,
-                borderColor: active ? TG_ACCENT : c.border, backgroundColor: active ? TG_ACCENT + '1C' : c.card,
+                flex: 1, minHeight: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center', gap: 4,
+                backgroundColor: active ? c.t.action.primary : c.chip,
               }}>
-              <Text style={{ color: active ? TG_ACCENT : c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{tr.weekdays[i]}</Text>
+              <Text style={{ color: active ? c.t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.weekdays[i]}</Text>
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: training ? (program.color || TG_ACCENT) : 'transparent', borderWidth: training ? 0 : 1, borderColor: c.border }} />
             </TouchableOpacity>
           );
@@ -286,7 +286,7 @@ export default function ProgramEditorScreen() {
             <Stepper c={c} label={tr.tgEstimatedMin} value={day.estimatedMin ?? 60} step={5} min={5} max={300}
               onChange={estimatedMin => updateDay({ ...day, estimatedMin })} />
           </View>
-        ) : day.title ? <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight, marginBottom: 8 }}>{day.title}</Text> : null}
+        ) : day.title ? <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{day.title}</Text> : null}
 
         {blocks.length === 0 ? (
           <Text style={{ color: c.sub, fontSize: 14, marginVertical: 6 }}>{tr.tgRestDayShort}</Text>
@@ -298,7 +298,7 @@ export default function ProgramEditorScreen() {
               accessibilityRole="button"
               accessibilityLabel={`${b.name || b.exerciseId}, ${b.sets}×${b.reps}`}
               style={{ flex: 1, paddingVertical: 8 }}>
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{`${i + 1}. ${b.name || b.exerciseId}`}</Text>
+              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>{`${i + 1}. ${b.name || b.exerciseId}`}</Text>
               <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
                 {`${b.sets}×${b.reps} · ${formatKg(b.weightG)} ${tr.tgUnitKg}${b.restSec ? ` · ${b.restSec} s` : ''} · ${progressionSummary(tr, b.progression)}`}
               </Text>
@@ -361,7 +361,7 @@ export default function ProgramEditorScreen() {
               <Card key={a.id} c={c} style={{ marginBottom: 8 }} accent={stale ? TG_WARN : undefined}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{memberName(Number(a.userId))}</Text>
+                    <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>{memberName(Number(a.userId))}</Text>
                     <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
                       {`${a.startDate} · ${fmt(tr.tgWeeks, { n: a.weekCount })}${a.sessionCount ? ` · ${a.sessionCount}` : ''}`}
                     </Text>
@@ -376,7 +376,7 @@ export default function ProgramEditorScreen() {
                     <PrimaryButton label={tr.tgRevoke} variant="soft" color={TG_ERR} onPress={() => revoke(a)} style={{ flex: 1 }} />
                   </View>
                 ) : null}
-                {stale ? <Text style={{ color: TG_WARN, fontSize: 12, marginTop: 6 }}>{tr.tgReexpandHint}</Text> : null}
+                {stale ? <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{tr.tgReexpandHint}</Text> : null}
               </Card>
             );
           })}

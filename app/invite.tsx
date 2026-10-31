@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/invite.tsx — обробка запрошення в проєкт (WORKSPACE_PROJECTS_PLAN.md §4,
  * контракт §4.3).
@@ -20,12 +19,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { UnsyncedOutboxError, useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
@@ -42,6 +40,9 @@ import {
   type WorkspaceCheckSuccess,
 } from '@/store/workspace';
 import { haptic } from '@/utils/haptics';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 type Stage = 'loading' | 'switch-confirm' | 'confirm-workspace' | 'preview' | 'joining' | 'joined' | 'already-member' | 'error';
 
@@ -64,6 +65,7 @@ export default function InviteScreen() {
   const dateLocale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { status: authStatus, switchWorkspace } = useAuth();
   const contentWidth = useContentWidth();
+  const k = dsTokens(isDark);
   const c = getScreenColors('auth', isDark);
   // `projectId`/`token` — назви, якими штовхає наш власний слухач
   // (hooks/use-incoming-invite-links.ts). `p`/`t` — запасний варіант: якщо
@@ -312,14 +314,14 @@ export default function InviteScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={[st.scroll, contentWidth]} showsVerticalScrollIndicator={false}>
           <Text style={[st.title, { color: c.text }]}>{tr.inviteScreenTitle}</Text>
 
           {(stage === 'loading' || stage === 'joining') && (
             <View style={{ alignItems: 'center', marginTop: 40 }}>
-              <ActivityIndicator color={c.accent} />
+              <ActivityIndicator color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 13, marginTop: 12 }}>
                 {stage === 'joining' ? tr.inviteJoining : tr.inviteLoading}
               </Text>
@@ -327,38 +329,38 @@ export default function InviteScreen() {
           )}
 
           {stage === 'switch-confirm' && (
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 8 }}>{tr.inviteSwitchWorkspaceTitle}</Text>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold, marginBottom: 8 }}>{tr.inviteSwitchWorkspaceTitle}</Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>{tr.inviteSwitchWorkspaceMsg}</Text>
-              <TouchableOpacity onPress={confirmSwitch} style={[st.primaryBtn, { backgroundColor: c.accent }]}>
-                <Text style={st.primaryBtnText}>{tr.inviteSwitchWorkspaceConfirm}</Text>
+              <TouchableOpacity onPress={confirmSwitch} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
+                <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteSwitchWorkspaceConfirm}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => router.replace('/(tabs)/today')} style={st.linkBtn}>
-                <Text style={{ color: c.sub, fontSize: 14, fontWeight: '500' }}>{tr.cancel}</Text>
+                <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.medium }}>{tr.cancel}</Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
           )}
 
           {stage === 'confirm-workspace' && pendingWorkspace && (
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 8 }}>{tr.inviteConfirmWorkspaceTitle}</Text>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+              <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold, marginBottom: 8 }}>{tr.inviteConfirmWorkspaceTitle}</Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>
                 {tr.inviteConfirmWorkspaceMsg.replace('{name}', pendingWorkspace.info.name || pendingWorkspace.origin)}
               </Text>
-              <TouchableOpacity onPress={confirmSetWorkspace} style={[st.primaryBtn, { backgroundColor: c.accent }]}>
-                <Text style={st.primaryBtnText}>{tr.inviteConfirmWorkspaceButton}</Text>
+              <TouchableOpacity onPress={confirmSetWorkspace} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
+                <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteConfirmWorkspaceButton}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => router.replace(authStatus === 'authed' ? '/(tabs)/today' : '/welcome')} style={st.linkBtn}>
-                <Text style={{ color: c.sub, fontSize: 14, fontWeight: '500' }}>{tr.cancel}</Text>
+                <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.medium }}>{tr.cancel}</Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
           )}
 
           {stage === 'preview' && preview && (
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <View style={[st.colorDot, { backgroundColor: preview.project.color || c.accent }]} />
-                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight }}>{preview.project.name}</Text>
+                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 18, fontFamily: fontFamily.semibold }}>{preview.project.name}</Text>
               </View>
               {preview.invited_by ? <Text style={{ color: c.sub, fontSize: 13, marginBottom: 4 }}>
                 {tr.inviteInvitedByLabel}: {preview.invited_by.name}
@@ -376,43 +378,43 @@ export default function InviteScreen() {
               </Text>
 
               {authStatus === 'authed' ? (
-                <TouchableOpacity onPress={handleJoin} style={[st.primaryBtn, { backgroundColor: c.accent }]}>
-                  <Text style={st.primaryBtnText}>{tr.inviteJoinButton}</Text>
+                <TouchableOpacity onPress={handleJoin} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
+                  <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteJoinButton}</Text>
                 </TouchableOpacity>
               ) : (
                 <>
                   <Text style={{ color: c.sub, fontSize: 13, marginBottom: 12 }}>{tr.inviteGuestHint}</Text>
-                  <TouchableOpacity onPress={goRegister} style={[st.primaryBtn, { backgroundColor: c.accent }]}>
-                    <Text style={st.primaryBtnText}>{tr.inviteRegisterButton}</Text>
+                  <TouchableOpacity onPress={goRegister} style={[st.primaryBtn, { backgroundColor: k.action.primary }]}>
+                    <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteRegisterButton}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={goLogin} style={st.linkBtn}>
-                    <Text style={{ color: c.accent, fontSize: 14, fontWeight: '600' }}>{tr.inviteLoginButton}</Text>
+                    <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>{tr.inviteLoginButton}</Text>
                   </TouchableOpacity>
                 </>
               )}
-            </BlurView>
+            </View>
           )}
 
           {stage === 'joined' && (
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, alignItems: 'center' }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), alignItems: 'center' }]}>
               <IconSymbol name="checkmark.circle.fill" size={40} color={c.accent} />
-              <Text style={{ color: c.text, fontSize: 17, fontWeight: Atlas.type.headingWeight, marginTop: 12, marginBottom: 16 }}>{tr.inviteJoinedTitle}</Text>
-              <TouchableOpacity onPress={openProject} style={[st.primaryBtn, { backgroundColor: c.accent, alignSelf: 'stretch' }]}>
-                <Text style={st.primaryBtnText}>{tr.inviteJoinedOpenProject}</Text>
+              <Text style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, marginTop: 12, marginBottom: 16 }}>{tr.inviteJoinedTitle}</Text>
+              <TouchableOpacity onPress={openProject} style={[st.primaryBtn, { backgroundColor: k.action.primary, alignSelf: 'stretch' }]}>
+                <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteJoinedOpenProject}</Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
           )}
 
           {stage === 'already-member' && alreadyMember && (
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, alignItems: 'center' }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), alignItems: 'center' }]}>
               <IconSymbol name="person.crop.circle" size={40} color={c.accent} />
-              <Text accessibilityRole="header" style={{ color: c.text, fontSize: 17, fontWeight: Atlas.type.headingWeight, marginTop: 12, marginBottom: 6, textAlign: 'center' }}>
+              <Text accessibilityRole="header" style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, marginTop: 12, marginBottom: 6, textAlign: 'center' }}>
                 {tr.inviteAlreadyMemberTitle}
               </Text>
               {alreadyMember.name ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6, maxWidth: '100%' }}>
                   <View style={[st.colorDot, { backgroundColor: alreadyMember.color || c.accent }]} />
-                  <Text numberOfLines={1} style={{ flexShrink: 1, color: c.text, fontSize: 15, fontWeight: '600' }}>{alreadyMember.name}</Text>
+                  <Text numberOfLines={1} style={{ flexShrink: 1, color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{alreadyMember.name}</Text>
                 </View>
               ) : null}
               {alreadyMember.role ? (
@@ -426,28 +428,28 @@ export default function InviteScreen() {
               <TouchableOpacity
                 onPress={openProject}
                 accessibilityRole="button"
-                style={[st.primaryBtn, { backgroundColor: c.accent, alignSelf: 'stretch' }]}>
-                <Text style={st.primaryBtnText}>{tr.inviteJoinedOpenProject}</Text>
+                style={[st.primaryBtn, { backgroundColor: k.action.primary, alignSelf: 'stretch' }]}>
+                <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.inviteJoinedOpenProject}</Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
           )}
 
           {stage === 'error' && errorTitle ? (
-            <Text accessibilityRole="header" style={{ color: c.text, fontSize: 17, fontWeight: Atlas.type.headingWeight, marginBottom: 10 }}>
+            <Text accessibilityRole="header" style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, marginBottom: 10 }}>
               {errorTitle}
             </Text>
           ) : null}
 
           {stage === 'error' && (
-            <View style={[st.hintRow, { backgroundColor: '#EF444414', borderColor: '#EF444430' }]}>
-              <IconSymbol name="exclamationmark.circle" size={16} color="#EF4444" />
-              <Text style={{ color: '#EF4444', fontSize: 13, lineHeight: 18, flex: 1, marginLeft: 8 }}>{errorText}</Text>
+            <View style={[st.hintRow, { backgroundColor: k.status.danger + '14' }]}>
+              <IconSymbol name="exclamationmark.circle" size={16} color={k.status.danger} />
+              <Text style={{ color: k.status.danger, fontSize: 13, lineHeight: 18, flex: 1, marginLeft: 8 }}>{errorText}</Text>
             </View>
           )}
 
           {(stage === 'error') && (
-            <TouchableOpacity onPress={() => router.replace(authStatus === 'authed' ? '/(tabs)/today' : '/welcome')} style={[st.primaryBtn, { backgroundColor: c.accent, marginTop: 16 }]}>
-              <Text style={st.primaryBtnText}>{tr.back}</Text>
+            <TouchableOpacity onPress={() => router.replace(authStatus === 'authed' ? '/(tabs)/today' : '/welcome')} style={[st.primaryBtn, { backgroundColor: k.action.primary, marginTop: 16 }]}>
+              <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.back}</Text>
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -458,11 +460,11 @@ export default function InviteScreen() {
 
 const st = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 60 },
-  title: { fontSize: 26, fontWeight: '700', letterSpacing: -0.4, marginBottom: 20 },
-  card: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', padding: 18 },
+  title: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32, marginBottom: 20 },
+  card: { borderRadius: 24, overflow: 'hidden', padding: 24 },
   colorDot: { width: 14, height: 14, borderRadius: 7 },
-  primaryBtn: { borderRadius: Atlas.radius.large, paddingVertical: 15, alignItems: 'center' },
-  primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  linkBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 6 },
-  hintRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12, borderRadius: Atlas.radius.medium, borderWidth: 1 },
+  primaryBtn: { borderRadius: 999, minHeight: 52, justifyContent: 'center', paddingVertical: 15, alignItems: 'center' },
+  primaryBtnText: { fontSize: 15, fontFamily: fontFamily.semibold },
+  linkBtn: { marginTop: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingVertical: 6 },
+  hintRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16 },
 });

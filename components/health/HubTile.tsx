@@ -1,8 +1,9 @@
-import { Atlas } from '@/constants/atlas';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, shadow, theme } from '@/constants/theme';
+import { ds } from '@/hooks/use-ds';
 
 /**
  * Плитка розділу на хабі Здоровʼя.
@@ -38,7 +39,7 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
   border: string;
   text: string;
   sub: string;
-  /** Суцільний фон плитки (c.card); без нього — той самий, що в getHealthColors. */
+  /** Фон плитки (c.card — скло DS v2.1); без нього — glass.surface. */
   card?: string;
 }) {
   const detail = stat ?? hint;
@@ -51,22 +52,23 @@ export function HubTile({ title, icon, color, stat, hint, badge, onPress, isDark
       accessibilityLabel={[title, detail, badge != null && badge > 0 ? String(badge) : null].filter(Boolean).join(', ')}
     >
       <View
-        style={{ borderRadius: Atlas.radius.xlarge, borderWidth: 1, borderColor: border, padding: 14, minHeight: 112,
-          backgroundColor: card ?? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)') }}>
+        style={{ borderRadius: radius.cardCompact, padding: 20, minHeight: 112,
+          // DS v2.1: скло (заливка + спекулярний обідок) над mesh.
+          ...ds.glass(isDark, 'card'), ...(card ? { backgroundColor: card } : null), ...shadow[isDark ? 'dark' : 'light'].card }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 38, height: 38, borderRadius: radius.pill, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name={icon as any} size={19} color={color} />
           </View>
           <View style={{ flex: 1 }} />
           {badge != null && badge > 0 && (
-            <View style={{ minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 11, fontWeight: Atlas.type.headingWeight }}>{badge}</Text>
+            <View style={{ minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, backgroundColor: (isDark ? theme.dark : theme.light).accent.coral, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{badge}</Text>
             </View>
           )}
         </View>
-        <Text numberOfLines={2} style={{ color: text, fontSize: 15, fontWeight: Atlas.type.headingWeight, marginTop: 12 }}>{title}</Text>
-        {stat ? <Text numberOfLines={2} style={{ color, fontSize: 13, fontWeight: '700', marginTop: 3 }}>{stat}</Text>
-              : hint ? <Text numberOfLines={2} style={{ color: sub, fontSize: 11, fontWeight: '600', marginTop: 3 }}>{hint}</Text> : null}
+        <Text numberOfLines={2} style={{ color: text, fontSize: 16, fontFamily: fontFamily.semibold, marginTop: 12 }}>{title}</Text>
+        {stat ? <Text numberOfLines={2} style={{ color: text, fontSize: 13, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginTop: 3 }}>{stat}</Text>
+              : hint ? <Text numberOfLines={2} style={{ color: sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 3 }}>{hint}</Text> : null}
       </View>
     </TouchableOpacity>
   );

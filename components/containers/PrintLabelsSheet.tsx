@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius } from '@/constants/theme';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from 'react-native';
 
@@ -19,7 +19,7 @@ import { buildLabelSheetHtml, type LabelInput } from '@/utils/containersLabels';
 import { ContainersSheet, SheetButton, SheetLabel } from './ContainersSheet';
 import { fill, itemsCount } from './i18n';
 import { qrContext } from './qr';
-import { CONTAINERS_ACCENT, type ContainersColors } from './theme';
+import type { ContainersColors } from './theme';
 
 type PrintModule = typeof import('expo-print');
 type SharingModule = typeof import('expo-sharing');
@@ -107,7 +107,7 @@ export function PrintLabelsSheet({ visible, containers, places, statsFor, presel
     <ContainersSheet visible={visible} onClose={onClose} c={c} title={tr.ctrPrint}
       footer={<>
         <SheetButton label={tr.cancel} onPress={onClose} c={c} />
-        <SheetButton label={busy ? '…' : tr.ctrPrintGo} onPress={() => void print()} c={c} color={CONTAINERS_ACCENT}
+        <SheetButton label={busy ? '…' : tr.ctrPrintGo} onPress={() => void print()} c={c} primary
           disabled={!selected.size || busy} flex={2} />
       </>}>
       <SheetLabel text={tr.ctrPrintPreset} c={c} />
@@ -118,10 +118,10 @@ export function PrintLabelsSheet({ visible, containers, places, statsFor, presel
           return (
             <TouchableOpacity key={option.id} onPress={() => setPreset(option.id)} accessibilityRole="radio"
               accessibilityState={{ checked: active }} accessibilityLabel={`${option.title}. ${option.hint}`}
-              style={{ padding: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: active ? CONTAINERS_ACCENT : c.border,
-                backgroundColor: active ? CONTAINERS_ACCENT + '1A' : c.dim }}>
-              <Text style={{ color: c.text, fontWeight: '700', fontSize: 14 }}>{option.title}</Text>
-              <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{option.hint} · {p.columns}×{p.rows}</Text>
+              style={{ padding: 14, borderRadius: radius.nestedCompact, borderWidth: 2,
+                borderColor: active ? c.t.action.primary : 'transparent', backgroundColor: c.dim }}>
+              <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 14 }}>{option.title}</Text>
+              <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 2 }}>{option.hint} · {p.columns}×{p.rows}</Text>
             </TouchableOpacity>
           );
         })}
@@ -131,32 +131,32 @@ export function PrintLabelsSheet({ visible, containers, places, statsFor, presel
       <View style={{ flexDirection: 'row', gap: 16, marginBottom: 6 }}>
         <TouchableOpacity onPress={() => setSelected(new Set(containers.map(box => box.id)))} accessibilityRole="button"
           style={{ minHeight: 44, justifyContent: 'center' }}>
-          <Text style={{ color: CONTAINERS_ACCENT, fontWeight: '700' }}>{tr.ctrPrintSelectAll}</Text>
+          <Text style={{ color: c.text, fontFamily: fontFamily.semibold }}>{tr.ctrPrintSelectAll}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setSelected(new Set())} accessibilityRole="button"
           style={{ minHeight: 44, justifyContent: 'center' }}>
-          <Text style={{ color: c.sub, fontWeight: '700' }}>{tr.ctrPrintSelectNone}</Text>
+          <Text style={{ color: c.sub, fontFamily: fontFamily.semibold }}>{tr.ctrPrintSelectNone}</Text>
         </TouchableOpacity>
       </View>
-      <View style={{ borderRadius: Atlas.radius.medium, backgroundColor: c.dim, padding: 4 }}>
+      <View style={{ borderRadius: radius.nested, backgroundColor: c.dim, padding: 4 }}>
         {containers.map(box => {
           const on = selected.has(box.id);
           return (
             <TouchableOpacity key={box.id} onPress={() => toggle(box.id)} accessibilityRole="checkbox"
               accessibilityState={{ checked: on }} accessibilityLabel={box.name}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 10 }}>
-              <View style={{ width: 22, height: 22, borderRadius: Atlas.radius.small, borderWidth: 2, alignItems: 'center', justifyContent: 'center',
-                borderColor: on ? CONTAINERS_ACCENT : c.sub, backgroundColor: on ? CONTAINERS_ACCENT : 'transparent' }}>
-                {on ? <IconSymbol name="checkmark" size={12} color="#fff" /> : null}
+              <View style={{ width: 22, height: 22, borderRadius: 7, borderWidth: 2, alignItems: 'center', justifyContent: 'center',
+                borderColor: on ? c.t.action.primary : c.sub, backgroundColor: on ? c.t.action.primary : 'transparent' }}>
+                {on ? <IconSymbol name="checkmark" size={12} color={c.t.text.onAction} /> : null}
               </View>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: containerColor(box.color) }} />
-              <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14 }}>{box.name}</Text>
-              {box.qrSlug ? null : <Text style={{ color: c.sub, fontSize: 11 }}>{tr.ctrPrintNoCode}</Text>}
+              <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.regular }}>{box.name}</Text>
+              {box.qrSlug ? null : <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.regular }}>{tr.ctrPrintNoCode}</Text>}
             </TouchableOpacity>
           );
         })}
       </View>
-      {busy ? <ActivityIndicator style={{ marginTop: 12 }} color={CONTAINERS_ACCENT} /> : null}
+      {busy ? <ActivityIndicator style={{ marginTop: 12 }} color={c.sub} /> : null}
     </ContainersSheet>
   );
 }

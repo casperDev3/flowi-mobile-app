@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/time.tsx — Час простору проєкту.
  *
@@ -43,6 +42,9 @@ import { anomalyMap, anomalySeverity, applyDuration, detectAnomalies, trimmedSec
 // копія інтерфейсу вже одного разу розійшлася з ним на полі `shift`.
 import { recordProjectId, sortRecords, taskProjectMap, type TimeRecord } from '@/utils/timeEntries';
 import type { EditableTask } from '@/utils/timeEntryEdit';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export default function ProjectTimeScreen() {
   const { id: projectId } = useLocalSearchParams<{ id: string }>();
@@ -56,6 +58,7 @@ export default function ProjectTimeScreen() {
   // Contract §4.1: глядач бачить записи часу проєкту, але не додає й не видаляє.
   const canEdit = useProjectRole(projectId) !== 'viewer';
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
+  const tk = dsTokens(isDark);
   const sheetColors = useMemo(() => timeColors(isDark), [isDark]);
 
   const { items: entries, setItems: setEntries, reload: reloadEntries } = useSyncedList<TimeRecord>('time_entries', { enabled: true });
@@ -151,8 +154,8 @@ export default function ProjectTimeScreen() {
         <HeaderButton
           onPress={() => openEntry(null)}
           accessibilityLabel={tr.timeAddEntry}
-          style={{ backgroundColor: c.accent + '20', borderColor: c.accent }}>
-          <IconSymbol name="plus" size={17} color={c.accent} />
+          style={{ backgroundColor: tk.action.primary, borderColor: 'transparent' }}>
+          <IconSymbol name="plus" size={17} color={tk.text.onAction} />
         </HeaderButton>
       ) : undefined}>
       <ScrollView
@@ -160,12 +163,17 @@ export default function ProjectTimeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
 
-        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 10, marginTop: 4 }}>
-          {tr.totalLabel}: {fmtDur(totalSeconds)}
-        </Text>
+        {/* DS v2: підсумок — KPI-картка з великими тонкими цифрами. */}
+        <View
+          accessible
+          accessibilityLabel={`${tr.totalLabel}: ${fmtDur(totalSeconds)}`}
+          style={{ backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.cardCompact, padding: 20, marginTop: 4, marginBottom: 12 }}>
+          <Text style={[type.caption, { color: c.sub }]}>{tr.totalLabel}</Text>
+          <Text style={[type.displaySm, { color: c.text, marginTop: 4 }]} numberOfLines={1} adjustsFontSizeToFit>{fmtDur(totalSeconds)}</Text>
+        </View>
 
         {own.length === 0 ? (
-          <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 30 }}>{tr.timeNoEntries}</Text>
+          <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center', marginTop: 30 }]}>{tr.timeNoEntries}</Text>
         ) : own.map(entry => {
           const anomaly = rowAnomalies.get(entry.id);
           const severity = anomalySeverity(anomaly?.kinds ?? []);
@@ -189,41 +197,42 @@ export default function ProjectTimeScreen() {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                borderRadius: Atlas.radius.medium,
-                borderWidth: 1,
-                borderColor: flag ? flag + '88' : c.border,
-                backgroundColor: flag ? flag + '12' : 'transparent',
-                padding: 12,
+                // DS v2: рядок — картка без рамки; аномалія — рамка кольору
+                // прапорця (без бічної смуги), значок ⚠ лишається.
+                borderRadius: radius.nested,
+                borderWidth: 1.5,
+                borderColor: flag ?? 'transparent',
+                backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'),
+                padding: 14,
                 marginBottom: 8,
                 overflow: 'hidden',
               }}>
-              {flag && <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: flag }} />}
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   {flag && <IconSymbol name="exclamationmark.triangle.fill" size={12} color={flag} style={{ marginRight: 5 }} />}
-                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600', flexShrink: 1 }}>{title}</Text>
+                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{title}</Text>
                 </View>
-                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
                   {formatWhen(entry.date)}
                   {entry.note ? ` · ${entry.note}` : ''}
                 </Text>
                 {reason ? (
-                  <Text numberOfLines={2} style={{ color: c.text, fontSize: 11, fontWeight: '600', marginTop: 2 }}>{reason}</Text>
+                  <Text numberOfLines={2} style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.medium, marginTop: 2 }}>{reason}</Text>
                 ) : null}
                 {trim !== null && (
                   <TouchableOpacity
                     onPress={() => trimEntry(entry, trim)}
                     accessibilityRole="button"
                     accessibilityLabel={`${tr.anomalyTrimTo.replace('{duration}', fmtDur(trim))}: ${title}`}
-                    style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 9, borderWidth: 1, borderColor: c.border, paddingHorizontal: 9, paddingVertical: 6, marginTop: 7 }}>
-                    <IconSymbol name="arrow.down.trend" size={11} color={c.accent} />
-                    <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>
+                    style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, minHeight: 32, paddingHorizontal: 12, marginTop: 8 }}>
+                    <IconSymbol name="arrow.down.trend" size={11} color={tk.action.secondaryText} />
+                    <Text style={{ color: tk.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginLeft: 5 }}>
                       {tr.anomalyTrimTo.replace('{duration}', fmtDur(trim))}
                     </Text>
                   </TouchableOpacity>
                 )}
               </View>
-              <Text style={{ color: c.accent, fontSize: 13, fontWeight: '700', marginLeft: 10 }}>{duration}</Text>
+              <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginLeft: 10 }}>{duration}</Text>
             </TouchableOpacity>
           );
         })}

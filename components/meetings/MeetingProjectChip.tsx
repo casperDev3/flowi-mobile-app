@@ -8,6 +8,7 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { fontFamily, radius } from '@/constants/theme';
 
 export interface MeetingChipProject {
   id: string;
@@ -30,7 +31,7 @@ export function MeetingProjectChip({
       style={[st.chip, { backgroundColor: project.color + '1F', borderColor: project.color + '40', maxWidth }, md && st.chipMd]}
       accessibilityLabel={project.name}>
       <View style={[st.dot, { backgroundColor: project.color }]} />
-      <Text numberOfLines={1} style={{ color: textColor, fontSize: md ? 12 : 10, fontWeight: '600', flexShrink: 1 }}>
+      <Text numberOfLines={1} style={{ color: textColor, fontSize: md ? 12 : 10, fontFamily: fontFamily.semibold, flexShrink: 1 }}>
         {project.name}
       </Text>
     </View>
@@ -38,7 +39,7 @@ export function MeetingProjectChip({
 }
 
 const st = StyleSheet.create({
-  chip:   { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 7, borderWidth: 1, paddingHorizontal: 5, paddingVertical: 1, alignSelf: 'flex-start' },
-  chipMd: { paddingHorizontal: 8, paddingVertical: 4, gap: 6, borderRadius: 9 },
+  chip:   { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 5, paddingVertical: 1, alignSelf: 'flex-start' },
+  chipMd: { paddingHorizontal: 8, paddingVertical: 4, gap: 6, borderRadius: radius.pill },
   dot:    { width: 8, height: 8, borderRadius: 4 },
 });

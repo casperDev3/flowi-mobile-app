@@ -9,6 +9,8 @@ import { View } from 'react-native';
 
 import type { CashflowPoint } from '@/utils/finance/cashflow';
 import type { ForecastPoint } from '@/utils/finance/forecast';
+import { useDS } from '@/hooks/use-ds';
+
 import type { FinColors } from './financeLabels';
 
 export function CashflowFactChart({ points, c, height = 120, summary }: {
@@ -22,6 +24,7 @@ export function CashflowFactChart({ points, c, height = 120, summary }: {
     () => points.reduce((m, p) => Math.max(m, p.inflow, p.outflow), 0),
     [points],
   );
+  const { t, g } = useDS();
   const half = height / 2;
   return (
     <View
@@ -35,11 +38,11 @@ export function CashflowFactChart({ points, c, height = 120, summary }: {
         return (
           <View key={p.day} style={{ flex: 1, height, justifyContent: 'center' }}>
             <View style={{ height: half, justifyContent: 'flex-end' }}>
-              <View style={{ height: up, backgroundColor: c.green, borderTopLeftRadius: 2, borderTopRightRadius: 2 }} />
+              <View style={{ height: up, backgroundColor: t.status.success, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} />
             </View>
-            <View style={{ height: 1, backgroundColor: c.border }} />
+            <View style={{ height: 1, backgroundColor: t.border.hairline }} />
             <View style={{ height: half - 1, justifyContent: 'flex-start' }}>
-              <View style={{ height: down, backgroundColor: c.red, borderBottomLeftRadius: 2, borderBottomRightRadius: 2 }} />
+              <View style={{ height: down, backgroundColor: g.accent.coral.fill, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 }} />
             </View>
           </View>
         );
@@ -63,6 +66,7 @@ export function ForecastChart({ points, c, height = 110, summary }: {
     }
     return { maxPos: pos, maxNeg: -neg };
   }, [points]);
+  const { t, g } = useDS();
   const span = maxPos + maxNeg || 1;
   const posH = (maxPos / span) * height;
   const negH = height - posH;
@@ -79,10 +83,11 @@ export function ForecastChart({ points, c, height = 110, summary }: {
         return (
           <View key={p.day} style={{ flex: 1 }}>
             <View style={{ height: posH, justifyContent: 'flex-end' }}>
-              <View style={{ height: pos, backgroundColor: hasEvent ? c.accent : c.accent + '88' }} />
+              {/* День із подією — підсвічений стовпець (лайм), решта — нейтральна заливка. */}
+              <View style={{ height: pos, backgroundColor: hasEvent ? g.accent.lime.fill : t.text.muted }} />
             </View>
-            <View style={{ height: negH, justifyContent: 'flex-start', borderTopWidth: maxNeg > 0 ? 1 : 0, borderTopColor: c.border }}>
-              <View style={{ height: neg, backgroundColor: c.red }} />
+            <View style={{ height: negH, justifyContent: 'flex-start', borderTopWidth: maxNeg > 0 ? 1 : 0, borderTopColor: t.border.hairline }}>
+              <View style={{ height: neg, backgroundColor: g.accent.coral.fill }} />
             </View>
           </View>
         );

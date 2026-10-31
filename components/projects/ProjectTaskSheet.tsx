@@ -30,6 +30,8 @@ import { useProjectRole } from '@/hooks/use-project-role';
 import { useI18n } from '@/store/i18n';
 import { projectShellColors } from './ProjectScreenShell';
 import { useProjectTaskCard, useProjectTaskHost } from './ProjectTaskCard';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf } from '@/components/shared/dsTheme';
 
 export interface ProjectTaskSheetProps {
   projectId: string;
@@ -48,7 +50,7 @@ export function ProjectTaskSheet({ projectId, taskId, onClose, initialTab = 'mai
   const role = useProjectRole(projectId);
   const host = useProjectTaskHost(projectId);
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED', project?.appearance);
-  const colors = { ...c, sheet: isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)' };
+  const colors = { ...c, sheet: glassOf(dsTokens(isDark)).sheet };
   const scrollRef = useRef<InstanceType<typeof ScrollView> | null>(null);
   const [tab, setTab] = useState<TaskDetailTab>(initialTab);
   // Нова задача — з тієї вкладки, яку попросили, а не з тієї, де лишили минулу.

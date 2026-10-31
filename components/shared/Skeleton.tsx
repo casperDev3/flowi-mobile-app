@@ -1,9 +1,10 @@
-import { Atlas } from '@/constants/atlas';
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { radius as dsRadius, space } from '@/constants/theme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { glassOf } from '@/components/shared/dsTheme';
 
 /**
  * Непрозорість скелетона при ввімкненому «Зменшенні руху».
@@ -24,7 +25,7 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ width = '100%', height = 16, radius = 8, style }: SkeletonProps) {
-  const isDark = useColorScheme() === 'dark';
+  const { t } = useDSTheme();
   const reduced = useReduceMotion();
   const opacity = useRef(new Animated.Value(0.5)).current;
 
@@ -47,7 +48,8 @@ export function Skeleton({ width = '100%', height = 16, radius = 8, style }: Ske
     return () => anim.stop();
   }, [opacity, reduced]);
 
-  const bg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+  // DS v2: skeleton.base (пульсація прозорістю до «highlight»-яскравості).
+  const bg = t.skeleton.base;
 
   return (
     <Animated.View
@@ -67,12 +69,12 @@ interface SkeletonCardProps {
 }
 
 export function SkeletonCard({ style }: SkeletonCardProps) {
-  const isDark = useColorScheme() === 'dark';
-  const bg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
-  const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  // DS v2: плейсхолдер картки — surface.card без рамки.
+  const { t } = useDSTheme();
+  const bg = glassOf(t).surface;
 
   return (
-    <View style={[ss.card, { backgroundColor: bg, borderColor: border }, style]}>
+    <View style={[ss.card, { backgroundColor: bg }, style]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Skeleton width={30} height={30} radius={9} />
         <Skeleton width={120} height={14} radius={6} />
@@ -90,12 +92,12 @@ interface SkeletonRowProps {
 }
 
 export function SkeletonRow({ style }: SkeletonRowProps) {
-  const isDark = useColorScheme() === 'dark';
-  const bg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)';
-  const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  // DS v2: плейсхолдер картки — surface.card без рамки.
+  const { t } = useDSTheme();
+  const bg = glassOf(t).surface;
 
   return (
-    <View style={[ss.row, { backgroundColor: bg, borderColor: border }, style]}>
+    <View style={[ss.row, { backgroundColor: bg }, style]}>
       <Skeleton width={22} height={22} radius={6} />
       <View style={{ flex: 1, gap: 6 }}>
         <Skeleton width="70%" height={13} radius={5} />
@@ -107,18 +109,16 @@ export function SkeletonRow({ style }: SkeletonRowProps) {
 
 const ss = StyleSheet.create({
   card: {
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 12,
+    borderRadius: dsRadius.cardCompact,
+    padding: space.cardPaddingCompact,
+    marginBottom: space.cardGapCompact,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: Atlas.radius.large,
-    borderWidth: 1,
-    padding: 14,
+    borderRadius: dsRadius.nested,
+    padding: space[4],
     marginBottom: 8,
   },
 });

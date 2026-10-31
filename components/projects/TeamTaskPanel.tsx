@@ -39,6 +39,9 @@ import {
 
 import { ProjectPaletteContext } from './ProjectPaletteContext';
 import { TeamResultFiles } from './TeamResultFiles';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf } from '@/components/shared/dsTheme';
 
 export { TeamButton, TeamInput } from './TeamControls';
 
@@ -72,13 +75,15 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
   const scheme = useColorScheme();
   const isDark = isDarkProp ?? scheme === 'dark';
   const palette = useContext(ProjectPaletteContext);
+  // DS v2: запасна палітра — з токенів (tk, бо `t` нижче — змінна задачі).
+  const tk = dsTokens(isDark);
   const c: CardColors = colors ?? {
-    text: palette?.text ?? (isDark ? '#F0EEFF' : '#302341'),
-    sub: palette?.sub ?? (isDark ? 'rgba(240,238,255,0.62)' : 'rgba(48,35,65,0.6)'),
-    border: palette?.border ?? (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(48,35,65,0.14)'),
-    dim: palette?.dim ?? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
+    text: palette?.text ?? tk.text.primary,
+    sub: palette?.sub ?? tk.text.secondary,
+    border: palette?.border ?? tk.border.hairline,
+    dim: palette?.dim ?? glassOf(tk).surfaceSubtle,
     accent: palette?.accent ?? '#7C3AED',
-    sheet: isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
+    sheet: glassOf(tk).sheet,
   };
   const { tr } = useI18n();
   const { user } = useAuth();
@@ -202,10 +207,10 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
     actions.push({ key: 'reopen', label: tr.cardTeamReopen, icon: 'arrow.counterclockwise', onPress: () => void commit({ status: 'active', reviewState: 'none' }) });
   }
 
-  const reviewBanner = task.reviewState === 'needs_reviewer' ? { text: tr.cardTeamNeedsReviewer, color: '#F59E0B', icon: 'clock' as const }
-    : task.reviewState === 'pending' ? { text: tr.cardTeamPending, color: '#F59E0B', icon: 'clock' as const }
-    : task.reviewState === 'approved' ? { text: tr.cardTeamApproved, color: '#10B981', icon: 'checkmark.seal' as const }
-    : task.reviewState === 'changes_requested' ? { text: tr.cardTeamChangesRequested, color: '#EF4444', icon: 'exclamationmark.circle' as const }
+  const reviewBanner = task.reviewState === 'needs_reviewer' ? { text: tr.cardTeamNeedsReviewer, color: tk.status.warning, icon: 'clock' as const }
+    : task.reviewState === 'pending' ? { text: tr.cardTeamPending, color: tk.status.warning, icon: 'clock' as const }
+    : task.reviewState === 'approved' ? { text: tr.cardTeamApproved, color: tk.status.success, icon: 'checkmark.seal' as const }
+    : task.reviewState === 'changes_requested' ? { text: tr.cardTeamChangesRequested, color: tk.accent.coral, icon: 'exclamationmark.circle' as const }
     : null;
 
   const reviewerOptions = memberOptions(task.assigneeId);
@@ -213,10 +218,11 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
   return (
     <View>
       {reviewBanner ? (
-        <View style={[st.banner, { borderColor: reviewBanner.color + '55', backgroundColor: reviewBanner.color + '14' }]}>
+        // DS v2: банер — вкладений subtle-блок; стан — кольорова іконка, текст — text.primary.
+        <View style={[st.banner, { backgroundColor: c.dim }]}>
           <IconSymbol name={reviewBanner.icon} size={15} color={reviewBanner.color} />
           <View style={{ flex: 1 }}>
-            <Text style={{ color: reviewBanner.color, fontWeight: '700', fontSize: 13 }}>{reviewBanner.text}</Text>
+            <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 14 }}>{reviewBanner.text}</Text>
             {task.reviewFeedback ? (
               <Text style={{ color: c.text, fontSize: 13, marginTop: 2 }}>{tr.cardTeamRemarks}: {task.reviewFeedback}</Text>
             ) : null}
@@ -254,14 +260,14 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
             onChangeText={setFeedback}
             multiline
             placeholder={tr.cardTeamFeedback}
-            placeholderTextColor={c.sub}
+            placeholderTextColor={tk.text.muted}
             accessibilityLabel={tr.cardTeamFeedback}
-            style={[st.input, { color: c.text, borderColor: c.border }]}
+            style={[st.input, { color: c.text, backgroundColor: c.dim }]}
           />
         </View>
       ) : null}
 
-      {error ? <Text accessibilityRole="alert" style={st.error}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={[st.error, { color: tk.status.danger }]}>{error}</Text> : null}
 
       <PropertyGroup title={tr.cardTeamResponsibility} colors={c}>
         <OptionField
@@ -279,7 +285,7 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
         {sprintSlot ?? null}
       </PropertyGroup>
       {load ? (
-        <Text style={[st.note, { color: remaining !== null && remaining < 0 ? '#EF4444' : c.sub }]}>
+        <Text style={[st.note, { color: remaining !== null && remaining < 0 ? tk.status.danger : c.sub }]}>
           {remaining === null
             ? tr.cardTeamLoadUnknown
             : tr.cardTeamLoadLeft.replace('{h}', String(Math.round(remaining / 6) / 10))}
@@ -367,12 +373,12 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
             colors={c}
           />
           {blockingDraft && !task.blocked ? (
-            <Text style={[st.note, { color: '#F59E0B' }]}>{tr.cardTeamErrBlockReason}</Text>
+            <Text style={[st.note, { color: tk.status.danger }]}>{tr.cardTeamErrBlockReason}</Text>
           ) : null}
         </View>
       ) : null}
       {warnings.map(t => (
-        <Text key={t.id} style={[st.note, { color: '#A46B1B' }]}>{tr.cardTeamDepWarn.replace('{title}', t.title)}</Text>
+        <Text key={t.id} style={[st.note, { color: c.text }]}>{tr.cardTeamDepWarn.replace('{title}', t.title)}</Text>
       ))}
 
       <PropertyGroup title={tr.cardTeamResult} colors={c}>
@@ -412,8 +418,8 @@ export function TeamTaskPanel({ task, role, onSaved, sprintSlot, colors, isDark:
 }
 
 const st = StyleSheet.create({
-  banner:    { flexDirection: 'row', alignItems: 'flex-start', gap: 9, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10 },
-  error:     { color: '#D94040', marginTop: 10, fontSize: 13 },
-  input:     { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, minHeight: 56, fontSize: 14, textAlignVertical: 'top' },
+  banner:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: radius.nested, padding: 16, marginBottom: 10 },
+  error:     { marginTop: 10, fontSize: 13, fontFamily: fontFamily.medium },
+  input:     { borderRadius: radius.control, fontFamily: fontFamily.regular, paddingHorizontal: 14, paddingVertical: 11, minHeight: 56, fontSize: 14, textAlignVertical: 'top' },
   note:      { fontSize: 12, marginTop: 6, marginLeft: 2 },
 });

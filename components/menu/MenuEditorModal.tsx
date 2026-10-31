@@ -5,7 +5,7 @@
  * в useMenuEditor; тут лише розмітка.
  */
 import React from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, ScrollView, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FormField } from '@/components/shared/FormField';
@@ -17,6 +17,8 @@ import { menuBits } from './MenuBits';
 import { dateLabel } from './model';
 import { MENU_ERR, type MenuColors } from './theme';
 import type { MenuEditorState } from './useMenuEditor';
+import { fontFamily } from '@/constants/theme';
+import { MeshCanvas } from '@/components/shared/MeshCanvas';
 
 const TITLES: Record<string, string> = {
   dish: 'Страва',
@@ -111,19 +113,20 @@ export function MenuEditorModal({
       presentationStyle={wide ? 'formSheet' : 'fullScreen'}
       onRequestClose={() => void ed.close()}>
       <View style={{ flex: 1, backgroundColor: c.bg1, paddingBottom: insets.bottom }}>
+        <MeshCanvas isDark={c.isDark} />
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View
             style={{
               paddingHorizontal: 16,
               paddingBottom: 12,
               paddingTop: (wide ? 0 : topInset) + 12,
-              borderBottomWidth: 1,
+              borderBottomWidth: StyleSheet.hairlineWidth,
               borderColor: c.border,
             }}>
             {row(
               <>
                 {btn('‹ Назад', () => void ed.close(), false, photoBusy)}
-                <Text style={{ flex: 1, fontSize: 19, fontWeight: '700', color: c.text }}>
+                <Text style={{ flex: 1, fontSize: 20, fontFamily: fontFamily.semibold, color: c.text }}>
                   {(kind && TITLES[kind]) || 'Група меню'}
                 </Text>
               </>,
@@ -166,7 +169,7 @@ export function MenuEditorModal({
             )}
             {dishReadOnly ? (
               <>
-                <Text style={{ fontSize: 24, color: c.text, fontWeight: '700' }}>{ed.title}</Text>
+                <Text style={{ fontSize: 24, color: c.text, fontFamily: fontFamily.bold }}>{ed.title}</Text>
                 {text(dateLabel(ed.date) + ' · ' + meals[ed.meal], true)}
                 {text(ed.description || 'Без опису')}
                 {ed.photo && <Image source={{ uri: ed.photo }} style={{ height: 250 }} resizeMode="contain" />}

@@ -1,6 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -78,6 +75,11 @@ import { useAuth } from '@/store/auth';
 import { ApiError } from '@/store/api';
 import { removeProjectMember } from '@/store/project-team';
 import { useProjectRoles } from '@/hooks/use-project-roles';
+import { fontFamily, radius, theme, type } from '@/constants/theme';
+import { dsTokens, useDS } from '@/hooks/use-ds';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRim, glassRimFor } from '@/components/shared/dsTheme';
+import { AccentIcon } from '@/components/shared/GlassBits';
 
 export interface Project {
   appearance?: import("@/utils/projectAppearance").ProjectAppearance;
@@ -185,6 +187,7 @@ function ListChip({ label, count, selected, onPress, accent, sub, dim, border }:
   label: string; count?: number; selected: boolean; onPress: () => void;
   accent: string; sub: string; dim: string; border: string;
 }) {
+  const { t } = useDS();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -193,21 +196,21 @@ function ListChip({ label, count, selected, onPress, accent, sub, dim, border }:
       accessibilityState={{ selected }}
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36,
-        paddingHorizontal: 12, paddingVertical: 7, borderRadius: Atlas.radius.medium, borderWidth: 1,
-        backgroundColor: selected ? accent + '18' : dim,
-        borderColor: selected ? accent : border,
+        // DS v2: pill-чип; вибраний — action.primary + text.onAction.
+        paddingHorizontal: 14, paddingVertical: 7, borderRadius: radius.pill,
+        backgroundColor: selected ? t.action.primary : glassOf(t).surface,
       }}>
-      <Text style={{ color: selected ? accent : sub, fontWeight: '700', fontSize: 12 }}>{label}</Text>
+      <Text style={{ color: selected ? t.text.onAction : t.text.primary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{label}</Text>
       {count === undefined ? null : (
-        <Text style={{ color: sub, fontSize: 11, fontVariant: ['tabular-nums'] }}>{count}</Text>
+        <Text style={{ color: selected ? t.text.onAction : sub, opacity: selected ? 0.75 : 1, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] }}>{count}</Text>
       )}
     </TouchableOpacity>
   );
 }
 
 /** Протермінований спринт — бурштиновий: червоний зайнятий простроченими задачами (§4). */
-const SPRINT_OVERDUE_COLOR = '#F59E0B';
-const OVERDUE_COLOR = '#EF4444';
+const SPRINT_OVERDUE_COLOR = theme.light.accent.amber;
+const OVERDUE_COLOR = theme.light.accent.coral;
 
 type CardTr = Pick<Translations,
   | 'projectOverdueTasks' | 'projectDone' | 'projectNoTasks' | 'projectDeadline' | 'projectNearest'
@@ -234,7 +237,7 @@ function CounterRow({ items, subColor, fontSize, marginTop }: {
           {index > 0 ? ' · ' : ''}
           <Text
             accessibilityLabel={item.a11y}
-            style={{ color: item.color ?? subColor, fontWeight: item.bold ? '700' : '400', fontVariant: ['tabular-nums'] }}>
+            style={{ color: item.color ?? subColor, fontFamily: item.bold ? fontFamily.semibold : fontFamily.regular, fontVariant: ['tabular-nums'] }}>
             {item.text}
           </Text>
         </Text>
@@ -286,7 +289,7 @@ interface ProjectCardProps {
 
 /**
  * Картка мемоізована: без цього кожен рендер екрана (наприклад, набір
- * тексту в модалці) перемальовує BlurView для всіх проєктів.
+ * тексту в модалці) перемальовує всі картки проєктів.
  */
 export const ProjectCard = React.memo(function ProjectCard({
   project, stats, counters, sprintCard, sprintsEnabled, canEditContent, onOpenSprints,
@@ -295,6 +298,7 @@ export const ProjectCard = React.memo(function ProjectCard({
 }: ProjectCardProps) {
   const pct = stats.pct;
   const overdueColor = OVERDUE_COLOR;
+  const t = dsTokens(isDark);
   const fill = (template: string, values: Record<string, string | number>) =>
     Object.entries(values).reduce((acc, [key, value]) => acc.split(`{${key}}`).join(String(value)), template);
 
@@ -327,21 +331,19 @@ export const ProjectCard = React.memo(function ProjectCard({
       accessibilityRole="button"
       accessibilityLabel={project.name}
       accessibilityState={{ selected }}>
-      <BlurView
-        intensity={isDark ? 20 : 40}
-        tint={isDark ? 'dark' : 'light'}
-        // На широкому екрані деталь стоїть поруч, і без цієї рамки не видно,
-        // яку саме картку вона показує.
-        style={[st.card, { borderColor: selected ? accentColor : borderColor }]}>
+      {/* DS v2: картка surface.card без рамки. На широкому екрані деталь
+          стоїть поруч, і вибрану картку видно з рамки action.primary. */}
+      {/* DS v2.1: скло з обідком; вибрана — рамка action.primary. */}
+      <View style={[st.card, { backgroundColor: glassOf(t).surface }, selected ? { borderColor: t.action.primary } : glassRim(t, 'card'), glassOf(t).shadow]}>
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={[st.colorBadge, { backgroundColor: project.color + '25', borderColor: project.color + '60' }]}>
+          <View style={[st.colorBadge, { backgroundColor: project.color + '25' }]}>
             <View style={[st.colorDot, { backgroundColor: project.color }]} />
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text numberOfLines={1} style={{ color: textColor, fontSize: 15, fontWeight: '700' }}>{project.name}</Text>
+            <Text numberOfLines={1} style={{ color: textColor, fontSize: 16, fontFamily: fontFamily.semibold }}>{project.name}</Text>
             {/* Порожній проєкт — одним рядком замість усієї статистики (§8.2). */}
-            <Text style={{ color: subColor, fontSize: 12, marginTop: 2 }}>
+            <Text style={{ color: subColor, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 2 }}>
               {stats.empty ? tr.projectNoTasks : `${tr.projectTasks}: ${stats.total}`}
             </Text>
           </View>
@@ -375,7 +377,7 @@ export const ProjectCard = React.memo(function ProjectCard({
               accessibilityLabel={tr.projectMembersLeave}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={{ padding: 4 }}>
-              <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{tr.projectMembersLeave}</Text>
+              <Text style={{ color: t.status.danger, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.projectMembersLeave}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -393,7 +395,7 @@ export const ProjectCard = React.memo(function ProjectCard({
                 {/* Червоним лише коли ВЛАСНИЙ термін минув при незакритій
                     роботі. Прострочена задача червонить свій лічильник, а не
                     термін проєкту — інакше два різні факти зливаються в один. */}
-                <Text style={{ color: stats.projectOverdue ? overdueColor : subColor, fontSize: 11, fontWeight: '700' }}>
+                <Text style={{ color: stats.projectOverdue ? t.status.danger : subColor, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>
                   {shortDate(project.deadline, locale)}
                 </Text>
               </View>
@@ -403,7 +405,7 @@ export const ProjectCard = React.memo(function ProjectCard({
                 style={st.metaChip}
                 accessibilityLabel={`${tr.projectNearest}: ${shortDate(stats.upcomingDeadline, locale)}`}>
                 <IconSymbol name="calendar" size={11} color={subColor} />
-                <Text style={{ color: subColor, fontSize: 11, fontWeight: '600' }}>
+                <Text style={{ color: subColor, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>
                   {shortDate(stats.upcomingDeadline, locale)}
                 </Text>
               </View>
@@ -414,10 +416,11 @@ export const ProjectCard = React.memo(function ProjectCard({
         {stats.total > 0 && (
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
-              <View style={[st.progressBg, { flex: 1 }]}>
-                <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: project.color }]} />
+              {/* DS v2: прогрес — amber; відсоток — тонкі табличні цифри. */}
+              <View style={[st.progressBg, { flex: 1, backgroundColor: glassOf(t).surfaceSubtle }]}>
+                <View style={[st.progressFill, { width: `${pct}%`, backgroundColor: glassOf(t).accent.lavender.fill }]} />
               </View>
-              <Text style={{ color: subColor, fontSize: 10, fontWeight: '700' }}>{pct}%</Text>
+              <Text style={{ color: textColor, fontSize: 20, fontFamily: fontFamily.light, letterSpacing: -0.4, fontVariant: ['tabular-nums'] }}>{pct}<Text style={{ color: subColor, fontSize: 12, fontFamily: fontFamily.regular }}>%</Text></Text>
             </View>
 
             {/* Ряд 4 (воронка) і ряд 5 (ознаки відкритих) — різні бази, тож
@@ -427,9 +430,9 @@ export const ProjectCard = React.memo(function ProjectCard({
 
             {sprintCard ? (
               <View style={{ marginTop: 12 }}>
-                <Text numberOfLines={1} style={{ color: subColor, fontSize: 11 }}>
+                <Text numberOfLines={1} style={{ color: subColor, fontSize: 12, fontFamily: fontFamily.regular }}>
                   {tr.sprintCurrent}{' · '}
-                  <Text style={{ color: textColor, fontWeight: '700' }}>{sprintCard.name}</Text>
+                  <Text style={{ color: textColor, fontFamily: fontFamily.semibold }}>{sprintCard.name}</Text>
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
                   <View
@@ -439,13 +442,13 @@ export const ProjectCard = React.memo(function ProjectCard({
                     // шкали неможливо розрізнити на слух.
                     accessibilityLabel={fill(tr.sprintProgressA11y, { name: sprintCard.name, done: sprintCard.done, total: sprintCard.total })}
                     accessibilityValue={{ min: 0, max: 100, now: sprintCard.pct }}
-                    style={[st.progressBg, { flex: 1 }]}>
+                    style={[st.progressBg, { flex: 1, backgroundColor: glassOf(t).surfaceSubtle }]}>
                     <View style={[st.progressFill, {
                       width: `${sprintCard.pct}%`,
-                      backgroundColor: sprintCard.overdue ? SPRINT_OVERDUE_COLOR : project.color,
+                      backgroundColor: sprintCard.overdue ? glassOf(t).accent.coral.fill : glassOf(t).accent.amber.fill,
                     }]} />
                   </View>
-                  <Text style={{ color: sprintCard.overdue ? SPRINT_OVERDUE_COLOR : subColor, fontSize: 11, fontWeight: sprintCard.overdue ? '700' : '400' }}>
+                  <Text style={{ color: sprintCard.overdue ? textColor : subColor, fontSize: 12, fontVariant: ['tabular-nums'], fontFamily: sprintCard.overdue ? fontFamily.semibold : fontFamily.regular }}>
                     {sprintCard.done}/{sprintCard.total}{' · '}
                     {sprintCard.overdue
                       ? fill(tr.sprintOverdueDays, { n: sprintCard.overdueDays })
@@ -464,8 +467,8 @@ export const ProjectCard = React.memo(function ProjectCard({
                       accessibilityRole="button"
                       accessibilityLabel={`${tr.sprintClose}: ${sprintCard.name}`}
                       hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
-                      style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: SPRINT_OVERDUE_COLOR }}>
-                      <Text style={{ color: SPRINT_OVERDUE_COLOR, fontSize: 11, fontWeight: '700' }}>{tr.sprintClose}</Text>
+                      style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: SPRINT_OVERDUE_COLOR }}>
+                      <Text style={{ color: t.text.onAccent, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.sprintClose}</Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -484,7 +487,7 @@ export const ProjectCard = React.memo(function ProjectCard({
             </View>
           </>
         )}
-      </BlurView>
+      </View>
     </TouchableOpacity>
   );
 });
@@ -935,16 +938,21 @@ export default function ProjectsScreen() {
   }, [user, tr]);
 
   // Палітра стабільна між рендерами — інакше React.memo на картці не спрацює.
-  const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: '#7C3AED',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-  }), [isDark]);
+  // DS v2: палітра — семантичні токени (canvas / card / subtle / text.*).
+  const tk = dsTokens(isDark);
+  const c = useMemo(() => {
+    const t = dsTokens(isDark);
+    return {
+      bg1:    t.bg.canvas,
+      bg2:    t.bg.canvas,
+      border: t.border.hairline,
+      text:   t.text.primary,
+      sub:    t.text.secondary,
+      accent: glassOf(t).accent.lavender.ink, // DS v2.1: акцент «Проєктів» — lavender
+      dim:    glassOf(t).surfaceSubtle,
+      sheet:  glassOf(t).sheet,
+    };
+  }, [isDark]);
 
   // Окремий обʼєкт, а не сам `c`: аналітика бере з палітри рівно п'ять полів, і
   // передавати їй увесь набір означало б перемальовувати графіки щоразу, коли
@@ -986,8 +994,8 @@ export default function ProjectsScreen() {
             accessibilityRole="button"
             accessibilityLabel={tr.back}
             hitSlop={HEADER_BUTTON_HIT_SLOP}
-            style={[st.headerBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-            <IconSymbol name="chevron.left" size={17} color={c.sub} />
+            style={[st.headerBtn, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+            <IconSymbol name="chevron.left" size={17} color={c.text} />
           </TouchableOpacity>
         ) : null}
         <Text style={[st.pageTitle, { color: c.text, flex: 1, marginLeft: lead === 'back' ? 12 : 0 }]}>{tr.projects}</Text>
@@ -995,8 +1003,8 @@ export default function ProjectsScreen() {
           onPress={openAdd}
           accessibilityRole="button"
           accessibilityLabel={tr.newProject}
-          style={[st.headerBtn, { backgroundColor: c.accent, borderColor: c.accent }]}>
-          <IconSymbol name="plus" size={17} color="#fff" />
+          style={[st.headerBtn, { backgroundColor: tk.action.primary }]}>
+          <IconSymbol name="plus" size={17} color={tk.text.onAction} />
         </TouchableOpacity>
       </View>
 
@@ -1015,14 +1023,13 @@ export default function ProjectsScreen() {
               accessibilityState={{ selected: showArchived === opt.key }}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 6,
-                paddingHorizontal: 13, paddingVertical: 8, borderRadius: Atlas.radius.medium, borderWidth: 1,
-                backgroundColor: showArchived === opt.key ? c.accent + '18' : c.dim,
-                borderColor: showArchived === opt.key ? c.accent : c.border,
+                minHeight: 36, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill,
+                backgroundColor: showArchived === opt.key ? tk.action.primary : glassOf(tk).surface,
               }}>
-              <Text style={{ color: showArchived === opt.key ? c.accent : c.sub, fontWeight: '700', fontSize: 13 }}>
+              <Text style={{ color: showArchived === opt.key ? tk.text.onAction : c.text, fontFamily: fontFamily.semibold, fontSize: 13 }}>
                 {opt.label}
               </Text>
-              <Text style={{ color: c.sub, fontSize: 12 }}>{opt.count}</Text>
+              <Text style={{ color: showArchived === opt.key ? tk.text.onAction : c.sub, opacity: showArchived === opt.key ? 0.75 : 1, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] }}>{opt.count}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -1037,7 +1044,7 @@ export default function ProjectsScreen() {
             keyboardShouldPersistTaps="handled"
             accessibilityLabel={tr.projectSortLabel}
             contentContainerStyle={{ gap: 7, alignItems: 'center' }}>
-            <Text style={{ color: c.sub, fontSize: 12, marginRight: 2 }}>{tr.projectSortLabel}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginRight: 2 }}>{tr.projectSortLabel}</Text>
             {PROJECT_SORT_KEYS.map(key => (
               <ListChip
                 key={key}
@@ -1106,31 +1113,29 @@ export default function ProjectsScreen() {
   const filteredOut = scopedStats.length > 0 && visibleStats.length === 0;
   const listEmpty = filteredOut ? (
     <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-      <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', textAlign: 'center' }}>{tr.projectListFilterNoMatch}</Text>
+      <Text style={[type.h2, { color: c.text, textAlign: 'center' }]}>{tr.projectListFilterNoMatch}</Text>
       <TouchableOpacity
         onPress={() => updateListPrefs({ ...listPrefs, statuses: [] })}
         accessibilityRole="button"
         accessibilityLabel={tr.projectListFilterReset}
-        style={{ marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.accent }}>
-        <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.projectListFilterReset}</Text>
+        style={{ marginTop: 16, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, ...glassRim(tk, 'subtle') }}>
+        <Text style={{ color: tk.action.secondaryText, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.projectListFilterReset}</Text>
       </TouchableOpacity>
     </View>
   ) : (
     <View style={{ alignItems: 'center', paddingVertical: 64 }}>
-      <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
-        <IconSymbol name="folder" size={32} color={c.accent} />
-      </View>
-      <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontWeight: '700' }}>{tr.noProjects}</Text>
-      <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+      <AccentIcon isDark={isDark} icon="folder" accent="lavender" size="lg" style={st.emptyIcon} />
+      <Text style={[type.h2, { color: c.text, marginTop: 18 }]}>{tr.noProjects}</Text>
+      <Text style={[type.body, { color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }]}>
         {tr.pressToAdd}
       </Text>
       <TouchableOpacity
         onPress={openAdd}
         accessibilityRole="button"
         accessibilityLabel={tr.newProject}
-        style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <IconSymbol name="plus" size={15} color="#fff" />
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.newProject}</Text>
+        style={{ marginTop: 18, minHeight: 48, paddingHorizontal: 22, borderRadius: radius.pill, backgroundColor: tk.action.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <IconSymbol name="plus" size={15} color={tk.text.onAction} />
+        <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.newProject}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -1155,7 +1160,7 @@ export default function ProjectsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {isWide ? (
           // Планшет: колонки masonry (2 від 600pt, 3 від 1100pt) на всю ширину
@@ -1163,7 +1168,7 @@ export default function ProjectsScreen() {
           <ScrollView
             contentContainerStyle={st.wideContent}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
             {listHeader}
             {visibleStats.length > 0
               ? <MasonryColumns items={masonryItems} columnCount={columnCount} />
@@ -1176,8 +1181,8 @@ export default function ProjectsScreen() {
             keyExtractor={stat => stat.project.id}
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
             showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}
             ListHeaderComponent={listHeader}
             // Аналітика — підвал списку, а не окремий екран: цифри під картками
             // відповідають на питання, яке виникає саме після погляду на них
@@ -1193,12 +1198,9 @@ export default function ProjectsScreen() {
       {/* Add/Edit Modal */}
       <Modal visible={showModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={closeModal}>
+          <Pressable accessible={false} style={[st.overlay, { backgroundColor: tk.surface.overlay }, wm.overlay]} onPress={closeModal}>
             <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-              <BlurView
-                intensity={isDark ? 50 : 70}
-                tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[st.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -1221,7 +1223,7 @@ export default function ProjectsScreen() {
                 <TextInput
                   placeholder={tr.projectNamePlaceholder}
                   accessibilityLabel={tr.projectNamePlaceholder}
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={tk.text.muted}
                   value={name}
                   onChangeText={setName}
                   style={[st.input, { backgroundColor: c.dim, color: c.text }]}
@@ -1234,7 +1236,7 @@ export default function ProjectsScreen() {
                     одного поля — окрема залежність. Порожньо = терміну немає. */}
                 <TextInput
                   placeholder="2026-10-01"
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={tk.text.muted}
                   value={deadline}
                   onChangeText={setDeadline}
                   autoCapitalize="none"
@@ -1246,7 +1248,7 @@ export default function ProjectsScreen() {
                 <Text style={[st.label, { color: c.sub }]}>{tr.projectDescription}</Text>
                 <TextInput
                   placeholder=""
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={tk.text.muted}
                   value={description}
                   onChangeText={setDescription}
                   multiline
@@ -1262,9 +1264,9 @@ export default function ProjectsScreen() {
                       style={[
                         st.colorChip,
                         { backgroundColor: col },
-                        color === col && { borderWidth: 3, borderColor: '#fff' },
+                        color === col && { borderWidth: 3, borderColor: tk.action.primary },
                       ]}>
-                      {color === col && <IconSymbol name="checkmark" size={14} color="#fff" />}
+                      {color === col && <IconSymbol name="checkmark" size={14} color="#FFFFFF" />}
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -1283,11 +1285,9 @@ export default function ProjectsScreen() {
                           onPress={() => setTemplate(t)}
                           style={[st.btn, {
                             flex: 1,
-                            backgroundColor: template === t ? c.accent : c.dim,
-                            borderWidth: 1,
-                            borderColor: template === t ? c.accent : c.border,
+                            backgroundColor: template === t ? tk.action.primary : c.dim,
                           }]}>
-                          <Text style={{ color: template === t ? '#fff' : c.sub, fontWeight: '700' }}>
+                          <Text style={{ color: template === t ? tk.text.onAction : c.text, fontFamily: fontFamily.semibold }}>
                             {t === 'work' ? tr.projectTemplateWork : tr.projectTemplateSimple}
                           </Text>
                         </TouchableOpacity>
@@ -1300,25 +1300,25 @@ export default function ProjectsScreen() {
                   <TouchableOpacity
                     onPress={() => { const target = editing; closeModal(); toggleArchive(target); }}
                     accessibilityRole="button"
-                    style={[st.btn, { marginTop: 18, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>
+                    style={[st.btn, { marginTop: 18, backgroundColor: glassOf(tk).surfaceSubtle, ...glassRim(tk, 'subtle') }]}>
+                    <Text style={{ color: tk.action.secondaryText, fontFamily: fontFamily.semibold }}>
                       {editing.archivedAt ? tr.unarchiveProject : tr.archiveAccount}
                     </Text>
                   </TouchableOpacity>
                 )}
 
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 22, marginBottom: 4 }}>
-                  <TouchableOpacity onPress={closeModal} style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                  <TouchableOpacity onPress={closeModal} style={[st.btn, { flex: 1, backgroundColor: glassOf(tk).surfaceSubtle, ...glassRim(tk, 'subtle') }]}>
+                    <Text style={{ color: tk.action.secondaryText, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={save} style={[st.btn, { flex: 2, backgroundColor: c.accent }]}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>
+                  <TouchableOpacity onPress={save} style={[st.btn, { flex: 2, backgroundColor: tk.action.primary }]}>
+                    <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold }}>
                       {editing ? tr.save : tr.create}
                     </Text>
                   </TouchableOpacity>
                 </View>
                 </ScrollView>
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -1333,26 +1333,26 @@ export default function ProjectsScreen() {
 const st = StyleSheet.create({
   metaChip:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
 
-  pageTitle:   { fontSize: 32, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.8 },
-  headerBtn:   { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon:   { width: 72, height: 72, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
-  card:        { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, overflow: 'hidden' },
-  colorBadge:  { width: 42, height: 42, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  colorDot:    { width: 20, height: 20, borderRadius: 6 },
-  progressBg:  { height: 3, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
-  progressFill:{ height: '100%', borderRadius: 2 },
-  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  pageTitle:   { ...type.h1 },
+  headerBtn:   { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  emptyIcon:   { width: 72, height: 72, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  card:        { borderRadius: radius.cardCompact, borderWidth: 1.5, padding: 20 },
+  colorBadge:  { width: 42, height: 42, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  colorDot:    { width: 18, height: 18, borderRadius: 9 },
+  progressBg:  { height: 6, borderRadius: radius.pill, overflow: 'hidden' },
+  progressFill:{ height: '100%', borderRadius: radius.pill },
+  overlay:     { flex: 1, justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   wideContent: { width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 40 },
   // Стеля висоти — числом із useSheetSurface(): відсоток від батька з
   // height:auto у Yoga не рахується, аркуш ріс на всю висоту вмісту, а
   // ScrollView усередині нічого не гортав (NAT-01).
-  sheet:       { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:       { borderRadius: radius.card, padding: 24, overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:  { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 16 },
-  input:       { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
-  label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 16 },
-  colorChip:   { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  btn:         { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  sheetTitle:  { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 16 },
+  input:       { borderRadius: radius.control, minHeight: 44, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, fontFamily: fontFamily.regular },
+  label:       { fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 16 },
+  colorChip:   { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  btn:         { minHeight: 48, paddingVertical: 13, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

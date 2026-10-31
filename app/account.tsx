@@ -1,6 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -22,6 +19,7 @@ import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError } from '@/store/api';
 import { UnsyncedOutboxError, useAuth } from '@/store/auth';
@@ -29,6 +27,9 @@ import { useI18n } from '@/store/i18n';
 import { throttleMessage } from '@/store/auth-throttle';
 import { useSync } from '@/store/sync-engine';
 import { haptic } from '@/utils/haptics';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
 
 export default function AccountScreen() {
   const cs = useColorScheme();
@@ -41,9 +42,12 @@ export default function AccountScreen() {
   // інакше кнопка збереження відʼїжджає від свого поля на пів екрана вправо.
   const contentWidth = useContentWidth();
 
+  const k = dsTokens(isDark);
   const c = {
     ...getScreenColors('auth', isDark),
-    red: '#EF4444',
+    // Картка форми — суцільна поверхня DS v2.
+    card: glassOf(k).surface,
+    red: k.status.danger,
   };
 
   // ── Name ──────────────────────────────────────────────────────────────────
@@ -224,7 +228,7 @@ export default function AccountScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
 
       {/* Без верхнього краю: інсет зверху дає ScreenHeader через
           useTopInset() (CLAUDE.md) — інакше шапка з'їжджає двічі. */}
@@ -236,7 +240,7 @@ export default function AccountScreen() {
           title={tr.accountManage}
           color={c.text}
           titleStyle={st.title}
-          back={{ onPress: () => router.back(), label: tr.back, color: c.accent }}
+          back={{ onPress: () => router.back(), label: tr.back, color: c.text }}
           crumbs={[
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
             { label: tr.accountManage },
@@ -255,20 +259,20 @@ export default function AccountScreen() {
           >
             {/* Email (readonly) */}
             <SectionLabel label={tr.authEmail} color={c.sub} />
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               <View style={st.fieldWrap}>
                 <Text style={[st.input, { color: c.sub }]} numberOfLines={1}>{user?.email}</Text>
               </View>
-            </BlurView>
+            </View>
 
             {/* Name */}
             <SectionLabel label={tr.accountDisplayName} color={c.sub} />
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               <View style={st.fieldWrap}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountDisplayName.toUpperCase()}</Text>
                 <TextInput
                   style={[st.input, { color: c.text }]}
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={k.text.muted}
                   placeholder={tr.authName}
                   value={name}
                   onChangeText={v => { setName(v); setNameError(''); }}
@@ -278,10 +282,10 @@ export default function AccountScreen() {
                   onSubmitEditing={handleSaveName}
                 />
               </View>
-            </BlurView>
+            </View>
             {nameError ? <Text style={[st.error, { color: c.red }]}>{nameError}</Text> : null}
             <TouchableOpacity
-              style={[st.btn, { backgroundColor: c.accent, opacity: nameSaving ? 0.7 : 1 }]}
+              style={[st.btn, { backgroundColor: nameSaving ? k.action.primaryPressed : k.action.primary }]}
               activeOpacity={0.82}
               onPress={handleSaveName}
               disabled={nameSaving || !name.trim()}
@@ -290,21 +294,21 @@ export default function AccountScreen() {
               accessibilityState={{ disabled: nameSaving || !name.trim(), busy: nameSaving }}
             >
               {nameSaving ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={k.text.onAction} />
               ) : (
-                <Text style={st.btnText}>{tr.accountSaveName}</Text>
+                <Text style={[st.btnText, { color: k.text.onAction }]}>{tr.accountSaveName}</Text>
               )}
             </TouchableOpacity>
 
             {/* Change password */}
             <SectionLabel label={tr.accountChangePassword} color={c.sub} />
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.accountOldPassword.toUpperCase()}</Text>
                 <View style={st.row}>
                   <TextInput
                     style={[st.input, { color: c.text, flex: 1 }]}
-                    placeholderTextColor={c.sub}
+                    placeholderTextColor={k.text.muted}
                     placeholder="••••••••"
                     value={oldPwd}
                     onChangeText={v => { setOldPwd(v); setPwdError(''); }}
@@ -328,7 +332,7 @@ export default function AccountScreen() {
                 <View style={st.row}>
                   <TextInput
                     style={[st.input, { color: c.text, flex: 1 }]}
-                    placeholderTextColor={c.sub}
+                    placeholderTextColor={k.text.muted}
                     placeholder="••••••••"
                     value={newPwd}
                     onChangeText={v => { setNewPwd(v); setPwdError(''); }}
@@ -351,7 +355,7 @@ export default function AccountScreen() {
                 <View style={st.row}>
                   <TextInput
                     style={[st.input, { color: c.text, flex: 1 }]}
-                    placeholderTextColor={c.sub}
+                    placeholderTextColor={k.text.muted}
                     placeholder="••••••••"
                     value={repeatPwd}
                     onChangeText={v => { setRepeatPwd(v); setPwdError(''); }}
@@ -369,10 +373,10 @@ export default function AccountScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </BlurView>
+            </View>
             {pwdError ? <Text style={[st.error, { color: c.red }]}>{pwdError}</Text> : null}
             <TouchableOpacity
-              style={[st.btn, { backgroundColor: c.accent, opacity: pwdSaving ? 0.7 : 1 }]}
+              style={[st.btn, { backgroundColor: pwdSaving ? k.action.primaryPressed : k.action.primary }]}
               activeOpacity={0.82}
               onPress={handleChangePassword}
               disabled={pwdSaving}
@@ -381,15 +385,15 @@ export default function AccountScreen() {
               accessibilityState={{ disabled: pwdSaving, busy: pwdSaving }}
             >
               {pwdSaving ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={k.text.onAction} />
               ) : (
-                <Text style={st.btnText}>{tr.accountChangePassword}</Text>
+                <Text style={[st.btnText, { color: k.text.onAction }]}>{tr.accountChangePassword}</Text>
               )}
             </TouchableOpacity>
 
             {/* Workspace */}
             <SectionLabel label={tr.workspaceScreenTitle} color={c.sub} />
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               {user?.isAdmin && (
                 <TouchableOpacity
                   style={[st.fieldWrap, { flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderBottomColor: c.border }]}
@@ -407,21 +411,21 @@ export default function AccountScreen() {
                 activeOpacity={0.82}
                 disabled={switching}
               >
-                {switching ? <ActivityIndicator color={c.accent} /> : <IconSymbol name="arrow.triangle.2.circlepath" size={17} color={c.accent} />}
+                {switching ? <ActivityIndicator color={c.sub} /> : <IconSymbol name="arrow.triangle.2.circlepath" size={17} color={c.accent} />}
                 <Text style={[st.input, { color: c.text, flex: 1 }]}>{tr.workspaceSwitchButton}</Text>
                 <IconSymbol name="chevron.right" size={16} color={c.sub} />
               </TouchableOpacity>
-            </BlurView>
+            </View>
 
             {/* Danger zone */}
             <SectionLabel label={tr.accountDangerZone} color={c.red} />
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.red + '40' }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               <TouchableOpacity
                 style={[st.fieldWrap, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}
                 onPress={handleDeleteRequest}
                 activeOpacity={0.82}
               >
-                <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: c.red + '20', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.red + '20', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name="trash.fill" size={17} color={c.red} />
                 </View>
                 <Text style={[st.input, { color: c.red, flex: 1 }]}>{tr.accountDeleteAccount}</Text>
@@ -435,7 +439,7 @@ export default function AccountScreen() {
                     <TextInput
                       autoFocus
                       style={[st.input, { color: c.text, flex: 1 }]}
-                      placeholderTextColor={c.sub}
+                      placeholderTextColor={k.text.muted}
                       placeholder="••••••••"
                       value={deletePwd}
                       onChangeText={setDeletePwd}
@@ -462,14 +466,14 @@ export default function AccountScreen() {
                     accessibilityState={{ disabled: deleting || !deletePwd, busy: deleting }}
                   >
                     {deleting ? (
-                      <ActivityIndicator color="#fff" />
+                      <ActivityIndicator color={k.text.onAction} />
                     ) : (
-                      <Text style={st.btnText}>{tr.accountDeleteAccount}</Text>
+                      <Text style={[st.btnText, { color: k.text.onAction }]}>{tr.accountDeleteAccount}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
               )}
-            </BlurView>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -493,38 +497,32 @@ const st = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 80,
   },
-  // Кегль лишається 28/700, як був у прокрутці: ScreenHeader бере його
-  // через titleStyle, тож переїзд у шапку не змінив вигляду заголовка.
+  // H1 сторінки DS v2 (32/500): ScreenHeader бере його через titleStyle.
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.4,
+    fontSize: 32,
+    fontFamily: fontFamily.medium,
+    letterSpacing: -0.32,
   },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontFamily: fontFamily.medium,
+    letterSpacing: 0.3,
     marginBottom: 8,
     marginTop: 20,
     marginLeft: 4,
   },
   card: {
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
+    borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
   },
   fieldWrap: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
   },
   fieldLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontFamily: fontFamily.medium,
+    letterSpacing: 0.3,
     marginBottom: 4,
   },
   row: {
@@ -533,7 +531,8 @@ const st = StyleSheet.create({
   },
   input: {
     fontSize: 16,
-    paddingVertical: 2,
+    fontFamily: fontFamily.regular,
+    paddingVertical: 4,
   },
   error: {
     fontSize: 13,
@@ -542,14 +541,15 @@ const st = StyleSheet.create({
     paddingHorizontal: 4,
   },
   btn: {
-    borderRadius: Atlas.radius.large,
-    paddingVertical: 16,
+    borderRadius: 999,
+    minHeight: 52,
+    justifyContent: 'center',
+    paddingVertical: 15,
     alignItems: 'center',
     marginTop: 12,
   },
   btnText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fontFamily.semibold,
   },
 });

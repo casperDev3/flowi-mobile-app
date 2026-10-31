@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
 /**
  * app/(tabs)/health.tsx — розділ «Здоровʼя» однією сторінкою з вкладками.
  *
@@ -20,8 +21,6 @@ import { Atlas } from '@/constants/atlas';
  * програмами, тож вкладка «Активність і тренування» показує їхнє зведення і
  * веде туди, а не втягує його в себе.
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -46,7 +45,7 @@ import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { sheetSurfaceStyle } from '@/hooks/use-content-width';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useHealthEntries } from '@/hooks/use-health-entries';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useScreenView } from '@/hooks/use-screen-view';
@@ -59,6 +58,9 @@ import {
   type HealthColors, fmtSleep, getHealthColors,
 } from '@/utils/healthTheme';
 import { HealthEntry, getMonthEntries } from '@/utils/healthUtils';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { AccentIcon } from '@/components/shared/GlassBits';
 
 export default function HealthHubScreen() {
   const tabBarInset = useTabBarInset();
@@ -67,7 +69,8 @@ export default function HealthHubScreen() {
   const { isWide } = useResponsive();
   // Смуга вкладок: на планшеті — шість в один ряд без прокрутки (рішення 07.10).
   const tabBarLayout = healthTabBarLayout(useScreenWidth(), isWide);
-  const isDark = useColorScheme() === 'dark';
+  // DS v2: canvas без градієнта; головна дія — pill/коло action.primary.
+  const { t, isDark } = useDSTheme();
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
@@ -114,7 +117,7 @@ export default function HealthHubScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <View style={{ flex: 1 }}>
 
         <ScreenHeader
@@ -124,17 +127,17 @@ export default function HealthHubScreen() {
             <>
               {isWide && (
                 <HeaderButton onPress={() => setQuickOpen(true)} accessibilityLabel={tr.add}
-                  style={{ borderColor: ACCENT + '55', backgroundColor: ACCENT }}>
-                  <IconSymbol name="plus" size={17} color="#fff" />
+                  style={{ backgroundColor: t.action.primary }}>
+                  <IconSymbol name="plus" size={17} color={t.text.onAction} />
                 </HeaderButton>
               )}
               <HeaderButton onPress={() => setHistoryOpen(true)} accessibilityLabel={tr.history}
-                style={{ borderColor: c.border, backgroundColor: c.dim }}>
+                style={{ backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }}>
                 <IconSymbol name="clock.arrow.circlepath" size={17} color={c.text} />
               </HeaderButton>
               {/* Налаштування розділу: профіль здоровʼя і джерела даних. */}
               <HeaderButton onPress={() => router.push('/health-profile')} accessibilityLabel={tr.settings}
-                style={{ borderColor: c.border, backgroundColor: c.dim }}>
+                style={{ backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }}>
                 <IconSymbol name="gearshape.fill" size={17} color={c.text} />
               </HeaderButton>
             </>
@@ -158,9 +161,9 @@ export default function HealthHubScreen() {
       <View style={[s.fabContainer, { bottom: tabBarInset + 20 }]} pointerEvents="box-none">
         <TouchableOpacity onPress={() => setQuickOpen(true)} activeOpacity={0.85}
           accessibilityRole="button" accessibilityLabel={tr.add}
-          style={[s.fab, { backgroundColor: ACCENT }]}>
+          style={[s.fab, { backgroundColor: t.action.primary }]}>
           {/* Суцільна кнопка без кольорового «сяйва» — як FAB Фінансів. */}
-          <IconSymbol name="plus" size={26} color="#fff" />
+          <IconSymbol name="plus" size={26} color={t.text.onAction} />
         </TouchableOpacity>
       </View>
       )}
@@ -175,7 +178,7 @@ export default function HealthHubScreen() {
   );
 }
 
-function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onDelete, isDark, c, tr, locale }: {
+function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onDelete, isDark: _isDark, c, tr, locale }: {
   open: boolean; onClose: () => void; entries: HealthEntry[];
   activeMonth: Date; setActiveMonth: (d: Date) => void;
   /** h.deleteEntry: автоматичний запис ще й потрапляє в тумбстоуни, щоб синк його не повернув. */
@@ -185,6 +188,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
   const { height, isWide } = useResponsive();
   const sheetSurface = sheetSurfaceStyle(height);
   const now = new Date();
+  const { t } = useDSTheme();
   const monthEntries = useMemo(() => getMonthEntries(entries, activeMonth), [entries, activeMonth]);
   /*
    * Журнал — довідка «збоку» від дашборда: на планшеті він виїжджає панеллю
@@ -194,8 +198,8 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
    */
   return (
     <SheetModal visible={open} onClose={onClose} presentation="side">
-          <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-            style={[s.sheet, isWide ? s.sheetSide : sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+          <View
+            style={[s.sheet, isWide ? s.sheetSide : sheetSurface, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
               <Text style={[s.sheetTitle, { color: c.text, flex: 1 }]}>{tr.history}</Text>
               <MonthPicker month={activeMonth} onChange={setActiveMonth} months={tr.months}
@@ -204,8 +208,8 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
             <ScrollView showsVerticalScrollIndicator={false} style={isWide ? { flex: 1 } : { maxHeight: height * 0.58 }}>
               {monthEntries.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-                  <IconSymbol name="heart.fill" size={38} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 15, marginTop: 12, fontWeight: '600' }}>{tr.noEntriesYet}</Text>
+                  <AccentIcon isDark={_isDark} icon="heart.fill" accent="coral" size="lg" />
+                  <Text style={{ color: c.sub, fontSize: 15, marginTop: 12, fontFamily: fontFamily.semibold }}>{tr.noEntriesYet}</Text>
                 </View>
               ) : (
                 <View style={{ gap: 8, paddingBottom: 16 }}>
@@ -215,17 +219,17 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
                     const timeStr = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
                     const cfg = getEntryCfg(entry, tr);
                     return (
-                      <View key={entry.id} style={[s.historyCard, { borderColor: c.border, backgroundColor: c.card }]}>
-                        <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+                      <View key={entry.id} style={[s.historyCard, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+                        <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center' }}>
                           <IconSymbol name={cfg.icon as any} size={16} color={cfg.color} />
                         </View>
                         <View style={{ flex: 1, marginLeft: 10 }}>
-                          <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{cfg.valueStr}</Text>
+                          <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{cfg.valueStr}</Text>
                           {entry.note && entry.note !== '__hk__' ? <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>{entry.note}</Text> : null}
-                          <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{dayStr} · {timeStr}</Text>
+                          <Text style={{ color: c.sub, fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'] }}>{dayStr} · {timeStr}</Text>
                         </View>
-                        <View style={[s.badge, { backgroundColor: cfg.color + '18', borderColor: cfg.color + '35' }]}>
-                          <Text style={{ color: cfg.color, fontSize: 10, fontWeight: '700' }}>{cfg.typeLabel}</Text>
+                        <View style={[s.badge, { backgroundColor: cfg.color + '18' }]}>
+                          <Text style={{ color: cfg.color, fontSize: 10, fontFamily: fontFamily.bold }}>{cfg.typeLabel}</Text>
                         </View>
                         <TouchableOpacity
                           onPress={() => Alert.alert(tr.tlHealthDeleteEntryTitle, tr.tlHealthDeleteEntryMsg, [
@@ -243,7 +247,7 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
                 </View>
               )}
             </ScrollView>
-          </BlurView>
+          </View>
     </SheetModal>
   );
 }
@@ -270,16 +274,16 @@ function getEntryCfg(entry: HealthEntry, tr: any) {
 }
 
 const s = StyleSheet.create({
-  badge:        { borderRadius: 7, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
+  badge:        { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   // 44×44 — мінімальна ціль дотику (HIG); іконка маленька, ціль — ні.
   deleteBtn:    { width: 44, height: 44, marginLeft: 4, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
-  historyCard:  { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' },
+  historyCard:  { borderRadius: Atlas.radius.large, padding: 14, flexDirection: 'row', alignItems: 'center' },
   fabContainer: { position: 'absolute', right: 20, alignItems: 'center', justifyContent: 'center' },
-  fab:          { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  fab:          { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', shadowColor: '#111113', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 6 },
   // Стеля висоти — числом із sheetSurfaceStyle(); відсоток від батька з
   // height:auto не рахується і обмеження просто зникає (NAT-01).
-  sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:        { borderRadius: Atlas.radius.xxlarge, padding: 20, overflow: 'hidden' },
   // Бокова панель: на всю висоту, список гортається всередині.
   sheetSide:    { flex: 1, marginBottom: 12 },
-  sheetTitle:   { fontSize: 20, fontWeight: Atlas.type.headingWeight },
+  sheetTitle:   { fontSize: 20, fontFamily: fontFamily.semibold },
 });

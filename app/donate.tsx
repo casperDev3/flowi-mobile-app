@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -19,8 +18,12 @@ import { ScreenHeader } from '@/components/shared/ScreenHeader';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
+import { fontFamily } from '@/constants/theme';
+import { glassStyles } from '@/components/finance/finPalette';
+import { MeshBackground } from '@/components/ds';
 
 const PAYPAL_EMAIL = 'ihor.lialuik@gmail.com';
 const DONATELLO_URL = 'https://donatello.to/igorichua';
@@ -31,15 +34,23 @@ export default function DonateScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
+  const k = dsTokens(isDark);
+  const g = glassTokens(isDark);
+  const { reduceTransparency } = useDS();
+
+  // DS v2.1: mesh-основа, скляні картки (gl), акцент екрана — coral.
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F5F5FA',
-    bg2:    isDark ? '#14121E' : '#EBEBF5',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
-  }), [isDark]);
+    bg1:    g.mesh.base,
+    bg2:    g.mesh.base,
+    border: k.border.hairline,
+    text:   k.text.primary,
+    sub:    k.text.secondary,
+    dim:    g.surfaceSubtle,
+    card:   reduceTransparency ? g.solid.card : g.surface,
+    accent: g.accent.coral.ink,
+    accentTint: g.accent.coral.tint,
+    gl:     glassStyles(isDark, reduceTransparency),
+  }), [k, g, isDark, reduceTransparency]);
 
   const handlePayPal = useCallback(async () => {
     await Clipboard.setStringAsync(PAYPAL_EMAIL);
@@ -52,7 +63,7 @@ export default function DonateScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
 
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
@@ -69,7 +80,7 @@ export default function DonateScreen() {
             onPress: () => router.back(),
             label: tr.back,
             color: c.sub,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { ...c.gl.card, borderColor: 'transparent' },
           }}
           crumbs={[
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
@@ -83,9 +94,16 @@ export default function DonateScreen() {
           showsVerticalScrollIndicator={false}>
 
           {/* Hero */}
-          <View style={[st.hero, { backgroundColor: c.card, borderColor: c.border }]}>
-            <View style={[st.heroIconWrap, { backgroundColor: '#EF444415' }]}>
-              <IconSymbol name="heart.fill" size={28} color="#EF4444" />
+          {/* Promo-блок DS v2: переливчастий градієнт + frosted-підкладка іконки. */}
+          <View style={st.hero}>
+            <LinearGradient
+              colors={k.gradient.iridescent}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[st.heroIconWrap, { backgroundColor: k.surface.glass }]}>
+              <IconSymbol name="heart.fill" size={28} color={k.status.danger} />
             </View>
             <Text style={[st.heroTitle, { color: c.text }]}>Підтримайте розробника</Text>
             <Text style={[st.heroSub, { color: c.sub }]}>
@@ -97,25 +115,19 @@ export default function DonateScreen() {
           <Text style={[st.sectionLabel, { color: c.sub }]}>ШВИДКИЙ ДОНАТ</Text>
           <Pressable
             onPress={() => Linking.openURL(DONATELLO_URL)}
-            style={({ pressed }) => [st.card, { opacity: pressed ? 0.82 : 1, borderColor: 'rgba(255,183,0,0.35)' }]}>
-            <LinearGradient
-              colors={isDark ? ['#2A1F00', '#3D2D00'] : ['#FFF8E1', '#FFF0B3']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+            style={({ pressed }) => [st.card, { ...c.gl.card, opacity: pressed ? 0.82 : 1 }]}>
             <View style={st.cardContent}>
-              <View style={[st.iconWrap, { backgroundColor: '#FFB70020', borderColor: '#FFB70040', borderWidth: 1 }]}>
+              <View style={[st.iconWrap, { backgroundColor: '#FFB70020' }]}>
                 <IconSymbol name="gift.fill" size={22} color="#FFB700" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[st.cardTitle, { color: isDark ? '#FFD740' : '#92650A' }]}>Donatello</Text>
-                <Text style={[st.cardSub, { color: isDark ? 'rgba(255,215,64,0.6)' : 'rgba(146,101,10,0.65)' }]}>
+                <Text style={[st.cardTitle, { color: c.text }]}>Donatello</Text>
+                <Text style={[st.cardSub, { color: c.sub }]}>
                   donatello.to/igorichua
                 </Text>
               </View>
-              <View style={[st.actionBtn, { backgroundColor: '#FFB70020', borderColor: '#FFB70040', borderWidth: 1 }]}>
-                <IconSymbol name="arrow.up.trend" size={15} color="#FFB700" />
+              <View style={[st.actionBtn, { backgroundColor: k.action.primary }]}>
+                <IconSymbol name="arrow.up.trend" size={15} color={k.text.onAction} />
               </View>
             </View>
           </Pressable>
@@ -124,25 +136,19 @@ export default function DonateScreen() {
           <Text style={[st.sectionLabel, { color: c.sub, marginTop: 20 }]}>ЧЕРЕЗ EMAIL</Text>
           <Pressable
             onPress={handlePayPal}
-            style={({ pressed }) => [st.card, { opacity: pressed ? 0.82 : 1, borderColor: 'rgba(0,112,186,0.3)' }]}>
-            <LinearGradient
-              colors={isDark ? ['#001830', '#002A4D'] : ['#EBF5FF', '#D6ECFF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+            style={({ pressed }) => [st.card, { ...c.gl.card, opacity: pressed ? 0.82 : 1 }]}>
             <View style={st.cardContent}>
-              <View style={[st.iconWrap, { backgroundColor: '#0070BA20', borderColor: '#0070BA40', borderWidth: 1 }]}>
+              <View style={[st.iconWrap, { backgroundColor: '#0070BA20' }]}>
                 <IconSymbol name="banknote" size={22} color="#0070BA" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[st.cardTitle, { color: isDark ? '#5BB8F5' : '#003D73' }]}>PayPal</Text>
-                <Text style={[st.cardSub, { color: isDark ? 'rgba(91,184,245,0.6)' : 'rgba(0,61,115,0.65)' }]}>
+                <Text style={[st.cardTitle, { color: c.text }]}>PayPal</Text>
+                <Text style={[st.cardSub, { color: c.sub }]}>
                   Натисніть, щоб скопіювати email
                 </Text>
               </View>
-              <View style={[st.actionBtn, { backgroundColor: '#0070BA20', borderColor: '#0070BA40', borderWidth: 1 }]}>
-                <IconSymbol name="doc.on.clipboard" size={15} color="#0070BA" />
+              <View style={[st.actionBtn, { backgroundColor: k.action.primary }]}>
+                <IconSymbol name="doc.on.clipboard" size={15} color={k.text.onAction} />
               </View>
             </View>
           </Pressable>
@@ -155,44 +161,33 @@ export default function DonateScreen() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:    { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
-  sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 4, marginLeft: 4 },
+  pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
+  sectionLabel: { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginBottom: 8, marginTop: 4, marginLeft: 4 },
   hero: {
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
-    padding: 22,
+    borderRadius: 24,
+    overflow: 'hidden',
+    padding: 24,
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
   },
   heroIconWrap: {
     width: 60,
     height: 60,
-    borderRadius: Atlas.radius.xlarge,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
   },
-  heroTitle:    { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4, marginBottom: 8, textAlign: 'center' },
-  heroSub:      { fontSize: 14, lineHeight: 20, textAlign: 'center', fontWeight: '400' },
+  heroTitle:    { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.4, marginBottom: 8, textAlign: 'center' },
+  heroSub:      { fontSize: 14, lineHeight: 20, textAlign: 'center', fontFamily: fontFamily.regular },
   card: {
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
+    borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
   },
-  cardContent:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, gap: 14 },
-  iconWrap:     { width: 48, height: 48, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
-  cardTitle:    { fontSize: 17, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 },
-  cardSub:      { fontSize: 12, marginTop: 3, fontWeight: '400' },
-  actionBtn:    { width: 36, height: 36, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  thankYou:     { textAlign: 'center', fontSize: 13, marginTop: 28, fontWeight: '500' },
+  cardContent:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 20, gap: 14 },
+  iconWrap:     { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  cardTitle:    { fontSize: 17, fontFamily: fontFamily.semibold, letterSpacing: -0.3 },
+  cardSub:      { fontSize: 12, marginTop: 3, fontFamily: fontFamily.regular },
+  actionBtn:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  thankYou:     { textAlign: 'center', fontSize: 13, marginTop: 28, fontFamily: fontFamily.medium },
 });

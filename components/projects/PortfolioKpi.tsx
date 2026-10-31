@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/projects/PortfolioKpi.tsx — дашборд портфеля над списком проєктів
  * (docs/specs/projects-analytics.md §8.3).
@@ -22,12 +21,16 @@ import { CHART_WEEKS } from '@/utils/projectCharts';
 import type { PortfolioKpi as PortfolioKpiData } from '@/utils/projectStatsMetrics';
 
 import { Footnotes, WeekBars, type AnalyticsPalette } from './ProjectAnalytics';
+import { fontFamily, radius, theme, type } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
+import { glassOf, glassRim, dsTheme } from '@/components/shared/dsTheme';
+import { AccentDot } from '@/components/shared/GlassBits';
 
 /** Локальний ключ згортання. Не синкається й не бекапиться — це вибір пристрою. */
 export const PORTFOLIO_COLLAPSED_KEY = 'projects_portfolio_collapsed';
 
-const DONE_COLOR = '#10B981';
-const OVERDUE_COLOR = '#EF4444';
+// DS v2: прострочене — coral-тік. Графік — нейтральні стовпці, поточний тиждень — lime (WeekBars).
+const OVERDUE_COLOR = theme.light.accent.coral;
 const TABLET_MIN_WIDTH = 600;
 
 interface Tile {
@@ -39,6 +42,7 @@ interface Tile {
 
 export function PortfolioKpi({ kpi, palette }: { kpi: PortfolioKpiData; palette: AnalyticsPalette }) {
   const { tr } = useI18n();
+  const { t } = useDS();
   const { width } = useWindowDimensions();
   const tablet = width >= TABLET_MIN_WIDTH;
   const [collapsed, setCollapsed] = useState(false);
@@ -64,7 +68,7 @@ export function PortfolioKpi({ kpi, palette }: { kpi: PortfolioKpiData; palette:
   const tiles: Tile[] = [
     { key: 'projects', value: String(kpi.projects), label: tr.portfolioProjects },
     { key: 'tasks', value: String(kpi.total), label: tr.portfolioTasks },
-    { key: 'done', value: `${kpi.done} / ${kpi.pct}%`, label: tr.projectDone, color: DONE_COLOR },
+    { key: 'done', value: `${kpi.done} / ${kpi.pct}%`, label: tr.projectDone },
     { key: 'inProgress', value: String(kpi.inProgress), label: tr.projectInProgress },
     {
       key: 'overdue', value: String(kpi.overdue), label: tr.projectOverdueTasks,
@@ -86,16 +90,20 @@ export function PortfolioKpi({ kpi, palette }: { kpi: PortfolioKpiData; palette:
       accessibilityLabel={`${tile.value} ${tile.label}`}
       style={[
         st.tile,
-        { borderColor: palette.border, backgroundColor: palette.dim },
+        { backgroundColor: palette.dim, ...glassRim(t, 'subtle') },
         tablet ? { flexBasis: '31%', flexGrow: 1 } : { width: phoneTileWidth },
       ]}>
-      <Text style={[st.tileValue, { color: tile.color ?? palette.text }]} numberOfLines={1}>{tile.value}</Text>
+      {/* KPI — тонкі великі цифри; алерт — coral-тік ліворуч від числа. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {tile.color ? <View style={{ width: 3, height: 22, borderRadius: 2, backgroundColor: tile.color }} /> : null}
+        <Text style={[st.tileValue, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit>{tile.value}</Text>
+      </View>
       <Text style={[st.tileLabel, { color: palette.sub }]} numberOfLines={2}>{tile.label}</Text>
     </View>
   );
 
   return (
-    <View style={[st.wrap, { borderColor: palette.border }]}>
+    <View style={[st.wrap, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
       <TouchableOpacity
         onPress={toggle}
         accessibilityRole="button"
@@ -103,7 +111,10 @@ export function PortfolioKpi({ kpi, palette }: { kpi: PortfolioKpiData; palette:
         accessibilityState={{ expanded: !collapsed }}
         hitSlop={{ top: 8, bottom: 8 }}
         style={st.header}>
-        <Text style={[st.title, { color: palette.text }]}>{tr.portfolioKpi}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+          <AccentDot isDark={t === dsTheme(true)} accent="lavender" />
+          <Text style={[st.title, { color: palette.text }]}>{tr.portfolioKpi}</Text>
+        </View>
         <IconSymbol name={collapsed ? 'chevron.down' : 'chevron.up'} size={14} color={palette.sub} />
       </TouchableOpacity>
 
@@ -115,21 +126,21 @@ export function PortfolioKpi({ kpi, palette }: { kpi: PortfolioKpiData; palette:
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+              contentContainerStyle={{ gap: 12, paddingVertical: 2 }}>
               {tiles.map(renderTile)}
             </ScrollView>
           )}
 
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 16, marginBottom: 8, gap: 8 }}>
             <Text style={[st.chartTitle, { color: palette.sub, flex: 1 }]}>{tr.doneByWeekTitle}</Text>
-            <Text style={{ color: palette.sub, fontSize: 11 }}>
+            <Text style={[type.caption, type.numeric, { color: palette.sub }]}>
               {tr.portfolioWeeksTotal.replace('{n}', String(CHART_WEEKS)).replace('{count}', String(kpi.weekly.total))}
             </Text>
           </View>
           <WeekBars
             weeks={kpi.weekly.weeks}
             months={tr.monthsShort}
-            color={DONE_COLOR}
+            color={glassOf(t).accent.lavender.fill}
             label={tr.doneByWeekTitle}
             palette={palette}
           />
@@ -155,12 +166,12 @@ function formatAverage(value: number): string {
 }
 
 const st = StyleSheet.create({
-  wrap:       { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, marginBottom: 18 },
+  wrap:       { borderRadius: radius.cardCompact, padding: 20, marginBottom: 16 },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, minHeight: 28 },
-  title:      { fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.2 },
-  grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tile:       { borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
-  tileValue:  { fontSize: 20, fontWeight: Atlas.type.headingWeight, fontVariant: ['tabular-nums'] },
-  tileLabel:  { fontSize: 11, marginTop: 2 },
-  chartTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  title:      { fontSize: 16, fontFamily: fontFamily.semibold },
+  grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  tile:       { borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 14 },
+  tileValue:  { flexShrink: 1, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, letterSpacing: -0.64, fontVariant: ['tabular-nums'] },
+  tileLabel:  { fontSize: 12, fontFamily: fontFamily.regular, marginTop: 4 },
+  chartTitle: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.4, textTransform: 'uppercase' },
 });

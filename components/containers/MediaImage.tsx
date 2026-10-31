@@ -46,7 +46,7 @@ export function MediaImage({
     return (
       <View style={[style, { alignItems: 'center', justifyContent: 'center', backgroundColor: placeholderColor }]}
         accessible accessibilityRole="image" accessibilityLabel={pendingLabel}>
-        <IconSymbol name="icloud.slash" size={16} color="rgba(128,128,128,0.9)" />
+        <IconSymbol name="icloud.slash" size={16} color="#A1A1AA" />
       </View>
     );
   }

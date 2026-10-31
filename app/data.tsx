@@ -1,9 +1,6 @@
-import { Atlas } from '@/constants/atlas';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,7 +18,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/shared/ScreenHeader';
 
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import { useAutoBackup } from '@/store/auto-backup';
 import { BACKUP_KEYS } from '@/store/backup-keys';
 import { loadData, notifyStorageChanged, saveData } from '@/store/storage';
@@ -29,6 +27,8 @@ import { SYNC_ARRAY_KEYS, saveSynced } from '@/store/synced-storage';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { localDateKey } from '@/utils/dateUtils';
+import { glassStyles } from '@/components/finance/finPalette';
+import { GlassSurface, MeshBackground } from '@/components/ds';
 
 const ALL_KEYS = [
   { key: 'tasks',             label: 'Завдання',    icon: 'checklist',          color: '#7C3AED' },
@@ -126,7 +126,7 @@ type Counts = Record<string, number>;
 export default function DataScreen() {
   const { tr } = useI18n();
   const contentWidth = useContentWidth();
-  const isDark = useColorScheme() === 'dark';
+  const { t, g, isDark, reduceTransparency } = useDS();
   const router = useRouter();
   const { triggerBackup, getLastBackupTime, getLastBackupUri, isAutoBackupEnabled, setAutoBackupEnabled } = useAutoBackup();
 
@@ -140,15 +140,22 @@ export default function DataScreen() {
   const [importing, setImporting] = useState(false);
   // Палітра — у useMemo: рядки статистики під React.memo інакше
   // перемальовувалися б через новий об'єкт кольорів на кожен рендер.
+  // DS v2: токени теми замість фіолетової палітри екрана.
+  // DS v2.1: mesh-основа, скляні картки (gl), акцент — lavender (ink/tint).
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: '#7C3AED',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  }), [isDark]);
+    bg1:    g.mesh.base,
+    bg2:    g.mesh.base,
+    card:   reduceTransparency ? g.solid.card : g.surface,
+    border: t.border.hairline,
+    text:   t.text.primary,
+    sub:    t.text.secondary,
+    accent: g.accent.lavender.ink,
+    accentTint: g.accent.lavender.tint,
+    dim:    g.surfaceSubtle,
+    danger: t.status.danger,
+    cardShadow: g.shadow,
+    gl:     glassStyles(isDark, reduceTransparency),
+  }), [t, g, isDark, reduceTransparency]);
 
   const loadCounts = useCallback(async () => {
     const results = await Promise.all(ALL_KEYS.map(k => loadData<any[]>(k.key, [])));
@@ -412,7 +419,7 @@ export default function DataScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
       <SafeAreaView style={{ flex: 1 }} edges={[]}>
@@ -428,7 +435,7 @@ export default function DataScreen() {
             onPress: () => router.back(),
             label: tr.back,
             color: c.sub,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { ...c.gl.card, borderColor: 'transparent' },
           }}
           crumbs={[
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
@@ -441,40 +448,40 @@ export default function DataScreen() {
 
           {/* ─── Auto-backup ─── */}
           <Text style={[st.sectionLabel, { color: c.sub }]}>АВТО-РЕЗЕРВУВАННЯ</Text>
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, marginBottom: 24 }]}>
-            <View style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-              <View style={[st.iconBox, { backgroundColor: '#6366F120' }]}>
-                <IconSymbol name="clock.arrow.2.circlepath" size={17} color="#6366F1" />
+          <GlassSurface radius={radius.cardCompact} style={[st.card, { marginBottom: 24 }]}>
+            <View style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
+              <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
+                <IconSymbol name="clock.arrow.2.circlepath" size={17} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>Авто-резервування</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>Авто-резервування</Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Кожні 3 години поки додаток активний</Text>
               </View>
               <Switch
                 value={autoBackup}
                 onValueChange={handleAutoBackupToggle}
-                trackColor={{ false: 'rgba(128,128,128,0.3)', true: c.accent }}
+                trackColor={{ false: t.border.hairline, true: t.status.success }}
                 thumbColor="#fff"
-                ios_backgroundColor="rgba(128,128,128,0.3)"
+                ios_backgroundColor={t.border.hairline}
               />
             </View>
 
-            <View style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-              <View style={[st.iconBox, { backgroundColor: '#10B98120' }]}>
-                <IconSymbol name="checkmark.shield.fill" size={17} color="#10B981" />
+            <View style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
+              <View style={[st.iconBox, { backgroundColor: t.status.success + '1F' }]}>
+                <IconSymbol name="checkmark.shield.fill" size={17} color={t.status.success} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>Остання копія</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>Остання копія</Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{formatBackupTime(lastBackup)}</Text>
               </View>
             </View>
 
-            <TouchableOpacity onPress={handleBackupNow} disabled={backingUp} style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-              <View style={[st.iconBox, { backgroundColor: c.accent + '20' }]}>
-                <IconSymbol name="arrow.clockwise" size={17} color={c.accent} />
+            <TouchableOpacity onPress={handleBackupNow} disabled={backingUp} style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
+              <View style={[st.iconBox, { backgroundColor: t.action.primary }]}>
+                <IconSymbol name="arrow.clockwise" size={17} color={t.text.onAction} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: backingUp ? c.sub : c.accent, fontSize: 14, fontWeight: '600' }}>
+                <Text style={{ color: backingUp ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
                   {backingUp ? 'Збереження...' : 'Зробити копію зараз'}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Зберегти у Documents додатку</Text>
@@ -482,12 +489,12 @@ export default function DataScreen() {
               <IconSymbol name="chevron.right" size={16} color={c.sub} />
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={handleOpenLastBackup} disabled={openingBackup} style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-              <View style={[st.iconBox, { backgroundColor: '#10B98120' }]}>
-                <IconSymbol name="folder.badge.magnifyingglass" size={17} color="#10B981" />
+            <TouchableOpacity onPress={handleOpenLastBackup} disabled={openingBackup} style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
+              <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
+                <IconSymbol name="folder.badge.magnifyingglass" size={17} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: openingBackup ? c.sub : c.text, fontSize: 14, fontWeight: '600' }}>
+                <Text style={{ color: openingBackup ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
                   {openingBackup ? 'Відкриття...' : 'Відкрити останню копію'}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Переглянути або поділитись файлом</Text>
@@ -496,84 +503,86 @@ export default function DataScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleRestoreFromBackup} disabled={restoring} style={st.row}>
-              <View style={[st.iconBox, { backgroundColor: '#6366F120' }]}>
-                <IconSymbol name="arrow.triangle.2.circlepath" size={17} color="#6366F1" />
+              <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
+                <IconSymbol name="arrow.triangle.2.circlepath" size={17} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: restoring ? c.sub : '#6366F1', fontSize: 14, fontWeight: '600' }}>
+                <Text style={{ color: restoring ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
                   {restoring ? 'Відновлення...' : 'Відновити з останнього бекапу'}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Замінити поточні дані даними з копії</Text>
               </View>
               <IconSymbol name="chevron.right" size={16} color={c.sub} />
             </TouchableOpacity>
-          </BlurView>
+          </GlassSurface>
 
           {/* ─── Export / Import ─── */}
           <Text style={[st.sectionLabel, { color: c.sub }]}>ВИВАНТАЖЕННЯ ТА ЗАВАНТАЖЕННЯ</Text>
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, marginBottom: 24 }]}>
-            <TouchableOpacity onPress={handleExport} disabled={exporting} style={[st.row, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-              <View style={[st.iconBox, { backgroundColor: '#8B5CF620' }]}>
-                <IconSymbol name="square.and.arrow.up" size={17} color="#8B5CF6" />
+          <GlassSurface radius={radius.cardCompact} style={[st.card, { marginBottom: 24 }]}>
+            <TouchableOpacity onPress={handleExport} disabled={exporting} style={[st.row, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
+              <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
+                <IconSymbol name="square.and.arrow.up" size={17} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: exporting ? c.sub : c.text, fontSize: 14, fontWeight: '600' }}>
+                <Text style={{ color: exporting ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
                   {exporting ? 'Підготовка...' : 'Вивантажити дані'}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Зберегти JSON-файл на телефон</Text>
               </View>
-              <View style={[st.actionBadge, { backgroundColor: '#8B5CF620' }]}>
-                <Text style={{ color: '#8B5CF6', fontSize: 11, fontWeight: '700' }}>JSON</Text>
+              <View style={[st.actionBadge, { backgroundColor: c.dim }]}>
+                <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>JSON</Text>
               </View>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleImport} disabled={importing} style={st.row}>
-              <View style={[st.iconBox, { backgroundColor: '#0EA5E920' }]}>
-                <IconSymbol name="square.and.arrow.down" size={17} color="#0EA5E9" />
+              <View style={[st.iconBox, { backgroundColor: c.accentTint }]}>
+                <IconSymbol name="square.and.arrow.down" size={17} color={c.accent} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: importing ? c.sub : c.text, fontSize: 14, fontWeight: '600' }}>
+                <Text style={{ color: importing ? c.sub : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
                   {importing ? 'Завантаження...' : 'Завантажити дані'}
                 </Text>
                 <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Вибрати JSON-файл з телефону</Text>
               </View>
-              <View style={[st.actionBadge, { backgroundColor: '#0EA5E920' }]}>
-                <Text style={{ color: '#0EA5E9', fontSize: 11, fontWeight: '700' }}>JSON</Text>
+              <View style={[st.actionBadge, { backgroundColor: c.dim }]}>
+                <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>JSON</Text>
               </View>
             </TouchableOpacity>
-          </BlurView>
+          </GlassSurface>
 
           {/* ─── Danger ─── */}
           <Text style={[st.sectionLabel, { color: c.sub }]}>НЕБЕЗПЕЧНА ЗОНА</Text>
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: '#EF444430' }]}>
-            <View style={[st.dangerHint, { backgroundColor: '#EF444410', borderColor: '#EF444430' }]}>
-              <IconSymbol name="exclamationmark.triangle.fill" size={14} color="#EF4444" />
-              <Text style={{ color: '#EF4444', fontSize: 12, marginLeft: 8, flex: 1, lineHeight: 17 }}>
+          <GlassSurface radius={radius.cardCompact} style={st.card}>
+            {/* Небезпечна зона: корал — лише гліфами й тлом-тінтом; текст лишається читабельним (4.5:1). */}
+            <View style={[st.dangerHint, { backgroundColor: c.danger + '12' }]}>
+              <IconSymbol name="exclamationmark.triangle.fill" size={14} color={t.accent.coral} />
+              <Text style={{ ...dsType.caption, color: c.text, marginLeft: 8, flex: 1, lineHeight: 17 }}>
                 Після очищення відновлення даних неможливе. Спочатку зробіть вивантаження.
               </Text>
             </View>
             <TouchableOpacity onPress={handleClear} style={[st.row, { paddingTop: 12 }]}>
-              <View style={[st.iconBox, { backgroundColor: '#EF444420' }]}>
-                <IconSymbol name="trash.fill" size={17} color="#EF4444" />
+              <View style={[st.iconBox, { backgroundColor: c.danger + '1F' }]}>
+                <IconSymbol name="trash.fill" size={17} color={c.danger} />
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: '#EF4444', fontSize: 14, fontWeight: '600' }}>Очистити всі дані</Text>
-                <Text style={{ color: '#EF444480', fontSize: 12, marginTop: 2 }}>Видалити всі записи без можливості відновлення</Text>
+                <Text style={{ color: c.danger, fontSize: 14, fontFamily: fontFamily.semibold }}>Очистити всі дані</Text>
+                <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>Видалити всі записи без можливості відновлення</Text>
               </View>
-              <IconSymbol name="chevron.right" size={16} color="#EF444460" />
+              <IconSymbol name="chevron.right" size={16} color={c.sub} />
             </TouchableOpacity>
-          </BlurView>
+          </GlassSurface>
 
           {/* ─── Stats compact ─── */}
           <Text style={[st.sectionLabel, { color: c.sub, marginTop: 24 }]}>СТАТИСТИКА ДАНИХ</Text>
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, marginBottom: 24 }]}>
+          <GlassSurface radius={radius.cardCompact} style={[st.card, { marginBottom: 24 }]}>
             {/* Total */}
-            <View style={[st.statRow, { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-              <View style={[st.statDot, { backgroundColor: c.accent + '20' }]}>
-                <IconSymbol name="externaldrive.fill" size={13} color={c.accent} />
+            <View style={[st.statRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
+              <View style={[st.statDot, { backgroundColor: c.dim }]}>
+                <IconSymbol name="externaldrive.fill" size={13} color={c.text} />
               </View>
               <Text style={[st.statLabel, { color: c.text }]}>Всього записів</Text>
-              <Text style={[st.statVal, { color: c.accent }]}>{totalItems}</Text>
+              {/* Лічильник — display-цифри DS. */}
+              <Text style={{ ...dsType.displaySm, fontSize: 32, lineHeight: 36, color: c.text }}>{totalItems}</Text>
             </View>
             {ALL_KEYS.map((item, i) => (
               <StatRow
@@ -588,7 +597,7 @@ export default function DataScreen() {
                 last={i === ALL_KEYS.length - 1}
               />
             ))}
-          </BlurView>
+          </GlassSurface>
         </ScrollView>
       </SafeAreaView>
 
@@ -612,9 +621,10 @@ interface StatRowProps {
 const StatRow = React.memo(function StatRow(
   { icon, color, label, value, text, sub, border, last }: StatRowProps,
 ) {
+  // DS v2: нейтральні гліфи на subtle-плашці; колір модуля — тонкою крапкою.
   return (
-    <View style={[st.statRow, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
-      <View style={[st.statDot, { backgroundColor: color + '20' }]}>
+    <View style={[st.statRow, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
+      <View style={[st.statDot, { backgroundColor: color + '1F' }]}>
         <IconSymbol name={icon} size={13} color={color} />
       </View>
       <Text style={[st.statLabel, { color: sub }]}>{label}</Text>
@@ -624,14 +634,14 @@ const StatRow = React.memo(function StatRow(
 });
 
 const st = StyleSheet.create({
-  sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10, marginLeft: 2 },
-  card:        { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', marginBottom: 0 },
-  statRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
-  statDot:     { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  statLabel:   { flex: 1, fontSize: 13, fontWeight: '500' },
-  statVal:     { fontSize: 14, fontWeight: '700', minWidth: 24, textAlign: 'right' },
-  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13 },
-  iconBox:     { width: 36, height: 36, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  actionBadge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
-  dangerHint:  { flexDirection: 'row', alignItems: 'flex-start', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 12, margin: 14, marginBottom: 0 },
+  sectionLabel:{ fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 10, marginLeft: 4 },
+  card:        { borderRadius: radius.cardCompact, overflow: 'hidden', marginBottom: 0 },
+  statRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 10, minHeight: 44 },
+  statDot:     { width: 28, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  statLabel:   { flex: 1, fontSize: 14, fontFamily: fontFamily.regular },
+  statVal:     { fontSize: 14, fontFamily: fontFamily.semibold, minWidth: 24, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, minHeight: 56 },
+  iconBox:     { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  actionBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  dangerHint:  { flexDirection: 'row', alignItems: 'flex-start', borderRadius: radius.nestedCompact, padding: 12, margin: space[4], marginBottom: 0 },
 });

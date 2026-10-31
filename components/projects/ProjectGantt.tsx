@@ -3,6 +3,7 @@ import { PanResponder, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/store/i18n';
 import type { GanttChart, GanttRow } from '@/utils/projectCharts';
+import { fontFamily } from '@/constants/theme';
 
 /**
  * Ширина колонки з назвами. Вона НЕ їде разом зі шкалою.
@@ -417,9 +418,9 @@ function barLabel(row: GanttRow, locale: string, tr: ReturnType<typeof useI18n>[
 const st = StyleSheet.create({
   legend:     { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 14, rowGap: 5 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendText: { fontSize: 10, fontWeight: '600', flexShrink: 1 },
-  axis:       { position: 'absolute', top: 4, fontSize: 9, fontWeight: '600' },
-  note:       { fontSize: 11, lineHeight: 15 },
+  legendText: { fontSize: 11, fontFamily: fontFamily.medium, flexShrink: 1 },
+  axis:       { position: 'absolute', top: 4, fontSize: 10, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
+  note:       { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },
   // Позиція абсолютна відносно смуги (яка сама absolute, overflow: 'visible')
   // — ширина/висота більша за 10pt-смугу навмисно, це тач-таргет, не вигляд.
   edgeHandle: { position: 'absolute', top: -8, bottom: -8, width: 20 },

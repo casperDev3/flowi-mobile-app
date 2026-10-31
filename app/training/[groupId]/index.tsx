@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/training/[groupId]/index.tsx — огляд групи (training-module.md §10.1):
  * сьогоднішня сесія великою карткою, тиждень стрічкою, стрік і XP, топ-3
@@ -32,6 +31,7 @@ import {
   weekDays,
 } from '@/utils/trainingSessions';
 import type { LeaderboardRow, Quest, QuestProgress, TrainingSession } from '@/utils/trainingTypes';
+import { fontFamily } from '@/constants/theme';
 
 export default function TrainingGroupHome() {
   const { groupId = '' } = useLocalSearchParams<{ groupId: string }>();
@@ -121,11 +121,11 @@ export default function TrainingGroupHome() {
           accessibilityRole="button"
           accessibilityLabel={t.label}
           style={{
-            flexGrow: 1, flexBasis: '45%', minHeight: 52, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border,
-            backgroundColor: c.card, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14,
+            flexGrow: 1, flexBasis: '45%', minHeight: 56, borderRadius: 16,
+            ...c.gl.card, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16,
           }}>
           <IconSymbol name={t.icon} size={18} color={TG_ACCENT} />
-          <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{t.label}</Text>
+          <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{t.label}</Text>
         </TouchableOpacity>
       ))}
     </View>

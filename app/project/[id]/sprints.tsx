@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/sprints.tsx — Спринти простору проєкту.
  *
@@ -53,9 +52,12 @@ import {
   type Sprint, type SprintDatesError, type SprintSort, type SprintStatusFilter,
 } from '@/utils/sprintUtils';
 import { isSprintOverdue, sprintBurndown, velocityWindow } from '@/utils/projectStatsMetrics';
+import { fontFamily, radius, theme, type } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 /** Протермінований спринт — бурштиновий: червоний зайнятий простроченими задачами. */
-const SPRINT_OVERDUE_COLOR = '#F59E0B';
+const SPRINT_OVERDUE_COLOR = theme.light.accent.amber;
 const TABLET_MIN_WIDTH = 600;
 
 /**
@@ -91,6 +93,7 @@ export default function ProjectSprintsScreen() {
   // Contract §4.1: спринти — командний CRUD (owner/member), глядач лише читає.
   const canEdit = useProjectRole(projectId) !== 'viewer';
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
+  const tk = dsTokens(isDark);
 
   const { items: allSprints, setItems: setSprints, reload: reloadSprints } = useSyncedList<Sprint>('sprints', { enabled: true });
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -237,7 +240,7 @@ export default function ProjectSprintsScreen() {
   const shortDate = (iso: string | undefined) =>
     iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
 
-  const inputStyle = { borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 8, color: c.text } as const;
+  const inputStyle = { borderRadius: radius.control, backgroundColor: glassOf(tk).surfaceSubtle, minHeight: 44, paddingHorizontal: 14, paddingVertical: 8, color: c.text, fontFamily: fontFamily.regular } as const;
 
   /** Спільна форма: назва + дати «з»/«по» + помилка/попередження. */
   const renderDraftForm = (submitLabel: string) => (
@@ -249,7 +252,7 @@ export default function ProjectSprintsScreen() {
         onSubmitEditing={saveDraft}
         placeholder={tr.sprintNamePlaceholder}
         accessibilityLabel={tr.sprintNamePlaceholder}
-        placeholderTextColor={c.sub}
+        placeholderTextColor={tk.text.muted}
         style={inputStyle}
       />
       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -258,7 +261,7 @@ export default function ProjectSprintsScreen() {
           onChangeText={text => { setDraftStart(text); setDraftError(null); }}
           placeholder={tr.sprintStartDate}
           accessibilityLabel={tr.sprintStartDate}
-          placeholderTextColor={c.sub}
+          placeholderTextColor={tk.text.muted}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="numbers-and-punctuation"
@@ -269,7 +272,7 @@ export default function ProjectSprintsScreen() {
           onChangeText={text => { setDraftEnd(text); setDraftError(null); }}
           placeholder={tr.sprintEndDate}
           accessibilityLabel={tr.sprintEndDate}
-          placeholderTextColor={c.sub}
+          placeholderTextColor={tk.text.muted}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="numbers-and-punctuation"
@@ -277,9 +280,9 @@ export default function ProjectSprintsScreen() {
         />
       </View>
       {draftError ? (
-        <Text accessibilityRole="alert" style={{ color: '#EF4444', fontSize: 12 }}>{dateErrorText(draftError)}</Text>
+        <Text accessibilityRole="alert" style={{ color: tk.status.danger, fontSize: 12, fontFamily: fontFamily.medium }}>{dateErrorText(draftError)}</Text>
       ) : draftOverlap.length ? (
-        <Text style={{ color: SPRINT_OVERDUE_COLOR, fontSize: 12 }}>
+        <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.medium }}>
           {tr.sprintDatesOverlap.replace('{names}', draftOverlap.map(s => s.name).join(', '))}
         </Text>
       ) : (
@@ -360,7 +363,7 @@ export default function ProjectSprintsScreen() {
       <View
         key={sprint.id}
         onLayout={e => onRowLayout(sprint.id, e.nativeEvent.layout.y)}
-        style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 12, marginBottom: 10 }}>
+        style={{ borderRadius: radius.cardCompact, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 16, marginBottom: 12 }}>
         {/* Звичайний View, а не TouchableOpacity: пенал/закриття — окремі
             дотикові цілі, і вкладені TouchableOpacity в RN ненадійно
             передають дотик у дочірні — рядок і кнопки мають бути сиблінгами. */}
@@ -373,8 +376,9 @@ export default function ProjectSprintsScreen() {
             style={{ flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <IconSymbol name={open ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
             <IconSymbol name={closed ? 'checkmark.circle' : 'flag'} size={14} color={closed ? c.sub : (project?.color ?? c.accent)} />
-            <Text numberOfLines={1} style={{ flex: 1, color: closed ? c.sub : c.text, fontSize: 14, fontWeight: '700' }}>{sprint.name}</Text>
-            <Text style={{ color: c.sub, fontSize: 11 }}>{progress.done}/{progress.total}</Text>
+            <Text numberOfLines={1} style={[type.h2, { flex: 1, color: closed ? c.sub : c.text }]}>{sprint.name}</Text>
+            {/* Лічильник — тонкі табличні цифри (DS v2). */}
+            <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.light, letterSpacing: -0.4, fontVariant: ['tabular-nums'] }}>{progress.done}<Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular }}>/{progress.total}</Text></Text>
           </TouchableOpacity>
           {/* Дії рядка — однакові 44×44 IconAction (без hitSlop-латок). */}
           {canEdit && !archived && (
@@ -402,21 +406,22 @@ export default function ProjectSprintsScreen() {
         {/* Підпис дат: «12 вер – 26 вер» або «без дат»; протермінований —
             бурштинова мітка. Спринт лишається відкритим: автозакриття немає. */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 4, marginLeft: 20 }}>
-          <Text style={{ color: c.sub, fontSize: 11 }}>
+          <Text style={[type.caption, type.numeric, { color: c.sub }]}>
             {dated ? `${shortDate(sprint.startDate)} – ${shortDate(sprint.endDate)}` : tr.sprintUndated}
           </Text>
           {archived ? (
-            <View style={{ borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: c.border, paddingHorizontal: 6, paddingVertical: 1 }}>
-              <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700' }}>{tr.sprintArchivedBadge}</Text>
+            <View style={{ borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium }}>{tr.sprintArchivedBadge}</Text>
             </View>
           ) : sprintStatus(sprint, now) === 'planned' ? (
-            <View style={{ borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: c.accent + '66', paddingHorizontal: 6, paddingVertical: 1 }}>
-              <Text style={{ color: c.accent, fontSize: 10, fontWeight: '700' }}>{tr.sprintStatusPlanned}</Text>
+            <View style={{ borderRadius: radius.pill, backgroundColor: tk.accent.lavenderSoft, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.medium }}>{tr.sprintStatusPlanned}</Text>
             </View>
           ) : null}
           {overdue ? (
-            <View style={{ borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: SPRINT_OVERDUE_COLOR, paddingHorizontal: 6, paddingVertical: 1 }}>
-              <Text style={{ color: SPRINT_OVERDUE_COLOR, fontSize: 10, fontWeight: '700' }}>{tr.sprintOverdue}</Text>
+            // DS v2: протермінований — amber-бейдж із темним текстом.
+            <View style={{ borderRadius: radius.pill, backgroundColor: SPRINT_OVERDUE_COLOR, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <Text style={{ color: tk.text.onAccent, fontSize: 11, fontFamily: fontFamily.semibold }}>{tr.sprintOverdue}</Text>
             </View>
           ) : null}
           {!closed && dated ? (
@@ -427,20 +432,20 @@ export default function ProjectSprintsScreen() {
               accessibilityState={{ expanded: showBurndown }}
               hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <IconSymbol name={showBurndown ? 'chevron.up' : 'chevron.down'} size={10} color={c.accent} />
-              <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>{tr.burndownTitle}</Text>
+              <IconSymbol name={showBurndown ? 'chevron.up' : 'chevron.down'} size={10} color={c.text} />
+              <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.burndownTitle}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
         {progress.total > 0 ? (
-          <View style={{ height: 4, borderRadius: 2, backgroundColor: c.border, marginTop: 8, marginLeft: 20, overflow: 'hidden' }}>
-            <View style={{ width: `${Math.round((progress.done / progress.total) * 100)}%`, height: 4, backgroundColor: closed ? c.sub : (project?.color ?? c.accent) }} />
+          <View style={{ height: 6, borderRadius: radius.pill, backgroundColor: glassOf(tk).surfaceSubtle, marginTop: 10, marginLeft: 20, overflow: 'hidden' }}>
+            <View style={{ width: `${Math.round((progress.done / progress.total) * 100)}%`, height: 6, borderRadius: radius.pill, backgroundColor: closed ? c.sub : tk.accent.amber }} />
           </View>
         ) : null}
 
         {burndown ? (
-          <SprintBurndown burndown={burndown} color={project?.color ?? c.accent} palette={{ text: c.text, sub: c.sub, border: c.border }} />
+          <SprintBurndown burndown={burndown} color={tk.accent.amber} palette={{ text: c.text, sub: c.sub, border: c.border }} />
         ) : null}
 
         {draft?.sprint?.id === sprint.id && (
@@ -451,16 +456,16 @@ export default function ProjectSprintsScreen() {
 
         {closing?.id === sprint.id && (
           <View style={{ marginTop: 10, gap: 6 }}>
-            <Text style={{ color: c.sub, fontSize: 12 }}>{tr.sprintMoveHint}</Text>
+            <Text style={[type.caption, { color: c.sub }]}>{tr.sprintMoveHint}</Text>
             {sprintMoveTargets(projectSprints, sprint).map(target => (
               <TouchableOpacity key={target.id} onPress={() => closeSprint(sprint, target)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
-                <IconSymbol name="flag" size={13} color={c.accent} />
-                <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{target.name}</Text>
+                <IconSymbol name="flag" size={13} color={c.sub} />
+                <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{target.name}</Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity onPress={() => closeSprint(sprint, null)} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
               <IconSymbol name="tray" size={13} color={c.sub} />
-              <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{tr.sprintMoveToBacklog}</Text>
+              <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.sprintMoveToBacklog}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -469,10 +474,10 @@ export default function ProjectSprintsScreen() {
           <View style={{ marginTop: 10, gap: 6 }}>
             {!closed && !dated ? (
               // Відкритий недатований — явним рядком, чому немає burndown (§3.3).
-              <Text style={{ color: c.sub, fontSize: 11, opacity: 0.8 }}>{tr.sprintNotDated}</Text>
+              <Text style={[type.caption, { color: c.sub }]}>{tr.sprintNotDated}</Text>
             ) : null}
             {own.length === 0 ? (
-              <Text style={{ color: c.sub, fontSize: 12, opacity: 0.7 }}>{tr.sprintEmpty}</Text>
+              <Text style={[type.caption, { color: c.sub }]}>{tr.sprintEmpty}</Text>
             ) : own.map(task => (
               <TouchableOpacity
                 key={task.id}
@@ -480,8 +485,8 @@ export default function ProjectSprintsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={task.title}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: task.status === 'done' ? '#10B981' : c.sub }} />
-                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }}>{task.title}</Text>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: task.status === 'done' ? tk.status.success : c.sub }} />
+                <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.regular, textDecorationLine: task.status === 'done' ? 'line-through' : 'none' }}>{task.title}</Text>
               </TouchableOpacity>
             ))}
             {!closed && canEdit && (
@@ -494,10 +499,10 @@ export default function ProjectSprintsScreen() {
                     onSubmitEditing={() => addTask(sprint)}
                     placeholder={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
                     accessibilityLabel={tr.sprintAddTaskIn.replace('{name}', sprint.name)}
-                    placeholderTextColor={c.sub}
-                    style={{ flex: 1, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 7, color: c.text, fontSize: 13 }}
+                    placeholderTextColor={tk.text.muted}
+                    style={{ flex: 1, borderRadius: radius.control, backgroundColor: glassOf(tk).surfaceSubtle, minHeight: 44, paddingHorizontal: 14, paddingVertical: 7, color: c.text, fontSize: 14, fontFamily: fontFamily.regular }}
                   />
-                  <IconAction icon="plus" label={tr.sprintAddTaskA11y} color={c.accent} onPress={() => addTask(sprint)} colors={c} />
+                  <IconAction icon="plus" label={tr.sprintAddTaskA11y} color={c.text} onPress={() => addTask(sprint)} colors={c} />
                 </View>
               ) : (
                 <TouchableOpacity
@@ -506,8 +511,8 @@ export default function ProjectSprintsScreen() {
                   accessibilityLabel={`${tr.sprintAddTaskA11y}: ${sprint.name}`}
                   accessibilityState={{ expanded: false }}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, minHeight: 44 }}>
-                  <IconSymbol name="plus" size={13} color={c.accent} />
-                  <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700' }}>{tr.projectAddTask}</Text>
+                  <IconSymbol name="plus" size={13} color={c.text} />
+                  <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.projectAddTask}</Text>
                 </TouchableOpacity>
               )
             )}
@@ -573,8 +578,8 @@ export default function ProjectSprintsScreen() {
             <HeaderButton
               onPress={openCreate}
               accessibilityLabel={tr.sprintNew}
-              style={{ backgroundColor: c.dim, borderColor: c.border }}>
-              <IconSymbol name="plus" size={17} color={c.accent} />
+              style={{ backgroundColor: tk.action.primary, borderColor: 'transparent' }}>
+              <IconSymbol name="plus" size={17} color={tk.text.onAction} />
             </HeaderButton>
           ) : null}
           <TasksMenuButton onPress={() => setMenuOpen(true)} label={tr.sprintListMenu} active={filtersActive} colors={c} />
@@ -589,7 +594,7 @@ export default function ProjectSprintsScreen() {
         // виглядає мертвою.
         keyboardShouldPersistTaps="handled">
         {draft && !draft.sprint && (
-          <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.accent, backgroundColor: c.dim, padding: 12, marginBottom: 12, gap: 8 }}>
+          <View style={{ borderRadius: radius.cardCompact, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 16, marginBottom: 12, gap: 8 }}>
             {renderDraftForm(tr.create)}
           </View>
         )}

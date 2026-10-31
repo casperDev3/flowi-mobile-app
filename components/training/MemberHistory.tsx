@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/training/MemberHistory.tsx — історія виконання учасника для
  * тренера (training-module.md §0.5, §10.1): сесії, вправи, підходи, вага,
@@ -26,7 +25,8 @@ import type { MemberProgressResponse, Quest, WorkoutLog } from '@/utils/training
 import type { GroupStream } from './hooks';
 import { formatSessionDate, statusColor, statusLabel } from './SessionCards';
 import { Avatar, Card, Notice, PrimaryButton, SectionTitle } from './TrainingBits';
-import { fmt, TG_ACCENT, TG_XP, type TrainingColors } from './theme';
+import { fmt, TG_ACCENT, type TrainingColors } from './theme';
+import { fontFamily } from '@/constants/theme';
 
 function LogCard({ c, localId, log, onSaveNote, canNote }: {
   c: TrainingColors;
@@ -43,17 +43,17 @@ function LogCard({ c, localId, log, onSaveNote, canNote }: {
     <Card c={c} style={{ marginBottom: 10 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{log.title || formatSessionDate(tr, log.date)}</Text>
+          <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{log.title || formatSessionDate(tr, log.date)}</Text>
           <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
             {[formatSessionDate(tr, log.date), log.durationMin ? fmt(tr.tgMinutesShort, { n: log.durationMin }) : null,
               log.totalVolumeG ? fmt(tr.tgVolume, { kg: formatKg(log.totalVolumeG) }) : null].filter(Boolean).join(' · ')}
           </Text>
         </View>
-        <Text style={{ color: statusColor(log.status, c), fontWeight: Atlas.type.headingWeight }}>{statusLabel(tr, log.status)}</Text>
+        <Text style={{ color: statusColor(log.status, c), fontFamily: fontFamily.semibold }}>{statusLabel(tr, log.status)}</Text>
       </View>
       {(log.exercises ?? []).map(ex => (
         <View key={ex.exerciseId + ex.name} style={{ marginTop: 8 }}>
-          <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{ex.name}</Text>
+          <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>{ex.name}</Text>
           <Text style={{ color: c.sub, fontSize: 13 }}>
             {ex.sets.map(s => `${s.done ? '' : '✕ '}${s.reps}×${formatKg(s.weightG)}${s.rpe ? `@${s.rpe}` : ''}`).join('  ·  ')}
           </Text>
@@ -72,7 +72,7 @@ function LogCard({ c, localId, log, onSaveNote, canNote }: {
             accessibilityLabel={tr.tgCoachNote}
             multiline
             maxLength={2000}
-            style={{ minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.input, color: c.text, padding: 10, fontSize: 14 }}
+            style={{ minHeight: 44, borderRadius: 12, backgroundColor: c.input, color: c.text, padding: 10, fontSize: 14 }}
           />
           {changed ? (
             <PrimaryButton
@@ -142,11 +142,11 @@ export function MemberHistory({ c, groupId, userId, stream, canNote }: {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Avatar name={member.user.name || member.user.email} size={44} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight }}>{member.user.name || member.user.email}</Text>
+              <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold }}>{member.user.name || member.user.email}</Text>
               <Text style={{ color: c.sub, fontSize: 13 }}>{member.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ color: TG_XP, fontSize: 16, fontWeight: Atlas.type.headingWeight }}>{`${member.xp_total || xpTotal} XP`}</Text>
+              <Text style={{ color: c.text, fontSize: 28, fontFamily: fontFamily.light, letterSpacing: -0.56, fontVariant: ['tabular-nums'] }}>{`${member.xp_total || xpTotal} XP`}</Text>
               <Text style={{ color: c.sub, fontSize: 13 }}>{`🔥 ${fmt(tr.tgStreakDays, { n: member.streak_days })}`}</Text>
             </View>
           </View>
@@ -160,7 +160,7 @@ export function MemberHistory({ c, groupId, userId, stream, canNote }: {
             {data.quest_progress.map(({ local_id, data: p }) => (
               <View key={local_id} style={{ flexDirection: 'row', justifyContent: 'space-between', minHeight: 36, alignItems: 'center' }}>
                 <Text style={{ color: c.text, fontSize: 14, flex: 1 }} numberOfLines={1}>{questTitle(p.questId)}</Text>
-                <Text style={{ color: p.completed ? '#10B981' : c.sub, fontSize: 13, fontWeight: '700' }}>
+                <Text style={{ color: p.completed ? c.t.status.success : c.sub, fontSize: 13, fontFamily: fontFamily.bold }}>
                   {p.completed ? tr.tgStatusCompleted
                     : p.targetValue != null ? `${formatMetricValue(p.currentValue)} / ${formatMetricValue(p.targetValue)} ${p.unit ?? ''}` : '—'}
                 </Text>

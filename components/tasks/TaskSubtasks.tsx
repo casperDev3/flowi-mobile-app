@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskSubtasks.tsx
  *
@@ -13,6 +12,9 @@ import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export interface Subtask {
   id: string;
@@ -54,8 +56,9 @@ export function TaskSubtasks({
   onToggle, onCopy, onShowActions, onOpenAll, newText, onChangeNewText, onAdd, onFocusInput,
   colors: c, isDark, tr,
 }: TaskSubtasksProps) {
+  const t = dsTokens(isDark);
   return (
-    <View style={{ marginTop: 14, borderRadius: Atlas.radius.large, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderWidth: 1, borderColor: c.border, padding: 12 }}>
+    <View style={{ marginTop: 14, borderRadius: radius.nested, backgroundColor: glassOf(t).surfaceSubtle, padding: 16 }}>
 
     {task.subtasks.length > 0 && (
       <View style={{ marginBottom: 10 }}>
@@ -64,10 +67,10 @@ export function TaskSubtasks({
           <Text style={[st.label, { color: c.sub, marginLeft: 5, marginTop: 0, marginBottom: 0, flex: 1 }]}>
             {tr.subtasks} · {task.subtasks.filter(x => x.done).length}/{task.subtasks.length}
           </Text>
-          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{progressPercent}%</Text>
+          <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{progressPercent}%</Text>
         </View>
-        <View style={st.progressBg}>
-          <View style={[st.progressFill, { width: `${progressPercent}%`, backgroundColor: task.status === 'done' ? '#10B981' : c.accent }]} />
+        <View style={[st.progressBg, { backgroundColor: glassOf(t).surface }]}>
+          <View style={[st.progressFill, { width: `${progressPercent}%`, backgroundColor: task.status === 'done' ? t.status.success : t.accent.amber }]} />
         </View>
       </View>
     )}
@@ -91,8 +94,8 @@ export function TaskSubtasks({
             const originalIdx = task.subtasks.findIndex(item => item.id === sub.id);
             if (editingId === sub.id) {
               return (
-                <View key={sub.id} style={[st.subRow, { backgroundColor: c.dim, borderColor: c.accent + '80' }]}>
-                  <View style={[st.subCheck, { borderColor: c.accent, backgroundColor: 'transparent' }]} />
+                <View key={sub.id} style={[st.subRow, { backgroundColor: glassOf(t).surface, borderColor: t.focus.ring }]}>
+                  <View style={[st.subCheck, { borderColor: c.sub, backgroundColor: 'transparent' }]} />
                   <TextInput
                     value={editingText}
                     onChangeText={onChangeEditingText}
@@ -102,7 +105,7 @@ export function TaskSubtasks({
                     style={[st.subTitle, { color: c.text, flex: 1, marginHorizontal: 10 }]}
                   />
                   <TouchableOpacity onPress={() => onSaveEdit(sub.id, editingText)}>
-                    <IconSymbol name="checkmark.circle.fill" size={20} color={c.accent} />
+                    <IconSymbol name="checkmark.circle.fill" size={20} color={c.text} />
                   </TouchableOpacity>
                 </View>
               );
@@ -114,9 +117,9 @@ export function TaskSubtasks({
                 onPress={() => onToggle(sub.id)}
                 onLongPress={() => onShowActions(sub, originalIdx)}
                 delayLongPress={350}
-                style={[st.subRow, { backgroundColor: c.dim, borderColor: sub.done ? '#10B98130' : c.border }]}>
-                <View style={[st.subCheck, { borderColor: sub.done ? '#10B981' : c.border, backgroundColor: sub.done ? '#10B981' : 'transparent' }]}>
-                  {sub.done && <IconSymbol name="checkmark" size={10} color="#fff" />}
+                style={[st.subRow, { backgroundColor: glassOf(t).surface, borderColor: 'transparent' }]}>
+                <View style={[st.subCheck, { borderColor: sub.done ? t.status.success : c.sub, backgroundColor: sub.done ? t.status.success : 'transparent' }]}>
+                  {sub.done && <IconSymbol name="checkmark" size={10} color="#FFFFFF" />}
                 </View>
                 <Text style={[st.subTitle, { color: sub.done ? c.sub : c.text, textDecorationLine: sub.done ? 'line-through' : 'none', flex: 1, marginHorizontal: 10 }]}>{sub.title}</Text>
                 <TouchableOpacity
@@ -137,20 +140,20 @@ export function TaskSubtasks({
           {hasMore && (
             <TouchableOpacity
               onPress={onOpenAll}
-              style={[st.viewAllBtn, { backgroundColor: c.accent + '12', borderColor: c.accent + '40' }]}>
-              <IconSymbol name="list.bullet" size={14} color={c.accent} />
-              <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 8 }}>
+              style={[st.viewAllBtn, { backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+              <IconSymbol name="list.bullet" size={14} color={c.text} />
+              <Text style={{ color: t.action.secondaryText, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 8 }}>
                 {tr.viewAllSubtasks} · {task.subtasks.length}
               </Text>
-              <IconSymbol name="chevron.right" size={12} color={c.accent} />
+              <IconSymbol name="chevron.right" size={12} color={c.sub} />
             </TouchableOpacity>
           )}
 
-          <View style={[st.addSubRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+          <View style={[st.addSubRow, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
             <IconSymbol name="plus" size={15} color={c.sub} />
             <TextInput
               placeholder={tr.addSubtask}
-              placeholderTextColor={c.sub}
+              placeholderTextColor={t.text.muted}
               value={newText}
               onChangeText={onChangeNewText}
               onSubmitEditing={() => onAdd()}
@@ -160,7 +163,7 @@ export function TaskSubtasks({
             />
             {newText.trim() ? (
               <TouchableOpacity onPress={() => onAdd()}>
-                <IconSymbol name="checkmark.circle.fill" size={20} color={c.accent} />
+                <IconSymbol name="checkmark.circle.fill" size={20} color={c.text} />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -173,13 +176,13 @@ export function TaskSubtasks({
 }
 
 const st = StyleSheet.create({
-  label:        { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  progressBg:   { height: 3, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 2 },
-  subRow:       { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10 },
-  subCheck:     { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  subTitle:     { fontSize: 13, fontWeight: '500' },
-  subInput:     { fontSize: 13, paddingVertical: 0 },
-  addSubRow:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 10, paddingVertical: 10 },
-  viewAllBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11 },
+  label:        { fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
+  progressBg:   { height: 6, borderRadius: radius.pill, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: radius.pill },
+  subRow:       { flexDirection: 'row', alignItems: 'center', borderRadius: radius.control, borderWidth: 1.5, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10 },
+  subCheck:     { width: 18, height: 18, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  subTitle:     { fontSize: 13, fontFamily: fontFamily.medium },
+  subInput:     { fontSize: 13, fontFamily: fontFamily.regular, paddingVertical: 0 },
+  addSubRow:    { flexDirection: 'row', alignItems: 'center', borderRadius: radius.control, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10 },
+  viewAllBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, minHeight: 44, paddingHorizontal: 16, paddingVertical: 11 },
 });

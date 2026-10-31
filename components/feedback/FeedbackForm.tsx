@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
 /**
  * components/feedback/FeedbackForm.tsx — форма ідеї / бага (§10.2).
  *
@@ -9,11 +10,11 @@ import { Atlas } from '@/constants/atlas';
  * означало б видалити один запис і створити інший, і синк на іншому пристрої
  * побачив би це як зникнення.
  */
-import { BlurView } from 'expo-blur';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
 import type { Translations } from '@/store/translations';
 
 import {
@@ -86,6 +87,8 @@ export function FeedbackForm({
   const [showMissing, setShowMissing] = useState(false);
   const modules = useMemo(() => feedbackModules(), []);
   const accent = KIND_COLOR[draft.kind];
+  // DS v2: аркуш — surface.elevated, поля — subtle без рамки, головна дія — pill action.primary.
+  const t = dsTheme(isDark);
   const missing = missingForSubmit(draft);
   const isBug = draft.kind === 'bug';
 
@@ -133,24 +136,22 @@ export function FeedbackForm({
     onSave(draft, send);
   };
 
-  const inputStyle = [st.input, { color: c.text, backgroundColor: c.dim, borderColor: c.border }];
+  const inputStyle = [st.input, { color: c.text, backgroundColor: glassOf(t).surfaceSubtle, borderColor: 'transparent' }];
   const invalid = (field: 'title' | 'description' | 'steps' | 'expected' | 'actual') =>
-    showMissing && missing.includes(field) ? { borderColor: '#EF4444' } : null;
+    showMissing && missing.includes(field) ? { borderColor: t.status.danger } : null;
 
   const title = isNew
     ? (isBug ? tr.fbNewBug : tr.fbNewIdea)
     : (isBug ? tr.fbEditBug : tr.fbEditIdea);
 
   return (
-    <BlurView
-      intensity={isDark ? 50 : 70}
-      tint={isDark ? 'dark' : 'light'}
-      style={[st.sheet, { maxHeight, borderColor: c.border, backgroundColor: c.sheet }]}>
+    <View
+      style={[st.sheet, { maxHeight, backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={[st.sheetTitle, { color: c.text }]} accessibilityRole="header">{title}</Text>
 
         {isNew ? (
-          <View style={[st.segment, { borderColor: c.border, backgroundColor: c.dim }]} accessibilityRole="tablist">
+          <View style={[st.segment, { backgroundColor: glassOf(t).surfaceSubtle }]} accessibilityRole="tablist">
             {(['idea', 'bug'] as const).map(kind => {
               const active = draft.kind === kind;
               return (
@@ -159,9 +160,9 @@ export function FeedbackForm({
                   onPress={() => switchKind(kind)}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
-                  style={[st.segmentBtn, active && { backgroundColor: KIND_COLOR[kind] }]}>
-                  <IconSymbol name={kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={13} color={active ? '#fff' : c.sub} />
-                  <Text style={{ color: active ? '#fff' : c.sub, fontWeight: '700', fontSize: 13 }}>
+                  style={[st.segmentBtn, active && { backgroundColor: t.action.primary }]}>
+                  <IconSymbol name={kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={13} color={active ? t.text.onAction : c.sub} />
+                  <Text style={{ color: active ? t.text.onAction : c.sub, fontFamily: fontFamily.semibold, fontSize: 13 }}>
                     {kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}
                   </Text>
                 </TouchableOpacity>
@@ -171,13 +172,13 @@ export function FeedbackForm({
         ) : null}
 
         <Text style={[st.label, { color: c.sub }]}>{tr.fbFieldTitle}
-          <Text style={{ color: "#EF4444" }}> *</Text>
+          <Text style={{ color: t.status.danger }}> *</Text>
         </Text>
         <TextInput
           value={draft.title}
           onChangeText={v => set('title', v)}
           placeholder={isBug ? tr.fbTitlePhBug : tr.fbTitlePhIdea}
-          placeholderTextColor={c.sub}
+          placeholderTextColor={t.text.muted}
           maxLength={TITLE_MAX}
           autoFocus={isNew}
           accessibilityLabel={tr.fbFieldTitle}
@@ -194,8 +195,8 @@ export function FeedbackForm({
                 onPress={() => set('module', module)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                style={[st.chip, { borderColor: active ? accent : c.border, backgroundColor: active ? accent + '20' : c.dim }]}>
-                <Text style={{ color: active ? accent : c.sub, fontSize: 12, fontWeight: '600' }}>{moduleLabel(tr, module)}</Text>
+                style={[st.chip, { backgroundColor: active ? t.action.primary : glassOf(t).surfaceSubtle }]}>
+                <Text style={{ color: active ? t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{moduleLabel(tr, module)}</Text>
               </TouchableOpacity>
             );
           })}
@@ -203,7 +204,7 @@ export function FeedbackForm({
 
         <Text style={[st.label, { color: c.sub }]}>
           {tr.fbFieldPlatforms}
-          <Text style={{ fontWeight: '400' }}>{' · ' + tr.fbFieldPlatformsHint}</Text>
+          <Text style={{ fontFamily: fontFamily.regular }}>{' · ' + tr.fbFieldPlatformsHint}</Text>
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {FEEDBACK_PLATFORMS.map((platform) => {
@@ -215,8 +216,8 @@ export function FeedbackForm({
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: active }}
                 accessibilityLabel={`${tr.fbFieldPlatforms}: ${platformLabel(tr, platform)}`}
-                style={[st.chip, { borderColor: active ? accent : c.border, backgroundColor: active ? accent + '20' : c.dim }]}>
-                <Text style={{ color: active ? accent : c.sub, fontSize: 12, fontWeight: '600' }}>
+                style={[st.chip, { backgroundColor: active ? t.action.primary : glassOf(t).surfaceSubtle }]}>
+                <Text style={{ color: active ? t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>
                   {platformLabel(tr, platform)}
                 </Text>
               </TouchableOpacity>
@@ -238,11 +239,11 @@ export function FeedbackForm({
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 style={[st.weightBtn, {
-                  backgroundColor: active ? style.color + '20' : c.dim,
-                  borderColor: active ? style.color : c.border,
-                  borderWidth: active ? 1.5 : 1,
+                  backgroundColor: active ? style.color + '20' : glassOf(t).surfaceSubtle,
+                  borderColor: active ? style.color : 'transparent',
+                  borderWidth: 1.5,
                 }]}>
-                <Text style={{ color: active ? style.color : c.sub, fontSize: 12, fontWeight: '600' }}>
+                <Text style={{ color: active ? style.color : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>
                   {weightLabel(tr, draft.kind, weight)}
                 </Text>
               </TouchableOpacity>
@@ -256,7 +257,7 @@ export function FeedbackForm({
           ) : (
             <>
               {tr.fbFieldDescription}
-              <Text style={{ color: "#EF4444" }}> *</Text>
+              <Text style={{ color: t.status.danger }}> *</Text>
             </>
           )}
         </Text>
@@ -264,7 +265,7 @@ export function FeedbackForm({
           value={draft.description}
           onChangeText={v => set('description', v)}
           placeholder={isBug ? tr.fbDescPhBug : tr.fbDescPhIdea}
-          placeholderTextColor={c.sub}
+          placeholderTextColor={t.text.muted}
           maxLength={DESCRIPTION_MAX}
           multiline
           textAlignVertical="top"
@@ -279,7 +280,7 @@ export function FeedbackForm({
               value={draft.steps}
               onChangeText={v => set('steps', v)}
               placeholder={tr.fbStepsPh}
-              placeholderTextColor={c.sub}
+              placeholderTextColor={t.text.muted}
               maxLength={STEPS_MAX}
               multiline
               textAlignVertical="top"
@@ -293,7 +294,7 @@ export function FeedbackForm({
               value={draft.expected}
               onChangeText={v => set('expected', v)}
               placeholder={tr.fbExpectedPh}
-              placeholderTextColor={c.sub}
+              placeholderTextColor={t.text.muted}
               maxLength={STEPS_MAX}
               multiline
               textAlignVertical="top"
@@ -305,7 +306,7 @@ export function FeedbackForm({
               value={draft.actual}
               onChangeText={v => set('actual', v)}
               placeholder={tr.fbActualPh}
-              placeholderTextColor={c.sub}
+              placeholderTextColor={t.text.muted}
               maxLength={STEPS_MAX}
               multiline
               textAlignVertical="top"
@@ -322,10 +323,10 @@ export function FeedbackForm({
           {attachmentsLocked ? tr.fbAttachLocked : tr.fbAttachHint.replace('{max}', String(MAX_ATTACHMENTS))}
         </Text>
         {draft.attachments.map((att) => (
-          <View key={att.uid} style={[st.attRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+          <View key={att.uid} style={[st.attRow, { backgroundColor: glassOf(t).surfaceSubtle }]}>
             <IconSymbol name={att.kind === 'video' ? 'play.circle.fill' : 'camera.fill'} size={15} color={c.sub} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+              <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }} numberOfLines={1}>
                 {att.name}
               </Text>
               <Text style={{ color: c.sub, fontSize: 11 }}>
@@ -350,17 +351,17 @@ export function FeedbackForm({
             disabled={picking}
             accessibilityRole="button"
             accessibilityLabel={tr.fbAddAttachment}
-            style={[st.addAtt, { borderColor: c.border }]}>
+            style={[st.addAtt, { borderColor: t.border.hairline }]}>
             {picking ? <ActivityIndicator size="small" color={accent} /> : <IconSymbol name="plus" size={14} color={accent} />}
-            <Text style={{ color: accent, fontWeight: '700', fontSize: 13 }}>
+            <Text style={{ color: accent, fontFamily: fontFamily.bold, fontSize: 13 }}>
               {tr.fbAddAttachment}
             </Text>
           </TouchableOpacity>
         ) : null}
 
         {canSend ? (
-          <View style={[st.ctxBox, { borderColor: c.border }]}>
-            <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>
+          <View style={[st.ctxBox, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+            <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.bold }}>
               {tr.fbContext}
             </Text>
             <Text style={{ color: c.sub, fontSize: 11, marginBottom: 6 }}>
@@ -394,14 +395,14 @@ export function FeedbackForm({
         ) : null}
 
         <View style={st.actions}>
-          <TouchableOpacity onPress={onCancel} accessibilityRole="button" style={[st.btn, { flex: 1, backgroundColor: c.dim }]}>
-            <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+          <TouchableOpacity onPress={onCancel} accessibilityRole="button" style={[st.btn, { flex: 1, backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+            <Text style={{ color: t.action.secondaryText, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => submit(false)}
             accessibilityRole="button"
-            style={[st.btn, { flex: canSend ? 1.4 : 2, backgroundColor: canSend ? c.dim : accent, borderWidth: canSend ? 1 : 0, borderColor: accent }]}>
-            <Text style={{ color: canSend ? accent : '#fff', fontWeight: '700' }}>
+            style={[st.btn, { flex: canSend ? 1.4 : 2, backgroundColor: canSend ? glassOf(t).surfaceSubtle : t.action.primary }]}>
+            <Text style={{ color: canSend ? t.action.secondaryText : t.text.onAction, fontFamily: fontFamily.semibold }}>
               {canSend ? tr.fbSaveDraft : tr.fbSave}
             </Text>
           </TouchableOpacity>
@@ -410,34 +411,34 @@ export function FeedbackForm({
           <TouchableOpacity
             onPress={() => submit(true)}
             accessibilityRole="button"
-            style={[st.btn, { marginTop: 8, backgroundColor: accent }]}>
-            <IconSymbol name="paperplane.fill" size={15} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 6 }}>
+            style={[st.btn, { marginTop: 8, backgroundColor: t.action.primary }]}>
+            <IconSymbol name="paperplane.fill" size={15} color={t.text.onAction} />
+            <Text style={{ color: t.text.onAction, fontFamily: fontFamily.semibold, marginLeft: 6 }}>
               {tr.fbSaveAndSend}
             </Text>
           </TouchableOpacity>
         ) : null}
       </ScrollView>
-    </BlurView>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
-  sheet:      { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, paddingTop: 4, overflow: 'hidden', flexShrink: 1 },
-  sheetTitle: { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 12 },
-  segment:    { flexDirection: 'row', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 3, marginBottom: 4 },
-  segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 9 },
-  label:      { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input:      { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500', borderWidth: 1 },
+  sheet:      { borderRadius: Atlas.radius.xxlarge, padding: 20, paddingTop: 4, overflow: 'hidden', flexShrink: 1 },
+  sheetTitle: { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 12 },
+  segment:    { flexDirection: 'row', borderRadius: 999, padding: 4, marginBottom: 4 },
+  segmentBtn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, minHeight: 40, borderRadius: 999 },
+  label:      { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 14 },
+  input:      { borderRadius: Atlas.radius.medium, padding: 13, minHeight: 44, fontSize: 14, fontFamily: fontFamily.regular, borderWidth: 1.5 },
   multi:      { minHeight: 84 },
   multiShort: { minHeight: 60 },
-  chip:       { borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8 },
-  weightBtn:  { flex: 1, paddingVertical: 10, borderRadius: Atlas.radius.medium, alignItems: 'center' },
-  attRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 10, marginBottom: 6 },
+  chip:       { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  weightBtn:  { flex: 1, paddingVertical: 10, minHeight: 40, borderRadius: 999, alignItems: 'center' },
+  attRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, padding: 10, marginBottom: 6 },
   addAtt:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderStyle: 'dashed', borderRadius: Atlas.radius.medium, paddingVertical: 12, minHeight: 44 },
-  ctxBox:     { borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 12, marginTop: 16 },
+  ctxBox:     { borderRadius: Atlas.radius.large, padding: 14, marginTop: 16 },
   ctxRow:     { flexDirection: 'row', gap: 8, paddingVertical: 2 },
-  missing:    { color: '#EF4444', fontSize: 12, fontWeight: '600', marginTop: 12 },
+  missing:    { color: '#E8543F', fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 12 },
   actions:    { flexDirection: 'row', gap: 8, marginTop: 18 },
-  btn:        { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', minHeight: 44 },
+  btn:        { paddingVertical: 13, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', minHeight: 44 },
 });

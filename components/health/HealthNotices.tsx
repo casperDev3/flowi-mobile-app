@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/health/HealthNotices.tsx
  *
@@ -21,12 +20,14 @@ import React from 'react';
 import { Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, theme } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import type { HKAccess } from '@/store/healthkit';
 import { allTranslations, type Lang } from '@/store/translations';
 import type { HealthColors } from '@/utils/healthTheme';
 
-const WARN = '#F59E0B';
-const ERR = '#EF4444';
+const WARN = theme.light.status.warning;
+const ERR = theme.light.status.danger;
 
 /** ERR-01: «не прочиталось» ≠ «порожньо». */
 export function LoadErrorNotice({ lang, c, isDark, onRetry }: {
@@ -36,20 +37,21 @@ export function LoadErrorNotice({ lang, c, isDark, onRetry }: {
   onRetry: () => void;
 }) {
   const t = allTranslations[lang] ?? allTranslations.uk;
+  const { t: k } = useDS();
   return (
     // Суцільна тонована картка, як попередження у Фінансах (OverviewTab warningCard).
-    <View style={{ borderRadius: Atlas.radius.xlarge, borderWidth: 1, borderColor: ERR + '55', backgroundColor: ERR + (isDark ? '1A' : '12'), padding: 14, marginBottom: 12 }}>
+    <View style={{ borderRadius: radius.cardCompact, backgroundColor: ERR + (isDark ? '1A' : '14'), padding: 20, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <IconSymbol name="exclamationmark.triangle.fill" size={16} color={ERR} />
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight, marginLeft: 8, flex: 1 }}>{t.loadErrorTitle}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1 }}>{t.loadErrorTitle}</Text>
       </View>
       <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{t.loadErrorBody}</Text>
       <TouchableOpacity
         onPress={onRetry}
         accessibilityRole="button"
         accessibilityLabel={t.loadErrorRetry}
-        style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: ERR }}>
-        <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.loadErrorRetry}</Text>
+        style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: radius.pill, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, backgroundColor: k.action.primary }}>
+        <Text style={{ color: k.text.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>{t.loadErrorRetry}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -64,11 +66,12 @@ export function ReminderBlockedNotice({ lang, c, isDark, onOpenSettings, onDismi
   onDismiss?: () => void;
 }) {
   const t = allTranslations[lang] ?? allTranslations.uk;
+  const { t: k } = useDS();
   return (
-    <View style={{ borderRadius: Atlas.radius.xlarge, borderWidth: 1, borderColor: WARN + '55', backgroundColor: WARN + (isDark ? '1A' : '12'), padding: 14, marginBottom: 12 }}>
+    <View style={{ borderRadius: radius.cardCompact, backgroundColor: WARN + (isDark ? '1A' : '14'), padding: 20, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <IconSymbol name="bell.slash" size={16} color={WARN} />
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight, marginLeft: 8, flex: 1 }}>{t.healthReminderOff}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginLeft: 8, flex: 1 }}>{t.healthReminderOff}</Text>
         {onDismiss ? (
           <TouchableOpacity onPress={onDismiss} accessibilityRole="button" accessibilityLabel={t.healthReminderOff}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
@@ -82,8 +85,8 @@ export function ReminderBlockedNotice({ lang, c, isDark, onOpenSettings, onDismi
           onPress={onOpenSettings}
           accessibilityRole="button"
           accessibilityLabel={t.healthNoticeSettings}
-          style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: WARN }}>
-          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{t.healthNoticeSettings}</Text>
+          style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: radius.pill, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, backgroundColor: k.action.primary }}>
+          <Text style={{ color: k.text.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>{t.healthNoticeSettings}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -137,16 +140,17 @@ export function HealthKitStatus({ lang, c, hk, onGrant, onRetry }: {
 }) {
   const t = allTranslations[lang] ?? allTranslations.uk;
   const { text, action } = healthKitStatusText(lang, hk);
+  const { t: k } = useDS();
   return (
     <View>
-      <Text style={{ color: action ? WARN : c.sub, fontSize: 11, marginTop: 6, fontWeight: action ? '700' : '400' }}>{text}</Text>
+      <Text style={{ color: action ? c.text : c.sub, fontSize: 12, marginTop: 6, fontFamily: action ? fontFamily.semibold : fontFamily.regular }}>{text}</Text>
       {action ? (
         <TouchableOpacity
           onPress={action === 'grant' ? onGrant : onRetry}
           accessibilityRole="button"
           accessibilityLabel={action === 'grant' ? t.hkGrant : t.loadErrorRetry}
-          style={{ marginTop: 8, alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: WARN }}>
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{action === 'grant' ? t.hkGrant : t.loadErrorRetry}</Text>
+          style={{ marginTop: 8, alignSelf: 'flex-start', borderRadius: radius.pill, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, backgroundColor: k.action.primary }}>
+          <Text style={{ color: k.text.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>{action === 'grant' ? t.hkGrant : t.loadErrorRetry}</Text>
         </TouchableOpacity>
       ) : null}
     </View>

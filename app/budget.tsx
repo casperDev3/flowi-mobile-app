@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius, shadow, space, touchTarget, type as dsType } from '@/constants/theme';
 /**
  * app/budget.tsx — місячні ліміти витрат по категоріях.
  *
@@ -34,8 +34,6 @@ import { Atlas } from '@/constants/atlas';
  * обох платформах: бюджет — це порівняння двох чисел, і якщо телефон і браузер
  * рахують «витрачено» по-різному, людина бачить не дві думки, а зіпсовані дані.
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -84,7 +82,8 @@ import {
 } from '@/utils/budgetScope';
 import type { CategoryRow } from '@/store/migrations';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDS } from '@/hooks/use-ds';
+import { finPalette } from '@/components/finance/finPalette';
 import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
 import { loadDataResult, retryStorageRead, saveData } from '@/store/storage';
@@ -97,20 +96,16 @@ import { WIDE_CONTENT_MAX_WIDTH, useContentWidth, useSheetSurface } from '@/hook
 import { wideModalStyles } from '@/components/finance/wideModal';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
+import { GlassBackdrop, GlassSurface, MeshBackground } from '@/components/ds';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ACCENT = '#0EA5E9';
 /**
- * A11Y-05. Той самий `#0EA5E9`, узятий КОЛЬОРОМ ТЕКСТУ на світлому тлі
- * екрана, дає 2.51:1 при нормі 4.5:1 — цифра ліміту й підписи чипів
- * практично не читаються при яскравому світлі. Тло, заливки й прогрес
- * лишаються акцентними (там норма інша), а текст і гліфи у світлій темі
- * беруть темніший відтінок: `#0369A1` на `#EFF5FF` = 5.4:1.
- * Правильне місце для такої пари — токени теми, але constants/tokens.ts —
- * чужа зона цього проходу.
+ * DS v2: синього акценту екрана більше немає. Головні дії — pill
+ * action.primary, прогрес — accent.amber (≤80%) / accent.coral (ближче до
+ * ліміту й понад), текст і гліфи — text.primary/secondary (A11Y-05 тримає
+ * сама тема: усі пари ≥ 4.5:1).
  */
-const ACCENT_TEXT_LIGHT = '#0369A1';
 
 const ICON_OPTIONS: IconSymbolName[] = [
   'fork.knife', 'car.fill', 'gamecontroller.fill', 'cross.fill', 'house.fill',
@@ -157,22 +152,12 @@ function chunk<T>(arr: T[], n: number): T[][] {
  * рендерами, інакше кожен рядок категорії отримує нові кольори і `React.memo`
  * на ньому нічого не заощаджує.
  */
-function makeColors(isDark: boolean) {
+function makeColors(isDark: boolean, reduceTransparency = false) {
+  // Токени DS v2 (components/finance/finPalette.ts) — спільні для всього розділу.
+  const p = finPalette(isDark, reduceTransparency);
   return {
-    bg1:    isDark ? '#080E18' : '#EFF5FF',
-    bg2:    isDark ? '#0F1A2E' : '#E0ECFF',
-    card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.80)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#EEF4FF' : '#0A1628',
-    sub:    isDark ? 'rgba(220,235,255,0.62)' : 'rgba(10,22,40,0.58)',
-    dim:    isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(8,14,24,0.98)' : 'rgba(239,245,255,0.98)',
-    input:  isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-    /** Акцент у ролі тексту/гліфа — див. ACCENT_TEXT_LIGHT (A11Y-05). */
-    accentText: isDark ? ACCENT : ACCENT_TEXT_LIGHT,
-    green:  '#10B981',
-    amber:  '#F59E0B',
-    red:    '#EF4444',
+    ...p,
+    coral: p.t.accent.coral,
   };
 }
 
@@ -236,10 +221,10 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
   // Аркуші ліміту/категорії — діалогом посеред екрана на планшеті.
   const wm = wideModalStyles(isWide, 'slide');
   const sheetSurface = useSheetSurface();
-  const isDark = useColorScheme() === 'dark';
+  const { isDark, reduceTransparency } = useDS();
   const { tr, lang } = useI18n();
 
-  const c = useMemo(() => makeColors(isDark), [isDark]);
+  const c = useMemo(() => makeColors(isDark, reduceTransparency), [isDark, reduceTransparency]);
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
   // Межу довжини підставляє екран, а не словник: `store/translations.ts` не
@@ -563,7 +548,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
   return (
     <View style={{ flex: 1 }}>
       {!embedded ? <Stack.Screen options={{ headerShown: false }} /> : null}
-      {!embedded ? <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} /> : null}
+      {!embedded ? <MeshBackground /> : null}
 
       {/* Шапка, перемикач місяця і вміст стоять в ОДНІЙ колонці: на планшеті
           хедер, розтягнутий на всю ширину, «від'їжджав» від списку під ним. */}
@@ -576,14 +561,14 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             onPress: () => router.back(),
             label: tr.back,
             color: c.sub,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { ...c.gl.card, borderColor: 'transparent' },
           }}
           actions={
             <HeaderButton
               onPress={openAdd}
               accessibilityLabel={tr.add}
-              style={{ backgroundColor: ACCENT + '20', borderColor: ACCENT + '40' }}>
-              <IconSymbol name="plus" size={18} color={c.accentText} />
+              style={{ backgroundColor: c.action, borderColor: 'transparent', borderRadius: radius.pill }}>
+              <IconSymbol name="plus" size={18} color={c.onAction} />
             </HeaderButton>
           }>
           <MonthPicker
@@ -592,7 +577,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             months={tr.months}
             monthsShort={tr.monthsShort}
             monthsGenitive={tr.monthsGenitive}
-            accentColor={ACCENT}
+            accentColor={c.text}
             textColor={c.text}
             subColor={c.sub}
             dimColor={c.dim}
@@ -616,9 +601,9 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             onPress={openAdd}
             accessibilityRole="button"
             accessibilityLabel={tr.add}
-            style={[st.inlineAdd, { borderColor: ACCENT + '40', backgroundColor: ACCENT + '15' }]}>
-            <IconSymbol name="plus" size={15} color={c.accentText} />
-            <Text style={{ color: c.accentText, fontSize: 14, fontWeight: '700' }}>{tr.budgetAddManually}</Text>
+            style={[st.inlineAdd, { backgroundColor: c.action }]}>
+            <IconSymbol name="plus" size={15} color={c.onAction} />
+            <Text style={{ ...dsType.label, color: c.onAction }}>{tr.budgetAddManually}</Text>
           </TouchableOpacity>
         ) : null}
 
@@ -640,10 +625,9 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                 accessibilityState={{ selected: active, checked: active }}
                 accessibilityLabel={moneyScopeLabel(option, tr)}
                 style={[st.scopeChip, {
-                  borderColor: active ? ACCENT : c.border,
-                  backgroundColor: active ? ACCENT + '15' : c.dim,
+                  backgroundColor: active ? c.action : c.card,
                 }]}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: active ? c.accentText : c.sub }}>
+                <Text style={{ fontSize: 13, fontFamily: fontFamily.semibold, color: active ? c.onAction : c.text }}>
                   {moneyScopeLabel(option, tr)}
                 </Text>
               </TouchableOpacity>
@@ -674,9 +658,9 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
               onPress={embedded.onShowMonth}
               accessibilityRole="button"
               accessibilityLabel={tr.budgetShowMonth}
-              style={[st.inlineAdd, { borderColor: ACCENT + '40', backgroundColor: ACCENT + '15', marginBottom: 0 }]}>
-              <IconSymbol name="calendar" size={15} color={c.accentText} />
-              <Text style={{ color: c.accentText, fontSize: 14, fontWeight: '700' }}>{tr.budgetShowMonth}</Text>
+              style={[st.inlineAdd, { ...c.gl.card, marginBottom: 0 }]}>
+              <IconSymbol name="calendar" size={15} color={c.text} />
+              <Text style={{ ...dsType.label, color: c.text }}>{tr.budgetShowMonth}</Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -694,8 +678,8 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
-              backgroundColor: c.red + '15', borderRadius: Atlas.radius.medium, marginBottom: 12, borderWidth: 1, borderColor: c.red + '40' }}>
-            <IconSymbol name="exclamationmark.triangle.fill" size={15} color={c.red} />
+              ...c.gl.card, borderRadius: radius.nestedCompact, marginBottom: 12 }}>
+            <IconSymbol name="exclamationmark.triangle.fill" size={15} color={c.coral} />
             <Text style={{ flex: 1, fontSize: 12, color: c.text, lineHeight: 17 }}>{tr.budgetSaveFailed}</Text>
           </View>
         ) : null}
@@ -703,9 +687,8 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         {/* Info: other-currency transactions excluded */}
         {otherCurrencyCount > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12,
-            backgroundColor: ACCENT + '15', borderRadius: Atlas.radius.medium, marginBottom: 12,
-            borderWidth: 1, borderColor: ACCENT + '30' }}>
-            <IconSymbol name="info.circle" size={15} color={c.accentText} />
+            ...c.gl.card, borderRadius: radius.nestedCompact, marginBottom: 12 }}>
+            <IconSymbol name="info.circle" size={15} color={c.t.status.info} />
             <Text style={{ flex: 1, fontSize: 12, color: c.sub, lineHeight: 17 }}>
               {tr.budgetOtherCurrenciesHint.replace('{n}', String(otherCurrencyCount))}
             </Text>
@@ -730,18 +713,18 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         <View style={splitColumns ? st.splitAside : undefined}>
         {/* Total summary card */}
         {!multiMonth && totals.totalBudget > 0 && (
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-            style={[st.summaryCard, { borderColor: c.border }]}>
+          <GlassSurface radius={radius.cardCompact} tint="lime" style={st.summaryCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
               <View>
-                <Text style={{ fontSize: 12, color: c.sub, fontWeight: '600' }}>{tr.budgetSpentCaps}</Text>
-                <Text style={{ fontSize: 22, fontWeight: Atlas.type.headingWeight, color: c.text, marginTop: 2, letterSpacing: -0.5 }}>
+                <Text style={{ ...dsType.caption, color: c.sub, fontFamily: fontFamily.medium }}>{tr.budgetSpentCaps}</Text>
+                {/* KPI — display-цифри DS: тонкі, великі, табличні. */}
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, color: c.text, marginTop: 4 }}>
                   {fmt(totals.totalSpent)}
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 12, color: c.sub, fontWeight: '600' }}>{tr.budgetBudgetCaps}</Text>
-                <Text style={{ fontSize: 22, fontWeight: Atlas.type.headingWeight, color: c.accentText, marginTop: 2, letterSpacing: -0.5 }}>
+                <Text style={{ ...dsType.caption, color: c.sub, fontFamily: fontFamily.medium }}>{tr.budgetBudgetCaps}</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ ...dsType.displaySm, fontSize: 28, lineHeight: 32, color: c.sub, marginTop: 4 }}>
                   {fmt(totals.totalBudget)}
                 </Text>
               </View>
@@ -749,7 +732,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             <ProgressBar spent={totals.totalSpent} limit={totals.totalBudget} c={c} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
               <Text style={{ fontSize: 12, color: c.sub }}>
-                {tr.budgetLeft}: <Text style={{ fontWeight: '700', color: totals.totalSpent > totals.totalBudget ? c.red : c.green }}>
+                {tr.budgetLeft}: <Text style={{ fontFamily: fontFamily.semibold, color: totals.totalSpent > totals.totalBudget ? c.red : c.text }}>
                   {fmt(Math.max(0, totals.totalBudget - totals.totalSpent))}
                 </Text>
               </Text>
@@ -762,18 +745,17 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                 би ніколи. Але й ховати їх не можна: це справжні гроші. */}
             {totals.unbudgetedSpent > 0 && (
               <Text style={{ fontSize: 12, color: c.sub, marginTop: 6 }}>
-                {tr.budgetOutsideLimits}: <Text style={{ fontWeight: '700', color: c.text }}>{fmt(totals.unbudgetedSpent)}</Text>
+                {tr.budgetOutsideLimits}: <Text style={{ fontFamily: fontFamily.semibold, color: c.text }}>{fmt(totals.unbudgetedSpent)}</Text>
               </Text>
             )}
-          </BlurView>
+          </GlassSurface>
         )}
         </View>
 
         <View style={splitColumns ? st.splitMain : undefined}>
         {/* Category rows */}
         {!multiMonth && displayBudgets.length > 0 && (
-          <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-            style={[st.card, { borderColor: c.border }]}>
+          <GlassSurface radius={radius.cardCompact} style={st.card}>
             {displayBudgets.map((item, idx) => (
               <BudgetCategoryRow
                 key={item.category}
@@ -788,7 +770,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                 onPress={openEdit}
               />
             ))}
-          </BlurView>
+          </GlassSurface>
         )}
         </View>
         </View>
@@ -796,10 +778,10 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         {/* Empty state */}
         {!multiMonth && displayBudgets.length === 0 && !loadFailed && (
           <View style={{ alignItems: 'center', paddingVertical: 64 }}>
-            <View style={[st.emptyIcon, { backgroundColor: ACCENT + '15' }]}>
-              <IconSymbol name="chart.pie.fill" size={36} color={c.accentText} />
+            <View style={[st.emptyIcon, { ...c.gl.card }]}>
+              <IconSymbol name="chart.pie.fill" size={36} color={c.muted} />
             </View>
-            <Text style={{ fontSize: 17, fontWeight: '700', color: c.text, marginTop: 16 }}>
+            <Text style={{ fontSize: 17, fontFamily: fontFamily.semibold, color: c.text, marginTop: 16 }}>
               {tr.budgetEmptyTitle}
             </Text>
             <Text style={{ fontSize: 14, color: c.sub, marginTop: 6, textAlign: 'center' }}>
@@ -807,9 +789,9 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
             </Text>
             <TouchableOpacity
               onPress={openAdd}
-              style={[st.addBtn, { backgroundColor: ACCENT, marginTop: 24 }]}>
-              <IconSymbol name="plus" size={16} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{tr.budgetAddManually}</Text>
+              style={[st.addBtn, { backgroundColor: c.action, marginTop: 24 }]}>
+              <IconSymbol name="plus" size={16} color={c.onAction} />
+              <Text style={{ ...dsType.label, fontSize: 15, color: c.onAction }}>{tr.budgetAddManually}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -828,31 +810,31 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={() => setShowEditModal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, readingWidth, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[st.sheet, sheetSurface, { ...c.gl.strong }, shadow[isDark ? 'dark' : 'light'].popover]}>
+                <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
                 <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
                 {/* Handle */}
                 <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                  <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
+                  <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.muted }} />
                 </View>
 
                 {/* Icon + title */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                  <View style={[st.catIconBox, { backgroundColor: ACCENT + '18', width: 44, height: 44, borderRadius: 13 }]}>
-                    {editItem && <IconSymbol name={editItem.icon} size={20} color={c.accentText} />}
+                  <View style={[st.catIconBox, { backgroundColor: c.dim, width: 44, height: 44, borderRadius: radius.pill }]}>
+                    {editItem && <IconSymbol name={editItem.icon} size={20} color={c.text} />}
                   </View>
                   <View style={{ flexShrink: 1 }}>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{editItem?.label}</Text>
+                    <Text style={{ fontSize: 18, fontFamily: fontFamily.semibold, color: c.text }}>{editItem?.label}</Text>
                     <Text style={{ fontSize: 13, color: c.sub, marginTop: 2 }}>{tr.budgetMonthlyForecast}</Text>
                   </View>
                 </View>
 
                 {/* Actual spent */}
                 {editItem && (
-                  <View style={[st.spentRow, { backgroundColor: c.dim, borderColor: c.border }]}>
+                  <View style={[st.spentRow, { backgroundColor: c.dim }]}>
                     <Text style={{ fontSize: 13, color: c.sub }}>{tr.budgetActuallySpent}</Text>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>
+                    <Text style={{ fontSize: 16, fontFamily: fontFamily.semibold, color: c.text, fontVariant: ['tabular-nums'] }}>
                       {fmt(editItem.spent)}
                     </Text>
                   </View>
@@ -865,19 +847,19 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                 )}
 
                 {/* Limit input */}
-                <Text style={{ fontSize: 13, color: c.sub, marginBottom: 6, fontWeight: '500' }}>
+                <Text style={{ fontSize: 13, color: c.sub, marginBottom: 6, fontFamily: fontFamily.medium }}>
                   {tr.budgetPlannedFor.replace('{currency}', currencySymbol)}
                 </Text>
                 <TextInput
                   autoFocus
                   placeholder="0"
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={c.muted}
                   value={editLimit}
                   onChangeText={setEditLimit}
                   keyboardType="decimal-pad"
                   returnKeyType="done"
                   onSubmitEditing={saveEdit}
-                  style={[st.input, { backgroundColor: c.input, color: c.text, borderColor: c.border }]}
+                  style={[st.input, { backgroundColor: c.input, color: c.text }]}
                 />
 
                 {/* Quick presets */}
@@ -891,31 +873,30 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                       accessibilityRole="radio"
                       accessibilityState={{ selected: editLimit === String(v), checked: editLimit === String(v) }}
                       accessibilityLabel={v.toLocaleString(locale)}
-                      style={[st.preset, { borderColor: editLimit === String(v) ? ACCENT : c.border,
-                        backgroundColor: editLimit === String(v) ? ACCENT + '15' : c.dim }]}>
+                      style={[st.preset, { backgroundColor: editLimit === String(v) ? c.action : c.dim }]}>
                       {/* I18N-03: число форматувалось жорстко в 'uk-UA'. */}
-                      <Text style={{ fontSize: 13, fontWeight: '600',
-                        color: editLimit === String(v) ? c.accentText : c.sub }}>{v.toLocaleString(locale)}</Text>
+                      <Text style={{ fontSize: 13, fontFamily: fontFamily.semibold,
+                        color: editLimit === String(v) ? c.onAction : c.text, fontVariant: ['tabular-nums'] }}>{v.toLocaleString(locale)}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
 
                 {/* Buttons */}
                 <TouchableOpacity onPress={saveEdit}
-                  style={[st.btn, { backgroundColor: ACCENT }]}>
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{tr.save}</Text>
+                  style={[st.btn, { backgroundColor: c.action }]}>
+                  <Text style={{ ...dsType.label, fontSize: 15, color: c.onAction }}>{tr.save}</Text>
                 </TouchableOpacity>
 
                 {editItem && !editItem.isAutoAdded && (
                   <TouchableOpacity
                     onPress={() => { setShowEditModal(false); deleteCategory(editItem.category); }}
-                    style={[st.btn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: c.red + '50', marginTop: 8 }]}>
+                    style={[st.btn, { backgroundColor: c.red + '14', marginTop: 8 }]}>
                     <IconSymbol name="trash" size={15} color={c.red} />
-                    <Text style={{ color: c.red, fontSize: 15, fontWeight: '600' }}>{tr.budgetDeleteAction}</Text>
+                    <Text style={{ color: c.red, fontSize: 15, fontFamily: fontFamily.semibold }}>{tr.budgetDeleteAction}</Text>
                   </TouchableOpacity>
                 )}
                 </ScrollView>
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -927,48 +908,48 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={() => setShowAddModal(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, readingWidth, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'}
-                style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[st.sheet, sheetSurface, { ...c.gl.strong }, shadow[isDark ? 'dark' : 'light'].popover]}>
+                <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
 
                 <ScrollView keyboardShouldPersistTaps="handled">
                   {/* Handle */}
                   <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                    <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
+                    <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.muted }} />
                   </View>
 
-                  <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 20 }}>
+                  <Text style={{ fontSize: 18, fontFamily: fontFamily.semibold, color: c.text, marginBottom: 20 }}>
                     {tr.budgetNewCategory}
                   </Text>
 
                   {/* Name */}
-                  <Text style={{ fontSize: 13, color: c.sub, marginBottom: 6, fontWeight: '500' }}>{tr.budgetName}</Text>
+                  <Text style={{ fontSize: 13, color: c.sub, marginBottom: 6, fontFamily: fontFamily.medium }}>{tr.budgetName}</Text>
                   <TextInput
                     autoFocus
                     placeholder={tr.budgetNamePlaceholder}
-                    placeholderTextColor={c.sub}
+                    placeholderTextColor={c.muted}
                     value={newCatName}
                     onChangeText={text => { setNewCatName(text); setAddError(null); }}
-                    style={[st.input, { backgroundColor: c.input, color: c.text, borderColor: c.border }]}
+                    style={[st.input, { backgroundColor: c.input, color: c.text }]}
                   />
                   {addError && (
                     <Text style={{ fontSize: 12, color: c.red, marginBottom: 6 }}>{addError}</Text>
                   )}
 
                   {/* Limit */}
-                  <Text style={{ fontSize: 13, color: c.sub, marginTop: 14, marginBottom: 6, fontWeight: '500' }}>
+                  <Text style={{ fontSize: 13, color: c.sub, marginTop: 14, marginBottom: 6, fontFamily: fontFamily.medium }}>
                     {tr.budgetPlannedFor.replace('{currency}', currencySymbol)}
                   </Text>
                   <TextInput
                     placeholder="0"
-                    placeholderTextColor={c.sub}
+                    placeholderTextColor={c.muted}
                     value={newCatLimit}
                     onChangeText={setNewCatLimit}
                     keyboardType="decimal-pad"
-                    style={[st.input, { backgroundColor: c.input, color: c.text, borderColor: c.border }]}
+                    style={[st.input, { backgroundColor: c.input, color: c.text }]}
                   />
 
                   {/* Icon picker */}
-                  <Text style={{ fontSize: 13, color: c.sub, marginTop: 14, marginBottom: 8, fontWeight: '500' }}>{tr.budgetIcon}</Text>
+                  <Text style={{ fontSize: 13, color: c.sub, marginTop: 14, marginBottom: 8, fontFamily: fontFamily.medium }}>{tr.budgetIcon}</Text>
                   {/* На планшеті аркуш ширший, тож іконки не роздуваються до
                       розміру кнопки — у ряд їх стає більше. */}
                   {chunk(ICON_OPTIONS, isWide ? 10 : 7).map((row, ri) => (
@@ -976,23 +957,23 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                       {row.map(icon => (
                         <TouchableOpacity key={icon} onPress={() => setNewCatIcon(icon)}
                           style={[st.iconOption, {
-                            backgroundColor: newCatIcon === icon ? ACCENT + '25' : c.dim,
-                            borderColor: newCatIcon === icon ? ACCENT : 'transparent',
+                            backgroundColor: newCatIcon === icon ? c.action : c.dim,
+                            borderColor: 'transparent',
                           }]}>
-                          <IconSymbol name={icon} size={18} color={newCatIcon === icon ? c.accentText : c.sub} />
+                          <IconSymbol name={icon} size={18} color={newCatIcon === icon ? c.onAction : c.sub} />
                         </TouchableOpacity>
                       ))}
                     </View>
                   ))}
 
                   <TouchableOpacity onPress={addCategory} disabled={!newCatName.trim()} accessibilityState={{ disabled: !newCatName.trim() }}
-                    style={[st.btn, { backgroundColor: newCatName.trim() ? ACCENT : c.dim, marginTop: 8 }]}>
-                    <Text style={{ color: newCatName.trim() ? '#fff' : c.sub, fontSize: 15, fontWeight: '700' }}>
+                    style={[st.btn, { backgroundColor: newCatName.trim() ? c.action : c.t.state.disabledBg, marginTop: 8 }]}>
+                    <Text style={{ ...dsType.label, fontSize: 15, color: newCatName.trim() ? c.onAction : c.t.state.disabledText }}>
                       {tr.budgetAddCategory}
                     </Text>
                   </TouchableOpacity>
                 </ScrollView>
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -1005,10 +986,12 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
 
 function ProgressBar({ spent, limit, c }: { spent: number; limit: number; c: BudgetColors }) {
   const pct = barRatio(spent, limit);
-  const color = isOverLimit(spent, limit) ? c.red : pct > 0.8 ? c.amber : ACCENT;
+  // DS v2.1: прогрес — акцент модуля (lime fill); ближче до ліміту — бурштин,
+  // понад — корал (тік-алерт).
+  const color = isOverLimit(spent, limit) ? c.coral : pct > 0.8 ? c.amber : c.limeFill;
   return (
-    <View style={[{ height: 8, borderRadius: 4, overflow: 'hidden' }, { backgroundColor: c.dim }]}>
-      <View style={{ height: '100%', width: `${pct * 100}%` as `${number}%`, borderRadius: 4, backgroundColor: color }} />
+    <View style={[{ height: 8, borderRadius: radius.pill, overflow: 'hidden' }, { backgroundColor: c.dim }]}>
+      <View style={{ height: '100%', width: `${pct * 100}%` as `${number}%`, borderRadius: radius.pill, backgroundColor: color }} />
     </View>
   );
 }
@@ -1038,23 +1021,23 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
 }) {
   const pct = barRatio(item.spent, item.limit);
   const isOver = isOverLimit(item.spent, item.limit);
-  const barColor = isOver ? c.red : pct > 0.8 ? c.amber : ACCENT;
+  const barColor = isOver ? c.coral : pct > 0.8 ? c.amber : c.limeFill;
   return (
     <TouchableOpacity onPress={() => onPress(item)} activeOpacity={0.75}>
       <View style={[st.categoryRow,
         divider && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
         {/* Icon */}
-        <View style={[st.catIconBox, { backgroundColor: item.isAutoAdded ? c.dim : ACCENT + '18' }]}>
-          <IconSymbol name={item.icon} size={16} color={item.isAutoAdded ? c.sub : c.accentText} />
+        <View style={[st.catIconBox, { backgroundColor: item.isAutoAdded ? c.dim : c.limeTint }]}>
+          <IconSymbol name={item.icon} size={16} color={item.isAutoAdded ? c.sub : c.lime} />
         </View>
         {/* Info */}
         <View style={{ flex: 1, gap: 4 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 14, fontWeight: '600', color: c.text }}>{item.label}</Text>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: isOver ? c.red : c.text }}>
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 14, fontFamily: fontFamily.semibold, color: c.text }}>{item.label}</Text>
+            <Text style={{ fontSize: 13, fontFamily: fontFamily.semibold, color: isOver ? c.red : c.text, fontVariant: ['tabular-nums'] }}>
               {fmt(item.spent)}
               {item.limit > 0 && (
-                <Text style={{ color: c.sub, fontWeight: '400' }}> / {fmt(item.limit)}</Text>
+                <Text style={{ color: c.sub, fontFamily: fontFamily.regular }}> / {fmt(item.limit)}</Text>
               )}
             </Text>
           </View>
@@ -1089,25 +1072,25 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  summaryCard:  { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', padding: 16, marginBottom: 16 },
-  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', marginBottom: 16 },
+  summaryCard:  { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: space.cardGap },
+  card:         { borderRadius: radius.cardCompact, overflow: 'hidden', marginBottom: space.cardGap },
   split:        { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
   splitAside:   { flex: 1, minWidth: 0 },
   splitMain:    { flex: 1.6, minWidth: 0 },
-  categoryRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  catIconBox:   { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  progressTrack:{ height: 5, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
-  scopeChip:    { paddingHorizontal: 14, paddingVertical: 7, borderRadius: Atlas.radius.xlarge, borderWidth: 1 },
-  inlineAdd:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: Atlas.radius.large, borderWidth: 1, marginBottom: 12 },
-  emptyIcon:    { width: 80, height: 80, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
-  addBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: Atlas.radius.large },
+  categoryRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  catIconBox:   { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  progressTrack:{ height: 6, borderRadius: radius.pill, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: radius.pill },
+  scopeChip:    { paddingHorizontal: 16, minHeight: 36, justifyContent: 'center', borderRadius: radius.pill },
+  inlineAdd:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, borderRadius: radius.pill, marginBottom: 12 },
+  emptyIcon:    { width: 80, height: 80, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  addBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, minHeight: 52, borderRadius: radius.pill },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { width: '100%', flexShrink: 1 },
-  sheet:        { borderTopLeftRadius: Atlas.radius.xlarge, borderTopRightRadius: Atlas.radius.xlarge, borderTopWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, padding: 24, paddingBottom: 36 },
-  input:        { borderRadius: Atlas.radius.large, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, marginBottom: 8 },
-  spentRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16 },
-  preset:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Atlas.radius.xlarge, borderWidth: 1 },
-  btn:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: Atlas.radius.large, paddingVertical: 14, paddingHorizontal: 24 },
-  iconOption:   { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1.5, padding: 6 },
+  sheet:        { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.cardPadding, paddingBottom: 36 },
+  input:        { borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 13, fontSize: 18, fontFamily: fontFamily.medium, marginBottom: 8, fontVariant: ['tabular-nums'] },
+  spentRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: radius.nestedCompact, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16 },
+  preset:       { paddingHorizontal: 16, minHeight: 36, justifyContent: 'center', borderRadius: radius.pill },
+  btn:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.pill, minHeight: 52, paddingHorizontal: 24 },
+  iconOption:   { flex: 1, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1.5, padding: 6 },
 });

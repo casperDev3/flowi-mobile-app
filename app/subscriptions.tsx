@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/subscriptions.tsx — Підписки (регулярні платежі).
  *
@@ -19,8 +18,6 @@ import { Atlas } from '@/constants/atlas';
  * id, і запис застарілого React-стану видалив би підписки, що прийшли синком.
  * Єдине видалення — явна дія «Видалити» з підтвердженням.
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -51,7 +48,9 @@ import { RecurringIncomesSection } from '@/components/finance/RecurringIncomesSe
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { finPalette } from '@/components/finance/finPalette';
+import { fontFamily, radius, shadow, space, touchTarget, type as dsType } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -90,24 +89,15 @@ import {
   type SubscriptionDraft,
   type SubscriptionDraftError,
 } from '@/utils/subscriptions';
+import { GlassBackdrop, GlassSurface, MeshBackground } from '@/components/ds';
 
-const ACCENT = '#0EA5E9';
 const ALL = '__all';
 const NO_PROJECT = '__none';
 
-function makeColors(isDark: boolean) {
-  return {
-    bg1:    isDark ? '#080E18' : '#EFF5FF',
-    bg2:    isDark ? '#0F1A2E' : '#E0ECFF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#EEF4FF' : '#0A1628',
-    sub:    isDark ? 'rgba(220,235,255,0.62)' : 'rgba(10,22,40,0.58)',
-    dim:    isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(8,14,24,0.98)' : 'rgba(239,245,255,0.98)',
-    accent: ACCENT,
-    red:    '#EF4444',
-    green:  '#10B981',
-  };
+function makeColors(isDark: boolean, reduceTransparency = false) {
+  // Токени DS v2 (components/finance/finPalette.ts). Головні дії — pill
+  // action.primary; `accent` (= text.primary) лишився для гліфів і рамок вибору.
+  return finPalette(isDark, reduceTransparency);
 }
 
 type RawItem = { id: string } & Record<string, unknown>;
@@ -136,7 +126,7 @@ export default function SubscriptionsScreen() {
 }
 
 export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: number } } = {}) {
-  const isDark = useColorScheme() === 'dark';
+  const { isDark, reduceTransparency } = useDS();
   const { tr, lang } = useI18n();
   const uiLang: 'uk' | 'en' = lang === 'en' ? 'en' : 'uk';
   const locale = uiLang === 'uk' ? 'uk-UA' : 'en-US';
@@ -149,7 +139,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   // би висіти, ніколи не долетівши.
   const projectRoles = useProjectRoles();
   const { isExpanded, height, width } = useResponsive();
-  const c = useMemo(() => makeColors(isDark), [isDark]);
+  const c = useMemo(() => makeColors(isDark, reduceTransparency), [isDark, reduceTransparency]);
   const uiColors: SubscriptionUiColors = useMemo(
     () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, red: c.red, green: c.green }),
     [c],
@@ -684,7 +674,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   return (
     <View style={{ flex: 1 }}>
       {!embedded ? <Stack.Screen options={{ headerShown: false }} /> : null}
-      {!embedded ? <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} /> : null}
+      {!embedded ? <MeshBackground /> : null}
 
       <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
         <View style={{ flex: 1 }}>
@@ -698,14 +688,14 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
               onPress: () => router.back(),
               label: tr.back,
               color: c.sub,
-              style: { backgroundColor: c.dim, borderColor: c.border },
+              style: { ...c.gl.card, borderColor: 'transparent' },
             }}
             actions={
               <HeaderButton
                 onPress={() => openCreate()}
                 accessibilityLabel={tr.subNew}
-                style={{ backgroundColor: ACCENT + '20', borderColor: 'transparent' }}>
-                <IconSymbol name="plus" size={18} color={ACCENT} />
+                style={{ backgroundColor: c.action, borderColor: 'transparent', borderRadius: radius.pill }}>
+                <IconSymbol name="plus" size={18} color={c.onAction} />
               </HeaderButton>
             }
           />
@@ -719,33 +709,34 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
             }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
 
             {/* Два списки однієї вкладки (§9.5): спершу платежі, нижче доходи. */}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={[st.sectionLabel, { color: c.sub, flex: 1, marginBottom: 0 }]}>{tr.finRecurringPayments}</Text>
+              <Text style={[st.sectionLabel, { color: c.text, flex: 1, marginBottom: 0 }]}>{tr.finRecurringPayments}</Text>
               {embedded ? (
                 <TouchableOpacity
                   onPress={() => openCreate()}
                   accessibilityRole="button"
                   accessibilityLabel={tr.subNew}
-                  style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                  <IconSymbol name="plus" size={17} color={ACCENT} />
+                  style={{ width: 44, height: 44, borderRadius: radius.pill, backgroundColor: c.action, alignItems: 'center', justifyContent: 'center' }}>
+                  <IconSymbol name="plus" size={17} color={c.onAction} />
                 </TouchableOpacity>
               ) : null}
             </View>
 
             {/* Підсумки за валютами */}
             {totals.length > 0 ? (
-              <View style={[st.totalsCard, { borderColor: c.border, backgroundColor: c.dim }]}>
-                <Text style={[st.sectionLabel, { color: c.sub }]}>{tr.subTotals}</Text>
-                <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4 }}>
+              <GlassSurface radius={radius.cardCompact} tint="lime" style={st.totalsCard}>
+                <Text style={[st.totalsLabel, { color: c.sub }]}>{tr.subTotals}</Text>
+                {/* Підсумок — display-цифри DS (тонкі, табличні). */}
+                <Text style={{ ...dsType.displaySm, fontSize: 32, lineHeight: 36, color: c.text, marginTop: 4 }}>
                   {formatTotalsLine(totals, 'monthly', tr.subPerMonth, currencies, locale)}
                 </Text>
-                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4 }}>
+                <Text style={{ ...dsType.body, ...dsType.numeric, color: c.sub, marginTop: 6 }}>
                   {formatTotalsLine(totals, 'yearly', tr.subPerYear, currencies, locale)}
                 </Text>
-              </View>
+              </GlassSurface>
             ) : null}
 
             {/* Фільтр за проєктом */}
@@ -769,9 +760,9 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                       accessibilityRole="button"
                       accessibilityState={{ selected: on }}
                       accessibilityLabel={`${tr.project}: ${opt.label}`}
-                      style={[st.filterChip, { backgroundColor: on ? ACCENT + '1F' : c.dim, borderColor: on ? ACCENT : c.border }]}>
+                      style={[st.filterChip, { backgroundColor: on ? c.action : c.card }]}>
                       {opt.color ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: opt.color }} /> : null}
-                      <Text numberOfLines={1} style={{ color: on ? ACCENT : c.text, fontSize: 13, fontWeight: '600', maxWidth: 160 }}>{opt.label}</Text>
+                      <Text numberOfLines={1} style={{ color: on ? c.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, maxWidth: 160 }}>{opt.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -784,17 +775,17 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
             {/* Порожньо */}
             {initialized && subs.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 64 }}>
-                <View style={[st.emptyIcon, { backgroundColor: ACCENT + '15' }]}>
-                  <IconSymbol name="repeat" size={34} color={ACCENT} />
+                <View style={[st.emptyIcon, { ...c.gl.card }]}>
+                  <IconSymbol name="repeat" size={34} color={c.muted} />
                 </View>
-                <Text style={{ fontSize: 17, fontWeight: '700', color: c.text, marginTop: 16 }}>{tr.subEmptyTitle}</Text>
+                <Text style={{ fontSize: 17, fontFamily: fontFamily.semibold, color: c.text, marginTop: 16 }}>{tr.subEmptyTitle}</Text>
                 <Text style={{ fontSize: 14, color: c.sub, marginTop: 6, textAlign: 'center' }}>{tr.subEmptyHint}</Text>
                 <TouchableOpacity
                   onPress={() => openCreate()}
                   accessibilityRole="button"
-                  style={[st.addBtn, { backgroundColor: ACCENT, marginTop: 22 }]}>
-                  <IconSymbol name="plus" size={16} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{tr.subNew}</Text>
+                  style={[st.addBtn, { backgroundColor: c.action, marginTop: 22 }]}>
+                  <IconSymbol name="plus" size={16} color={c.onAction} />
+                  <Text style={{ ...dsType.label, fontSize: 15, color: c.onAction }}>{tr.subNew}</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -809,7 +800,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                   style={st.archiveToggle}>
                   <IconSymbol name={showArchive ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} />
                   <IconSymbol name="archivebox" size={13} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 13, fontWeight: '700' }}>
+                  <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>
                     {tr.subArchiveCount.replace('{count}', String(archived.length))}
                   </Text>
                 </TouchableOpacity>
@@ -818,7 +809,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
             ) : null}
 
             <RecurringIncomesSection
-              c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: c.dim, accent: c.accent, green: c.green, red: c.red, sheet: c.sheet }}
+              c={c}
               tr={tr}
               lang={uiLang}
               isDark={isDark}
@@ -876,14 +867,12 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
 
       {/* «Оплачено»: підтвердження суми перед створенням витрати */}
       <SheetModal visible={!!paySub} onClose={closePay}>
-        <BlurView
-          intensity={isDark ? 50 : 70}
-          tint={isDark ? 'dark' : 'light'}
-          style={[st.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+        <View style={[st.sheet, { ...c.gl.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={st.handleRow}>
               <View style={{ flex: 1 }} />
-              <View style={[st.handle, { backgroundColor: c.border }]} />
+              <View style={[st.handle, { backgroundColor: c.muted }]} />
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <TouchableOpacity
                   onPress={closePay}
@@ -897,14 +886,14 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
 
             {paySub ? (
               <>
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.4, textTransform: 'uppercase' }}>
                   {tr.payTitle}
                 </Text>
-                <Text numberOfLines={2} style={{ color: c.text, fontSize: 19, fontWeight: Atlas.type.headingWeight, marginTop: 4 }}>
+                <Text numberOfLines={2} style={{ color: c.text, fontSize: 20, lineHeight: 26, fontFamily: fontFamily.semibold, marginTop: 4 }}>
                   {paySub.name}
                 </Text>
 
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginTop: 16 }}>
+                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 16 }}>
                   {tr.payAmount} ({paySub.currency})
                 </Text>
                 <TextInput
@@ -913,7 +902,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                   keyboardType="decimal-pad"
                   autoFocus
                   accessibilityLabel={tr.payAmount}
-                  style={[st.payInput, { color: c.text, borderColor: payValid ? c.border : c.red }]}
+                  style={[st.payInput, { color: c.text, backgroundColor: c.dim, borderColor: payValid ? 'transparent' : c.red }]}
                 />
 
                 <Text style={{ color: c.sub, fontSize: 12, lineHeight: 18, marginTop: 10 }}>
@@ -930,8 +919,8 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                   <TouchableOpacity
                     onPress={closePay}
                     accessibilityRole="button"
-                    style={[st.payBtn, { flex: 1, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                    style={[st.payBtn, { flex: 1, ...c.gl.subtle }]}>
+                    <Text style={{ ...dsType.label, color: c.t.action.secondaryText }}>{tr.cancel}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => { void paySelected(); }}
@@ -939,20 +928,20 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                     accessibilityRole="button"
                     accessibilityState={{ disabled: !payValid || busy }}
                     accessibilityLabel={tr.payConfirm}
-                    style={[st.payBtn, { flex: 1.6, backgroundColor: payValid && !busy ? c.accent : c.dim }]}>
-                    <IconSymbol name="checkmark" size={14} color={payValid && !busy ? '#fff' : c.sub} />
-                    <Text style={{ color: payValid && !busy ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>
+                    style={[st.payBtn, { flex: 1.6, backgroundColor: payValid && !busy ? c.action : c.t.state.disabledBg }]}>
+                    <IconSymbol name="checkmark" size={14} color={payValid && !busy ? c.onAction : c.t.state.disabledText} />
+                    <Text style={{ ...dsType.label, color: payValid && !busy ? c.onAction : c.t.state.disabledText, marginLeft: 6 }}>
                       {tr.payConfirm}
                     </Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={{ color: c.sub, fontSize: 11, marginTop: 10, textAlign: 'center' }}>
+                <Text style={{ ...dsType.caption, ...dsType.numeric, color: c.sub, marginTop: 10, textAlign: 'center' }}>
                   {formatSubscriptionMoney(payValid ? payAmount : paySub.amount, payAccount?.currency || paySub.currency, currencies, locale)}
                 </Text>
               </>
             ) : null}
           </ScrollView>
-        </BlurView>
+        </View>
       </SheetModal>
 
       <SubscriptionForm
@@ -976,15 +965,16 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
 }
 
 const st = StyleSheet.create({
-  totalsCard:    { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, marginBottom: 14 },
-  sectionLabel:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 },
-  filterChip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  emptyIcon:     { width: 80, height: 80, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
-  sheet:         { borderTopLeftRadius: Atlas.radius.xxlarge, borderTopRightRadius: Atlas.radius.xxlarge, borderWidth: 1, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 28 },
+  totalsCard:    { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: space.cardGapCompact },
+  totalsLabel:   { ...dsType.caption, fontFamily: fontFamily.medium },
+  sectionLabel:  { ...dsType.h2, marginBottom: 6 },
+  filterChip:    { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.pill, minHeight: 36, paddingHorizontal: 14, paddingVertical: 8 },
+  emptyIcon:     { width: 80, height: 80, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  sheet:         { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, paddingHorizontal: space.cardPadding, paddingTop: 10, paddingBottom: 28 },
   handleRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   handle:        { width: 38, height: 4, borderRadius: 2 },
-  payInput:      { borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 11, fontSize: 17, fontWeight: '700', marginTop: 6 },
-  payBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.large, paddingVertical: 13 },
-  addBtn:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 13, borderRadius: Atlas.radius.large },
+  payInput:      { borderWidth: 1, borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 11, fontSize: 20, fontFamily: fontFamily.medium, marginTop: 6, fontVariant: ['tabular-nums'] },
+  payBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, minHeight: 48 },
+  addBtn:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, minHeight: 52, borderRadius: radius.pill },
   archiveToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 14, marginTop: 8 },
 });

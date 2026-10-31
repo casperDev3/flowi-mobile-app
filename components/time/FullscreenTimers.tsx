@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/FullscreenTimers.tsx
  *
@@ -15,7 +14,6 @@ import { Atlas } from '@/constants/atlas';
  * має бути стільки ж, скільки на телефоні.
  */
 import { useKeepAwake } from 'expo-keep-awake';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
@@ -34,7 +32,9 @@ import { DialPicker } from '@/components/time/DialPicker';
 import { shouldSmoothDial } from '@/utils/dialSmooth';
 import { timerExpandedDialSize, timerFocusLayout } from '@/utils/timerGrid';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius } from '@/constants/theme';
 import { getScreenColors } from '@/constants/tokens';
+import { dsTokens } from '@/hooks/use-ds';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTimerDials } from '@/hooks/use-timer-dial';
@@ -45,8 +45,9 @@ import { updateSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
 import { timerProject, type ActiveTimer } from '@/utils/activeTimers';
 import { isOverdue, type HistoryEventType, type Task, type TaskHistoryEvent } from '@/utils/taskUtils';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { MeshBackground } from '@/components/ds';
 
-const STOP = '#EF4444';
 const PAD = 16;
 const GAP = 12;
 /** Висота шапки з кнопкою виходу — вираховується з простору під сітку. */
@@ -102,6 +103,8 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
   const { dialFor, setDialFor, defaultDial, setDefaultDial } = useTimerDials(liveIds);
 
   const c = useMemo(() => getScreenColors('time', isDark), [isDark]);
+  const t = dsTokens(isDark);
+  const gs = useGlassStyles();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -212,7 +215,7 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
   const expanded = expandedId ? activeTimers.find(t => t.id === expandedId) : undefined;
   const expandedTask = taskById(expanded?.taskId);
 
-  const dim = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+  const dim = (gs.card.backgroundColor as string);
 
   return (
     <>
@@ -222,8 +225,8 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
         presentationStyle="fullScreen"
         animationType="fade"
         onRequestClose={onClose}>
-        <View style={{ flex: 1 }}>
-          <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+        <View style={{ flex: 1, backgroundColor: c.bg1 }}>
+          <MeshBackground />
 
           <View
             style={{
@@ -258,8 +261,8 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                 accessibilityRole="button"
                 accessibilityLabel={tr.exitFullscreen}
                 hitSlop={10}
-                style={[st.exit, { backgroundColor: dim, borderColor: c.border }]}>
-                <IconSymbol name="xmark" size={16} color={c.sub} />
+                style={[st.exit, { ...gs.card }]}>
+                <IconSymbol name="xmark" size={16} color={c.text} />
               </Pressable>
             </View>
 
@@ -267,8 +270,8 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
               // Останній таймер зупинено, а режим лишається відкритим:
               // згортати його за користувача не можна — він вийде сам.
               <View style={st.empty}>
-                <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
-                  <IconSymbol name="timer" size={30} color={c.accent} />
+                <View style={[st.emptyIcon, { ...gs.card }]}>
+                  <IconSymbol name="timer" size={30} color={t.text.muted} />
                 </View>
                 <Text style={[st.emptyTitle, { color: c.text }]}>{tr.noActiveTimers}</Text>
                 <Text style={[st.emptyHint, { color: c.sub }]}>{tr.noActiveTimersHint}</Text>
@@ -317,16 +320,16 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                 {expandedTask ? (
                   <View style={{ marginTop: 8 }}>
                     {expandedTask.deadline ? (
-                      <View style={[st.metaRow, { borderColor: c.border, backgroundColor: dim }]}>
+                      <View style={[st.metaRow, { backgroundColor: dim }]}>
                         <IconSymbol
                           name="calendar"
                           size={15}
-                          color={isOverdue(expandedTask) ? STOP : c.sub}
+                          color={isOverdue(expandedTask) ? t.status.danger : c.sub}
                         />
                         <Text style={[st.metaLabel, { color: c.sub }]}>{tr.deadline}</Text>
                         <Text
                           style={[st.metaValue, {
-                            color: isOverdue(expandedTask) ? STOP : c.text,
+                            color: isOverdue(expandedTask) ? t.status.danger : c.text,
                           }]}>
                           {new Date(expandedTask.deadline).toLocaleDateString(locale, {
                             day: 'numeric',
@@ -346,11 +349,11 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                             onPress={() => { void toggleSubtask(expandedTask.id, sub.id); }}
                             accessibilityRole="checkbox"
                             accessibilityState={{ checked: sub.done }}
-                            style={[st.subRow, { borderColor: c.border, backgroundColor: dim }]}>
+                            style={[st.subRow, { backgroundColor: dim }]}>
                             <IconSymbol
                               name={sub.done ? 'checkmark.circle.fill' : 'circle'}
                               size={19}
-                              color={sub.done ? c.accent : c.sub}
+                              color={sub.done ? t.status.success : c.sub}
                             />
                             <Text
                               numberOfLines={2}
@@ -370,9 +373,9 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
                 <Pressable
                   onPress={() => { void stopTimer(expanded.id); setExpandedId(null); }}
                   accessibilityRole="button"
-                  style={[st.stopWide, { borderColor: STOP + '55', backgroundColor: STOP + '16' }]}>
-                  <IconSymbol name="stop.fill" size={15} color={STOP} />
-                  <Text style={st.stopWideText}>{tr.stopTimerAction}</Text>
+                  style={[st.stopWide, { ...gs.card }]}>
+                  <IconSymbol name="stop.fill" size={15} color={t.status.danger} />
+                  <Text style={[st.stopWideText, { color: t.text.primary }]}>{tr.stopTimerAction}</Text>
                 </Pressable>
               </ScrollView>
             ) : (
@@ -420,7 +423,7 @@ export function FullscreenTimers({ visible, onClose }: { visible: boolean; onClo
             onClose={() => setPickerFor(null)}
             defaultDial={defaultDial}
             onMakeDefault={setDefaultDial}
-            colors={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent, sheet: c.bg2 }}
+            colors={{ text: c.text, sub: c.sub, border: c.border, accent: c.accent, sheet: (gs.strong.backgroundColor as string) }}
             isDark={isDark}
             tr={tr}
           />
@@ -437,32 +440,32 @@ const st = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: PAD,
   },
-  title:    { fontSize: 17, fontWeight: Atlas.type.headingWeight, flex: 1 },
+  title:    { fontSize: 20, fontFamily: fontFamily.semibold, flex: 1, fontVariant: ['tabular-nums'] },
   back:     { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  backText: { fontSize: 15, fontWeight: '600', marginLeft: 2 },
-  exit:     { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  backText: { fontSize: 15, fontFamily: fontFamily.medium, marginLeft: 2 },
+  exit:     { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
 
   empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyIcon:  { width: 64, height: 64, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 16, fontWeight: '700', marginTop: 16 },
-  emptyHint:  { fontSize: 13, marginTop: 6, textAlign: 'center', lineHeight: 19 },
+  emptyIcon:  { width: 64, height: 64, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontSize: 16, fontFamily: fontFamily.semibold, marginTop: 16 },
+  emptyHint:  { fontSize: 13, fontFamily: fontFamily.regular, marginTop: 6, textAlign: 'center', lineHeight: 19 },
 
   bigClockBox: { alignItems: 'center', paddingVertical: 26 },
   head:        { flexDirection: 'row', alignItems: 'center', maxWidth: '100%' },
   dot:         { width: 9, height: 9, borderRadius: 5, marginRight: 8 },
-  bigLabel:    { fontSize: 16, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
+  bigLabel:    { fontSize: 18, fontFamily: fontFamily.semibold, flexShrink: 1, textAlign: 'center' },
   // tabular-nums: без нього ширина цифр гуляє і великий годинник смикається.
-  caption:     { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginTop: 8, textTransform: 'uppercase' },
+  caption:     { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.8, marginTop: 8, textTransform: 'uppercase' },
 
-  metaRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginBottom: 8 },
-  metaLabel:    { fontSize: 12, fontWeight: '600', marginLeft: 9, flex: 1 },
-  metaValue:    { fontSize: 13, fontWeight: '700', marginLeft: 10, flexShrink: 1 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
-  subRow:       { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginBottom: 7 },
-  subText:      { fontSize: 14, fontWeight: '600', marginLeft: 10, flex: 1 },
+  metaRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nestedCompact, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 8 },
+  metaLabel:    { fontSize: 13, fontFamily: fontFamily.regular, marginLeft: 9, flex: 1 },
+  metaValue:    { fontSize: 14, fontFamily: fontFamily.semibold, marginLeft: 10, flexShrink: 1, fontVariant: ['tabular-nums'] },
+  sectionLabel: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 8 },
+  subRow:       { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nestedCompact, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 8, minHeight: 44 },
+  subText:      { fontSize: 14, fontFamily: fontFamily.medium, marginLeft: 10, flex: 1 },
 
-  stopWide:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.large, borderWidth: 1, paddingVertical: 13, marginTop: 22 },
-  stopWideText: { color: STOP, fontSize: 14, fontWeight: '700', marginLeft: 8 },
+  stopWide:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, minHeight: 52, marginTop: 24 },
+  stopWideText: { fontSize: 15, fontFamily: fontFamily.semibold, marginLeft: 8 },
 });

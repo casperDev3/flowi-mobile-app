@@ -1,0 +1,330 @@
+# Flowi Design System v2 — мобільний застосунок
+
+> **v2.1 — Liquid Glass + видимі акценти.** Поверх «м'якого мінімалізму» нижче:
+> кольоровий mesh-canvas, скляні картки/навігація/модалки й акцент у кожного
+> модуля. Розділ [Liquid Glass (v2.1)](#liquid-glass-v21) нижче ПЕРЕКРИВАЄ
+> старі правила «градієнти й frosted glass — лише promo/AI» та «таб-бар —
+> суцільний surface.card». Решта (типографіка, радіуси, відступи, pill CTA)
+> лишається.
+
+«М'який мінімалізм»: холодний світло-сірий canvas, білі картки з великим
+радіусом, багато повітря, великі тонкі цифри як головний акцент, чорні
+pill-кнопки для головних дій, точкові яскраві акценти (лайм, бурштин, лаванда,
+корал). Градієнти й frosted glass — ЛИШЕ для promo- та AI-блоків. Без важких
+тіней і рамок: ієрархія через фон, відступи й типографіку.
+
+Темна тема — та сама структура токенів із власними значеннями (не інверсія);
+«підйом» поверхні — яскравістю (`surface.elevated`), а не тінню.
+
+Ті самі семантичні назви на вебі (`--ds-<група>-<назва>`) і тут
+(`t.<група>.<назва>`, camelCase).
+
+## Де що лежить
+
+| Що | Шлях | Експорт |
+|---|---|---|
+| Токени | `constants/theme.ts` | `theme` (`theme.light` / `theme.dark`), `radius`, `space`, `shadow`, `type`, `fontFamily`, `fontFor()`, `touchTarget`, типи `DSTheme`, `DSScheme`; легасі `Colors`, `Fonts` |
+| Хук | `hooks/use-ds.ts` | `useDS()` → `{ t, isDark, scheme }`; `dsTokens(isDark)`; помічники `ds.*` |
+| Примітиви | `components/ds/` (`index.ts`) | `Card`, `PillButton`, `Chip`, `Badge`, `ProgressBar`, `DisplayNumber`, `Skeleton`, `SkeletonCard`, `EmptyState`, `AIBlock`, `AIOrb`, `PromoCard` |
+| Палітра екрана (легасі) | `constants/tokens.ts` | `getScreenColors(screen, isDark)`, `Radius`, `Spacing` |
+| Радіуси Atlas (легасі) | `constants/atlas.ts` | `Atlas.radius.*` — перепризначено на шкалу DS |
+
+`useDS()` бере схему з `store/theme-context` (вибір користувача «світла/темна/
+системна» має пріоритет над системою) — так само, як `useColorScheme()`.
+
+## Кольори
+
+| Токен (`t.…`) | Світла | Темна | Для чого |
+|---|---|---|---|
+| `bg.canvas` | `#F1F1F3` | `#0D0D0F` | фон екрана |
+| `surface.card` | `#FFFFFF` | `#17171A` | картки, таб-бар, сайдбар |
+| `surface.subtle` | `#F5F5F7` | `#202024` | інпути, чипи, неактивні таби, вкладені блоки |
+| `surface.elevated` | `#FFFFFF` | `#1E1E22` | поповери, плаваючі панелі |
+| `surface.overlay` | `rgba(17,17,19,.40)` | `rgba(0,0,0,.60)` | затемнення під модалкою |
+| `surface.glass` | `rgba(255,255,255,.72)` | `rgba(23,23,26,.72)` | frosted (лише promo/AI) |
+| `border.hairline` | `#E8E8EC` | `#2A2A2F` | роздільники — мінімально |
+| `text.primary` | `#111113` | `#F4F4F5` | основний текст |
+| `text.secondary` | `#6B6B73` | `#A1A1AA` | підписи, мета, caption |
+| `text.muted` | `#A1A1AA` | `#6B6B73` | ЛИШЕ placeholder / disabled / декор (< 4.5:1!) |
+| `text.onAction` | `#FFFFFF` | `#111113` | текст на `action.primary` |
+| `text.onAccent` | `#111113` | `#111113` | текст на lime/amber/lavender |
+| `action.primary` | `#111113` | `#F4F4F5` | pill-кнопка головної дії, активний таб |
+| `action.primaryHover` | `#2A2A2E` | `#FFFFFF` | hover (iPad-курсор/веб) |
+| `action.primaryPressed` | `#000000` | `#D4D4D8` | pressed |
+| `action.secondary` / `secondaryText` | `#F5F5F7` / `#111113` | `#202024` / `#F4F4F5` | вторинна кнопка |
+| `accent.lime` | `#DDF54A` | `#CDEB3A` | бейджі значень на графіках, активний стовпець |
+| `accent.amber` | `#F6B93B` | `#F2B135` | прогрес-бари, gauge, тултіпи, «7 днів» |
+| `accent.lavender` | `#B8A4F8` | `#B8A4F8` | AI-блоки, асистент, focus ring |
+| `accent.lavenderSoft` | `#EDE6FF` | `rgba(184,164,248,.22)` | тло AI-чипів |
+| `accent.coral` | `#E8543F` | `#E8543F` | тіки-індикатори, високий пріоритет, алерти |
+| `status.success` | `#22A55B` | `#2FBF6C` | |
+| `status.warning` | `#F6B93B` | `#F2B135` | |
+| `status.danger` | `#E8543F` | `#EF6450` | |
+| `status.info` | `#4F7CF7` | `#6A90FA` | |
+| `focus.ring` | `#B8A4F8` | `#B8A4F8` | 2px рамка фокусу |
+| `state.disabledBg` / `disabledText` | `#F5F5F7` / `#A1A1AA` | `#1A1A1D` / `#52525B` | |
+| `skeleton.base` / `highlight` | `#ECECEF` / `#F7F7F9` | `#1E1E22` / `#26262B` | |
+
+Градієнти — масиви для `expo-linear-gradient` (`colors={t.gradient.x}`):
+
+| Токен | Світла | Темна | Лише для |
+|---|---|---|---|
+| `gradient.iridescent` | `#CFE3FF → #F6D9F0 → #FFE3B8` | `#1E3A66 → #5A2752 → #6B4419` (+ `iridescentGlow` 15%) | promo («Upgrade to Pro») з BlurView |
+| `gradient.aiOrb` | `#7B5CFF → #FF7AC6 → #FFB86B` | те саме | сфера асистента |
+| `gradient.aiSurface` | `#EDE6FF → #F6F1FF` | `rgba(123,92,255,.25) → rgba(184,164,248,.12)` | тло AI-блоків |
+
+## Форма, відступи, глибина
+
+- `radius` (зменшено 2026-11-01): `card` 16, `cardCompact` 14, `nested` 12, `nestedCompact` 10, `control` 10, `pill` 999 (кнопки, чипи, аватари).
+- `space`: 1→4, 2→8, 3→12, 4→16, 5→20, 6→24, 8→32, 10→40, 12→48; `cardPadding` 24 / `cardPaddingCompact` 20; `cardGap` 16 / `cardGapCompact` 12. На телефоні — compact-варіанти.
+- `shadow[scheme].card` / `.popover` — розгорнути у стиль (`...shadow[scheme].card`). Світла — м'яка тінь; темна `card` — без тіні, лише світлий верхній край 4%.
+- `touchTarget` = 44.
+
+Легасі-шкали тепер на DS:
+- `Atlas.radius`: small 6, medium 10, large 10, xlarge 14, xxlarge 16 (зменшено 2026-11-01; жорстко прописані `borderRadius` у екранах не чіпались).
+- `Radius` (tokens.ts): sm 12, md 14, lg 16, xl 20, xxl 24, pill 999.
+
+## Типографіка
+
+Manrope (кирилиця), вантажиться в `app/_layout.tsx` (300/400/500/600/700; рендер
+чекає не довше 2.5 с, далі — системний шрифт). **Вага задається родиною, не
+`fontWeight`**: `fontFamily.light|regular|medium|semibold|bold` або
+`fontFor('600')`. Поєднання кастомної родини з `fontWeight` на Android
+ігнорується, а на iOS може дати синтетичний жирний.
+
+| Стиль (`type.…`) | Розмір / родина | Примітка |
+|---|---|---|
+| `display` | 48 / Light 300, tracking −2% | KPI, лічильники, годинник; `tabular-nums` |
+| `displaySm` | 40 / Light | вузькі картки |
+| `displayUnit` | 22 / Regular | одиниця біля числа (k, s, /5, ₴) — колір `text.secondary` |
+| `h1` | 32 / Medium 500 | заголовок сторінки |
+| `h2` | 16 / SemiBold 600 | заголовок картки |
+| `body` / `bodyMedium` | 14 / Regular / Medium | |
+| `caption` | 12 / Regular | колір `text.secondary` |
+| `label` | 14 / SemiBold | підпис кнопки/чипа |
+| `numeric` | — | домішка `fontVariant: ['tabular-nums']` для будь-якого числа |
+
+Кольору в `type.*` немає — додавайте `{ color: t.text.primary }`.
+
+## Акценти екранів (`getScreenColors`)
+
+Усі екрани тепер ділять `bg1 = bg2 = bg.canvas`, `card = surface.card`
+(непрозорий), `border = border.hairline`, `text = text.primary`,
+`sub = text.secondary`, `subStrong` = `#3F3F46` / `#D4D4D8`.
+Акцент лишився (завжди `#RRGGBB`, бо споживачі дописують альфу `accent + '22'`):
+
+| Екран | Світла | Темна | Чому |
+|---|---|---|---|
+| tasks, auth, time | `#6D4CF5` | `#8B6CFF` | глибока лаванда: `accent.lavender` не тримає білий підпис/дрібний текст (≈2:1) |
+| finance | `status.info` | `status.info` | |
+| health | `status.success` | `status.success` | |
+| notes, containers | `accent.amber` | `accent.amber` | |
+| settings | `text.secondary` | `text.secondary` | нейтральний |
+
+Головні дії в мігрованих екранах — `action.primary` pill, а не акцент екрана.
+
+## Навігація
+
+- Таб-бар (телефон): суцільний `surface.card` (`TAB_BAR_BG` у `constants/nav.ts`), без блюру й рамки; активна іконка — у pill `action.primary` з `text.onAction`, підписи `text.primary` / `text.secondary` (`TAB_BAR_TINT`). Контраст охороняє `__tests__/audit-tabbar-a11y.test.tsx`.
+- Сайдбар і рейка (планшет, `NavSidebar`, `ProjectSidebar`): `surface.card` без правої рамки, активний пункт — pill `action.primary` + `text.onAction`.
+
+## Рецепт міграції екрана
+
+1. Тема:
+   ```tsx
+   // було
+   const isDark = useColorScheme() === 'dark';
+   // стало
+   import { useDS } from '@/hooks/use-ds';
+   const { t, isDark } = useDS();
+   ```
+   Поза компонентом (StyleSheet-фабрика, утиліта з `isDark`) — `dsTokens(isDark)`.
+2. Замінити інлайн-кольори семантикою:
+   | Було (типово) | Стало |
+   |---|---|
+   | `isDark ? '#0C0C14' : '#F4F2FF'` (фон, градієнт bg1/bg2) | `t.bg.canvas` (градієнт фону прибрати) |
+   | `isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.85)'` + BlurView | `t.surface.card` (непрозора, без BlurView) |
+   | `isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)'` (рамка) | прибрати рамку; за потреби — `t.border.hairline` |
+   | `isDark ? '#F0EEFF' : '#1A1433'` | `t.text.primary` |
+   | `rgba(…,0.55–0.62)` підписи | `t.text.secondary` |
+   | placeholderTextColor | `t.text.muted` |
+   | інпут/чип фон `rgba(…,0.05)` | `t.surface.subtle` |
+   | кнопка головної дії `backgroundColor: accent` + `'#fff'` | `<PillButton>` або `ds.pillButton(t)` + `ds.pillText(t)` |
+   | `'#EF4444'`, `'#10B981'`, `'#F59E0B'`, `'#3B82F6'` | `t.status.danger/success/warning/info` |
+   | прогрес-бар | `<ProgressBar value=… />` (amber) |
+3. Картки: `<Card>` (або `ds.card(t, isDark)`), радіус 20–24, без `borderWidth`.
+4. Числа: великі KPI → `<DisplayNumber value unit caption />`; будь-яке число — `type.numeric`.
+5. Порожні стани → `<EmptyState>`; завантаження → `<Skeleton>` / `<SkeletonCard>`.
+6. AI-блоки → `<AIBlock>`; promo → `<PromoCard>`. Більше ніде градієнтів.
+7. НЕ чіпати: логіку, дані, маршрути, ключі i18n, `accessibilityLabel` / `testID` / `accessibilityRole` / `hitSlop`; зона дотику ≥ 44.
+
+## Примітиви — API
+
+```tsx
+import { Card, PillButton, Chip, Badge, ProgressBar, DisplayNumber,
+         Skeleton, SkeletonCard, EmptyState, AIBlock, AIOrb, PromoCard } from '@/components/ds';
+
+<Card compact? padded? elevated? nested? style />                 // ViewProps
+<PillButton label variant="primary|secondary|ghost" size="md|sm" icon? iconRight?
+            loading? fullWidth? disabled? onPress testID accessibilityLabel? />
+<Chip label selected? icon? count? onPress disabled? />
+<Badge label tone="lime|amber|lavender|coral|neutral" accessibilityLabel? />
+<ProgressBar value={0..1} tone="amber|lime|lavender|coral|success|primary" height? accessibilityLabel? />
+<DisplayNumber value unit? unitPosition="after|before" size="sm|md|lg" caption? color? accessibilityLabel? />
+<Skeleton width? height? radius? />   <SkeletonCard />
+<EmptyState icon? title caption? actionLabel? onAction? actionTestID? />
+<AIBlock title? orb? compact?>…</AIBlock>     <AIOrb size? />
+<PromoCard title caption? actionLabel? onAction?>…</PromoCard>
+```
+
+Помічники стилів (`hooks/use-ds.ts`): `ds.card(t, isDark, {compact, padded})`,
+`ds.nested(t, compact)`, `ds.input(t)`, `ds.pillButton(t, variant)`,
+`ds.pillText(t, variant)`, `ds.chip(t, active)`, `ds.chipText(t, active)`,
+`ds.screen(t)`, `ds.focusRing(t)`.
+
+
+---
+
+## Liquid Glass (v2.1)
+
+Напівпрозорі поверхні над кольоровою сіткою (mesh) — у **світлій і темній**
+темах. Скло = блюр + напівпрозора заливка + спекулярний обідок 1px (світліший
+верхній край) + внутрішній відблиск + м'яка розсіяна тінь. Великі радіуси
+(24 картки, 999 pill) лишаються. Головна CTA — суцільна `action.primary` pill
+(якір контрасту), за бажання з м'яким світінням акценту.
+
+### Як рендериться (components/ds/Glass.tsx)
+
+| Умова | Що малюється |
+|---|---|
+| «Зменшити прозорість» (iOS) / `prefers-reduced-transparency` (веб) | суцільна `glass.solid.*` (= surface.card) + hairline, без блюру |
+| iOS 26+ із нативним Liquid Glass (`expo-glass-effect`: `isLiquidGlassAvailable() && isGlassEffectAPIAvailable()`) | `<GlassView glassEffectStyle="regular">` — справжнє заломлення |
+| iOS < 26 (або збірка без нативного модуля) | `expo-blur` `<BlurView tint="systemUltraThinMaterial…">` + заливка + обідок + відблиск |
+| Android / веб | напівпрозора заливка + обідок (BlurView на Android дорогий) |
+| `variant="subtle"` | ніколи не блюрить — вкладене скло для рядків у картці, інпутів |
+
+`expo-glass-effect` (~0.1.10) встановлено через `npx expo install`. Це нативний
+модуль: справжнє скло з'явиться після **нової dev/EAS-збірки**; до того
+`Glass.tsx` перевіряє `requireOptionalNativeModule('ExpoGlassEffect')` і тихо
+бере BlurView-шлях.
+
+### Токени скла (`constants/theme.ts` → `glass.light` / `glass.dark`, у компоненті `useDS().g`)
+
+| Токен (`g.…`) | Світла | Темна | Для чого |
+|---|---|---|---|
+| `surface` | `rgba(255,255,255,.55)` | `rgba(30,30,36,.52)` | картки, сайдбар |
+| `surfaceStrong` | `rgba(255,255,255,.72)` | `rgba(32,32,38,.70)` | модалки, поповери, шапки, таб-бар — під щільний текст |
+| `surfaceSubtle` | `rgba(255,255,255,.38)` | `rgba(255,255,255,.06)` | вкладене: рядки, інпути, чипи, доріжки прогресу |
+| `rim` / `rimShade` | `rgba(255,255,255,.75)` / `rgba(17,17,19,.06)` | `rgba(255,255,255,.14)` / `rgba(0,0,0,.4)` | обідок: верх/боки `rim`, низ `rimShade` |
+| `highlight` | `rgba(255,255,255,.9)` | `rgba(255,255,255,.16)` | внутрішній верхній відблиск (градієнт → 0) |
+| `blur` / `saturate` | 24 / 1.8 | 28 / 1.6 | паритет із вебом (`backdrop-filter`) |
+| `blurIntensity` / `blurTint` | 40 / `systemUltraThinMaterialLight` | 45 / `…Dark` | expo-blur |
+| `shadow` | `#281E6E` 10%, r16, y8 | `#000` 45%, r16, y8 | iOS; Android — без elevation (просвічує крізь скло) |
+| `solid.card/strong/subtle` | `#FFF` / `#FFF` / `#F5F5F7` | `#17171A` / `#1E1E22` / `#202024` | фолбек «Зменшити прозорість» |
+| `mesh.base` | `#F1F0F5` | `#0D0D10` | основа canvas під плямами |
+| `mesh.blobs` | лаванда 38% ↖, лайм 30% ↗, бурштин 26% ↘, синій 20% ↙, корал 12% → | фіолет 32% ↖, синій 22% ↗, корал 14% ↘, лайм 10% ↙, бурштин 10% · | радіальні плями `<MeshBackground/>` |
+
+### Акценти (`g.accent[x]`, x = `lime | amber | lavender | coral | info | success`)
+
+Кожен акцент — набір ролей (контраст перевірено на композиті скла над mesh):
+
+| Роль | Для чого | Контраст |
+|---|---|---|
+| `solid` | велика заливка під `onSolid` (#111113): вибраний чип, `variant="accent"` кнопка, бейдж | ≥ 4.99:1 (обидві теми) |
+| `fill` | тонкі індикатори: прогрес, кільця, графіки, крапки | ≥ 3:1 на склі |
+| `ink` | іконки й текст акцентом на склі; `#RRGGBB` (можна `ink + '22'`) | світла ≥ 4.4–5.4, темна ≥ 6.4 |
+| `tint` | rgba-«змивка»: KPI-картка, icon-chip, активний пункт навігації | — |
+| `glow` | `shadowColor` світіння (активний пункт, головна CTA) | — |
+
+| Акцент | solid (світла/темна) | fill світла | ink світла / темна |
+|---|---|---|---|
+| lavender | `#B8A4F8` | `#8B6CFF` | `#6D4CF5` / `#B8A4F8` |
+| lime | `#DDF54A` / `#CDEB3A` | `#6E8C00` | `#4F6B00` / `#CDEB3A` |
+| amber | `#F6B93B` / `#F2B135` | `#B87800` | `#8F5400` / `#F2B135` |
+| coral | `#E8543F` / `#FF8A75` | `#E8543F` | `#C23A24` / `#FF8A75` |
+| info | `#4F7CF7` / `#8FAEFF` | `#4F7CF7` | `#2F5BD8` / `#8FAEFF` |
+| success | `#22A55B` / `#4CD787` | `#1E9450` | `#127536` / `#4CD787` |
+
+**Акцент модуля** (`moduleAccent` у theme.ts): today/tasks/projects/settings/auth/archive → lavender ·
+finance → lime · health/workouts → coral · time/notes/containers/ideas → amber ·
+meetings/calendar/integrations → info · training/menu → success.
+
+Правило: **один акцент на картку, 2–3 на кластер екрана** — кольорово, не веселка.
+Текст на склі — завжди `text.primary` / `text.secondary` (≥ 4.5:1: secondary ≈ 4.7 на
+світлому склі, ≈ 5.7 на темному); під щільним текстом — `strong`.
+
+### Примітиви v2.1 — API
+
+```tsx
+import { GlassScreen, GlassSurface, GlassBackdrop, MeshBackground, IconChip, SectionHeader,
+         AccentProvider, useModuleAccent, useResolvedAccent, isNativeLiquidGlass,
+         Card, Chip, PillButton, Badge, ProgressBar, AIBlock, PromoCard, EmptyState } from '@/components/ds';
+
+// Корінь екрана: mesh + акцент модуля для всіх примітивів усередині
+<GlassScreen module="finance" mesh? meshIntensity? accent? style>…</GlassScreen>
+<MeshBackground intensity? style? />          // absoluteFill; замість <View absoluteFill bg={c.bg1}/>
+<AccentProvider module="health" | accent="coral">…</AccentProvider>
+
+<GlassSurface variant="card|strong|subtle|pill" radius? tint?={true|'lime'…} glow?={true|'lime'…}
+              blur? shadow? interactive? style testID …ViewProps />
+<GlassBackdrop intensityBoost? />            // лише «матеріал» (native glass / BlurView) для власних панелей
+
+<Card compact? padded? elevated? nested? tint? glow? blur? solid? style />
+   // elevated → strong; nested → subtle без блюру; blur={false} — картки в довгих списках
+<IconChip icon accent? size="sm|md|lg" solid? accessibilityLabel? />   // тонований скляний кружок, іконка ink
+<SectionHeader title accent? actionLabel? onAction? actionTestID? />   // крапка fill + h2
+<Chip … accent?={GlassAccent|null} />          // вибраний = solid акценту модуля; null → чорна pill
+<PillButton … variant="primary|secondary|ghost|accent" accent? glow? />  // secondary = скляна pill
+<Badge tone="lime|amber|lavender|coral|info|success|accent|neutral" />
+<ProgressBar tone?="accent|amber|lime|lavender|coral|info|success|primary" />  // за замовч. — акцент модуля
+```
+
+Хук і помічники:
+
+```ts
+const { t, g, isDark, scheme, reduceTransparency } = useDS();
+glassTokens(isDark)            // поза хуками
+accentRoles('lime', isDark)    // ролі одного акценту
+ds.glass(isDark, 'card'|'strong'|'subtle', reduceTransparency?)  // заливка + обідок, будь-яка форма
+ds.accentWash(isDark, 'lime') // тонована змивка
+ds.card(t, isDark, {compact, padded, reduceTransparency})          // скляна картка БЕЗ блюру
+ds.nested / ds.input / ds.chip(t, active, accent?) / ds.chipText(t, active, accent?) — тепер скло
+ds.pillButton(t, 'secondary')  // скляна pill
+ds.screen(t)                   // flex:1 + mesh.base (плями — <MeshBackground/>)
+```
+
+`getScreenColors(screen, isDark)` (constants/tokens.ts) у v2.1:
+`bg1 = bg2 = glass.mesh.base`, **`card` = `glass.surface` (rgba!)**, нове
+`cardSolid` = surface.card, `accent` = `ink` акценту модуля (`#RRGGBB`),
+нові `onAccent` (світла `#FFFFFF`, темна `#111113`), `accentTint` (rgba),
+`accentName` (`GlassAccent`). Екрани: tasks/auth/settings → lavender,
+time/notes/containers → amber, finance → lime, health → coral.
+
+### Навігація v2.1
+
+- **Таб-бар (телефон)**: `TabBarGlass` у `app/(tabs)/_layout.tsx` — `GlassBackdrop` (iOS 26 нативне скло / BlurView) + `surfaceStrong` (Android — майже непрозора 0.9) + верхній відблиск і обідок. Активна вкладка — скляна pill, тонована **акцентом модуля** вкладки (Сьогодні/Завдання/Налаштування — lavender, Фінанси — lime, Здоров'я — coral) + іконка `ink` + світіння (iOS). «Зменшити прозорість» → суцільне `TAB_BAR_BG` і pill `solid` + `onSolid`.
+- **Сайдбар / рейка (планшет)**: `NavSidebar` / `ProjectSidebar` — скло над глобальним mesh (`GlassBackdrop` + `g.surface` + обідок праворуч). Активний пункт — тонована pill акценту модуля пункту (`navItemAccent(item)` з NavSidebar), іконка `ink`, підпис `text.primary` SemiBold; у просторі проєкту — акцент «Проєкти» (lavender).
+- **Глобальний mesh**: `app/_layout.tsx` малює `<MeshBackground/>` під сайдбаром і Stack; тема навігації — `mesh.base`. Екрани все одно малюють свій mesh (непрозоро), щоб native-stack перехід не просвічував попередній екран.
+
+### Рецепт міграції екрана на v2.1
+
+1. Фон: `<View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg1 }]} />` → `<MeshBackground />`;
+   або корінь екрана → `<GlassScreen module="…">` (дає і mesh, і акцент примітивам).
+2. Картки: `<Card>` (уже скло). Інлайн `backgroundColor: c.card` теж стає склом (rgba) —
+   додайте обідок: `...ds.glass(isDark, 'card')` замість `backgroundColor`. Картки в
+   `FlatList`/довгих списках — `<Card blur={false}>`; рядки всередині картки — `<Card nested>`
+   або `ds.glass(isDark, 'subtle')` (без блюру).
+3. Модалки/аркуші/поповери — `<GlassSurface variant="strong">` або `ds.glass(isDark,'strong')`
+   (щільний текст ≥ 4.5:1). Шапки — `variant="strong"` / `GlassBackdrop` + `g.surfaceStrong`.
+4. Інпути/чипи — `ds.input(t, isDark)` / `<Chip>` (скло subtle; вибраний — акцент модуля).
+5. Акценти **видимі**: іконки розділів → `<IconChip icon=… />`; головна KPI-картка →
+   `<Card tint>` (+ `glow` для однієї на екран); прогрес/кільця/графіки → `g.accent[x].fill`
+   або `<ProgressBar />`; заголовки секцій → `<SectionHeader>`; посилання/акцентний текст →
+   `c.accent` / `g.accent[x].ink`.
+6. Текст на заливці акцентом: `backgroundColor: c.accent` → колір тексту **`c.onAccent`**
+   (не `'#fff'`: у темній ink світлий). Краще — `<PillButton variant="accent">` (solid + #111113).
+7. Головна дія — як і раніше `<PillButton>` primary (суцільна); `glow` — для однієї на екран.
+8. Не вкладати блюр у блюр: усередині `GlassSurface` з блюром — лише `subtle`/`ds.glass` без блюру.
+9. «Зменшити прозорість» обробляють примітиви самі; власні скляні стилі — через
+   `ds.glass(isDark, v, reduceTransparency)` з `useDS().reduceTransparency`.
+10. Як і раніше НЕ чіпати логіку, i18n-ключі, `accessibilityLabel`/`testID`/`hitSlop`.

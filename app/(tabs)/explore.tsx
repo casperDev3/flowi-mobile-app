@@ -1,6 +1,4 @@
 import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -34,7 +32,7 @@ import { SheetModal } from '@/components/shared/SheetModal';
 import { SkeletonCard } from '@/components/shared/Skeleton';
 import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useI18n } from '@/store/i18n';
 import { loadDataResult, retryStorageRead } from '@/store/storage';
@@ -90,6 +88,10 @@ import { inRange, monthsOf, resolvePeriod } from '@/utils/finance/period';
 import { calcPeriodTotalsByCurrency } from '@/utils/financePeriod';
 import { parseFinanceTab, reportsFabHidden, visibleFinanceTabs, type FinanceTab } from '@/utils/financeTabs';
 import { formatSubscriptionMoney, parseDateKey } from '@/utils/subscriptions';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRim, glassRimFor, dsGlass } from '@/components/shared/dsTheme';
+import { AccentIcon } from '@/components/shared/GlassBits';
 
 /**
  * Категорії існують лише для доходів і витрат. Переказ категорії не має: він
@@ -152,7 +154,8 @@ export default function FinanceScreen() {
   // Рукописні модалки (календар, валюта, категорії) — діалогом на планшеті,
   // як і SheetModal-и цього ж екрана.
   const wm = wideModalStyles(isWide);
-  const isDark = useColorScheme() === 'dark';
+  // DS v2: нейтральна палітра; головні дії/вибрані чипи — action.primary (c.accent).
+  const { t, isDark } = useDSTheme();
   useScreenView('finance');
   const insets = useSafeAreaInsets();
   /**
@@ -1129,28 +1132,33 @@ export default function FinanceScreen() {
   }, [txs]);
 
   const c = {
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(180,170,240,0.4)',
-    text:   isDark ? '#F4F2FF' : '#0A0818',
-    sub:    isDark ? 'rgba(244,242,255,0.62)' : 'rgba(10,8,24,0.60)',
-    green:  '#10B981',
-    red:    '#EF4444',
+    bg1:    t.bg.canvas,
+    bg2:    t.bg.canvas,
+    card:   glassOf(t).surface,
+    border: t.border.hairline,
+    text:   t.text.primary,
+    sub:    t.text.secondary,
+    green:  t.status.success,
+    red:    t.status.danger,
     // Переказ малюємо нейтральним: він не дохід і не витрата, і зелений чи
     // червоний тут брехали б про те, що сталося з грошима.
-    neutral: isDark ? '#94A3B8' : '#64748B',
-    accent: '#0EA5E9',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(12,12,20,0.98)' : 'rgba(248,246,255,0.98)',
+    neutral: t.text.secondary,
+    // DS v2: головна дія / вибраний чип — action.primary з text.onAction.
+    accent: t.action.primary,
+    onAccent: t.text.onAction,
+    // DS v2.1: акцент розділу «Фінанси» — lime (ink на склі, #RRGGBB) — для
+    // вкладених палітр компонентів, icon-chip меню, прогресу.
+    info:   glassOf(t).accent.lime.ink,
+    dim:    glassOf(t).surfaceSubtle,
+    sheet:  glassOf(t).sheet,
   };
 
   const txDetailScrollRef = useRef<ScrollView>(null);
 
   /** Палітра вкладок розділу — з тих самих кольорів екрана. */
   const finColors = useMemo<FinColors>(
-    () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: c.card, accent: c.accent, green: c.green, red: c.red, sheet: c.sheet }),
-    [c.text, c.sub, c.border, c.dim, c.card, c.accent, c.green, c.red, c.sheet],
+    () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: c.card, accent: c.info, green: c.green, red: c.red, sheet: c.sheet }),
+    [c.text, c.sub, c.border, c.dim, c.card, c.info, c.green, c.red, c.sheet],
   );
   /** Суми у вкладках: копійки не відкидаються, невідомий код — через символ. */
   const money = useCallback(
@@ -1174,8 +1182,8 @@ export default function FinanceScreen() {
   );
 
   const pickerColors = useMemo(
-    () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }),
-    [c.text, c.sub, c.border, c.dim, c.accent, c.sheet],
+    () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.info, sheet: c.sheet }),
+    [c.text, c.sub, c.border, c.dim, c.info, c.sheet],
   );
 
   /**
@@ -1344,12 +1352,12 @@ export default function FinanceScreen() {
             {dateFilter && (
               <TouchableOpacity
                 onPress={() => setDateFilter(null)}
-                style={[s.dateChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
-                <IconSymbol name="calendar" size={13} color={c.accent} />
-                <Text style={{ color: c.accent, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>
+                style={[s.dateChip, { backgroundColor: c.accent }]}>
+                <IconSymbol name="calendar" size={13} color={c.onAccent} />
+                <Text style={{ color: c.onAccent, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 5 }}>
                   {dateFilter.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
                 </Text>
-                <IconSymbol name="xmark" size={13} color={c.accent} style={{ marginLeft: 4 }} />
+                <IconSymbol name="xmark" size={13} color={c.onAccent} style={{ marginLeft: 4 }} />
               </TouchableOpacity>
             )}
 
@@ -1378,7 +1386,7 @@ export default function FinanceScreen() {
                   accessibilityLabel={`${filter === 'income' ? tr.incomes : tr.expenses}, ${tr.all}`}
                   hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
                   style={[s.dateChip, { marginBottom: 0, backgroundColor: (filter === 'income' ? c.green : c.red) + '20', borderColor: (filter === 'income' ? c.green : c.red) + '60' }]}>
-                  <Text style={{ color: filter === 'income' ? c.green : c.red, fontSize: 12, fontWeight: '600' }}>
+                  <Text style={{ color: filter === 'income' ? c.green : c.red, fontSize: 12, fontFamily: fontFamily.semibold }}>
                     {filter === 'income' ? tr.incomes : tr.expenses}
                   </Text>
                   <IconSymbol name="xmark" size={12} color={filter === 'income' ? c.green : c.red} style={{ marginLeft: 4 }} />
@@ -1389,25 +1397,23 @@ export default function FinanceScreen() {
             {/* Empty state with CTA */}
             {groups.length === 0 && !loadFailed && (
               <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-                <View style={{ width: 64, height: 64, borderRadius: Atlas.radius.xlarge, backgroundColor: c.accent + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                  <IconSymbol name="banknote" size={32} color={c.accent} />
-                </View>
-                <Text style={{ color: c.text, fontSize: 16, marginTop: 6, fontWeight: '700' }}>{tr.noTransactions}</Text>
+                <AccentIcon isDark={isDark} icon="banknote" accent="lime" size="lg" style={{ width: 64, height: 64, borderRadius: 32, marginBottom: 14 }} />
+                <Text style={{ color: c.text, fontSize: 16, marginTop: 6, fontFamily: fontFamily.bold }}>{tr.noTransactions}</Text>
                 <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.85 }}>{tr.pressToAdd}</Text>
                 <TouchableOpacity
                   onPress={() => openAdd()}
                   accessibilityRole="button"
                   accessibilityLabel={tr.add}
-                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <IconSymbol name="plus" size={15} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.add}</Text>
+                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, minHeight: 44, borderRadius: 999, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <IconSymbol name="plus" size={15} color={c.onAccent} />
+                  <Text style={{ color: c.onAccent, fontFamily: fontFamily.bold, fontSize: 14 }}>{tr.add}</Text>
                 </TouchableOpacity>
               </View>
             )}
 
     </>
   ), [
-    c.accent, c.green, c.red, c.sub, c.text, dateFilter, filter,
+    c.accent, c.onAccent, c.green, c.red, c.sub, c.text, dateFilter, filter,
     groups.length, initialized, isDark, isExpanded, isWide, lang, loadFailed, locale, openAdd,
     retryLoad, tr, todayDueCard, opsSummary, hasTodayDue,
   ]);
@@ -1448,7 +1454,7 @@ export default function FinanceScreen() {
                         </View>
 
                         {/* Hero */}
-                        <View style={[s.detailHero, { backgroundColor: color + '12', borderColor: color + '25' }]}>
+                        <View style={[s.detailHero, { backgroundColor: c.dim }]}>
                           <View style={[s.detailIcon, { backgroundColor: color + '25' }]}>
                             <IconSymbol name={iconName} size={30} color={color} />
                           </View>
@@ -1456,7 +1462,7 @@ export default function FinanceScreen() {
                             {transfer ? '' : isIncome ? '+' : '−'}{fmtCur(selected.amount, detailCur)}
                           </Text>
                           {credited !== null && credited !== selected.amount && (
-                            <Text style={{ color: c.sub, fontSize: 15, fontWeight: '700', marginTop: 4 }}>
+                            <Text style={{ color: c.sub, fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginTop: 4 }}>
                               → {fmtCur(credited, creditedCur)}
                             </Text>
                           )}
@@ -1468,10 +1474,10 @@ export default function FinanceScreen() {
                           <View style={{ flexDirection: 'row', gap: 6, marginTop: 10 }}>
                             <View style={[s.typePill, { backgroundColor: color + '20', borderColor: color + '40' }]}>
                               <IconSymbol name={transfer ? 'arrow.left.arrow.right' : isIncome ? 'arrow.up.trend' : 'arrow.down.trend'} size={11} color={color} />
-                              <Text style={{ color, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{typeLabel(selected.type)}</Text>
+                              <Text style={{ color, fontSize: 11, fontFamily: fontFamily.bold, marginLeft: 5 }}>{typeLabel(selected.type)}</Text>
                             </View>
                             <View style={[s.typePill, { backgroundColor: c.dim, borderColor: c.border }]}>
-                              <Text style={{ color: c.sub, fontSize: 11, fontWeight: Atlas.type.headingWeight, letterSpacing: 0.5 }}>
+                              <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5 }}>
                                 {detailCur.code}
                               </Text>
                             </View>
@@ -1513,9 +1519,9 @@ export default function FinanceScreen() {
                             }}
                             accessibilityRole="button"
                             accessibilityLabel={tr.markAsTransfer}
-                            style={[s.btn, { marginTop: 14, backgroundColor: c.neutral + '18', borderWidth: 1, borderColor: c.neutral + '40' }]}>
+                            style={[s.btn, { marginTop: 14, backgroundColor: c.dim }]}>
                             <IconSymbol name="arrow.left.arrow.right" size={15} color={c.neutral} />
-                            <Text style={{ color: c.neutral, fontWeight: '700', marginLeft: 6 }}>{tr.markAsTransfer}</Text>
+                            <Text style={{ color: c.neutral, fontFamily: fontFamily.bold, marginLeft: 6 }}>{tr.markAsTransfer}</Text>
                           </TouchableOpacity>
                         )}
 
@@ -1524,11 +1530,11 @@ export default function FinanceScreen() {
                             <Text style={[s.label, { color: c.sub, marginBottom: 8 }]}>{tr.history}</Text>
                             {[...selected.history].reverse().map((h) => (
                               <View key={h.id} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10, gap: 10 }}>
-                                <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: '#F59E0B20', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-                                  <IconSymbol name="pencil.circle.fill" size={14} color="#F59E0B" />
+                                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: t.accent.amber + '26', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                                  <IconSymbol name="pencil.circle.fill" size={14} color={t.accent.amber} />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{tr.transactionEdited}</Text>
+                                  <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.transactionEdited}</Text>
                                   <Text style={{ color: c.sub, fontSize: 12, marginTop: 1 }} numberOfLines={2}>{h.note}</Text>
                                   <Text style={{ color: c.sub, fontSize: 11, marginTop: 3 }}>
                                     {new Date(h.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
@@ -1542,16 +1548,16 @@ export default function FinanceScreen() {
                         )}
 
                         <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
-                          <TouchableOpacity onPress={() => deleteTx(selected.id)} style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
-                            <IconSymbol name="trash" size={15} color="#EF4444" />
-                            <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
+                          <TouchableOpacity onPress={() => deleteTx(selected.id)} style={[s.btn, { flex: 1, backgroundColor: c.red + '14' }]}>
+                            <IconSymbol name="trash" size={15} color={c.red} />
+                            <Text style={{ color: c.red, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.delete}</Text>
                           </TouchableOpacity>
-                          <TouchableOpacity onPress={() => startEdit(selected)} style={[s.btn, { flex: 1, backgroundColor: c.accent + '15', borderColor: c.accent + '40', borderWidth: 1 }]}>
+                          <TouchableOpacity onPress={() => startEdit(selected)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
                             <IconSymbol name="pencil" size={15} color={c.accent} />
-                            <Text style={{ color: c.accent, fontWeight: '600', marginLeft: 5 }}>{tr.edit}</Text>
+                            <Text style={{ color: c.accent, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.edit}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 1, backgroundColor: c.accent }]}>
-                            <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.close}</Text>
+                            <Text style={{ color: c.onAccent, fontFamily: fontFamily.bold }}>{tr.close}</Text>
                           </TouchableOpacity>
                         </View>
     </>
@@ -1560,7 +1566,7 @@ export default function FinanceScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <View style={{ flex: 1, flexDirection: 'row' }}>
       <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
@@ -1574,14 +1580,14 @@ export default function FinanceScreen() {
               <HeaderButton
                 onPress={() => setCompact(v => !v)}
                 accessibilityLabel={compact ? tr.listMode : tr.compactView}
-                style={{ backgroundColor: compact ? c.accent + '20' : c.dim, borderColor: compact ? c.accent : c.border }}>
-                <IconSymbol name={compact ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={compact ? c.accent : c.sub} />
+                style={{ backgroundColor: compact ? c.accent : c.card }}>
+                <IconSymbol name={compact ? 'rectangle.stack.fill' : 'rectangle.stack'} size={17} color={compact ? c.onAccent : c.sub} />
               </HeaderButton>
               <HeaderButton
                 onPress={() => setShowMenu(true)}
                 accessibilityLabel={tr.filtersAndSort}
-                style={{ backgroundColor: dateFilter ? c.accent + '20' : c.dim, borderColor: dateFilter ? c.accent : c.border }}>
-                <IconSymbol name="ellipsis" size={17} color={dateFilter ? c.accent : c.sub} />
+                style={{ backgroundColor: dateFilter ? c.accent : c.card }}>
+                <IconSymbol name="ellipsis" size={17} color={dateFilter ? c.onAccent : c.sub} />
               </HeaderButton>
             </>
           }>
@@ -1662,7 +1668,7 @@ export default function FinanceScreen() {
                 onPickPrimary={() => setShowPrimaryPicker(true)}
                 fmt={fmtCur}
                 isDark={isDark}
-                c={{ border: c.border, sub: c.sub, text: c.text, dim: c.dim, accent: c.accent, green: c.green, red: c.red }}
+                c={{ border: c.border, sub: c.sub, text: c.text, dim: c.dim, accent: c.info, green: c.green, red: c.red }}
                 incomeLabel={tr.incomes}
                 expenseLabel={tr.expenses}
                 savingsLabel={tr.savings}
@@ -1702,7 +1708,7 @@ export default function FinanceScreen() {
         accessibilityLabel={tr.add}
         scaleTo={0.92}
         style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
-        <IconSymbol name="plus" size={26} color="#fff" />
+        <IconSymbol name="plus" size={26} color={c.onAccent} />
       </PressableScale>
       ) : null}
       </View>
@@ -1731,7 +1737,7 @@ export default function FinanceScreen() {
             {todayDueCard({ marginTop: 16, marginBottom: 0 })}
             <View style={{ alignItems: 'center', marginTop: 32 }}>
               <IconSymbol name="banknote" size={32} color={c.sub} />
-              <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginTop: 10 }}>{tr.txEmptyTitle}</Text>
+              <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold, marginTop: 10 }}>{tr.txEmptyTitle}</Text>
               <Text style={{ color: c.sub, fontSize: 12, textAlign: 'center', marginTop: 4 }}>{tr.txEmptyHint}</Text>
             </View>
           </ScrollView>
@@ -1748,7 +1754,7 @@ export default function FinanceScreen() {
       {/* ─── Context Menu Modal ─── */}
       <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>
         <Pressable accessible={false}
-          style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
+          style={{ flex: 1, backgroundColor: t.surface.overlay }}
           onPress={() => setShowMenu(false)}>
             {/* NAT-03: Pressable з onPress на iOS сам стає елементом
                 доступності й склеює ВСЕ піддерево в один вузол — VoiceOver
@@ -1761,14 +1767,14 @@ export default function FinanceScreen() {
             accessibilityViewIsModal
             importantForAccessibility="yes"
             style={{ position: 'absolute', top: insets.top + 62, right: 16, width: 220 }}>
-            <BlurView intensity={isDark ? 60 : 75} tint={isDark ? 'dark' : 'light'} style={[s.menuBox, { borderColor: c.border }]}>
+            <View style={[s.menuBox, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
 
               {/* Статистика */}
               <TouchableOpacity
                 onPress={() => { setShowMenu(false); router.push('/finance-stats'); }}
                 style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: '#0EA5E9' + '25' }]}>
-                  <IconSymbol name="chart.bar.fill" size={15} color="#0EA5E9" />
+                <View style={[s.menuIconBox, { backgroundColor: c.info + '22' }]}>
+                  <IconSymbol name="chart.bar.fill" size={15} color={c.info} />
                 </View>
                 <Text style={[s.menuLabel, { color: c.text }]}>{tr.statistics}</Text>
                 <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -1780,8 +1786,8 @@ export default function FinanceScreen() {
               <TouchableOpacity
                 onPress={() => openAfterModalExit(() => setShowMenu(false), () => setShowCats(true))}
                 style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: '#F59E0B25' }]}>
-                  <IconSymbol name="tag.fill" size={15} color="#F59E0B" />
+                <View style={[s.menuIconBox, { backgroundColor: t.accent.amber + '26' }]}>
+                  <IconSymbol name="tag.fill" size={15} color={t.accent.amber} />
                 </View>
                 <Text style={[s.menuLabel, { color: c.text }]}>{tr.categories}</Text>
                 <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -1800,8 +1806,8 @@ export default function FinanceScreen() {
                   () => { setAccForm(null); setShowAccounts(true); },
                 )}
                 style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: '#8B5CF625' }]}>
-                  <IconSymbol name="banknote" size={15} color="#8B5CF6" />
+                <View style={[s.menuIconBox, { backgroundColor: t.accent.lavender + '33' }]}>
+                  <IconSymbol name="banknote" size={15} color={dsGlass(isDark).accent.lavender.ink} />
                 </View>
                 <Text style={[s.menuLabel, { color: c.text }]}>{tr.accounts}</Text>
                 <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -1813,8 +1819,8 @@ export default function FinanceScreen() {
               <TouchableOpacity
                 onPress={() => { setShowMenu(false); router.push('/banks'); }}
                 style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: '#10B981' + '25' }]}>
-                  <IconSymbol name="building.columns.fill" size={15} color="#10B981" />
+                <View style={[s.menuIconBox, { backgroundColor: c.green + '22' }]}>
+                  <IconSymbol name="building.columns.fill" size={15} color={c.green} />
                 </View>
                 <Text style={[s.menuLabel, { color: c.text }]}>{tr.piggyBanks}</Text>
                 <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -1827,12 +1833,12 @@ export default function FinanceScreen() {
                 onPress={() => openAfterModalExit(() => setShowMenu(false), () => setShowCal(true))}
                 style={s.menuItem}>
                 <View style={[s.menuIconBox, { backgroundColor: dateFilter ? c.accent + '25' : c.dim }]}>
-                  <IconSymbol name="calendar" size={15} color={dateFilter ? c.accent : c.sub} />
+                  <IconSymbol name="calendar" size={15} color={dateFilter ? c.onAccent : c.sub} />
                 </View>
                 <Text style={[s.menuLabel, { color: c.text }]}>Календар</Text>
                 {dateFilter
-                  ? <View style={[s.menuPill, { backgroundColor: c.accent + '20', borderColor: c.accent + '40' }]}>
-                      <Text style={[s.menuPillText, { color: c.accent }]}>
+                  ? <View style={[s.menuPill, { backgroundColor: c.dim }]}>
+                      <Text style={[s.menuPillText, { color: c.text }]}>
                         {dateFilter.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                       </Text>
                     </View>
@@ -1840,7 +1846,7 @@ export default function FinanceScreen() {
                 }
               </TouchableOpacity>
 
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1855,7 +1861,7 @@ export default function FinanceScreen() {
               accessibilityViewIsModal
               importantForAccessibility="yes"
               style={[s.sheetWrapper, wm.column]}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
 
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -1883,7 +1889,7 @@ export default function FinanceScreen() {
                     style={s.navBtn}>
                     <IconSymbol name="chevron.left" size={20} color={c.sub} />
                   </TouchableOpacity>
-                  <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontWeight: '700' }}>
+                  <Text style={{ flex: 1, textAlign: 'center', color: c.text, fontSize: 16, fontFamily: fontFamily.bold }}>
                     {MONTHS_UA[calMonth]} {calYear}
                   </Text>
                   <TouchableOpacity
@@ -1898,7 +1904,7 @@ export default function FinanceScreen() {
                 {/* Weekdays */}
                 <View style={{ flexDirection: 'row', marginBottom: 6 }}>
                   {WEEKDAYS_SHORT.map(d => (
-                    <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontWeight: '600' }}>{d}</Text>
+                    <Text key={d} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>{d}</Text>
                   ))}
                 </View>
 
@@ -1924,7 +1930,7 @@ export default function FinanceScreen() {
                           accessibilityState={{ selected: isSel }}
                           style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}>
                           <View style={[s.dayCell, isSel && { backgroundColor: c.accent }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }]}>
-                            <Text style={{ color: isSel ? '#fff' : isToday ? c.accent : c.text, fontSize: 13, fontWeight: isToday || isSel ? '700' : '400' }}>{day}</Text>
+                            <Text style={{ color: isSel ? c.onAccent : isToday ? c.accent : c.text, fontSize: 13, fontFamily: isToday || isSel ? fontFamily.bold : fontFamily.regular }}>{day}</Text>
                           </View>
                           {hasMark && !isSel && <View style={[s.daydot, { backgroundColor: c.accent }]} />}
                         </TouchableOpacity>
@@ -1934,12 +1940,12 @@ export default function FinanceScreen() {
                 ))}
 
                 {dateFilter && (
-                  <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { borderColor: c.border }]}>
+                  <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { backgroundColor: c.dim }]}>
                     <IconSymbol name="xmark" size={13} color={c.sub} />
-                    <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5 }}>{tr.resetFilter}</Text>
+                    <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.resetFilter}</Text>
                   </TouchableOpacity>
                 )}
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -1947,11 +1953,11 @@ export default function FinanceScreen() {
 
       {/* ─── Add Modal ─── */}
       <SheetModal visible={showAdd} onClose={handleAddSheetClosed}>
-        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+        <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                   {editingId ? (
-                    <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 14 }}>{tr.editTransaction}</Text>
+                    <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold, marginBottom: 14 }}>{tr.editTransaction}</Text>
                   ) : null}
 
                   {/* Вид операції: переказ — третій рівноправний, а не витрата */}
@@ -1972,9 +1978,9 @@ export default function FinanceScreen() {
                           <IconSymbol
                             name={t === 'income' ? 'arrow.up.trend' : t === 'expense' ? 'arrow.down.trend' : 'arrow.left.arrow.right'}
                             size={14}
-                            color={txType === t ? '#fff' : c.sub}
+                            color={txType === t ? WHITE : c.sub}
                           />
-                          <Text style={{ fontSize: 13, fontWeight: '700', marginLeft: 5, color: txType === t ? '#fff' : c.sub }}>
+                          <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, marginLeft: 5, color: txType === t ? WHITE : c.sub }}>
                             {typeLabel(t)}
                           </Text>
                         </TouchableOpacity>
@@ -1984,11 +1990,11 @@ export default function FinanceScreen() {
 
                   {/* Amount display. Валюта приходить із рахунку, окремого вибору немає. */}
                   <View style={[s.amountBlock, { backgroundColor: formColor + '12', borderColor: formColor + '30' }]}>
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>
+                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 6 }}>
                       {tr.amountUAH.replace('₴', formCur.symbol).replace('UAH', formCur.code)}
                     </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ color: formColor, fontSize: 28, fontWeight: '300' }}>{formCur.symbol}</Text>
+                      <Text style={{ color: formColor, fontSize: 28, fontFamily: fontFamily.light }}>{formCur.symbol}</Text>
                       <TextInput
                         placeholder="0"
                         placeholderTextColor={c.sub}
@@ -1996,7 +2002,7 @@ export default function FinanceScreen() {
                         onChangeText={t => setAmount(cleanAmountInput(t))}
                         keyboardType="decimal-pad"
                         accessibilityLabel={tr.amount}
-                        style={{ color: formColor, fontSize: 38, fontWeight: '700', letterSpacing: -1, flex: 1 }}
+                        style={{ color: formColor, fontSize: 38, fontFamily: fontFamily.bold, letterSpacing: -1, flex: 1 }}
                       />
                     </View>
                   </View>
@@ -2043,9 +2049,9 @@ export default function FinanceScreen() {
                       onPress={goCreateFirstAccount}
                       accessibilityRole="button"
                       accessibilityLabel={tr.newAccount}
-                      style={[s.btn, { marginTop: 12, backgroundColor: c.accent + '15', borderWidth: 1, borderColor: c.accent + '40' }]}>
+                      style={[s.btn, { marginTop: 12, backgroundColor: c.dim }]}>
                       <IconSymbol name="plus" size={15} color={c.accent} />
-                      <Text style={{ color: c.accent, fontWeight: '700', marginLeft: 6 }}>{tr.newAccount}</Text>
+                      <Text style={{ color: c.accent, fontFamily: fontFamily.bold, marginLeft: 6 }}>{tr.newAccount}</Text>
                     </TouchableOpacity>
                   )}
 
@@ -2055,7 +2061,7 @@ export default function FinanceScreen() {
                     <>
                       <Text style={[s.label, { color: c.sub }]}>{tr.transferReceived}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={{ color: c.sub, fontSize: 18, fontWeight: '700', width: 22, textAlign: 'center' }}>
+                        <Text style={{ color: c.sub, fontSize: 18, fontFamily: fontFamily.bold, width: 22, textAlign: 'center' }}>
                           {curOf(formTo!.currency).symbol}
                         </Text>
                         <TextInput
@@ -2103,7 +2109,7 @@ export default function FinanceScreen() {
 
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
                     <TouchableOpacity onPress={() => closeAddSheet()} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                      <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                      <Text style={{ color: c.sub, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={saveTx}
@@ -2114,13 +2120,13 @@ export default function FinanceScreen() {
                       <IconSymbol
                         name={editingId ? 'checkmark' : txType === 'income' ? 'arrow.up.trend' : txType === 'expense' ? 'arrow.down.trend' : 'arrow.left.arrow.right'}
                         size={15}
-                        color={formValid ? '#fff' : c.sub}
+                        color={formValid ? c.onAccent : c.sub}
                       />
-                      <Text style={{ color: formValid ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>{editingId ? tr.save : tr.add}</Text>
+                      <Text style={{ color: formValid ? c.onAccent : c.sub, fontFamily: fontFamily.bold, marginLeft: 6 }}>{editingId ? tr.save : tr.add}</Text>
                     </TouchableOpacity>
                   </View>
           </ScrollView>
-        </BlurView>
+        </View>
       </SheetModal>
 
       {/* ─── Primary Currency Picker ─── */}
@@ -2132,7 +2138,7 @@ export default function FinanceScreen() {
             accessibilityViewIsModal
             importantForAccessibility="yes"
             style={[s.sheetWrapper, wm.column]}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+            <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -2146,7 +2152,7 @@ export default function FinanceScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 6 }}>{tr.primaryCurrency}</Text>
+              <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold, marginBottom: 6 }}>{tr.primaryCurrency}</Text>
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 18, marginBottom: 14 }}>
                 {tr.primaryCurrencyDesc}
               </Text>
@@ -2168,11 +2174,11 @@ export default function FinanceScreen() {
                     }, idx < allCurrencies.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
                     <View style={{ width: 34, height: 34, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
                       backgroundColor: isSelected ? c.accent : c.dim,
-                      borderWidth: 1, borderColor: isSelected ? c.accent : c.border }}>
-                      <Text style={{ color: isSelected ? '#fff' : c.sub, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>{curr.symbol}</Text>
+                      }}>
+                      <Text style={{ color: isSelected ? c.onAccent : c.sub, fontSize: 14, fontFamily: fontFamily.semibold }}>{curr.symbol}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{curr.code}</Text>
+                      <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>{curr.code}</Text>
                       <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
                         {curr.kind === 'crypto' ? tr.cryptoKind : tr.fiatKind}
                       </Text>
@@ -2182,7 +2188,7 @@ export default function FinanceScreen() {
                 );
               })}
               </ScrollView>
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -2197,7 +2203,7 @@ export default function FinanceScreen() {
               accessibilityViewIsModal
               importantForAccessibility="yes"
               style={[s.sheetWrapper, wm.column]}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                   {/* Handle + close */}
@@ -2215,7 +2221,7 @@ export default function FinanceScreen() {
                     </View>
                   </View>
 
-                  <Text style={{ color: c.text, fontSize: 17, fontWeight: Atlas.type.headingWeight, marginBottom: 12 }}>{tr.categories}</Text>
+                  <Text style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, marginBottom: 12 }}>{tr.categories}</Text>
 
                   {/* Tabs */}
                   <View style={[s.typeRow, { backgroundColor: c.dim, marginBottom: 12 }]}>
@@ -2224,8 +2230,8 @@ export default function FinanceScreen() {
                         key={t}
                         onPress={() => { setCatTab(t); setShowAddCat(false); }}
                         style={[s.typeBtn, catTab === t && { backgroundColor: t === 'income' ? c.green : c.red }]}>
-                        <IconSymbol name={t === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={13} color={catTab === t ? '#fff' : c.sub} />
-                        <Text style={{ fontSize: 13, fontWeight: '700', marginLeft: 5, color: catTab === t ? '#fff' : c.sub }}>
+                        <IconSymbol name={t === 'income' ? 'arrow.up.trend' : 'arrow.down.trend'} size={13} color={catTab === t ? WHITE : c.sub} />
+                        <Text style={{ fontSize: 13, fontFamily: fontFamily.bold, marginLeft: 5, color: catTab === t ? WHITE : c.sub }}>
                           {t === 'income' ? tr.incomes : tr.expenses}
                         </Text>
                       </TouchableOpacity>
@@ -2247,8 +2253,8 @@ export default function FinanceScreen() {
                           style={!isLast ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border } : undefined}>
                         <View
                           style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7 }}>
-                          <View style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: c.accent + '18', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                            <IconSymbol name={cat.icon} size={13} color={c.accent} />
+                          <View style={{ width: 28, height: 28, borderRadius: Atlas.radius.small, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                            <IconSymbol name={cat.icon} size={13} color={c.text} />
                           </View>
                           <TouchableOpacity
                             onPress={() => setMetaOpenId(metaOpen ? null : rowId)}
@@ -2256,14 +2262,14 @@ export default function FinanceScreen() {
                             accessibilityState={{ expanded: metaOpen }}
                             accessibilityLabel={`${cat.name}: ${categoryGroupLabel(meta.group, tr)}${catTab === 'expense' ? `, ${costKindLabel(meta.cost, tr)}` : ''}`}
                             style={{ flex: 1, minHeight: 36, justifyContent: 'center' }}>
-                            <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{cat.name}</Text>
+                            <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{cat.name}</Text>
                             <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>
                               {categoryGroupLabel(meta.group, tr)}{catTab === 'expense' ? ` · ${costKindLabel(meta.cost, tr)}` : ''}
                             </Text>
                           </TouchableOpacity>
                           {isDefault
                             ? <View style={{ backgroundColor: c.dim, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                                <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600' }}>{tr.defaultCategory}</Text>
+                                <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold }}>{tr.defaultCategory}</Text>
                               </View>
                             : <TouchableOpacity
                                 onPress={() => setCats(prev => ({ ...prev, [catTab]: prev[catTab].filter(cc => cc.name !== cat.name) }))}
@@ -2293,14 +2299,14 @@ export default function FinanceScreen() {
 
                   {/* Add new category */}
                   {showAddCat ? (
-                    <View style={[{ borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14 }, { borderColor: c.border, backgroundColor: c.dim }]}>
+                    <View style={[{ borderRadius: Atlas.radius.large, padding: 14 }, { backgroundColor: c.dim }]}>
                       <TextInput
                         placeholder={tr.category}
                         placeholderTextColor={c.sub}
                         value={newCatName}
                         onChangeText={setNewCatName}
                         accessibilityLabel={tr.newCategory}
-                        style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 12 }]}
+                        style={[s.input, { backgroundColor: c.dim, color: c.text, marginBottom: 12 }]}
                         autoFocus
                       />
 
@@ -2314,11 +2320,11 @@ export default function FinanceScreen() {
                               onPress={() => setNewCatIcon(icon)}
                               style={{
                                 width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
-                                backgroundColor: isSel ? c.accent : isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
-                                borderWidth: isSel ? 0 : 1,
+                                backgroundColor: isSel ? c.accent : c.dim,
+                                borderWidth: 0,
                                 borderColor: c.border,
                               }}>
-                              <IconSymbol name={icon} size={15} color={isSel ? '#fff' : c.sub} />
+                              <IconSymbol name={icon} size={15} color={isSel ? c.onAccent : c.sub} />
                             </TouchableOpacity>
                           );
                         })}
@@ -2326,28 +2332,28 @@ export default function FinanceScreen() {
 
                       <View style={{ flexDirection: 'row', gap: 8 }}>
                         <TouchableOpacity onPress={() => { setShowAddCat(false); setNewCatName(''); setNewCatIcon('ellipsis.circle.fill'); }} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                          <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                          <Text style={{ color: c.sub, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={addCategory}
                           disabled={!newCatName.trim()}
                           style={[s.btn, { flex: 2, backgroundColor: !newCatName.trim() ? c.dim : c.accent }]}>
-                          <IconSymbol name="plus" size={14} color={!newCatName.trim() ? c.sub : '#fff'} />
-                          <Text style={{ color: !newCatName.trim() ? c.sub : '#fff', fontWeight: '700', marginLeft: 5 }}>{tr.add}</Text>
+                          <IconSymbol name="plus" size={14} color={!newCatName.trim() ? c.sub : c.onAccent} />
+                          <Text style={{ color: !newCatName.trim() ? c.sub : c.onAccent, fontFamily: fontFamily.bold, marginLeft: 5 }}>{tr.add}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
                   ) : (
                     <TouchableOpacity
                       onPress={() => setShowAddCat(true)}
-                      style={[s.btn, { backgroundColor: c.accent + '15', borderWidth: 1, borderColor: c.accent + '40' }]}>
+                      style={[s.btn, { backgroundColor: c.dim }]}>
                       <IconSymbol name="plus" size={15} color={c.accent} />
-                      <Text style={{ color: c.accent, fontWeight: '700', marginLeft: 6 }}>{tr.newCategory}</Text>
+                      <Text style={{ color: c.accent, fontFamily: fontFamily.bold, marginLeft: 6 }}>{tr.newCategory}</Text>
                     </TouchableOpacity>
                   )}
 
                 </ScrollView>
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -2355,7 +2361,7 @@ export default function FinanceScreen() {
 
       {/* ─── Рахунки: створення, перейменування, архівація ─── */}
       <SheetModal visible={showAccounts} onClose={handleAccountsSheetClosed}>
-        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+        <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             <View style={s.handleRow}>
@@ -2372,7 +2378,7 @@ export default function FinanceScreen() {
               </View>
             </View>
 
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 12 }}>{tr.accounts}</Text>
+            <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold, marginBottom: 12 }}>{tr.accounts}</Text>
 
             {accounts.length === 0 && (
               <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>{tr.noAccountsHint}</Text>
@@ -2395,7 +2401,7 @@ export default function FinanceScreen() {
                         <IconSymbol name={(a.icon as IconSymbolName) ?? KIND_ICON[a.kind]} size={14} color={tint} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{a.name}</Text>
+                        <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.bold }}>{a.name}</Text>
                         <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>
                           {kindLabel(a.kind)} · {fmtCur(accountBalances[a.id] ?? a.openingBalance, curOf(a.currency))}
                           {a.archived ? ` · ${tr.accountArchived}` : ''}
@@ -2424,7 +2430,7 @@ export default function FinanceScreen() {
             )}
 
             {accForm ? (
-              <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, borderColor: c.border, backgroundColor: c.dim }}>
+              <View style={{ borderRadius: Atlas.radius.large, padding: 14, backgroundColor: c.dim }}>
                 <Text style={[s.label, { color: c.sub, marginTop: 0 }]}>{tr.nameLabel}</Text>
                 <TextInput
                   placeholder={tr.accountDefaultName}
@@ -2432,7 +2438,7 @@ export default function FinanceScreen() {
                   value={accForm.name}
                   onChangeText={t => setAccForm(prev => (prev ? { ...prev, name: t } : prev))}
                   accessibilityLabel={tr.nameLabel}
-                  style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text }]}
+                  style={[s.input, { backgroundColor: c.dim, color: c.text }]}
                 />
 
                 <Text style={[s.label, { color: c.sub }]}>{tr.account}</Text>
@@ -2445,9 +2451,9 @@ export default function FinanceScreen() {
                         onPress={() => setAccForm(prev => (prev ? { ...prev, kind } : prev))}
                         accessibilityRole="button"
                         accessibilityState={{ selected: isSel }}
-                        style={[s.catChip, { backgroundColor: isSel ? c.accent : c.dim, borderColor: isSel ? c.accent : c.border }]}>
-                        <IconSymbol name={KIND_ICON[kind]} size={13} color={isSel ? '#fff' : c.sub} />
-                        <Text style={{ color: isSel ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{kindLabel(kind)}</Text>
+                        style={[s.catChip, { backgroundColor: isSel ? c.accent : c.dim }]}>
+                        <IconSymbol name={KIND_ICON[kind]} size={13} color={isSel ? c.onAccent : c.sub} />
+                        <Text style={{ color: isSel ? c.onAccent : c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{kindLabel(kind)}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -2458,8 +2464,8 @@ export default function FinanceScreen() {
                   <>
                     {/* Валюту не міняємо: вся історія рахунку порахована в ній,
                         і зміна заднім числом зробила б її безглуздою. */}
-                    <View style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', borderWidth: 1, borderColor: c.border, opacity: 0.7 }]}>
-                      <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{accForm.currency}</Text>
+                    <View style={[s.input, { backgroundColor: c.dim, opacity: 0.7 }]}>
+                      <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>{accForm.currency}</Text>
                     </View>
                     <Text style={{ color: c.sub, fontSize: 11, marginTop: 6, lineHeight: 16 }}>{tr.accountCurrencyLocked}</Text>
                   </>
@@ -2479,9 +2485,9 @@ export default function FinanceScreen() {
                             accessibilityRole="button"
                             accessibilityLabel={curr.code}
                             accessibilityState={{ selected: isSel }}
-                            style={[s.catChip, { backgroundColor: isSel ? c.accent : c.dim, borderColor: isSel ? c.accent : c.border }]}>
-                            <Text style={{ color: isSel ? '#fff' : c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{curr.symbol}</Text>
-                            <Text style={{ color: isSel ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{curr.code}</Text>
+                            style={[s.catChip, { backgroundColor: isSel ? c.accent : c.dim }]}>
+                            <Text style={{ color: isSel ? c.onAccent : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{curr.symbol}</Text>
+                            <Text style={{ color: isSel ? c.onAccent : c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{curr.code}</Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -2489,14 +2495,14 @@ export default function FinanceScreen() {
                         onPress={() => { setShowInlineAddCur(v => !v); setInlineCurTicker(''); setInlineCurSymbol(''); }}
                         accessibilityRole="button"
                         accessibilityLabel={tr.newCurrency}
-                        style={[s.catChip, { backgroundColor: showInlineAddCur ? c.accent + '20' : c.dim, borderColor: showInlineAddCur ? c.accent : c.border, borderStyle: 'dashed' }]}>
-                        <IconSymbol name="plus" size={13} color={showInlineAddCur ? c.accent : c.sub} />
-                        <Text style={{ color: showInlineAddCur ? c.accent : c.sub, fontSize: 12, fontWeight: '600', marginLeft: 5 }}>{tr.newCurrency}</Text>
+                        style={[s.catChip, { backgroundColor: c.dim, borderWidth: 1, borderColor: showInlineAddCur ? c.text : c.border, borderStyle: 'dashed' }]}>
+                        <IconSymbol name="plus" size={13} color={showInlineAddCur ? c.text : c.sub} />
+                        <Text style={{ color: showInlineAddCur ? c.text : c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.newCurrency}</Text>
                       </TouchableOpacity>
                     </ScrollView>
 
                     {showInlineAddCur && (
-                      <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 10, borderColor: c.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+                      <View style={{ borderRadius: Atlas.radius.large, padding: 14, marginTop: 10, backgroundColor: c.dim }}>
                         <TextInput
                           placeholder={tr.currencyTicker}
                           placeholderTextColor={c.sub}
@@ -2505,7 +2511,7 @@ export default function FinanceScreen() {
                           autoCapitalize="characters"
                           maxLength={8}
                           accessibilityLabel={tr.currencyTicker}
-                          style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 10 }]}
+                          style={[s.input, { backgroundColor: c.dim, color: c.text, marginBottom: 10 }]}
                         />
                         <TextInput
                           placeholder={tr.currencySymbol}
@@ -2514,20 +2520,20 @@ export default function FinanceScreen() {
                           onChangeText={setInlineCurSymbol}
                           maxLength={4}
                           accessibilityLabel={tr.currencySymbol}
-                          style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text, marginBottom: 10 }]}
+                          style={[s.input, { backgroundColor: c.dim, color: c.text, marginBottom: 10 }]}
                         />
                         <View style={{ flexDirection: 'row', gap: 7 }}>
                           <TouchableOpacity
                             onPress={() => { setShowInlineAddCur(false); setInlineCurTicker(''); setInlineCurSymbol(''); }}
                             style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                            <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                            <Text style={{ color: c.sub, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={addInlineCurrency}
                             disabled={!inlineCurTicker.trim()}
                             style={[s.btn, { flex: 2, backgroundColor: !inlineCurTicker.trim() ? c.dim : c.accent }]}>
-                            <IconSymbol name="plus" size={14} color={!inlineCurTicker.trim() ? c.sub : '#fff'} />
-                            <Text style={{ color: !inlineCurTicker.trim() ? c.sub : '#fff', fontWeight: '700', marginLeft: 5 }}>{tr.add}</Text>
+                            <IconSymbol name="plus" size={14} color={!inlineCurTicker.trim() ? c.sub : c.onAccent} />
+                            <Text style={{ color: !inlineCurTicker.trim() ? c.sub : c.onAccent, fontFamily: fontFamily.bold, marginLeft: 5 }}>{tr.add}</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -2545,14 +2551,14 @@ export default function FinanceScreen() {
                   // Мінус лишаємо: борг по картці — теж стан рахунку.
                   onChangeText={t => { setReconcileNote(null); setAccForm(prev => (prev ? { ...prev, opening: t.replace(/[^0-9.,-]/g, '') } : prev)); }}
                   keyboardType="numbers-and-punctuation"
-                  style={[s.input, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text }]}
+                  style={[s.input, { backgroundColor: c.dim, color: c.text }]}
                 />
                 {/* Пояснення поля + живий підсумок: головна причина розбіжності
                     «Сьогодні» і «Фінансів» — поточний залишок, введений сюди
                     поверх уже привʼязаної історії (вона рахується двічі). */}
                 <Text style={{ color: c.sub, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{tr.openingBalanceHint}</Text>
                 {accFormPreview !== null && (
-                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginTop: 6 }}>
+                  <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.bold, marginTop: 6 }}>
                     {tr.balanceWillBe.replace('{amount}', fmtCur(accFormPreview, curOf(accForm.currency)))}
                   </Text>
                 )}
@@ -2567,7 +2573,7 @@ export default function FinanceScreen() {
                         accessibilityLabel={tr.reconcileActualLabel}
                         onChangeText={t => setReconcileActual(t.replace(/[^0-9.,-]/g, ''))}
                         keyboardType="numbers-and-punctuation"
-                        style={[s.input, { flexGrow: 1, flexBasis: 120, backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', color: c.text }]}
+                        style={[s.input, { flexGrow: 1, flexBasis: 120, backgroundColor: c.dim, color: c.text }]}
                       />
                       <TouchableOpacity
                         onPress={applyReconcile}
@@ -2575,20 +2581,20 @@ export default function FinanceScreen() {
                         accessibilityRole="button"
                         accessibilityState={{ disabled: !reconcileActual.trim() }}
                         accessibilityLabel={tr.reconcileBalance}
-                        style={[s.btn, { flexGrow: 1, minHeight: 44, paddingHorizontal: 12, backgroundColor: reconcileActual.trim() ? c.accent + '20' : c.dim, borderWidth: 1, borderColor: reconcileActual.trim() ? c.accent + '55' : c.border }]}>
-                        <IconSymbol name="arrow.triangle.2.circlepath" size={14} color={reconcileActual.trim() ? c.accent : c.sub} />
-                        <Text style={{ color: reconcileActual.trim() ? c.accent : c.sub, fontWeight: '700', marginLeft: 6 }}>{tr.reconcileBalance}</Text>
+                        style={[s.btn, { flexGrow: 1, minHeight: 44, paddingHorizontal: 12, backgroundColor: reconcileActual.trim() ? c.accent : c.dim }]}>
+                        <IconSymbol name="arrow.triangle.2.circlepath" size={14} color={reconcileActual.trim() ? c.onAccent : c.sub} />
+                        <Text style={{ color: reconcileActual.trim() ? c.onAccent : c.sub, fontFamily: fontFamily.bold, marginLeft: 6 }}>{tr.reconcileBalance}</Text>
                       </TouchableOpacity>
                     </View>
                     {reconcileNote && (
-                      <Text style={{ color: c.accent, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{reconcileNote}</Text>
+                      <Text style={{ color: c.sub, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{reconcileNote}</Text>
                     )}
                   </>
                 )}
 
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
                   <TouchableOpacity onPress={() => setAccForm(null)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                    <Text style={{ color: c.sub, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={saveAccount}
@@ -2596,8 +2602,8 @@ export default function FinanceScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ disabled: !accForm.name.trim() }}
                     style={[s.btn, { flex: 2, backgroundColor: !accForm.name.trim() ? c.dim : c.accent }]}>
-                    <IconSymbol name="checkmark" size={14} color={!accForm.name.trim() ? c.sub : '#fff'} />
-                    <Text style={{ color: !accForm.name.trim() ? c.sub : '#fff', fontWeight: '700', marginLeft: 6 }}>{tr.save}</Text>
+                    <IconSymbol name="checkmark" size={14} color={!accForm.name.trim() ? c.sub : c.onAccent} />
+                    <Text style={{ color: !accForm.name.trim() ? c.sub : c.onAccent, fontFamily: fontFamily.bold, marginLeft: 6 }}>{tr.save}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2606,19 +2612,19 @@ export default function FinanceScreen() {
                 onPress={() => openAccountForm(null)}
                 accessibilityRole="button"
                 accessibilityLabel={tr.newAccount}
-                style={[s.btn, { backgroundColor: c.accent + '15', borderWidth: 1, borderColor: c.accent + '40' }]}>
+                style={[s.btn, { backgroundColor: c.dim }]}>
                 <IconSymbol name="plus" size={15} color={c.accent} />
-                <Text style={{ color: c.accent, fontWeight: '700', marginLeft: 6 }}>{tr.newAccount}</Text>
+                <Text style={{ color: c.accent, fontFamily: fontFamily.bold, marginLeft: 6 }}>{tr.newAccount}</Text>
               </TouchableOpacity>
             )}
 
           </ScrollView>
-        </BlurView>
+        </View>
       </SheetModal>
 
       {/* ─── Позначити операцію переказом ─── */}
       <SheetModal visible={!!markTxId} onClose={() => { setMarkTxId(null); setMarkTargetId(null); }}>
-        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+        <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={s.handleRow}>
               <View style={{ flex: 1 }} />
@@ -2634,7 +2640,7 @@ export default function FinanceScreen() {
               </View>
             </View>
 
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 6 }}>{tr.markAsTransfer}</Text>
+            <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold, marginBottom: 6 }}>{tr.markAsTransfer}</Text>
             <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19 }}>{tr.transfersNotCounted}</Text>
             <Text style={{ color: c.sub, fontSize: 12, lineHeight: 18, marginTop: 4 }}>{tr.markTransferSameCurrency}</Text>
 
@@ -2659,7 +2665,7 @@ export default function FinanceScreen() {
               <TouchableOpacity
                 onPress={() => { setMarkTxId(null); setMarkTargetId(null); }}
                 style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                <Text style={{ color: c.sub, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={applyMarkAsTransfer}
@@ -2667,12 +2673,12 @@ export default function FinanceScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ disabled: !markTargetId }}
                 style={[s.btn, { flex: 2, backgroundColor: markTargetId ? c.accent : c.dim }]}>
-                <IconSymbol name="arrow.left.arrow.right" size={15} color={markTargetId ? '#fff' : c.sub} />
-                <Text style={{ color: markTargetId ? '#fff' : c.sub, fontWeight: '700', marginLeft: 6 }}>{tr.save}</Text>
+                <IconSymbol name="arrow.left.arrow.right" size={15} color={markTargetId ? c.onAccent : c.sub} />
+                <Text style={{ color: markTargetId ? c.onAccent : c.sub, fontFamily: fontFamily.bold, marginLeft: 6 }}>{tr.save}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </BlurView>
+        </View>
       </SheetModal>
     </View>
   );
@@ -2680,64 +2686,68 @@ export default function FinanceScreen() {
 
 function InfoRow({ icon, label, value, color, text, sub, border, last }: any) {
   return (
-    <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 13 }, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+    <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 14 }, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <IconSymbol name={icon} size={15} color={sub} style={{ width: 20 }} />
-      <Text style={{ color: sub, fontSize: 12, fontWeight: '600', width: 72, marginLeft: 8 }}>{label}</Text>
-      <Text style={{ color: text, fontSize: 13, fontWeight: '600', flex: 1 }}>{value}</Text>
+      <Text style={{ color: sub, fontSize: 12, fontFamily: fontFamily.semibold, width: 72, marginLeft: 8 }}>{label}</Text>
+      <Text style={{ color: text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>{value}</Text>
     </View>
   );
 }
 
+/** Білий підпис на status.success / status.danger (перемикач «дохід/витрата»). */
+const WHITE = '#FFFFFF';
+
 const s = StyleSheet.create({
-  dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
+  dateChip:    { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, minHeight: 36, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 14 },
   feedHead:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 },
-  feedTitle:   { fontSize: 17, fontWeight: Atlas.type.headingWeight, flexShrink: 1 },
+  feedTitle:   { fontSize: 16, fontFamily: fontFamily.semibold, flexShrink: 1 },
   summaryRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' },
   summaryCell: { flexGrow: 1, flexBasis: 260, minWidth: 0 },
   // Планшет: вкладки ліворуч, період і «Фільтри (N)» праворуч — один ряд.
   // wrap лишається лише страховкою для найвужчого medium-вікна.
   navRowWide:  { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 12 },
   sidePane:    { alignSelf: 'stretch', flex: 1 },
-  groupLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  fab:         { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
-  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  groupLabel:  { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
+  fab:         { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowColor: '#111113', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 6 },
+  overlay:     { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:       { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  amountBlock: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 18, marginBottom: 4 },
-  detailHero:  { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, alignItems: 'center' },
-  typePill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
+  sheet:       { borderRadius: Atlas.radius.xxlarge, padding: 24, overflow: 'hidden' },
+  amountBlock: { borderRadius: Atlas.radius.large, padding: 20, marginBottom: 4 },
+  detailHero:  { borderRadius: Atlas.radius.xxlarge, padding: 24, alignItems: 'center' },
+  typePill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:  { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 16 },
-  typeRow:     { flexDirection: 'row', borderRadius: Atlas.radius.medium, padding: 3 },
-  typeBtn:     { flex: 1, flexDirection: 'row', paddingVertical: 9, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  input:       { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
-  label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  catChip:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9, borderWidth: 1 },
-  btn:         { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  detailIcon:  { width: 64, height: 64, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
-  detailAmount:{ fontSize: 32, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 },
-  detailCat:   { fontSize: 15, fontWeight: '600', marginTop: 4 },
-  infoBlock:   { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden' },
+  sheetTitle:  { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 16 },
+  typeRow:     { flexDirection: 'row', borderRadius: 999, padding: 4 },
+  typeBtn:     { flex: 1, flexDirection: 'row', paddingVertical: 9, minHeight: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  input:       { borderRadius: Atlas.radius.medium, minHeight: 44, padding: 13, fontSize: 14, fontFamily: fontFamily.regular },
+  label:       { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 16 },
+  catChip:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, minHeight: 36, borderRadius: 999 },
+  btn:         { paddingVertical: 13, minHeight: 48, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  detailIcon:  { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  // DS v2: сума — display (тонкі великі цифри, tabular-nums).
+  detailAmount:{ fontSize: 44, lineHeight: 48, fontFamily: fontFamily.light, letterSpacing: -0.88, fontVariant: ['tabular-nums'] },
+  detailCat:   { fontSize: 15, fontFamily: fontFamily.semibold, marginTop: 4 },
+  infoBlock:   { borderRadius: Atlas.radius.large, overflow: 'hidden' },
   navBtn:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell:     { width: 32, height: 32, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  dayCell:     { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   daydot:      { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
-  clearBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1 },
+  clearBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, minHeight: 44, borderRadius: 999 },
   // Context menu
-  menuBox:     { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 10 },
-  menuItem:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
-  menuIconBox: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  menuLabel:   { flex: 1, fontSize: 14, fontWeight: '600' },
-  menuDivider: { height: 1, marginHorizontal: 14 },
+  menuBox:     { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', shadowColor: '#111113', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 8 },
+  menuItem:    { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  menuIconBox: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  menuLabel:   { flex: 1, fontSize: 14, fontFamily: fontFamily.semibold },
+  menuDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 16 },
   menuToggle:  { width: 34, height: 20, borderRadius: 10, borderWidth: 1, padding: 2, justifyContent: 'center' },
   menuToggleDot:{ width: 14, height: 14, borderRadius: 7 },
-  menuPill:    { borderRadius: 7, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
-  menuPillText:{ fontSize: 11, fontWeight: '700' },
+  menuPill:    { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  menuPillText:{ fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   // Compact rows
-  txCompact:   { borderRadius: Atlas.radius.medium, borderWidth: 1, paddingRight: 13, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
+  txCompact:   { borderRadius: Atlas.radius.large, paddingRight: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
   txAccentBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginRight: 0 },
-  txIconSm:    { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  txCategorySm:{ fontSize: 13, fontWeight: '600' },
-  txNoteSm:    { fontSize: 11, fontWeight: '400' },
-  txAmountSm:  { fontSize: 13, fontWeight: Atlas.type.headingWeight },
+  txIconSm:    { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  txCategorySm:{ fontSize: 13, fontFamily: fontFamily.semibold },
+  txNoteSm:    { fontSize: 11, fontFamily: fontFamily.regular },
+  txAmountSm:  { fontSize: 14, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
 });

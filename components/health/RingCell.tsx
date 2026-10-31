@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 import React, { useEffect, useRef } from 'react';
 import { Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
@@ -12,8 +11,11 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Motion } from '@/constants/motion';
+import { fontFamily } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import { useMotion } from '@/hooks/use-motion';
 import { haptic } from '@/utils/haptics';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
 // ─── Animated SVG Circle ──────────────────────────────────────────────────────
 
@@ -40,6 +42,8 @@ interface RingCellProps {
 
 export function RingCell({ pct, color, label, value }: RingCellProps) {
   const { reduced } = useMotion();
+  const { t } = useDS();
+  const gs = useGlassStyles();
 
   // Visual ring is capped at 100 %; text label may show >100 % (preserves old behaviour).
   const capped       = Math.min(pct, 1);
@@ -96,7 +100,7 @@ export function RingCell({ pct, color, label, value }: RingCellProps) {
             cx={SIZE / 2}
             cy={SIZE / 2}
             r={R}
-            stroke={color + '22'}
+            stroke={(gs.subtle.backgroundColor as string)}
             strokeWidth={STROKE}
             fill="none"
           />
@@ -117,15 +121,15 @@ export function RingCell({ pct, color, label, value }: RingCellProps) {
         </Svg>
 
         {/* Pct text (uncapped — same as old implementation) */}
-        <Text style={{ color, fontSize: 10, fontWeight: Atlas.type.headingWeight }}>
+        <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>
           {Math.round(pct * 100)}%
         </Text>
       </View>
 
       {/* Value */}
-      <Text style={{ color, fontSize: 12, fontWeight: Atlas.type.headingWeight, marginTop: 5 }}>{value}</Text>
+      <Text style={{ color: t.text.primary, fontSize: 13, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginTop: 6 }}>{value}</Text>
       {/* Label */}
-      <Text style={{ color: color + '99', fontSize: 10, fontWeight: '600', marginTop: 2 }}>{label}</Text>
+      <Text style={{ color: t.text.secondary, fontSize: 11, fontFamily: fontFamily.regular, marginTop: 2 }}>{label}</Text>
     </Animated.View>
   );
 }

@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/settings-modules.tsx — які модулі інтерфейсу показувати.
  *
@@ -19,8 +18,6 @@ import { Atlas } from '@/constants/atlas';
  * Вимкнення НІЧОГО НЕ ВИДАЛЯЄ — це головне, що має зрозуміти користувач перед
  * першим дотиком, тож про це написано вгорі, а не в підтвердженні після.
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, router } from 'expo-router';
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
@@ -29,13 +26,16 @@ import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { moduleSections } from '@/constants/nav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { useI18n } from '@/store/i18n';
 import { isModuleEnabled, useUiModules } from '@/store/ui-preferences';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
 
-const ACCENT = '#7C3AED';
 
 export default function SettingsModulesScreen() {
   const readingWidth = useContentWidth();
@@ -58,19 +58,22 @@ export default function SettingsModulesScreen() {
   // екран кожен дотик по перемикачу.
   const sections = useMemo(() => moduleSections(), []);
 
+  const k = dsTokens(isDark);
+
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F5F5FA',
-    bg2:    isDark ? '#14121E' : '#EBEBF5',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  }), [isDark]);
+    bg1:    k.bg.canvas,
+    bg2:    k.bg.canvas,
+    border: k.border.hairline,
+    text:   k.text.primary,
+    sub:    k.text.secondary,
+    dim:    glassOf(k).surfaceSubtle,
+    card:   glassOf(k).surface,
+  }), [k]);
 
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
 
       <View style={contentWidth}>
         <ScreenHeader
@@ -82,7 +85,7 @@ export default function SettingsModulesScreen() {
             onPress: () => router.back(),
             label: tr.back,
             color: c.sub,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { backgroundColor: c.card, borderColor: 'transparent' },
           }}
           crumbs={[
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
@@ -108,10 +111,7 @@ export default function SettingsModulesScreen() {
             <Text style={[st.sectionLabel, { color: c.sub }]}>
               {String(tr[section.titleKey]).toUpperCase()}
             </Text>
-            <BlurView
-              intensity={isDark ? 20 : 40}
-              tint={isDark ? 'dark' : 'light'}
-              style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               {section.items.map((item, index) => {
                 const enabled = isModuleEnabled(disabledModules, item.module);
                 const label = String(tr[item.labelKey]);
@@ -119,9 +119,9 @@ export default function SettingsModulesScreen() {
                 return (
                   <View
                     key={item.module}
-                    style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
-                    <View style={[st.iconBox, { backgroundColor: ACCENT + '20' }]}>
-                      <IconSymbol name={item.icon} size={17} color={ACCENT} />
+                    style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
+                    <View style={[st.iconBox, { backgroundColor: c.dim }]}>
+                      <IconSymbol name={item.icon} size={17} color={c.text} />
                     </View>
                     <View style={{ flex: 1 }}><Text style={[st.rowLabel, { color: c.text }]}>{label}</Text>{item.module === 'integrations' && <Text style={{ color: c.sub, fontSize: 12, marginTop: 4 }}>{tr.integrationsModuleHint}</Text>}</View>
                     {/* Ім'я — на самому Switch, а не на обгортці: обгортка з
@@ -132,14 +132,14 @@ export default function SettingsModulesScreen() {
                       onValueChange={next => setModuleEnabled(item.module, next)}
                       accessibilityLabel={label}
                       accessibilityState={{ checked: enabled }}
-                      trackColor={{ false: 'rgba(128,128,128,0.3)', true: ACCENT }}
+                      trackColor={{ false: k.border.hairline, true: k.action.primary }}
                       thumbColor="#fff"
-                      ios_backgroundColor="rgba(128,128,128,0.3)"
+                      ios_backgroundColor={k.border.hairline}
                     />
                   </View>
                 );
               })}
-            </BlurView>
+            </View>
           </View>
         ),
           }))}
@@ -153,10 +153,10 @@ export default function SettingsModulesScreen() {
 
 const st = StyleSheet.create({
   intro:        { fontSize: 13, lineHeight: 19, marginTop: 4, marginBottom: 4 },
-  sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 20, marginLeft: 4 },
-  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden' },
-  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
-  iconBox:      { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  rowLabel:     { fontSize: 14, fontWeight: '500' },
+  sectionLabel: { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginBottom: 8, marginTop: 20, marginLeft: 4 },
+  card:         { borderRadius: 24, overflow: 'hidden' },
+  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 12 },
+  iconBox:      { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  rowLabel:     { fontSize: 14, fontFamily: fontFamily.medium },
   note:         { fontSize: 12, lineHeight: 17, marginTop: 16, paddingHorizontal: 4 },
 });

@@ -16,6 +16,7 @@ import {
   priorityLabel,
   type TaskPriority,
 } from '@/utils/taskUtils';
+import { fontFamily } from '@/constants/theme';
 
 export interface PriorityBadgeProps {
   level: TaskPriority | undefined;
@@ -50,7 +51,7 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   text: {
-    fontWeight: '700',
+    fontFamily: fontFamily.semibold,
     fontVariant: ['tabular-nums'],
     includeFontPadding: false,
   },

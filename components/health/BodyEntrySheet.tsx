@@ -1,5 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -7,9 +5,13 @@ import {
 
 import { useWideModal } from '@/components/health/HealthLayout';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ACCENT_WEIGHT, getHealthColors } from '@/utils/healthTheme';
+import { getHealthDSColors } from '@/components/health/palette';
+import { fontFamily } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
 import { EntryType } from '@/utils/healthUtils';
 import { useSheetSurface } from '@/hooks/use-content-width';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { GlassBackdrop } from '@/components/ds';
 
 export interface BodyRecord { type: EntryType; value: number; }
 
@@ -33,7 +35,9 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
   isDark: boolean;
   tr: any;
 }) {
-  const c = getHealthColors(isDark);
+  const c = getHealthDSColors(isDark);
+  const gs = useGlassStyles();
+  const k = dsTokens(isDark);
   const sheetSurface = useSheetSurface();
   const wm = useWideModal();
   const [vals, setVals] = useState<Record<string, string>>({});
@@ -76,7 +80,8 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
             accessibilityViewIsModal
             importantForAccessibility="yes"
           >
-            <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+            <View style={[s.sheet, sheetSurface, { ...gs.strong }]}>
+              <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -93,16 +98,16 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
                   {FIELDS.map(f => (
                     <View key={f.type} style={s.cell}>
                       <Text style={[s.label, { color: c.sub }]}>{tr[f.labelKey]}</Text>
-                      <View style={[s.inputWrap, { borderColor: c.border, backgroundColor: c.dim }]}>
+                      <View style={[s.inputWrap, { backgroundColor: c.dim }]}>
                         <TextInput
                           accessibilityLabel={`${tr[f.labelKey]}, ${f.unit}`}
                           value={vals[f.type] ?? ''}
                           onChangeText={t => setVals(p => ({ ...p, [f.type]: t }))}
                           keyboardType="decimal-pad"
-                          placeholder="—" placeholderTextColor={c.sub}
-                          style={{ flex: 1, color: c.text, fontSize: 17, fontWeight: '700', paddingVertical: 10 }}
+                          placeholder="—" placeholderTextColor={k.text.muted}
+                          style={{ flex: 1, minHeight: 44, color: c.text, fontSize: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.44, paddingVertical: 10 }}
                         />
-                        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{f.unit}</Text>
+                        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular }}>{f.unit}</Text>
                       </View>
                     </View>
                   ))}
@@ -110,20 +115,20 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
               </ScrollView>
 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                  <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[s.btn, { ...gs.subtle, flex: 1 }]}>
+                  <Text style={{ color: k.action.secondaryText, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityState={{ disabled: !canSave }}
                   disabled={!canSave}
                   onPress={save}
-                  style={[s.btn, { flex: 2, backgroundColor: ACCENT_WEIGHT, opacity: canSave ? 1 : 0.55 }]}
+                  style={[s.btn, { flex: 2, backgroundColor: canSave ? k.action.primary : k.state.disabledBg }]}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+                  <Text style={{ color: canSave ? k.text.onAction : k.state.disabledText, fontFamily: fontFamily.semibold }}>{tr.save}</Text>
                 </TouchableOpacity>
               </View>
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -132,17 +137,17 @@ export function BodyEntrySheet({ visible, onClose, onSubmit, defaults, isDark, t
 }
 
 const s = StyleSheet.create({
-  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
+  overlay:   { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)' /* surface.overlay */, justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти — числом із useSheetSurface(); відсоток від батька з
   // height:auto не рахується і обмеження просто зникає (NAT-01).
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:     { borderRadius: 24, padding: 24 },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   handle:    { width: 36, height: 4, borderRadius: 2 },
-  title:     { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 12 },
+  title:     { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 12 },
   grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   cell:      { width: '47%' },
-  label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 5 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12 },
-  btn:       { paddingVertical: 14, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
+  label:        { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 5 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 14 },
+  btn:          { minHeight: 48, paddingVertical: 14, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
 });

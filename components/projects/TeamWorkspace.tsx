@@ -18,7 +18,7 @@ import { ProjectDiscussions } from './ProjectDiscussions';
 import { actualWorkload } from '@/utils/workloadActual';
 import { TeamOfflineStatus } from './TeamOfflineStatus';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useProject } from '@/hooks/use-project';
@@ -54,6 +54,9 @@ import { boardColumnForTask, scopedColumnFor } from '@/utils/taskStatuses';
 import { assigneeDisplayName, closeSubtasksOnDone, normalizePriority, priorityLabel as priorityLevelLabel, type Task } from '@/utils/taskUtils';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { teamPreferencesId, isLead, isComplete, myWork, progress, taskRights, type Milestone, type TeamPreferences, type WorkloadRow } from '@/utils/teamwork';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { dsTokens, useDS } from '@/hooks/use-ds';
+import { glassOf } from '@/components/shared/dsTheme';
 
 const makeId = () => `tw-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 
@@ -73,7 +76,8 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
   const uid = String(user?.id ?? '');
   const isDark = useColorScheme() === 'dark';
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED', project?.appearance);
-  const cardColors = { ...c, sheet: isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)' };
+  const tk = dsTokens(isDark);
+  const cardColors = { ...c, sheet: glassOf(tk).sheet };
   const { tr } = useI18n();
 
   const host = useProjectTaskHost(pid);
@@ -176,8 +180,8 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
   const section = (name: string, items: readonly Task[]) => (
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{name}</Text>
-        <Text style={{ color: c.sub, fontSize: 12 }}>{items.length}</Text>
+        <Text style={[type.h2, { color: c.text }]}>{name}</Text>
+        <Text style={[type.caption, type.numeric, { color: c.sub }]}>{items.length}</Text>
       </View>
       {items.slice(0, 5).map(t => (
         <TaskCompactCard
@@ -212,7 +216,7 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
     { key: 'home-my-work', icon: 'checklist', label: tr.projectHomeMyWork, checked: homePage === 'my-work', onPress: () => void run(() => pref({ homePage: 'my-work' })) },
     { key: 'home-overview', icon: 'square.grid.2x2.fill', label: tr.projectHomeOverview, checked: homePage === 'overview', onPress: () => void run(() => pref({ homePage: 'overview' })) },
     { key: 'tasks', icon: 'list.bullet', label: tr.projectAllTasks, color: c.accent, onPress: () => router.push(projectRoute(pid, 'tasks') as never), separatorBefore: true },
-    { key: 'calendar', icon: 'calendar', label: tr.calendar, color: '#6366F1', onPress: () => router.push(projectRoute(pid, 'calendar') as never) },
+    { key: 'calendar', icon: 'calendar', label: tr.calendar, color: tk.status.info, onPress: () => router.push(projectRoute(pid, 'calendar') as never) },
   ];
 
   const content = (
@@ -228,12 +232,12 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
           <ActionButton label={tr.projectAddTask} icon="plus" tone="primary" onPress={newTask} colors={c} />
         </ActionBar>
       )}
-      {!!error && <Text accessibilityRole="alert" style={{ color: '#DB4444' }}>{error}</Text>}
+      {!!error && <Text accessibilityRole="alert" style={{ color: tk.status.danger, fontFamily: fontFamily.medium }}>{error}</Text>}
       {(mode === 'my-work' || mode === 'overview') && <>
-        <Text style={{ color: c.text }}>{tr.twCounts.replace('{done}', String(counts.done)).replace('{total}', String(counts.total)).replace('{pending}', String(counts.pending)).replace('{blocked}', String(counts.blocked)).replace('{overdue}', String(counts.overdue))}</Text>
+        <Text style={[type.body, { color: c.text }]}>{tr.twCounts.replace('{done}', String(counts.done)).replace('{total}', String(counts.total)).replace('{pending}', String(counts.pending)).replace('{blocked}', String(counts.blocked)).replace('{overdue}', String(counts.overdue))}</Text>
         {isLead(role) && tasks.length === 0 && !inviteSkipped && (
           <View style={{ gap: 10 }}>
-            <Text style={{ color: c.text }}>{tr.twInviteHint}</Text>
+            <Text style={[type.body, { color: c.text }]}>{tr.twInviteHint}</Text>
             <ActionBar>
               <ActionButton label={tr.twSkipInvite} tone="neutral" onPress={() => setInviteSkipped(true)} colors={c} />
               <ActionButton label={tr.twInvite} icon="person.badge.plus" tone="primary" onPress={() => router.push(`/project/${pid}/members` as never)} colors={c} />
@@ -262,12 +266,12 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
           {showMilestones && <>
             {milestones.map(m => {
               const linked = tasks.filter(t => m.taskIds.includes(t.id));
-              return <Text key={m.id} style={{ color: c.text }}>{m.title} · {m.deadline || tr.twNoDeadline} · {linked.filter(isComplete).length}/{linked.length}</Text>;
+              return <Text key={m.id} style={[type.body, type.numeric, { color: c.text }]}>{m.title} · {m.deadline || tr.twNoDeadline} · {linked.filter(isComplete).length}/{linked.length}</Text>;
             })}
             {isLead(role) && <>
               <TeamInput label={tr.twMilestoneTitle} value={milestoneTitle} onChange={setMilestoneTitle} />
               <TeamInput label={tr.twMilestoneDate} value={milestoneDate} onChange={setMilestoneDate} />
-              <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{tr.twMilestoneTasks}</Text>
+              <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.twMilestoneTasks}</Text>
               {/* Вибір задач — чипи з вибраним станом, а не стовпець кнопок із «✓ ». */}
               <ActionBar>
                 {tasks.map(t => (
@@ -286,7 +290,7 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
       </>}
       {mode === 'discussions' && <ProjectDiscussions projectId={pid} initialId={discussionId} />}
       {mode === 'workload' && <>
-        <Text style={{ color: c.text }}>{tr.twWorkloadHint}</Text>
+        <Text style={[type.body, { color: c.text }]}>{tr.twWorkloadHint}</Text>
         <TeamInput label={tr.twMyAvailability} numeric value={hours} onChange={setHours} />
         <TeamButton label={tr.twSaveAvailability} tone="primary" onPress={() => void run(async () => {
           await pref({ weeklyHours: hours === '' ? null : Number(hours) });
@@ -362,8 +366,8 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
         empty={
           <View style={{ alignItems: 'center', gap: 8 }}>
             <IconSymbol name="checklist" size={28} color={c.sub} />
-            <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', textAlign: 'center' }}>{tr.detailEmptyTitle}</Text>
-            <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>{tr.detailEmptyHint}</Text>
+            <Text style={[type.h2, { color: c.text, textAlign: 'center' }]}>{tr.detailEmptyTitle}</Text>
+            <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center' }]}>{tr.detailEmptyHint}</Text>
           </View>
         }
         list={
@@ -385,14 +389,15 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
 function CapacityRow({ row: w, actual, onSave, colors }: { actual: ReturnType<typeof actualWorkload>; row: WorkloadRow; onSave: (hours: number | null) => void; colors: Pick<ReturnType<typeof projectShellColors>, 'text' | 'border'> }) {
   // Кольори — токени теми проєкту (projectShellColors), а не захардкоджені.
   const textColor = colors.text;
+  const { t: tk } = useDS();
   const { tr } = useI18n();
   const [value, setValue] = useState(w.weeklyHours == null ? '' : String(w.weeklyHours));
   return (
-    <View style={{ gap: 8, borderWidth: 1, borderColor: colors.border, padding: 12, borderRadius: 12 }}>
-      <Text style={{ color: textColor, fontWeight: '700' }}>{w.name}</Text>
-      <Text style={{ color: textColor }}>{tr.twActiveCount.replace('{n}', String(actual.activeCount))}</Text>
-      <Text style={{ color: textColor }}>{tr.twAvgTime.replace('{avg}', actual.averageMinutes === null ? tr.noData : tr.twMinutesShort.replace('{n}', String(Math.round(actual.averageMinutes)))).replace('{n}', String(actual.sampleCount))}</Text>
-      <Text style={{ color: textColor }}>{tr.twForecast.replace('{value}', actual.forecastMinutes === null ? tr.noData : tr.twHoursShort.replace('{n}', (actual.forecastMinutes / 60).toFixed(1)))}</Text>
+    <View style={{ gap: 8, backgroundColor: glassOf(tk).surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, padding: 20, borderRadius: radius.cardCompact }}>
+      <Text style={[type.h2, { color: textColor }]}>{w.name}</Text>
+      <Text style={[type.body, type.numeric, { color: textColor }]}>{tr.twActiveCount.replace('{n}', String(actual.activeCount))}</Text>
+      <Text style={[type.body, type.numeric, { color: textColor }]}>{tr.twAvgTime.replace('{avg}', actual.averageMinutes === null ? tr.noData : tr.twMinutesShort.replace('{n}', String(Math.round(actual.averageMinutes)))).replace('{n}', String(actual.sampleCount))}</Text>
+      <Text style={[type.body, type.numeric, { color: textColor }]}>{tr.twForecast.replace('{value}', actual.forecastMinutes === null ? tr.noData : tr.twHoursShort.replace('{n}', (actual.forecastMinutes / 60).toFixed(1)))}</Text>
       <TeamInput label={tr.twMemberAvailability} numeric value={value} onChange={setValue} />
       <TeamButton label={tr.twSaveMemberAvailability} onPress={() => onSave(value === '' ? null : Number(value))} />
     </View>

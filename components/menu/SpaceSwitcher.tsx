@@ -19,6 +19,8 @@ import type { MenuSpace } from '@/store/menu-api';
 
 import { visibleSpaces } from './model';
 import type { MenuColors } from './theme';
+import { fontFamily } from '@/constants/theme';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 /**
  * Пауза між закриттям аркуша й відкриттям наступної модалки: SheetModal ще
@@ -73,9 +75,9 @@ export function SpaceSwitcher({
       onPress={() => after(onPress)}
       accessibilityRole="button"
       accessibilityLabel={text}
-      style={[st.row, { borderColor: c.border, backgroundColor: c.dim }]}>
+      style={[st.row, { backgroundColor: c.dim }]}>
       <IconSymbol name={icon} size={15} color={c.accent} />
-      <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', flex: 1, marginLeft: 10 }}>{text}</Text>
+      <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 10 }}>{text}</Text>
     </TouchableOpacity>
   );
 
@@ -90,7 +92,7 @@ export function SpaceSwitcher({
         hitSlop={{ top: 4, bottom: 4 }}
         style={({ pressed }) => [
           st.chip,
-          { borderColor: c.border, backgroundColor: c.dim, opacity: disabled ? 0.5 : pressed ? 0.7 : 1 },
+          { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), opacity: disabled ? 0.5 : pressed ? 0.7 : 1 },
         ]}>
         <IconSymbol name="person.2.fill" size={13} color={c.accent} />
         <Text numberOfLines={1} style={[st.chipText, { color: c.text }]}>
@@ -104,7 +106,7 @@ export function SpaceSwitcher({
           style={[
             st.sheet,
             sheetColumnStyle(isWide),
-            { maxHeight: height * 0.88, backgroundColor: c.sheet, borderColor: c.border },
+            { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') },
           ]}>
           <Text style={[st.sheetLabel, { color: c.sub }]}>{tr.menu.spacesTitle}</Text>
           <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 6 }} keyboardShouldPersistTaps="handled">
@@ -123,17 +125,17 @@ export function SpaceSwitcher({
                   accessibilityLabel={name}
                   style={[
                     st.row,
-                    { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent + '15' : c.dim },
+                    { borderColor: on ? c.text : 'transparent', backgroundColor: c.dim },
                   ]}>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text numberOfLines={1} style={{ color: on ? c.accent : c.text, fontSize: 15, fontWeight: '600' }}>
+                    <Text numberOfLines={1} style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
                       {name}
                     </Text>
                     <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12 }}>
                       {x.is_owner ? 'Ви власник' : 'Ви учасник'}
                     </Text>
                   </View>
-                  {on ? <IconSymbol name="checkmark" size={14} color={c.accent} /> : null}
+                  {on ? <IconSymbol name="checkmark" size={14} color={c.text} /> : null}
                 </TouchableOpacity>
               );
             })}
@@ -143,7 +145,7 @@ export function SpaceSwitcher({
                 accessibilityRole="button"
                 accessibilityLabel={showArchive ? 'Сховати архів' : 'Показати архів'}
                 style={st.link}>
-                <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600' }}>
+                <Text style={{ color: c.accent, fontSize: 13, fontFamily: fontFamily.semibold }}>
                   {showArchive ? 'Сховати архів' : 'Показати архів'}
                 </Text>
               </TouchableOpacity>
@@ -165,14 +167,13 @@ const st = StyleSheet.create({
     gap: 6,
     height: 36,
     maxWidth: 180,
-    paddingHorizontal: 10,
-    borderRadius: 11,
-    borderWidth: 1,
+    paddingHorizontal: 14,
+    borderRadius: 999,
     flexShrink: 1,
   },
-  chipText: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
-  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, gap: 10 },
-  sheetLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
+  chipText: { fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 },
+  sheet: { borderRadius: Atlas.radius.xxlarge, padding: 20, gap: 10 },
+  sheetLabel: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -180,7 +181,8 @@ const st = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: Atlas.radius.large,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     gap: 8,
   },
   link: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },

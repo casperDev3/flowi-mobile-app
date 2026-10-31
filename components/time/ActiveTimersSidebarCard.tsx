@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/ActiveTimersSidebarCard.tsx — активні таймери внизу
  * сайдбара на широкому екрані (планшет).
@@ -30,6 +29,8 @@ import { useTimerProjects } from '@/components/time/useTimerProjects';
 import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import { useI18n } from '@/store/i18n';
 import { useTimerContext } from '@/store/timer-context';
 import { primaryTimer, timerKind, timersCountLabel, timerTrackerRoute } from '@/utils/activeTimersBar';
@@ -37,6 +38,7 @@ import type { TimerProject } from '@/utils/activeTimers';
 import { formatClock } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
 import { elapsedSince } from '@/utils/taskTimer';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
 export interface SidebarCardColors {
   text: string;
@@ -54,6 +56,8 @@ export function ActiveTimersSidebarCard({ colors: c, projectId }: {
   projectId?: string;
 }) {
   const router = useRouter();
+  const { t } = useDS();
+  const gs = useGlassStyles();
   const { tr, lang } = useI18n();
   const { activeTimers } = useTimerContext();
   const { busy, stop } = useTimerStopper();
@@ -85,7 +89,7 @@ export function ActiveTimersSidebarCard({ colors: c, projectId }: {
   );
 
   return (
-    <View style={[st.card, { borderColor: c.border, backgroundColor: c.activeBg }]}>
+    <View style={[st.card, { backgroundColor: c.activeBg }]}>
       <View style={st.head}>
         <Pressable
           onPress={() => {
@@ -109,7 +113,7 @@ export function ActiveTimersSidebarCard({ colors: c, projectId }: {
                 running
                 seconds={now => elapsedSince(primary.startedAt, now)}
                 format={formatClock}
-                style={[st.clock, { color: c.accent }]}
+                style={[st.clock, { color: c.text }]}
               />
               {single && (
                 <TimerProjectTag project={projectOf(primary)} tr={tr} color={c.sub} size={11} style={st.tag} />
@@ -156,17 +160,17 @@ export function ActiveTimersSidebarCard({ colors: c, projectId }: {
           <Pressable
             onPress={() => router.push(trackerRoute as never)}
             accessibilityRole="button"
-            style={[st.action, { borderColor: c.border }]}>
-            <IconSymbol name="timer" size={13} color={c.accent} />
-            <Text numberOfLines={1} style={[st.actionText, { color: c.accent }]}>{tr.navTimeTracker}</Text>
+            style={[st.action, { ...gs.subtle }]}>
+            <IconSymbol name="timer" size={13} color={t.action.secondaryText} />
+            <Text numberOfLines={1} style={[st.actionText, { color: t.action.secondaryText }]}>{tr.navTimeTracker}</Text>
           </Pressable>
           <Pressable
             onPress={() => { haptic.light(); setFocusOpen(true); }}
             accessibilityRole="button"
             accessibilityLabel={`${tr.focusMode}, ${tr.activeTimers}: ${count}`}
-            style={[st.action, { borderColor: c.accent, backgroundColor: c.accent + '20' }]}>
-            <IconSymbol name="viewfinder" size={13} color={c.accent} />
-            <Text numberOfLines={1} style={[st.actionText, { color: c.accent }]}>{tr.focusMode}</Text>
+            style={[st.action, { backgroundColor: t.action.primary }]}>
+            <IconSymbol name="viewfinder" size={13} color={t.text.onAction} />
+            <Text numberOfLines={1} style={[st.actionText, { color: t.text.onAction }]}>{tr.focusMode}</Text>
           </Pressable>
         </View>
       )}
@@ -176,12 +180,12 @@ export function ActiveTimersSidebarCard({ colors: c, projectId }: {
 }
 
 const st = StyleSheet.create({
-  card:     { borderRadius: Atlas.radius.medium, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, paddingVertical: 8, marginTop: 8 },
+  card:     { borderRadius: radius.nested, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8 },
   head:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, minWidth: 0 },
-  icon:     { width: 26, height: 26, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
-  title:    { fontSize: 13, fontWeight: '700' },
-  clock:    { fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'], marginTop: 1 },
+  icon:     { width: 28, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  title:    { fontSize: 13, fontFamily: fontFamily.semibold },
+  clock:    { fontSize: 13, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 1 },
   meta:     { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
   tag:      { flexShrink: 1, marginTop: 1 },
   list:     { maxHeight: 260, marginTop: 4 },
@@ -193,9 +197,8 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     minHeight: 36,
-    borderRadius: 9,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 6,
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
   },
-  actionText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
+  actionText: { fontSize: 12, fontFamily: fontFamily.semibold, flexShrink: 1 },
 });

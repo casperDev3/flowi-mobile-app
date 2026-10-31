@@ -1,11 +1,12 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
 import type { Currency, TxGroup, Transaction } from '@/utils/financeUtils';
 import { accountById, creditedAmount, isTransfer, resolveTxCurrency, type Account } from '@/utils/accounts';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
 interface Colors {
   sub: string;
@@ -51,6 +52,8 @@ export function TransactionGroup({
     group.label === '__yesterday__' ? yesterdayLabel :
     group.label;
 
+  const t = dsTokens(isDark);
+  const gs = useGlassStyles();
   const curOf = (code: string): Currency =>
     currencyByCode[code] ?? { code, symbol: code, kind: 'fiat', decimals: 2 };
 
@@ -61,22 +64,22 @@ export function TransactionGroup({
     <View style={{ marginBottom: 16 }}>
       {/* Group header — денні підсумки без переказів (їх не рахує groupTransactions) */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
-        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1, minWidth: 80 }}>
+        <Text style={{ color: t.text.secondary, fontSize: 12, fontFamily: fontFamily.semibold, flex: 1, minWidth: 80 }}>
           {displayLabel}
         </Text>
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {incomeCodes.map(code => (
-            <View key={'in_' + code} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.green + '18', borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 4 }}>
-              <IconSymbol name="arrow.up" size={9} color={c.green} />
-              <Text style={{ color: c.green, fontSize: 11, fontWeight: '700' }}>
+            <View key={'in_' + code} style={{ ...gs.card, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
+              <IconSymbol name="arrow.up" size={9} color={t.status.success} />
+              <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>
                 {fmt(group.dayIncomeByCur[code], curOf(code))}
               </Text>
             </View>
           ))}
           {expenseCodes.map(code => (
-            <View key={'ex_' + code} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.red + '18', borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 4 }}>
-              <IconSymbol name="arrow.down" size={9} color={c.red} />
-              <Text style={{ color: c.red, fontSize: 11, fontWeight: '700' }}>
+            <View key={'ex_' + code} style={{ ...gs.card, flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
+              <IconSymbol name="arrow.down" size={9} color={t.status.danger} />
+              <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>
                 {fmt(group.dayExpenseByCur[code], curOf(code))}
               </Text>
             </View>
@@ -92,7 +95,8 @@ export function TransactionGroup({
           // витратою означало б брехати про те, що сталося з грошима.
           const transfer = tx.type === 'transfer';
           const isIncome = tx.type === 'income';
-          const color = transfer ? c.neutral : isIncome ? c.green : c.red;
+          // Тип — лише в гліфі (статусний колір); суми — text.primary, щоб читались на 4.5:1.
+          const color = transfer ? t.status.info : isIncome ? t.status.success : t.status.danger;
           const iconName: IconSymbolName = transfer
             ? 'arrow.left.arrow.right'
             : getCatIcon(tx.category, isIncome ? 'income' : 'expense');
@@ -118,81 +122,75 @@ export function TransactionGroup({
           if (compact) {
             return (
               <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => onSelect(tx)}>
-                <BlurView
-                  intensity={isDark ? 18 : 35}
-                  tint={isDark ? 'dark' : 'light'}
-                  style={{ borderRadius: 15, borderWidth: 1, borderColor: c.border, paddingLeft: 10, paddingRight: 13, paddingVertical: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: color + '70', borderRadius: 2, marginRight: 12 }} />
-                  <View style={{ width: 40, height: 40, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '20' : '12') }}>
+                <View style={[{ ...gs.card, borderRadius: radius.nested, paddingLeft: 14, paddingRight: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center' }, shadow[isDark ? 'dark' : 'light'].card]}>
+                  <View style={{ width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
                     <IconSymbol name={iconName} size={19} color={color} />
                   </View>
                   <View style={{ flex: 1, marginLeft: 11 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }} numberOfLines={1}>{title}</Text>
-                    {tx.note ? <Text style={{ fontSize: 12, color: c.sub, marginTop: 2 }} numberOfLines={1}>{tx.note}</Text> : null}
+                    <Text style={{ ...dsType.bodyMedium, color: t.text.primary }} numberOfLines={1}>{title}</Text>
+                    {tx.note ? <Text style={{ ...dsType.caption, color: t.text.secondary, marginTop: 2 }} numberOfLines={1}>{tx.note}</Text> : null}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}>
-                      <IconSymbol name="clock" size={10} color={c.sub} />
-                      <Text style={{ color: c.sub, fontSize: 10, fontWeight: '500' }}>
+                      <IconSymbol name="clock" size={10} color={t.text.secondary} />
+                      <Text style={{ color: t.text.secondary, fontSize: 11, fontFamily: fontFamily.regular, ...dsType.numeric }}>
                         {txDate.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
                       </Text>
-                      <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: c.sub + '80' }} />
-                      <View style={{ backgroundColor: color + '20', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                        <Text style={{ color, fontSize: 9, fontWeight: '700' }}>
+                      <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: t.text.muted }} />
+                      <View style={{ ...gs.subtle, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 1 }}>
+                        <Text style={{ color: t.text.secondary, fontSize: 10, fontFamily: fontFamily.semibold }}>
                           {transfer ? transferLabel : isIncome ? incomeLabel : expenseLabel}
                         </Text>
                       </View>
                       {cur.code !== primaryCode && (
-                        <View style={{ backgroundColor: c.dim, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                          <Text style={{ color: c.sub, fontSize: 9, fontWeight: '700' }}>{cur.code}</Text>
+                        <View style={{ ...gs.subtle, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 1 }}>
+                          <Text style={{ color: t.text.secondary, fontSize: 10, fontFamily: fontFamily.semibold }}>{cur.code}</Text>
                         </View>
                       )}
                     </View>
                   </View>
                   <View style={{ alignItems: 'flex-end', marginLeft: 10 }}>
-                    <Text style={{ fontSize: 15, fontWeight: Atlas.type.headingWeight, color }}>
+                    <Text style={{ fontSize: 16, fontFamily: fontFamily.semibold, color: t.text.primary, ...dsType.numeric }}>
                       {sign}{fmt(tx.amount, cur)}
                     </Text>
                     {showCredited && (
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: c.sub, marginTop: 2 }}>
+                      <Text style={{ fontSize: 11, fontFamily: fontFamily.medium, color: t.text.secondary, marginTop: 2, ...dsType.numeric }}>
                         → {fmt(credited, creditedCur)}
                       </Text>
                     )}
                   </View>
-                </BlurView>
+                </View>
               </TouchableOpacity>
             );
           }
 
           return (
             <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => onSelect(tx)}>
-              <BlurView
-                intensity={isDark ? 16 : 28}
-                tint={isDark ? 'dark' : 'light'}
+              <View
                 style={{
-                  paddingHorizontal: 10, paddingVertical: 8, overflow: 'hidden',
-                  flexDirection: 'row', alignItems: 'center',
-                  borderTopLeftRadius:    isFirst ? 13 : 5,
-                  borderTopRightRadius:   isFirst ? 13 : 5,
-                  borderBottomLeftRadius: isLast  ? 13 : 5,
-                  borderBottomRightRadius:isLast  ? 13 : 5,
+                  paddingHorizontal: 14, paddingVertical: 10, ...gs.card,
+                  flexDirection: 'row', alignItems: 'center', minHeight: 52,
+                  borderTopLeftRadius:    isFirst ? radius.nested : 4,
+                  borderTopRightRadius:   isFirst ? radius.nested : 4,
+                  borderBottomLeftRadius: isLast  ? radius.nested : 4,
+                  borderBottomRightRadius:isLast  ? radius.nested : 4,
                 }}>
-                <View style={{ width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '20' : '12') }}>
+                <View style={{ width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
                   <IconSymbol name={iconName} size={14} color={color} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 9 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }} numberOfLines={1}>{title}</Text>
-                  {tx.note ? <Text style={{ fontSize: 11, marginTop: 1, color: c.sub }} numberOfLines={1}>{tx.note}</Text> : null}
+                  <Text style={{ fontSize: 14, fontFamily: fontFamily.medium, color: t.text.primary }} numberOfLines={1}>{title}</Text>
+                  {tx.note ? <Text style={{ ...dsType.caption, marginTop: 1, color: t.text.secondary }} numberOfLines={1}>{tx.note}</Text> : null}
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 13, fontWeight: Atlas.type.headingWeight, color }}>
+                  <Text style={{ fontSize: 14, fontFamily: fontFamily.semibold, color: t.text.primary, ...dsType.numeric }}>
                     {sign}{fmt(tx.amount, cur)}
                   </Text>
                   {showCredited && (
-                    <Text style={{ fontSize: 10, fontWeight: '600', color: c.sub, marginTop: 1 }}>
+                    <Text style={{ fontSize: 11, fontFamily: fontFamily.medium, color: t.text.secondary, marginTop: 1, ...dsType.numeric }}>
                       → {fmt(credited, creditedCur)}
                     </Text>
                   )}
                 </View>
-              </BlurView>
+              </View>
             </TouchableOpacity>
           );
         })}

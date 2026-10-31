@@ -17,6 +17,7 @@ import { useTimerContext } from "@/store/timer-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAdvertisingRecording } from "@/store/advertising-safety";
 import { isOnlineMode } from "@/store/app-mode";
+import { fontFamily, theme } from '@/constants/theme';
 type Campaign = { title: string; body: string; url: string };
 type Ads = { enabled: boolean; campaigns: Record<string, Campaign> };
 let activityAt = 0;
@@ -85,10 +86,11 @@ export function AdSlot({
         maxWidth: 320,
         alignSelf: "center",
         width: "100%",
-        borderWidth: 1,
-        borderColor: dark ? "#555" : "#ccc",
-        borderRadius: Atlas.radius.medium,
-        padding: 6,
+        // DS v2: рекламний блок — нейтральна картка surface.card без рамки.
+        backgroundColor: theme[dark ? "dark" : "light"].surface.card,
+        borderRadius: Atlas.radius.large,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         marginVertical: 8,
         overflow: "hidden",
       }}
@@ -97,19 +99,19 @@ export function AdSlot({
         accessibilityRole="link"
         onPress={() => void Linking.openURL(creative.url).catch(() => {})}
       >
-        <Text style={{ fontSize: 10, color: dark ? "#bbb" : "#666" }}>
+        <Text style={{ fontSize: 10, color: theme[dark ? "dark" : "light"].text.secondary }}>
           Реклама
         </Text>
         <Text
           numberOfLines={1}
-          style={{ fontWeight: "700", color: dark ? "white" : "#222" }}
+          style={{ fontFamily: fontFamily.bold, color: theme[dark ? "dark" : "light"].text.primary }}
         >
           {creative.title}
         </Text>
         {slot === "M1" && (
           <Text
             numberOfLines={2}
-            style={{ fontSize: 12, color: dark ? "#bbb" : "#666" }}
+            style={{ fontSize: 12, color: theme[dark ? "dark" : "light"].text.secondary }}
           >
             {creative.body}
           </Text>
@@ -126,11 +128,10 @@ export function AdvertisingSettings() {
   return (
     <View
       style={{
-        padding: 16,
+        padding: 20,
         marginVertical: 10,
-        borderRadius: Atlas.radius.large,
-        borderWidth: 1,
-        borderColor: dark ? "#555" : "#ccc",
+        borderRadius: Atlas.radius.xlarge,
+        backgroundColor: theme[dark ? "dark" : "light"].surface.card,
       }}
     >
       <View
@@ -140,7 +141,7 @@ export function AdvertisingSettings() {
           justifyContent: "space-between",
         }}
       >
-        <Text style={{ color: dark ? "white" : "#222", flex: 1 }}>
+        <Text style={{ color: theme[dark ? "dark" : "light"].text.primary, flex: 1 }}>
           Показувати рекламу
         </Text>
         <Switch
@@ -158,11 +159,11 @@ export function AdvertisingSettings() {
           }}
         />
       </View>
-      <Text style={{ fontSize: 12, color: dark ? "#bbb" : "#666" }}>
+      <Text style={{ fontSize: 12, color: theme[dark ? "dark" : "light"].text.secondary }}>
         Вимикає банери й спонсорські паузи на ваших пристроях у цьому workspace.
       </Text>
       {!!error && (
-        <Text accessibilityRole="alert" style={{ color: "#EF4444" }}>
+        <Text accessibilityRole="alert" style={{ color: theme[dark ? "dark" : "light"].status.danger }}>
           {error}
         </Text>
       )}
@@ -219,30 +220,31 @@ export function SponsorPause() {
       <View
         style={{
           flex: 1,
-          backgroundColor: "#171320",
+          // DS v2: повноекранна пауза — темний canvas.
+          backgroundColor: theme.dark.bg.canvas,
           padding: 28,
           justifyContent: "center",
         }}
       >
         <Text
           accessibilityRole="header"
-          style={{ fontSize: 20, color: "white", marginBottom: 20 }}
+          style={{ fontSize: 20, fontFamily: fontFamily.medium, color: theme.dark.text.primary, marginBottom: 20 }}
         >
           {seconds === 11 ? "Спонсорська пауза · 10 с" : "Спонсор"}
         </Text>
         {seconds < 11 && creative && (
           <>
-            <Text style={{ color: "white", fontSize: 24, fontWeight: "700" }}>
+            <Text style={{ color: theme.dark.text.primary, fontSize: 24, fontFamily: fontFamily.semibold }}>
               {creative.title}
             </Text>
-            <Text style={{ color: "white", marginVertical: 16 }}>
+            <Text style={{ color: theme.dark.text.secondary, fontFamily: fontFamily.regular, marginVertical: 16 }}>
               {creative.body}
             </Text>
             <Pressable
               accessibilityRole="link"
               onPress={() => void Linking.openURL(creative.url).catch(() => {})}
             >
-              <Text style={{ color: "#c4b5fd", paddingVertical: 12 }}>
+              <Text style={{ color: theme.dark.accent.lavender, fontFamily: fontFamily.semibold, paddingVertical: 12 }}>
                 Дізнатися більше
               </Text>
             </Pressable>
@@ -255,11 +257,13 @@ export function SponsorPause() {
           onPress={() => setCreative(null)}
           style={{
             padding: 16,
-            borderRadius: Atlas.radius.medium,
-            backgroundColor: seconds ? "#555" : "#7c3aed",
+            minHeight: 48,
+            alignItems: "center",
+            borderRadius: 999,
+            backgroundColor: seconds ? theme.dark.state.disabledBg : theme.dark.action.primary,
           }}
         >
-          <Text style={{ color: "white" }}>
+          <Text style={{ color: seconds ? theme.dark.text.secondary : theme.dark.text.onAction, fontFamily: fontFamily.semibold, fontVariant: ["tabular-nums"] }}>
             {seconds
               ? `Продовжити через ${Math.min(10, seconds)} с`
               : "Продовжити"}

@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius } from '@/constants/theme';
 /**
  * components/shared/UndoToast.tsx
  *
@@ -12,11 +12,10 @@ import { Atlas } from '@/constants/atlas';
  *   // У JSX: <View style={{ flex: 1 }}>{undoElement}</View>
  */
 
-import { BlurView } from 'expo-blur';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Platform, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useI18n } from '@/store/i18n';
 
@@ -54,7 +53,7 @@ interface UndoToastApi {
  */
 export function useUndoToast(isTab = true): UndoToastApi {
   const { tr } = useI18n();
-  const isDark = useColorScheme() === 'dark';
+  const { t, isDark } = useDSTheme();
   const reduced = useReduceMotion();
 
   const [toastData, setToastData] = useState<ToastData | null>(null);
@@ -117,10 +116,12 @@ export function useUndoToast(isTab = true): UndoToastApi {
     ? (Platform.OS === 'ios' ? 100 : 80)
     : 40;
 
+  // DS v2: тост — інвертована pill-плашка (action.primary + text.onAction);
+  // «Скасувати» — лайм на чорному, глибока лаванда на світлому.
   const c = {
-    border: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    accent: '#7C3AED',
+    bg:     t.action.primary,
+    text:   t.text.onAction,
+    accent: isDark ? '#6D4CF5' : t.accent.lime,
   };
 
   const element: React.ReactElement = toastData ? (
@@ -128,11 +129,7 @@ export function useUndoToast(isTab = true): UndoToastApi {
       style={[st.container, { bottom, opacity, transform: [{ translateY }] }]}
       pointerEvents="box-none"
     >
-      <BlurView
-        intensity={isDark ? 45 : 65}
-        tint={isDark ? 'dark' : 'light'}
-        style={[st.card, { borderColor: c.border }]}
-      >
+      <View style={[st.card, { backgroundColor: c.bg }]}>
         <Text style={[st.message, { color: c.text }]} numberOfLines={1}>
           {toastData.message}
         </Text>
@@ -146,7 +143,7 @@ export function useUndoToast(isTab = true): UndoToastApi {
           <Text style={[st.undoBtn, { color: c.accent }]}>{tr.undo}</Text>
         </TouchableOpacity>
         ) : null}
-      </BlurView>
+      </View>
     </Animated.View>
   ) : <></>;
 
@@ -164,24 +161,24 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: Atlas.radius.large,
-    borderWidth: 1,
-    paddingHorizontal: 16,
+    borderRadius: radius.pill,
+    minHeight: 48,
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#111113',
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 6,
   },
   message: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
     flex: 1,
     marginRight: 12,
   },
   undoBtn: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: fontFamily.semibold,
   },
 });

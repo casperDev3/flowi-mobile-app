@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/ActiveTimerRow.tsx — рядок активного таймера зі стопом.
  *
@@ -17,12 +16,14 @@ import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 import { useTimerContext } from '@/store/timer-context';
 import type { ActiveTimer, TimerProject } from '@/utils/activeTimers';
+import { fontFamily, radius } from '@/constants/theme';
 import { timerKind, type TimerKind } from '@/utils/activeTimersBar';
 import { formatClock } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
 import { elapsedSince } from '@/utils/taskTimer';
 
-export const STOP_COLOR = '#EF4444';
+/** Стоп — status.danger DS v2 (однаковий відтінок для обох тем: білий гліф на ньому читається). */
+export const STOP_COLOR = '#E8543F';
 
 export const TIMER_KIND_ICON: Record<TimerKind, IconSymbolName> = {
   task: 'checklist',
@@ -170,14 +171,14 @@ export function ActiveTimerRow({
 
 const st = StyleSheet.create({
   row:   { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
-  kind:  { width: 26, height: 26, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
+  kind:  { width: 28, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   body:  { flex: 1, minWidth: 0 },
-  label: { fontSize: 14, fontWeight: '600' },
-  clock: { fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'], marginTop: 1 },
+  label: { fontSize: 14, fontFamily: fontFamily.medium },
+  clock: { fontSize: 13, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 1 },
   stop:  { backgroundColor: STOP_COLOR, alignItems: 'center', justifyContent: 'center' },
   meta:    { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
   metaTag: { flexShrink: 1, marginTop: 1 },
   tag:     { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 },
   tagDot:  { width: 7, height: 7, borderRadius: 4 },
-  tagText: { fontWeight: '600', flexShrink: 1 },
+  tagText: { fontFamily: fontFamily.medium, flexShrink: 1 },
 });

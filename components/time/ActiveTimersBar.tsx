@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/ActiveTimersBar.tsx — глобальна панель активних таймерів
  * на телефоні (як міні-плеєр над панеллю табів).
@@ -18,7 +17,6 @@ import { Atlas } from '@/constants/atlas';
  * вкладок і накривають панель разом із табами — там, де табів немає, немає й
  * її, як і обіцяє useTabBarInset().
  */
-import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -37,7 +35,9 @@ import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ACTIVE_TIMERS_BAR_HEIGHT, TAB_BAR_HEIGHT, activeTimersBarVisible } from '@/constants/nav';
+import { fontFamily, radius, shadow } from '@/constants/theme';
 import { getScreenColors } from '@/constants/tokens';
+import { dsTokens } from '@/hooks/use-ds';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
@@ -46,6 +46,8 @@ import { primaryTimer, timerKind, timersCountLabel } from '@/utils/activeTimersB
 import { formatClock } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
 import { elapsedSince } from '@/utils/taskTimer';
+import { GlassBackdrop } from '@/components/ds';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
 const BAR_BODY_HEIGHT = 44;
 
@@ -63,6 +65,8 @@ export function ActiveTimersBar() {
   const focusDelay = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const c = useMemo(() => getScreenColors('time', isDark), [isDark]);
+  const t = dsTokens(isDark);
+  const gs = useGlassStyles();
   const visible = activeTimersBarVisible(isWide, activeTimers.length);
   const count = activeTimers.length;
   const primary = primaryTimer(activeTimers);
@@ -107,23 +111,20 @@ export function ActiveTimersBar() {
             right: insets.right + 10,
           },
         ]}>
-        <BlurView
-          intensity={80}
-          tint={isDark ? 'dark' : 'light'}
+        {/* DS v2: суцільна піднята поверхня замість блюру; тінь — лише м'яка popover. */}
+        <View
           style={[
             st.bar,
-            {
-              borderColor: c.border,
-              backgroundColor: isDark ? 'rgba(18,21,37,0.82)' : 'rgba(255,255,255,0.86)',
-            },
+            { ...gs.strong },
+            shadow[isDark ? 'dark' : 'light'].popover,
           ]}>
           <Pressable
             onPress={onBodyPress}
             accessibilityRole="button"
             accessibilityLabel={single ? `${tr.navTimeTracker}: ${primaryLabel}` : tr.activeTimersExpandA11y}
             style={st.body}>
-            <View style={[st.icon, { backgroundColor: c.accent + '22' }]}>
-              <IconSymbol name={single ? TIMER_KIND_ICON[timerKind(primary)] : 'timer'} size={15} color={c.accent} />
+            <View style={[st.icon, { ...gs.subtle }]}>
+              <IconSymbol name={single ? TIMER_KIND_ICON[timerKind(primary)] : 'timer'} size={15} color={c.text} />
             </View>
             <Text numberOfLines={1} style={[st.title, { color: c.text }]}>{title}</Text>
             {single && (
@@ -133,7 +134,7 @@ export function ActiveTimersBar() {
               running
               seconds={now => elapsedSince(primary.startedAt, now)}
               format={formatClock}
-              style={[st.clock, { color: c.accent }]}
+              style={[st.clock, { color: c.text }]}
             />
             {!single && <IconSymbol name="chevron.up" size={14} color={c.sub} />}
           </Pressable>
@@ -144,13 +145,14 @@ export function ActiveTimersBar() {
               label={`${tr.stopTimerAction}: ${primaryLabel}`}
             />
           )}
-        </BlurView>
+        </View>
       </View>
 
       <Modal visible={sheetOpen} transparent animationType="slide" onRequestClose={() => setSheetOpen(false)}>
-        <Pressable style={st.backdrop} onPress={() => setSheetOpen(false)} accessibilityRole="button" accessibilityLabel={tr.close} />
-        <View style={[st.sheet, { backgroundColor: c.bg2, paddingBottom: insets.bottom + 16 }]}>
-          <View style={[st.handle, { backgroundColor: c.border }]} />
+        <Pressable style={[st.backdrop, { backgroundColor: t.surface.overlay }]} onPress={() => setSheetOpen(false)} accessibilityRole="button" accessibilityLabel={tr.close} />
+        <View style={[st.sheet, { ...gs.strong, paddingBottom: insets.bottom + 16 }]}>
+          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+          <View style={[st.handle, { backgroundColor: t.text.muted }]} />
           <View style={st.head}>
             <Text style={[st.sheetTitle, { color: c.text }]}>
               {tr.activeTimers} · {count}
@@ -176,9 +178,9 @@ export function ActiveTimersBar() {
             <Pressable
               onPress={() => { setSheetOpen(false); router.push('/(tabs)/time' as never); }}
               accessibilityRole="button"
-              style={[st.action, { borderColor: c.border }]}>
-              <IconSymbol name="timer" size={15} color={c.accent} />
-              <Text numberOfLines={1} style={[st.actionText, { color: c.accent }]}>{tr.navTimeTracker}</Text>
+              style={[st.action, { ...gs.subtle }]}>
+              <IconSymbol name="timer" size={15} color={t.action.secondaryText} />
+              <Text numberOfLines={1} style={[st.actionText, { color: t.action.secondaryText }]}>{tr.navTimeTracker}</Text>
             </Pressable>
             <Pressable
               onPress={() => {
@@ -189,9 +191,9 @@ export function ActiveTimersBar() {
               }}
               accessibilityRole="button"
               accessibilityLabel={`${tr.focusMode}, ${tr.activeTimers}: ${count}`}
-              style={[st.action, { borderColor: c.accent, backgroundColor: c.accent + '20' }]}>
-              <IconSymbol name="viewfinder" size={15} color={c.accent} />
-              <Text numberOfLines={1} style={[st.actionText, { color: c.accent }]}>{tr.focusMode}</Text>
+              style={[st.action, { backgroundColor: t.action.primary }]}>
+              <IconSymbol name="viewfinder" size={15} color={t.text.onAction} />
+              <Text numberOfLines={1} style={[st.actionText, { color: t.text.onAction }]}>{tr.focusMode}</Text>
             </Pressable>
           </View>
         </View>
@@ -205,9 +207,7 @@ const st = StyleSheet.create({
   wrap: { position: 'absolute', justifyContent: 'flex-end', paddingBottom: ACTIVE_TIMERS_BAR_HEIGHT - BAR_BODY_HEIGHT - 2 },
   bar: {
     height: BAR_BODY_HEIGHT,
-    borderRadius: Atlas.radius.large,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
+    borderRadius: radius.pill,
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: 6,
@@ -215,25 +215,25 @@ const st = StyleSheet.create({
     gap: 8,
   },
   body:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, height: '100%', minWidth: 0 },
-  icon:  { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, fontSize: 14, fontWeight: '700' },
-  clock: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  icon:  { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  title: { flex: 1, fontSize: 14, fontFamily: fontFamily.semibold },
+  clock: { fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
   // Назва таймера головніша за проєкт: мітка стискається першою.
   tag:   { flexShrink: 1, maxWidth: '38%' },
 
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
     maxHeight: '70%',
-    borderTopLeftRadius: Atlas.radius.xlarge,
-    borderTopRightRadius: Atlas.radius.xlarge,
-    paddingHorizontal: 18,
+    borderTopLeftRadius: radius.card,
+    borderTopRightRadius: radius.card,
+    paddingHorizontal: 20,
     paddingTop: 10,
   },
   handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   head:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  sheetTitle: { fontSize: 17, fontWeight: '700' },
+  sheetTitle: { fontSize: 18, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   actions:    { flexDirection: 'row', gap: 8, marginTop: 10 },
   action: {
     flex: 1,
@@ -241,10 +241,9 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    minHeight: 44,
-    borderRadius: Atlas.radius.medium,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 10,
+    minHeight: 48,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
   },
-  actionText: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
+  actionText: { fontSize: 14, fontFamily: fontFamily.semibold, flexShrink: 1 },
 });

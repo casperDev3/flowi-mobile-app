@@ -1,6 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -17,16 +14,20 @@ import { loadDataResult, retryStorageRead } from '@/store/storage';
 import { saveSynced } from '@/store/synced-storage';
 import { useI18n } from '@/store/i18n';
 import { LoadErrorNotice, ReminderBlockedNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
-import { HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
+import { HEALTH_ACCENTS } from '@/utils/healthTheme';
+import { getHealthDSColors } from '@/components/health/palette';
+import { dsTokens } from '@/hooks/use-ds';
 import { HABITS_KEY, Habit, genId, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { useWideModal } from '@/components/health/HealthLayout';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
+import { fontFamily } from '@/constants/theme';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { GlassBackdrop, MeshBackground } from '@/components/ds';
 
 // Типізовано: раніше це був string[], і назва без відповідника в маппінгу
 // мовчки малювала порожнє місце на Android.
 const ICONS: IconSymbolName[] = ['drop.fill', 'bolt.fill', 'figure.walk', 'moon.fill', 'pills.fill', 'heart.fill'];
 const COLORS = [HEALTH_ACCENTS.water, HEALTH_ACCENTS.prot, HEALTH_ACCENTS.steps, HEALTH_ACCENTS.sleep, HEALTH_ACCENTS.cal, HEALTH_ACCENTS.pulse];
-const ACC = HEALTH_ACCENTS.prot;
 
 export default function HabitsScreen() {
   const contentWidth = useContentWidth();
@@ -36,7 +37,9 @@ export default function HabitsScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
   const { tr, lang } = useI18n();
-  const c = getHealthColors(isDark);
+  const c = getHealthDSColors(isDark);
+  const gs = useGlassStyles();
+  const k = dsTokens(isDark);
   useScreenView('health_habits');
 
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -116,15 +119,15 @@ export default function HabitsScreen() {
     // висоти — без minHeight `flex: 1` схлопувався до висоти вмісту, і нижні
     // дві третини «аркуша» лишались прозорими.
     <View style={{ flex: 1, minHeight: sheetScreenMinHeight }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={tr.back} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <IconSymbol name="xmark" size={18} color={c.text} />
           </TouchableOpacity>
           <Text style={[s.title, { color: c.text, flex: 1, marginLeft: 8 }]}>{tr.habits}</Text>
-          <TouchableOpacity onPress={() => setAdd(true)} accessibilityRole="button" accessibilityLabel={tr.add} style={[s.addBtn, { backgroundColor: ACC }]}>
-            <IconSymbol name="plus" size={18} color="#fff" />
+          <TouchableOpacity onPress={() => setAdd(true)} accessibilityRole="button" accessibilityLabel={tr.add} style={[s.addBtn, { backgroundColor: k.action.primary }]}>
+            <IconSymbol name="plus" size={18} color={k.text.onAction} />
           </TouchableOpacity>
         </View>
 
@@ -138,13 +141,13 @@ export default function HabitsScreen() {
           {loadFailed ? null : habits.length === 0 ? <Empty c={c} text={tr.habitsSub} icon="checklist" /> : habits.map(h => {
             const done = habitDoneToday(h); const streak = habitStreak(h);
             return (
-              <BlurView key={h.id} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'} style={[s.card, { borderColor: c.border }]}>
-                <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: h.color + '20', alignItems: 'center', justifyContent: 'center' }}>
+              <View key={h.id} style={[s.card, { ...gs.card }]}>
+                <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: h.color + '20', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name={h.icon} size={17} color={h.color} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{h.title}</Text>
-                  <Text style={{ color: c.sub, fontSize: 11, marginTop: 1 }}>
+                  <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>{h.title}</Text>
+                  <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
                     🔥 {tr.streak}: {streak} {tr.daysStreak}{h.reminderAt ? ` · ⏰ ${h.reminderAt}` : ''}
                   </Text>
                 </View>
@@ -152,10 +155,10 @@ export default function HabitsScreen() {
                   <IconSymbol name="trash" size={15} color={c.sub} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => toggle(h)}
-                  style={[s.check, { borderColor: done ? h.color : c.border, backgroundColor: done ? h.color : 'transparent' }]}>
-                  {done && <IconSymbol name="checkmark" size={18} color="#fff" />}
+                  style={[s.check, { borderColor: done ? k.action.primary : c.border, backgroundColor: done ? k.action.primary : 'transparent' }]}>
+                  {done && <IconSymbol name="checkmark" size={18} color={k.text.onAction} />}
                 </TouchableOpacity>
-              </BlurView>
+              </View>
             );
           })}
         </ScrollView>
@@ -165,7 +168,8 @@ export default function HabitsScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setAdd(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrap, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-              <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'} style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[s.sheet, sheetSurface, { ...gs.strong }]}>
+                <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addHabit}</Text>
                 <Field label={tr.title} value={title} onChange={setTitle} placeholder="Випити вітаміни" autoFocus c={c} />
@@ -173,8 +177,8 @@ export default function HabitsScreen() {
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {ICONS.map(ic => (
                     <TouchableOpacity key={ic} onPress={() => setIcon(ic)}
-                      style={[s.pick, { borderColor: icon === ic ? color : c.border, backgroundColor: icon === ic ? color + '20' : c.dim }]}>
-                      <IconSymbol name={ic} size={17} color={icon === ic ? color : c.sub} />
+                      style={[s.pick, { backgroundColor: icon === ic ? k.action.primary : c.dim }]}>
+                      <IconSymbol name={ic} size={17} color={icon === ic ? k.text.onAction : c.sub} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -187,15 +191,15 @@ export default function HabitsScreen() {
                 </View>
                 <Field label={`${tr.reminders} (08:00)`} value={remAt} onChange={setRemAt} placeholder="08:00" c={c} />
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
-                  <TouchableOpacity onPress={() => setAdd(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                    <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                  <TouchableOpacity onPress={() => setAdd(false)} style={[s.btn, { ...gs.subtle, flex: 1 }]}>
+                    <Text style={{ color: k.action.secondaryText, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity disabled={!canCreate} accessibilityState={{ disabled: !canCreate }} onPress={create} style={[s.btn, { flex: 2, backgroundColor: canCreate ? ACC : c.dim }]}>
-                    <Text style={{ color: canCreate ? '#fff' : c.sub, fontWeight: '700' }}>{tr.save}</Text>
+                  <TouchableOpacity disabled={!canCreate} accessibilityState={{ disabled: !canCreate }} onPress={create} style={[s.btn, { flex: 2, backgroundColor: canCreate ? k.action.primary : k.state.disabledBg }]}>
+                    <Text style={{ color: canCreate ? k.text.onAction : k.state.disabledText, fontFamily: fontFamily.semibold }}>{tr.save}</Text>
                   </TouchableOpacity>
                 </View>
                 </ScrollView>
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -206,17 +210,17 @@ export default function HabitsScreen() {
 
 const s = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
-  title:     { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
-  addBtn:    { width: 38, height: 38, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  card:      { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', marginBottom: 10 },
-  check:     { width: 32, height: 32, borderRadius: 16, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  pick:      { width: 44, height: 44, borderRadius: Atlas.radius.medium, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
+  title:     { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
+  addBtn:    { width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  card:      { borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  check:     { width: 44, height: 44, borderRadius: 22, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  pick:      { width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  overlay:   { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)' /* surface.overlay */, justifyContent: 'flex-end' },
   sheetWrap: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти — числом із useSheetSurface(); відсоток тут не працював
   // (батько має height:auto), і кнопка «Зберегти» лишалась за краєм вікна.
-  sheet:     { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  sheetTitle:{ fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 6 },
-  label:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  btn:       { paddingVertical: 14, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
+  sheet:     { borderRadius: 24, padding: 24 },
+  sheetTitle:{ fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 6 },
+  label:     { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 14 },
+  btn:       { minHeight: 48, paddingVertical: 14, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
 });

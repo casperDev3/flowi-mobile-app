@@ -1,8 +1,9 @@
-import { Atlas } from '@/constants/atlas';
 import React, { useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import { CHART_TYPES, ChartType } from '@/store/chart-prefs';
 import { PERIODS, Period, TrendData } from '@/utils/healthPeriods';
 
@@ -13,14 +14,17 @@ const PERIOD_LABEL: Record<Period, string> = {
 export function PeriodSelector({ period, onChange, color, c, tr }: {
   period: Period; onChange: (p: Period) => void; color: string; c: any; tr: any;
 }) {
+  const { t: k } = useDS();
+  // Сегментований перемикач DS v2: subtle-доріжка, активний сегмент — pill action.primary.
   return (
-    <View style={{ flexDirection: 'row', gap: 4, backgroundColor: c.dim, borderRadius: Atlas.radius.medium, padding: 3 }}>
+    <View style={{ flexDirection: 'row', gap: 2, backgroundColor: c.dim, borderRadius: radius.pill, padding: 3 }}>
       {PERIODS.map(p => {
         const active = p === period;
         return (
           <TouchableOpacity key={p} onPress={() => onChange(p)} accessibilityRole="button" accessibilityLabel={tr[PERIOD_LABEL[p]]}
-            style={{ flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center', backgroundColor: active ? color : 'transparent' }}>
-            <Text style={{ color: active ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>{tr[PERIOD_LABEL[p]]}</Text>
+            accessibilityState={{ selected: active }}
+            style={{ flex: 1, paddingVertical: 7, borderRadius: radius.pill, alignItems: 'center', backgroundColor: active ? k.action.primary : 'transparent' }}>
+            <Text style={{ color: active ? k.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr[PERIOD_LABEL[p]]}</Text>
           </TouchableOpacity>
         );
       })}
@@ -36,14 +40,16 @@ const CHART_A11Y: Record<ChartType, string> = { bar: 'chartBar', line: 'chartLin
 export function ChartTypeToggle({ value, onChange, color, c, tr }: {
   value: ChartType; onChange: (t: ChartType) => void; color: string; c: any; tr: any;
 }) {
+  const { t: k } = useDS();
   return (
-    <View style={{ flexDirection: 'row', gap: 2, backgroundColor: c.dim, borderRadius: 9, padding: 2 }}>
+    <View style={{ flexDirection: 'row', gap: 2, backgroundColor: c.dim, borderRadius: radius.pill, padding: 3 }}>
       {CHART_TYPES.map(t => {
         const active = t === value;
         return (
           <TouchableOpacity key={t} onPress={() => onChange(t)} accessibilityRole="button" accessibilityLabel={tr[CHART_A11Y[t]]}
-            style={{ width: 30, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: active ? color : 'transparent' }}>
-            <IconSymbol name={CHART_ICON[t] as any} size={14} color={active ? '#fff' : c.sub} />
+            accessibilityState={{ selected: active }}
+            style={{ width: 32, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: active ? k.action.primary : 'transparent' }}>
+            <IconSymbol name={CHART_ICON[t] as any} size={14} color={active ? k.text.onAction : c.sub} />
           </TouchableOpacity>
         );
       })}
@@ -65,7 +71,7 @@ export function TrendChart({ data, color, height = 96, sub, goal, chartType = 'b
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', height, gap: n > 14 ? 1 : 3 }}>
             {data.buckets.map((v, i) => (
               <View key={i} style={{ flex: 1, height, justifyContent: 'flex-end' }}>
-                <View style={{ height: Math.max(v > 0 ? 3 : 0, (v / max) * height), borderRadius: 3, backgroundColor: data.hasData[i] ? color : color + '22' }} />
+                <View style={{ height: Math.max(v > 0 ? 3 : 0, (v / max) * height), borderRadius: 4, backgroundColor: data.hasData[i] ? color : color + '22' }} />
               </View>
             ))}
           </View>
@@ -101,7 +107,7 @@ export function TrendChart({ data, color, height = 96, sub, goal, chartType = 'b
 
       <View style={{ flexDirection: 'row', marginTop: 4 }}>
         {data.labels.map((l, i) => (
-          <Text key={i} style={{ flex: 1, textAlign: 'center', color: sub, fontSize: 8, fontWeight: '600' }} numberOfLines={1}>{l}</Text>
+          <Text key={i} style={{ flex: 1, textAlign: 'center', color: sub, fontSize: 9, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{l}</Text>
         ))}
       </View>
     </View>

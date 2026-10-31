@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/banks.tsx — заощадження як РАХУНКИ, а не окремі скарбнички.
  *
@@ -16,8 +15,6 @@ import { Atlas } from '@/constants/atlas';
  * `accountBalance(account, transactions)` — інакше збережене число й історія
  * операцій розійшлися б і жодне з них не було б правдою.
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -43,7 +40,9 @@ import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { wideModalStyles } from '@/components/finance/wideModal';
 import { Layout } from '@/constants/tokens';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { finPalette } from '@/components/finance/finPalette';
+import { fontFamily, radius, shadow, space, touchTarget, type as dsType } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import { useBreakpointValue, useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { loadDataResult, retryStorageRead, saveData } from '@/store/storage';
@@ -62,6 +61,7 @@ import {
   type Transaction,
 } from '@/utils/financeUtils';
 import { haptic } from '@/utils/haptics';
+import { GlassBackdrop, GlassSurface, MeshBackground } from '@/components/ds';
 
 const JAR_ICONS: IconSymbolName[] = [
   'star.fill', 'house.fill', 'car.fill', 'airplane',
@@ -98,19 +98,14 @@ const LAST_SOURCE_KEY = 'banks_last_source';
  * між рендерами: інакше кожна картка бачить нові кольори й `React.memo`
  * на ній не має сенсу.
  */
-function makeColors(isDark: boolean) {
+function makeColors(isDark: boolean, reduceTransparency = false) {
+  // Токени DS v2 (components/finance/finPalette.ts). `jarFallback` — колір
+  // ідентичності скарбнички без власного кольору (крапка/іконка), не заливка дій.
+  const p = finPalette(isDark, reduceTransparency);
   return {
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(100,160,240,0.3)',
-    text:   isDark ? '#EFF5FF' : '#071524',
-    sub:    isDark ? 'rgba(239,245,255,0.62)' : 'rgba(7,21,36,0.58)',
-    accent: '#0EA5E9',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(8,14,24,0.98)' : 'rgba(239,245,255,0.98)',
-    green:  '#10B981',
-    gold:   '#F59E0B',
+    ...p,
+    gold: p.t.accent.amber,
+    jarFallback: p.t.status.info,
   };
 }
 
@@ -142,7 +137,7 @@ export default function BanksScreen() {
   );
   // Форма й поповнення — діалогом посеред екрана на планшеті.
   const wm = wideModalStyles(isWide);
-  const isDark = useColorScheme() === 'dark';
+  const { isDark, reduceTransparency } = useDS();
   const { tr, lang } = useI18n();
 
   // Тримаємо ВЕСЬ список рахунків, а не лише заощадження: збереження пише
@@ -285,7 +280,7 @@ export default function BanksScreen() {
 
   const multiCurrency = summary.length > 1;
 
-  const c = useMemo(() => makeColors(isDark), [isDark]);
+  const c = useMemo(() => makeColors(isDark, reduceTransparency), [isDark, reduceTransparency]);
 
   const editingAccount = useMemo(
     () => accounts.find(a => a.id === editingId) ?? null,
@@ -459,11 +454,12 @@ export default function BanksScreen() {
   const fromSymbol = curOf(fromAccount?.currency ?? primaryCurrency).symbol;
   const toSymbol = curOf(toAccount?.currency ?? primaryCurrency).symbol;
   const formSymbol = curOf(selCurrency).symbol;
-  const signColor = depositSign === '+' ? c.green : '#EF4444';
+  // Тип операції — лише гліфом/крапкою; суми — text.primary, кнопка — pill action.primary.
+  const signColor = depositSign === '+' ? c.green : c.red;
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
       <SafeAreaView style={{ flex: 1 }} edges={[]}>
@@ -478,7 +474,7 @@ export default function BanksScreen() {
             onPress: () => router.back(),
             label: tr.back,
             color: c.sub,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { ...c.gl.card, borderColor: 'transparent' },
           }}
         />
 
@@ -501,31 +497,31 @@ export default function BanksScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             savings.length > 0 ? (
-              <BlurView intensity={isDark ? 25 : 45} tint={isDark ? 'dark' : 'light'} style={[s.summaryCard, { borderColor: c.border, marginBottom: 16 }]}>
+              <GlassSurface radius={radius.cardCompact} tint="lime" style={[s.summaryCard, { marginBottom: 16 }]}>
                 {summary.map((row, i) => {
                   const pct = row.goal > 0 ? Math.min(100, Math.round((row.saved / row.goal) * 100)) : 0;
                   return (
                     <View key={row.code} style={i > 0 ? { marginTop: 16 } : undefined}>
                       {multiCurrency && (
-                        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 }}>{row.code}</Text>
+                        <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 8 }}>{row.code}</Text>
                       )}
                       <View style={{ flexDirection: 'row', marginBottom: 14 }}>
                         <View style={{ flex: 1 }}>
                           <Text style={[s.summaryLabel, { color: c.sub }]}>Накопичено</Text>
-                          <Text style={[s.summaryAmount, { color: c.green }]}>{fmt(row.saved, row.code)}</Text>
+                          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[s.summaryAmount, { color: c.text }]}>{fmt(row.saved, row.code)}</Text>
                         </View>
-                        <View style={{ width: 1, backgroundColor: c.border }} />
+                        <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: c.border }} />
                         <View style={{ flex: 1, paddingLeft: 16 }}>
                           <Text style={[s.summaryLabel, { color: c.sub }]}>Мета</Text>
-                          <Text style={[s.summaryAmount, { color: c.text }]}>{fmt(row.goal, row.code)}</Text>
+                          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[s.summaryAmount, { color: c.sub }]}>{fmt(row.goal, row.code)}</Text>
                         </View>
                       </View>
                       {row.goal > 0 && (
                         <>
-                          <View style={[s.progressBg, { height: 6 }]}>
-                            <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: c.green }]} />
+                          <View style={[s.progressBg, { height: 8, backgroundColor: c.dim }]}>
+                            <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: c.limeFill }]} />
                           </View>
-                          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 7 }}>
+                          <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginTop: 7 }}>
                             {pct}% від загальної мети
                           </Text>
                         </>
@@ -533,7 +529,7 @@ export default function BanksScreen() {
                     </View>
                   );
                 })}
-              </BlurView>
+              </GlassSurface>
             ) : null
           }
           ListEmptyComponent={
@@ -542,8 +538,8 @@ export default function BanksScreen() {
             ) : (
             <View style={{ alignItems: 'center', paddingVertical: 56 }}>
               <Text style={{ fontSize: 48 }}>🫙</Text>
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noPiggyBanks}</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>Натисніть + щоб створити ціль</Text>
+              <Text style={{ ...dsType.h2, color: c.text, marginTop: 14 }}>{tr.noPiggyBanks}</Text>
+              <Text style={{ ...dsType.body, color: c.sub, marginTop: 4 }}>Натисніть + щоб створити ціль</Text>
             </View>
             )
           }
@@ -556,8 +552,8 @@ export default function BanksScreen() {
         accessibilityRole="button"
         accessibilityLabel={tr.add}
         scaleTo={0.92}
-        style={[s.fab, { backgroundColor: c.accent }]}>
-        <IconSymbol name="plus" size={26} color="#fff" />
+        style={[s.fab, { backgroundColor: c.action }]}>
+        <IconSymbol name="plus" size={26} color={c.onAction} />
       </PressableScale>
 
       {/* ─── Add / Edit Modal ─── */}
@@ -570,11 +566,12 @@ export default function BanksScreen() {
               accessibilityViewIsModal
               importantForAccessibility="yes"
               style={[s.sheetWrapper, readingWidth, wm.column]}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.92 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+                <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={s.handleRow}>
                     <View style={{ flex: 1 }} />
-                    <View style={[s.handle, { backgroundColor: c.border }]} />
+                    <View style={[s.handle, { backgroundColor: c.muted }]} />
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
                       <TouchableOpacity
                         onPress={() => setShowForm(false)}
@@ -591,21 +588,21 @@ export default function BanksScreen() {
                   </Text>
 
                   {/* Goal amount */}
-                  <View style={[s.amountBlock, { backgroundColor: selColor + '12', borderColor: selColor + '30' }]}>
+                  <View style={[s.amountBlock, { backgroundColor: c.dim }]}>
                     {/* Підпис локалізований, символ валюти підставляємо: рахунок
                         не завжди гривневий. */}
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>
+                    <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 6 }}>
                       {tr.goalUAH.replace('₴', formSymbol)}
                     </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ color: selColor, fontSize: 28, fontWeight: '300' }}>{formSymbol}</Text>
+                      <Text style={{ ...dsType.displayUnit, fontSize: 28, lineHeight: 34, color: c.sub }}>{formSymbol}</Text>
                       <TextInput
                         placeholder="0"
-                        placeholderTextColor={c.sub}
+                        placeholderTextColor={c.muted}
                         value={goal}
                         onChangeText={setGoal}
                         keyboardType="decimal-pad"
-                        style={{ color: selColor, fontSize: 38, fontWeight: '700', letterSpacing: -1, flex: 1 }}
+                        style={{ ...dsType.display, fontSize: 44, lineHeight: 50, color: c.text, flex: 1 }}
                       />
                     </View>
                   </View>
@@ -614,17 +611,17 @@ export default function BanksScreen() {
                   <Text style={[s.label, { color: c.sub }]}>{tr.nameLabel}</Text>
                   <TextInput
                     placeholder={tr.piggyPlaceholder}
-                    placeholderTextColor={c.sub}
+                    placeholderTextColor={c.muted}
                     value={name}
                     onChangeText={setName}
-                    style={[s.input, { backgroundColor: c.dim, color: c.text, borderColor: c.border, borderWidth: 1 }]}
+                    style={[s.input, { backgroundColor: c.dim, color: c.text }]}
                   />
 
                   {/* Currency — лише при створенні: після нього незмінна */}
                   <Text style={[s.label, { color: c.sub }]}>{tr.currency}</Text>
                   {editingAccount ? (
-                    <View style={[s.input, { backgroundColor: c.dim, borderColor: c.border, borderWidth: 1 }]}>
-                      <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>
+                    <View style={[s.input, { backgroundColor: c.dim, justifyContent: 'center' }]}>
+                      <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
                         {editingAccount.currency}
                       </Text>
                       <Text style={{ color: c.sub, fontSize: 11, marginTop: 3 }}>{tr.accountCurrencyLocked}</Text>
@@ -639,10 +636,10 @@ export default function BanksScreen() {
                           accessibilityState={{ selected: selCurrency === cur.code, checked: selCurrency === cur.code }}
                           accessibilityLabel={cur.code}
                           style={[s.chip, {
-                            backgroundColor: selCurrency === cur.code ? selColor + '25' : c.dim,
-                            borderColor: selCurrency === cur.code ? selColor : c.border,
+                            backgroundColor: selCurrency === cur.code ? c.action : c.dim,
+                            borderColor: 'transparent',
                           }]}>
-                          <Text style={{ color: selCurrency === cur.code ? selColor : c.sub, fontSize: 13, fontWeight: '700' }}>
+                          <Text style={{ color: selCurrency === cur.code ? c.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>
                             {cur.symbol} {cur.code}
                           </Text>
                         </TouchableOpacity>
@@ -654,11 +651,11 @@ export default function BanksScreen() {
                   <Text style={[s.label, { color: c.sub }]}>{tr.openingBalance} ({formSymbol})</Text>
                   <TextInput
                     placeholder="0"
-                    placeholderTextColor={c.sub}
+                    placeholderTextColor={c.muted}
                     value={opening}
                     onChangeText={setOpening}
                     keyboardType="decimal-pad"
-                    style={[s.input, { backgroundColor: c.dim, color: c.text, borderColor: c.border, borderWidth: 1 }]}
+                    style={[s.input, { backgroundColor: c.dim, color: c.text }]}
                   />
 
                   {/* Icon picker */}
@@ -672,9 +669,9 @@ export default function BanksScreen() {
                         accessibilityState={{ selected: selIcon === icon, checked: selIcon === icon }}
                         accessibilityLabel={`${tr.icon} ${JAR_ICONS.indexOf(icon) + 1}`}
                         style={[s.iconChip, {
-                          backgroundColor: selIcon === icon ? selColor + '25' : c.dim,
-                          borderColor: selIcon === icon ? selColor : c.border,
-                          borderWidth: 1,
+                          backgroundColor: selIcon === icon ? selColor + '24' : c.dim,
+                          borderColor: selIcon === icon ? selColor : 'transparent',
+                          borderWidth: 2,
                         }]}>
                         <IconSymbol name={icon} size={18} color={selIcon === icon ? selColor : c.sub} />
                       </TouchableOpacity>
@@ -691,7 +688,7 @@ export default function BanksScreen() {
                         accessibilityRole="radio"
                         accessibilityState={{ selected: selColor === color, checked: selColor === color }}
                         accessibilityLabel={`${tr.subColor} ${JAR_COLORS.indexOf(color) + 1}`}
-                        style={[s.colorDot, { backgroundColor: color, borderWidth: selColor === color ? 3 : 0, borderColor: isDark ? '#fff' : '#333' }]}
+                        style={[s.colorDot, { backgroundColor: color, borderWidth: selColor === color ? 3 : 0, borderColor: c.text }]}
                       />
                     ))}
                   </View>
@@ -702,25 +699,25 @@ export default function BanksScreen() {
                       <TouchableOpacity
                         onPress={() => archiveAccount(editingAccount.id)}
                         accessibilityLabel={tr.archiveAccount}
-                        style={[s.btn, { width: 46, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
-                        <IconSymbol name="archivebox" size={15} color="#EF4444" />
+                        style={[s.btn, { width: 48, backgroundColor: c.red + '14' }]}>
+                        <IconSymbol name="archivebox" size={15} color={c.red} />
                       </TouchableOpacity>
                     )}
-                    <TouchableOpacity onPress={() => setShowForm(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                      <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                    <TouchableOpacity onPress={() => setShowForm(false)} style={[s.btn, { flex: 1, ...c.gl.subtle }]}>
+                      <Text style={{ ...dsType.label, color: c.t.action.secondaryText }}>{tr.cancel}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={saveForm}
                       disabled={!formValid}
-                      style={[s.btn, { flex: 2, backgroundColor: !formValid ? c.dim : selColor }]}>
-                      <IconSymbol name={editingAccount ? 'checkmark' : 'plus'} size={15} color={!formValid ? c.sub : '#fff'} />
-                      <Text style={{ color: !formValid ? c.sub : '#fff', fontWeight: '700', marginLeft: 6 }}>
+                      style={[s.btn, { flex: 2, backgroundColor: !formValid ? c.t.state.disabledBg : c.action }]}>
+                      <IconSymbol name={editingAccount ? 'checkmark' : 'plus'} size={15} color={!formValid ? c.t.state.disabledText : c.onAction} />
+                      <Text style={{ ...dsType.label, color: !formValid ? c.t.state.disabledText : c.onAction, marginLeft: 6 }}>
                         {editingAccount ? tr.save : tr.create}
                       </Text>
                     </TouchableOpacity>
                   </View>
                 </ScrollView>
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -737,11 +734,12 @@ export default function BanksScreen() {
               importantForAccessibility="yes"
               style={[s.sheetWrapper, readingWidth, wm.column]}>
               {depositAccount && (
-                <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.92, borderColor: c.border, backgroundColor: c.sheet }]}>
+                <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.92 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+                  <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
                   <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     <View style={s.handleRow}>
                       <View style={{ flex: 1 }} />
-                      <View style={[s.handle, { backgroundColor: c.border }]} />
+                      <View style={[s.handle, { backgroundColor: c.muted }]} />
                       <View style={{ flex: 1, alignItems: 'flex-end' }}>
                         <TouchableOpacity
                           onPress={() => setShowDeposit(false)}
@@ -755,12 +753,12 @@ export default function BanksScreen() {
 
                     {/* Target preview */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 }}>
-                      <View style={[s.jarIcon, { backgroundColor: (depositAccount.color ?? c.accent) + (isDark ? '22' : '18') }]}>
-                        <IconSymbol name={(depositAccount.icon as IconSymbolName) ?? 'star.fill'} size={20} color={depositAccount.color ?? c.accent} />
+                      <View style={[s.jarIcon, { backgroundColor: (depositAccount.color ?? c.jarFallback) + (isDark ? '2E' : '1F') }]}>
+                        <IconSymbol name={(depositAccount.icon as IconSymbolName) ?? 'star.fill'} size={20} color={depositAccount.color ?? c.jarFallback} />
                       </View>
                       <View>
                         <Text style={[s.jarName, { color: c.text }]}>{depositAccount.name}</Text>
-                        <Text style={{ color: c.sub, fontSize: 12 }}>
+                        <Text style={{ ...dsType.caption, ...dsType.numeric, color: c.sub }}>
                           {fmt(balances[depositAccount.id] ?? 0, depositAccount.currency)}
                           {depositAccount.goal ? ` / ${fmt(depositAccount.goal, depositAccount.currency)}` : ''}
                         </Text>
@@ -773,9 +771,9 @@ export default function BanksScreen() {
                         <TouchableOpacity
                           key={sign}
                           onPress={() => setDepositSign(sign)}
-                          style={[s.typeBtn, depositSign === sign && { backgroundColor: sign === '+' ? c.green : '#EF4444' }]}>
-                          <Text style={{ fontSize: 18, fontWeight: '700', color: depositSign === sign ? '#fff' : c.sub }}>{sign}</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '600', marginLeft: 5, color: depositSign === sign ? '#fff' : c.sub }}>
+                          style={[s.typeBtn, depositSign === sign && { backgroundColor: c.action }]}>
+                          <Text style={{ fontSize: 18, fontFamily: fontFamily.semibold, color: depositSign === sign ? c.onAction : c.text }}>{sign}</Text>
+                          <Text style={{ fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 5, color: depositSign === sign ? c.onAction : c.text }}>
                             {sign === '+' ? tr.depositSign : tr.withdrawSign}
                           </Text>
                         </TouchableOpacity>
@@ -787,8 +785,8 @@ export default function BanksScreen() {
                       {depositSign === '+' ? tr.transferFrom : tr.transferTo}
                     </Text>
                     {sources.length === 0 ? (
-                      <View style={[s.input, { backgroundColor: c.dim, borderColor: c.border, borderWidth: 1 }]}>
-                        <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{tr.noAccounts}</Text>
+                      <View style={[s.input, { backgroundColor: c.dim, justifyContent: 'center' }]}>
+                        <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.noAccounts}</Text>
                         <Text style={{ color: c.sub, fontSize: 11, marginTop: 3 }}>{tr.noAccountsHint}</Text>
                       </View>
                     ) : (
@@ -799,17 +797,17 @@ export default function BanksScreen() {
                               key={a.id}
                               onPress={() => setSourceId(a.id)}
                               style={[s.chip, {
-                                backgroundColor: sourceId === a.id ? c.accent + '25' : c.dim,
-                                borderColor: sourceId === a.id ? c.accent : c.border,
+                                backgroundColor: sourceId === a.id ? c.action : c.dim,
+                                borderColor: 'transparent',
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 gap: 6,
                               }]}>
-                              <IconSymbol name={KIND_ICON[a.kind]} size={14} color={sourceId === a.id ? c.accent : c.sub} />
-                              <Text style={{ color: sourceId === a.id ? c.accent : c.sub, fontSize: 13, fontWeight: '600' }}>
+                              <IconSymbol name={KIND_ICON[a.kind]} size={14} color={sourceId === a.id ? c.onAction : c.sub} />
+                              <Text style={{ color: sourceId === a.id ? c.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>
                                 {a.name}
                               </Text>
-                              <Text style={{ color: c.sub, fontSize: 11 }}>{a.currency}</Text>
+                              <Text style={{ color: sourceId === a.id ? c.onAction : c.sub, fontSize: 11 }}>{a.currency}</Text>
                             </TouchableOpacity>
                           ))}
                         </View>
@@ -819,22 +817,21 @@ export default function BanksScreen() {
                     {/* Amount input — у валюті рахунку, з якого списуємо */}
                     <View style={[s.amountBlock, {
                       marginTop: 14,
-                      backgroundColor: signColor + '12',
-                      borderColor: signColor + '30',
+                      backgroundColor: c.dim,
                     }]}>
-                      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 }}>
+                      <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 6 }}>
                         {tr.amountWithCurrency.replace('{symbol}', fromSymbol)}
                       </Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ color: signColor, fontSize: 28, fontWeight: '300' }}>{fromSymbol}</Text>
+                        <Text style={{ ...dsType.displayUnit, fontSize: 28, lineHeight: 34, color: signColor }}>{fromSymbol}</Text>
                         <TextInput
                           placeholder="0"
-                          placeholderTextColor={c.sub}
+                          placeholderTextColor={c.muted}
                           value={depositAmount}
                           onChangeText={setDepositAmount}
                           keyboardType="decimal-pad"
                           autoFocus
-                          style={{ color: signColor, fontSize: 38, fontWeight: '700', letterSpacing: -1, flex: 1 }}
+                          style={{ ...dsType.display, fontSize: 44, lineHeight: 50, color: c.text, flex: 1 }}
                         />
                       </View>
                     </View>
@@ -846,11 +843,11 @@ export default function BanksScreen() {
                         <Text style={[s.label, { color: c.sub }]}>{tr.transferReceived} ({toSymbol})</Text>
                         <TextInput
                           placeholder="0"
-                          placeholderTextColor={c.sub}
+                          placeholderTextColor={c.muted}
                           value={receivedAmount}
                           onChangeText={setReceivedAmount}
                           keyboardType="decimal-pad"
-                          style={[s.input, { backgroundColor: c.dim, color: c.text, borderColor: c.border, borderWidth: 1 }]}
+                          style={[s.input, { backgroundColor: c.dim, color: c.text }]}
                         />
                       </>
                     )}
@@ -861,20 +858,20 @@ export default function BanksScreen() {
                     </View>
 
                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                      <TouchableOpacity onPress={() => setShowDeposit(false)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                        <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                      <TouchableOpacity onPress={() => setShowDeposit(false)} style={[s.btn, { flex: 1, ...c.gl.subtle }]}>
+                        <Text style={{ ...dsType.label, color: c.t.action.secondaryText }}>{tr.cancel}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={applyDeposit}
                         disabled={!depositValid}
-                        style={[s.btn, { flex: 2, backgroundColor: !depositValid ? c.dim : signColor }]}>
-                        <Text style={{ color: !depositValid ? c.sub : '#fff', fontWeight: '700' }}>
+                        style={[s.btn, { flex: 2, backgroundColor: !depositValid ? c.t.state.disabledBg : c.action }]}>
+                        <Text style={{ ...dsType.label, color: !depositValid ? c.t.state.disabledText : c.onAction }}>
                           {depositSign === '+' ? tr.depositBtn : tr.withdrawBtn}
                         </Text>
                       </TouchableOpacity>
                     </View>
                   </ScrollView>
-                </BlurView>
+                </View>
               )}
             </Pressable>
           </Pressable>
@@ -917,26 +914,24 @@ const JarCard = React.memo(function JarCard({
   onEdit: (account: Account) => void;
   onDeposit: (account: Account) => void;
 }) {
-  const color = account.color ?? '#0EA5E9';
+  const color = account.color ?? c.jarFallback;
   const goal = account.goal ?? 0;
   const pct = goal > 0 ? Math.min(100, Math.max(0, (balance / goal) * 100)) : 0;
   const done = goal > 0 && pct >= 100;
   return (
-    <BlurView
-      intensity={isDark ? 18 : 35}
-      tint={isDark ? 'dark' : 'light'}
-      style={[s.jarCard, width !== undefined && { width }, { borderColor: done ? color + '60' : c.border }]}>
+    <View style={[s.jarCard, width !== undefined && { width }, { ...c.gl.card }, shadow[isDark ? 'dark' : 'light'].card]}>
       {/* Top row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-        <View style={[s.jarIcon, { backgroundColor: color + (isDark ? '22' : '18') }]}>
+        <View style={[s.jarIcon, { backgroundColor: color + (isDark ? '2E' : '1F') }]}>
           <IconSymbol name={(account.icon as IconSymbolName) ?? 'star.fill'} size={20} color={color} />
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={[s.jarName, { color: c.text }]}>{account.name}</Text>
             {done && (
-              <View style={[s.doneBadge, { backgroundColor: color + '20', borderColor: color + '40' }]}>
-                <Text style={{ color, fontSize: 10, fontWeight: '700' }}>{doneLabel}</Text>
+              // Бейдж досягнутого значення — лайм (правило DS для бейджів значень).
+              <View style={[s.doneBadge, { backgroundColor: c.t.accent.lime }]}>
+                <Text style={{ color: c.t.text.onAccent, fontSize: 11, fontFamily: fontFamily.semibold }}>{doneLabel}</Text>
               </View>
             )}
           </View>
@@ -947,73 +942,74 @@ const JarCard = React.memo(function JarCard({
           accessibilityRole="button"
           accessibilityLabel={`${editLabel}: ${account.name}`}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={[s.editBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
-          <IconSymbol name="pencil" size={13} color={c.sub} />
+          style={[s.editBtn, { backgroundColor: c.dim }]}>
+          <IconSymbol name="pencil" size={13} color={c.text} />
         </TouchableOpacity>
       </View>
 
       {/* Amounts */}
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10 }}>
-        <Text style={[s.savedAmt, { color }]}>{fmt(balance, account.currency)}</Text>
+        <Text style={[s.savedAmt, { color: c.text }]}>{fmt(balance, account.currency)}</Text>
         {goal > 0 && <Text style={[s.goalAmt, { color: c.sub }]}> / {fmt(goal, account.currency)}</Text>}
         <View style={{ flex: 1 }} />
-        {goal > 0 && <Text style={[s.pctLabel, { color: done ? color : c.sub }]}>{Math.round(pct)}%</Text>}
+        {goal > 0 && <Text style={[s.pctLabel, { color: done ? c.text : c.sub }]}>{Math.round(pct)}%</Text>}
       </View>
 
       {/* Progress */}
       {goal > 0 && (
-        <View style={[s.progressBg, { marginBottom: 12 }]}>
-          <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: color }]} />
+        <View style={[s.progressBg, { marginBottom: 14, backgroundColor: c.dim }]}>
+          <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: c.amber }]} />
         </View>
       )}
 
       {/* Deposit button */}
       <TouchableOpacity
         onPress={() => onDeposit(account)}
-        style={[s.depositBtn, { backgroundColor: color + '18', borderColor: color + '35' }]}>
-        <IconSymbol name="plus.circle.fill" size={15} color={color} />
-        <Text style={{ color, fontSize: 13, fontWeight: '700', marginLeft: 6 }}>{depositLabel}</Text>
+        style={[s.depositBtn, { ...c.gl.subtle }]}>
+        <IconSymbol name="plus.circle.fill" size={15} color={c.t.action.secondaryText} />
+        <Text style={{ color: c.t.action.secondaryText, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{depositLabel}</Text>
         <View style={{ flex: 1 }} />
         {goal > 0 && (
-          <Text style={{ color: c.sub, fontSize: 11 }}>
+          <Text style={{ ...dsType.caption, ...dsType.numeric, color: c.sub }}>
             Залишилось {fmt(Math.max(0, goal - balance), account.currency)}
           </Text>
         )}
       </TouchableOpacity>
-    </BlurView>
+    </View>
   );
 });
 
 const s = StyleSheet.create({
-  summaryCard:  { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18, overflow: 'hidden' },
-  summaryLabel: { fontSize: 11, fontWeight: '600', marginBottom: 4 },
-  summaryAmount:{ fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
-  jarCard:      { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
-  jarIcon:      { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  jarName:      { fontSize: 15, fontWeight: '700' },
-  jarNote:      { fontSize: 12, marginTop: 2 },
-  doneBadge:    { borderRadius: 7, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
-  editBtn:      { width: 30, height: 30, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  savedAmt:     { fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
-  goalAmt:      { fontSize: 14, fontWeight: '500', paddingBottom: 2 },
-  pctLabel:     { fontSize: 13, fontWeight: '700' },
-  progressBg:   { height: 5, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
-  depositBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 10 },
-  fab:          { position: 'absolute', right: 20, bottom: FAB_BOTTOM, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  summaryCard:  { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact },
+  summaryLabel: { ...dsType.caption, fontFamily: fontFamily.medium, marginBottom: 4 },
+  // Підсумки — display-цифри DS (тонкі, табличні).
+  summaryAmount:{ ...dsType.displaySm, fontSize: 32, lineHeight: 36 },
+  jarCard:      { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact },
+  jarIcon:      { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  jarName:      { ...dsType.h2 },
+  jarNote:      { ...dsType.caption, marginTop: 2 },
+  doneBadge:    { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  editBtn:      { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  savedAmt:     { fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, letterSpacing: -0.56, fontVariant: ['tabular-nums'] },
+  goalAmt:      { fontSize: 14, fontFamily: fontFamily.regular, paddingBottom: 3, fontVariant: ['tabular-nums'] },
+  pctLabel:     { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
+  progressBg:   { height: 8, borderRadius: radius.pill, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: radius.pill },
+  depositBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, minHeight: touchTarget, paddingHorizontal: 16 },
+  fab:          { position: 'absolute', right: 20, bottom: FAB_BOTTOM, width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', shadowColor: '#111113', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 6 },
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:        { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:        { borderRadius: radius.card, padding: space.cardPaddingCompact, overflow: 'hidden' },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:   { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 16 },
-  amountBlock:  { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 18, marginBottom: 4 },
-  label:        { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input:        { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
-  chip:         { borderRadius: 11, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
-  iconChip:     { width: 44, height: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  sheetTitle:   { fontSize: 20, lineHeight: 26, fontFamily: fontFamily.semibold, marginBottom: 16 },
+  amountBlock:  { borderRadius: radius.nested, padding: 18, marginBottom: 4 },
+  label:        { fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
+  input:        { borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 12, fontSize: 15, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] },
+  chip:         { borderRadius: radius.pill, minHeight: 36, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 8 },
+  iconChip:     { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   colorDot:     { width: 30, height: 30, borderRadius: 15 },
-  btn:          { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  typeRow:      { flexDirection: 'row', borderRadius: Atlas.radius.medium, padding: 3 },
-  typeBtn:      { flex: 1, flexDirection: 'row', paddingVertical: 9, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  btn:          { minHeight: 48, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  typeRow:      { flexDirection: 'row', borderRadius: radius.pill, padding: 3 },
+  typeBtn:      { flex: 1, flexDirection: 'row', minHeight: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

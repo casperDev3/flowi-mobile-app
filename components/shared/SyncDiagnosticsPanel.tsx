@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
 /**
  * components/shared/SyncDiagnosticsPanel.tsx
  *
@@ -308,17 +309,18 @@ function ago(at: number, now: number): string {
 }
 
 const st = StyleSheet.create({
-  wrap:         { borderRadius: Atlas.radius.large, borderWidth: 1, marginBottom: 16, overflow: 'hidden' },
+  // DS v2: вкладений блок — без рамки, тло задає картка-батько.
+  wrap:         { borderRadius: Atlas.radius.large, marginBottom: 16, overflow: 'hidden' },
   head:         { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 14, paddingVertical: 12 },
-  headTitle:    { fontSize: 13, fontWeight: '700' },
-  headHint:     { fontSize: 11, marginTop: 2, lineHeight: 15 },
-  body:         { borderTopWidth: 1, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
+  headTitle:    { fontSize: 13, fontFamily: fontFamily.bold },
+  headHint:     { fontFamily: fontFamily.regular, fontSize: 11, marginTop: 2, lineHeight: 15 },
+  body:         { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
   section:      { marginBottom: 12 },
-  sectionTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginBottom: 5 },
+  sectionTitle: { fontSize: 10, fontFamily: fontFamily.bold, letterSpacing: 0.7, marginBottom: 5 },
   row:          { marginBottom: 6 },
-  rowLabel:     { fontSize: 10, fontWeight: '600', letterSpacing: 0.2 },
-  rowValue:     { fontSize: 12, fontWeight: '600', lineHeight: 16 },
+  rowLabel:     { fontSize: 10, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
+  rowValue:     { fontSize: 12, fontFamily: fontFamily.semibold, lineHeight: 16 },
   logRow:       { flexDirection: 'row', gap: 8, marginBottom: 3 },
-  logTime:      { fontSize: 10, fontWeight: '600', width: 66 },
-  logText:      { fontSize: 11, fontWeight: '500', flex: 1 },
+  logTime:      { fontSize: 10, fontFamily: fontFamily.semibold, width: 66, fontVariant: ['tabular-nums'] },
+  logText:      { fontSize: 11, fontFamily: fontFamily.medium, flex: 1 },
 });

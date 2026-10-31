@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/UpcomingPaymentsCard.tsx — блок «Найближчі оплати / Прострочено».
  *
@@ -12,12 +11,13 @@ import { Atlas } from '@/constants/atlas';
  * малювати обгортку секції: на планшетній сітці «Сьогодні» порожня секція
  * лишила б дірку в дві колонки.
  */
-import { BlurView } from 'expo-blur';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, type as dsType } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useTodayKey } from '@/hooks/use-today-key';
 import { loadData } from '@/store/storage';
@@ -30,8 +30,9 @@ import {
   type Subscription,
   type UpcomingPayment,
 } from '@/utils/subscriptions';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { GlassSurface } from '@/components/ds';
 
-const RED = '#EF4444';
 
 export interface UpcomingPaymentsData {
   items: UpcomingPayment[];
@@ -85,6 +86,9 @@ export function UpcomingPaymentsCard({
   todayOnly?: boolean;
 }) {
   const router = useRouter();
+  const t = dsTokens(isDark);
+  const gs = useGlassStyles();
+  const RED = t.status.danger;
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { currencies } = data;
   const items = todayOnly ? data.items.filter(item => item.daysUntil === 0) : data.items;
@@ -110,17 +114,20 @@ export function UpcomingPaymentsCard({
         accessibilityRole="button"
         accessibilityLabel={`${sub.name}, ${whenLabel(item)}`}
         activeOpacity={0.75}
-        style={[st.row, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
-        <View style={[st.iconBox, { backgroundColor: (sub.color || '#8B5CF6') + '22' }]}>
-          <IconSymbol name={(sub.icon || 'repeat') as IconSymbolName} size={15} color={sub.color || '#8B5CF6'} />
+        style={[st.row, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border.hairline }]}>
+        <View style={[st.iconBox, { backgroundColor: (sub.color || '#8B6CFF') + '22' }]}>
+          <IconSymbol name={(sub.icon || 'repeat') as IconSymbolName} size={15} color={sub.color || '#8B6CFF'} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{sub.name}</Text>
-          <Text numberOfLines={1} style={{ color: isOverdue ? RED : c.sub, fontSize: 12, marginTop: 1, fontWeight: isOverdue ? '700' : '400' }}>
-            {whenLabel(item)}
-          </Text>
+          <Text numberOfLines={1} style={{ ...dsType.bodyMedium, color: t.text.primary }}>{sub.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
+            {isOverdue ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.accent.coral }} /> : null}
+            <Text numberOfLines={1} style={{ ...dsType.caption, color: isOverdue ? t.text.primary : t.text.secondary, fontFamily: isOverdue ? fontFamily.semibold : fontFamily.regular }}>
+              {whenLabel(item)}
+            </Text>
+          </View>
         </View>
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+        <Text style={{ color: t.text.primary, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
           {formatSubscriptionMoney(sub.amount, sub.currency, currencies, locale)}
         </Text>
         {/* Як у вебі: оплата просто з блоку. Підтвердження суми — на екрані
@@ -131,16 +138,19 @@ export function UpcomingPaymentsCard({
           accessibilityRole="button"
           accessibilityLabel={`${tr.subPayNow}: ${sub.name}`}
           hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-          style={[st.renewBtn, { backgroundColor: isOverdue ? RED + '1A' : 'transparent', borderColor: isOverdue ? RED + '40' : c.border }]}>
-          <Text style={{ color: isOverdue ? RED : c.text, fontSize: 12, fontWeight: '700' }}>{tr.subPayNow}</Text>
+          style={[st.renewBtn, { backgroundColor: isOverdue ? t.action.primary : (gs.subtle.backgroundColor as string) }]}>
+          <Text style={{ color: isOverdue ? t.text.onAction : t.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.subPayNow}</Text>
         </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
   const sectionLabel = (text: string, color: string, first: boolean) => (
-    <View style={[st.sectionHead, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }]}>
-      <Text style={[st.sectionText, { color }]}>{text}</Text>
+    <View style={[st.sectionHead, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border.hairline }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {color === RED ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.accent.coral }} /> : null}
+        <Text style={[st.sectionText, { color: t.text.secondary }]}>{text}</Text>
+      </View>
     </View>
   );
   const split = overdue.length > 0 && soon.length > 0;
@@ -148,34 +158,34 @@ export function UpcomingPaymentsCard({
   return (
     <View style={[{ marginBottom: 12 }, style]}>
       <View style={st.headRow}>
-        <Text style={[st.title, { color: !todayOnly && overdue.length && !soon.length ? RED : c.sub }]}>
+        <Text style={[st.title, { color: t.text.primary }]}>
           {todayOnly ? tr.finTodayDue : overdue.length && !soon.length ? tr.subOverdue : tr.subUpcoming}
         </Text>
         <TouchableOpacity
           onPress={() => router.push('/subscriptions')}
           accessibilityRole="link"
           hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
-          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700' }}>{tr.navSubscriptions}</Text>
+          <Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{tr.navSubscriptions}</Text>
         </TouchableOpacity>
       </View>
-      <BlurView intensity={isDark ? 18 : 36} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+      <GlassSurface radius={radius.cardCompact} style={st.card}>
         {split ? sectionLabel(`${tr.subOverdue} · ${overdue.length}`, RED, true) : null}
         {overdue.map((item, idx) => renderRow(item, split ? idx + 1 : idx))}
-        {split ? sectionLabel(tr.subUpcomingWithin.replace('{n}', String(withinDays)), c.sub, false) : null}
+        {split ? sectionLabel(tr.subUpcomingWithin.replace('{n}', String(withinDays)), t.text.secondary, false) : null}
         {soon.map((item, idx) => renderRow(item, split ? idx + 1 : idx))}
-      </BlurView>
+      </GlassSurface>
     </View>
   );
 }
 
 const st = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  title:   { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  badge:   { borderRadius: 8, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2 },
-  card:    { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden' },
-  row:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  iconBox: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  renewBtn: { borderRadius: Atlas.radius.small, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 5 },
-  sectionHead: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 2 },
-  sectionText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  title:   { ...dsType.h2 },
+  badge:   { borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2 },
+  card:    { borderRadius: radius.cardCompact, paddingVertical: 4 },
+  row:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, minHeight: 56 },
+  iconBox: { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  renewBtn: { borderRadius: radius.pill, minHeight: 32, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 5 },
+  sectionHead: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
+  sectionText: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase' },
 });

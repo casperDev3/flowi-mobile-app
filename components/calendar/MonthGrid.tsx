@@ -13,12 +13,12 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Atlas } from '@/constants/atlas';
 import type { Translations } from '@/store/translations';
 import type { Meeting } from '@/utils/meetings';
 
 import { keyToDate, layoutSprintRow, type CalendarTaskItem, type SprintBar } from './calendarModel';
 import type { CalendarColors } from './palette';
+import { fontFamily, radius } from '@/constants/theme';
 
 export interface MonthGridProps {
   rows: string[][];
@@ -52,7 +52,7 @@ export function MonthGrid({
     <View accessibilityRole="none">
       <View style={{ flexDirection: 'row', marginBottom: 4 }}>
         {tr.weekdays.map((w, i) => (
-          <Text key={w} style={{ flex: 1, textAlign: 'center', color: i >= 5 ? c.accent : c.sub, fontSize: 11, fontWeight: '700' }}>{w}</Text>
+          <Text key={w} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold }}>{w}</Text>
         ))}
       </View>
       {rows.map(week => {
@@ -80,9 +80,9 @@ export function MonthGrid({
                   accessibilityRole="button"
                   accessibilityLabel={a11y}
                   accessibilityState={{ selected: isSel }}
-                  style={[st.cell, { opacity: inMonth ? 1 : 0.4, backgroundColor: isSel && labels ? c.accent + '12' : 'transparent' }]}>
-                  <View style={[st.dateBox, isSel && !labels && { backgroundColor: c.accent }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }, isSel && labels && { borderWidth: 1.5, borderColor: c.accent }]}>
-                    <Text style={{ color: isSel && !labels ? '#fff' : isToday ? c.accent : c.text, fontSize: 13, fontWeight: isToday || isSel ? '800' : '500' }}>
+                  style={[st.cell, { opacity: inMonth ? 1 : 0.4, backgroundColor: isSel && labels ? c.dim : 'transparent' }]}>
+                  <View style={[st.dateBox, isSel && !labels && { backgroundColor: c.select }, !isSel && isToday && { borderWidth: 1.5, borderColor: c.accent }, isSel && labels && { backgroundColor: c.select }]}>
+                    <Text style={{ color: isSel ? c.onSelect : isToday ? c.accent : c.text, fontSize: 13, fontVariant: ['tabular-nums'], fontFamily: isToday || isSel ? fontFamily.semibold : fontFamily.regular }}>
                       {d.getDate()}
                     </Text>
                   </View>
@@ -98,7 +98,7 @@ export function MonthGrid({
                           {t.task.title}
                         </Text>
                       ))}
-                      {total > maxLines ? <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700' }}>+{total - maxLines}</Text> : null}
+                      {total > maxLines ? <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold }}>+{total - maxLines}</Text> : null}
                     </View>
                   ) : (
                     <View style={[st.dots, { top: contentTop }]}>
@@ -136,7 +136,7 @@ export function MonthGrid({
                   paddingHorizontal: 4,
                 }}>
                   {labels ? (
-                    <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontWeight: '700' }}>
+                    <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontFamily: fontFamily.semibold }}>
                       №{seg.bar.number} · {seg.bar.sprint.name}
                     </Text>
                   ) : null}
@@ -163,10 +163,10 @@ function uniqueColors(tasks: readonly CalendarTaskItem[]): string[] {
 }
 
 const st = StyleSheet.create({
-  cell: { flex: 1, alignItems: 'center', paddingTop: 3, borderRadius: Atlas.radius.small },
+  cell: { flex: 1, alignItems: 'center', paddingTop: 3, borderRadius: radius.control },
   dateBox: { width: DATE_BOX, height: DATE_BOX, borderRadius: DATE_BOX / 2, alignItems: 'center', justifyContent: 'center' },
   dots: { position: 'absolute', flexDirection: 'row', gap: 3, alignSelf: 'center' },
   dot: { width: 6, height: 6, borderRadius: 3 },
   dotSquare: { width: 6, height: 6, borderRadius: 1.5 },
-  label: { fontSize: 10, fontWeight: '600', paddingHorizontal: 3, paddingVertical: 1, borderLeftWidth: 2, borderRadius: 3, overflow: 'hidden' },
+  label: { fontSize: 10, fontFamily: fontFamily.semibold, paddingHorizontal: 3, paddingVertical: 1, borderLeftWidth: 2, borderRadius: 3, overflow: 'hidden' },
 });

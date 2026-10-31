@@ -1,5 +1,4 @@
 import { TeamWorkspace } from '@/components/projects/TeamWorkspace';
-import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/overview.tsx — дашборд простору проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §3: «прогрес і дедлайн, прострочене, найближчі
@@ -23,7 +22,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useProjectContentStyle } from '@/components/projects/ProjectLayout';
 import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
 import { useProjectRouteId } from '@/hooks/use-project-route-id';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useProject } from '@/hooks/use-project';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
@@ -47,6 +45,10 @@ import { currentSprintCard, projectCounters } from '@/utils/projectStatsMetrics'
 import type { Sprint, SprintTaskLike } from '@/utils/sprintUtils';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
+import { fontFamily, radius, space, type } from '@/constants/theme';
+import { Card, DisplayNumber, ProgressBar } from '@/components/ds';
+import { ds, useDS } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 interface OverviewTask extends SprintTaskLike {
   backlogKind?: string;
@@ -65,11 +67,24 @@ interface ProjectBudgetRecord {
   updatedAt?: string;
 }
 
+/**
+ * Плитка KPI (DS v2): біла картка, велике тонке число, підпис text.secondary.
+ * `color` — лише крапка-індикатор (coral — алерт, amber — попередження,
+ * колір проєкту — звичайна метрика), саме число завжди text.primary.
+ */
 function StatCard({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
+  const { t, isDark } = useDS();
   return (
-    <View style={{ flex: 1, minWidth: 130, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: color + '30', backgroundColor: color + '12', padding: 12 }}>
-      <Text style={{ color, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{value}</Text>
-      <Text style={{ color: sub, fontSize: 11, marginTop: 2 }}>{label}</Text>
+    <View style={[ds.card(t, isDark, { compact: true }), { flex: 1, minWidth: 150, gap: space[2] }]}>
+      {/* DS v2.1: KPI — легка змивка кольором індикатора (один акцент на картку). */}
+      {/^#[0-9A-Fa-f]{6}$/.test(color) ? (
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.cardCompact, backgroundColor: color + (isDark ? '1F' : '14') }} />
+      ) : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+        <Text numberOfLines={2} style={[type.caption, { flex: 1, color: sub }]}>{label}</Text>
+      </View>
+      <DisplayNumber value={value} size="sm" adjustsFontSizeToFit />
     </View>
   );
 }
@@ -77,7 +92,7 @@ function StatCard({ label, value, color, sub }: { label: string; value: string; 
 export default function ProjectOverviewScreen() {
   const id = useProjectRouteId() as string;
   const router = useRouter();
-  const isDark = useColorScheme() === 'dark';
+  const { t, isDark } = useDS();
   // Дашборд: на планшеті — широка стеля, наради й активність поруч.
   const contentStyle = useProjectContentStyle('wide');
   const tabBarInset = useTabBarInset();
@@ -242,7 +257,7 @@ export default function ProjectOverviewScreen() {
       <ProjectScreenShell project={null} isDark={isDark} title={tr.projectNavOverview}>
         {!loading && (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-            <Text style={{ color: c.sub, fontSize: 14 }}>{tr.projectNotFound}</Text>
+            <Text style={[type.body, { color: c.sub }]}>{tr.projectNotFound}</Text>
           </View>
         )}
       </ProjectScreenShell>
@@ -261,38 +276,37 @@ export default function ProjectOverviewScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
 
         {project.description ? (
-          <Text style={{ color: c.sub, fontSize: 13, lineHeight: 19, marginBottom: 16 }}>{project.description}</Text>
+          <Text style={[type.body, { color: c.sub, marginBottom: 16 }]}>{project.description}</Text>
         ) : null}
 
         {/* Contract §4.1 — глядач читає весь проєкт, але ніде в ньому не
             редагує; без цього напису обмеження в кожному розділі виглядали б
             як прихована помилка, а не свідома роль. */}
         {role === 'viewer' ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 16, alignSelf: 'flex-start' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.pill, backgroundColor: glassOf(t).surface, ...glassRim(t, 'card'), paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16, alignSelf: 'flex-start' }}>
             <IconSymbol name="eye" size={13} color={c.sub} />
-            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{tr.viewerReadOnlyNotice}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.viewerReadOnlyNotice}</Text>
           </View>
         ) : null}
 
-        {/* Прогрес + дедлайн */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <View style={[{ flex: 1, height: 8, borderRadius: 4, backgroundColor: c.dim, overflow: 'hidden' }]}>
-            <View style={{ width: `${stats?.pct ?? 0}%`, height: 8, backgroundColor: project.color }} />
-          </View>
-          <Text style={{ color: c.text, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>{stats?.pct ?? 0}%</Text>
-        </View>
-        <Text style={{ color: c.sub, fontSize: 12, marginBottom: counterLine ? 4 : 16 }}>
-          {stats?.done ?? 0}/{stats?.total ?? 0} {tr.projectDone}
-          {project.deadline ? ` · ${tr.projectDeadline}: ${new Date(project.deadline).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}` : ''}
-        </Text>
-        {counterLine ? (
-          <Text style={{ color: c.sub, fontSize: 11, marginBottom: 16 }}>{counterLine}</Text>
-        ) : null}
+        {/* Прогрес + дедлайн — головна KPI-картка (DS v2.1): скло зі змивкою і
+            світінням lavender (акцент «Проєктів»), прогрес — lavender fill. */}
+        <Card tint="lavender" glow="lavender" style={{ marginBottom: space.cardGapCompact }}>
+          <DisplayNumber value={stats?.pct ?? 0} unit="%" size="lg" />
+          <ProgressBar value={(stats?.pct ?? 0) / 100} tone="lavender" height={8} style={{ marginTop: space[4], marginBottom: space[3] }} />
+          <Text style={[type.caption, type.numeric, { color: c.sub, marginBottom: counterLine ? 4 : 0 }]}>
+            {stats?.done ?? 0}/{stats?.total ?? 0} {tr.projectDone}
+            {project.deadline ? ` · ${tr.projectDeadline}: ${new Date(project.deadline).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}` : ''}
+          </Text>
+          {counterLine ? (
+            <Text style={[type.caption, type.numeric, { color: c.sub }]}>{counterLine}</Text>
+          ) : null}
+        </Card>
 
         {/* Плитки статистики */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.cardGapCompact, marginBottom: 20 }}>
           {(stats?.overdue ?? 0) > 0 && (
-            <StatCard label={tr.projectOverdueTasks} value={String(stats!.overdue)} color="#EF4444" sub={c.sub} />
+            <StatCard label={tr.projectOverdueTasks} value={String(stats!.overdue)} color={glassOf(t).accent.coral.fill} sub={c.sub} />
           )}
           {modules.time ? (
             <StatCard
@@ -307,7 +321,7 @@ export default function ProjectOverviewScreen() {
               label={`${sprintStats.sprint.name} · ${sprintHint}`}
               value={`${sprintStats.done}/${sprintStats.total}`}
               // Протермінований спринт — бурштиновий, не червоний (§4).
-              color={sprintStats.overdue ? '#F59E0B' : project.color}
+              color={sprintStats.overdue ? glassOf(t).accent.amber.fill : project.color}
               sub={c.sub}
             />
           ) : null}
@@ -315,33 +329,33 @@ export default function ProjectOverviewScreen() {
             <StatCard
               label={tr.overviewBudgetSpent}
               value={formatSubscriptionMoney(spent, budget.currency, currencies, locale) + ' / ' + formatSubscriptionMoney(budget.amount, budget.currency, currencies, locale)}
-              color={spent > budget.amount ? '#EF4444' : project.color}
+              color={spent > budget.amount ? glassOf(t).accent.coral.fill : project.color}
               sub={c.sub}
             />
           ) : null}
         </View>
 
-        <ResponsiveGrid minItemWidth={340} maxColumns={2} gap={20}>
+        <ResponsiveGrid minItemWidth={340} maxColumns={2} gap={space.cardGapCompact}>
         {/* Найближчі наради */}
         {modules.meetings ? (
-          <View key="meetings">
-            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', letterSpacing: 0.4, marginBottom: 8 }}>
+          <View key="meetings" style={[ds.card(t, isDark, { compact: true }), { marginBottom: space.cardGapCompact }]}>
+            <Text style={[type.h2, { color: c.text, marginBottom: 12 }]}>
               {tr.overviewUpcomingMeetings}
             </Text>
             {upcomingMeetings.length === 0 ? (
-              <Text style={{ color: c.sub, fontSize: 12, opacity: 0.75, marginBottom: 20 }}>{tr.projectMeetingsNoUpcoming}</Text>
+              <Text style={[type.caption, { color: c.sub }]}>{tr.projectMeetingsNoUpcoming}</Text>
             ) : (
-              <View style={{ marginBottom: 20, gap: 8 }}>
+              <View style={{ gap: 8 }}>
                 {upcomingMeetings.map(({ meeting, date, time }) => (
                   <TouchableOpacity
                     key={`${meeting.id}_${date}`}
                     onPress={() => router.push({ pathname: '/project/[id]/calendar', params: { id: project.id, open: meeting.id } } as never)}
                     activeOpacity={0.75}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 10 }}>
-                    <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: meeting.color }} />
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.nested, backgroundColor: glassOf(t).surfaceSubtle, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: meeting.color }} />
                     <View style={{ flex: 1 }}>
-                      <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{meeting.title}</Text>
-                      <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                      <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{meeting.title}</Text>
+                      <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
                         {new Date(`${date}T00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'short', weekday: 'short' })}{time ? ` · ${time}` : ''}
                       </Text>
                     </View>
@@ -353,29 +367,31 @@ export default function ProjectOverviewScreen() {
           </View>
         ) : null}
 
-        <View key="activity">
+        <View key="activity" style={[ds.card(t, isDark, { compact: true }), { marginBottom: space.cardGapCompact }]}>
         {/* Активність (§4.6) — останні кілька записів; повна стрічка з пагінацією — окремий екран. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', letterSpacing: 0.4, flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+          <Text style={[type.h2, { color: c.text, flex: 1 }]}>
             {tr.projectActivityTitle}
           </Text>
-          <TouchableOpacity onPress={() => router.push(`/project/${encodeURIComponent(project.id)}/activity` as never)}>
-            <Text style={{ color: project.color, fontSize: 12, fontWeight: '700' }}>{tr.projectActivityShowAll}</Text>
+          <TouchableOpacity
+            onPress={() => router.push(`/project/${encodeURIComponent(project.id)}/activity` as never)}
+            style={{ minHeight: 32, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: glassOf(t).surfaceSubtle, justifyContent: 'center' }}>
+            <Text style={{ color: t.action.secondaryText, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.projectActivityShowAll}</Text>
           </TouchableOpacity>
         </View>
         {activityLoading ? null : recentActivity.length === 0 ? (
-          <Text style={{ color: c.sub, fontSize: 12, opacity: 0.75, marginBottom: 8 }}>{tr.projectActivityEmpty}</Text>
+          <Text style={[type.caption, { color: c.sub }]}>{tr.projectActivityEmpty}</Text>
         ) : (
-          <View style={{ gap: 8, marginBottom: 8 }}>
+          <View style={{ gap: 10 }}>
             {recentActivity.map(entry => (
               <View key={entry.id} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
                 <View style={{
-                  width: 22, height: 22, borderRadius: 11, backgroundColor: project.color + '1F',
+                  width: 24, height: 24, borderRadius: 12, backgroundColor: glassOf(t).surfaceSubtle,
                   alignItems: 'center', justifyContent: 'center', marginTop: 1,
                 }}>
-                  <IconSymbol name={activityIcon(entry)} size={11} color={project.color} />
+                  <IconSymbol name={activityIcon(entry)} size={11} color={c.text} />
                 </View>
-                <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontSize: 12.5, lineHeight: 17 }}>
+                <Text numberOfLines={2} style={[type.body, { flex: 1, color: c.text, fontSize: 13, lineHeight: 18 }]}>
                   {formatActivityMessage(entry, tr, activityCtx)}
                 </Text>
               </View>

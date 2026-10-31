@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/store/auth";
 import { menuApi } from "@/store/menu-api";
@@ -17,6 +16,7 @@ import { ScreenHeader } from "@/components/shared/ScreenHeader";
 import { menuBits } from "@/components/menu/MenuBits";
 import { MENU_ERR, useMenuColors } from "@/components/menu/theme";
 import { useI18n } from "@/store/i18n";
+import { fontFamily } from '@/constants/theme';
 export default function MenuInviteScreen() {
   const { ws, t } = useLocalSearchParams<{ ws?: string; t?: string }>();
   const { status, switchWorkspace } = useAuth();
@@ -87,14 +87,14 @@ export default function MenuInviteScreen() {
   const { btn, panel } = menuBits(c, busy);
   return (
     <View style={{ flex: 1, backgroundColor: c.bg1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg1 }]} />
       <ScreenHeader
         title="Запрошення до меню"
         color={c.text}
         back={{
           onPress: () => (router.canGoBack() ? router.back() : router.replace("/")),
           label: tr.back,
-          style: { backgroundColor: c.dim, borderColor: c.border },
+          style: { backgroundColor: c.card, borderColor: "transparent" },
         }}
       />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
@@ -118,7 +118,7 @@ export default function MenuInviteScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={{ color: c.text, fontSize: 20, fontWeight: "700" }}>{name}</Text>
+                  <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.semibold }}>{name}</Text>
                   <Text style={{ color: c.sub, fontSize: 15, lineHeight: 22 }}>
                     Переглядайте меню та надсилайте пропозиції або скарги автору.
                   </Text>

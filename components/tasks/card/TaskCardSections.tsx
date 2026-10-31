@@ -33,6 +33,7 @@ import {
   type FieldOption,
 } from './fields';
 import { FieldTrigger, PropertyGroup, SectionTitle, type CardColors } from './primitives';
+import { fontFamily } from '@/constants/theme';
 
 // ─── Основне ─────────────────────────────────────────────────────────────────
 
@@ -193,7 +194,7 @@ export function TaskCardDetails({
       {/* Наступний екземпляр створюється від дедлайну (toggleTask) — без
           нього повторення мовчки не спрацювало б. */}
       {recurrence && !hasDeadline ? (
-        <Text style={{ color: '#F59E0B', fontSize: 12, marginTop: 8, marginLeft: 2 }}>{tr.cardRepeatNeedsDeadline}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginTop: 8, marginLeft: 2 }}>{tr.cardRepeatNeedsDeadline}</Text>
       ) : null}
     </View>
   );

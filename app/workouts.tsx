@@ -1,7 +1,4 @@
-import { Atlas } from '@/constants/atlas';
 import * as Notifications from 'expo-notifications';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter, type Href } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -31,9 +28,12 @@ import { Layout } from '@/constants/tokens';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { LoadErrorNotice } from '@/components/health/HealthNotices';
-import { getHealthColors } from '@/utils/healthTheme';
+import { getHealthDSColors } from '@/components/health/palette';
+import { fontFamily } from '@/constants/theme';
+import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
+import { glassStyles } from '@/components/finance/finPalette';
+import { GlassSurface, MeshBackground } from '@/components/ds';
 
-const ACCENT = '#0EA5E9';
 const ACCENT2 = '#6366F1';
 
 type WorkoutType = 'run' | 'bike' | 'swim' | 'gym' | 'yoga' | 'walk' | 'other';
@@ -152,31 +152,32 @@ function ExerciseModal({
   };
 
   const inp = {
-    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-    borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 10,
-    color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border,
+    backgroundColor: c.subtle,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, minHeight: 44,
+    color: c.text, fontSize: 15, fontFamily: fontFamily.regular,
   } as const;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <LinearGradient colors={[isDark ? '#0C0C14' : '#F4F2FF', isDark ? '#14121E' : '#EAE6FF']} style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: c.bg1 }}>
+        <MeshBackground />
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}>
             <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}
               style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <IconSymbol name="xmark" size={18} color={c.sub} />
             </TouchableOpacity>
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: '700', flex: 1 }}>
+            <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.bold, flex: 1 }}>
               {exercise ? 'Редагувати вправу' : 'Нова вправа'}
             </Text>
-            <TouchableOpacity onPress={save} style={{ backgroundColor: ACCENT, borderRadius: Atlas.radius.medium, paddingHorizontal: 16, paddingVertical: 8 }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Зберегти</Text>
+            <TouchableOpacity onPress={save} style={{ backgroundColor: c.action, borderRadius: 999, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 8 }}>
+              <Text style={{ color: c.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>Зберегти</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
             <Text style={sectionLabel(c)}>Назва вправи *</Text>
-            <TextInput style={inp} value={name} onChangeText={setName} placeholder="Наприклад: Жим лежачи" placeholderTextColor={c.sub} />
+            <TextInput style={inp} value={name} onChangeText={setName} placeholder="Наприклад: Жим лежачи" placeholderTextColor={c.muted} />
 
             <Text style={[sectionLabel(c), { marginTop: 16 }]}>Група м&apos;язів</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -186,11 +187,10 @@ function ExerciseModal({
                     key={mg}
                     onPress={() => setMuscleGroup(mg === muscleGroup ? '' : mg)}
                     style={{
-                      paddingHorizontal: 12, paddingVertical: 7, borderRadius: Atlas.radius.medium,
-                      backgroundColor: muscleGroup === mg ? ACCENT + '20' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
-                      borderWidth: 1, borderColor: muscleGroup === mg ? ACCENT + '60' : c.border,
+                      paddingHorizontal: 16, minHeight: 36, justifyContent: 'center', borderRadius: 999,
+                      backgroundColor: muscleGroup === mg ? c.action : c.subtle,
                     }}>
-                    <Text style={{ color: muscleGroup === mg ? ACCENT : c.sub, fontSize: 13, fontWeight: '600' }}>{mg}</Text>
+                    <Text style={{ color: muscleGroup === mg ? c.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{mg}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -199,27 +199,27 @@ function ExerciseModal({
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <View style={{ flex: 1 }}>
                 <Text style={sectionLabel(c)}>Підходи</Text>
-                <TextInput style={inp} value={sets} onChangeText={setSets} keyboardType="number-pad" placeholder="3" placeholderTextColor={c.sub} />
+                <TextInput style={inp} value={sets} onChangeText={setSets} keyboardType="number-pad" placeholder="3" placeholderTextColor={c.muted} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={sectionLabel(c)}>Повтори</Text>
-                <TextInput style={inp} value={reps} onChangeText={setReps} keyboardType="number-pad" placeholder="10" placeholderTextColor={c.sub} />
+                <TextInput style={inp} value={reps} onChangeText={setReps} keyboardType="number-pad" placeholder="10" placeholderTextColor={c.muted} />
               </View>
             </View>
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <View style={{ flex: 1 }}>
                 <Text style={sectionLabel(c)}>Вага (кг)</Text>
-                <TextInput style={inp} value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={c.sub} />
+                <TextInput style={inp} value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={c.muted} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={sectionLabel(c)}>Відпочинок (сек)</Text>
-                <TextInput style={inp} value={rest} onChangeText={setRest} keyboardType="number-pad" placeholder="60" placeholderTextColor={c.sub} />
+                <TextInput style={inp} value={rest} onChangeText={setRest} keyboardType="number-pad" placeholder="60" placeholderTextColor={c.muted} />
               </View>
             </View>
           </ScrollView>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     </Modal>
   );
 }
@@ -274,31 +274,32 @@ function ProgramModal({
   };
 
   const inp = {
-    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-    borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 10,
-    color: c.text, fontSize: 15, borderWidth: 1, borderColor: c.border,
+    backgroundColor: c.subtle,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, minHeight: 44,
+    color: c.text, fontSize: 15, fontFamily: fontFamily.regular,
   } as const;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <LinearGradient colors={[isDark ? '#0C0C14' : '#F4F2FF', isDark ? '#14121E' : '#EAE6FF']} style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: c.bg1 }}>
+        <MeshBackground />
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}>
             <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}
               style={{ marginRight: 12 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <IconSymbol name="xmark" size={18} color={c.sub} />
             </TouchableOpacity>
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: '700', flex: 1 }}>
+            <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.bold, flex: 1 }}>
               {program ? 'Редагувати програму' : 'Нова програма'}
             </Text>
-            <TouchableOpacity onPress={save} style={{ backgroundColor: ACCENT, borderRadius: Atlas.radius.medium, paddingHorizontal: 16, paddingVertical: 8 }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Зберегти</Text>
+            <TouchableOpacity onPress={save} style={{ backgroundColor: c.action, borderRadius: 999, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 8 }}>
+              <Text style={{ color: c.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>Зберегти</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
             <Text style={sectionLabel(c)}>Назва програми *</Text>
-            <TextInput style={inp} value={name} onChangeText={setName} placeholder="Наприклад: Силовий день А" placeholderTextColor={c.sub} />
+            <TextInput style={inp} value={name} onChangeText={setName} placeholder="Наприклад: Силовий день А" placeholderTextColor={c.muted} />
 
             <Text style={[sectionLabel(c), { marginTop: 16 }]}>Колір</Text>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 4 }}>
@@ -310,7 +311,7 @@ function ProgramModal({
                     width: 32, height: 32, borderRadius: 16,
                     backgroundColor: col,
                     borderWidth: color === col ? 3 : 0,
-                    borderColor: '#fff',
+                    borderColor: c.card,
                     opacity: color === col ? 1 : 0.65,
                   }}
                 />
@@ -325,20 +326,19 @@ function ProgramModal({
                   onPress={() => toggleEx(ex.id)}
                   style={{
                     flexDirection: 'row', alignItems: 'center', padding: 12,
-                    borderRadius: Atlas.radius.medium, marginBottom: 8,
-                    backgroundColor: selectedEx.includes(ex.id) ? ACCENT + '15' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
-                    borderWidth: 1, borderColor: selectedEx.includes(ex.id) ? ACCENT + '50' : c.border,
+                    borderRadius: 14, marginBottom: 8, minHeight: 48,
+                    backgroundColor: c.subtle,
                   }}>
                   <View style={{
-                    width: 22, height: 22, borderRadius: Atlas.radius.small,
-                    backgroundColor: selectedEx.includes(ex.id) ? ACCENT : 'transparent',
+                    width: 22, height: 22, borderRadius: 11,
+                    backgroundColor: selectedEx.includes(ex.id) ? c.action : 'transparent',
                     borderWidth: selectedEx.includes(ex.id) ? 0 : 1.5,
                     borderColor: c.sub, alignItems: 'center', justifyContent: 'center', marginRight: 12,
                   }}>
-                    {selectedEx.includes(ex.id) && <IconSymbol name="checkmark" size={12} color="#fff" />}
+                    {selectedEx.includes(ex.id) && <IconSymbol name="checkmark" size={12} color={c.onAction} />}
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{ex.name}</Text>
+                    <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{ex.name}</Text>
                     {(ex.sets || ex.reps || ex.muscleGroup) && (
                       <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
                         {[ex.muscleGroup, ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null].filter(Boolean).join(' · ')}
@@ -351,55 +351,55 @@ function ProgramModal({
 
             <Text style={[sectionLabel(c), { marginTop: 16 }]}>Нагадування</Text>
             <View style={{
-              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-              borderRadius: Atlas.radius.large, padding: 14, borderWidth: 1, borderColor: c.border,
+              backgroundColor: c.subtle,
+              borderRadius: 16, padding: 16,
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: remOn ? 14 : 0 }}>
-                <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>Увімкнути нагадування</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>Увімкнути нагадування</Text>
                 <TouchableOpacity
                   onPress={() => setRemOn(!remOn)}
                   style={{
                     width: 44, height: 26, borderRadius: 13,
-                    backgroundColor: remOn ? ACCENT : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'),
+                    backgroundColor: remOn ? c.action : c.border,
                     justifyContent: 'center', paddingHorizontal: 3,
                   }}>
                   <View style={{
                     width: 20, height: 20, borderRadius: 10,
-                    backgroundColor: '#fff',
+                    backgroundColor: remOn ? c.onAction : c.card,
                     transform: [{ translateX: remOn ? 18 : 0 }],
                   }} />
                 </TouchableOpacity>
               </View>
 
               {remOn && <>
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>Дні тижня</Text>
+                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 8 }}>Дні тижня</Text>
                 <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
                   {DAY_LABELS.map((label, idx) => (
                     <TouchableOpacity
                       key={idx}
                       onPress={() => toggleDay(idx)}
                       style={{
-                        flex: 1, paddingVertical: 8, borderRadius: Atlas.radius.small, alignItems: 'center',
-                        backgroundColor: remDays.includes(idx) ? ACCENT : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                        flex: 1, minHeight: 36, justifyContent: 'center', borderRadius: 999, alignItems: 'center',
+                        backgroundColor: remDays.includes(idx) ? c.action : c.card,
                       }}>
-                      <Text style={{ color: remDays.includes(idx) ? '#fff' : c.sub, fontSize: 11, fontWeight: '700' }}>{label}</Text>
+                      <Text style={{ color: remDays.includes(idx) ? c.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
 
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>Час</Text>
+                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 8 }}>Час</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <TextInput style={[inp, { flex: 1, textAlign: 'center' }]} value={remHour} onChangeText={setRemHour}
-                    keyboardType="number-pad" maxLength={2} placeholder="09" placeholderTextColor={c.sub} />
-                  <Text style={{ color: c.text, fontSize: 20, fontWeight: '700' }}>:</Text>
+                    keyboardType="number-pad" maxLength={2} placeholder="09" placeholderTextColor={c.muted} />
+                  <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.bold }}>:</Text>
                   <TextInput style={[inp, { flex: 1, textAlign: 'center' }]} value={remMin} onChangeText={setRemMin}
-                    keyboardType="number-pad" maxLength={2} placeholder="00" placeholderTextColor={c.sub} />
+                    keyboardType="number-pad" maxLength={2} placeholder="00" placeholderTextColor={c.muted} />
                 </View>
               </>}
             </View>
           </ScrollView>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     </Modal>
   );
 }
@@ -444,10 +444,11 @@ function StatsModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <LinearGradient colors={[isDark ? '#0C0C14' : '#F4F2FF', isDark ? '#14121E' : '#EAE6FF']} style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: c.bg1 }}>
+        <MeshBackground />
         <SafeAreaView style={{ flex: 1 }} edges={['top']}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 }}>
-            <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, flex: 1, letterSpacing: -0.5 }}>Статистика</Text>
+            <Text style={{ color: c.text, fontSize: 32, fontFamily: fontFamily.medium, flex: 1, letterSpacing: -0.32 }}>Статистика</Text>
             <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <IconSymbol name="xmark" size={18} color={c.sub} />
@@ -462,89 +463,89 @@ function StatsModal({
                 { label: 'Цього тижня', value: thisWeek.length, sub: 'тренувань' },
                 { label: 'Стрік', value: streak, sub: 'днів' },
               ] as const).map(item => (
-                <BlurView key={item.label} intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                  style={{ flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, alignItems: 'center' }}>
-                  <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{item.label}</Text>
-                  <Text style={{ color: c.text, fontSize: 24, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 }}>{item.value}</Text>
+                <GlassSurface key={item.label} radius={20} tint="coral" style={{ flex: 1, padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 }} numberOfLines={1}>{item.label}</Text>
+                  <Text style={{ color: c.text, fontSize: 40, lineHeight: 44, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.8 }}>{item.value}</Text>
                   <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{item.sub}</Text>
-                </BlurView>
+                </GlassSurface>
               ))}
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-              <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                style={{ flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, alignItems: 'center' }}>
-                <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Загальний час</Text>
-                <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{fmtDuration(totalMin)}</Text>
-              </BlurView>
+              <View
+                style={{ ...c.gl.card, flex: 1, borderRadius: 20, padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 }} numberOfLines={1}>Загальний час</Text>
+                <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{fmtDuration(totalMin)}</Text>
+              </View>
               {totalCal > 0 && (
-                <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                  style={{ flex: 1, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, alignItems: 'center' }}>
-                  <Text style={{ color: c.sub, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Ккал спалено</Text>
-                  <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{totalCal}</Text>
-                </BlurView>
+                <View
+                  style={{ ...c.gl.card, flex: 1, borderRadius: 20, padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 }} numberOfLines={1}>Ккал спалено</Text>
+                  <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{totalCal}</Text>
+                </View>
               )}
             </View>
 
             {/* 7-day chart */}
             <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Активність за 7 днів</Text>
-            <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-              style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16, marginBottom: 16 }}>
+            <View
+              style={{ ...c.gl.card, borderRadius: 20, padding: 20, marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 72 }}>
                 {last7.map((item, idx) => (
                   <View key={idx} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
                     <View style={{
-                      width: '100%', borderRadius: Atlas.radius.small,
+                      width: '100%', borderRadius: 999,
                       height: Math.max((item.count / max7) * 50, item.count > 0 ? 8 : 4),
-                      backgroundColor: item.count > 0 ? ACCENT : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
+                      // DS v2: стовпці зі значенням — лайм, порожні дні — доріжка.
+                      backgroundColor: item.count > 0 ? c.g.accent.coral.fill : c.subtle,
                     }} />
-                    <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600' }}>{item.label}</Text>
+                    <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.semibold }}>{item.label}</Text>
                   </View>
                 ))}
               </View>
-            </BlurView>
+            </View>
 
             {/* By type */}
             {byType.length > 0 && <>
               <Text style={[sectionLabel(c), { marginBottom: 10 }]}>За типом</Text>
-              <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 16 }}>
+              <View
+                style={{ ...c.gl.card, borderRadius: 20, marginBottom: 16 }}>
                 {byType.map((wt, idx) => (
                   <View key={wt.key} style={{
                     flexDirection: 'row', alignItems: 'center', padding: 14,
-                    borderBottomWidth: idx < byType.length - 1 ? 1 : 0, borderBottomColor: c.border,
+                    borderBottomWidth: idx < byType.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: c.border,
                   }}>
-                    <View style={{ width: 34, height: 34, borderRadius: Atlas.radius.medium, backgroundColor: wt.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <View style={{ width: 34, height: 34, borderRadius: 999, backgroundColor: wt.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
                       <IconSymbol name={wt.icon as any} size={16} color={wt.color} />
                     </View>
-                    <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{wt.label}</Text>
-                    <Text style={{ color: wt.color, fontSize: 18, fontWeight: Atlas.type.headingWeight }}>{wt.count}</Text>
+                    <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }}>{wt.label}</Text>
+                    <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.44 }}>{wt.count}</Text>
                   </View>
                 ))}
-              </BlurView>
+              </View>
             </>}
 
             {/* This month */}
             <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Цього місяця</Text>
-            <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-              style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16 }}>
+            <View
+              style={{ ...c.gl.card, borderRadius: 20, padding: 20 }}>
               <View style={{ flexDirection: 'row', gap: 16 }}>
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ color: c.text, fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -1 }}>{thisMonth.length}</Text>
+                  <Text style={{ color: c.text, fontSize: 40, lineHeight: 44, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.8 }}>{thisMonth.length}</Text>
                   <Text style={{ color: c.sub, fontSize: 12 }}>тренувань</Text>
                 </View>
                 <View style={{ width: 1, backgroundColor: c.border }} />
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>
+                  <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>
                     {fmtDuration(thisMonth.reduce((s, w) => s + w.durationMin, 0))}
                   </Text>
                   <Text style={{ color: c.sub, fontSize: 12 }}>загалом</Text>
                 </View>
               </View>
-            </BlurView>
+            </View>
           </ScrollView>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     </Modal>
   );
 }
@@ -562,23 +563,39 @@ function gridCell(cols: number, node: React.ReactElement): React.ReactElement {
   return <View style={{ width: `${100 / cols}%`, paddingHorizontal: GRID_HALF_GAP }}>{node}</View>;
 }
 
-function makeColors(isDark: boolean) {
+/** Палітра екрана — токени Design System v2 (docs/design-system-v2.md). */
+function makeColors(isDark: boolean, reduceTransparency = false) {
+  const t = dsTokens(isDark);
+  const g = glassTokens(isDark);
+  // DS v2.1: mesh-основа, скляні картки (gl), акцент модуля — coral.
   return {
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
+    bg1:    g.mesh.base,
+    bg2:    g.mesh.base,
+    gl:     glassStyles(isDark, reduceTransparency),
+    g,
+    coral:  g.accent.coral.ink,
+    coralTint: g.accent.coral.tint,
+    border: t.border.hairline,
+    text:   t.text.primary,
+    sub:    t.text.secondary,
+    /** Лише placeholder / декор. */
+    muted:  t.text.muted,
+    card:   reduceTransparency ? g.solid.card : g.surface,
+    subtle: g.surfaceSubtle,
+    action: t.action.primary,
+    onAction: t.text.onAction,
+    danger: t.status.danger,
+    lime:   t.accent.lime,
+    amber:  t.accent.amber,
+    isDark,
   };
 }
 
 function sectionLabel(c: ReturnType<typeof makeColors>) {
   return {
     color: c.sub,
-    fontSize: 11,
-    fontWeight: '700' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.6,
+    fontSize: 12,
+    fontFamily: fontFamily.medium,
     marginBottom: 6,
   };
 }
@@ -597,13 +614,13 @@ const WorkoutRow = React.memo(function WorkoutRow({ w, c, isDark, lastInGroup, o
   const { tr } = useI18n();
   const cfg = WORKOUT_TYPES.find(t => t.key === w.type) ?? WORKOUT_TYPES[6];
   return (
-    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: lastInGroup ? 24 : 8, flexDirection: 'row', alignItems: 'center' }}>
-      <View style={{ width: 40, height: 40, borderRadius: Atlas.radius.medium, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+    <View
+      style={{ ...c.gl.card, borderRadius: 20, padding: 20, marginBottom: lastInGroup ? 24 : 8, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: cfg.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
         <IconSymbol name={cfg.icon as any} size={20} color={cfg.color} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{w.title}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>{w.title}</Text>
         <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
           {fmtDuration(w.durationMin)}{w.calories ? ` · ${w.calories} ккал` : ''}
           {w.groupId ? ` · ${tr.tgGroupBadge}` : ''}
@@ -613,7 +630,7 @@ const WorkoutRow = React.memo(function WorkoutRow({ w, c, isDark, lastInGroup, o
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <IconSymbol name="xmark" size={14} color={c.sub} />
       </TouchableOpacity>
-    </BlurView>
+    </View>
   );
 });
 
@@ -623,13 +640,13 @@ const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onD
 }) {
   const { tr } = useI18n();
   return (
-    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
-      <View style={{ width: 40, height: 40, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT2 + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+    <View
+      style={{ ...c.gl.card, borderRadius: 20, padding: 20, marginBottom: 10, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: ACCENT2 + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
         <IconSymbol name="dumbbell.fill" size={18} color={ACCENT2} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{ex.name}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold }}>{ex.name}</Text>
         <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
           {[
             ex.muscleGroup,
@@ -647,9 +664,9 @@ const ExerciseRow = React.memo(function ExerciseRow({ ex, c, isDark, onEdit, onD
       </TouchableOpacity>
       <TouchableOpacity onPress={() => onDelete(ex.id)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${ex.name}`}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <IconSymbol name="trash" size={15} color="#EF4444" />
+        <IconSymbol name="trash" size={15} color={c.danger} />
       </TouchableOpacity>
-    </BlurView>
+    </View>
   );
 });
 
@@ -663,23 +680,22 @@ const ProgramShortcut = React.memo(function ProgramShortcut({ prog, exercises, c
       activeOpacity={0.75}
       style={{
         flexDirection: 'row', alignItems: 'center',
-        padding: 14, borderRadius: Atlas.radius.large, marginBottom: 10,
-        backgroundColor: prog.color + '12',
-        borderWidth: 1, borderColor: prog.color + '35',
+        padding: 20, borderRadius: 20, marginBottom: 12,
+        ...c.gl.card,
       }}>
-      <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: prog.color + '28', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: prog.color + '28', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
         <IconSymbol name="dumbbell.fill" size={20} color={prog.color} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 15, fontWeight: '700', marginBottom: 3 }}>{prog.name}</Text>
+        <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold, marginBottom: 3 }}>{prog.name}</Text>
         <Text style={{ color: c.sub, fontSize: 12 }}>
           {progExs.length > 0
             ? progExs.slice(0, 3).map(e => e.name).join(', ') + (progExs.length > 3 ? ` +${progExs.length - 3}` : '')
             : `${prog.exerciseIds.length} вправ`}
         </Text>
       </View>
-      <View style={{ backgroundColor: prog.color + '20', borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 7 }}>
-        <Text style={{ color: prog.color, fontSize: 12, fontWeight: '700' }}>Старт</Text>
+      <View style={{ backgroundColor: c.action, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 }}>
+        <Text style={{ color: c.onAction, fontSize: 13, fontFamily: fontFamily.semibold }}>Старт</Text>
       </View>
     </TouchableOpacity>
   );
@@ -692,15 +708,15 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
   const { tr } = useI18n();
   const progExs = exercises.filter(e => prog.exerciseIds.includes(e.id));
   return (
-    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', marginBottom: 12 }}>
-      <View style={{ padding: 14 }}>
+    <View
+      style={{ ...c.gl.card, borderRadius: 20, marginBottom: 12 }}>
+      <View style={{ padding: 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: prog.color + '25', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+          <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: prog.color + '25', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
             <IconSymbol name="dumbbell.fill" size={18} color={prog.color} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }}>{prog.name}</Text>
+            <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }}>{prog.name}</Text>
             <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>
               {prog.exerciseIds.length} вправ
               {prog.reminderEnabled && prog.reminderDays.length > 0
@@ -716,7 +732,7 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onDelete(prog)} accessibilityRole="button" accessibilityLabel={`${tr.delete}: ${prog.name}`}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <IconSymbol name="trash" size={15} color="#EF4444" />
+            <IconSymbol name="trash" size={15} color={c.danger} />
           </TouchableOpacity>
         </View>
 
@@ -724,8 +740,8 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
           <View style={{ marginTop: 12, gap: 6 }}>
             {progExs.map((ex, idx) => (
               <View key={ex.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', width: 18 }}>{idx + 1}.</Text>
-                <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1 }}>{ex.name}</Text>
+                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, width: 18 }}>{idx + 1}.</Text>
+                <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>{ex.name}</Text>
                 <Text style={{ color: c.sub, fontSize: 12 }}>
                   {[
                     ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : null,
@@ -739,11 +755,11 @@ const ProgramCard = React.memo(function ProgramCard({ prog, exercises, c, isDark
 
         <TouchableOpacity
           onPress={() => onStart(prog)}
-          style={{ marginTop: 14, padding: 10, borderRadius: Atlas.radius.medium, backgroundColor: prog.color + '20', alignItems: 'center' }}>
-          <Text style={{ color: prog.color, fontSize: 13, fontWeight: '700' }}>Розпочати тренування</Text>
+          style={{ marginTop: 16, minHeight: 44, justifyContent: 'center', padding: 10, borderRadius: 999, backgroundColor: c.action, alignItems: 'center' }}>
+          <Text style={{ color: c.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>Розпочати тренування</Text>
         </TouchableOpacity>
       </View>
-    </BlurView>
+    </View>
   );
 });
 
@@ -774,11 +790,12 @@ export default function WorkoutsScreen() {
   const router = useRouter();
   // Палітра мусить бути стабільним обʼєктом: інакше кожен рендер екрана
   // віддавав би мемоізованим рядкам нове посилання, і React.memo не спрацює.
-  const c = useMemo(() => makeColors(isDark), [isDark]);
+  const { reduceTransparency } = useDS();
+  const c = useMemo(() => makeColors(isDark, reduceTransparency), [isDark, reduceTransparency]);
   const { tr, lang } = useI18n();
   // Плашка помилки читання спільна для всіх екранів; їй потрібна палітра
   // здоровʼя, а не локальна палітра тренувань.
-  const noticeColors = useMemo(() => getHealthColors(isDark), [isDark]);
+  const noticeColors = useMemo(() => getHealthDSColors(isDark), [isDark]);
 
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -996,7 +1013,7 @@ export default function WorkoutsScreen() {
     switch (item.kind) {
       case 'dateLabel':
         return (
-          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
+          <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 8 }}>
             {new Date(item.date + 'T00:00').toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' })}
           </Text>
         );
@@ -1019,11 +1036,11 @@ export default function WorkoutsScreen() {
           onPress={openNewExercise}
           style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            gap: 8, padding: 14, borderRadius: Atlas.radius.large, marginBottom: 16,
-            backgroundColor: ACCENT2 + '15', borderWidth: 1, borderColor: ACCENT2 + '40',
+            gap: 8, padding: 14, minHeight: 48, borderRadius: 999, marginBottom: 16,
+            backgroundColor: c.action,
           }}>
-          <IconSymbol name="plus" size={16} color={ACCENT2} />
-          <Text style={{ color: ACCENT2, fontSize: 14, fontWeight: '700' }}>Нова вправа</Text>
+          <IconSymbol name="plus" size={16} color={c.onAction} />
+          <Text style={{ color: c.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>Нова вправа</Text>
         </TouchableOpacity>
       );
     }
@@ -1033,39 +1050,39 @@ export default function WorkoutsScreen() {
           onPress={openNewProgram}
           style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            gap: 8, padding: 14, borderRadius: Atlas.radius.large, marginBottom: 16,
-            backgroundColor: ACCENT + '15', borderWidth: 1, borderColor: ACCENT + '40',
+            gap: 8, padding: 14, minHeight: 48, borderRadius: 999, marginBottom: 16,
+            backgroundColor: c.action,
           }}>
-          <IconSymbol name="plus" size={16} color={ACCENT} />
-          <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '700' }}>Нова програма</Text>
+          <IconSymbol name="plus" size={16} color={c.onAction} />
+          <Text style={{ color: c.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>Нова програма</Text>
         </TouchableOpacity>
       );
     }
     return (
       <>
         {todayStats.count > 0 && (
-          <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-            style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, overflow: 'hidden', padding: 16, marginBottom: 16 }}>
+          <View
+            style={{ ...c.gl.card, borderRadius: 20, padding: 20, marginBottom: 16 }}>
             <Text style={[sectionLabel(c), { marginBottom: 10 }]}>Сьогодні</Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{todayStats.count}</Text>
+                <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{todayStats.count}</Text>
                 <Text style={{ color: c.sub, fontSize: 11 }}>тренувань</Text>
               </View>
               <View style={{ width: 1, backgroundColor: c.border }} />
               <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{fmtDuration(todayStats.minutes)}</Text>
+                <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{fmtDuration(todayStats.minutes)}</Text>
                 <Text style={{ color: c.sub, fontSize: 11 }}>загалом</Text>
               </View>
               {todayStats.calories > 0 && <>
                 <View style={{ width: 1, backgroundColor: c.border }} />
                 <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
-                  <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{todayStats.calories}</Text>
+                  <Text style={{ color: c.text, fontSize: 28, lineHeight: 32, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.56 }}>{todayStats.calories}</Text>
                   <Text style={{ color: c.sub, fontSize: 11 }}>ккал</Text>
                 </View>
               </>}
             </View>
-          </BlurView>
+          </View>
         )}
 
         {programs.length > 0 && <>
@@ -1081,16 +1098,16 @@ export default function WorkoutsScreen() {
         )}
       </>
     );
-  }, [tab, c, isDark, todayStats, programs, exercises, grouped.length, startFromProgram, openNewExercise, openNewProgram]);
+  }, [tab, c, todayStats, programs, exercises, grouped.length, startFromProgram, openNewExercise, openNewProgram]);
 
   const listEmpty = useMemo(() => {
     if (tab === 'exercises') {
       return (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <View style={{ width: 56, height: 56, borderRadius: Atlas.radius.xlarge, backgroundColor: ACCENT2 + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-            <IconSymbol name="dumbbell.fill" size={26} color={ACCENT2} />
+          <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+            <IconSymbol name="dumbbell.fill" size={26} color={c.coral} />
           </View>
-          <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає вправ</Text>
+          <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.bold, marginBottom: 6 }}>Немає вправ</Text>
           <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>Створи свою бібліотеку вправ</Text>
         </View>
       );
@@ -1098,10 +1115,10 @@ export default function WorkoutsScreen() {
     if (tab === 'programs') {
       return (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <View style={{ width: 56, height: 56, borderRadius: Atlas.radius.xlarge, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-            <IconSymbol name="list.bullet.clipboard" size={26} color={ACCENT} />
+          <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+            <IconSymbol name="list.bullet.clipboard" size={26} color={c.coral} />
           </View>
-          <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає програм</Text>
+          <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.bold, marginBottom: 6 }}>Немає програм</Text>
           <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>Створи програму з вправ та встанови нагадування</Text>
         </View>
       );
@@ -1112,10 +1129,10 @@ export default function WorkoutsScreen() {
     const hasPrograms = programs.length > 0;
     return (
       <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-        <View style={{ width: 56, height: 56, borderRadius: Atlas.radius.xlarge, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-          <IconSymbol name="figure.run" size={26} color={ACCENT} />
+        <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.coralTint, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+          <IconSymbol name="figure.run" size={26} color={c.coral} />
         </View>
-        <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Немає тренувань</Text>
+        <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.bold, marginBottom: 6 }}>Немає тренувань</Text>
         <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center' }}>
           {hasPrograms ? 'Додай перше тренування вище' : 'Створи програму — і тренування зʼявляться тут'}
         </Text>
@@ -1124,11 +1141,11 @@ export default function WorkoutsScreen() {
             onPress={goToPrograms}
             style={{
               marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 8,
-              paddingHorizontal: 18, paddingVertical: 11, borderRadius: Atlas.radius.medium,
-              backgroundColor: ACCENT + '15', borderWidth: 1, borderColor: ACCENT + '40',
+              paddingHorizontal: 20, paddingVertical: 11, minHeight: 44, borderRadius: 999,
+              backgroundColor: c.action,
             }}>
-            <IconSymbol name="plus" size={15} color={ACCENT} />
-            <Text style={{ color: ACCENT, fontSize: 13, fontWeight: '700' }}>Нова програма</Text>
+            <IconSymbol name="plus" size={15} color={c.onAction} />
+            <Text style={{ color: c.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>Нова програма</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -1138,7 +1155,7 @@ export default function WorkoutsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Без edges={['top']}: верхній інсет тепер рахує ScreenHeader через
           useTopInset() (CLAUDE.md), і разом із нативним краєм шапка з'їжджала
           б униз двічі — на висоту статус-бара. */}
@@ -1164,7 +1181,7 @@ export default function WorkoutsScreen() {
                   accessibilityLabel={tr.tgGroupsButton}
                   style={{
                     borderColor: 'transparent',
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                    ...c.gl.card,
                   }}>
                   <IconSymbol name="person.2.fill" size={17} color={c.text} />
                 </HeaderButton>
@@ -1173,7 +1190,7 @@ export default function WorkoutsScreen() {
                   accessibilityLabel={tr.statistics}
                   style={{
                     borderColor: 'transparent',
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                    ...c.gl.card,
                   }}>
                   <IconSymbol name="chart.bar.fill" size={17} color={c.text} />
                 </HeaderButton>
@@ -1188,11 +1205,10 @@ export default function WorkoutsScreen() {
                 key={t.key}
                 onPress={() => setTab(t.key)}
                 style={{
-                  flex: 1, paddingVertical: 8, borderRadius: Atlas.radius.medium, alignItems: 'center',
-                  backgroundColor: tab === t.key ? ACCENT : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
-                  borderWidth: 1, borderColor: tab === t.key ? ACCENT + '80' : c.border,
+                  flex: 1, minHeight: 40, justifyContent: 'center', borderRadius: 999, alignItems: 'center',
+                  backgroundColor: tab === t.key ? c.action : c.card,
                 }}>
-                <Text style={{ color: tab === t.key ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
+                <Text style={{ color: tab === t.key ? c.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }} numberOfLines={1}>
                   {/* «Мої програми» — щоб не плутались із груповими (§10.1). */}
                   {t.key === 'programs' ? tr.tgPersonalProgramsTab : t.label}
                 </Text>
@@ -1218,7 +1234,7 @@ export default function WorkoutsScreen() {
           ListEmptyComponent={loadFailed ? null : listEmpty}
           contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}
         />
       </SafeAreaView>
 

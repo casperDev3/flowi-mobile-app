@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
 /**
  * Бейдж непрочитаних сповіщень (notifications-module.md §11: «таб
  * Налаштування / шапка»). Сам тримає лічильник живим: монтування бейджа —
@@ -26,7 +26,7 @@ export function formatBadgeCount(count: number): string {
   return count > 99 ? '99+' : String(count);
 }
 
-export function NotificationBadge({ variant = 'count', style, color = '#EF4444' }: Props) {
+export function NotificationBadge({ variant = 'count', style, color = '#E8543F' }: Props) {
   const { tr } = useI18n();
   const count = useUnreadNotificationsCount();
   if (count <= 0) return null;
@@ -59,6 +59,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  text: { color: '#fff', fontSize: 11, fontWeight: Atlas.type.headingWeight },
+  text: { color: '#fff', fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   dot: { width: 9, height: 9, borderRadius: 5 },
 });

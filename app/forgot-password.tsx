@@ -1,6 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -19,12 +16,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
+import { dsTokens } from '@/hooks/use-ds';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { ApiError, OfflineError, apiFetch } from '@/store/api';
 import { useI18n } from '@/store/i18n';
 import { throttleMessage } from '@/store/auth-throttle';
 import { haptic } from '@/utils/haptics';
+import { fontFamily } from '@/constants/theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -47,9 +46,12 @@ export default function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const k = dsTokens(isDark);
   const c = {
     ...getScreenColors('auth', isDark),
-    red: '#EF4444',
+    // Картка форми — суцільна поверхня DS v2.
+    card: k.surface.card,
+    red: k.status.danger,
   };
 
   const handleSendCode = async () => {
@@ -153,7 +155,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg1 }]} />
 
       <SafeAreaView style={{ flex: 1 }}>
         <View style={st.header}>
@@ -162,7 +164,7 @@ export default function ForgotPasswordScreen() {
             accessibilityRole="button"
             accessibilityLabel={tr.back}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="chevron.left" size={22} color={c.accent} />
+            <IconSymbol name="chevron.left" size={22} color={c.text} />
           </TouchableOpacity>
         </View>
 
@@ -179,16 +181,14 @@ export default function ForgotPasswordScreen() {
 
             {step === 1 ? (
               <>
-                <BlurView
-                  intensity={isDark ? 20 : 40}
-                  tint={isDark ? 'dark' : 'light'}
-                  style={[st.card, { borderColor: c.border }]}
-                >
+                <View
+              style={[st.card, { backgroundColor: c.card }]}
+            >
                   <View style={st.fieldWrap}>
                     <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEmail.toUpperCase()}</Text>
                     <TextInput
                       style={[st.input, { color: c.text }]}
-                      placeholderTextColor={c.sub}
+                      placeholderTextColor={k.text.muted}
                       placeholder="you@example.com"
                       value={email}
                       onChangeText={v => { setEmail(v); setError(''); }}
@@ -201,12 +201,12 @@ export default function ForgotPasswordScreen() {
                       onSubmitEditing={handleSendCode}
                     />
                   </View>
-                </BlurView>
+                </View>
 
                 {error ? <Text style={[st.error, { color: c.red }]}>{error}</Text> : null}
 
                 <TouchableOpacity
-                  style={[st.primaryBtn, { backgroundColor: c.accent, opacity: loading ? 0.7 : 1 }]}
+                  style={[st.primaryBtn, { backgroundColor: loading ? k.action.primaryPressed : k.action.primary }]}
                   activeOpacity={0.82}
                   onPress={handleSendCode}
                   disabled={loading}
@@ -215,9 +215,9 @@ export default function ForgotPasswordScreen() {
                   accessibilityState={{ disabled: loading, busy: loading }}
                 >
                   {loading ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={k.text.onAction} />
                   ) : (
-                    <Text style={st.primaryBtnText}>{tr.authSendCode}</Text>
+                    <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.authSendCode}</Text>
                   )}
                 </TouchableOpacity>
               </>
@@ -225,17 +225,15 @@ export default function ForgotPasswordScreen() {
               <>
                 <Text style={[st.hint, { color: c.sub }]}>{tr.authCodeSentHint}</Text>
 
-                <BlurView
-                  intensity={isDark ? 20 : 40}
-                  tint={isDark ? 'dark' : 'light'}
-                  style={[st.card, { borderColor: c.border }]}
-                >
+                <View
+              style={[st.card, { backgroundColor: c.card }]}
+            >
                   {/* Code */}
                   <View style={[st.fieldWrap, { borderBottomColor: c.border, borderBottomWidth: 1 }]}>
                     <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.authEnterCode.toUpperCase()}</Text>
                     <TextInput
-                      style={[st.input, { color: c.text, fontSize: 22, fontWeight: '700', letterSpacing: 4 }]}
-                      placeholderTextColor={c.sub}
+                      style={[st.input, { color: c.text, fontSize: 28, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: 6 }]}
+                      placeholderTextColor={k.text.muted}
                       placeholder="000000"
                       value={code}
                       onChangeText={v => { setCode(v.replace(/\D/g, '').slice(0, 6)); setError(''); }}
@@ -252,7 +250,7 @@ export default function ForgotPasswordScreen() {
                     <View style={st.passwordRow}>
                       <TextInput
                         style={[st.input, { color: c.text, flex: 1 }]}
-                        placeholderTextColor={c.sub}
+                        placeholderTextColor={k.text.muted}
                         placeholder="••••••••"
                         value={newPassword}
                         onChangeText={v => { setNewPassword(v); setError(''); }}
@@ -277,7 +275,7 @@ export default function ForgotPasswordScreen() {
                     <View style={st.passwordRow}>
                       <TextInput
                         style={[st.input, { color: c.text, flex: 1 }]}
-                        placeholderTextColor={c.sub}
+                        placeholderTextColor={k.text.muted}
                         placeholder="••••••••"
                         value={repeatPassword}
                         onChangeText={v => { setRepeatPassword(v); setError(''); }}
@@ -296,12 +294,12 @@ export default function ForgotPasswordScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
-                </BlurView>
+                </View>
 
                 {error ? <Text style={[st.error, { color: c.red }]}>{error}</Text> : null}
 
                 <TouchableOpacity
-                  style={[st.primaryBtn, { backgroundColor: c.accent, opacity: loading ? 0.7 : 1 }]}
+                  style={[st.primaryBtn, { backgroundColor: loading ? k.action.primaryPressed : k.action.primary }]}
                   activeOpacity={0.82}
                   onPress={handleResetPassword}
                   disabled={loading}
@@ -310,9 +308,9 @@ export default function ForgotPasswordScreen() {
                   accessibilityState={{ disabled: loading, busy: loading }}
                 >
                   {loading ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={k.text.onAction} />
                   ) : (
-                    <Text style={st.primaryBtnText}>{tr.authChangePasswordBtn}</Text>
+                    <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.authChangePasswordBtn}</Text>
                   )}
                 </TouchableOpacity>
 
@@ -345,9 +343,9 @@ const st = StyleSheet.create({
     paddingBottom: 60,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.4,
+    fontSize: 32,
+    fontFamily: fontFamily.medium,
+    letterSpacing: -0.32,
     marginBottom: 16,
   },
   hint: {
@@ -357,22 +355,17 @@ const st = StyleSheet.create({
     paddingHorizontal: 4,
   },
   card: {
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
+    borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
   },
   fieldWrap: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
   },
   fieldLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontFamily: fontFamily.medium,
+    letterSpacing: 0.3,
     marginBottom: 4,
   },
   passwordRow: {
@@ -381,7 +374,8 @@ const st = StyleSheet.create({
   },
   input: {
     fontSize: 16,
-    paddingVertical: 2,
+    fontFamily: fontFamily.regular,
+    paddingVertical: 4,
   },
   error: {
     fontSize: 13,
@@ -390,23 +384,26 @@ const st = StyleSheet.create({
     paddingHorizontal: 4,
   },
   primaryBtn: {
-    borderRadius: Atlas.radius.large,
+    borderRadius: 999,
+    minHeight: 52,
+    justifyContent: 'center',
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 20,
   },
   primaryBtnText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fontFamily.semibold,
   },
   linkBtn: {
-    marginTop: 16,
+    marginTop: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
     paddingVertical: 8,
   },
   linkText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
 });

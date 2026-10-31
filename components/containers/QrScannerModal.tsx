@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius } from '@/constants/theme';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -211,7 +211,7 @@ export function QrScannerModal({ visible, containers, onClose, onFound, onSearch
               {outcome?.kind !== 'checking' ? (
                 <TouchableOpacity onPress={() => { setOutcome(null); handling.current = false; }}
                   accessibilityRole="button" style={[styles.pill, styles.pillGhost]}>
-                  <Text style={styles.pillText}>{tr.ctrScan}</Text>
+                  <Text style={[styles.pillText, { color: '#fff' }]}>{tr.ctrScan}</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -223,12 +223,12 @@ export function QrScannerModal({ visible, containers, onClose, onFound, onSearch
             <TouchableOpacity onPress={() => setTorch(t => !t)} accessibilityRole="switch"
               accessibilityState={{ checked: torch }} accessibilityLabel={tr.ctrScanTorch}
               style={[styles.roundBtn, torch && { backgroundColor: CONTAINERS_ACCENT }]}>
-              <IconSymbol name={torch ? 'bolt.fill' : 'bolt'} size={18} color="#fff" />
+              <IconSymbol name={torch ? 'bolt.fill' : 'bolt'} size={18} color={torch ? '#111113' : '#fff'} />
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity onPress={() => setManual(m => !m)} accessibilityRole="button" accessibilityLabel={tr.ctrScanManual}
-            style={[styles.roundBtn, manual && { backgroundColor: CONTAINERS_ACCENT }]}>
-            <IconSymbol name="textformat.abc" size={18} color="#fff" />
+            style={[styles.roundBtn, manual && { backgroundColor: '#F4F4F5' }]}>
+            <IconSymbol name="textformat.abc" size={18} color={manual ? '#111113' : '#fff'} />
           </TouchableOpacity>
         </View>
 
@@ -252,19 +252,20 @@ export function QrScannerModal({ visible, containers, onClose, onFound, onSearch
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000', paddingHorizontal: 16 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  title: { color: '#fff', fontSize: 20, fontWeight: Atlas.type.headingWeight },
+  title: { color: '#fff', fontSize: 20, fontFamily: fontFamily.semibold },
   roundBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' },
-  viewport: { flex: 1, borderRadius: Atlas.radius.xlarge, overflow: 'hidden', backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  frame: { width: 240, height: 240, borderRadius: Atlas.radius.xlarge, borderWidth: 3, borderColor: CONTAINERS_ACCENT },
+  viewport: { flex: 1, borderRadius: radius.card, overflow: 'hidden', backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
+  frame: { width: 240, height: 240, borderRadius: radius.card, borderWidth: 3, borderColor: CONTAINERS_ACCENT },
   noCamera: { alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
-  hint: { color: 'rgba(255,255,255,0.85)', fontSize: 14, textAlign: 'center' },
-  result: { marginTop: 12, padding: 14, borderRadius: Atlas.radius.large, backgroundColor: 'rgba(255,255,255,0.12)', gap: 10, alignItems: 'center' },
-  resultText: { color: '#fff', fontSize: 14, textAlign: 'center' },
+  hint: { color: 'rgba(255,255,255,0.85)', fontSize: 14, fontFamily: fontFamily.regular, textAlign: 'center' },
+  result: { marginTop: 12, padding: 16, borderRadius: radius.nested, backgroundColor: 'rgba(255,255,255,0.12)', gap: 10, alignItems: 'center' },
+  resultText: { color: '#fff', fontSize: 14, fontFamily: fontFamily.regular, textAlign: 'center' },
   bottom: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 14 },
   manual: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  input: { flex: 1, minHeight: 48, borderRadius: Atlas.radius.medium, paddingHorizontal: 14, color: '#fff', fontSize: 16, letterSpacing: 1,
+  input: { flex: 1, minHeight: 48, borderRadius: radius.pill, paddingHorizontal: 16, color: '#fff', fontSize: 16, fontFamily: fontFamily.medium, letterSpacing: 1,
     backgroundColor: 'rgba(255,255,255,0.12)' },
-  pill: { minHeight: 44, paddingHorizontal: 16, borderRadius: 12, backgroundColor: CONTAINERS_ACCENT, alignItems: 'center', justifyContent: 'center' },
+  // Камера завжди на чорному: головна дія — світла pill (як action.primary темної теми).
+  pill: { minHeight: 44, paddingHorizontal: 18, borderRadius: radius.pill, backgroundColor: '#F4F4F5', alignItems: 'center', justifyContent: 'center' },
   pillGhost: { backgroundColor: 'rgba(255,255,255,0.16)' },
-  pillText: { color: '#fff', fontWeight: '700' },
+  pillText: { color: '#111113', fontFamily: fontFamily.semibold },
 });

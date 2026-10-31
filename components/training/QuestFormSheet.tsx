@@ -15,6 +15,7 @@ import { XP_QUEST_MAX, XP_QUEST_MIN } from '@/utils/trainingXp';
 import { Chip, Field, Notice, PrimaryButton, Stepper } from './TrainingBits';
 import { TrainingSheet } from './TrainingSheet';
 import { TG_ACCENT, TG_ERR, type TrainingColors } from './theme';
+import { fontFamily } from '@/constants/theme';
 
 export function QuestFormSheet({ c, visible, quest, members, onClose, onSave, onArchive }: {
   c: TrainingColors;
@@ -83,7 +84,7 @@ export function QuestFormSheet({ c, visible, quest, members, onClose, onSave, on
 
       {measurable ? (
         <>
-          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{tr.tgMetric}</Text>
+          <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginBottom: 6 }}>{tr.tgMetric}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
             {QUEST_METRICS.map(m => (
               <Chip
@@ -133,7 +134,7 @@ export function QuestFormSheet({ c, visible, quest, members, onClose, onSave, on
         onChange={xpReward => setDraft({ ...draft, xpReward })}
       />
 
-      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginTop: 14, marginBottom: 6 }}>{tr.tgSelectMembers}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginTop: 14, marginBottom: 6 }}>{tr.tgSelectMembers}</Text>
       <Chip c={c} label={tr.tgAllMembers} active={assignees.size === 0} onPress={() => setDraft({ ...draft, assigneeIds: [] })} />
       {candidates.map(m => {
         const on = assignees.has(m.user.id);

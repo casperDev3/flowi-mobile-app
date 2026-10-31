@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
@@ -6,13 +5,15 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import { useMotion } from '@/hooks/use-motion';
 
 export function Empty({ c, text, icon = 'tray' }: { c: any; text: string; icon?: string }) {
   return (
     <View style={{ alignItems: 'center', paddingVertical: 48 }}>
       <IconSymbol name={icon as any} size={38} color={c.sub} />
-      <Text style={{ color: c.sub, fontSize: 14, marginTop: 12, fontWeight: '600' }}>{text}</Text>
+      <Text style={{ color: c.sub, fontSize: 14, marginTop: 12, fontFamily: fontFamily.medium }}>{text}</Text>
     </View>
   );
 }
@@ -21,12 +22,13 @@ export function Field({ label, value, onChange, placeholder, autoFocus, c, keybo
   label: string; value: string; onChange: (t: string) => void; placeholder?: string;
   autoFocus?: boolean; c: any; keyboardType?: any; multiline?: boolean;
 }) {
+  const { t } = useDS();
   return (
     <>
       <Text style={[s.label, { color: c.sub }]}>{label}</Text>
-      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.sub}
+      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={t.text.muted}
         autoFocus={autoFocus} keyboardType={keyboardType} multiline={multiline}
-        style={[s.input, { color: c.text, borderColor: c.border, backgroundColor: c.dim, minHeight: multiline ? 70 : undefined, textAlignVertical: multiline ? 'top' : 'center' }]} />
+        style={[s.input, { color: c.text, backgroundColor: c.dim, minHeight: multiline ? 70 : undefined, textAlignVertical: multiline ? 'top' : 'center' }]} />
     </>
   );
 }
@@ -42,6 +44,7 @@ function SegmentOption<T extends string>({
   c: any;
 }) {
   const { reduced } = useMotion();
+  const { t } = useDS();
   const progress = useSharedValue(isActive ? 1 : 0);
 
   useEffect(() => {
@@ -49,8 +52,8 @@ function SegmentOption<T extends string>({
   }, [isActive, reduced]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const animStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(progress.value, [0, 1], [c.dim, color + '20']),
-    borderColor:     interpolateColor(progress.value, [0, 1], [c.border, color]),
+    // Активний сегмент — pill action.primary (DS v2); color лишився в API.
+    backgroundColor: interpolateColor(progress.value, [0, 1], [c.dim, t.action.primary]),
   }));
 
   return (
@@ -62,7 +65,7 @@ function SegmentOption<T extends string>({
       style={{ flex: 1 }}
     >
       <Animated.View style={[s.seg, animStyle]}>
-        <Text style={{ color: isActive ? color : c.text, fontWeight: '700', fontSize: 13 }}>
+        <Text style={{ color: isActive ? t.text.onAction : c.text, fontFamily: fontFamily.semibold, fontSize: 13 }}>
           {option.label}
         </Text>
       </Animated.View>
@@ -94,7 +97,7 @@ export function Segment<T extends string>({ label, options, value, onChange, col
 }
 
 const s = StyleSheet.create({
-  label: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  input: { fontSize: 15, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
-  seg:   { textAlign: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1.5, paddingVertical: 11, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 14 },
+  input: { fontSize: 15, fontFamily: fontFamily.regular, borderRadius: radius.control, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44 },
+  seg:   { textAlign: 'center', borderRadius: radius.pill, minHeight: 44, paddingVertical: 11, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
 });

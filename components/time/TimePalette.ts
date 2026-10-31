@@ -7,7 +7,27 @@
  * копіювати визначення — розійтися в темній темі на першій же правці.
  */
 
+import { glassStyles, type GlassStyles } from '@/components/finance/finPalette';
+import { dsTokens, glassTokens, type DSTheme, type GlassTokens } from '@/hooks/use-ds';
+
+/**
+ * Значення — токени Design System v2 (docs/design-system-v2.md): canvas-фон,
+ * непрозорі картки, текст за рівнями. `indigo` лишився назвою поля (на нього
+ * спираються споживачі), але це акцент екрана «Час» — глибока лаванда, що
+ * тримає білий підпис (див. getScreenColors('time')).
+ *
+ * DS v2.1 (Liquid Glass): bg1/bg2 — основа mesh, card — скло glass.surface
+ * (rgba, альфу НЕ дописувати), dim — скло subtle, sheet — surfaceStrong.
+ * `indigo` — ink акценту модуля «Час» (amber): #RRGGBB, ≥ 4.5:1 як текст/
+ * іконка на склі в обох темах. НЕ фон під білий підпис (у темній він світлий).
+ */
 export interface TimeColors {
+  /** Повні токени DS — для pill-кнопок, чипів, станів. */
+  t: DSTheme;
+  /** Токени Liquid Glass (акценти, rim, mesh). */
+  g: GlassTokens;
+  /** Стилі скла (fill + rim). */
+  gl: GlassStyles;
   bg1: string;
   bg2: string;
   card: string;
@@ -19,20 +39,28 @@ export interface TimeColors {
   sheet: string;
   danger: string;
   warn: string;
+  /** Лише placeholder / disabled / декор. */
+  muted: string;
 }
 
-export function timeColors(isDark: boolean): TimeColors {
+export function timeColors(isDark: boolean, reduceTransparency = false): TimeColors {
+  const t = dsTokens(isDark);
+  const g = glassTokens(isDark);
   return {
-    bg1: isDark ? '#0C0C14' : '#F4F2FF',
-    bg2: isDark ? '#14121E' : '#EAE6FF',
-    card: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,205,255,0.5)',
-    text: isDark ? '#EEF0FF' : '#0D1033',
-    sub: isDark ? 'rgba(238,240,255,0.62)' : 'rgba(13,16,51,0.58)',
-    indigo: '#6366F1',
-    dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet: isDark ? 'rgba(10,12,24,0.98)' : 'rgba(250,251,255,0.98)',
-    danger: '#EF4444',
-    warn: '#F59E0B',
+    t,
+    g,
+    gl: glassStyles(isDark, reduceTransparency),
+    bg1: g.mesh.base,
+    bg2: g.mesh.base,
+    card: reduceTransparency ? g.solid.card : g.surface,
+    border: t.border.hairline,
+    text: t.text.primary,
+    sub: t.text.secondary,
+    indigo: g.accent.amber.ink,
+    dim: g.surfaceSubtle,
+    sheet: g.surfaceStrong,
+    danger: t.status.danger,
+    warn: t.status.warning,
+    muted: t.text.muted,
   };
 }

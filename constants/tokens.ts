@@ -1,17 +1,25 @@
-import { Atlas } from './atlas';
+import { glass as dsGlass, moduleAccent, theme as dsTheme, type GlassAccent } from './theme';
 // ─── Дизайн-токени Flowi ─────────────────────────────────────────────────────
-// Фундамент B8: radius / spacing / палітра-фабрика (B5-контрастний sub ≥0.62/0.58)
+// DS v2 («м'який мінімалізм»): Radius/Spacing — на шкалі constants/theme.ts,
+// палітра екрана — тонка обгортка над семантичними токенами теми.
 
-/** Радіуси заокруглення (в пікселях) */
+/** Радіуси заокруглення (в пікселях) — шкала DS v2. */
 export const Radius = {
-  sm:  Atlas.radius.small,
-  md:  Atlas.radius.medium,
-  lg:  Atlas.radius.large,
-  xl:  Atlas.radius.xlarge,
-  xxl: Atlas.radius.xxlarge,
+  /** Контроли, дрібні елементи (radius.control). */
+  sm:   10,
+  /** Вкладені блоки, компактні (radius.nestedCompact). */
+  md:   10,
+  /** Вкладені блоки (radius.nested). */
+  lg:   12,
+  /** Картки, компактні (radius.cardCompact). */
+  xl:   14,
+  /** Картки (radius.card). */
+  xxl:  16,
+  /** Кнопки, чипи, аватари. */
+  pill: 999,
 } as const;
 
-/** Відступи (в пікселях) */
+/** Відступи (в пікселях) — сітка 4 px. */
 export const Spacing = {
   xs:  4,
   sm:  8,
@@ -25,147 +33,94 @@ export const Spacing = {
 
 /**
  * Типізована палітра кольорів екрана.
- * - `sub`      ≥ opacity 0.62 (dark) / 0.58 (light) — відповідає WCAG AA (≥4.5:1)
- * - `subStrong` ≥ 0.75 / 0.70 — для більш виразного secondary-тексту
+ * - `sub`       = text.secondary — WCAG AA (≥4.5:1) на bg.canvas і surface.card
+ * - `subStrong` — між secondary і primary, для виразних підписів
  */
 export type ScreenPalette = {
-  /** Основний колір фону (верхній шар градієнта) */
+  /** Основний колір фону (DS v2: bg.canvas) */
   bg1: string;
-  /** Другий колір фону (нижній шар градієнта) */
+  /** Другий колір фону (DS v2: той самий bg.canvas — градієнтів фону більше немає) */
   bg2: string;
-  /** Колір картки / BlurView-контейнера */
+  /**
+   * Колір картки — DS v2.1: СКЛО glass.surface (rgba, напівпрозоре). Дає
+   * ефект лише над <MeshBackground/>; альфу до нього НЕ дописувати.
+   */
   card: string;
-  /** Колір рамок і роздільників */
+  /** Непрозора картка (surface.card) — модалки без блюру, «Зменшити прозорість». */
+  cardSolid: string;
+  /** Колір рамок і роздільників (DS v2: border.hairline — використовувати мінімально) */
   border: string;
   /** Основний колір тексту */
   text: string;
-  /** Вторинний текст (placeholder, підписи, мета-інфо) — WCAG AA ≥4.5:1 */
+  /** Вторинний текст (підписи, мета-інфо) — WCAG AA ≥4.5:1 */
   sub: string;
   /** Вторинний текст, вищий контраст (підписи полів, помітки) */
   subStrong: string;
-  /** Акцентний колір екрана */
+  /**
+   * Акцентний колір екрана — glass.accent[модуль].ink, завжди #RRGGBB
+   * (споживачі дописують альфу: accent + '22'). ≥ 4.5:1 як текст/іконка на
+   * склі в обох темах; у світлій ще й під білим підписом (≥ 5:1).
+   * У ТЕМНІЙ ink світлий — текст поверх заливки акцентом бере `onAccent`.
+   */
   accent: string;
+  /** Колір тексту/іконки ПОВЕРХ заливки `accent` (світла — #FFFFFF, темна — #111113). */
+  onAccent: string;
+  /** Тонована «змивка» акцентом (rgba) — фон KPI-карток, icon-chip, активного пункту. */
+  accentTint: string;
+  /** Назва акценту модуля (для <IconChip accent>, <GlassScreen accent>, ProgressBar tone). */
+  accentName: GlassAccent;
+};
+
+type ScreenName = 'tasks' | 'finance' | 'time' | 'health' | 'notes' | 'containers' | 'settings' | 'auth';
+
+/**
+ * Акценти екранів у DS v2.1 (Liquid Glass) — з glass.moduleAccent:
+ *   tasks / auth / settings → lavender, time / notes / containers → amber,
+ *   finance → lime, health → coral.
+ * `accent` — роль `ink` цього акценту (#RRGGBB, ≥ 4.5:1 на склі): у світлій
+ * це глибокий тон (лаванда #6D4CF5, лайм #4F6B00 …), у темній — сам яскравий
+ * акцент. Канвас — mesh (glass.mesh.base під <MeshBackground/>), картка —
+ * скло glass.surface. Головні дії — action.primary pill, не акцент екрана.
+ */
+const SCREEN_MODULE: Record<ScreenName, keyof typeof moduleAccent> = {
+  tasks: 'tasks',
+  auth: 'auth',
+  time: 'time',
+  finance: 'finance',
+  health: 'health',
+  notes: 'notes',
+  containers: 'containers',
+  settings: 'settings',
 };
 
 /**
  * Фабрика палітри екрана.
  * Приймає назву екрана та прапор темної теми, повертає готовий об'єкт кольорів.
- *
- * Кольори bg1/bg2/accent відповідають CLAUDE.md §«Кольори/Фони по екранах».
- * sub/subStrong розраховані для дотримання WCAG AA (≥4.5:1 на відповідному bg).
+ * DS v2.1: bg1/bg2 = основа mesh (самі плями — <MeshBackground/> першим
+ * дочірнім), card = скло, accent = ink акценту модуля.
  *
  * @example
  * const c = getScreenColors('auth', isDark);
  */
-export function getScreenColors(
-  screen: 'tasks' | 'finance' | 'time' | 'health' | 'notes' | 'containers' | 'settings' | 'auth',
-  isDark: boolean,
-): ScreenPalette {
-  switch (screen) {
-    // ── Завдання (#7C3AED) ────────────────────────────────────────────────────
-    case 'tasks':
-      return {
-        bg1:       isDark ? '#0C0C14' : '#F4F2FF',
-        bg2:       isDark ? '#14121E' : '#EAE6FF',
-        card:      isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.85)',
-        border:    isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-        text:      isDark ? '#F0EEFF' : '#1A1433',
-        sub:       isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-        subStrong: isDark ? 'rgba(240,238,255,0.75)' : 'rgba(26,20,51,0.70)',
-        accent:    '#7C3AED',
-      };
-
-    // ── Авторизація (tasks-фони + #7C3AED) ───────────────────────────────────
-    case 'auth':
-      return {
-        bg1:       isDark ? '#0C0C14' : '#F4F2FF',
-        bg2:       isDark ? '#14121E' : '#EAE6FF',
-        card:      isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.85)',
-        border:    isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-        text:      isDark ? '#F0EEFF' : '#1A1433',
-        sub:       isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-        subStrong: isDark ? 'rgba(240,238,255,0.75)' : 'rgba(26,20,51,0.70)',
-        accent:    '#7C3AED',
-      };
-
-    // ── Фінанси (#0EA5E9) ─────────────────────────────────────────────────────
-    case 'finance':
-      return {
-        bg1:       isDark ? '#080E18' : '#EFF5FF',
-        bg2:       isDark ? '#0F1A2E' : '#E0ECFF',
-        card:      isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-        border:    isDark ? 'rgba(255,255,255,0.09)' : 'rgba(180,170,240,0.4)',
-        text:      isDark ? '#F4F2FF' : '#0A0818',
-        sub:       isDark ? 'rgba(244,242,255,0.62)' : 'rgba(10,8,24,0.58)',
-        subStrong: isDark ? 'rgba(244,242,255,0.75)' : 'rgba(10,8,24,0.70)',
-        accent:    '#0EA5E9',
-      };
-
-    // ── Час (#6366F1) ─────────────────────────────────────────────────────────
-    case 'time':
-      return {
-        bg1:       isDark ? '#0A0C18' : '#EEF0FF',
-        bg2:       isDark ? '#121525' : '#E2E5FF',
-        card:      isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-        border:    isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,205,255,0.5)',
-        text:      isDark ? '#EEF0FF' : '#0D1033',
-        sub:       isDark ? 'rgba(238,240,255,0.62)' : 'rgba(13,16,51,0.58)',
-        subStrong: isDark ? 'rgba(238,240,255,0.75)' : 'rgba(13,16,51,0.70)',
-        accent:    '#6366F1',
-      };
-
-    // ── Здоров'я (#10B981) ────────────────────────────────────────────────────
-    case 'health':
-      return {
-        bg1:       isDark ? '#0C0C14' : '#F4F2FF',
-        bg2:       isDark ? '#14121E' : '#EAE6FF',
-        card:      isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.85)',
-        border:    isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-        text:      isDark ? '#F0EEFF' : '#1A1433',
-        sub:       isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-        subStrong: isDark ? 'rgba(240,238,255,0.75)' : 'rgba(26,20,51,0.70)',
-        accent:    '#10B981',
-      };
-
-    // ── Нотатки (#F59E0B) ─────────────────────────────────────────────────────
-    case 'notes':
-      return {
-        bg1:       isDark ? '#100D08' : '#FFFBF4',
-        bg2:       isDark ? '#1A1510' : '#FFF3DC',
-        card:      isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-        border:    isDark ? 'rgba(255,255,255,0.09)' : 'rgba(245,158,11,0.2)',
-        text:      isDark ? '#FFF8E7' : '#1C1209',
-        sub:       isDark ? 'rgba(255,248,231,0.62)' : 'rgba(28,18,9,0.58)',
-        subStrong: isDark ? 'rgba(255,248,231,0.75)' : 'rgba(28,18,9,0.70)',
-        accent:    '#F59E0B',
-      };
-
-    // ── Контейнери (#F97316) ──────────────────────────────────────────────────
-    case 'containers':
-      return {
-        bg1:       isDark ? '#100A00' : '#FFF7ED',
-        bg2:       isDark ? '#1A1200' : '#FFEDD5',
-        card:      isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-        border:    isDark ? 'rgba(255,255,255,0.09)' : 'rgba(249,115,22,0.2)',
-        text:      isDark ? '#FFF7ED' : '#1A0E00',
-        sub:       isDark ? 'rgba(255,247,237,0.62)' : 'rgba(26,14,0,0.58)',
-        subStrong: isDark ? 'rgba(255,247,237,0.75)' : 'rgba(26,14,0,0.70)',
-        accent:    '#F97316',
-      };
-
-    // ── Налаштування (tasks-фони + #7C3AED) ──────────────────────────────────
-    case 'settings':
-      return {
-        bg1:       isDark ? '#0C0C14' : '#F5F5FA',
-        bg2:       isDark ? '#14121E' : '#EBEBF5',
-        card:      isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.80)',
-        border:    isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-        text:      isDark ? '#F0EEFF' : '#1A1433',
-        sub:       isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-        subStrong: isDark ? 'rgba(240,238,255,0.75)' : 'rgba(26,20,51,0.70)',
-        accent:    '#7C3AED',
-      };
-  }
+export function getScreenColors(screen: ScreenName, isDark: boolean): ScreenPalette {
+  const t = isDark ? dsTheme.dark : dsTheme.light;
+  const g = isDark ? dsGlass.dark : dsGlass.light;
+  const accentName = moduleAccent[SCREEN_MODULE[screen]];
+  const a = g.accent[accentName];
+  return {
+    bg1:        g.mesh.base,
+    bg2:        g.mesh.base,
+    card:       g.surface,
+    cardSolid:  t.surface.card,
+    border:     t.border.hairline,
+    text:       t.text.primary,
+    sub:        t.text.secondary,
+    subStrong:  isDark ? '#D4D4D8' : '#3F3F46',
+    accent:     a.ink,
+    onAccent:   isDark ? '#111113' : '#FFFFFF',
+    accentTint: a.tint,
+    accentName,
+  };
 }
 
 // ─── Клас розміру вікна ───────────────────────────────────────────────────────

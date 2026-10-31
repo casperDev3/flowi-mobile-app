@@ -36,7 +36,7 @@ import { Image } from 'expo-image';
  */
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NotificationBadge } from '@/components/notifications/NotificationBadge';
@@ -47,9 +47,14 @@ import {
   useNavSidebarMode,
   type SidebarOverrides,
 } from '@/components/shared/sidebar-mode';
+import type { NavItem } from '@/constants/nav';
 import { ActiveTimersSidebarCard } from '@/components/time/ActiveTimersSidebarCard';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Layout } from '@/constants/tokens';
+import { GlassBackdrop } from '@/components/ds/Glass';
+import { fontFamily, moduleAccent, radius, type GlassAccent, type ModuleKey } from '@/constants/theme';
+import { dsTokens, glassTokens } from '@/hooks/use-ds';
+import { useReduceTransparency } from '@/hooks/use-reduce-transparency';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTimerContext } from '@/store/timer-context';
 import {
@@ -74,6 +79,21 @@ import { useUiModules } from '@/store/ui-preferences';
 export { SIDEBAR_WIDTH } from '@/constants/nav';
 
 const COLLAPSED_KEY = 'nav_collapsed_groups';
+
+/**
+ * Акцент пункту меню (DS v2.1): модуль → glass.moduleAccent. Пункти без
+ * модуля — «Сьогодні», «Налаштування», адмінка — лавандові (бренд).
+ */
+const MODULE_TO_ACCENT_KEY: Partial<Record<string, ModuleKey>> = {
+  tasks: 'tasks', projects: 'projects', meetings: 'calendar', time: 'time', notes: 'notes',
+  integrations: 'integrations', finance: 'finance', budget: 'finance', subscriptions: 'finance',
+  banks: 'finance', health: 'health', workouts: 'workouts', training: 'training', menu: 'menu',
+  containers: 'containers', archive: 'archive', ideas: 'ideas', bugs: 'ideas',
+};
+export function navItemAccent(item: Pick<NavItem, 'module'>): GlassAccent {
+  const key = item.module ? MODULE_TO_ACCENT_KEY[item.module] : undefined;
+  return key ? moduleAccent[key] : 'lavender';
+}
 /** Вибір «рейка/повний» за класом вікна — локально, як і згорнуті групи. */
 const MODE_KEY = 'nav_sidebar_mode';
 
@@ -151,14 +171,48 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
     setCollapsed(prev => toggleCollapsedGroupId(prev, id));
   }, []);
 
+  // DS v2.1 (Liquid Glass): сайдбар — скло над mesh (GlassBackdrop + заливка
+  // glass.surface + спекулярний обідок праворуч). Активний пункт — скляна
+  // pill, тонована акцентом МОДУЛЯ пункту (tint + обідок + світіння), іконка
+  // accent.ink, підпис text.primary SemiBold. «Зменшити прозорість» →
+  // суцільна surface.card і заливка акценту solid + onSolid.
+  const t = dsTokens(isDark);
+  const g = glassTokens(isDark);
+  const reduceTransparency = useReduceTransparency();
   const c = {
-    bg:       isDark ? '#0E0C1A' : '#F4F0FF',
-    border:   isDark ? 'rgba(255,255,255,0.08)' : 'rgba(124,58,237,0.14)',
-    text:     isDark ? '#F0EEFF' : '#1A1433',
-    sub:      isDark ? 'rgba(240,238,255,0.55)' : 'rgba(26,20,51,0.52)',
-    accent:   isDark ? '#A78BFA' : '#7C3AED',
-    activeBg: isDark ? 'rgba(167,139,250,0.14)' : 'rgba(124,58,237,0.10)',
+    bg:       reduceTransparency ? t.surface.card : g.surface,
+    border:   t.border.hairline,
+    text:     t.text.primary,
+    sub:      t.text.secondary,
+    accent:   t.text.primary,
   };
+  const activeStyle = (accent: GlassAccent) => {
+    const a = g.accent[accent];
+    return reduceTransparency
+      ? { backgroundColor: a.solid }
+      : {
+          backgroundColor: a.tint,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: g.rim,
+          ...(Platform.OS === 'ios'
+            ? { shadowColor: a.glow, shadowOpacity: isDark ? 0.5 : 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 3 } }
+            : null),
+        };
+  };
+  const activeIcon = (accent: GlassAccent) => (reduceTransparency ? g.accent[accent].onSolid : g.accent[accent].ink);
+  const activeText = (accent: GlassAccent) => (reduceTransparency ? g.accent[accent].onSolid : t.text.primary);
+  // Картка таймерів має власну підкладку — скло subtle, не pill активного пункту.
+  const timerCardColors = {
+    border: c.border, text: c.text, sub: c.sub, accent: g.accent[moduleAccent.time].ink,
+    activeBg: reduceTransparency ? t.surface.subtle : g.surfaceSubtle,
+  };
+  const glassLayer = reduceTransparency ? null : (
+    <>
+      <GlassBackdrop />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: c.bg }]} />
+      <View pointerEvents="none" style={[st.rimRight, { backgroundColor: isDark ? g.rim : g.rimShade }]} />
+    </>
+  );
 
   const toggleLabel = rail ? tr.navSidebarExpand : tr.navSidebarCollapse;
   const toggleButton = (
@@ -177,8 +231,9 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
   if (rail) {
     return (
       <View
-        style={[st.root, st.railRoot, { width: Layout.railWidth, backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 14 }]}
+        style={[st.root, st.railRoot, { width: Layout.railWidth, backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 14 }]}
         accessibilityRole="menu">
+        {glassLayer}
         <Image source={require('@/assets/logo_app.png')} style={st.railLogo} accessible={false} />
         {toggleButton}
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, alignItems: 'center' }}>
@@ -190,7 +245,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
             const activeInside = hidden && groupHasActiveItem(group, pathname);
             const groupTitle = group.titleKey ? String(tr[group.titleKey] ?? '') : '';
             return (
-              <View key={group.id ?? `g${gi}`} style={[st.railGroup, gi > 0 && { borderTopColor: c.border, borderTopWidth: StyleSheet.hairlineWidth }]}>
+              <View key={group.id ?? `g${gi}`} style={[st.railGroup, gi > 0 && st.railGroupGap]}>
                 {collapsible && (
                   <TouchableOpacity
                     onPress={() => toggleGroup(group.id)}
@@ -206,6 +261,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
                 )}
                 {!hidden && group.items.map(item => {
                   const active = isNavItemActive(item, pathname);
+                  const accent = navItemAccent(item);
                   return (
                     <TouchableOpacity
                       key={item.route}
@@ -214,8 +270,8 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
                       accessibilityRole="menuitem"
                       accessibilityLabel={String(tr[item.labelKey] ?? '')}
                       accessibilityState={{ selected: active }}
-                      style={[st.railItem, active && { backgroundColor: c.activeBg }]}>
-                      <IconSymbol name={item.icon} size={21} color={active ? c.accent : c.sub} />
+                      style={[st.railItem, active && activeStyle(accent)]}>
+                      <IconSymbol name={item.icon} size={21} color={active ? activeIcon(accent) : c.sub} />
                       {item.route === '/(tabs)/settings' && (
                         <NotificationBadge variant="dot" style={st.railBadge} />
                       )}
@@ -235,7 +291,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel={`${tr.navTime}: ${activeTimers.length}`}
-              style={[st.railItem, { backgroundColor: c.activeBg }]}>
+              style={[st.railItem, { backgroundColor: timerCardColors.activeBg }]}>
               <IconSymbol name="timer" size={21} color={c.accent} />
               <Text style={[st.railTimerCount, { color: c.accent }]}>{activeTimers.length}</Text>
             </TouchableOpacity>
@@ -247,9 +303,10 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
 
   return (
     <View
-      style={[st.root, { width: SIDEBAR_WIDTH, backgroundColor: c.bg, borderRightColor: c.border, paddingTop: insets.top + 14 }]}
+      style={[st.root, { width: SIDEBAR_WIDTH, backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 14 }]}
       accessibilityRole="menu">
-      <View style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:12}}><Image source={require('@/assets/logo_app.png')} style={{width:34,height:34,borderRadius:Atlas.radius.medium}} accessible={false}/><Text style={[st.brand, { color: c.accent, marginBottom:0, flex: 1 }]}>Flowi</Text>{toggleButton}</View>
+      {glassLayer}
+      <View style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:12}}><Image source={require('@/assets/logo_app.png')} style={{width:34,height:34,borderRadius:Atlas.radius.medium}} accessible={false}/><Text style={[st.brand, { color: c.text, marginBottom:0, flex: 1 }]}>Flowi</Text>{toggleButton}</View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
         {navGroups.map((group, gi) => {
@@ -294,6 +351,7 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
 
               {!hidden && group.items.map(item => {
                 const active = isNavItemActive(item, pathname);
+                const accent = navItemAccent(item);
                 return (
                   <TouchableOpacity
                     key={item.route}
@@ -301,11 +359,11 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
                     activeOpacity={0.7}
                     accessibilityRole="menuitem"
                     accessibilityState={{ selected: active }}
-                    style={[st.row, active && { backgroundColor: c.activeBg }]}>
-                    <IconSymbol name={item.icon} size={19} color={active ? c.accent : c.sub} />
+                    style={[st.row, active && activeStyle(accent)]}>
+                    <IconSymbol name={item.icon} size={19} color={active ? activeIcon(accent) : c.sub} />
                     <Text
                       numberOfLines={1}
-                      style={[st.label, { color: active ? c.accent : c.text, fontWeight: active ? '700' : '500' }]}>
+                      style={[st.label, { color: active ? activeText(accent) : c.text, fontFamily: active ? fontFamily.semibold : fontFamily.medium }]}>
                       {String(tr[item.labelKey] ?? '')}
                     </Text>
                     {/* Непрочитані сповіщення — на пункті «Налаштування», звідки
@@ -323,37 +381,40 @@ export function NavSidebar({ pathname, isDark }: { pathname: string; isDark: boo
           мусить бути можна з будь-якого розділу без прокрутки сайдбара.
           Картка сама ховається, коли таймерів немає. */}
       <View style={{ paddingBottom: insets.bottom + 10 }}>
-        <ActiveTimersSidebarCard colors={c} />
+        <ActiveTimersSidebarCard colors={timerCardColors} />
       </View>
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  root:       { borderRightWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10 },
-  brand:      { fontSize: 20, fontWeight: Atlas.type.headingWeight, paddingHorizontal: 10, marginBottom: 18 },
+  root:       { paddingHorizontal: 12 },
+  // Спекулярний обідок скла на правому краї сайдбара (межа зі вмістом).
+  rimRight:   { position: 'absolute', top: 0, bottom: 0, right: 0, width: StyleSheet.hairlineWidth },
+  brand:      { fontSize: 20, fontFamily: fontFamily.semibold, paddingHorizontal: 10, marginBottom: 18 },
   // 32 — свідомо менше за 44: це заголовок, а не пункт призначення. Промах по
   // ньому нічого не ламає (розгорнулась зайва група), тож повний тач-таргет
   // тут коштував би рядків, заради яких усе й затівалося.
   groupHead:  { flexDirection: 'row', alignItems: 'center', minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.small },
-  groupTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 6 },
-  groupCount: { fontSize: 10, fontWeight: '700', marginBottom: 6, opacity: 0.8 },
+  groupTitle: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.6, marginBottom: 6 },
+  groupCount: { fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 6, fontVariant: ['tabular-nums'] },
   // 44 — мінімальний тач-таргет за HIG; на планшеті промахуються частіше,
   // бо палець тягнеться через увесь екран.
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 10, borderRadius: Atlas.radius.medium },
+  row:        { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 44, paddingHorizontal: 14, borderRadius: radius.pill },
   label:      { fontSize: 14, flex: 1 },
   // ── Рейка ──
   railRoot:   { paddingHorizontal: 0, alignItems: 'center' },
   railLogo:   { width: 34, height: 34, borderRadius: Atlas.radius.medium, marginBottom: 6 },
   railGroup:  { alignItems: 'center', paddingVertical: 6, gap: 2, alignSelf: 'stretch' },
+  railGroupGap: { marginTop: 6 },
   // 44×44 — мінімальний тач-таргет; у рейці підпису немає, тож площа кнопки —
   // єдине, у що цілиться палець.
-  iconBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium },
-  railItem:   { width: 52, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium },
+  iconBtn:    { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
+  railItem:   { width: 52, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
   railBadge:  { position: 'absolute', top: 10, right: 12 },
-  railCount:  { position: 'absolute', bottom: 4, fontSize: 9, fontWeight: '700' },
+  railCount:  { position: 'absolute', bottom: 4, fontSize: 9, fontFamily: fontFamily.bold, fontVariant: ['tabular-nums'] },
   // Крапка «поточний розділ усередині» на згорнутому заголовку групи.
   activeDot:  { width: 6, height: 6, borderRadius: 3, marginBottom: 6 },
   railActiveDot: { position: 'absolute', top: 9, right: 9, marginBottom: 0 },
-  railTimerCount: { position: 'absolute', bottom: 3, right: 8, fontSize: 10, fontWeight: '800' },
+  railTimerCount: { position: 'absolute', bottom: 3, right: 8, fontSize: 10, fontFamily: fontFamily.bold, fontVariant: ['tabular-nums'] },
 });

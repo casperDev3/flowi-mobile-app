@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TaskCompactCard.tsx — компактна картка завдання у списку.
  *
@@ -11,7 +10,6 @@ import { Atlas } from '@/constants/atlas';
  * колбеки приймають завдання аргументом — інакше виклик довелося б
  * загортати в стрілку, нову при кожному рендері.
  */
-import { BlurView } from 'expo-blur';
 import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -24,6 +22,9 @@ import { useI18n } from '@/store/i18n';
 import { findSprint, sprintBadgeLabel, type Sprint } from '@/utils/sprintUtils';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { isOverdue, normalizePriority, type Task } from '@/utils/taskUtils';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
@@ -107,6 +108,7 @@ function TaskCompactCardInner<T extends Task>({
     // припиняв оптимізувати ВСЮ картку (PERF-2).
   }, [isDone, titleOpacity]);
   const titleAnimStyle = useAnimatedStyle(() => ({ opacity: titleOpacity.value }));
+  const t = dsTokens(isDark);
 
   // Опис рядка для VoiceOver: інакше озвучувалась лише назва, а статус,
   // дедлайн, пріоритет і проєкт передавались виключно кольором.
@@ -139,10 +141,8 @@ function TaskCompactCardInner<T extends Task>({
        * нижче, у якого є onAccessibilityTap.
        */
       accessible={false}>
-      <BlurView
-        intensity={isDark ? 18 : 35}
-        tint={isDark ? 'dark' : 'light'}
-        style={st.card}>
+      {/* DS v2: непрозора картка surface.card, без блюру й рамки. */}
+      <View style={[st.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
         {/* Ціль дотику чекбокса — справжні 44×44, а не 18 + hitSlop: hitSlop
             не виходить за межі картки (у неї відступ 12/9), тож фактично
             лишалось ~36. Колонка 44pt на всю висоту картки, сам квадратик —
@@ -157,11 +157,11 @@ function TaskCompactCardInner<T extends Task>({
             accessibilityState={{ checked: isDone }}
             testID="task-row-checkbox"
             style={st.checkHit}>
-            <AnimatedCheck checked={isDone} color="#10B981" borderColor={c.border} size={18} radius={5} />
+            <AnimatedCheck checked={isDone} color={t.status.success} borderColor={c.sub} size={18} radius={5} />
           </Pressable>
         ) : (
           <View style={st.checkHit} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-            <AnimatedCheck checked={isDone} color="#10B981" borderColor={c.border} size={18} radius={5} />
+            <AnimatedCheck checked={isDone} color={t.status.success} borderColor={c.sub} size={18} radius={5} />
           </View>
         )}
 
@@ -176,7 +176,7 @@ function TaskCompactCardInner<T extends Task>({
           accessibilityLabel={a11ySummary}
           onAccessibilityTap={() => onPress(task)}>
           <AnimatedText
-            style={[{ color: c.text, fontSize: 14, fontWeight: '600', textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
+            style={[{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}
             numberOfLines={2}>
             {task.title}
           </AnimatedText>
@@ -190,19 +190,19 @@ function TaskCompactCardInner<T extends Task>({
             importantForAccessibility="no-hide-descendants">
             <View
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.small, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: statusColumn.color + '16' }}>
-                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 4 }} />
-                <Text numberOfLines={1} style={{ color: statusColumn.color, fontSize: 10, fontWeight: '700' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: glassOf(t).surfaceSubtle }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColumn.color, marginRight: 5 }} />
+                <Text numberOfLines={1} style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.medium }}>
                   {statusColumn.name}
                 </Text>
               </View>
 
               {proj && badgeLabel && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.small, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: proj.color + '16' }}>
-                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: proj.color, marginRight: 4 }} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: glassOf(t).surfaceSubtle }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: proj.color, marginRight: 5 }} />
                   {/* maxWidth більший за колишні 110: у бейдж тепер уміщається
                       ще й назва спринта, і на 110 від неї лишалося три літери. */}
-                  <Text numberOfLines={1} style={{ color: proj.color, fontSize: 10, fontWeight: '600', maxWidth: 180 }}>
+                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.medium, maxWidth: 180 }}>
                     {badgeLabel}
                   </Text>
                 </View>
@@ -215,7 +215,7 @@ function TaskCompactCardInner<T extends Task>({
               {assigneeLabel && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                   <IconSymbol name="person.fill" size={10} color={c.sub} />
-                  <Text numberOfLines={1} style={{ color: c.sub, fontSize: 10, fontWeight: '600', maxWidth: 90 }}>
+                  <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, maxWidth: 90 }}>
                     {assigneeLabel}
                   </Text>
                 </View>
@@ -228,11 +228,11 @@ function TaskCompactCardInner<T extends Task>({
                   <IconSymbol
                     name={allSubtasksDone ? 'checkmark.circle.fill' : 'list.bullet'}
                     size={10}
-                    color={allSubtasksDone ? '#10B981' : c.sub}
+                    color={allSubtasksDone ? t.status.success : c.sub}
                   />
                   <Text style={{
-                    color: allSubtasksDone ? '#10B981' : c.sub,
-                    fontSize: 10, fontWeight: '600', fontVariant: ['tabular-nums'],
+                    color: allSubtasksDone ? t.status.success : c.sub,
+                    fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'],
                   }}>
                     {doneSubtasks}/{task.subtasks.length}
                   </Text>
@@ -263,7 +263,7 @@ function TaskCompactCardInner<T extends Task>({
             <PriorityBadge level={priorityLevel} />
           </View>
         )}
-      </BlurView>
+      </View>
     </PressableScale>
   );
 }
@@ -276,8 +276,8 @@ const st = StyleSheet.create({
   // minHeight 44 — мінімальна ціль дотику (Apple HIG). Було ~38: рядок цілком
   // клікабельний, тож він мусить відповідати нормі, а не лише чекбокс у ньому.
   // Ліворуч без відступу: його займає 44-пунктова колонка чекбокса.
-  card: { minHeight: 44, borderRadius: Atlas.radius.medium, paddingLeft: 0, paddingRight: 12, paddingVertical: 9, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' },
+  card: { minHeight: 44, borderRadius: radius.nested, paddingLeft: 0, paddingRight: 14, paddingVertical: 12, overflow: 'hidden', flexDirection: 'row', alignItems: 'flex-start' },
   // Колонка чекбокса: 44 завширшки, на всю висоту картки (мінімум 44 —
   // відʼємні відступи «з'їдають» вертикальні 9pt картки).
-  checkHit: { width: 44, minHeight: 44, marginVertical: -9, alignSelf: 'stretch', alignItems: 'center', paddingTop: 10 },
+  checkHit: { width: 44, minHeight: 44, marginVertical: -12, alignSelf: 'stretch', alignItems: 'center', paddingTop: 13 },
 });

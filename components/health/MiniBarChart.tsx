@@ -5,6 +5,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Motion } from '@/constants/motion';
+import { useDS } from '@/hooks/use-ds';
 import { useMotion } from '@/hooks/use-motion';
 
 interface MiniBarChartProps {
@@ -42,7 +43,7 @@ function Bar({ targetHeight, color, delayMs, reduced }: BarProps) {
   const style = useAnimatedStyle(() => ({ height: h.value }));
 
   return (
-    <Animated.View style={[{ borderRadius: 4, backgroundColor: color }, style]} />
+    <Animated.View style={[{ borderRadius: 999, backgroundColor: color }, style]} />
   );
 }
 
@@ -50,12 +51,14 @@ function Bar({ targetHeight, color, delayMs, reduced }: BarProps) {
 export function MiniBarChart({ values, color, goal, height = 52 }: MiniBarChartProps) {
   const max = Math.max(...values, goal ?? 0, 1);
   const { reduced } = useMotion();
+  const { t } = useDS();
 
+  // DS v2: поточний (активний) стовпець — лайм, історія — тонований колір метрики.
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height }}>
       {values.map((v, i) => {
         const targetH = Math.max(3, (v / max) * height);
-        const barColor = i === values.length - 1 ? color : color + '55';
+        const barColor = i === values.length - 1 ? t.accent.lime : color + '55';
         return (
           <View key={i} style={{ flex: 1, height, justifyContent: 'flex-end' }}>
             <Bar

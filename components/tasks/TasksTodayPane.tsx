@@ -1,5 +1,4 @@
 import { copyMeeting } from '@/utils/meetingSharing';
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/TasksTodayPane.tsx — права колонка екрана Завдань на
  * широкому вікні, коли жодне завдання не вибране (рішення власника, п. 3).
@@ -25,6 +24,9 @@ import { isSameDay } from '@/utils/dateUtils';
 import { buildDayActivity, trackedMinutes, type DayActivityInput } from '@/utils/dayActivity';
 import { formatDuration } from '@/utils/durationFormat';
 import type { Meeting, TodayMeetingPhase } from '@/utils/meetings';
+import { fontFamily, radius, theme, type } from '@/constants/theme';
+import { dsTokensForText } from '@/components/tasks/dsTokensForText';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export interface TasksTodayPaneProps {
   today: Date;
@@ -48,7 +50,7 @@ export interface TasksTodayPaneProps {
   now?: Date;
 }
 
-const MEETING_COLOR = '#6366F1';
+const MEETING_COLOR = theme.light.status.info;
 
 /** «Зараз» з кроком у хвилину — частіше графіку оновлюватись нема сенсу. */
 function useMinuteClock(fixed?: Date): Date {
@@ -64,6 +66,7 @@ function useMinuteClock(fixed?: Date): Date {
 export function TasksTodayPane({
   today, locale, meetings, activitySources, onOpenMeeting, onOpenCalendar, colors: c, tr, now: fixedNow,
 }: TasksTodayPaneProps) {
+  const t = dsTokensForText(c.text);
   const units = { hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute };
   const dateLabel = today.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
   const now = useMinuteClock(fixedNow);
@@ -93,7 +96,7 @@ export function TasksTodayPane({
           textColor={c.text}
         />
         {meetings.length === 0 ? (
-          <Text style={[st.empty, { color: c.sub, borderColor: c.border }]}>{tr.todayPaneNoMeetings}</Text>
+          <Text style={[st.empty, { color: c.sub, backgroundColor: c.dim }]}>{tr.todayPaneNoMeetings}</Text>
         ) : (
           <View style={{ gap: 6 }}>
             {meetings.map(({ meeting, phase }) => {
@@ -105,16 +108,16 @@ export function TasksTodayPane({
                   activeOpacity={0.75}
                   accessibilityRole="button"
                   accessibilityLabel={`${meeting.time || ''} ${meeting.title}, ${duration}`.trim()}
-                  style={[st.meetingRow, { backgroundColor: c.dim, borderColor: c.border, opacity: phase === 'past' ? 0.5 : 1 }]}>
+                  style={[st.meetingRow, { backgroundColor: c.dim, opacity: phase === 'past' ? 0.5 : 1 }]}>
                   <View style={[st.meetingBar, { backgroundColor: meeting.color }]} />
-                  <Text style={[st.meetingTime, { color: meeting.color }]}>{meeting.time || '--:--'}</Text>
+                  <Text style={[st.meetingTime, { color: c.text }]}>{meeting.time || '--:--'}</Text>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      {phase === 'current' && <View style={[st.nowDot, { backgroundColor: meeting.color }]} />}
-                      <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 13, fontWeight: '700' }}>{meeting.title}</Text>
+                      {phase === 'current' && <View style={[st.nowDot, { backgroundColor: t.accent.coral }]} />}
+                      <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{meeting.title}</Text>
                       <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.copyText} onPress={event => { event.stopPropagation(); void copyMeeting(meeting, locale.startsWith('en')); }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><IconSymbol name="doc.on.doc" size={15} color={c.sub} /></TouchableOpacity>
                     </View>
-                    <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                    <Text numberOfLines={1} style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
                       {duration}{meeting.location ? ` · ${meeting.location}` : ''}
                     </Text>
                   </View>
@@ -149,10 +152,10 @@ export function TasksTodayPane({
           onPress={onOpenCalendar}
           accessibilityRole="button"
           accessibilityLabel={tr.todayPaneOpenCalendar}
-          style={[st.calendarBtn, { borderColor: c.border, backgroundColor: c.dim }]}>
-          <IconSymbol name="calendar" size={15} color={c.accent} />
-          <Text style={{ color: c.accent, fontSize: 14, fontWeight: '700', flex: 1 }}>{tr.todayPaneOpenCalendar}</Text>
-          <IconSymbol name="chevron.right" size={12} color={c.accent} />
+          style={[st.calendarBtn, { backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+          <IconSymbol name="calendar" size={15} color={t.action.secondaryText} />
+          <Text style={{ color: t.action.secondaryText, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }}>{tr.todayPaneOpenCalendar}</Text>
+          <IconSymbol name="chevron.right" size={12} color={c.sub} />
         </TouchableOpacity>
 
         <Text style={[st.hint, { color: c.sub }]}>{tr.detailEmptyHint}</Text>
@@ -171,10 +174,11 @@ function SectionTitle({ icon, color, label, badge, textColor }: {
   return (
     <View style={st.sectionTitle} accessibilityRole="header">
       <IconSymbol name={icon} size={15} color={color} />
-      <Text style={{ color: textColor, fontSize: 14, fontWeight: '700', flex: 1 }}>{label}</Text>
+      <Text style={[type.h2, { color: textColor, flex: 1 }]}>{label}</Text>
       {badge !== undefined && (
-        <View style={[st.countPill, { backgroundColor: color + '20' }]}>
-          <Text style={{ color, fontSize: 11, fontWeight: '700' }}>{badge}</Text>
+        // DS v2: бейдж значення — lime-pill з темним текстом.
+        <View style={[st.countPill, { backgroundColor: theme.light.accent.lime }]}>
+          <Text style={{ color: theme.light.text.onAccent, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{badge}</Text>
         </View>
       )}
     </View>
@@ -185,16 +189,16 @@ const st = StyleSheet.create({
   // DetailPane центрує порожній стан — колонці «Сьогодні» потрібна вся висота й ширина.
   root:        { flex: 1, alignSelf: 'stretch' },
   content:     { paddingBottom: 40 },
-  title:       { fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4 },
-  date:        { fontSize: 13, marginTop: 2, marginBottom: 6, textTransform: 'capitalize' },
+  title:       { fontSize: 28, fontFamily: fontFamily.medium, letterSpacing: -0.4 },
+  date:        { fontSize: 13, fontFamily: fontFamily.regular, marginTop: 2, marginBottom: 6, textTransform: 'capitalize' },
   sectionTitle:{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 18, marginBottom: 10 },
-  countPill:   { borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 2 },
-  empty:       { fontSize: 12, textAlign: 'center', borderWidth: 1, borderStyle: 'dashed', borderRadius: Atlas.radius.medium, paddingVertical: 16, paddingHorizontal: 10 },
-  meetingRow:  { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 48, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingVertical: 8, paddingRight: 10, overflow: 'hidden' },
-  meetingBar:  { width: 3, alignSelf: 'stretch' },
-  meetingTime: { fontSize: 13, fontWeight: '700', minWidth: 42, fontVariant: ['tabular-nums'] },
+  countPill:   { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 2 },
+  empty:       { fontSize: 12, fontFamily: fontFamily.regular, textAlign: 'center', borderRadius: radius.nested, overflow: 'hidden', paddingVertical: 16, paddingHorizontal: 12 },
+  meetingRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, borderRadius: radius.nested, paddingVertical: 8, paddingLeft: 14, paddingRight: 10, overflow: 'hidden' },
+  meetingBar:  { width: 8, height: 8, borderRadius: 4 },
+  meetingTime: { fontSize: 14, fontFamily: fontFamily.medium, minWidth: 42, fontVariant: ['tabular-nums'] },
   nowDot:      { width: 6, height: 6, borderRadius: 3 },
-  calendarBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, marginTop: 22 },
-  trackHint:   { fontSize: 11, marginTop: 6 },
-  hint:        { fontSize: 12, textAlign: 'center', marginTop: 16, opacity: 0.8 },
+  calendarBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, borderRadius: radius.pill, paddingHorizontal: 18, marginTop: 22 },
+  trackHint:   { fontSize: 12, fontFamily: fontFamily.regular, marginTop: 6 },
+  hint:        { fontSize: 12, fontFamily: fontFamily.regular, textAlign: 'center', marginTop: 16 },
 });

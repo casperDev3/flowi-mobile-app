@@ -12,8 +12,9 @@ export const ACTION = {
   height: Atlas.controlHeight,
   /** Проміжок між діями в рядку й між рядками при переносі. */
   gap: Atlas.space.s100,
-  radius: Atlas.radius.large,
-  paddingX: 14,
+  /** DS v2: кнопки й чипи — повний pill. */
+  radius: 999,
+  paddingX: 18,
   /** Іконка в кнопці з підписом. */
   icon: 15,
   /** Іконка в IconAction. */

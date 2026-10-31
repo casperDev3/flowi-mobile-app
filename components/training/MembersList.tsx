@@ -13,7 +13,8 @@ import type { CompletionStats } from '@/utils/trainingPrograms';
 import type { TrainingMember } from '@/utils/trainingTypes';
 
 import { Avatar, Badge } from './TrainingBits';
-import { TG_ACCENT, TG_OK, TG_XP, type TrainingColors } from './theme';
+import { TG_ACCENT, type TrainingColors } from './theme';
+import { fontFamily } from '@/constants/theme';
 
 export interface MemberRowStats {
   weekXp: number;
@@ -40,7 +41,7 @@ export function MembersList({ c, members, stats, isCoach, selectedId, meId, onOp
         return (
           <View key={m.user.id} style={{
             flexDirection: 'row', alignItems: 'center', borderTopWidth: i ? 1 : 0, borderTopColor: c.border,
-            backgroundColor: selected ? TG_ACCENT + '14' : 'transparent', borderRadius: selected ? 12 : 0,
+            backgroundColor: selected ? c.chip : 'transparent', borderRadius: selected ? 14 : 0,
           }}>
             <TouchableOpacity
               disabled={!onOpen}
@@ -49,17 +50,17 @@ export function MembersList({ c, members, stats, isCoach, selectedId, meId, onOp
               accessibilityState={{ selected }}
               accessibilityLabel={`${name}, ${m.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember}`}
               style={{ flex: 1, minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6 }}>
-              <Avatar name={name} color={m.role === 'coach' ? TG_ACCENT : '#8B5CF6'} />
+              <Avatar name={name} color={m.role === 'coach' ? TG_ACCENT : c.sub} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontSize: 15, fontWeight: '700' }} numberOfLines={1}>
+                <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.bold }} numberOfLines={1}>
                   {m.user.id === meId ? `${name} (${tr.tgYou})` : name}
                 </Text>
                 {isCoach && m.role === 'member' ? (
                   <Text style={{ color: c.sub, fontSize: 12 }}>
                     {`🔥${m.streak_days} · `}
-                    <Text style={{ color: TG_XP }}>{`${s?.weekXp ?? 0} ${tr.tgWeekXp}`}</Text>
+                    <Text style={{ color: c.text, fontVariant: ['tabular-nums'] }}>{`${s?.weekXp ?? 0} ${tr.tgWeekXp}`}</Text>
                     {s?.completion?.percent != null ? (
-                      <Text style={{ color: TG_OK }}>{` · ${s.completion.percent}% (${s.completion.completed}/${s.completion.due})`}</Text>
+                      <Text style={{ color: c.sub, fontVariant: ['tabular-nums'] }}>{` · ${s.completion.percent}% (${s.completion.completed}/${s.completion.due})`}</Text>
                     ) : null}
                   </Text>
                 ) : null}

@@ -1,5 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -18,8 +16,11 @@ import { useWideModal } from '@/components/health/HealthLayout';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   ACCENT, ACCENT_CAL, ACCENT_MOOD, ACCENT_PROT, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
-  ModalKey, getHealthColors,
+  ModalKey,
 } from '@/utils/healthTheme';
+import { dsTokensFor, getHealthDSColors, healthGlassStyles } from '@/components/health/palette';
+import { fontFamily } from '@/constants/theme';
+
 import { EntryType } from '@/utils/healthUtils';
 import { useSheetSurface } from '@/hooks/use-content-width';
 
@@ -27,10 +28,6 @@ export interface NewEntryPayload {
   type: EntryType; value: number; note?: string;
   protein?: number; fat?: number; carbs?: number;
 }
-
-const KEY_COLOR: Record<ModalKey, string> = {
-  water: ACCENT, calories: ACCENT_CAL, weight: ACCENT_WEIGHT, steps: ACCENT_STEPS, pulse: ACCENT_PULSE, sleep: ACCENT_SLEEP,
-};
 
 export function isValidHealthEntryInput(
   modalKey: ModalKey | null,
@@ -53,7 +50,10 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
   isDark: boolean;
   tr: any;
 }) {
-  const c = getHealthColors(isDark);
+  const c = getHealthDSColors(isDark);
+  // Без hooks/use-ds: модуль імпортують чисті тести (health-modal.test).
+  const gs = healthGlassStyles(isDark);
+  const k = dsTokensFor(c);
   const sheetSurface = useSheetSurface();
   const wm = useWideModal();
   const [val, setVal] = useState('');
@@ -95,8 +95,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
             accessibilityViewIsModal
             importantForAccessibility="yes"
           >
-            <BlurView intensity={isDark ? 55 : 75} tint={isDark ? 'dark' : 'light'}
-              style={[s.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+            <View style={[s.sheet, sheetSurface, { ...gs.strong }]}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -121,20 +120,20 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
               {modalKey === 'water' && <>
                 <ModalTitle title={tr.addWater} icon="drop.fill" color={ACCENT} textColor={c.text} />
                 <Text style={[s.label, { color: c.sub }]}>КІЛЬКІСТЬ (МЛ)</Text>
-                <TextInput placeholder="250" placeholderTextColor={c.sub} value={val} onChangeText={setVal}
+                <TextInput placeholder="250" placeholderTextColor={k.text.muted} value={val} onChangeText={setVal}
                   accessibilityLabel={tr.addWater}
                   keyboardType="number-pad" autoFocus
-                  style={[s.bigInput, { color: ACCENT, borderColor: ACCENT + '40', backgroundColor: ACCENT + '10' }]} />
+                  style={[s.bigInput, { color: c.text, backgroundColor: c.dim }]} />
                 <Presets values={[150, 250, 350, 500]} val={val} setVal={setVal} color={ACCENT} c={c} />
               </>}
 
               {modalKey === 'calories' && <>
                 <ModalTitle title={tr.calories} icon="flame.fill" color={ACCENT_CAL} textColor={c.text} />
                 <Text style={[s.label, { color: c.sub }]}>КІЛОКАЛОРІЇ</Text>
-                <TextInput placeholder="350" placeholderTextColor={c.sub} value={val} onChangeText={setVal}
+                <TextInput placeholder="350" placeholderTextColor={k.text.muted} value={val} onChangeText={setVal}
                   accessibilityLabel={tr.calories}
                   keyboardType="number-pad" autoFocus
-                  style={[s.bigInput, { color: ACCENT_CAL, borderColor: ACCENT_CAL + '40', backgroundColor: ACCENT_CAL + '10' }]} />
+                  style={[s.bigInput, { color: c.text, backgroundColor: c.dim }]} />
                 <Presets values={[200, 350, 500, 700]} val={val} setVal={setVal} color={ACCENT_CAL} c={c} />
                 <Text style={[s.label, { color: c.sub }]}>{tr.macrosOptional}</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -143,38 +142,38 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
                   <Macro label={tr.carbs} value={carb} onChange={setCarb} color={ACCENT_STEPS} c={c} />
                 </View>
                 <Text style={[s.label, { color: c.sub }]}>НОТАТКА (страва)</Text>
-                <TextInput placeholder="Обід, гречка з куркою…" placeholderTextColor={c.sub} value={note} onChangeText={setNote}
+                <TextInput placeholder="Обід, гречка з куркою…" placeholderTextColor={k.text.muted} value={note} onChangeText={setNote}
                   accessibilityLabel={tr.note}
-                  style={[s.noteInput, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]} />
+                  style={[s.noteInput, { color: c.text, backgroundColor: c.dim }]} />
               </>}
 
               {modalKey === 'weight' && <>
                 <ModalTitle title={tr.weight} icon="scalemass.fill" color={ACCENT_WEIGHT} textColor={c.text} />
                 <Text style={[s.label, { color: c.sub }]}>ВАГА (КГ)</Text>
-                <TextInput placeholder="70.5" placeholderTextColor={c.sub} value={val} onChangeText={setVal}
+                <TextInput placeholder="70.5" placeholderTextColor={k.text.muted} value={val} onChangeText={setVal}
                   accessibilityLabel={tr.weight}
                   keyboardType="decimal-pad" autoFocus
-                  style={[s.bigInput, { color: ACCENT_WEIGHT, borderColor: ACCENT_WEIGHT + '40', backgroundColor: ACCENT_WEIGHT + '10' }]} />
+                  style={[s.bigInput, { color: c.text, backgroundColor: c.dim }]} />
               </>}
 
               {modalKey === 'sleep' && <>
                 <ModalTitle title={tr.sleep} icon="moon.fill" color={ACCENT_SLEEP} textColor={c.text} />
                 <Text style={[s.label, { color: c.sub }]}>ТРИВАЛІСТЬ</Text>
-                <View style={[s.durBlock, { backgroundColor: ACCENT_SLEEP + '12', borderColor: ACCENT_SLEEP + '30' }]}>
+                <View style={[s.durBlock, { backgroundColor: c.dim }]}>
                   <View style={{ flex: 1, alignItems: 'center' }}>
-                    <TextInput placeholder="7" placeholderTextColor={c.sub} value={val} onChangeText={setVal}
+                    <TextInput placeholder="7" placeholderTextColor={k.text.muted} value={val} onChangeText={setVal}
                       accessibilityLabel={`${tr.sleep}, ${tr.hrs}`}
                       keyboardType="number-pad" autoFocus
-                      style={{ color: ACCENT_SLEEP, fontSize: 38, fontWeight: Atlas.type.headingWeight, textAlign: 'center', letterSpacing: -1 }} />
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.hrs}</Text>
+                      style={{ color: c.text, fontSize: 44, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], textAlign: 'center', letterSpacing: -0.88 }} />
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>{tr.hrs}</Text>
                   </View>
-                  <Text style={{ color: c.sub, fontSize: 30, fontWeight: '200', alignSelf: 'center', marginBottom: 18 }}>:</Text>
+                  <Text style={{ color: c.sub, fontSize: 30, fontFamily: fontFamily.light, alignSelf: 'center', marginBottom: 18 }}>:</Text>
                   <View style={{ flex: 1, alignItems: 'center' }}>
-                    <TextInput placeholder="30" placeholderTextColor={c.sub} value={val2} onChangeText={setVal2}
+                    <TextInput placeholder="30" placeholderTextColor={k.text.muted} value={val2} onChangeText={setVal2}
                       accessibilityLabel={`${tr.sleep}, ${tr.mins}`}
                       keyboardType="number-pad"
-                      style={{ color: ACCENT_SLEEP, fontSize: 38, fontWeight: Atlas.type.headingWeight, textAlign: 'center', letterSpacing: -1 }} />
-                    <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>{tr.mins}</Text>
+                      style={{ color: c.text, fontSize: 44, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], textAlign: 'center', letterSpacing: -0.88 }} />
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>{tr.mins}</Text>
                   </View>
                 </View>
                 <Text style={[s.label, { color: c.sub }]}>ШВИДКИЙ ВИБІР</Text>
@@ -185,8 +184,8 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
                       accessibilityRole="button"
                       accessibilityLabel={`${Math.floor(mins / 60)} ${tr.hrs}`}
                       accessibilityState={{ selected: val === String(Math.floor(mins / 60)) }}
-                      style={[s.presetBtn, { borderColor: ACCENT_SLEEP + '40', backgroundColor: val === String(Math.floor(mins / 60)) ? ACCENT_SLEEP + '25' : c.dim }]}>
-                      <Text style={{ color: ACCENT_SLEEP, fontSize: 13, fontWeight: '700' }}>{Math.floor(mins / 60)}г</Text>
+                      style={[s.presetBtn, { backgroundColor: val === String(Math.floor(mins / 60)) ? k.action.primary : c.dim }]}>
+                      <Text style={{ color: val === String(Math.floor(mins / 60)) ? k.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{Math.floor(mins / 60)}г</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -195,26 +194,26 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
               {modalKey === 'steps' && <>
                 <ModalTitle title={tr.steps} icon="figure.walk" color={ACCENT_STEPS} textColor={c.text} />
                 <Text style={[s.label, { color: c.sub }]}>КІЛЬКІСТЬ КРОКІВ</Text>
-                <TextInput placeholder="5000" placeholderTextColor={c.sub} value={val} onChangeText={setVal}
+                <TextInput placeholder="5000" placeholderTextColor={k.text.muted} value={val} onChangeText={setVal}
                   accessibilityLabel={tr.steps}
                   keyboardType="number-pad" autoFocus
-                  style={[s.bigInput, { color: ACCENT_STEPS, borderColor: ACCENT_STEPS + '40', backgroundColor: ACCENT_STEPS + '10' }]} />
+                  style={[s.bigInput, { color: c.text, backgroundColor: c.dim }]} />
                 <Presets values={[1000, 3000, 5000, 10000]} val={val} setVal={setVal} color={ACCENT_STEPS} c={c} fmt={st => (st >= 1000 ? `${st / 1000}т` : String(st))} />
               </>}
 
               {modalKey === 'pulse' && <>
                 <ModalTitle title={tr.pulse} icon="waveform.path.ecg" color={ACCENT_PULSE} textColor={c.text} />
                 <Text style={[s.label, { color: c.sub }]}>УДАРИ ЗА ХВИЛИНУ</Text>
-                <TextInput placeholder="72" placeholderTextColor={c.sub} value={val} onChangeText={setVal}
+                <TextInput placeholder="72" placeholderTextColor={k.text.muted} value={val} onChangeText={setVal}
                   accessibilityLabel={tr.pulse}
                   keyboardType="number-pad" autoFocus
-                  style={[s.bigInput, { color: ACCENT_PULSE, borderColor: ACCENT_PULSE + '40', backgroundColor: ACCENT_PULSE + '10' }]} />
+                  style={[s.bigInput, { color: c.text, backgroundColor: c.dim }]} />
                 <Presets values={[60, 70, 80, 90]} val={val} setVal={setVal} color={ACCENT_PULSE} c={c} />
               </>}
 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 24 }}>
-                <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                  <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.cancel}</Text>
+                <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[s.btn, { ...gs.subtle, flex: 1 }]}>
+                  <Text style={{ color: k.action.secondaryText, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   accessibilityRole="button"
@@ -223,15 +222,14 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
                   onPress={save}
                   style={[s.btn, {
                     flex: 2,
-                    opacity: canSave ? 1 : 0.55,
-                    backgroundColor: modalKey ? KEY_COLOR[modalKey] : ACCENT,
+                    backgroundColor: canSave ? k.action.primary : k.state.disabledBg,
                   }]}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+                  <Text style={{ color: canSave ? k.text.onAction : k.state.disabledText, fontFamily: fontFamily.semibold }}>{tr.save}</Text>
                 </TouchableOpacity>
               </View>
               </ScrollView>
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -242,6 +240,7 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
 function Presets({ values, val, setVal, color, c, fmt }: {
   values: number[]; val: string; setVal: (s: string) => void; color: string; c: any; fmt?: (n: number) => string;
 }) {
+  const k = dsTokensFor(c);
   return (
     <>
       <Text style={[s.label, { color: c.sub }]}>ШВИДКИЙ ВИБІР</Text>
@@ -251,8 +250,8 @@ function Presets({ values, val, setVal, color, c, fmt }: {
             accessibilityRole="button"
             accessibilityLabel={String(fmt ? fmt(v) : v)}
             accessibilityState={{ selected: val === String(v) }}
-            style={[s.presetBtn, { borderColor: color + '40', backgroundColor: val === String(v) ? color + '25' : c.dim }]}>
-            <Text style={{ color, fontSize: 13, fontWeight: '700' }}>{fmt ? fmt(v) : v}</Text>
+            style={[s.presetBtn, { backgroundColor: val === String(v) ? k.action.primary : c.dim }]}>
+            <Text style={{ color: val === String(v) ? k.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{fmt ? fmt(v) : v}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -263,12 +262,15 @@ function Presets({ values, val, setVal, color, c, fmt }: {
 function Macro({ label, value, onChange, color, c }: {
   label: string; value: string; onChange: (t: string) => void; color: string; c: any;
 }) {
+  const k = dsTokensFor(c);
   return (
     <View style={{ flex: 1 }}>
-      <TextInput placeholder="0" placeholderTextColor={c.sub} value={value} onChangeText={onChange} keyboardType="number-pad"
+      <TextInput placeholder="0" placeholderTextColor={k.text.muted} value={value} onChangeText={onChange} keyboardType="number-pad"
         accessibilityLabel={label}
-        style={{ color, fontSize: 18, fontWeight: Atlas.type.headingWeight, textAlign: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: color + '40', backgroundColor: color + '10', paddingVertical: 10 }} />
-      <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 4 }}>{label}</Text>
+        style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], textAlign: 'center', borderRadius: 14, backgroundColor: c.dim, paddingVertical: 10, minHeight: 44 }} />
+      {/* Колір макросу — тонкою позначкою під полем. */}
+      <View style={{ alignSelf: 'center', width: 14, height: 3, borderRadius: 2, backgroundColor: color, marginTop: 6 }} />
+      <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.regular, textAlign: 'center', marginTop: 4 }}>{label}</Text>
     </View>
   );
 }
@@ -276,27 +278,28 @@ function Macro({ label, value, onChange, color, c }: {
 function ModalTitle({ title, icon, color, textColor }: { title: string; icon: any; color: string; textColor: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18, gap: 10 }}>
-      <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
         <IconSymbol name={icon} size={18} color={color} />
       </View>
-      <Text style={{ color: textColor, fontSize: 20, fontWeight: Atlas.type.headingWeight }}>{title}</Text>
+      <Text style={{ color: textColor, fontSize: 20, fontFamily: fontFamily.semibold }}>{title}</Text>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
+  overlay:      { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)' /* surface.overlay */, justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти — числом із useSheetSurface(); відсоток від батька з
   // height:auto не рахується і обмеження просто зникає (NAT-01).
-  sheet:        { borderRadius: 26, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:        { borderRadius: 24, padding: 24 },
   content:      { paddingBottom: 2 },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:       { width: 36, height: 4, borderRadius: 2 },
-  label:        { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
-  bigInput:     { fontSize: 36, fontWeight: Atlas.type.headingWeight, textAlign: 'center', borderRadius: Atlas.radius.large, borderWidth: 1.5, paddingVertical: 16, letterSpacing: -1 },
-  noteInput:    { fontSize: 14, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11 },
-  durBlock:     { flexDirection: 'row', borderRadius: Atlas.radius.large, borderWidth: 1, padding: 16, alignItems: 'flex-start' },
-  presetBtn:    { flex: 1, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingVertical: 9, alignItems: 'center' },
-  btn:          { paddingVertical: 14, borderRadius: Atlas.radius.large, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  label:        { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 14 },
+  // Великі тонкі цифри (display DS v2): Light 300, tabular-nums, tracking −2%.
+  bigInput:     { fontSize: 48, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], textAlign: 'center', borderRadius: 16, paddingVertical: 16, letterSpacing: -0.96 },
+  noteInput:    { fontSize: 14, fontFamily: fontFamily.regular, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, minHeight: 44 },
+  durBlock:     { flexDirection: 'row', borderRadius: 16, padding: 16, alignItems: 'flex-start' },
+  presetBtn:    { flex: 1, borderRadius: 999, minHeight: 44, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
+  btn:          { minHeight: 48, paddingVertical: 14, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

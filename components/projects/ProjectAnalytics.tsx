@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -16,9 +15,11 @@ import {
   type WeekPoint,
 } from '@/utils/projectCharts';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokensForText } from '@/components/tasks/dsTokensForText';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 /** Зелений — той самий, яким усюди в застосунку позначено завершене. */
-const DONE_COLOR = '#10B981';
 
 export interface AnalyticsPalette {
   text: string;
@@ -54,6 +55,7 @@ export function ProjectAnalytics({
   palette: AnalyticsPalette;
 }) {
   const { tr } = useI18n();
+  const t = dsTokensForText(palette.text);
   // '' — усі проєкти списку. Порожній рядок, а не null: значення слугує ще й
   // ключем чипа, і сентинель довелося б конвертувати в обидва боки.
   const [selected, setSelected] = useState('');
@@ -93,7 +95,7 @@ export function ProjectAnalytics({
     : scopeLabel;
 
   return (
-    <View style={{ marginTop: 26, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: 18 }}>
+    <View style={{ marginTop: 24 }}>
       <Text style={[st.heading, { color: palette.text }]}>{tr.projectAnalytics}</Text>
       <Text style={[st.note, { color: palette.sub, marginTop: 4 }]}>{tr.projectAnalyticsHint}</Text>
 
@@ -112,11 +114,9 @@ export function ProjectAnalytics({
               onPress={() => setSelected(option.id)}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
-              style={[st.chip, {
-                backgroundColor: active ? palette.accent + '18' : palette.dim,
-                borderColor: active ? palette.accent : palette.border,
-              }]}>
-              <Text style={{ color: active ? palette.accent : palette.sub, fontSize: 12, fontWeight: '700' }}>
+              // DS v2: чип-pill, активний — action.primary.
+              style={[st.chip, { backgroundColor: active ? t.action.primary : glassOf(t).surface }]}>
+              <Text style={{ color: active ? t.text.onAction : palette.text, fontSize: 13, fontFamily: fontFamily.semibold }}>
                 {option.name}
               </Text>
             </TouchableOpacity>
@@ -144,7 +144,7 @@ export function ProjectAnalytics({
         <WeekBars
           weeks={done.weeks}
           months={months}
-          color={DONE_COLOR}
+          color={palette.text}
           label={tr.chartDoneWeeks}
           palette={palette}
         />
@@ -201,9 +201,10 @@ function Panel({
   palette: AnalyticsPalette;
   children: React.ReactNode;
 }) {
+  const t = dsTokensForText(palette.text);
   return (
-    <View style={[st.panel, { borderColor: palette.border, backgroundColor: palette.dim }]}>
-      <Text style={[st.panelTitle, { color: palette.sub }]}>{title}</Text>
+    <View style={[st.panel, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+      <Text style={[st.panelTitle, { color: palette.text }]}>{title}</Text>
       <Text style={[st.note, { color: palette.sub, marginBottom: 12, marginTop: 2 }]}>{hint}</Text>
       {children}
     </View>
@@ -255,17 +256,17 @@ function CategoryBars({
       {slices.map(slice => (
         <View key={slice.key}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
-            <Text numberOfLines={1} style={{ color: palette.text, fontSize: 12, fontWeight: '600', flex: 1 }}>
+            <Text numberOfLines={1} style={{ color: palette.text, fontSize: 12, fontFamily: fontFamily.semibold, flex: 1 }}>
               {slice.label}
             </Text>
-            <Text style={{ color: palette.sub, fontSize: 11, fontWeight: '700', marginLeft: 8 }}>
+            <Text style={{ color: palette.text, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginLeft: 8 }}>
               {format(slice.value)}
             </Text>
           </View>
           <View style={[st.track, { backgroundColor: palette.border }]}>
             {/* Нульова категорія лишається порожнім жолобом, а не зникає:
                 «на перевірці нуль» — це відповідь, а діра в потоці — ні. */}
-            <View style={{ width: `${slice.share * 100}%`, height: '100%', borderRadius: 3, backgroundColor: slice.color }} />
+            <View style={{ width: `${slice.share * 100}%`, height: '100%', borderRadius: radius.pill, backgroundColor: slice.color }} />
           </View>
         </View>
       ))}
@@ -289,6 +290,7 @@ export function WeekBars({
   label: string;
   palette: AnalyticsPalette;
 }) {
+  const t = dsTokensForText(palette.text);
   const height = 70;
   const peak = Math.max(1, ...weeks.map(week => week.count));
   const spoken = weeks
@@ -305,8 +307,9 @@ export function WeekBars({
                 // Порожній тиждень лишається видимою рискою, а не зникає:
                 // провал у ряді — це і є відповідь «нічого не закрили».
                 height: week.count ? Math.max(4, (week.count / peak) * height) : 2,
-                borderRadius: 3,
-                backgroundColor: week.count ? color : palette.border,
+                // DS v2: поточний тиждень — lime (активний стовпець), решта — `color`.
+                borderRadius: 4,
+                backgroundColor: week.count ? (week.current ? t.accent.lime : color) : palette.border,
               }}
             />
           </View>
@@ -318,10 +321,10 @@ export function WeekBars({
             key={week.weekStart}
             numberOfLines={1}
             style={{
-              flex: 1, textAlign: 'center', fontSize: 8,
+              flex: 1, textAlign: 'center', fontSize: 9, fontVariant: ['tabular-nums'],
               // Поточний тиждень позначено підписом, а не окремим кольором
               // стовпчика: колір тут уже зайнятий змістом графіка.
-              fontWeight: week.current ? '800' : '600',
+              fontFamily: week.current ? fontFamily.semibold : fontFamily.semibold,
               color: week.current ? palette.text : palette.sub,
             }}>
             {weekLabel(week.weekStart, months)}
@@ -333,10 +336,10 @@ export function WeekBars({
 }
 
 const st = StyleSheet.create({
-  heading:    { fontSize: 17, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 },
-  chip:       { paddingHorizontal: 13, paddingVertical: 8, borderRadius: Atlas.radius.medium, borderWidth: 1 },
-  panel:      { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, marginBottom: 10 },
-  panelTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  note:       { fontSize: 11, lineHeight: 15 },
+  heading:    { fontSize: 20, fontFamily: fontFamily.semibold, letterSpacing: -0.2 },
+  chip:       { paddingHorizontal: 14, minHeight: 36, justifyContent: 'center', borderRadius: radius.pill },
+  panel:      { borderRadius: radius.cardCompact, padding: 20, marginBottom: 12 },
+  panelTitle: { fontSize: 16, fontFamily: fontFamily.semibold },
+  note:       { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },
   track:      { height: 6, borderRadius: 3, overflow: 'hidden' },
 });

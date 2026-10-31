@@ -1,6 +1,5 @@
 import { Atlas } from '@/constants/atlas';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
 import {
@@ -18,8 +17,12 @@ import { ScreenHeader } from '@/components/shared/ScreenHeader';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
+import { fontFamily } from '@/constants/theme';
+import { glassStyles } from '@/components/finance/finPalette';
+import { MeshBackground } from '@/components/ds';
 
 const SOCIALS: {
   key: string;
@@ -74,19 +77,27 @@ export default function DeveloperScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
+  const k = dsTokens(isDark);
+  const g = glassTokens(isDark);
+  const { reduceTransparency } = useDS();
+
+  // DS v2.1: mesh-основа, скляні картки (gl), акцент екрана — lavender.
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F5F5FA',
-    bg2:    isDark ? '#14121E' : '#EBEBF5',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
-  }), [isDark]);
+    bg1:    g.mesh.base,
+    bg2:    g.mesh.base,
+    border: k.border.hairline,
+    text:   k.text.primary,
+    sub:    k.text.secondary,
+    dim:    g.surfaceSubtle,
+    card:   reduceTransparency ? g.solid.card : g.surface,
+    accent: g.accent.lavender.ink,
+    accentTint: g.accent.lavender.tint,
+    gl:     glassStyles(isDark, reduceTransparency),
+  }), [k, g, isDark, reduceTransparency]);
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
 
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
@@ -103,7 +114,7 @@ export default function DeveloperScreen() {
             onPress: () => router.back(),
             label: tr.back,
             color: c.sub,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { ...c.gl.card, borderColor: 'transparent' },
           }}
           crumbs={[
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
@@ -117,13 +128,12 @@ export default function DeveloperScreen() {
           showsVerticalScrollIndicator={false}>
 
           {/* Developer card */}
-          <View style={[st.devCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={[st.devCard, { ...c.gl.card }]}>
             {/* Avatar */}
-            <LinearGradient
-              colors={['#7C3AED', '#6366F1']}
-              style={st.avatar}>
-              <Text style={st.avatarText}>IL</Text>
-            </LinearGradient>
+            {/* Аватар — коло action.primary (градієнти DS лишає лише promo/AI). */}
+            <View style={[st.avatar, { backgroundColor: k.action.primary }]}>
+              <Text style={[st.avatarText, { color: k.text.onAction }]}>IL</Text>
+            </View>
 
             <Text style={[st.devName, { color: c.text }]}>Igor Lialiuk</Text>
             <Text style={[st.devRole, { color: c.sub }]}>Software Engineer</Text>
@@ -131,19 +141,18 @@ export default function DeveloperScreen() {
             <Pressable
               onPress={() => Linking.openURL('https://github.com/casperDev3')}
               style={({ pressed }) => [st.githubBtn, {
-                backgroundColor: isDark ? '#FFFFFF10' : '#24292E10',
-                borderColor: isDark ? '#FFFFFF20' : '#24292E20',
+                ...c.gl.subtle,
                 opacity: pressed ? 0.7 : 1,
               }]}>
-              <MaterialCommunityIcons name="github" size={16} color={isDark ? '#E0E0E0' : '#24292E'} />
-              <Text style={[st.githubBtnText, { color: isDark ? '#E0E0E0' : '#24292E' }]}>casperDev3</Text>
+              <MaterialCommunityIcons name="github" size={16} color={k.action.secondaryText} />
+              <Text style={[st.githubBtnText, { color: k.action.secondaryText }]}>casperDev3</Text>
             </Pressable>
           </View>
 
           {/* Socials */}
           <Text style={[st.sectionLabel, { color: c.sub }]}>СОЦІАЛЬНІ МЕРЕЖІ</Text>
 
-          <View style={[st.socialsCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={[st.socialsCard, { ...c.gl.card }]}>
             {SOCIALS.map((s, i) => {
               const iconColor = s.color(isDark);
               const bgColor   = s.bg(isDark);
@@ -153,10 +162,10 @@ export default function DeveloperScreen() {
                   onPress={() => Linking.openURL(s.url)}
                   style={({ pressed }) => [
                     st.socialRow,
-                    i < SOCIALS.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border },
+                    i < SOCIALS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
                     { opacity: pressed ? 0.7 : 1 },
                   ]}>
-                  <View style={[st.socialIconWrap, { backgroundColor: bgColor, borderColor: iconColor + '30', borderWidth: 1 }]}>
+                  <View style={[st.socialIconWrap, { backgroundColor: bgColor }]}>
                     <MaterialCommunityIcons name={s.icon} size={20} color={iconColor} />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -176,58 +185,41 @@ export default function DeveloperScreen() {
 }
 
 const st = StyleSheet.create({
-  pageTitle:      { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
-  sectionLabel:   { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 4, marginLeft: 4 },
+  pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
+  sectionLabel:   { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginBottom: 8, marginTop: 4, marginLeft: 4 },
   devCard: {
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
+    borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
   },
   avatar: {
     width: 72,
     height: 72,
-    borderRadius: 22,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
   },
-  avatarText:     { fontSize: 26, fontWeight: Atlas.type.headingWeight, color: '#fff', letterSpacing: -0.5 },
-  devName:        { fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4, marginBottom: 4 },
-  devRole:        { fontSize: 14, fontWeight: '500', marginBottom: 16 },
+  avatarText:     { fontSize: 26, fontFamily: fontFamily.medium, letterSpacing: -0.5 },
+  devName:        { fontSize: 22, fontFamily: fontFamily.semibold, letterSpacing: -0.4, marginBottom: 4 },
+  devRole:        { fontSize: 14, fontFamily: fontFamily.medium, marginBottom: 16 },
   githubBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: Atlas.radius.medium,
-    borderWidth: 1,
+    minHeight: 40,
+    borderRadius: 999,
   },
-  githubBtnText:  { fontSize: 13, fontWeight: '600' },
+  githubBtnText:  { fontSize: 13, fontFamily: fontFamily.semibold },
   socialsCard: {
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
+    borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
   },
-  socialRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 13 },
+  socialRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 13 },
   socialIconWrap: { width: 42, height: 42, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  socialLabel:    { fontSize: 15, fontWeight: '600' },
-  socialHandle:   { fontSize: 12, fontWeight: '400', marginTop: 1 },
+  socialLabel:    { fontSize: 15, fontFamily: fontFamily.semibold },
+  socialHandle:   { fontSize: 12, fontFamily: fontFamily.regular, marginTop: 1 },
 });

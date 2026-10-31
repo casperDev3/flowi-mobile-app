@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/task-group.tsx — «Всі (N)»: повний список ОДНІЄЇ групи завдань.
  *
@@ -19,7 +18,6 @@ import { Atlas } from '@/constants/atlas';
  * що й на екрані завдань (через ?open=), по задачі проєкту — картку проєкту
  * тут же, аркушем (ProjectTaskSheet); довгий тап — меню з копіюванням.
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import { useInPlaceProjectTask } from '@/components/projects/ProjectTaskSheet';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useProjectRoles } from '@/hooks/use-project-roles';
@@ -59,6 +57,10 @@ import {
 } from '@/utils/taskListView';
 import { mergeTaskStatusColumns, taskStatusColumn, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { assigneeDisplayName, normalizePriority, priorityLabel as priorityLevelLabel, type Task } from '@/utils/taskUtils';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, dsGlass } from '@/components/shared/dsTheme';
 
 interface ProjectLite {
   id: string;
@@ -101,14 +103,16 @@ export default function TaskGroupScreen() {
   const columns = useMemo(() => mergeTaskStatusColumns(storedColumns), [storedColumns]);
 
   // Палітра — та сама, що на екрані завдань: це його продовження.
+  // DS v2: семантичні токени замість лілових відтінків.
+  const tk = dsTokens(isDark);
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: '#7C3AED',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    bg1:    dsTokens(isDark).bg.canvas,
+    bg2:    dsTokens(isDark).bg.canvas,
+    border: dsTokens(isDark).border.hairline,
+    text:   dsTokens(isDark).text.primary,
+    sub:    dsTokens(isDark).text.secondary,
+    accent: dsGlass(isDark).accent.lavender.ink, // DS v2: акцент tasks
+    dim:    glassOf(dsTokens(isDark)).surfaceSubtle,
   }), [isDark]);
 
   const load = useCallback(async () => {
@@ -231,7 +235,7 @@ export default function TaskGroupScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
 
       {/* Екрана немає в сайдбарі — стрілка «Назад» тут не рудимент і
           лишається на планшеті, а поруч із нею шлях «Завдання → добірка».
@@ -244,8 +248,8 @@ export default function TaskGroupScreen() {
         back={{
           onPress: () => router.back(),
           label: tr.back,
-          color: c.accent,
-          style: { backgroundColor: c.dim, borderColor: c.border },
+          color: c.text,
+          style: { backgroundColor: glassOf(tk).surface, borderColor: 'transparent' },
         }}
         crumbs={[
           { label: tr.tabTasks, onPress: () => router.push('/(tabs)') },
@@ -253,12 +257,12 @@ export default function TaskGroupScreen() {
         ]}
         crumbColor={c.sub}
         actions={loaded ? (
-          <View style={[st.countBadge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50' }]}>
-            <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{data.length}</Text>
+          <View style={[st.countBadge, { backgroundColor: tk.accent.lime }]}>
+            <Text style={{ color: tk.text.onAccent, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{data.length}</Text>
           </View>
         ) : undefined}>
         {group?.subtitle ? (
-          <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12 }}>{group.subtitle}</Text>
+          <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular }}>{group.subtitle}</Text>
         ) : null}
       </ScreenHeader>
 
@@ -274,7 +278,7 @@ export default function TaskGroupScreen() {
         ListEmptyComponent={loaded ? (
           <View style={{ alignItems: 'center', paddingVertical: 72 }}>
             <IconSymbol name="checklist" size={36} color={c.sub} />
-            <Text style={{ color: c.sub, fontSize: 14, marginTop: 14, fontWeight: '600' }}>{tr.groupEmpty}</Text>
+            <Text style={{ color: c.sub, fontSize: 14, marginTop: 14, fontFamily: fontFamily.semibold }}>{tr.groupEmpty}</Text>
           </View>
         ) : null}
       />
@@ -286,7 +290,7 @@ export default function TaskGroupScreen() {
 }
 
 const st = StyleSheet.create({
-  title:      { fontSize: 24, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 },
-  countBadge: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4, marginLeft: 8 },
-  separator:  { height: 6 },
+  title:      { fontSize: 28, fontFamily: fontFamily.medium, letterSpacing: -0.4 },
+  countBadge: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
+  separator:  { height: 8 },
 });

@@ -32,6 +32,7 @@ import { Skeleton, SKELETON_REDUCED_OPACITY } from '@/components/shared/Skeleton
 import { useUndoToast } from '@/components/shared/UndoToast';
 import { CALENDAR_NAV_HIT_SLOP, CalendarGrid } from '@/components/tasks/CalendarGrid';
 import {
+  TAB_BAR_BG,
   TAB_BAR_BG_MEASURED,
   TAB_BAR_TINT,
   TAB_LABEL_FONT_SIZE,
@@ -76,6 +77,16 @@ describe('A11Y-06: контраст підписів та іконок таб-б
     // І активні — для них звіт дав 5.18 / 6.51.
     expect(contrast('#7C3AED', TAB_BAR_BG_MEASURED.light)).toBeCloseTo(5.18, 1);
     expect(contrast('#A78BFA', TAB_BAR_BG_MEASURED.dark)).toBeCloseTo(6.51, 1);
+  });
+
+  // DS v2: головна панель тепер на суцільному TAB_BAR_BG (surface.card);
+  // TAB_BAR_BG_MEASURED лишився тлом панелі простору проєкту.
+  test.each([
+    ['light', TAB_BAR_TINT.light, TAB_BAR_BG.light],
+    ['dark', TAB_BAR_TINT.dark, TAB_BAR_BG.dark],
+  ])('%s (DS v2 тло): тінти проходять 4.5:1, активний помітніший', (_name, tint, bg) => {
+    expect(contrast(tint.inactive, bg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(tint.active, bg)).toBeGreaterThan(contrast(tint.inactive, bg));
   });
 
   test.each([

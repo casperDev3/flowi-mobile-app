@@ -7,7 +7,7 @@
  */
 import { Atlas } from '@/constants/atlas';
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useI18n } from '@/store/i18n';
@@ -15,6 +15,8 @@ import type { Meal, MenuEntry } from '@/store/menu-api';
 
 import { cap, dateLabel, daySummary, MEAL_META, weekdayLabel } from './model';
 import type { MenuColors } from './theme';
+import { fontFamily } from '@/constants/theme';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 const dayA11y = (d: string, isToday: boolean) =>
   cap(weekdayLabel(d, 'long')) + ', ' + dateLabel(d) + (isToday ? ', сьогодні' : '');
@@ -54,12 +56,13 @@ export function DayChips({
               paddingVertical: 8,
               alignItems: 'center',
               gap: 2,
+              // DS v2: вибраний день — action.primary; сьогодні — обвідка text.primary.
               borderWidth: 1.5,
-              borderColor: selected || isToday ? c.accent : c.border,
-              backgroundColor: selected ? c.accent : c.card,
+              borderColor: selected ? c.primary : isToday ? c.text : 'transparent',
+              backgroundColor: selected ? c.primary : c.card,
             }}>
-            <Text style={{ fontSize: 11, color: selected ? '#fff' : c.sub }}>{weekdayLabel(d, 'short')}</Text>
-            <Text style={{ fontSize: 18, color: selected ? '#fff' : c.text, fontWeight: '700' }}>
+            <Text style={{ fontSize: 11, fontFamily: fontFamily.regular, color: selected ? c.onPrimary : c.sub }}>{weekdayLabel(d, 'short')}</Text>
+            <Text style={{ fontSize: 20, color: selected ? c.onPrimary : c.text, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'] }}>
               {Number(d.slice(-2))}
             </Text>
             <View
@@ -69,10 +72,10 @@ export function DayChips({
                 borderRadius: 2,
                 backgroundColor: selected
                   ? isToday || hasDish
-                    ? '#fff'
+                    ? c.onPrimary
                     : 'transparent'
                   : isToday
-                    ? c.accent
+                    ? c.text
                     : hasDish
                       ? c.faint
                       : 'transparent',
@@ -112,9 +115,7 @@ export function DayList({
     <View
       accessibilityRole="list"
       style={{
-        borderWidth: 1,
-        borderColor: c.border,
-        backgroundColor: c.card,
+        backgroundColor: c.card, ...glassRimFor(c.card, 'card'),
         borderRadius: Atlas.radius.xlarge,
         overflow: 'hidden',
       }}>
@@ -134,10 +135,10 @@ export function DayList({
               flexDirection: 'row',
               gap: 12,
               paddingVertical: 12,
-              paddingHorizontal: 14,
-              borderTopWidth: i === 0 ? 0 : 1,
+              paddingHorizontal: 16,
+              borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
               borderColor: c.border,
-              backgroundColor: selected ? c.accent + '1F' : pressed ? c.dim : 'transparent',
+              backgroundColor: selected ? c.dim : pressed ? c.dim : 'transparent',
               opacity: d < dimBefore && !selected ? 0.6 : 1,
             })}>
             {/* Смужка вибраного: колір не єдиний сигнал — ще й фон рядка. */}
@@ -149,32 +150,32 @@ export function DayList({
                 bottom: 8,
                 width: 3,
                 borderRadius: 2,
-                backgroundColor: selected ? c.accent : 'transparent',
+                backgroundColor: selected ? c.primary : 'transparent',
               }}
             />
             <View style={{ width: 44, alignItems: 'center' }}>
               <Text
                 style={{
-                  color: isToday ? c.accent : c.sub,
+                  color: isToday ? c.text : c.sub,
                   fontSize: 11,
-                  fontWeight: '700',
+                  fontFamily: fontFamily.semibold,
                   textTransform: 'uppercase',
                 }}>
                 {weekdayLabel(d, 'short')}
               </Text>
-              <Text style={{ color: selected ? c.accent : c.text, fontSize: 20, fontWeight: '700' }}>
+              <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'] }}>
                 {Number(d.slice(-2))}
               </Text>
             </View>
             <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600', flexShrink: 1 }}>
+                <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flexShrink: 1 }}>
                   {cap(weekdayLabel(d, 'long'))}
                 </Text>
                 {isToday && todayPill}
               </View>
               {dishes === 0 ? (
-                <Text style={{ color: c.faint, fontSize: 12 }}>{tr.menu.dayEmpty}</Text>
+                <Text style={{ color: c.sub, fontSize: 12 }}>{tr.menu.dayEmpty}</Text>
               ) : (
                 lines
                   .filter((l) => l.titles.length)

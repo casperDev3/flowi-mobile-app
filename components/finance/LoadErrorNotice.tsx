@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/LoadErrorNotice.tsx — «дані не прочитались» ≠ «порожньо».
  *
@@ -19,14 +18,15 @@ import { Atlas } from '@/constants/atlas';
  * Плашка бере мову прямо зі словника за пропом `lang`, а не через `tr`: її
  * малюють десяток екранів, і всі вони вже передають саме `lang`.
  */
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, shadow, space, type as dsType } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
 import { allTranslations, type Lang } from '@/store/translations';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
-const ERR = '#EF4444';
 
 export function LoadErrorNotice({ lang, isDark, text, sub, onRetry, style }: {
   lang: Lang;
@@ -39,29 +39,29 @@ export function LoadErrorNotice({ lang, isDark, text, sub, onRetry, style }: {
   style?: object;
 }) {
   const t = allTranslations[lang] ?? allTranslations.uk;
+  const ds = dsTokens(isDark);
+  const gs = useGlassStyles();
   return (
-    <BlurView
-      intensity={isDark ? 22 : 42}
-      tint={isDark ? 'dark' : 'light'}
-      style={[{
-        borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: ERR + '55',
-        overflow: 'hidden', padding: 14, marginBottom: 12,
-      }, style]}>
+    // Алерт DS v2: біла картка, корал лише гліфом; повтор — pill action.primary.
+    <View style={[{
+        borderRadius: radius.cardCompact, ...gs.card,
+        padding: space.cardPaddingCompact, marginBottom: 12,
+      }, shadow[isDark ? 'dark' : 'light'].card, style]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <IconSymbol name="exclamationmark.triangle.fill" size={16} color={ERR} />
-        <Text style={{ color: text, fontSize: 14, fontWeight: '700', flex: 1 }}>{t.loadErrorTitle}</Text>
+        <IconSymbol name="exclamationmark.triangle.fill" size={16} color={ds.accent.coral} />
+        <Text style={{ ...dsType.h2, color: text, flex: 1 }}>{t.loadErrorTitle}</Text>
       </View>
-      <Text style={{ color: sub, fontSize: 12, lineHeight: 17, marginTop: 6 }}>{t.loadErrorBody}</Text>
+      <Text style={{ ...dsType.body, color: sub, marginTop: 6 }}>{t.loadErrorBody}</Text>
       <TouchableOpacity
         onPress={onRetry}
         accessibilityRole="button"
         accessibilityLabel={t.loadErrorRetry}
         style={{
-          alignSelf: 'flex-start', marginTop: 10, paddingHorizontal: 14, paddingVertical: 8,
-          borderRadius: Atlas.radius.medium, backgroundColor: ERR + '1A', borderWidth: 1, borderColor: ERR + '55',
+          alignSelf: 'flex-start', marginTop: 12, paddingHorizontal: 20, minHeight: 44, justifyContent: 'center',
+          borderRadius: radius.pill, backgroundColor: ds.action.primary,
         }}>
-        <Text style={{ color: ERR, fontSize: 13, fontWeight: '700' }}>{t.loadErrorRetry}</Text>
+        <Text style={{ color: ds.text.onAction, fontSize: 14, fontFamily: fontFamily.semibold }}>{t.loadErrorRetry}</Text>
       </TouchableOpacity>
-    </BlurView>
+    </View>
   );
 }

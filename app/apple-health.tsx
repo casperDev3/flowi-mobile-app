@@ -1,6 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -43,7 +40,12 @@ import type { Translations } from '@/store/translations';
 import { HealthColumns, useHealthTabLayout } from '@/components/health/HealthLayout';
 import { Layout } from '@/constants/tokens';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
-import { fmtSleep } from '@/utils/healthTheme';
+import { HEALTH_ACCENTS, fmtSleep } from '@/utils/healthTheme';
+import { getHealthDSColors } from '@/components/health/palette';
+import { fontFamily, shadow } from '@/constants/theme';
+import { dsTokens, useDS } from '@/hooks/use-ds';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { MeshBackground } from '@/components/ds';
 
 
 const WORKOUT_NAMES: Record<number, string> = {
@@ -108,9 +110,11 @@ function parseDayKey(key: string): Date {
 }
 
 /** Проміжок між картками метрик; від нього рахується їхня ширина. */
-const GRID_GAP = 10;
+const GRID_GAP = 12;
 
 function MiniBarChart({ values, color, maxVal, height = 48 }: { values: (number | null)[]; color: string; maxVal?: number; height?: number }) {
+  const { t } = useDS();
+  // DS v2: сьогоднішній (активний) стовпець — лайм, решта — тонований колір метрики.
   const max = maxVal ?? Math.max(...values.map(v => v ?? 0), 1);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, height }}>
@@ -118,8 +122,8 @@ function MiniBarChart({ values, color, maxVal, height = 48 }: { values: (number 
         <View key={i} style={{ flex: 1, height, justifyContent: 'flex-end' }}>
           <View style={{
             height: Math.max(3, ((v ?? 0) / max) * height),
-            borderRadius: 4,
-            backgroundColor: i === values.length - 1 ? color : color + '66',
+            borderRadius: 999,
+            backgroundColor: i === values.length - 1 ? t.accent.lime : color + '55',
           }} />
         </View>
       ))}
@@ -274,14 +278,9 @@ export default function AppleHealthScreen() {
   // Палітра — у useMemo, щоб React.memo на картках метрик і тренувань
   // не збивався новим обʼєктом на кожен ререндер (а їх тут багато: синхронізація
   // оновлює стан чотири рази поспіль).
-  const c = useMemo(() => ({
-    bg1: isDark ? '#080F18' : '#EFF8F4',
-    bg2: isDark ? '#0F1A2A' : '#E0F2EE',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(16,185,129,0.15)',
-    text: isDark ? '#E8FFF7' : '#0A2018',
-    sub: isDark ? 'rgba(232,255,247,0.62)' : 'rgba(10,32,24,0.58)',
-    dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  }), [isDark]);
+  const c = useMemo(() => getHealthDSColors(isDark), [isDark]);
+  const gs = useGlassStyles();
+  const k = dsTokens(isDark);
 
   const weekLabels = week.map(d => {
     const date = parseDayKey(d.date);
@@ -298,7 +297,7 @@ export default function AppleHealthScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
       <SafeAreaView style={{ flex: 1 }} edges={[]}>
@@ -320,7 +319,7 @@ export default function AppleHealthScreen() {
             onPress: () => router.back(),
             label: tr.back,
             color: c.sub,
-            style: { borderColor: c.border, backgroundColor: c.dim },
+            style: { backgroundColor: c.dim },
           }}
           crumbs={[
             { label: tr.tabHealth, onPress: () => router.push('/(tabs)/health') },
@@ -332,18 +331,18 @@ export default function AppleHealthScreen() {
             <HeaderButton
               onPress={load}
               accessibilityLabel={tr.syncNow}
-              style={{ borderColor: c.border, backgroundColor: '#10B98115' }}>
+              style={{ backgroundColor: c.dim }}>
               {syncing
-                ? <ActivityIndicator size="small" color="#10B981" />
-                : <IconSymbol name="arrow.clockwise" size={16} color="#10B981" />}
+                ? <ActivityIndicator size="small" color={c.text} />
+                : <IconSymbol name="arrow.clockwise" size={16} color={c.text} />}
             </HeaderButton>
           ) : undefined}>
           {readFailed ? (
-            <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>
+            <Text style={{ color: k.status.danger, fontSize: 12, fontFamily: fontFamily.semibold }}>
               {tr.healthReadFailed}
             </Text>
           ) : lastSync ? (
-            <Text style={{ color: c.sub, fontSize: 11 }}>
+            <Text style={{ color: c.sub, fontSize: 12, fontVariant: ['tabular-nums'] }}>
               {tr.healthUpdatedAt.replace(
                 '{time}',
                 lastSync.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
@@ -354,7 +353,7 @@ export default function AppleHealthScreen() {
 
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color="#10B981" />
+            <ActivityIndicator size="large" color={c.sub} />
           </View>
         ) : !SOURCE?.isAvailable || hcMissing ? (
           <NotAvailable c={c} tr={tr} androidMissing={hcMissing} />
@@ -393,18 +392,18 @@ export default function AppleHealthScreen() {
             {/* ERR-14: збій читання показуємо явно — інакше нулі нижче
                 неможливо відрізнити від справжніх «сьогодні 0 кроків». */}
             {readFailed && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: '#EF444444', backgroundColor: '#EF444412', padding: 14, marginBottom: 12 }}>
-                <IconSymbol name="exclamationmark.triangle.fill" size={16} color="#EF4444" />
-                <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '700', flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20, backgroundColor: k.status.danger + '14', padding: 20, marginBottom: 12 }}>
+                <IconSymbol name="exclamationmark.triangle.fill" size={16} color={k.status.danger} />
+                <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>
                   {tr.hautoReadFailedBody.replace('{source}', sourceLabel)}
                 </Text>
               </View>
             )}
 
             {/* WIP banner */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: '#F59E0B44', backgroundColor: '#F59E0B12', padding: 14, marginBottom: 18 }}>
-              <IconSymbol name="hammer.fill" size={16} color="#F59E0B" />
-              <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '700', flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20, backgroundColor: k.status.warning + '1F', padding: 20, marginBottom: 18 }}>
+              <IconSymbol name="hammer.fill" size={16} color={c.text} />
+              <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>
                 {tr.hautoWip}
               </Text>
             </View>
@@ -413,22 +412,22 @@ export default function AppleHealthScreen() {
             <Text style={[s.sectionTitle, { color: c.text, marginTop: 4, marginBottom: 12 }]}>{tr.today}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP }}>
               <MetricCard label={tr.steps} value={today?.steps ? today.steps.toLocaleString(locale) : '—'} unit=""
-                icon="figure.walk" color="#0EA5E9" width={cardWidth}
+                icon="figure.walk" color={HEALTH_ACCENTS.steps} width={cardWidth}
                 isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               <MetricCard label={tr.hautoActiveKcal} value={today?.activeCalories ? `${today.activeCalories}` : '—'} unit={tr.hautoKcal}
-                icon="flame.fill" color="#F97316" width={cardWidth}
+                icon="flame.fill" color={HEALTH_ACCENTS.cal} width={cardWidth}
                 isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               <MetricCard label={tr.hautoDistance} value={today?.distanceKm != null ? `${today.distanceKm}` : '—'} unit={tr.hautoKm}
-                icon="map.fill" color="#10B981" width={cardWidth}
+                icon="map.fill" color={HEALTH_ACCENTS.water} width={cardWidth}
                 isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               {/* Поверхи — лише HealthKit; у Health Connect ми їх не просимо (зайвий дозвіл = відмова в Play). */}
               {IS_IOS && (
                 <MetricCard label={tr.hautoFlights} value={today?.flightsClimbed ? `${today.flightsClimbed}` : '—'} unit=""
-                  icon="arrow.up.circle" color="#8B5CF6" width={cardWidth}
+                  icon="arrow.up.circle" color={HEALTH_ACCENTS.weight} width={cardWidth}
                   isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               )}
               <MetricCard label={tr.sleep} value={today?.sleepMinutes ? fmtSleep(today.sleepMinutes) : '—'} unit=""
-                icon="moon.fill" color="#6366F1" width={cardWidth}
+                icon="moon.fill" color={HEALTH_ACCENTS.sleep} width={cardWidth}
                 isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               {/* Вага — останній замір і ЙОГО дата: вона не обовʼязково сьогоднішня. */}
               {IS_IOS && (
@@ -436,70 +435,70 @@ export default function AppleHealthScreen() {
                   note={today?.weightAt
                     ? tr.hautoWeightMeasuredAt.replace('{date}', new Date(today.weightAt).toLocaleDateString(locale, { day: 'numeric', month: 'short' }))
                     : undefined}
-                  icon="scalemass.fill" color="#EC4899" width={cardWidth}
+                  icon="scalemass.fill" color={HEALTH_ACCENTS.prot} width={cardWidth}
                   isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
               )}
               <MetricCard label={tr.hautoSpo2} value={today?.spo2 != null ? `${today.spo2}` : '—'} unit="%"
-                icon="lungs.fill" color="#0EA5E9" width={cardWidth}
+                icon="lungs.fill" color={HEALTH_ACCENTS.steps} width={cardWidth}
                 isDark={isDark} border={c.border} text={c.text} sub={c.sub} />
             </View>
 
             <HealthColumns twoCol={lay.twoCol && week.length > 0} left={<>
             {/* Heart rate */}
             <Text style={[s.sectionTitle, { color: c.text, marginTop: 24, marginBottom: 12 }]}>{tr.pulse}</Text>
-            <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-              style={[s.card, { borderColor: c.border }]}>
+            <View
+              style={[s.card, { ...gs.card }]}>
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-                <HRStatBox label={tr.hautoHrAvgShort} value={today?.heartRateAvg} unit={tr.hautoBpm} color="#EF4444" c={c} />
-                <HRStatBox label={tr.hautoHrMin} value={today?.heartRateMin} unit={tr.hautoBpm} color="#F97316" c={c} />
-                <HRStatBox label={tr.hautoHrMax} value={today?.heartRateMax} unit={tr.hautoBpm} color="#DC2626" c={c} />
-                <HRStatBox label={tr.hautoHrRest} value={today?.restingHeartRate} unit={tr.hautoBpm} color="#6366F1" c={c} />
+                <HRStatBox label={tr.hautoHrAvgShort} value={today?.heartRateAvg} unit={tr.hautoBpm} color={HEALTH_ACCENTS.pulse} c={c} />
+                <HRStatBox label={tr.hautoHrMin} value={today?.heartRateMin} unit={tr.hautoBpm} color={HEALTH_ACCENTS.cal} c={c} />
+                <HRStatBox label={tr.hautoHrMax} value={today?.heartRateMax} unit={tr.hautoBpm} color={HEALTH_ACCENTS.pulse} c={c} />
+                <HRStatBox label={tr.hautoHrRest} value={today?.restingHeartRate} unit={tr.hautoBpm} color={HEALTH_ACCENTS.sleep} c={c} />
               </View>
               {hrSamples.length > 1 && (
                 <>
-                  <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginBottom: 4 }}>
+                  <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginBottom: 4 }}>
                     {tr.hautoLast24h.replace('{n}', String(hrSamples.length))}
                   </Text>
-                  <HRSparkline samples={hrSamples} color="#EF4444" />
+                  <HRSparkline samples={hrSamples} color={HEALTH_ACCENTS.pulse} />
                 </>
               )}
               {/* Фази ночі, що закінчилась сьогодні (якщо джерело їх дало). */}
               {today?.sleep && today.sleep.deep != null && (
-                <View style={[s.hkvRow, { borderColor: c.border, backgroundColor: c.dim, marginTop: 8, flexWrap: 'wrap', gap: 8 }]}>
-                  <IconSymbol name="moon.fill" size={15} color="#6366F1" />
-                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', flex: 1 }}>{tr.hautoSleepPhases}</Text>
+                <View style={[s.hkvRow, { backgroundColor: c.dim, marginTop: 8, flexWrap: 'wrap', gap: 8 }]}>
+                  <IconSymbol name="moon.fill" size={15} color={HEALTH_ACCENTS.sleep} />
+                  <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.bold, flex: 1 }}>{tr.hautoSleepPhases}</Text>
                   <Text style={{ color: c.sub, fontSize: 12, width: '100%' }}>
                     {`${tr.hautoSleepDeep} ${fmtSleep(today.sleep.deep)} · ${tr.hautoSleepRem} ${fmtSleep(today.sleep.rem ?? 0)} · ${tr.hautoSleepLight} ${fmtSleep(today.sleep.light ?? 0)} · ${tr.hautoSleepAwake} ${fmtSleep(today.sleep.awake ?? 0)}`}
                   </Text>
                 </View>
               )}
-            </BlurView>
+            </View>
             </>} right={<>
             {/* Week charts */}
             {week.length > 0 && (
               <>
                 <Text style={[s.sectionTitle, { color: c.text, marginTop: 24, marginBottom: 12 }]}>{tr.hautoWeek}</Text>
-                <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-                  style={[s.card, { borderColor: c.border }]}>
+                <View
+                  style={[s.card, { ...gs.card }]}>
 
-                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 10 }}>{tr.steps}</Text>
-                  <MiniBarChart values={week.map(d => d.steps)} color="#0EA5E9" />
+                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{tr.steps}</Text>
+                  <MiniBarChart values={week.map(d => d.steps)} color={HEALTH_ACCENTS.steps} />
                   <View style={{ flexDirection: 'row', marginTop: 4, marginBottom: 18 }}>
-                    {weekLabels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{l}</Text>)}
+                    {weekLabels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 10, fontFamily: fontFamily.medium }}>{l}</Text>)}
                   </View>
 
-                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 10 }}>{tr.hautoActiveCalories}</Text>
-                  <MiniBarChart values={week.map(d => d.activeCalories)} color="#F97316" />
+                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{tr.hautoActiveCalories}</Text>
+                  <MiniBarChart values={week.map(d => d.activeCalories)} color={HEALTH_ACCENTS.cal} />
                   <View style={{ flexDirection: 'row', marginTop: 4, marginBottom: 18 }}>
-                    {weekLabels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{l}</Text>)}
+                    {weekLabels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 10, fontFamily: fontFamily.medium }}>{l}</Text>)}
                   </View>
 
-                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 10 }}>{tr.hautoPulseAvg}</Text>
-                  <MiniBarChart values={week.map(d => d.heartRateAvg)} color="#EF4444" maxVal={200} />
+                  <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{tr.hautoPulseAvg}</Text>
+                  <MiniBarChart values={week.map(d => d.heartRateAvg)} color={HEALTH_ACCENTS.pulse} maxVal={200} />
                   <View style={{ flexDirection: 'row', marginTop: 4 }}>
-                    {weekLabels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 9, fontWeight: '600' }}>{l}</Text>)}
+                    {weekLabels.map((l, i) => <Text key={i} style={{ flex: 1, textAlign: 'center', color: c.sub, fontSize: 10, fontFamily: fontFamily.medium }}>{l}</Text>)}
                   </View>
-                </BlurView>
+                </View>
               </>
             )}
             </>} />
@@ -528,20 +527,22 @@ const MetricCard = React.memo(function MetricCard({ label, value, unit, note, ic
   width: number;
   isDark: boolean; border: string; text: string; sub: string;
 }) {
+  const gs = useGlassStyles();
   return (
-    <BlurView intensity={isDark ? 22 : 42} tint={isDark ? 'dark' : 'light'}
-      style={{ width, borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: border, overflow: 'hidden', padding: 14 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
+    <View
+      style={{ ...gs.card, width, borderRadius: 20, padding: 20, ...shadow[isDark ? 'dark' : 'light'].card }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: color + '22', alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol name={icon} size={14} color={color} />
         </View>
-        <Text style={{ color: sub, fontSize: 11, fontWeight: '600', marginLeft: 8 }}>{label}</Text>
+        <Text style={{ color: sub, fontSize: 12, fontFamily: fontFamily.medium, marginLeft: 8, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
       </View>
-      <Text style={{ color: text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }} numberOfLines={1}>
-        {value}{unit ? <Text style={{ fontSize: 13, fontWeight: '600', color: sub }}> {unit}</Text> : null}
+      {/* KPI — великі тонкі табличні цифри; одиниця дрібніша й світліша. */}
+      <Text style={{ color: text, fontSize: 32, lineHeight: 36, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.64 }} numberOfLines={1}>
+        {value}{unit ? <Text style={{ fontSize: 15, fontFamily: fontFamily.regular, color: sub, letterSpacing: 0 }}> {unit}</Text> : null}
       </Text>
-      {note ? <Text style={{ color: sub, fontSize: 10, marginTop: 3 }} numberOfLines={1}>{note}</Text> : null}
-    </BlurView>
+      {note ? <Text style={{ color: sub, fontSize: 11, marginTop: 4 }} numberOfLines={1}>{note}</Text> : null}
+    </View>
   );
 });
 
@@ -557,53 +558,57 @@ const WorkoutCard = React.memo(function WorkoutCard({ wo, isDark, border, text, 
   const dateStr = d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   const timeStr = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 
+  const gs = useGlassStyles();
   return (
-    <BlurView intensity={isDark ? 18 : 35} tint={isDark ? 'dark' : 'light'}
-      style={[s.workoutCard, { borderColor: border }]}>
-      <View style={[s.workoutIcon, { backgroundColor: '#10B98122' }]}>
-        <IconSymbol name="figure.run" size={18} color="#10B981" />
+    <View
+      style={[s.workoutCard, { ...gs.card }]}>
+      <View style={[s.workoutIcon, { backgroundColor: HEALTH_ACCENTS.water + '22' }]}>
+        <IconSymbol name="figure.run" size={18} color={HEALTH_ACCENTS.water} />
       </View>
       <View style={{ flex: 1, marginLeft: 12 }}>
-        <Text style={{ color: text, fontSize: 13, fontWeight: '700' }}>
+        <Text style={{ color: text, fontSize: 14, fontFamily: fontFamily.semibold }}>
           {workoutName(wo.activityId)}
         </Text>
-        <Text style={{ color: sub, fontSize: 11, marginTop: 2 }}>
+        <Text style={{ color: sub, fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'] }}>
           {dateStr} · {timeStr} · {wo.sourceName}
         </Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <Text style={{ color: text, fontSize: 13, fontWeight: '700' }}>{fmtDuration(wo.duration)}</Text>
-        <Text style={{ color: '#F97316', fontSize: 11, fontWeight: '600', marginTop: 2 }}>
+        <Text style={{ color: text, fontSize: 16, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{fmtDuration(wo.duration)}</Text>
+        <Text style={{ color: sub, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 2 }}>
           {Math.round(wo.calories)} {tr.hautoKcal}
         </Text>
         {wo.distance > 0 && (
-          <Text style={{ color: '#0EA5E9', fontSize: 11, fontWeight: '600' }}>
+          <Text style={{ color: sub, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] }}>
             {(wo.distance / 1000).toFixed(1)} {tr.hautoKm}
           </Text>
         )}
       </View>
-    </BlurView>
+    </View>
   );
 });
 
 function HRStatBox({ label, value, unit, color, c }: { label: string; value: number | null | undefined; unit: string; color: string; c: any }) {
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ color: c.sub, fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{label}</Text>
-      <Text style={{ color, fontSize: 18, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{value ?? '—'}</Text>
-      {value != null && <Text style={{ color: c.sub, fontSize: 9, marginTop: 2 }}>{unit}</Text>}
+      <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, marginBottom: 4 }} numberOfLines={1}>{label}</Text>
+      <Text style={{ color: c.text, fontSize: 26, lineHeight: 30, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.52 }}>{value ?? '—'}</Text>
+      {/* Колір показника — тонкою позначкою під числом. */}
+      <View style={{ width: 12, height: 3, borderRadius: 2, backgroundColor: color, marginTop: 4 }} />
+      {value != null && <Text style={{ color: c.sub, fontSize: 11, marginTop: 4 }}>{unit}</Text>}
     </View>
   );
 }
 
 function NotAvailable({ c, tr, androidMissing }: { c: any; tr: Translations; androidMissing: boolean }) {
+  const { t: k } = useDS();
   const body = Platform.OS === 'android'
     ? tr.hautoNotAvailableAndroid
     : Platform.OS === 'ios' ? tr.hautoNotAvailableIos : tr.hautoNotAvailableOther;
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
       <IconSymbol name="heart.slash.fill" size={52} color={c.sub} />
-      <Text style={{ color: c.text, fontSize: 18, fontWeight: Atlas.type.headingWeight, marginTop: 16, textAlign: 'center' }}>
+      <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold, marginTop: 16, textAlign: 'center' }}>
         {tr.hautoNotAvailable}
       </Text>
       <Text style={{ color: c.sub, fontSize: 14, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
@@ -612,8 +617,8 @@ function NotAvailable({ c, tr, androidMissing }: { c: any; tr: Translations; and
       {androidMissing && (
         <TouchableOpacity onPress={() => { void openHealthConnectInstall(); }}
           accessibilityRole="button" accessibilityLabel={tr.hautoInstallHc}
-          style={{ marginTop: 24, backgroundColor: '#10B981', borderRadius: Atlas.radius.large, paddingHorizontal: 24, paddingVertical: 14 }}>
-          <Text style={{ color: '#fff', fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{tr.hautoInstallHc}</Text>
+          style={{ marginTop: 24, backgroundColor: k.action.primary, borderRadius: 999, minHeight: 48, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 14 }}>
+          <Text style={{ color: k.text.onAction, fontSize: 15, fontFamily: fontFamily.semibold }}>{tr.hautoInstallHc}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -621,31 +626,32 @@ function NotAvailable({ c, tr, androidMissing }: { c: any; tr: Translations; and
 }
 
 function NotAuthorized({ c, tr, label, onRequest }: { c: any; tr: Translations; label: string; onRequest: () => void }) {
+  const { t: k } = useDS();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-      <View style={{ width: 80, height: 80, borderRadius: Atlas.radius.xlarge, backgroundColor: '#EF444420', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-        <IconSymbol name="heart.fill" size={38} color="#EF4444" />
+      <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: HEALTH_ACCENTS.pulse + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+        <IconSymbol name="heart.fill" size={38} color={HEALTH_ACCENTS.pulse} />
       </View>
-      <Text style={{ color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, textAlign: 'center' }}>
+      <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.semibold, textAlign: 'center' }}>
         {tr.hautoConnectTitle.replace('{source}', label)}
       </Text>
       <Text style={{ color: c.sub, fontSize: 14, marginTop: 10, textAlign: 'center', lineHeight: 22 }}>
         {tr.hautoConnectBody}
       </Text>
       <TouchableOpacity onPress={onRequest} accessibilityRole="button" accessibilityLabel={tr.hkGrant}
-        style={{ marginTop: 28, backgroundColor: '#EF4444', borderRadius: Atlas.radius.large, paddingHorizontal: 32, paddingVertical: 14 }}>
-        <Text style={{ color: '#fff', fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{tr.hkGrant}</Text>
+        style={{ marginTop: 28, backgroundColor: k.action.primary, borderRadius: 999, minHeight: 48, justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 14 }}>
+        <Text style={{ color: k.text.onAction, fontSize: 15, fontFamily: fontFamily.semibold }}>{tr.hkGrant}</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  pageTitle:   { fontSize: 26, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
-  sectionTitle:{ fontSize: 17, fontWeight: Atlas.type.headingWeight },
-  card:        { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, overflow: 'hidden' },
-  syncBtn:     { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  hkvRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 12 },
-  workoutCard: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  workoutIcon: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  pageTitle:   { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
+  sectionTitle:{ fontSize: 16, fontFamily: fontFamily.semibold },
+  card:        { borderRadius: 20, padding: 20 },
+  syncBtn:     { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  hkvRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: 16, padding: 16 },
+  workoutCard: { borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center' },
+  workoutIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });

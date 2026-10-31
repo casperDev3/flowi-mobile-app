@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/PriorityFilterChips.tsx
  *
@@ -16,6 +15,7 @@ import {
   priorityLabel,
   type PriorityLevel,
 } from '@/utils/taskUtils';
+import { fontFamily, radius } from '@/constants/theme';
 
 export interface PriorityFilterChipsProps {
   value: readonly PriorityLevel[];
@@ -53,8 +53,9 @@ export function PriorityFilterChips({ value, onChange, colors: c }: PriorityFilt
             style={[
               s.chip,
               {
-                borderColor: selected ? color : c.border,
-                backgroundColor: selected ? (priorityBadgeBg(level) as string) : 'transparent',
+                // DS v2: pill; невибраний — subtle-тло без рамки, вибраний — колір пріоритету.
+                borderColor: selected ? color : 'transparent',
+                backgroundColor: selected ? (priorityBadgeBg(level) as string) : (c.dim ?? 'transparent'),
               },
             ]}>
             <Text style={[s.text, { color }]}>{label}</Text>
@@ -66,8 +67,8 @@ export function PriorityFilterChips({ value, onChange, colors: c }: PriorityFilt
           onPress={() => onChange([])}
           accessibilityRole="button"
           accessibilityLabel={tr.priorityFilterReset}
-          style={[s.chip, s.reset, { borderColor: c.border, backgroundColor: c.dim ?? 'transparent' }]}>
-          <Text style={[s.text, { color: c.sub, fontWeight: '600' }]}>{tr.priorityFilterReset}</Text>
+          style={[s.chip, s.reset, { borderColor: 'transparent', backgroundColor: c.dim ?? 'transparent' }]}>
+          <Text style={[s.text, { color: c.sub, fontFamily: fontFamily.semibold }]}>{tr.priorityFilterReset}</Text>
         </TouchableOpacity>
       )}
     </ScrollView>
@@ -80,11 +81,11 @@ const s = StyleSheet.create({
     minWidth: 40,
     height: 34,
     paddingHorizontal: 10,
-    borderRadius: Atlas.radius.small,
+    borderRadius: radius.pill,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reset: { borderWidth: 1 },
-  text: { fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  text: { fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

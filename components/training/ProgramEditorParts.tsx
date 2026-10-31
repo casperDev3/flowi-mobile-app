@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/training/ProgramEditorParts.tsx — частини конструктора програми
  * (training-module.md §3.3, §5, §6.3): аркуш блоку з прогресією, вибір
@@ -18,6 +17,7 @@ import { addDays, type Progression, type ProgressionMode } from '@/utils/trainin
 import { Chip, Field, Notice, PrimaryButton, Stepper } from './TrainingBits';
 import { TrainingSheet } from './TrainingSheet';
 import { fmt, TG_ACCENT, type TrainingColors } from './theme';
+import { fontFamily } from '@/constants/theme';
 
 export function progressionSummary(tr: Translations, p: Progression | undefined): string {
   const every = p?.everyWeeks && p.everyWeeks > 1 ? ` / ${p.everyWeeks} ${tr.tgWeeks.replace('{n}', '').trim()}` : '';
@@ -111,7 +111,7 @@ export function BlockEditorSheet({ c, visible, block, onClose, onSave }: {
         />
       </View>
 
-      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>{tr.tgProgression}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold, marginBottom: 6 }}>{tr.tgProgression}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         {modes.map(m => (
           <Chip key={m.key} c={c} label={m.label} active={mode === m.key} onPress={() => setP({ mode: m.key })} />
@@ -201,9 +201,9 @@ export function ProgressionPreview({ c, program, day }: { c: TrainingColors; pro
   return (
     <View style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row' }}>
-        <Text style={{ flex: 2, color: c.faint, fontSize: 12, fontWeight: '700' }} />
+        <Text style={{ flex: 2, color: c.faint, fontSize: 12, fontFamily: fontFamily.bold }} />
         {weeks.map(w => (
-          <Text key={w} style={{ flex: 1, color: c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight, textAlign: 'right' }}>
+          <Text key={w} style={{ flex: 1, color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, textAlign: 'right' }}>
             {fmt(tr.tgWeekN, { n: w + 1 })}
           </Text>
         ))}
@@ -275,15 +275,15 @@ export function AssignSheet({ c, visible, onClose, program, members, today, busy
         </>
       )}>
       {error ? <Notice c={c} text={error} tone="error" /> : null}
-      <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight, marginBottom: 10 }}>{program.name}</Text>
+      <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{program.name}</Text>
       <Field c={c} label={tr.tgStartDate} value={start} onChangeText={setStart} autoCapitalize="none" keyboardType="numbers-and-punctuation" />
-      {!validDate ? <Text style={{ color: '#EF4444', fontSize: 12, marginTop: -6, marginBottom: 10 }}>{tr.tgDateInvalid}</Text> : null}
+      {!validDate ? <Text style={{ color: c.t.status.danger, fontSize: 12, marginTop: -6, marginBottom: 10 }}>{tr.tgDateInvalid}</Text> : null}
       <Stepper c={c} label={tr.tgWeekCount} value={weeks} min={1} max={Math.min(52, program.weekCount)} onChange={setWeeks} />
       <Text style={{ color: c.sub, fontSize: 13, marginVertical: 10 }}>
         {fmt(tr.tgAssignSessions, { n: sessionCount(program, weeks) })}
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700' }}>{tr.tgSelectMembers}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold }}>{tr.tgSelectMembers}</Text>
         <Chip
           c={c}
           label={tr.tgSelectAll}

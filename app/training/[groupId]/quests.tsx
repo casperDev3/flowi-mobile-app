@@ -109,7 +109,7 @@ export default function QuestsScreen() {
   );
   // Планшет: квести — сіткою карток під «широкою» стелею; телефон — стрічкою.
   const list = (qs: Quest[]) => (isWide
-    ? <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={10} style={{ marginBottom: 10 }}>{qs.map(card)}</ResponsiveGrid>
+    ? <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12} style={{ marginBottom: 10 }}>{qs.map(card)}</ResponsiveGrid>
     : <>{qs.map(card)}</>);
 
   return (

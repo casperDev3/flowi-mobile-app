@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
 /**
  * app/(tabs)/time.tsx — єдина сторінка про час.
  *
@@ -34,7 +35,6 @@ import { Atlas } from '@/constants/atlas';
  *  • поділу на ранок/день/вечір/ніч — жоден звіт за ним не будувався.
  */
 
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -66,7 +66,7 @@ import { timeColors } from '@/components/time/TimePalette';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Layout, detailColumnWidthFor } from '@/constants/tokens';
 import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useScreenView } from '@/hooks/use-screen-view';
@@ -111,6 +111,9 @@ import {
 } from '@/utils/timeEntries';
 import type { EditableTask } from '@/utils/timeEntryEdit';
 import { migrateTaskSessions, type MigratableTask } from '@/utils/timeMigration';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
+import { AccentDot } from '@/components/shared/GlassBits';
 
 /** Рівно те, що рядок активного таймера показує про підзавдання. */
 interface RowSubtask { id: string; title: string; done: boolean }
@@ -150,7 +153,8 @@ export default function TimeScreen() {
   const timerColumns = isWide && !twoPane ? 2 : 1;
   const { user } = useAuth();
   const projectRoles = useProjectRoles();
-  const isDark = useColorScheme() === 'dark';
+  // DS v2: canvas, білі картки без рамок, головна дія — action.primary.
+  const { t, isDark } = useDSTheme();
   useScreenView('time');
   const { activeTimers, stopTimer, startTaskTimer, tasksRevision, timeEntriesRevision } = useTimerContext();
   // Мітка проєкту в рядку таймера — та сама, що в панелі над табами й сайдбарі.
@@ -551,8 +555,9 @@ export default function TimeScreen() {
 
   const historyTitle = (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: twoPane ? 4 : 24, marginBottom: 4 }}>
+      <AccentDot isDark={isDark} accent="amber" style={{ marginRight: 8 }} />
       <Text style={[s.sectionTitle, { color: c.text, flex: 1 }]} accessibilityRole="header">{tr.history}</Text>
-      <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600' }}>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium }}>
         {periodLabels[period]}
         {grouping === 'project' ? tr.timeByProjectSuffix : ''}
       </Text>
@@ -569,7 +574,7 @@ export default function TimeScreen() {
       <Text numberOfLines={1} style={[s.groupLabel, { color: c.sub, flex: 1 }]}>{section.title}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
         <IconSymbol name="timer" size={11} color={c.sub} />
-        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{fmtDur(section.seconds)}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{fmtDur(section.seconds)}</Text>
       </View>
     </View>
   );
@@ -607,14 +612,14 @@ export default function TimeScreen() {
   const emptyList = (
     <View style={{ alignItems: 'center', paddingVertical: 48 }}>
       <IconSymbol name="clock.fill" size={40} color={c.sub} />
-      <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noRecords}</Text>
+      <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontFamily: fontFamily.semibold }}>{tr.noRecords}</Text>
       {hasFilters ? (
-        <TouchableOpacity onPress={resetFilters} style={[s.emptyAction, { backgroundColor: c.indigo }]}>
-          <IconSymbol name="xmark" size={12} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', marginLeft: 6 }}>{tr.resetAllFilters}</Text>
+        <TouchableOpacity onPress={resetFilters} style={[s.emptyAction, { backgroundColor: t.action.primary }]}>
+          <IconSymbol name="xmark" size={12} color={t.text.onAction} />
+          <Text style={{ color: t.text.onAction, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{tr.resetAllFilters}</Text>
         </TouchableOpacity>
       ) : (
-        <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7 }}>
+        <Text style={{ color: c.sub, fontSize: 13, marginTop: 4 }}>
           {tr.timeEmptyHint}
         </Text>
       )}
@@ -631,8 +636,11 @@ export default function TimeScreen() {
             onPress={() => { haptic.light(); setPeriod(key); }}
             accessibilityRole="radio"
             accessibilityState={{ selected: active }}
-            style={[s.periodChip, { borderColor: active ? c.indigo : c.border, backgroundColor: active ? c.indigo + '20' : 'transparent' }]}>
-            <Text style={{ color: active ? c.indigo : c.text, fontSize: 13, fontWeight: active ? '700' : '500' }}>
+            // DS v2.1: вибраний чип — суцільний amber (акцент «Часу») + onSolid.
+            style={[s.periodChip, active
+              ? { backgroundColor: dsGlass(isDark).accent.amber.solid, borderColor: 'transparent' }
+              : { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+            <Text style={{ color: active ? dsGlass(isDark).accent.amber.onSolid : c.text, fontSize: 13, fontFamily: active ? fontFamily.semibold : fontFamily.medium }}>
               {periodLabels[key]}
             </Text>
           </TouchableOpacity>
@@ -642,9 +650,9 @@ export default function TimeScreen() {
         onPress={() => setShowFilters(true)}
         accessibilityRole="button"
         accessibilityLabel={tr.filtersAndSort}
-        style={[s.periodChip, { borderColor: hasFilters ? c.indigo : c.border, flexDirection: 'row', gap: 6 }]}>
+        style={[s.periodChip, { borderColor: hasFilters ? c.indigo : 'transparent', backgroundColor: glassOf(t).surface, flexDirection: 'row', gap: 6 }]}>
         <IconSymbol name="slider.horizontal.3" size={13} color={hasFilters ? c.indigo : c.sub} />
-        <Text style={{ color: hasFilters ? c.indigo : c.text, fontSize: 13, fontWeight: '600' }}>{tr.timeMoreFilters}</Text>
+        <Text style={{ color: hasFilters ? c.indigo : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.timeMoreFilters}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -660,7 +668,7 @@ export default function TimeScreen() {
         contentContainerStyle={{ paddingBottom: tabBarInset + 24, gap: 14 }}>
         {panel.mode !== 'none' ? (
           <View
-            style={[s.panelCard, { borderColor: c.border, backgroundColor: c.sheet }]}
+            style={[s.panelCard, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}
             accessibilityLabel={panel.mode === 'edit' ? tr.timeEditEntry : tr.timeNewEntry}>
             <TimeEntryForm
               active
@@ -681,7 +689,7 @@ export default function TimeScreen() {
                 {tr.activeTimers}{activeTimers.length > 0 ? ` (${activeTimers.length})` : ''}
               </Text>
               {activeTimersBlock ?? (
-                <View style={[s.panelEmpty, { borderColor: c.border }]}>
+                <View style={[s.panelEmpty, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
                   <IconSymbol name="stop.fill" size={12} color={c.sub} />
                   <Text style={{ color: c.sub, fontSize: 13, marginLeft: 8, flex: 1 }}>{tr.timeNothingRunning}</Text>
                 </View>
@@ -705,7 +713,7 @@ export default function TimeScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <View style={{ flex: 1 }}>
         <ScreenHeader
           title={tr.navTimeTracker}
@@ -719,7 +727,7 @@ export default function TimeScreen() {
                 <HeaderButton
                   onPress={() => { haptic.light(); setFsOpen(true); }}
                   accessibilityLabel={`${tr.fullscreenTimers}, ${tr.activeTimers}: ${activeTimers.length}`}
-                  style={{ backgroundColor: c.indigo + '20', borderColor: c.indigo }}>
+                  style={{ backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }}>
                   <IconSymbol name="timer" size={17} color={c.indigo} />
                 </HeaderButton>
               )}
@@ -730,8 +738,7 @@ export default function TimeScreen() {
                   onPress={() => setShowFilters(true)}
                   accessibilityLabel={tr.filtersAndSort}
                   style={{
-                    backgroundColor: hasFilters ? c.indigo + '20' : c.dim,
-                    borderColor: hasFilters ? c.indigo : c.border,
+                    backgroundColor: hasFilters ? c.indigo + '20' : glassOf(t).surface,
                   }}>
                   <IconSymbol name="slider.horizontal.3" size={17} color={hasFilters ? c.indigo : c.sub} />
                 </HeaderButton>
@@ -742,8 +749,8 @@ export default function TimeScreen() {
                 <HeaderButton
                   onPress={() => openEntry(null)}
                   accessibilityLabel={tr.timeAddEntry}
-                  style={{ backgroundColor: c.indigo, borderColor: c.indigo }}>
-                  <IconSymbol name="plus" size={17} color="#fff" />
+                  style={{ backgroundColor: t.action.primary }}>
+                  <IconSymbol name="plus" size={17} color={t.text.onAction} />
                 </HeaderButton>
               )}
             </>
@@ -815,8 +822,8 @@ export default function TimeScreen() {
           onPress={() => openEntry(null)}
           scaleTo={0.92}
           accessibilityLabel={tr.timeAddEntry}
-          style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.indigo }]}>
-          <IconSymbol name="plus" size={26} color="#fff" />
+          style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: t.action.primary }]}>
+          <IconSymbol name="plus" size={26} color={t.text.onAction} />
         </PressableScale>
       )}
 
@@ -868,6 +875,10 @@ export default function TimeScreen() {
 
 // ─── Рядки списків ────────────────────────────────────────────────────────────
 
+/** status.danger / focus.ring — однакові в обох темах для цих ролей. */
+const STOP_RED = '#E8543F';
+const FOCUS_RING = '#B8A4F8';
+
 interface ActiveTimerRowProps {
   subtasks?: RowSubtask[];
   timer: ActiveTimer;
@@ -888,7 +899,7 @@ interface ActiveTimerRowProps {
  * прямо в <Text>: інакше число завмирає до наступного перерендеру екрана.
  */
 const ActiveTimerRow = React.memo(function ActiveTimerRow({
-  timer, project, tr, subtasks, accent, border, card, text, sub, stopLabel, onStop,
+  timer, project, tr, subtasks, accent, border: _border, card, text, sub, stopLabel, onStop,
 }: ActiveTimerRowProps) {
   const all = subtasks ?? [];
   const doneCount = all.filter(x => x.done).length;
@@ -896,7 +907,7 @@ const ActiveTimerRow = React.memo(function ActiveTimerRow({
   const pending = all.filter(x => !x.done).slice(0, 2);
   const hidden = all.filter(x => !x.done).length - pending.length;
   return (
-    <View style={[s.activeRow, { borderColor: border, backgroundColor: card }]}>
+    <View style={[s.activeRow, { backgroundColor: card }]}>
       <View style={[s.rowDot, { backgroundColor: accent }]} />
       <View style={{ flex: 1, marginLeft: 11, marginRight: 8 }}>
         <Text style={[s.entryTask, { color: text }]} numberOfLines={1}>{timer.label}</Text>
@@ -923,7 +934,7 @@ const ActiveTimerRow = React.memo(function ActiveTimerRow({
         accessibilityLabel={stopLabel}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={s.stopBtn}>
-        <IconSymbol name="stop.fill" size={13} color="#EF4444" />
+        <IconSymbol name="stop.fill" size={13} color={STOP_RED} />
       </TouchableOpacity>
     </View>
   );
@@ -962,11 +973,13 @@ interface EntryRowProps {
  * список записів.
  */
 const EntryRow = React.memo(function EntryRow({
-  entry, selected = false, severity, reason, trimSeconds, trimLabel, warn, projectName, projectColor, accent, border, text, sub, danger,
+  entry, selected = false, severity, reason, trimSeconds, trimLabel, warn, projectName, projectColor, accent, border: _border, text, sub, danger,
   duration, when, tr, onPress, onDelete, onTrim,
 }: EntryRowProps) {
   const flag = severity === 'red' ? danger : severity === 'amber' ? warn : null;
   const title = entry.task || tr.untitled;
+  const { t } = useDSTheme();
+  const cardBg = glassOf(t).surface;
   return (
     <TouchableOpacity
       activeOpacity={0.75}
@@ -976,9 +989,11 @@ const EntryRow = React.memo(function EntryRow({
       accessibilityLabel={`${title}, ${duration}.${reason ? ` ${tr.timeRowAnomalyA11y.replace('{kinds}', reason)}.` : ''} ${tr.edit}`}
       style={[
         s.entryCard,
+        // DS v2: картка surface.card без рамки; вибраний — 2px focus ring;
+        // аномалія — тоноване тло (колір несуть смуга й іконка).
         selected
-          ? { borderColor: accent, backgroundColor: accent + '18' }
-          : { borderColor: flag ? flag + '88' : border, backgroundColor: flag ? flag + '12' : 'transparent' },
+          ? { borderColor: FOCUS_RING, backgroundColor: cardBg }
+          : { borderColor: 'transparent', backgroundColor: flag ? flag + '14' : cardBg },
       ]}>
       {/* Смуга: колір проєкту, а в аномального запису — колір тривоги, і
           ширша, щоб її було видно краєм ока під час гортання. */}
@@ -998,7 +1013,7 @@ const EntryRow = React.memo(function EntryRow({
         {reason ? (
           // Текст — кольором тексту: бурштиновий 11 px у світлій темі не
           // тримає 4.5:1. Колір несуть смуга, рамка й іконка.
-          <Text numberOfLines={2} style={[s.entryMeta, { color: text, fontWeight: '600' }]}>{reason}</Text>
+          <Text numberOfLines={2} style={[s.entryMeta, { color: text, fontFamily: fontFamily.semibold }]}>{reason}</Text>
         ) : null}
         {trimSeconds !== null && trimLabel ? (
           <TouchableOpacity
@@ -1006,9 +1021,9 @@ const EntryRow = React.memo(function EntryRow({
             accessibilityRole="button"
             accessibilityLabel={`${trimLabel}: ${title}`}
             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-            style={[s.trimBtn, { borderColor: border }]}>
+            style={[s.trimBtn, { backgroundColor: glassOf(t).surfaceSubtle }]}>
             <IconSymbol name="scissors" size={11} color={accent} />
-            <Text style={{ color: accent, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>{trimLabel}</Text>
+            <Text style={{ color: accent, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{trimLabel}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -1025,27 +1040,27 @@ const EntryRow = React.memo(function EntryRow({
 });
 
 const s = StyleSheet.create({
-  activeRow: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  activeRow: { borderRadius: Atlas.radius.xlarge, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   rowDot: { width: 9, height: 9, borderRadius: 5 },
   rowSubLine: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
   rowSubDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1.2, marginRight: 6 },
-  rowSubText: { flex: 1, fontSize: 11, opacity: 0.85 },
-  rowSubMore: { fontSize: 10, fontWeight: '700', marginTop: 3, letterSpacing: 0.3 },
-  rowClock: { fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3, fontVariant: ['tabular-nums'], marginRight: 10 },
-  stopBtn: { width: 32, height: 32, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: 'rgba(239,68,68,0.28)', backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' },
-  sectionTitle: { fontSize: 17, fontWeight: Atlas.type.headingWeight },
-  groupLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  entryCard: { borderRadius: Atlas.radius.large, borderWidth: 1, paddingVertical: 11, paddingRight: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  rowSubText: { fontFamily: fontFamily.regular, flex: 1, fontSize: 11, opacity: 0.85 },
+  rowSubMore: { fontSize: 10, fontFamily: fontFamily.bold, marginTop: 3, letterSpacing: 0.3 },
+  rowClock: { fontSize: 20, fontFamily: fontFamily.light, letterSpacing: -0.4, fontVariant: ['tabular-nums'], marginRight: 10 },
+  stopBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(232,84,63,0.12)', alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: 16, fontFamily: fontFamily.semibold },
+  groupLabel: { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
+  entryCard: { borderRadius: Atlas.radius.xlarge, borderWidth: 2, minHeight: 56, paddingVertical: 12, paddingRight: 16, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
   entryBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginLeft: 11 },
-  entryTask: { fontSize: 13, fontWeight: '600' },
-  entryMeta: { fontSize: 11, marginTop: 2 },
-  entryDur: { fontSize: 13, fontWeight: Atlas.type.headingWeight },
-  trimBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 6, marginTop: 7 },
-  emptyAction: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 11 },
-  periodChip: { minHeight: 44, paddingHorizontal: 14, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  panelCard: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 18 },
-  panelEmpty: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, borderWidth: 1, borderStyle: 'dashed', padding: 14 },
+  entryTask: { fontSize: 14, fontFamily: fontFamily.semibold },
+  entryMeta: { fontFamily: fontFamily.regular, fontSize: 12, marginTop: 2 },
+  entryDur: { fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
+  trimBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8 },
+  emptyAction: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingHorizontal: 20, minHeight: 44, borderRadius: 999 },
+  periodChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1.5, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  panelCard: { borderRadius: Atlas.radius.xxlarge, padding: 24 },
+  panelEmpty: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.xlarge, padding: 16 },
   wideBody: { flex: 1, width: '100%', alignSelf: 'center' },
   wideColumns: { flex: 1, flexDirection: 'row', gap: 20, marginTop: 16 },
-  fab: { position: 'absolute', right: 20, width: 52, height: 52, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 6 },
+  fab: { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowColor: '#111113', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 6 },
 });

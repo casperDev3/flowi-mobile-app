@@ -16,7 +16,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MeetingProjectChip, type MeetingChipProject } from '@/components/meetings/MeetingProjectChip';
 import { PriorityBadge } from '@/components/tasks/PriorityBadge';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Atlas } from '@/constants/atlas';
 import type { Translations } from '@/store/translations';
 import type { Meeting } from '@/utils/meetings';
 import { normalizePriority, type Task } from '@/utils/taskUtils';
@@ -25,6 +24,9 @@ import type { CalendarTaskItem, SprintBar } from './calendarModel';
 import { keyToDate } from './calendarModel';
 import { MeetingCard } from './MeetingCard';
 import type { CalendarColors } from './palette';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 const MIN_TOUCH = 44;
 
@@ -71,7 +73,7 @@ export function DayAgenda({
       <View style={st.titleRow}>
         <Text
           accessibilityRole="header"
-          style={{ flex: 1, color: c.text, fontSize: compactTitle ? 15 : 17, fontWeight: '800' }}
+          style={[type.h2, { flex: 1, color: c.text, fontSize: compactTitle ? 16 : 18 }]}
           numberOfLines={2}>
           {title}
         </Text>
@@ -80,17 +82,17 @@ export function DayAgenda({
             onPress={() => onAdd(day)}
             accessibilityRole="button"
             accessibilityLabel={tr.calAddToDay}
-            style={[st.addBtn, { borderColor: c.accent + '50', backgroundColor: c.accent + '14' }]}>
-            <IconSymbol name="plus" size={16} color={c.accent} />
+            style={[st.addBtn, { backgroundColor: c.action }]}>
+            <IconSymbol name="plus" size={16} color={c.onAction} />
           </TouchableOpacity>
         ) : null}
       </View>
 
       {empty ? (
-        <View style={[st.emptyBox, { borderColor: c.border }]}>
+        <View style={[st.emptyBox, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
           <IconSymbol name="calendar.badge.checkmark" size={26} color={c.sub} />
-          <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600', marginTop: 8 }}>{tr.calNothingPlanned}</Text>
-          <Text style={{ color: c.sub, fontSize: 12, marginTop: 4, textAlign: 'center' }}>{tr.calNothingPlannedHint}</Text>
+          <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.semibold, marginTop: 8 }}>{tr.calNothingPlanned}</Text>
+          <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginTop: 4, textAlign: 'center' }}>{tr.calNothingPlannedHint}</Text>
         </View>
       ) : null}
 
@@ -103,13 +105,13 @@ export function DayAgenda({
               onPress={() => onSprintPress(bar)}
               accessibilityRole="button"
               accessibilityLabel={`${tr.calSprintA11y} ${bar.number} · ${bar.sprint.name} · ${bar.project.name}`}
-              style={[st.row, { backgroundColor: bar.project.color + '1A', borderColor: bar.project.color + '40' }]}>
+              style={[st.row, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               <View style={[st.sprintSwatch, { backgroundColor: bar.project.color }]} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
+                <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }} numberOfLines={1}>
                   №{bar.number} · {bar.sprint.name}
                 </Text>
-                <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'], marginTop: 2 }} numberOfLines={1}>
                   {bar.project.name} · {shortDate(bar.start)}–{shortDate(bar.end)}
                 </Text>
               </View>
@@ -128,14 +130,14 @@ export function DayAgenda({
               onPress={() => onTaskPress(item.task)}
               accessibilityRole="button"
               accessibilityLabel={`${item.task.title}${item.done ? `, ${tr.done}` : ''}`}
-              style={[st.row, { backgroundColor: c.card, borderColor: c.border, opacity: item.done ? 0.55 : 1 }]}>
+              style={[st.row, { backgroundColor: c.card, ...glassRimFor(c.card, 'card'), opacity: item.done ? 0.55 : 1 }]}>
               <IconSymbol
                 name={item.done ? 'checkmark.circle.fill' : 'circle'}
                 size={18}
-                color={item.done ? '#10B981' : item.color} />
+                color={item.done ? dsTokens(isDark).status.success : item.color} />
               <View style={{ flex: 1, gap: 3 }}>
                 <Text
-                  style={{ color: c.text, fontSize: 13, fontWeight: '600', textDecorationLine: item.done ? 'line-through' : 'none' }}
+                  style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, textDecorationLine: item.done ? 'line-through' : 'none' }}
                   numberOfLines={2}>
                   {item.task.title}
                 </Text>
@@ -175,12 +177,12 @@ export function DayAgenda({
 
 const st = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 32 },
-  addBtn: { width: MIN_TOUCH, height: MIN_TOUCH, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  section: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  addBtn: { width: MIN_TOUCH, height: MIN_TOUCH, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  section: { fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
   row: {
     minHeight: MIN_TOUCH, flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9,
+    borderRadius: radius.nested, paddingHorizontal: 16, paddingVertical: 12,
   },
   sprintSwatch: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
-  emptyBox: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 16, borderRadius: Atlas.radius.large, borderWidth: 1, borderStyle: 'dashed' },
+  emptyBox: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 20, borderRadius: radius.cardCompact },
 });

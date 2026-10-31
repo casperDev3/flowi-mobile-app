@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { copyMeeting } from '@/utils/meetingSharing';
 import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius } from '@/constants/theme';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { useSyncedList } from '@/hooks/use-synced-list';
 import { useI18n } from '@/store/i18n';
@@ -44,7 +45,7 @@ export function MeetingWorkspace({ meeting, date, colors: c, section = "agenda" 
     if (!note || (note.projectId || '') !== (meeting.projectId || '') || (note.linkedMeetingId && note.linkedMeetingId !== meeting.id)) throw new Error(t('Нотатка більше недоступна', 'Note is no longer available'));
     return fresh.map(item => { if (item.id !== id) return item; const next = { ...item, linkedMeetingId }; if (!linkedMeetingId) delete next.linkedMeetingId; return next; });
   });
-  const button = (label: string, onPress: () => void, disabled = false) => <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: disabled || busy }} disabled={disabled || busy} onPress={onPress} style={[st.button, { borderColor: c.border, backgroundColor: c.dim, opacity: disabled || busy ? 0.5 : 1 }]}><Text style={{ color: c.text, fontWeight: Atlas.type.headingWeight }}>{label}</Text></TouchableOpacity>;
+  const button = (label: string, onPress: () => void, disabled = false) => <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: disabled || busy }} disabled={disabled || busy} onPress={onPress} style={[st.button, { backgroundColor: c.dim, opacity: disabled || busy ? 0.5 : 1 }]}><Text style={{ color: c.text, fontFamily: fontFamily.semibold }}>{label}</Text></TouchableOpacity>;
   const print = () => void run(async () => {
     const Print = await import('expo-print');
     const Sharing = await import('expo-sharing');
@@ -67,7 +68,7 @@ export function MeetingWorkspace({ meeting, date, colors: c, section = "agenda" 
         {canEdit ? button(t('Видалити', 'Remove'), () => void run(() => mutate({ kind: 'remove', id: item.id }))) : null}
       </View>)}</View>
       {canEdit ? <>
-        <TextInput accessibilityLabel={t('Новий пункт порядку денного', 'New agenda item')} placeholder={t('Тема для обговорення', 'Topic to discuss')} placeholderTextColor={c.sub} value={itemText} onChangeText={setItemText} maxLength={2000} editable={!busy} style={[st.input, { color: c.text, borderColor: c.border }]} />
+        <TextInput accessibilityLabel={t('Новий пункт порядку денного', 'New agenda item')} placeholder={t('Тема для обговорення', 'Topic to discuss')} placeholderTextColor={c.sub} value={itemText} onChangeText={setItemText} maxLength={2000} editable={!busy} style={[st.input, { color: c.text, backgroundColor: c.dim }]} />
         {button(t('Додати пункт', 'Add item'), () => void run(async () => { await mutate({ kind: 'add', item: { id: uuidV4(), text: itemText, done: false } }); setItemText(''); }), !itemText.trim())}
       </> : null}
     </View>
@@ -78,7 +79,7 @@ export function MeetingWorkspace({ meeting, date, colors: c, section = "agenda" 
         {canEdit ? <View style={st.actions}>{button(t('Редагувати нотатку', 'Edit note'), () => { setEditing({ id: note.id, body: noteBody(note) }); setBody(noteBody(note)); }, !!body.trim())}{button(t('Відкріпити', 'Detach'), () => void run(() => attach(note.id)), editing?.id === note.id)}</View> : null}
       </View>)}
       {canEdit ? <>
-        <TextInput accessibilityLabel={t('Нова нотатка зустрічі', 'New meeting note')} placeholder={t('Рішення, ідеї та наступні кроки…', 'Decisions, ideas and next steps…')} placeholderTextColor={c.sub} multiline textAlignVertical="top" value={body} onChangeText={setBody} editable={!busy} style={[st.input, { color: c.text, borderColor: c.border, minHeight: 110 }]} />
+        <TextInput accessibilityLabel={t('Нова нотатка зустрічі', 'New meeting note')} placeholder={t('Рішення, ідеї та наступні кроки…', 'Decisions, ideas and next steps…')} placeholderTextColor={c.sub} multiline textAlignVertical="top" value={body} onChangeText={setBody} editable={!busy} style={[st.input, { color: c.text, backgroundColor: c.dim, minHeight: 110 }]} />
         {button(t('Зберегти нотатку', 'Save note'), () => void run(async () => {
           if (editing) {
             await updateSynced<Note>('notes', fresh => {
@@ -100,13 +101,13 @@ export function MeetingWorkspace({ meeting, date, colors: c, section = "agenda" 
         </View> : null}
       </> : !linked.length ? <Text style={{ color: c.sub }}>{t('Нотаток поки немає.', 'No notes yet.')}</Text> : null}
     </View>
-    {error ? <Text accessibilityRole="alert" style={{ color: '#DE350B' }}>{error}</Text> : null}
+    {error ? <Text accessibilityRole="alert" style={{ color: '#E8543F' }}>{error}</Text> : null}
   </View>;
 }
 const st = StyleSheet.create({
-  section: { borderWidth: 1, borderRadius: Atlas.radius.large, padding: Atlas.space.s150, gap: 8 },
-  heading: { fontSize: 15, fontWeight: Atlas.type.headingWeight },
+  section: { borderRadius: radius.nested, padding: Atlas.space.s150, gap: 8 },
+  heading: { fontSize: 15, fontFamily: fontFamily.semibold },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  button: { minHeight: Atlas.controlHeight, paddingHorizontal: 12, paddingVertical: 10, borderRadius: Atlas.radius.medium, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
-  input: { borderWidth: 1, borderRadius: Atlas.radius.medium, minHeight: Atlas.controlHeight, padding: 12, fontSize: 14 },
+  button: { minHeight: Atlas.controlHeight, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.pill, justifyContent: 'center', alignItems: 'center' },
+  input: { borderWidth: 0, borderRadius: radius.control, minHeight: Atlas.controlHeight, padding: 12, fontSize: 14, fontFamily: fontFamily.regular },
 });

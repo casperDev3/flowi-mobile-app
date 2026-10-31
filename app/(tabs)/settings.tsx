@@ -1,7 +1,5 @@
 import { Atlas } from '@/constants/atlas';
 import { AdvertisingSettings } from '@/components/advertising/Advertising';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -23,7 +21,7 @@ import {
 import { IconSymbol, IconSymbolName } from '@/components/ui/icon-symbol';
 import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 import { MODULE_SETTINGS_ROUTE, disabledModuleCount, type ModuleId } from '@/constants/nav';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useAppMode } from '@/store/app-mode';
 import { UnsyncedOutboxError, useAuth } from '@/store/auth';
@@ -43,6 +41,9 @@ import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryCo
 import { ProfileCard } from '@/components/settings/ProfileCard';
 import { ToolTiles } from '@/components/settings/ToolTiles';
 import { settingsColumnCount, settingsSectionLayout, type SettingsSectionId } from '@/components/settings/model';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRim, glassRimFor } from '@/components/shared/dsTheme';
 
 /**
  * Натискання рядка йде через один спільний колбек, а маршрут приходить
@@ -64,12 +65,12 @@ const TOOL_ROWS: readonly {
   module: ModuleId;
 }[] = [
   // `as never`: типи маршрутів згенеруються з новим /calendar лише на `expo start`.
-  { route: '/calendar' as never, icon: 'calendar',         iconColor: '#6366F1', labelKey: 'calendar',         module: 'meetings' },
-  { route: '/menu',          icon: 'fork.knife',       iconColor: '#F59E0B', labelKey: 'menuNavLabel',     module: 'menu' },
-  { route: '/(tabs)/time',   icon: 'timer',            iconColor: '#6366F1', labelKey: 'navTimeTracker',   module: 'time' },
-  { route: '/budget',        icon: 'chart.pie.fill',   iconColor: '#0EA5E9', labelKey: 'navBudget',        module: 'budget' },
-  { route: '/subscriptions', icon: 'repeat',           iconColor: '#8B5CF6', labelKey: 'navSubscriptions', module: 'subscriptions' },
-  { route: '/containers',    icon: 'shippingbox.fill', iconColor: '#F97316', labelKey: 'containers',       module: 'containers' },
+  { route: '/calendar' as never, icon: 'calendar',         iconColor: '#6D4CF5', labelKey: 'calendar',         module: 'meetings' },
+  { route: '/menu',          icon: 'fork.knife',       iconColor: '#F6B93B', labelKey: 'menuNavLabel',     module: 'menu' },
+  { route: '/(tabs)/time',   icon: 'timer',            iconColor: '#6D4CF5', labelKey: 'navTimeTracker',   module: 'time' },
+  { route: '/budget',        icon: 'chart.pie.fill',   iconColor: '#4F7CF7', labelKey: 'navBudget',        module: 'budget' },
+  { route: '/subscriptions', icon: 'repeat',           iconColor: '#6D4CF5', labelKey: 'navSubscriptions', module: 'subscriptions' },
+  { route: '/containers',    icon: 'shippingbox.fill', iconColor: '#F6B93B', labelKey: 'containers',       module: 'containers' },
 ];
 
 export default function SettingsScreen() {
@@ -83,9 +84,9 @@ export default function SettingsScreen() {
   // Тема й мова — діалогом посеред екрана на планшеті (як SheetModal), а не
   // смугою на всю ширину, притиснутою до низу.
   const wm = wideModalStyles(isWide);
-  const cs = useColorScheme();
+  // DS v2: `tk` (а не `t`) — `t` уже зайнятий у колбеках вибору теми.
+  const { t: tk, isDark } = useDSTheme();
   useScreenView('settings');
-  const isDark = cs === 'dark';
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { lang, setLang, tr } = useI18n();
@@ -204,15 +205,17 @@ export default function SettingsScreen() {
 
   // Палітра — у useMemo: інакше кожен рендер створює новий об'єкт, і всі
   // рядки-нащадки під React.memo однаково перемальовуються.
+  // DS v2: нейтральна палітра (canvas / surface.card / text.*); вибраний пункт — text.primary + галочка.
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F5F5FA',
-    bg2:    isDark ? '#14121E' : '#EBEBF5',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: '#7C3AED',
-    sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-  }), [isDark]);
+    bg1:    tk.bg.canvas,
+    bg2:    tk.bg.canvas,
+    border: tk.border.hairline,
+    text:   tk.text.primary,
+    sub:    tk.text.secondary,
+    // DS v2.1: вибраний пункт — lavender ink (акцент «Налаштувань»).
+    accent: glassOf(tk).accent.lavender.ink,
+    sheet:  glassOf(tk).sheet,
+  }), [tk]);
 
   const THEME_LABELS: Record<ThemeOption, string> = useMemo(
     () => ({ system: tr.themeSystem, light: tr.themeLight, dark: tr.themeDark }),
@@ -258,7 +261,6 @@ export default function SettingsScreen() {
   const goLogin = useCallback(() => router.push('/login'), [router]);
   const goRegister = useCallback(() => router.push('/register'), [router]);
 
-  const blur = { intensity: isDark ? 20 : 40, tint: (isDark ? 'dark' : 'light') as 'dark' | 'light' };
 
   // ── Секції (порядок — components/settings/model.ts) ────────────────────────
   const renderSection = (id: SettingsSectionId): React.ReactNode => {
@@ -267,10 +269,10 @@ export default function SettingsScreen() {
         return (
           <View>
             <SectionLabel label={tr.settingsHub.sectionLookNotify} color={c.sub} />
-            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
               <SettingRow
                 icon="paintbrush"
-                iconColor="#8B5CF6"
+                iconColor="#6D4CF5"
                 label={tr.theme}
                 value={THEME_LABELS[theme]}
                 onPress={openThemeModal}
@@ -281,7 +283,7 @@ export default function SettingsScreen() {
               />
               <SettingRow
                 icon="globe"
-                iconColor="#0EA5E9"
+                iconColor="#4F7CF7"
                 label={tr.language}
                 value={LANG_LABELS[lang]}
                 onPress={openLangModal}
@@ -294,7 +296,7 @@ export default function SettingsScreen() {
                   вимкнення нічого не видаляє — воно змінює те, що видно. */}
               <SettingRow
                 icon="square.grid.2x2"
-                iconColor="#10B981"
+                iconColor="#22A55B"
                 label={tr.modulesSettingsRow}
                 value={disabledCount ? String(disabledCount) : undefined}
                 route={MODULE_SETTINGS_ROUTE as Href}
@@ -317,7 +319,7 @@ export default function SettingsScreen() {
               />
               <SettingRow
                 icon="slider.horizontal.3"
-                iconColor="#F59E0B"
+                iconColor="#F6B93B"
                 label={tr.ncSettingsTitle}
                 route={'/settings-notifications' as Href}
                 onPress={go}
@@ -328,7 +330,7 @@ export default function SettingsScreen() {
               />
               <ToggleRow
                 icon="checklist"
-                iconColor="#7C3AED"
+                iconColor="#6D4CF5"
                 label={tr.taskReminders}
                 value={taskReminders}
                 onChange={handleTaskRemindersToggle}
@@ -336,17 +338,17 @@ export default function SettingsScreen() {
                 border={c.border}
                 last
               />
-            </BlurView>
+            </View>
           </View>
         );
       case 'data':
         return (
           <View>
             <SectionLabel label={tr.sectionData} color={c.sub} />
-            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
               <SettingRow
                 icon="arrow.triangle.2.circlepath"
-                iconColor="#7C3AED"
+                iconColor="#6D4CF5"
                 label={tr.sync}
                 value={syncValue}
                 route="/sync"
@@ -358,7 +360,7 @@ export default function SettingsScreen() {
               />
               <SettingRow
                 icon="arrow.triangle.2.circlepath"
-                iconColor="#10B981"
+                iconColor="#22A55B"
                 label={tr.syncNow}
                 value={syncState === 'syncing' ? '…' : undefined}
                 onPress={handleSyncNow}
@@ -372,7 +374,7 @@ export default function SettingsScreen() {
                   лише поточний стан. */}
               <StatusRow
                 icon={online ? 'wifi' : 'icloud.slash'}
-                iconColor="#0EA5E9"
+                iconColor="#4F7CF7"
                 label={`${tr.workMode}: ${online ? tr.modeOnline : tr.modeOffline}`}
                 text={c.text}
                 border={c.border}
@@ -380,7 +382,7 @@ export default function SettingsScreen() {
               />
               <SettingRow
                 icon="externaldrive"
-                iconColor="#6366F1"
+                iconColor="#6D4CF5"
                 label={tr.dataManagement}
                 route="/data"
                 onPress={go}
@@ -391,7 +393,7 @@ export default function SettingsScreen() {
               />
               <DisclosureRow
                 icon="arrow.up.arrow.down"
-                iconColor="#0EA5E9"
+                iconColor="#4F7CF7"
                 label={tr.settingsHub.serverTransfer}
                 open={showTransfer}
                 onToggle={toggleTransfer}
@@ -404,7 +406,7 @@ export default function SettingsScreen() {
                 <>
                   <SettingRow
                     icon="arrow.up.circle"
-                    iconColor="#0EA5E9"
+                    iconColor="#4F7CF7"
                     label={tr.syncPushAll}
                     onPress={handlePushAll}
                     text={c.text}
@@ -415,7 +417,7 @@ export default function SettingsScreen() {
                   />
                   <SettingRow
                     icon="arrow.down.circle"
-                    iconColor="#F59E0B"
+                    iconColor="#F6B93B"
                     label={tr.syncPullAll}
                     onPress={handlePullAll}
                     text={c.text}
@@ -426,7 +428,7 @@ export default function SettingsScreen() {
                   />
                 </>
               )}
-            </BlurView>
+            </View>
             {/* NAT-15: підпис мусить відповідати стану — інакше під «Онлайн»
                 стояло б «дані лише на пристрої». */}
             <Text style={[st.hint, { color: c.sub }]}>
@@ -439,11 +441,11 @@ export default function SettingsScreen() {
           <View>
             <SectionLabel label={tr.sectionSupport} color={c.sub} />
             <View style={{ gap: 4, marginBottom: 12 }}>{[['privacy', lang === 'en' ? 'Privacy' : 'Приватність'], ['terms', lang === 'en' ? 'Terms' : 'Умови'], ['contact', lang === 'en' ? 'Contact' : 'Контакти']].map(([path, label]) => <TouchableOpacity key={path} accessibilityRole="link" onPress={() => void Linking.openURL(`https://flowi-web-app.vercel.app/${path}`)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: c.text }}>{label}</Text></TouchableOpacity>)}</View>
-            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
               {/* Ідеї й баги — один екран (feedback-inbox.md §10.1). */}
               <SettingRow
                 icon="lightbulb.fill"
-                iconColor="#8B5CF6"
+                iconColor="#6D4CF5"
                 label={tr.fbTitle}
                 route={'/feedback' as Href}
                 onPress={go}
@@ -454,7 +456,7 @@ export default function SettingsScreen() {
               />
               <SettingRow
                 icon="paperplane.fill"
-                iconColor="#0EA5E9"
+                iconColor="#4F7CF7"
                 label={tr.sendFeedback}
                 onPress={handleInDevelopment}
                 text={c.text}
@@ -464,7 +466,7 @@ export default function SettingsScreen() {
               />
               <SettingRow
                 icon="star.fill"
-                iconColor="#F59E0B"
+                iconColor="#F6B93B"
                 label={tr.rateApp}
                 onPress={handleInDevelopment}
                 text={c.text}
@@ -474,7 +476,7 @@ export default function SettingsScreen() {
               />
               <SettingRow
                 icon="heart.fill"
-                iconColor="#EF4444"
+                iconColor="#E8543F"
                 label={tr.donate}
                 value="PayPal · Donatello"
                 route="/donate"
@@ -484,12 +486,12 @@ export default function SettingsScreen() {
                 border={c.border}
                 last
               />
-            </BlurView>
+            </View>
             <AdvertisingSettings />
-            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
               <SettingRow
                 icon="person.fill"
-                iconColor="#7C3AED"
+                iconColor="#6D4CF5"
                 label={tr.developer}
                 value="Igor Lialiuk"
                 route="/developer"
@@ -499,7 +501,7 @@ export default function SettingsScreen() {
                 border={c.border}
                 last
               />
-            </BlurView>
+            </View>
           </View>
         );
       case 'account':
@@ -507,10 +509,10 @@ export default function SettingsScreen() {
         return (
           <View>
             <SectionLabel label={tr.sectionAccount} color={c.sub} />
-            <BlurView {...blur} style={[st.card, { borderColor: c.border }]}>
+            <View style={[st.card, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
               <SettingRow
                 icon="person.crop.circle"
-                iconColor="#7C3AED"
+                iconColor="#6D4CF5"
                 label={tr.accountManage}
                 route="/account"
                 onPress={go}
@@ -522,7 +524,7 @@ export default function SettingsScreen() {
               {user.isAdmin && (
                 <SettingRow
                   icon="person.badge.key.fill"
-                  iconColor="#0EA5E9"
+                  iconColor="#4F7CF7"
                   label={tr.settingsAdminWorkspace}
                   route="/admin-workspace"
                   onPress={go}
@@ -540,12 +542,12 @@ export default function SettingsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={tr.authLogout}
                 style={st.row}>
-                <View style={[st.iconBox, { backgroundColor: '#EF444420' }]}>
-                  <IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color="#EF4444" />
+                <View style={[st.iconBox, { backgroundColor: tk.status.danger + '20' }]}>
+                  <IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color={tk.status.danger} />
                 </View>
-                <Text style={[st.rowLabel, { color: '#EF4444', flex: 1 }]}>{tr.authLogout}</Text>
+                <Text style={[st.rowLabel, { color: tk.status.danger, flex: 1 }]}>{tr.authLogout}</Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
           </View>
         );
     }
@@ -560,7 +562,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
 
       {/*
        * Інсет лягає на КОНТЕЙНЕР, а не в contentContainerStyle списку. Різниця
@@ -617,8 +619,8 @@ export default function SettingsScreen() {
               resizeMode="contain"
             />
             <Text style={[st.footerName, { color: c.text }]}>Flowi</Text>
-            <View style={[st.footerBadge, { backgroundColor: c.accent + '18' }]}>
-              <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700', letterSpacing: 0.3 }}>v0.0.1</Text>
+            <View style={[st.footerBadge, { backgroundColor: glassOf(tk).surfaceSubtle }]}>
+              <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>v0.0.1</Text>
             </View>
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 8 }}>© 2026</Text>
           </View>
@@ -634,7 +636,7 @@ export default function SettingsScreen() {
               accessible={false}
               accessibilityViewIsModal
               style={[st.sheetWrapper, wm.column]}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[st.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
@@ -653,7 +655,7 @@ export default function SettingsScreen() {
                   <TouchableOpacity
                     key={t}
                     onPress={() => { setTheme(t); setShowThemeModal(false); }}
-                    style={[st.optionRow, i < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                    style={[st.optionRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
                     <IconSymbol
                       name={t === 'system' ? 'circle.lefthalf.filled' : t === 'light' ? 'sun.max' : 'moon'}
                       size={20}
@@ -663,7 +665,7 @@ export default function SettingsScreen() {
                     {theme === t && <IconSymbol name="checkmark" size={18} color={c.accent} />}
                   </TouchableOpacity>
                 ))}
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -678,7 +680,7 @@ export default function SettingsScreen() {
               accessible={false}
               accessibilityViewIsModal
               style={[st.sheetWrapper, wm.column]}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[st.sheet, sheetSurface, { borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[st.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
@@ -697,13 +699,13 @@ export default function SettingsScreen() {
                   <TouchableOpacity
                     key={l}
                     onPress={() => { setLang(l); setShowLangModal(false); }}
-                    style={[st.optionRow, i < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }]}>
+                    style={[st.optionRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
                     <Text style={{ fontSize: 20 }}>{l === 'uk' ? '🇺🇦' : '🇬🇧'}</Text>
                     <Text style={[st.optionLabel, { color: lang === l ? c.accent : c.text }]}>{LANG_LABELS[l]}</Text>
                     {lang === l && <IconSymbol name="checkmark" size={18} color={c.accent} />}
                   </TouchableOpacity>
                 ))}
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -742,7 +744,7 @@ const SettingRow = React.memo(function SettingRow(
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={[st.row, indent && st.rowIndent, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+      style={[st.row, indent && st.rowIndent, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
@@ -777,7 +779,7 @@ const ToggleRow = React.memo(function ToggleRow(
   { icon, iconColor, label, value, onChange, text, border, last }: ToggleRowProps,
 ) {
   return (
-    <View style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+    <View style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
@@ -791,7 +793,7 @@ const ToggleRow = React.memo(function ToggleRow(
         onValueChange={onChange}
         accessibilityLabel={label}
         accessibilityState={{ checked: value }}
-        trackColor={{ false: 'rgba(128,128,128,0.3)', true: '#7C3AED' }}
+        trackColor={{ false: 'rgba(128,128,128,0.3)', true: '#22A55B' }}
         thumbColor="#fff"
         ios_backgroundColor="rgba(128,128,128,0.3)"
       />
@@ -817,7 +819,7 @@ const StatusRow = React.memo(function StatusRow(
   { icon, iconColor, label, text, border, last }: StatusRowProps,
 ) {
   return (
-    <View style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+    <View style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
@@ -842,12 +844,13 @@ const NotifRow = React.memo(function NotifRow(
   { label, scheduledCount, route, onPress, text, sub, border, accent, last }: NotifRowProps,
 ) {
   const handlePress = useCallback(() => onPress(route), [onPress, route]);
+  const onAccent = useDSTheme().t.text.onAction;
   return (
     <TouchableOpacity
       onPress={handlePress}
-      style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
-      <View style={[st.iconBox, { backgroundColor: '#F59E0B20' }]}>
-        <IconSymbol name="bell.badge" size={17} color="#F59E0B" />
+      style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
+      <View style={[st.iconBox, { backgroundColor: '#F6B93B26' }]}>
+        <IconSymbol name="bell.badge" size={17} color="#F6B93B" />
       </View>
       <Text style={[st.rowLabel, { color: text, flex: 1 }]}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -856,7 +859,7 @@ const NotifRow = React.memo(function NotifRow(
         <NotificationBadge />
         {scheduledCount > 0 && (
           <View style={{ backgroundColor: accent, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
-            <Text style={{ color: '#fff', fontSize: 11, fontWeight: Atlas.type.headingWeight }}>{scheduledCount}</Text>
+            <Text style={{ color: onAccent, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{scheduledCount}</Text>
           </View>
         )}
         <IconSymbol name="chevron.right" size={16} color={sub} />
@@ -887,7 +890,7 @@ const DisclosureRow = React.memo(function DisclosureRow(
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ expanded: open }}
-      style={[st.row, !last && { borderBottomWidth: 1, borderBottomColor: border }]}>
+      style={[st.row, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: border }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
         <IconSymbol name={icon} size={17} color={iconColor} />
       </View>
@@ -898,34 +901,35 @@ const DisclosureRow = React.memo(function DisclosureRow(
 });
 
 const st = StyleSheet.create({
-  pageTitle:   { fontSize: 34, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.8 },
-  sectionLabel:{ fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginTop: 20, marginLeft: 4 },
+  // DS v2: H1 32/500; підписи секцій — 12 secondary без капсу.
+  pageTitle:   { fontSize: 32, lineHeight: 38, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
+  sectionLabel:{ fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.2, marginBottom: 8, marginTop: 24, marginLeft: 4 },
   // Нижній відступ секції — справа самої картки: MasonryColumns вертикальних
   // проміжків не додає.
   sectionCell: { paddingBottom: 4 },
-  hint:        { fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 6 },
+  hint:        { fontFamily: fontFamily.regular, fontSize: 12, lineHeight: 16, paddingHorizontal: 4, marginTop: 6 },
   wideColumn:  { maxWidth: 960 },
-  card:        { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden' },
-  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
-  rowIndent:   { paddingLeft: 30 },
-  iconBox:     { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  rowLabel:    { fontSize: 14, fontWeight: '500' },
-  rowValue:    { fontSize: 13, fontWeight: '500' },
+  card:        { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', paddingVertical: 4 },
+  row:         { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 20, paddingVertical: 12, gap: 12 },
+  rowIndent:   { paddingLeft: 36 },
+  iconBox:     { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  rowLabel:    { fontSize: 15, fontFamily: fontFamily.medium },
+  rowValue:    { fontSize: 13, fontFamily: fontFamily.regular },
   // Підпис рядка займає вільне місце, але не стискається нижче власної
   // ширини — стискається (й обрізається «…») лише значення праворуч.
   rowLabelFixed: { flexGrow: 1, flexShrink: 0 },
   rowValueBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, flexShrink: 1, minWidth: 0 },
   footerCard:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28, marginBottom: 8 },
   footerLogo:  { width: 26, height: 26, borderRadius: 7 },
-  footerName:  { fontSize: 15, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 },
-  footerBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  footerName:  { fontSize: 15, fontFamily: fontFamily.semibold, letterSpacing: -0.3 },
+  footerBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  overlay:     { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти приходить із useSheetSurface() на місці використання.
-  sheet:       { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet:       { borderRadius: Atlas.radius.xxlarge, padding: 24, overflow: 'hidden' },
   handleRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:      { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:  { fontSize: 18, fontWeight: Atlas.type.headingWeight, marginBottom: 12 },
+  sheetTitle:  { fontSize: 18, fontFamily: fontFamily.semibold, marginBottom: 12 },
   optionRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
-  optionLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
+  optionLabel: { flex: 1, fontSize: 15, fontFamily: fontFamily.semibold },
 });

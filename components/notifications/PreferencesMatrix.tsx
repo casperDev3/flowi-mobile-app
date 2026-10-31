@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
 /**
  * Матриця «категорія × канал» з розгортанням до окремих подій
  * (notifications-module.md §4.4, §6.3).
@@ -22,9 +23,11 @@ import {
   isEventVisible,
 } from '@/api/notifications';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import type { Translations } from '@/store/translations';
 
 import { categoryLabel, categoryLook, channelLabel, eventLabel, fillTemplate } from './labels';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 export interface MatrixColors {
   border: string;
@@ -75,7 +78,7 @@ export function PreferencesMatrix({ doc, channels, disabledModules, tr, colors: 
         const label = categoryLabel(tr, category.key, category.label);
         const isOpen = !!expanded[category.key];
         return (
-          <View key={category.key} style={[st.card, { borderColor: c.border, backgroundColor: c.card }]}>
+          <View key={category.key} style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
             <View style={st.row}>
               <View style={st.labelCol}>
                 <View style={[st.iconBox, { backgroundColor: look.color + '20' }]}>
@@ -102,7 +105,7 @@ export function PreferencesMatrix({ doc, channels, disabledModules, tr, colors: 
               accessibilityState={{ expanded: isOpen }}
               accessibilityLabel={`${label}: ${isOpen ? tr.ncHideEvents : tr.ncShowEvents}`}
               style={st.expandBtn}>
-              <Text style={{ color: c.accent, fontSize: 13, fontWeight: '700' }}>
+              <Text style={{ color: c.accent, fontSize: 13, fontFamily: fontFamily.bold }}>
                 {isOpen ? tr.ncHideEvents : `${tr.ncShowEvents} · ${category.events.length}`}
               </Text>
               <IconSymbol name={isOpen ? 'chevron.up' : 'chevron.down'} size={13} color={c.accent} />
@@ -121,7 +124,7 @@ export function PreferencesMatrix({ doc, channels, disabledModules, tr, colors: 
                           accessibilityRole="button"
                           accessibilityLabel={`${evLabel}: ${tr.ncResetEvent}`}
                           style={st.resetBtn}>
-                          <Text style={{ color: c.sub, fontSize: 11.5, fontWeight: '600' }}>
+                          <Text style={{ color: c.sub, fontSize: 11.5, fontFamily: fontFamily.semibold }}>
                             {tr.ncCustomized} · <Text style={{ color: c.accent }}>{tr.ncResetEvent}</Text>
                           </Text>
                         </TouchableOpacity>
@@ -163,7 +166,9 @@ interface ToggleProps {
  * `Switch`: три перемикачі поруч на телефоні не влазять, а прапорець у
  * стовпчику читається як таблиця.
  */
-function ChannelToggle({ value, dimmed, label, accent, border, onToggle }: ToggleProps) {
+function ChannelToggle({ value, dimmed, label, accent: _accent, border, onToggle }: ToggleProps) {
+  // DS v2: увімкнений прапорець — action.primary з text.onAction.
+  const { t } = useDSTheme();
   return (
     <TouchableOpacity
       onPress={onToggle}
@@ -171,8 +176,8 @@ function ChannelToggle({ value, dimmed, label, accent, border, onToggle }: Toggl
       accessibilityState={{ checked: value }}
       accessibilityLabel={label}
       style={[st.toggleTarget, dimmed && { opacity: 0.4 }]}>
-      <View style={[st.toggleBox, value ? { backgroundColor: accent, borderColor: accent } : { borderColor: border }]}>
-        {value ? <IconSymbol name="checkmark" size={14} color="#fff" /> : null}
+      <View style={[st.toggleBox, value ? { backgroundColor: t.action.primary, borderColor: t.action.primary } : { borderColor: border }]}>
+        {value ? <IconSymbol name="checkmark" size={14} color={t.text.onAction} /> : null}
       </View>
     </TouchableOpacity>
   );
@@ -182,15 +187,15 @@ const CELL = 56;
 
 const st = StyleSheet.create({
   headRow:    { flexDirection: 'row', alignItems: 'flex-end', paddingLeft: 12, marginBottom: 6 },
-  headCell:   { width: CELL, textAlign: 'center', fontSize: 11, fontWeight: '700' },
-  card:       { borderRadius: Atlas.radius.large, borderWidth: 1, marginBottom: 10, overflow: 'hidden' },
+  headCell:   { width: CELL, textAlign: 'center', fontSize: 11, fontFamily: fontFamily.bold },
+  card:       { borderRadius: Atlas.radius.xlarge, marginBottom: 12, overflow: 'hidden', paddingVertical: 4 },
   row:        { flexDirection: 'row', alignItems: 'center', paddingLeft: 12, paddingVertical: 6 },
   labelCol:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0, paddingRight: 4 },
-  iconBox:    { width: 28, height: 28, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
-  catLabel:   { flex: 1, fontSize: 14, fontWeight: '700' },
+  iconBox:    { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  catLabel:   { flex: 1, fontSize: 15, fontFamily: fontFamily.semibold },
   expandBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, minHeight: 44 },
   eventRow:   { flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingVertical: 4, borderTopWidth: StyleSheet.hairlineWidth },
-  evLabel:    { fontSize: 13.5, fontWeight: '600' },
+  evLabel:    { fontSize: 13.5, fontFamily: fontFamily.semibold },
   resetBtn:   { minHeight: 36, justifyContent: 'center' },
   toggleTarget: { width: CELL, height: 44, alignItems: 'center', justifyContent: 'center' },
   toggleBox:  { width: 26, height: 26, borderRadius: Atlas.radius.small, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },

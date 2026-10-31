@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { fontFamily } from '@/constants/theme';
 import { useI18n } from '@/store/i18n';
 import { CONTAINER_COLORS, containerColor, type Container, type ContainerPlace } from '@/utils/containers';
 
@@ -55,15 +56,15 @@ export function ContainerFormSheet({ request, places, c, onClose, onSubmit, onCr
       title={request?.mode === 'edit' ? tr.editContainer : tr.newContainer}
       footer={<>
         <SheetButton label={tr.cancel} onPress={onClose} c={c} />
-        <SheetButton label={tr.save} onPress={save} c={c} color={color} disabled={!name.trim()} flex={2} />
+        <SheetButton label={tr.save} onPress={save} c={c} primary disabled={!name.trim()} flex={2} />
       </>}>
       <SheetLabel text={tr.containerName} c={c} required />
-      <TextInput value={name} onChangeText={setName} placeholder={tr.containerNamePlaceholder} placeholderTextColor={c.sub}
+      <TextInput value={name} onChangeText={setName} placeholder={tr.containerNamePlaceholder} placeholderTextColor={c.muted}
         autoFocus={request?.mode === 'new'} accessibilityLabel={tr.containerName}
         style={[sheetStyles.input, { backgroundColor: c.dim, color: c.text }]} />
 
       <SheetLabel text={tr.containerLocation} c={c} />
-      {legacy ? <Text style={{ color: c.sub, fontSize: 12, marginBottom: 6 }}>{fill(tr.ctrLegacyLocation, { loc: legacy })}</Text> : null}
+      {legacy ? <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, marginBottom: 6 }}>{fill(tr.ctrLegacyLocation, { loc: legacy })}</Text> : null}
       <PlacePicker places={places} value={placeId} onChange={setPlaceId} c={c} accent={color}
         noneLabel={tr.ctrNoPlace} onCreate={onCreatePlace} />
 
@@ -74,7 +75,7 @@ export function ContainerFormSheet({ request, places, c, onClose, onSubmit, onCr
             accessibilityState={{ checked: color === option }} accessibilityLabel={`${tr.ctrColor} ${option}`}
             style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
             <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: option,
-              borderWidth: color === option ? 3 : 0, borderColor: c.isDark ? '#fff' : '#1A1433' }} />
+              borderWidth: color === option ? 3 : 0, borderColor: c.text }} />
           </TouchableOpacity>
         ))}
       </View>

@@ -1,15 +1,23 @@
 /**
  * components/calendar/palette.ts — кольори екрана «Календар».
  *
- * Фони й акцент — ті самі, що були в «Нарад» (індиго «Часу»): календар
- * успадкував їхнє місце в навігації, і зміна гами виглядала б як інший
- * розділ, а не той самий, що виріс.
+ * DS v2.1: фон — mesh, картки — скло (glassOf(t).surface), аркуші — щільне скло,
+ * акцент — info (ink). Нижче — історичний опис v2.
+ * DS v2: фон — bg.canvas, картки — surface.card, вкладені/неактивні —
+ * surface.subtle, текст — text.primary/secondary. Акцент календаря — та сама
+ * глибока лаванда, що в «Завдань»/«Часу» (getScreenColors): нею позначено
+ * «сьогодні» й посилання; ВИБРАНИЙ стан (день, сегмент, головна дія) —
+ * action.primary + text.onAction, як усюди в DS.
  */
 import { useMemo } from 'react';
 
-export const CALENDAR_ACCENT = '#6366F1';
+import { theme } from '@/constants/theme';
+import { glassOf } from '@/components/shared/dsTheme';
+
+/** Світлий акцент календаря (лишився для статичних споживачів). */
+export const CALENDAR_ACCENT = '#6D4CF5';
 /** Особисті завдання — акцент «Завдань». */
-export const PERSONAL_TASK_COLOR = '#7C3AED';
+export const PERSONAL_TASK_COLOR = '#6D4CF5';
 
 export interface CalendarColors {
   bg1: string;
@@ -20,23 +28,46 @@ export interface CalendarColors {
   dim: string;
   text: string;
   sub: string;
+  /** Завжди #RRGGBB — споживачі дописують альфу (`accent + '14'`). */
   accent: string;
   /** Лінії сітки — тонші за рамки карток. */
   grid: string;
+  /** Вибраний стан / головна дія (DS action.primary). */
+  action: string;
+  /** Текст і іконки на `action`. */
+  onAction: string;
+  /** Плейсхолдер / декоративний текст (НЕ підписи). */
+  muted: string;
+  /** DS v2.1: вибраний сегмент / день / чип — суцільний info (акцент календаря). */
+  select: string;
+  /** Текст і іконки на `select` (onSolid, #111113). */
+  onSelect: string;
+  /** Тонована info-змивка (сьогодні, активні мітки). */
+  tint: string;
 }
 
 export function calendarColors(isDark: boolean): CalendarColors {
+  // Напряму з constants/theme, а не через hooks/use-ds: палітру імпортують
+  // модулі, що рендеряться в тестах без мока AsyncStorage.
+  const t = isDark ? theme.dark : theme.light;
   return {
-    bg1:    isDark ? '#0A0C18' : '#EEF0FF',
-    bg2:    isDark ? '#121525' : '#E2E5FF',
-    card:   isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.75)',
-    sheet:  isDark ? 'rgba(18,18,32,0.96)' : 'rgba(245,244,255,0.97)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)',
-    dim:    isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
-    text:   isDark ? '#F2F0FF' : '#1A1830',
-    sub:    isDark ? 'rgba(210,205,255,0.62)' : 'rgba(80,70,140,0.58)',
-    accent: CALENDAR_ACCENT,
-    grid:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+    bg1:    t.bg.canvas,
+    bg2:    t.bg.canvas,
+    card:   glassOf(t).surface,
+    sheet:  glassOf(t).sheet,
+    border: t.border.hairline,
+    dim:    glassOf(t).surfaceSubtle,
+    text:   t.text.primary,
+    sub:    t.text.secondary,
+    // DS v2.1: акцент календаря/зустрічей — info (glass.moduleAccent.calendar).
+    accent: glassOf(t).accent.info.ink,
+    grid:   t.border.hairline,
+    action: t.action.primary,
+    onAction: t.text.onAction,
+    muted:  t.text.muted,
+    select:   glassOf(t).accent.info.solid,
+    onSelect: glassOf(t).accent.info.onSolid,
+    tint:     glassOf(t).accent.info.tint,
   };
 }
 

@@ -1,4 +1,6 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily, shadow } from '@/constants/theme';
+import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
 /**
  * components/shared/CommentsSection.tsx — коментарі та @згадки на завданні
  * чи нараді (WORKSPACE_PROJECTS_PLAN.md §4, контракт §4.4).
@@ -72,6 +74,7 @@ function initials(name: string): string {
 export function CommentsSection({
   projectId, targetType, targetId, isOwner, currentUserId, readOnly = false, colors: c, isDark, locale, tr,
 }: CommentsSectionProps) {
+  const t = dsTheme(isDark);
   const [all, setAll] = useState<Comment[]>([]);
   const [members, setMembers] = useState<MemberOut[]>([]);
   const [draft, setDraft] = useState('');
@@ -195,11 +198,11 @@ export function CommentsSection({
                 width: 26, height: 26, borderRadius: 13, backgroundColor: c.accent + '26',
                 alignItems: 'center', justifyContent: 'center', marginTop: 2,
               }}>
-                <Text style={{ color: c.accent, fontSize: 10, fontWeight: Atlas.type.headingWeight }}>{initials(nameFor(comment.authorId))}</Text>
+                <Text style={{ color: c.accent, fontSize: 10, fontFamily: fontFamily.semibold }}>{initials(nameFor(comment.authorId))}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                  <Text style={{ color: c.text, fontSize: 12, fontWeight: '700' }}>{nameFor(comment.authorId)}</Text>
+                  <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.bold }}>{nameFor(comment.authorId)}</Text>
                   <Text style={{ color: c.sub, fontSize: 10 }}>
                     {when.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}{' '}
                     {when.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
@@ -214,12 +217,12 @@ export function CommentsSection({
                       multiline
                       maxLength={COMMENT_BODY_MAX_LENGTH}
                       style={{
-                        color: c.text, fontSize: 13, borderWidth: 1, borderColor: c.border,
-                        borderRadius: Atlas.radius.medium, padding: 8, minHeight: 40,
+                        color: c.text, fontSize: 13, fontFamily: fontFamily.regular, backgroundColor: glassOf(t).surfaceSubtle,
+                        borderRadius: Atlas.radius.medium, padding: 10, minHeight: 44,
                       }}
                     />
                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
-                      <TouchableOpacity onPress={saveEdit}><Text style={{ color: c.accent, fontSize: 12, fontWeight: '700' }}>{tr.commentsSaveEdit}</Text></TouchableOpacity>
+                      <TouchableOpacity onPress={saveEdit}><Text style={{ color: c.accent, fontSize: 12, fontFamily: fontFamily.bold }}>{tr.commentsSaveEdit}</Text></TouchableOpacity>
                       <TouchableOpacity onPress={cancelEdit}><Text style={{ color: c.sub, fontSize: 12 }}>{tr.commentsCancelEdit}</Text></TouchableOpacity>
                     </View>
                   </View>
@@ -228,7 +231,7 @@ export function CommentsSection({
                     <Text style={{ color: c.text, fontSize: 13, marginTop: 2, lineHeight: 18 }}>
                       {renderCommentBody(comment.body).map((seg, i) => (
                         seg.mentionUserId ? (
-                          <Text key={i} style={{ color: c.accent, fontWeight: '700' }}>@{seg.text}</Text>
+                          <Text key={i} style={{ color: c.accent, fontFamily: fontFamily.bold }}>@{seg.text}</Text>
                         ) : (
                           <Text key={i}>{seg.text}</Text>
                         )
@@ -243,7 +246,7 @@ export function CommentsSection({
                         ) : null}
                         {deletable ? (
                           <TouchableOpacity onPress={() => remove(comment.id)}>
-                            <Text style={{ color: '#EF4444', fontSize: 11 }}>{tr.commentsDeleteAction}</Text>
+                            <Text style={{ color: t.status.danger, fontSize: 11 }}>{tr.commentsDeleteAction}</Text>
                           </TouchableOpacity>
                         ) : null}
                       </View>
@@ -257,12 +260,12 @@ export function CommentsSection({
       )}
 
       {!readOnly && mentionCandidates.length > 0 ? (
-        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: Atlas.radius.medium, marginBottom: 6, overflow: 'hidden' }}>
+        <View style={{ backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong'), borderRadius: Atlas.radius.large, marginBottom: 6, overflow: 'hidden', ...shadow[isDark ? 'dark' : 'light'].popover }}>
           {mentionCandidates.map(m => (
             <TouchableOpacity
               key={m.user.id}
               onPress={() => insertMention(m)}
-              style={{ paddingVertical: 8, paddingHorizontal: 10, backgroundColor: c.dim }}>
+              style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 }}>
               <Text style={{ color: c.text, fontSize: 13 }}>{m.user.name || m.user.email}</Text>
             </TouchableOpacity>
           ))}
@@ -274,15 +277,15 @@ export function CommentsSection({
           value={draft}
           onChangeText={setDraft}
           placeholder={tr.commentsPlaceholder}
-          placeholderTextColor={c.sub}
+          placeholderTextColor={t.text.muted}
           multiline
           // Сервер відхиляє body > 10 000 символів як `invalid_data` і мовчки
           // губить локальну копію (contract §4.4, review finding) — обмеження
           // тут не дає взагалі набрати довше.
           maxLength={COMMENT_BODY_MAX_LENGTH}
           style={{
-            flex: 1, color: c.text, fontSize: 13, borderWidth: 1, borderColor: c.border,
-            borderRadius: Atlas.radius.medium, padding: 10, minHeight: 40, maxHeight: 120,
+            flex: 1, color: c.text, fontSize: 13, fontFamily: fontFamily.regular, backgroundColor: glassOf(t).surfaceSubtle,
+            borderRadius: 22, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, maxHeight: 120,
           }}
         />
         <TouchableOpacity
@@ -291,11 +294,11 @@ export function CommentsSection({
           accessibilityRole="button"
           accessibilityLabel={tr.commentsSend}
           style={{
-            width: 40, height: 40, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: draft.trim() && !busy ? c.accent : c.dim,
+            width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: draft.trim() && !busy ? t.action.primary : t.state.disabledBg,
           }}>
-          {busy ? <ActivityIndicator size="small" color="#fff" /> : (
-            <IconSymbol name="paperplane.fill" size={16} color={draft.trim() ? '#fff' : c.sub} />
+          {busy ? <ActivityIndicator size="small" color={t.text.onAction} /> : (
+            <IconSymbol name="paperplane.fill" size={16} color={draft.trim() ? t.text.onAction : t.state.disabledText} />
           )}
         </TouchableOpacity>
       </View> : null}

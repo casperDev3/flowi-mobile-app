@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/register-pending.tsx — екран очікування заявки на реєстрацію
  * (контракт §2.4, §2.5): режим workspace «за погодженням» не створює акаунт
@@ -9,8 +8,6 @@ import { Atlas } from '@/constants/atlas';
  * `ws/user/`), а push — це лише сповіщення «є новина», реальний стан однаково
  * читається звідси.
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,6 +15,7 @@ import { ActivityIndicator, Alert, AppState, ScrollView, StyleSheet, Text, Touch
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
+import { dsTokens } from '@/hooks/use-ds';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
@@ -30,6 +28,9 @@ import {
   getPendingRegistration,
   pollRegistrationStatus,
 } from '@/store/registration';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 // Контракт §2.5: `/auth/register/status/` кине throttle 60/год на IP. 65 с
 // дає ~55 запитів/год — з запасом під той ліміт (8 с давало б ~450/год і
@@ -44,6 +45,7 @@ export default function RegisterPendingScreen() {
   const { applyApprovedRegistration } = useAuth();
   const params = useLocalSearchParams<{ requestId?: string }>();
   const contentWidth = useContentWidth();
+  const k = dsTokens(isDark);
   const c = getScreenColors('auth', isDark);
   // CLAUDE.md: верхній інсет — useTopInset() у JS, не нативний SafeAreaView
   // (мінор із ревʼю; докладно — hooks/use-top-inset.ts).
@@ -184,14 +186,14 @@ export default function RegisterPendingScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <View style={{ flex: 1, paddingTop: topInset }}>
         <ScrollView contentContainerStyle={[st.scroll, contentWidth]} showsVerticalScrollIndicator={false}>
-          <View style={[st.iconWrap, { backgroundColor: (rejected ? '#EF4444' : c.accent) + '20' }]}>
+          <View style={[st.iconWrap, { backgroundColor: (rejected ? k.status.danger : c.accent) + '20' }]}>
             <IconSymbol
               name={rejected ? 'xmark.circle.fill' : 'clock.fill'}
               size={40}
-              color={rejected ? '#EF4444' : c.accent}
+              color={rejected ? k.status.danger : c.accent}
             />
           </View>
 
@@ -203,18 +205,20 @@ export default function RegisterPendingScreen() {
           </Text>
 
           {!rejected && (
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.statusCard, { borderColor: c.border }]}>
-              {checking ? <ActivityIndicator color={c.accent} /> : <IconSymbol name="clock" size={16} color={c.sub} />}
+            <View
+              style={[st.statusCard, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}
+            >
+              {checking ? <ActivityIndicator color={c.sub} /> : <IconSymbol name="clock" size={16} color={c.sub} />}
               <Text style={[st.statusText, { color: c.sub }]}>{tr.registrationPendingChecking}</Text>
-            </BlurView>
+            </View>
           )}
 
           <TouchableOpacity
-            style={[st.primaryBtn, { backgroundColor: c.accent }]}
+            style={[st.primaryBtn, { backgroundColor: k.action.primary }]}
             activeOpacity={0.82}
             onPress={() => router.replace('/login')}
           >
-            <Text style={st.primaryBtnText}>{tr.registrationPendingBack}</Text>
+            <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.registrationPendingBack}</Text>
           </TouchableOpacity>
 
           {!rejected && (
@@ -231,15 +235,15 @@ export default function RegisterPendingScreen() {
 const st = StyleSheet.create({
   scroll: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 60, alignItems: 'center' },
   iconWrap: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  title: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 10 },
+  title: { fontSize: 24, fontFamily: fontFamily.semibold, textAlign: 'center', marginBottom: 10 },
   msg: { fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 24 },
   statusCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 20,
     paddingHorizontal: 16, paddingVertical: 12, marginBottom: 24, alignSelf: 'stretch',
   },
-  statusText: { fontSize: 13, fontWeight: '500' },
-  primaryBtn: { borderRadius: Atlas.radius.large, paddingVertical: 16, alignItems: 'center', alignSelf: 'stretch' },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  linkBtn: { marginTop: 16, alignItems: 'center', paddingVertical: 8 },
-  linkText: { fontSize: 14, fontWeight: '500' },
+  statusText: { fontSize: 13, fontFamily: fontFamily.medium },
+  primaryBtn: { borderRadius: 999, minHeight: 52, justifyContent: 'center', paddingVertical: 16, alignItems: 'center', alignSelf: 'stretch' },
+  primaryBtnText: { fontSize: 16, fontFamily: fontFamily.semibold },
+  linkBtn: { marginTop: 12, alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingVertical: 8 },
+  linkText: { fontSize: 14, fontFamily: fontFamily.medium },
 });

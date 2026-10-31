@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Audio } from 'expo-av';
 import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius } from '@/constants/theme';
 import { useProjectRole } from '@/hooks/use-project-role';
 import { apiFetch } from '@/store/api';
 import { useI18n } from '@/store/i18n';
@@ -86,9 +87,9 @@ export function MeetingAudio({ meeting, colors: c }: { meeting: Meeting; colors:
     const savedUri = await persistRecording(uri);
     await upload(savedUri, `Meeting-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.m4a`, 'audio/mp4', true);
   });
-  const button = (label: string, onPress: () => void, disabled = false) => <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: disabled || busy }} disabled={disabled || busy} onPress={onPress} style={[st.button, { backgroundColor: c.dim, borderColor: c.border, opacity: disabled || busy ? 0.5 : 1 }]}><Text style={{ color: c.text, fontWeight: Atlas.type.headingWeight }}>{label}</Text></TouchableOpacity>;
+  const button = (label: string, onPress: () => void, disabled = false) => <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: disabled || busy }} disabled={disabled || busy} onPress={onPress} style={[st.button, { backgroundColor: c.dim, opacity: disabled || busy ? 0.5 : 1 }]}><Text style={{ color: c.text, fontFamily: fontFamily.semibold }}>{label}</Text></TouchableOpacity>;
   return <View style={[st.section, { borderColor: c.border }]}>
-    <Text accessibilityRole="header" style={{ color: c.text, fontWeight: Atlas.type.headingWeight, fontSize: 15 }}>{t('Медіа та файли', 'Media and files')}</Text>
+    <Text accessibilityRole="header" style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 15 }}>{t('Медіа та файли', 'Media and files')}</Text>
     <Text style={{ color: c.sub, fontSize: 12 }}>{t('До 25 МБ на файл. Збережені записи доступні на інших пристроях.', 'Up to 25 MB per file. Saved recordings are available on other devices.')}{meeting.projectId ? t(' Учасники проєкту також мають доступ.', ' Project members also have access.') : ''}</Text>
     {files.map(file => <View key={file.id} style={{ gap: 8 }}><Text style={{ color: c.text }}>{file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB</Text><View style={st.actions}>
       {button(playing === file.id ? t('Стоп', 'Stop') : (file.contentType.startsWith('audio/') ? t('Відтворити', 'Play') : t('Відкрити / поділитися', 'Open / share')), () => void run(async () => {
@@ -134,11 +135,11 @@ export function MeetingAudio({ meeting, colors: c }: { meeting: Meeting; colors:
       {recording ? <Text accessibilityRole="alert" style={{ color: c.text }}>{t('● Запис триває', '● Recording')}</Text> : null}
       {(meeting.recordings ?? []).map((uri, index) => <View key={uri}>{button(t(`Завантажити локальний запис ${index + 1}`, `Upload local recording ${index + 1}`), () => void run(() => upload(uri, uri.split('/').pop() || 'Recording.m4a', 'audio/mp4', true)), recording)}</View>)}
     </> : null}
-    {error ? <><Text accessibilityRole="alert" style={{ color: '#DE350B' }}>{error}</Text>{button(t('Оновити файли', 'Refresh files'), () => void load())}</> : null}
+    {error ? <><Text accessibilityRole="alert" style={{ color: '#E8543F' }}>{error}</Text>{button(t('Оновити файли', 'Refresh files'), () => void load())}</> : null}
   </View>;
 }
 const st = StyleSheet.create({
-  section: { borderWidth: 1, borderRadius: Atlas.radius.large, padding: 12, gap: 12, marginVertical: 8 },
+  section: { borderRadius: radius.nested, padding: 12, gap: 12, marginVertical: 8 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  button: { minHeight: Atlas.controlHeight, padding: 12, borderWidth: 1, borderRadius: Atlas.radius.medium, justifyContent: 'center' },
+  button: { minHeight: Atlas.controlHeight, padding: 12, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

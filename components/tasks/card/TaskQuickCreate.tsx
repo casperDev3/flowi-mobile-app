@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/card/TaskQuickCreate.tsx — коротка форма створення завдання.
  *
@@ -25,6 +24,9 @@ import {
 
 import { DateField, OptionField, PriorityField } from './fields';
 import { cardStyles, type CardColors } from './primitives';
+import { fontFamily, radius } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export interface QuickCreateProject {
   id: string;
@@ -59,6 +61,7 @@ export function TaskQuickCreate({
   projectLocked = false, colors: c, isDark, locale,
 }: TaskQuickCreateProps) {
   const { tr } = useI18n();
+  const { t } = useDS();
   const titleRef = useRef<TextInput>(null);
   const [attempted, setAttempted] = useState(false);
   const { projectId, sprintId } = editor.draft;
@@ -92,17 +95,17 @@ export function TaskQuickCreate({
         value={editor.draft.title}
         onChangeText={v => editor.patch({ title: v })}
         placeholder={tr.cardQuickPlaceholder}
-        placeholderTextColor={c.sub}
+        placeholderTextColor={t.text.muted}
         accessibilityLabel={tr.taskNamePlaceholder}
         returnKeyType="done"
         onSubmitEditing={() => submit(onSave)}
         style={[st.input, {
           backgroundColor: c.dim,
           color: c.text,
-          borderColor: missingTitle ? '#EF4444' : c.border,
+          borderColor: missingTitle ? t.status.danger : 'transparent',
         }]}
       />
-      {missingTitle ? <Text accessibilityRole="alert" style={st.error}>{tr.cardTitleRequired}</Text> : null}
+      {missingTitle ? <Text accessibilityRole="alert" style={[st.error, { color: t.status.danger }]}>{tr.cardTitleRequired}</Text> : null}
 
       {/* Чипи переносяться на новий рядок, а не їдуть горизонтальним
           скролом: їх три-чотири, і схований за краєм «Проєкт» ніхто не знайде. */}
@@ -161,14 +164,14 @@ export function TaskQuickCreate({
           onPress={() => submit(onMore)}
           accessibilityRole="button"
           accessibilityHint={tr.cardMoreHint}
-          style={[cardStyles.btn, { flex: 1, backgroundColor: c.dim, borderWidth: 1, borderColor: c.border }]}>
-          <Text style={{ color: c.text, fontWeight: '600' }}>{tr.cardMore}</Text>
+          style={[cardStyles.btn, { flex: 1, backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+          <Text style={{ color: t.action.secondaryText, fontFamily: fontFamily.semibold }}>{tr.cardMore}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => submit(onSave)}
           accessibilityRole="button"
-          style={[cardStyles.btn, { flex: 1.4, backgroundColor: c.accent }]}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.add}</Text>
+          style={[cardStyles.btn, { flex: 1.4, backgroundColor: t.action.primary }]}>
+          <Text style={{ color: t.text.onAction, fontFamily: fontFamily.semibold }}>{tr.add}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -185,9 +188,9 @@ export function TaskQuickCreateScroll(props: TaskQuickCreateProps) {
 }
 
 const st = StyleSheet.create({
-  title:   { fontSize: 19, fontWeight: '700', marginBottom: 12 },
-  input:   { borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 13, fontSize: 16, fontWeight: '500' },
-  error:   { color: '#EF4444', fontSize: 12, marginTop: 5 },
+  title:   { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 12 },
+  input:   { borderRadius: radius.control, borderWidth: 1.5, paddingHorizontal: 16, paddingVertical: 13, fontSize: 16, fontFamily: fontFamily.medium },
+  error:   { fontSize: 12, fontFamily: fontFamily.medium, marginTop: 5 },
   chips:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   buttons: { flexDirection: 'row', gap: 8, marginTop: 18, marginBottom: 4 },
 });

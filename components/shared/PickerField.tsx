@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius } from '@/constants/theme';
 /**
  * components/shared/PickerField.tsx — поле вибору одного зі списку.
  *
@@ -23,7 +23,6 @@ import { Atlas } from '@/constants/atlas';
  * лишаються під порогом. Рядок «створити» (`createOption`) пошук вмикає теж —
  * інакше не було б куди набрати назву.
  */
-import { BlurView } from 'expo-blur';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Keyboard,
@@ -41,6 +40,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
+import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
 import { useResponsive } from '@/hooks/use-responsive';
 import type { Translations } from '@/store/translations';
 import { haptic } from '@/utils/haptics';
@@ -134,6 +134,7 @@ export function PickerField({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const insets = useSafeAreaInsets();
+  const t = dsTheme(isDark);
   const { isWide, height: windowHeight } = useResponsive();
 
   /**
@@ -216,7 +217,7 @@ export function PickerField({
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${selected?.label ?? emptyOption?.label ?? ''}`}
-        style={[st.trigger, { backgroundColor: c.dim, borderColor: open ? c.accent : c.border }]}>
+        style={[st.trigger, { backgroundColor: glassOf(t).surfaceSubtle, borderColor: open ? t.focus.ring : 'transparent' }]}>
         {selected?.icon
           ? <IconSymbol name={selected.icon} size={15} color={selected.color ?? c.sub} />
           : selected?.color ? <View style={[st.dot, { backgroundColor: selected.color }]} /> : null}
@@ -225,7 +226,7 @@ export function PickerField({
           style={{
             flex: 1,
             fontSize: 14,
-            fontWeight: '600',
+            fontFamily: fontFamily.semibold,
             color: selected ? (selected.color ?? c.text) : c.sub,
           }}>
           {selected?.label ?? fallbackLabel ?? emptyOption?.label ?? ''}
@@ -235,7 +236,7 @@ export function PickerField({
 
       <Modal visible={open} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setOpen(false)}>
         <Pressable
-          style={[st.backdrop, { backgroundColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.25)' }]}
+          style={[st.backdrop, { backgroundColor: t.surface.overlay }]}
           onPress={() => setOpen(false)}
           accessibilityRole="button"
         />
@@ -243,7 +244,7 @@ export function PickerField({
           style={[
             st.sheet,
             {
-              backgroundColor: c.sheet,
+              backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong'),
               bottom: keyboardHeight,
               // Домашній індикатор ховається за клавіатурою — його відступ
               // потрібен лише тоді, коли її немає.
@@ -256,17 +257,17 @@ export function PickerField({
             // На планшеті аркуш на всю ширину дав би рядки завдовжки з екран.
             isWide && { maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
           ]}>
-          <View style={[st.handle, { backgroundColor: c.border }]} />
+          <View style={[st.handle, { backgroundColor: t.border.hairline }]} />
           <Text style={[st.sheetTitle, { color: c.text }]}>{label}</Text>
 
           {withSearch && (
             <TextInput
               placeholder={tr.pickerSearch}
-              placeholderTextColor={c.sub}
+              placeholderTextColor={t.text.muted}
               value={query}
               onChangeText={setQuery}
               autoCorrect={false}
-              style={[st.search, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]}
+              style={[st.search, { color: c.text, backgroundColor: glassOf(t).surfaceSubtle }]}
             />
           )}
 
@@ -288,11 +289,11 @@ export function PickerField({
               accessibilityState={{ disabled: Boolean(draftError) }}
               accessibilityLabel={createRowText}
               style={[st.create, {
-                borderColor: draftError ? c.border : c.accent,
+                borderColor: draftError ? t.border.hairline : c.accent,
                 opacity: draftError ? 0.5 : 1,
               }]}>
               <IconSymbol name="plus" size={14} color={draftError ? c.sub : c.accent} />
-              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '700', color: draftError ? c.sub : c.accent }}>
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.bold, color: draftError ? c.sub : c.accent }}>
                 {createRowText}
               </Text>
             </TouchableOpacity>
@@ -351,6 +352,8 @@ function Row({ label, color, icon, active, colors: c, isDark, onPress }: {
   onPress: () => void;
 }) {
   const accent = color ?? c.accent;
+  // DS v2: рядок — subtle-плашка без рамки й блюру; вибраний — тонований акцентом.
+  const t = dsTheme(isDark);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -358,49 +361,47 @@ function Row({ label, color, icon, active, colors: c, isDark, onPress }: {
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       style={st.rowWrap}>
-      <BlurView
-        intensity={isDark ? 16 : 32}
-        tint={isDark ? 'dark' : 'light'}
+      <View
         style={[st.row, {
-          borderColor: active ? accent : c.border,
-          backgroundColor: active ? accent + '14' : 'transparent',
+          borderColor: active ? accent : 'transparent',
+          backgroundColor: active ? accent + '14' : glassOf(t).surfaceSubtle,
         }]}>
         {icon
           ? <IconSymbol name={icon} size={15} color={active ? accent : c.sub} />
           : color ? <View style={[st.dot, { backgroundColor: color }]} /> : null}
         <Text
           numberOfLines={1}
-          style={{ flex: 1, fontSize: 14, fontWeight: active ? '700' : '500', color: active ? accent : c.text }}>
+          style={{ flex: 1, fontSize: 14, fontFamily: active ? fontFamily.bold : fontFamily.medium, color: active ? accent : c.text }}>
           {label}
         </Text>
         {/* Галочка, а не лише колір: вибраний стан не має триматись
             виключно на кольорі. */}
         {active && <IconSymbol name="checkmark" size={14} color={accent} />}
-      </BlurView>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const st = StyleSheet.create({
   labelRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
-  label:      { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  trigger:    { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, gap: 9 },
+  label:      { fontSize: 11, fontFamily: fontFamily.bold, letterSpacing: 0.5, textTransform: 'uppercase' },
+  trigger:    { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: radius.control, borderWidth: 2, paddingHorizontal: 14, gap: 9 },
   dot:        { width: 10, height: 10, borderRadius: 5 },
   backdrop:   { ...StyleSheet.absoluteFillObject },
   sheet: {
     position: 'absolute',
     left: 0, right: 0,
     // bottom і maxHeight задаються в компоненті: вони залежать від клавіатури.
-    borderTopLeftRadius: Atlas.radius.xlarge,
-    borderTopRightRadius: Atlas.radius.xlarge,
-    paddingHorizontal: 16,
+    borderTopLeftRadius: radius.card,
+    borderTopRightRadius: radius.card,
+    paddingHorizontal: 20,
     paddingTop: 10,
   },
   handle:     { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
-  sheetTitle: { fontSize: 17, fontWeight: '700', marginBottom: 12 },
-  search:     { borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14 },
-  create:     { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: Atlas.radius.medium,
+  sheetTitle: { fontSize: 17, fontFamily: fontFamily.bold, marginBottom: 12 },
+  search:     { fontFamily: fontFamily.regular, borderRadius: radius.control, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14 },
+  create:     { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: radius.nestedCompact,
                 borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 13, gap: 9, marginBottom: 7 },
   rowWrap:    { marginBottom: 7 },
-  row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, gap: 9, overflow: 'hidden' },
+  row:        { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: radius.nestedCompact, borderWidth: 1, paddingHorizontal: 14, gap: 9, overflow: 'hidden' },
 });

@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/training/SessionCards.tsx — «сьогоднішнє тренування» великою
  * карткою, тиждень стрічкою, картка стріку й XP (training-module.md §10.1).
@@ -15,6 +14,7 @@ import type { SessionStatus, TrainingSession } from '@/utils/trainingTypes';
 
 import { Card, PrimaryButton } from './TrainingBits';
 import { fmt, TG_ACCENT, TG_ERR, TG_OK, TG_WARN, TG_XP, type TrainingColors } from './theme';
+import { fontFamily } from '@/constants/theme';
 
 export function statusLabel(tr: Translations, status: SessionStatus | string): string {
   switch (status) {
@@ -56,13 +56,13 @@ export function TodaySessionCard({ c, session, next, onOpen, noPlanText }: {
       <Card c={c}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <IconSymbol name="moon.fill" size={20} color={c.sub} />
-          <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight, flex: 1 }}>
+          <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, flex: 1 }}>
             {next ? tr.tgRestDay : noPlanText}
           </Text>
         </View>
         {next ? (
           <TouchableOpacity onPress={() => onOpen(next)} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center', marginTop: 4 }}>
-            <Text style={{ color: TG_ACCENT, fontSize: 14, fontWeight: '700' }}>
+            <Text style={{ color: TG_ACCENT, fontSize: 14, fontFamily: fontFamily.bold }}>
               {fmt(tr.tgNextSession, { date: `${formatSessionDate(tr, next.date)} · ${next.title || next.programName || ''}` })}
             </Text>
           </TouchableOpacity>
@@ -74,8 +74,8 @@ export function TodaySessionCard({ c, session, next, onOpen, noPlanText }: {
   const color = statusColor(session.status, c);
   return (
     <Card c={c} accent={TG_ACCENT}>
-      <Text style={{ color: c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight, textTransform: 'uppercase' }}>{tr.tgTodaySession}</Text>
-      <Text style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, marginTop: 6 }} numberOfLines={2}>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, textTransform: 'uppercase' }}>{tr.tgTodaySession}</Text>
+      <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.semibold, marginTop: 6 }} numberOfLines={2}>
         {session.title || session.programName || tr.workoutsLabel}
       </Text>
       <Text style={{ color: c.sub, fontSize: 13, marginTop: 4 }}>
@@ -96,7 +96,7 @@ export function TodaySessionCard({ c, session, next, onOpen, noPlanText }: {
         <PrimaryButton label={tr.tgStart} icon="play.fill" onPress={() => onOpen(session)} style={{ marginTop: 14 }} />
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
-          <Text style={{ color, fontWeight: Atlas.type.headingWeight }}>{statusLabel(tr, session.status)}</Text>
+          <Text style={{ color, fontFamily: fontFamily.semibold }}>{statusLabel(tr, session.status)}</Text>
           <PrimaryButton label={tr.tgView} variant="soft" onPress={() => onOpen(session)} />
         </View>
       )}
@@ -128,12 +128,11 @@ export function WeekStrip({ c, days, sessions, today, onOpen }: {
             accessibilityRole={s ? 'button' : 'text'}
             accessibilityLabel={label}
             style={{
-              flex: 1, minHeight: 64, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', gap: 4,
-              borderWidth: 1, borderColor: isToday ? TG_ACCENT : c.border,
-              backgroundColor: isToday ? TG_ACCENT + '18' : c.card,
+              flex: 1, minHeight: 64, borderRadius: 999, alignItems: 'center', justifyContent: 'center', gap: 4,
+              backgroundColor: isToday ? c.t.action.primary : c.chip,
             }}>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700' }}>{tr.weekdays[(d.getDay() + 6) % 7]}</Text>
-            <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{d.getDate()}</Text>
+            <Text style={{ color: isToday ? c.t.text.onAction : c.sub, fontSize: 11, fontFamily: fontFamily.medium }}>{tr.weekdays[(d.getDay() + 6) % 7]}</Text>
+            <Text style={{ color: isToday ? c.t.text.onAction : c.text, fontSize: 15, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{d.getDate()}</Text>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: s ? color : 'transparent', borderWidth: s ? 0 : 1, borderColor: c.border }} />
           </TouchableOpacity>
         );
@@ -148,15 +147,15 @@ export function StreakXpCard({ c, xpTotal, streakDays }: { c: TrainingColors; xp
   return (
     <View style={{ flexDirection: 'row', gap: 10 }}>
       <Card c={c} style={{ flex: 1 }} accent={TG_WARN}>
-        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700' }}>{tr.tgStreak}</Text>
-        <Text style={{ color: c.text, fontSize: 24, fontWeight: Atlas.type.headingWeight, marginTop: 4 }}>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold }}>{tr.tgStreak}</Text>
+        <Text style={{ color: c.text, fontSize: 24, fontFamily: fontFamily.semibold, marginTop: 4 }}>
           {`🔥 ${fmt(tr.tgStreakDays, { n: streakDays })}`}
         </Text>
-        <Text style={{ color: TG_WARN, fontSize: 12, fontWeight: '700', marginTop: 2 }}>{fmt(tr.tgMultiplier, { x: mult })}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginTop: 2 }}>{fmt(tr.tgMultiplier, { x: mult })}</Text>
       </Card>
       <Card c={c} style={{ flex: 1 }} accent={TG_XP}>
-        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700' }}>{tr.tgXpTotal}</Text>
-        <Text style={{ color: c.text, fontSize: 24, fontWeight: Atlas.type.headingWeight, marginTop: 4 }}>{`★ ${xpTotal}`}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.bold }}>{tr.tgXpTotal}</Text>
+        <Text style={{ color: c.text, fontSize: 24, fontFamily: fontFamily.semibold, marginTop: 4 }}>{`★ ${xpTotal}`}</Text>
       </Card>
     </View>
   );

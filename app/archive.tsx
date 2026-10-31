@@ -1,6 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -35,6 +32,11 @@ import {
 } from '@/utils/taskUtils';
 import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { useBreakpointValue } from '@/hooks/use-responsive';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
+import { AccentIcon } from '@/components/shared/GlassBits';
 
 type Status = 'active' | 'done';
 
@@ -63,6 +65,12 @@ type GridItem = Task | { padId: string };
 
 
 interface Palette {
+  /** Поверхня картки (DS surface.card). */
+  card: string;
+  /** Колір «виконано» (DS status.success). */
+  success: string;
+  /** Колір видалення (DS status.danger). */
+  danger: string;
   border: string;
   text: string;
   sub: string;
@@ -85,30 +93,25 @@ interface ArchiveCardProps {
  * перемальовування всіх рядків на кожен tap по фільтру помітне оком.
  */
 const ArchiveCard = React.memo(function ArchiveCard({
-  task, isDark, c, restoreLabel, deleteLabel, onRestore, onDelete,
+  task, c, restoreLabel, deleteLabel, onRestore, onDelete,
 }: ArchiveCardProps) {
   // Задача без (валідного) пріоритету — без бейджа, а не TypeError.
   const prioLevel = normalizePriority(task);
   return (
-    <BlurView
-      intensity={isDark ? 18 : 35}
-      tint={isDark ? 'dark' : 'light'}
-      style={[ar.card, { borderColor: c.border }]}>
-      {/* Green left stripe */}
-      <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: c.accent, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 }} />
-
-      <View style={{ marginLeft: 8, flex: 1 }}>
+    // DS v2: непрозора картка surface.card, без рамки й бічної смуги.
+    <View style={[ar.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
+      <View style={{ flex: 1 }}>
         {/* Title row */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7 }}>
           <AnimatedCheck
             checked={true}
             size={18}
             radius={5}
-            color="#10B981"
+            color={c.success}
             /* read-only: no onPress */
           />
           <Text
-            style={{ color: c.sub, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 9, textDecorationLine: 'line-through', lineHeight: 18 }}
+            style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.medium, flex: 1, marginLeft: 9, textDecorationLine: 'line-through', lineHeight: 18 }}
             numberOfLines={2}>
             {task.title}
           </Text>
@@ -118,17 +121,17 @@ const ArchiveCard = React.memo(function ArchiveCard({
             (рішення власника, п. 4 — як в особистих картках списку). */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginLeft: 27 }}>
           {task.subtasks.length > 0 && (
-            <View style={[ar.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
+            <View style={[ar.badge, { backgroundColor: c.dim }]}>
               <IconSymbol name="list.bullet" size={10} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>
+              <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginLeft: 3 }}>
                 {task.subtasks.filter(s => s.done).length}/{task.subtasks.length}
               </Text>
             </View>
           )}
           {task.deadline && (
-            <View style={[ar.badge, { backgroundColor: c.dim, borderColor: c.border }]}>
+            <View style={[ar.badge, { backgroundColor: c.dim }]}>
               <IconSymbol name="calendar" size={10} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginLeft: 3 }}>
+              <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], marginLeft: 3 }}>
                 {deadlineLabel(task.deadline)}
               </Text>
             </View>
@@ -148,24 +151,24 @@ const ArchiveCard = React.memo(function ArchiveCard({
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel={restoreLabel}
-          style={[ar.iconBtn, { backgroundColor: c.accent + '18', borderColor: c.accent + '40' }]}>
-          <IconSymbol name="arrow.uturn.backward" size={14} color={c.accent} />
+          style={[ar.iconBtn, { backgroundColor: c.dim }]}>
+          <IconSymbol name="arrow.uturn.backward" size={14} color={c.text} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => onDelete(task.id)}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           accessibilityRole="button"
           accessibilityLabel={deleteLabel}
-          style={[ar.iconBtn, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.28)' }]}>
-          <IconSymbol name="trash" size={14} color="#EF4444" />
+          style={[ar.iconBtn, { backgroundColor: c.dim }]}>
+          <IconSymbol name="trash" size={14} color={c.danger} />
         </TouchableOpacity>
       </View>
-    </BlurView>
+    </View>
   );
 });
 
 /** Проміжок між картками архіву (і між рядками, і між колонками). */
-const CARD_GAP = 8;
+const CARD_GAP = 12;
 
 export default function ArchiveScreen() {
   const readingWidth = useContentWidth();
@@ -292,15 +295,23 @@ export default function ArchiveScreen() {
 
   // Палітра стабільна між рендерами — інакше React.memo на картці
   // не спрацює: новий об'єкт кольорів щоразу рахувався б як зміна пропа.
-  const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: '#10B981',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  }), [isDark]);
+  // DS v2: семантичні токени; «виконано» — status.success.
+  const tk = dsTokens(isDark);
+  const c = useMemo(() => {
+    const t = dsTokens(isDark);
+    return {
+      bg1:     t.bg.canvas,
+      bg2:     t.bg.canvas,
+      card:    glassOf(t).surface,
+      border:  t.border.hairline,
+      text:    t.text.primary,
+      sub:     t.text.secondary,
+      accent:  t.status.success,
+      success: t.status.success,
+      danger:  t.status.danger,
+      dim:     glassOf(t).surfaceSubtle,
+    };
+  }, [isDark]);
 
   /**
    * Неповний останній рядок сітки добиваємо порожніми комірками: інакше
@@ -332,7 +343,7 @@ export default function ArchiveScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
       <SafeAreaView style={{ flex: 1 }} edges={[]}>
@@ -347,19 +358,19 @@ export default function ArchiveScreen() {
           back={{
             onPress: () => router.back(),
             label: tr.back,
-            color: c.accent,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            color: c.text,
+            style: { backgroundColor: c.card, borderColor: 'transparent' },
           }}
           actions={done.length > 0 ? (
             <>
-              <View style={[ar.countBadge, { backgroundColor: c.accent + '20', borderColor: c.accent + '50' }]}>
-                <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700' }}>{done.length}</Text>
+              <View style={[ar.countBadge, { backgroundColor: tk.accent.lime }]}>
+                <Text style={{ color: tk.text.onAccent, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{done.length}</Text>
               </View>
               <HeaderButton
                 onPress={clearAll}
                 accessibilityLabel={tr.clearArchive}
-                style={{ backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)' }}>
-                <IconSymbol name="trash" size={14} color="#EF4444" />
+                style={{ backgroundColor: c.card, borderColor: 'transparent' }}>
+                <IconSymbol name="trash" size={14} color={c.danger} />
               </HeaderButton>
             </>
           ) : undefined}
@@ -385,12 +396,10 @@ export default function ArchiveScreen() {
             <TouchableOpacity
               key={opt.key}
               onPress={() => setSort(opt.key)}
-              style={[ar.chip, {
-                backgroundColor: sort === opt.key ? c.accent + '20' : c.dim,
-                borderColor: sort === opt.key ? c.accent : c.border,
-              }]}>
-              <IconSymbol name={opt.icon as any} size={11} color={sort === opt.key ? c.accent : c.sub} />
-              <Text style={{ color: sort === opt.key ? c.accent : c.sub, fontSize: 11, fontWeight: '600', marginLeft: 4 }}>
+              // DS v2: сортування — pill-чипи, активний — action.primary.
+              style={[ar.chip, { backgroundColor: sort === opt.key ? tk.action.primary : c.card }]}>
+              <IconSymbol name={opt.icon as any} size={11} color={sort === opt.key ? tk.text.onAction : c.sub} />
+              <Text style={{ color: sort === opt.key ? tk.text.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 4 }}>
                 {opt.label}
               </Text>
             </TouchableOpacity>
@@ -398,7 +407,7 @@ export default function ArchiveScreen() {
         </View>
 
         {/* Архів росте без стелі — список віртуалізований, інакше
-            кількасот BlurView-карток монтуються всі одразу. */}
+            кількасот карток монтуються всі одразу. */}
         <FlatList
           // numColumns не можна міняти «на льоту» — при повороті планшета
           // список перемонтовується з новим ключем.
@@ -413,11 +422,9 @@ export default function ArchiveScreen() {
           renderItem={renderItem}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 72 }}>
-              <View style={[ar.emptyIcon, { backgroundColor: c.accent + '15', borderColor: c.accent + '25' }]}>
-                <IconSymbol name="archivebox.fill" size={32} color={c.accent} />
-              </View>
-              <Text style={{ color: c.sub, fontSize: 15, marginTop: 18, fontWeight: '600' }}>Архів порожній</Text>
-              <Text style={{ color: c.sub, fontSize: 13, marginTop: 5, opacity: 0.7 }}>Виконані завдання з’являться тут</Text>
+              <AccentIcon isDark={isDark} icon="archivebox.fill" accent="lavender" size="lg" style={ar.emptyIcon} />
+              <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontFamily: fontFamily.semibold }}>Архів порожній</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 5 }}>Виконані завдання з’являться тут</Text>
             </View>
           }
         />
@@ -432,10 +439,10 @@ function ArchiveSeparator() {
 
 const ar = StyleSheet.create({
   gridCell:   { flex: 1, minWidth: 0, maxWidth: '100%' },
-  countBadge: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 4 },
-  chip:       { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
-  emptyIcon:  { width: 80, height: 80, borderRadius: Atlas.radius.xlarge, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  card:       { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 13, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
-  badge:      { flexDirection: 'row', alignItems: 'center', borderRadius: 7, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 3 },
-  iconBtn:    { width: 32, height: 32, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  countBadge: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  chip:       { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, minHeight: 36, paddingHorizontal: 14, paddingVertical: 6 },
+  emptyIcon:  { width: 80, height: 80, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  card:       { borderRadius: radius.nested, padding: 16, overflow: 'hidden', flexDirection: 'row', alignItems: 'center' },
+  badge:      { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  iconBtn:    { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

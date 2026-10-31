@@ -236,11 +236,9 @@ export function renewSubscription(sub: Subscription, opts?: { amount?: number; n
 /**
  * Момент ISO для дня `dateKey` з годиною з `now`.
  *
- * Операція датується днем ЦИКЛУ, який оплатили, а не «сьогодні»: прострочену
- * підписку позначають заднім числом, і витрата мусить лягти в той місяць, за
- * який заплатили, інакше бюджет місяця розходиться з підписками. Час доби
- * береться поточний — інакше всі операції дня злиплись би в опівніч і порядок
- * усередині дня став би випадковим (те саме правило, що у формі операції).
+ * Час доби береться поточний — інакше всі операції дня злиплись би в опівніч
+ * і порядок усередині дня став би випадковим (те саме правило, що у формі
+ * операції).
  */
 export function dateKeyAtTime(dateKey: string, now: Date = new Date()): string {
   const p = parseDateKey(dateKey);
@@ -266,6 +264,12 @@ export interface SubscriptionPaymentOptions {
   amount?: number;
   /** Категорія, коли в підписці її не вказано. */
   fallbackCategory: string;
+  /**
+   * 'YYYY-MM-DD' — день фактичного списання; відсутній чи невалідний — сьогодні.
+   * Операція лягає саме на нього (як у виписці банку), а не на день циклу.
+   * Дзеркало вебу (lib/subscriptions.ts).
+   */
+  paidOn?: string;
   now?: Date;
 }
 
@@ -285,7 +289,12 @@ export function subscriptionPaymentTx(sub: Subscription, opts: SubscriptionPayme
     category: (sub.category ?? '').trim() || opts.fallbackCategory,
     amount: subscriptionPaymentAmount(sub, opts.amount),
     note: sub.name,
-    date: dateKeyAtTime(sub.nextPaymentDate, now),
+    date: dateKeyAtTime(
+      opts.paidOn && isDateKey(opts.paidOn)
+        ? opts.paidOn
+        : formatKey(now.getFullYear(), now.getMonth() + 1, now.getDate()),
+      now,
+    ),
     accountId: opts.accountId ?? '',
     currency: opts.currency || sub.currency,
     projectId: sub.projectId,

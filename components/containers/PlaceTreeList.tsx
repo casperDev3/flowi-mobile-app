@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius, type as dsType } from '@/constants/theme';
 import React, { useMemo, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -28,7 +28,7 @@ export const NO_PLACE = '__none__';
  * лічильниками; вибір фільтрує сітку праворуч (§8.2).
  */
 export function PlaceTreeList({
-  places, containers, statsFor, c, accent, mode, selected, onSelect, onOpenBox, onEditPlace, onAddPlace,
+  places, containers, statsFor, c, accent: _accent, mode, selected, onSelect, onOpenBox, onEditPlace, onAddPlace,
 }: {
   places: readonly ContainerPlace[];
   containers: readonly Container[];
@@ -77,8 +77,8 @@ export function PlaceTreeList({
         accessibilityLabel={`${box.name}, ${itemsCount(tr, stats.count, lang)}`}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingLeft: 12 + depth * 16, paddingRight: 12 }}>
         <IconSymbol name="shippingbox.fill" size={14} color={color} />
-        <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '600' }}>{box.name}</Text>
-        <Text style={{ color: c.sub, fontSize: 12 }}>{stats.count}</Text>
+        <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontFamily: fontFamily.medium }}>{box.name}</Text>
+        <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, ...dsType.numeric }}>{stats.count}</Text>
         <IconSymbol name="chevron.right" size={11} color={c.sub} />
       </TouchableOpacity>
     );
@@ -91,31 +91,31 @@ export function PlaceTreeList({
     const active = mode === 'column' && selected === node.place.id;
     return (
       <View key={node.place.id}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 4 + node.depth * 16, borderRadius: Atlas.radius.medium,
-          backgroundColor: active ? accent + '22' : 'transparent' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 4 + node.depth * 16, borderRadius: radius.pill,
+          backgroundColor: active ? c.t.action.primary : 'transparent' }}>
           <TouchableOpacity onPress={() => expandable && toggle(node.place.id)} disabled={!expandable}
             accessibilityRole="button" accessibilityState={{ expanded: expandable ? open : undefined }}
             accessibilityLabel={node.place.name}
             style={{ width: 32, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-            {expandable ? <IconSymbol name={open ? 'chevron.down' : 'chevron.right'} size={12} color={c.sub} /> : null}
+            {expandable ? <IconSymbol name={open ? 'chevron.down' : 'chevron.right'} size={12} color={active ? c.t.text.onAction : c.sub} /> : null}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => (mode === 'column' ? onSelect?.(node.place.id) : toggle(node.place.id))}
             onLongPress={() => onEditPlace(node.place)} accessibilityRole="button"
             accessibilityHint={tr.ctrPlaceEdit} accessibilityState={{ selected: active }}
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
-            <IconSymbol name={placeKindIcon(node.place.kind)} size={14} color={active ? accent : c.sub} />
-            <Text numberOfLines={1} style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '700' }}>{node.place.name}</Text>
-            <Text style={{ color: c.sub, fontSize: 12 }}>{counts.get(node.place.id) ?? 0}</Text>
+            <IconSymbol name={placeKindIcon(node.place.kind)} size={14} color={active ? c.t.text.onAction : c.sub} />
+            <Text numberOfLines={1} style={{ flex: 1, color: active ? c.t.text.onAction : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{node.place.name}</Text>
+            <Text style={{ color: active ? c.t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.regular, ...dsType.numeric }}>{counts.get(node.place.id) ?? 0}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onEditPlace(node.place)} accessibilityRole="button"
             accessibilityLabel={`${tr.ctrPlaceEdit}: ${node.place.name}`}
             style={{ width: 40, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name="pencil" size={12} color={c.sub} />
+            <IconSymbol name="pencil" size={12} color={active ? c.t.text.onAction : c.sub} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onAddPlace(node.place.id)} accessibilityRole="button"
             accessibilityLabel={`${tr.ctrPlaceCreateHere}: ${node.place.name}`}
             style={{ width: 40, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name="plus" size={13} color={c.sub} />
+            <IconSymbol name="plus" size={13} color={active ? c.t.text.onAction : c.sub} />
           </TouchableOpacity>
         </View>
         {open ? (
@@ -133,10 +133,10 @@ export function PlaceTreeList({
     const active = selected === id;
     return (
       <TouchableOpacity onPress={() => onSelect?.(id)} accessibilityRole="button" accessibilityState={{ selected: active }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, borderRadius: Atlas.radius.medium,
-          backgroundColor: active ? accent + '22' : 'transparent' }}>
-        <Text style={{ flex: 1, color: c.text, fontSize: 14, fontWeight: '700' }}>{label}</Text>
-        <Text style={{ color: c.sub, fontSize: 12 }}>{count}</Text>
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, borderRadius: radius.pill,
+          backgroundColor: active ? c.t.action.primary : 'transparent' }}>
+        <Text style={{ flex: 1, color: active ? c.t.text.onAction : c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{label}</Text>
+        <Text style={{ color: active ? c.t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.regular, ...dsType.numeric }}>{count}</Text>
       </TouchableOpacity>
     );
   };
@@ -144,21 +144,21 @@ export function PlaceTreeList({
   return (
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 4 }}>
-        <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr.ctrPlaces}</Text>
+        <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5 }}>{tr.ctrPlaces}</Text>
         <TouchableOpacity onPress={() => onAddPlace(null)} accessibilityRole="button" accessibilityLabel={tr.ctrPlaceNew}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingHorizontal: 8 }}>
-          <IconSymbol name="plus" size={13} color={accent} />
-          <Text style={{ color: accent, fontSize: 13, fontWeight: '700' }}>{tr.ctrPlaceNew}</Text>
+          <IconSymbol name="plus" size={13} color={c.text} />
+          <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.ctrPlaceNew}</Text>
         </TouchableOpacity>
       </View>
       {mode === 'column' ? header(tr.ctrAllBoxes, null, containers.length) : null}
       {tree.length ? tree.map(placeRow) : (
-        <Text style={{ color: c.sub, fontSize: 13, paddingHorizontal: 12, paddingVertical: 10 }}>{tr.ctrPlacesEmpty}</Text>
+        <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, paddingHorizontal: 12, paddingVertical: 10 }}>{tr.ctrPlacesEmpty}</Text>
       )}
       {unplaced.length ? (
         mode === 'column' ? header(tr.ctrNoPlace, NO_PLACE, unplaced.length) : (
           <View style={{ marginTop: 6 }}>
-            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 6 }}>{tr.ctrNoPlace}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, paddingHorizontal: 12, paddingVertical: 6 }}>{tr.ctrNoPlace}</Text>
             {unplaced.map(box => boxRow(box, 0))}
           </View>
         )

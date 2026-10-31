@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -7,6 +6,7 @@ import { ChartTypeToggle, PeriodSelector, TrendChart } from '@/components/health
 import { useChartType } from '@/store/chart-prefs';
 import { Agg, Period, buildTrend } from '@/utils/healthPeriods';
 import { ACCENT } from '@/utils/healthTheme';
+import { fontFamily } from '@/constants/theme';
 import { EntryType, HealthEntry } from '@/utils/healthUtils';
 
 /**
@@ -46,7 +46,7 @@ export function MetricTrend({ entries, type, agg, color, goal, format, c, tr, ti
     <HealthCard
       c={c}
       title={title ?? tr.dynamics}
-      right={<Text style={{ color, fontSize: 16, fontWeight: Atlas.type.headingWeight }}>{hasAny ? format(headline) : '—'}</Text>}>
+      right={<Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, letterSpacing: -0.44, fontVariant: ['tabular-nums'] }}>{hasAny ? format(headline) : '—'}</Text>}>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 10 }}>
         <View style={{ flex: 1 }}><PeriodSelector period={period} onChange={setPeriod} color={ACCENT} c={c} tr={tr} /></View>
         <ChartTypeToggle value={chartType} onChange={setChartType} color={ACCENT} c={c} tr={tr} />
@@ -54,7 +54,7 @@ export function MetricTrend({ entries, type, agg, color, goal, format, c, tr, ti
       {hasAny ? (
         <>
           <TrendChart data={d} color={color} sub={c.sub} goal={goal} height={88} chartType={chartType} />
-          <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>{sub2}</Text>
+          <Text style={{ color: c.sub, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] }}>{sub2}</Text>
         </>
       ) : (
         <Text style={{ color: c.sub, fontSize: 12, paddingVertical: 16, textAlign: 'center' }}>{tr.noDataPeriod}</Text>

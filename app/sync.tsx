@@ -1,8 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
 import {loadRecoveryDrafts,dismissRecoveryDraft,type RecoveryDraft} from '@/store/recovery-drafts';
-import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -19,7 +16,8 @@ import { ScreenHeader } from '@/components/shared/ScreenHeader';
 
 import { SyncDiagnosticsPanel } from '@/components/shared/SyncDiagnosticsPanel';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { fontFamily, radius, shadow, space, type as dsType } from '@/constants/theme';
+import { useDS, type DSTheme } from '@/hooks/use-ds';
 import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
@@ -37,6 +35,8 @@ import {
 import { EMPTY_LOCAL_ONLY, type LocalOnlyReport } from '@/utils/syncDivergence';
 import { markDirty, SYNC_SINGLETON_KEYS } from '@/store/synced-storage';
 import { useContentWidth } from '@/hooks/use-content-width';
+import { glassStyles, type GlassStyles } from '@/components/finance/finPalette';
+import { GlassSurface, MeshBackground } from '@/components/ds';
 
 const DATA_KEY_LABELS: Record<string, string> = {
   tasks: 'Завдання', transactions: 'Транзакції', time_entries: 'Час',
@@ -52,12 +52,16 @@ const FIELD_LABELS: Record<string, string> = {
 interface Palette {
   bg1: string; bg2: string; border: string; text: string; sub: string;
   accent: string; green: string; orange: string; red: string; dim: string;
+  /** DS v2: тло карток і повні токени (pill-кнопки, стани). */
+  card: string; t: DSTheme; isDark: boolean;
+  /** DS v2.1: стилі скла й змивка акценту (info). */
+  gl: GlassStyles; accentTint: string;
 }
 
 export default function SyncScreen() {
   const contentWidth = useContentWidth();
   const router = useRouter();
-  const isDark = useColorScheme() === 'dark';
+  const { t, g, isDark, reduceTransparency } = useDS();
   const { tr } = useI18n();
   const { online } = useAppMode();
   const { status: authStatus } = useAuth();
@@ -74,15 +78,21 @@ export default function SyncScreen() {
 
   // Палітра — у useMemo: картка конфлікту нижче обгорнута в React.memo і
   // новий об'єкт кольорів щоразу зводив би мемоізацію нанівець.
+  // DS v2: токени теми. `accent` — нейтральний (text.primary): головна дія
+  // малюється pill action.primary, статуси — крапками status.*.
   const c: Palette = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F5F5FA',
-    bg2:    isDark ? '#14121E' : '#EBEBF5',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: '#7C3AED', green: '#10B981', orange: '#F59E0B', red: '#EF4444',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  }), [isDark]);
+    bg1:    g.mesh.base,
+    bg2:    g.mesh.base,
+    border: t.border.hairline,
+    text:   t.text.primary,
+    sub:    t.text.secondary,
+    accent: g.accent.info.ink, green: t.status.success, orange: t.status.warning, red: t.status.danger,
+    dim:    g.surfaceSubtle,
+    card:   reduceTransparency ? g.solid.card : g.surface,
+    t, isDark,
+    gl: glassStyles(isDark, reduceTransparency),
+    accentTint: g.accent.info.tint,
+  }), [t, g, isDark, reduceTransparency]);
 
   const refreshConflicts = useCallback(async () => {
     setConflicts(await loadConflicts());
@@ -163,7 +173,7 @@ export default function SyncScreen() {
 
   const cloudStatusColor =
     hasCloudError ? c.red :
-    isCloudSyncing ? c.accent :
+    isCloudSyncing ? c.t.status.info :
     conflictsCount > 0 ? c.orange : c.green;
 
   const errorText = formatSyncError(lastError);
@@ -187,7 +197,7 @@ export default function SyncScreen() {
   // ─── Main screen ────────────────────────────────────────────────────────────
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Без edges={['top']}: верхній інсет дає ScreenHeader через
           useTopInset() (CLAUDE.md) — разом вони зсували шапку двічі. */}
       <SafeAreaView style={{ flex: 1 }} edges={[]}>
@@ -197,7 +207,7 @@ export default function SyncScreen() {
         <ScreenHeader
           title={tr.sync}
           color={c.text}
-          back={{ onPress: () => router.back(), label: tr.back, color: c.accent }}
+          back={{ onPress: () => router.back(), label: tr.back, color: c.text, style: { ...c.gl.card, borderColor: 'transparent' } }}
           crumbs={[
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
             { label: tr.sync },
@@ -209,10 +219,10 @@ export default function SyncScreen() {
           contentContainerStyle={[contentWidth, { padding: 20, paddingBottom: 48 }]}
           showsVerticalScrollIndicator={false}>
 
-            {recovery.map(row=><View key={row.id} style={{padding:12,marginBottom:12,borderWidth:1,borderColor:c.border,borderRadius:12}}>
+            {recovery.map(row=><View key={row.id} style={{padding:16,marginBottom:12,backgroundColor:c.card,borderRadius:radius.nested}}>
               <Text style={{color:c.text}}>Локальна чернетка: права змінилися, ваш текст збережено.</Text>
               <Text selectable style={{color:c.text,marginVertical:8}}>{Object.values(row.text).join('\n\n')}</Text>
-              <TouchableOpacity accessibilityRole="button" onPress={()=>void Clipboard.setStringAsync(Object.values(row.text).join('\n\n'))}><Text style={{color:c.accent}}>Копіювати текст</Text></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" onPress={()=>void Clipboard.setStringAsync(Object.values(row.text).join('\n\n'))}><Text style={{color:c.text,fontFamily:fontFamily.semibold,textDecorationLine:'underline'}}>Копіювати текст</Text></TouchableOpacity>
               <TouchableOpacity accessibilityRole="button" onPress={()=>void dismissRecoveryDraft(row.id).then(refreshConflicts)}><Text style={{color:c.sub}}>Видалити чернетку</Text></TouchableOpacity>
             </View>)}
             {/* ── CLOUD SYNC CARD ── */}
@@ -220,13 +230,13 @@ export default function SyncScreen() {
               {tr.cloudSync.toUpperCase()}
             </Text>
 
-            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-              style={[st.card, { borderColor: c.border }]}>
+            <GlassSurface radius={radius.cardCompact} style={st.card}>
 
               {/* Cloud status row */}
-              <View style={[st.statusRow, { backgroundColor: cloudStatusColor + '15', borderColor: cloudStatusColor + '30' }]}>
+              {/* Статус — кольоровою крапкою; текст text.primary (4.5:1). */}
+              <View style={[st.statusRow, { backgroundColor: c.dim }]}>
                 <View style={[st.statusDot, { backgroundColor: cloudStatusColor }]} />
-                <Text style={[st.statusText, { color: cloudStatusColor, flex: 1 }]}>
+                <Text style={[st.statusText, { color: c.text, flex: 1 }]}>
                   {cloudStatusText}
                 </Text>
                 {isCloudSyncing && (
@@ -245,9 +255,9 @@ export default function SyncScreen() {
               {/* Причина провалу. Без неї «помилка» — це глухий кут: рушій знає
                   {status, code, message}, а користувач не бачив нічого. */}
               {errorText && (
-                <View style={[st.hintRow, { backgroundColor: c.red + '12', borderColor: c.red + '28' }]}>
+                <View style={[st.hintRow, { backgroundColor: c.red + '12' }]}>
                   <IconSymbol name="exclamationmark.circle" size={14} color={c.red} />
-                  <Text style={[st.hintText, { color: c.red }]} numberOfLines={4}>
+                  <Text style={[st.hintText, { color: c.text }]} numberOfLines={4}>
                     {errorText}
                   </Text>
                 </View>
@@ -256,9 +266,9 @@ export default function SyncScreen() {
               {/* Застрягла черга — окремий сигнал: синк може рапортувати «ок»,
                   поки записи не доїжджають днями. */}
               {isStalled && (
-                <View style={[st.hintRow, { backgroundColor: c.orange + '12', borderColor: c.orange + '28' }]}>
-                  <IconSymbol name="clock" size={14} color={c.orange} />
-                  <Text style={[st.hintText, { color: c.orange }]}>
+                <View style={[st.hintRow, { backgroundColor: c.orange + '1A' }]}>
+                  <IconSymbol name="clock" size={14} color={c.text} />
+                  <Text style={[st.hintText, { color: c.text }]}>
                     Черга не рухається з {fmtSyncTime(oldestPendingAt!)}. Записи лишаються
                     на цьому пристрої й не бачать змін з сервера.
                   </Text>
@@ -267,13 +277,13 @@ export default function SyncScreen() {
 
               {/* Guest / Offline hint */}
               {!online && (
-                <View style={[st.hintRow, { backgroundColor: c.sub + '12', borderColor: c.sub + '20' }]}>
+                <View style={[st.hintRow, { backgroundColor: c.dim }]}>
                   <IconSymbol name="icloud.slash" size={14} color={c.sub} />
                   <Text style={[st.hintText, { color: c.sub }]}>{tr.syncOfflineHint}</Text>
                 </View>
               )}
               {online && authStatus !== 'authed' && (
-                <View style={[st.hintRow, { backgroundColor: c.sub + '12', borderColor: c.sub + '20' }]}>
+                <View style={[st.hintRow, { backgroundColor: c.dim }]}>
                   <IconSymbol name="person.slash" size={14} color={c.sub} />
                   <Text style={[st.hintText, { color: c.sub }]}>{tr.syncGuestHint}</Text>
                 </View>
@@ -285,20 +295,20 @@ export default function SyncScreen() {
                 disabled={!isOnlineAuthed || isCloudSyncing}
                 style={[st.syncBtn, {
                   backgroundColor: isOnlineAuthed && !isCloudSyncing
-                    ? c.accent
-                    : c.dim,
+                    ? t.action.primary
+                    : t.state.disabledBg,
                 }]}>
                 {isCloudSyncing
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <IconSymbol name="arrow.triangle.2.circlepath" size={16} color="#fff" />
+                  ? <ActivityIndicator size="small" color={t.state.disabledText} />
+                  : <IconSymbol name="arrow.triangle.2.circlepath" size={16} color={isOnlineAuthed ? t.text.onAction : t.state.disabledText} />
                 }
                 <Text style={[st.syncBtnText, {
-                  color: isOnlineAuthed && !isCloudSyncing ? '#fff' : c.sub,
+                  color: isOnlineAuthed && !isCloudSyncing ? t.text.onAction : t.state.disabledText,
                 }]}>
                   {tr.syncNow}
                 </Text>
               </TouchableOpacity>
-            </BlurView>
+            </GlassSurface>
 
             {/* ── ЛИШЕ НА ЦЬОМУ ПРИСТРОЇ ──
                 Стоїть ВИЩЕ за карантин навмисно: карантин каже «сервер
@@ -310,19 +320,19 @@ export default function SyncScreen() {
                 <Text style={[st.sectionLabel, { color: c.sub }]}>
                   {tr.syncLocalOnlyTitle.toUpperCase()} ({localOnly.total})
                 </Text>
-                <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-                  style={[st.card, { borderColor: c.red + '28', marginTop: 8 }]}>
+                <GlassSurface radius={radius.cardCompact} style={[st.card, { marginTop: 8 }]}>
                   <Text style={[st.hintText, { color: c.sub, marginBottom: 10 }]}>
                     {tr.syncLocalOnlyHint}
                   </Text>
                   {localOnly.byCollection.map(row => (
                     <View
                       key={row.collection}
-                      style={[st.hintRow, { backgroundColor: c.red + '10', borderColor: c.red + '24' }]}>
+                      style={[st.hintRow, { backgroundColor: c.dim }]}>
+                      <View style={[st.statusDot, { backgroundColor: c.t.accent.coral, marginRight: 0 }]} />
                       <Text style={[st.hintText, { color: c.text, flex: 1 }]} numberOfLines={1}>
                         {row.collection}
                       </Text>
-                      <Text style={[st.hintText, { color: c.text, fontWeight: '700' }]}>
+                      <Text style={[st.hintText, { color: c.text, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], flex: 0 }]}>
                         {row.count}
                       </Text>
                     </View>
@@ -331,18 +341,15 @@ export default function SyncScreen() {
                     onPress={() => void handlePushAll()}
                     disabled={pushing || !isOnlineAuthed}
                     accessibilityRole="button"
-                    style={[st.hintRow, {
-                      backgroundColor: c.accent + '18',
-                      borderColor: c.accent,
-                      opacity: pushing || !isOnlineAuthed ? 0.5 : 1,
-                      justifyContent: 'center',
+                    style={[st.syncBtn, {
+                      backgroundColor: pushing || !isOnlineAuthed ? t.state.disabledBg : t.action.primary,
                       marginTop: 10,
                     }]}>
-                    <Text style={[st.hintText, { color: c.accent, fontWeight: '700' }]}>
+                    <Text style={[st.syncBtnText, { color: pushing || !isOnlineAuthed ? t.state.disabledText : t.text.onAction }]}>
                       {tr.syncLocalOnlyAction}
                     </Text>
                   </TouchableOpacity>
-                </BlurView>
+                </GlassSurface>
               </View>
             )}
 
@@ -363,8 +370,7 @@ export default function SyncScreen() {
                 <Text style={[st.sectionLabel, { color: c.sub }]}>
                   СЕРВЕР НЕ ПРИЙНЯВ ({rejected.length})
                 </Text>
-                <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-                  style={[st.card, { borderColor: c.red + '28', marginTop: 8 }]}>
+                <GlassSurface radius={radius.cardCompact} style={[st.card, { marginTop: 8 }]}>
                   <Text style={[st.hintText, { color: c.sub, marginBottom: 10 }]}>
                     Ці записи лишаються на пристрої. Решта синхронізації працює —
                     вони більше не блокують чергу.
@@ -372,7 +378,8 @@ export default function SyncScreen() {
                   {rejected.map(item => (
                     <View
                       key={`${item.collection}:${item.local_id}`}
-                      style={[st.hintRow, { backgroundColor: c.red + '10', borderColor: c.red + '24' }]}>
+                      style={[st.hintRow, { backgroundColor: c.dim }]}>
+                      <View style={[st.statusDot, { backgroundColor: c.t.accent.coral, marginRight: 0 }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={[st.hintText, { color: c.text }]} numberOfLines={1}>
                           {DATA_KEY_LABELS[item.collection] ?? item.collection}
@@ -392,7 +399,7 @@ export default function SyncScreen() {
                       </TouchableOpacity>
                     </View>
                   ))}
-                </BlurView>
+                </GlassSurface>
               </View>
             )}
 
@@ -409,12 +416,12 @@ export default function SyncScreen() {
 
             {/* ── SUCCESS CLOUD ── */}
             {syncState === 'idle' && conflicts.length === 0 && lastSyncAt && (
-              <View style={[st.banner, { backgroundColor: c.green + '12', borderColor: c.green + '28' }]}>
-                <View style={[st.bannerIcon, { backgroundColor: c.green + '20' }]}>
+              <View style={[st.banner, { ...c.gl.card }]}>
+                <View style={[st.bannerIcon, { backgroundColor: c.green + '1F' }]}>
                   <IconSymbol name="checkmark" size={18} color={c.green} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[st.bannerTitle, { color: c.green }]}>Синхронізовано успішно</Text>
+                  <Text style={[st.bannerTitle, { color: c.text }]}>Синхронізовано успішно</Text>
                   <Text style={[st.bannerSub, { color: c.sub }]}>Всі дані актуальні</Text>
                 </View>
               </View>
@@ -441,35 +448,35 @@ const ConflictCard = React.memo(function ConflictCard({ conflict, onResolve, c, 
   const diffs = getFieldDiffs(conflict.local, conflict.remote);
 
   return (
-    <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'}
-      style={[st.conflictCard, { borderColor: '#F59E0B28' }]}>
+    <View style={[st.conflictCard, { ...c.gl.card }, shadow[isDark ? 'dark' : 'light'].card]}>
 
       <View style={[st.conflictHead, { borderBottomColor: c.border }]}>
-        <View style={[st.conflictDot, { backgroundColor: '#F59E0B' }]} />
-        <Text style={st.conflictLabel}>{label.toUpperCase()}</Text>
+        <View style={[st.conflictDot, { backgroundColor: c.t.status.warning }]} />
+        <Text style={[st.conflictLabel, { color: c.sub }]}>{label.toUpperCase()}</Text>
         <Text style={[st.conflictName, { color: c.text, flex: 1 }]} numberOfLines={1}>{name}</Text>
         <Text style={[st.diffCount, { color: c.sub }]}>{diffs.length} змін</Text>
       </View>
 
       <View style={st.versionsRow}>
-        <VersionPanel label="Мій пристрій" accent="#7C3AED" diffs={diffs} version="local" c={c} />
+        <VersionPanel label="Мій пристрій" accent={c.t.accent.lavender} diffs={diffs} version="local" c={c} />
         <View style={[st.vDivider, { backgroundColor: c.border }]} />
-        <VersionPanel label="Інший пристрій" accent="#6366F1" diffs={diffs} version="remote" c={c} />
+        <VersionPanel label="Інший пристрій" accent={c.t.status.info} diffs={diffs} version="remote" c={c} />
       </View>
 
       <View style={[st.conflictActions, { borderTopColor: c.border }]}>
+        {/* Два рівноправні рішення — дві pill: основна (моє) і вторинна (інше). */}
         <TouchableOpacity onPress={() => onResolve(conflict.id, 'local')}
-          style={[st.resolveBtn, { backgroundColor: 'rgba(124,58,237,0.1)', borderRightColor: c.border }]}>
-          <IconSymbol name="checkmark" size={13} color="#7C3AED" />
-          <Text style={[st.resolveBtnText, { color: '#7C3AED' }]}>Залишити моє</Text>
+          style={[st.resolveBtn, { backgroundColor: c.t.action.primary }]}>
+          <IconSymbol name="checkmark" size={13} color={c.t.text.onAction} />
+          <Text style={[st.resolveBtnText, { color: c.t.text.onAction }]}>Залишити моє</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => onResolve(conflict.id, 'remote')}
-          style={[st.resolveBtn, { backgroundColor: 'rgba(99,102,241,0.1)' }]}>
-          <IconSymbol name="checkmark" size={13} color="#6366F1" />
-          <Text style={[st.resolveBtnText, { color: '#6366F1' }]}>Прийняти інше</Text>
+          style={[st.resolveBtn, { ...c.gl.subtle }]}>
+          <IconSymbol name="checkmark" size={13} color={c.t.action.secondaryText} />
+          <Text style={[st.resolveBtnText, { color: c.t.action.secondaryText }]}>Прийняти інше</Text>
         </TouchableOpacity>
       </View>
-    </BlurView>
+    </View>
   );
 });
 
@@ -482,7 +489,7 @@ function VersionPanel({ label, accent, diffs, version, c }: {
     <View style={{ flex: 1 }}>
       <View style={st.vLabelRow}>
         <View style={[st.vDot, { backgroundColor: accent }]} />
-        <Text style={[st.vLabel, { color: accent }]}>{label.toUpperCase()}</Text>
+        <Text style={[st.vLabel, { color: c.sub }]}>{label.toUpperCase()}</Text>
       </View>
       {diffs.length === 0
         ? <Text style={{ fontSize: 12, color: c.sub }}>Без змін</Text>
@@ -532,34 +539,34 @@ function fmtSyncTime(ms: number): string {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  card:          { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', padding: 20, marginBottom: 16 },
-  statusRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, borderRadius: Atlas.radius.medium, borderWidth: 1, marginBottom: 14 },
-  statusDot:     { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
-  statusText:    { fontSize: 13, fontWeight: '600' },
-  pendingText:   { fontSize: 12, color: '#888', marginBottom: 12, paddingHorizontal: 2 },
-  hintRow:       { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, marginBottom: 14 },
-  hintText:      { fontSize: 12, fontWeight: '500', flex: 1 },
-  syncBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: Atlas.radius.large, marginTop: 4 },
-  syncBtnText:   { fontSize: 14, fontWeight: '700' },
-  banner:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: Atlas.radius.large, borderWidth: 1, marginBottom: 16 },
-  bannerIcon:    { width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  bannerTitle:   { fontSize: 14, fontWeight: '700' },
-  bannerSub:     { fontSize: 12, marginTop: 2 },
-  sectionLabel:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginLeft: 2 },
-  conflictCard:  { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  conflictHead:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1 },
+  card:          { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: space.cardGap },
+  statusRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.pill, marginBottom: 14 },
+  statusDot:     { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  statusText:    { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
+  pendingText:   { ...dsType.caption, fontVariant: ['tabular-nums'], marginBottom: 12, paddingHorizontal: 2 },
+  hintRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.nestedCompact, marginBottom: 12 },
+  hintText:      { fontSize: 12, fontFamily: fontFamily.regular, lineHeight: 17, flex: 1 },
+  syncBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: radius.pill, marginTop: 4 },
+  syncBtnText:   { fontSize: 14, fontFamily: fontFamily.semibold },
+  banner:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: space[4], borderRadius: radius.nested, marginBottom: 16 },
+  bannerIcon:    { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  bannerTitle:   { ...dsType.h2, fontSize: 14 },
+  bannerSub:     { ...dsType.caption, marginTop: 2 },
+  sectionLabel:  { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.8, marginLeft: 4 },
+  conflictCard:  { borderRadius: radius.cardCompact, overflow: 'hidden', marginBottom: 12 },
+  conflictHead:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   conflictDot:   { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
-  conflictLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, color: '#F59E0B' },
-  conflictName:  { fontSize: 13, fontWeight: '700', marginLeft: 4 },
-  diffCount:     { fontSize: 10, fontWeight: '600' },
+  conflictLabel: { fontSize: 10, fontFamily: fontFamily.semibold, letterSpacing: 0.6 },
+  conflictName:  { fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 4 },
+  diffCount:     { fontSize: 10, fontFamily: fontFamily.semibold },
   versionsRow:   { flexDirection: 'row', padding: 14, gap: 12 },
-  vDivider:      { width: 1 },
+  vDivider:      { width: StyleSheet.hairlineWidth },
   vLabelRow:     { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
   vDot:          { width: 5, height: 5, borderRadius: 3 },
-  vLabel:        { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  fKey:          { fontSize: 10, fontWeight: '600', letterSpacing: 0.3, marginBottom: 2 },
-  fVal:          { fontSize: 12, fontWeight: '500', lineHeight: 16 },
-  conflictActions:{ flexDirection: 'row', borderTopWidth: 1 },
-  resolveBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 13, borderRightWidth: 1 },
-  resolveBtnText:{ fontSize: 13, fontWeight: '700' },
+  vLabel:        { fontSize: 10, fontFamily: fontFamily.semibold, letterSpacing: 0.5 },
+  fKey:          { fontSize: 10, fontFamily: fontFamily.semibold, letterSpacing: 0.3, marginBottom: 2 },
+  fVal:          { fontSize: 12, fontFamily: fontFamily.medium, lineHeight: 16 },
+  conflictActions:{ flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  resolveBtn:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 44, borderRadius: radius.pill },
+  resolveBtnText:{ fontSize: 13, fontFamily: fontFamily.semibold },
 });

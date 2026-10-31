@@ -1,4 +1,6 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily, type } from '@/constants/theme';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 /**
  * Вкладка «Нагадування» центру сповіщень — локально заплановані нагадування
  * ОС (notifications-module.md §10.4). Раніше це був увесь екран
@@ -9,7 +11,6 @@ import { Atlas } from '@/constants/atlas';
  * Перемикач `notificationsEnabled` — вимикач саме ЛОКАЛЬНИХ нагадувань;
  * серверні керуються налаштуваннями сповіщень (окремий екран).
  */
-import { BlurView } from 'expo-blur';
 import * as Notifications from 'expo-notifications';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -34,6 +35,7 @@ import {
   requestNotificationPermissions,
 } from '@/store/notifications';
 import { loadData, saveData } from '@/store/storage';
+import { AccentIcon } from '@/components/shared/GlassBits';
 
 interface ScheduledItem {
   identifier: string;
@@ -63,15 +65,16 @@ const GROUP_ORDER: NotifGroup[] = ['meds', 'habits', 'daily', 'checkups', 'vacci
 interface GroupMeta { icon: IconSymbolName; color: string }
 
 const GROUP_ICONS: Record<NotifGroup, GroupMeta> = {
-  tasks:         { icon: 'list.bullet',     color: '#7C3AED' },
-  meetings:      { icon: 'calendar',        color: '#6366F1' },
-  subscriptions: { icon: 'creditcard.fill', color: '#0EA5E9' },
-  daily:         { icon: 'clock.fill',      color: '#0EA5E9' },
-  meds:          { icon: 'cross.case.fill', color: '#10B981' },
-  checkups:      { icon: 'stethoscope',     color: '#10B981' },
-  vaccines:      { icon: 'syringe.fill',    color: '#10B981' },
-  habits:        { icon: 'star.fill',       color: '#F59E0B' },
-  other:         { icon: 'bell.fill',       color: '#7C3AED' },
+  // DS v2: акценти розділів (tokens.ts → SCREEN_ACCENT) + status.*.
+  tasks:         { icon: 'list.bullet',     color: '#6D4CF5' },
+  meetings:      { icon: 'calendar',        color: '#6D4CF5' },
+  subscriptions: { icon: 'creditcard.fill', color: '#4F7CF7' },
+  daily:         { icon: 'clock.fill',      color: '#4F7CF7' },
+  meds:          { icon: 'cross.case.fill', color: '#22A55B' },
+  checkups:      { icon: 'stethoscope',     color: '#22A55B' },
+  vaccines:      { icon: 'syringe.fill',    color: '#22A55B' },
+  habits:        { icon: 'star.fill',       color: '#F6B93B' },
+  other:         { icon: 'bell.fill',       color: '#6D4CF5' },
 };
 
 interface NotifSection { group: NotifGroup; title: string; meta: GroupMeta; data: ScheduledItem[] }
@@ -118,6 +121,7 @@ function toItem(n: Notifications.NotificationRequest): ScheduledItem {
 }
 
 export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: Props) {
+  const t = dsTheme(isDark);
   const router = useRouter();
   const { tr, lang } = useI18n();
   const [items, setItems] = useState<ScheduledItem[]>([]);
@@ -264,24 +268,24 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
           onPress={requestPerm}
           accessibilityRole="button"
           accessibilityLabel={`${tr.notifDisabled}. ${tr.notifDisabledSub}`}
-          style={[st.banner, { backgroundColor: '#EF444415', borderColor: '#EF444440' }]}>
-          <View style={[st.bannerIcon, { backgroundColor: '#EF444420' }]}>
-            <IconSymbol name="bell.slash" size={20} color="#EF4444" />
+          style={[st.banner, { backgroundColor: t.status.danger + '14' }]}>
+          <View style={[st.bannerIcon, { backgroundColor: t.status.danger + '20' }]}>
+            <IconSymbol name="bell.slash" size={20} color={t.status.danger} />
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={{ color: '#EF4444', fontSize: 14, fontWeight: '700' }}>{tr.notifDisabled}</Text>
-            <Text style={{ color: '#EF4444', fontSize: 12, marginTop: 2, opacity: 0.8 }}>{tr.notifDisabledSub}</Text>
+            <Text style={{ color: t.status.danger, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.notifDisabled}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{tr.notifDisabledSub}</Text>
           </View>
-          <IconSymbol name="chevron.right" size={15} color="#EF4444" />
+          <IconSymbol name="chevron.right" size={15} color={t.status.danger} />
         </TouchableOpacity>
       )}
 
-      <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border, marginBottom: 10 }]}>
+      <View style={[st.card, { borderColor: c.border, marginBottom: 10 }, { backgroundColor: glassOf(t).surface }]}>
         <View style={st.toggleRow}>
-          <View style={[st.iconBox, { backgroundColor: '#F59E0B20' }]}>
-            <IconSymbol name="bell.badge" size={17} color="#F59E0B" />
+          <View style={[st.iconBox, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+            <IconSymbol name="bell.badge" size={17} color={t.text.primary} />
           </View>
-          <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, marginLeft: 12 }}>
+          <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 12 }}>
             {tr.ncLocalRemindersToggle}
           </Text>
           <Switch
@@ -294,7 +298,7 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
             ios_backgroundColor="rgba(128,128,128,0.3)"
           />
         </View>
-      </BlurView>
+      </View>
       <Text style={[st.hint, { color: c.sub }]}>{tr.ncLocalRemindersHint}</Text>
       {serverHandles ? <Text style={[st.hint, { color: c.sub }]}>{tr.ncServerRemindersHint}</Text> : null}
 
@@ -302,27 +306,25 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
         <>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 6, marginBottom: 12 }}>
             {[
-              { value: items.length, label: tr.totalNotif, color: c.accent },
-              { value: oneTimeCount, label: tr.activeNotif, color: '#10B981' },
-              { value: recurringCount, label: tr.notifRecurring, color: '#0EA5E9' },
+              { value: items.length, label: tr.totalNotif, color: t.text.primary },
+              { value: oneTimeCount, label: tr.activeNotif, color: t.text.primary },
+              { value: recurringCount, label: tr.notifRecurring, color: t.text.primary },
             ].map(stat => (
-              <BlurView
+              <View
                 key={stat.label}
-                intensity={isDark ? 20 : 40}
-                tint={isDark ? 'dark' : 'light'}
-                style={[st.statCard, { borderColor: c.border, flex: 1 }]}>
-                <Text style={{ color: stat.color, fontSize: 24, fontWeight: Atlas.type.headingWeight }}>{stat.value}</Text>
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '600', marginTop: 2 }}>{stat.label}</Text>
-              </BlurView>
+                style={[st.statCard, { borderColor: c.border, flex: 1 }, { backgroundColor: glassOf(t).surface }]}>
+                <Text style={{ ...type.displaySm, fontSize: 32, lineHeight: 36, color: stat.color }}>{stat.value}</Text>
+                <Text style={{ ...type.caption, color: c.sub, marginTop: 4 }}>{stat.label}</Text>
+              </View>
             ))}
           </View>
           <TouchableOpacity
             onPress={cancelAll}
             accessibilityRole="button"
             accessibilityLabel={tr.deleteAllReminders}
-            style={[st.deleteAll, { borderColor: 'rgba(239,68,68,0.3)' }]}>
-            <IconSymbol name="trash" size={14} color="#EF4444" />
-            <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '700' }}>{tr.deleteAllReminders}</Text>
+            style={[st.deleteAll, { backgroundColor: t.status.danger + '14' }]}>
+            <IconSymbol name="trash" size={14} color={t.status.danger} />
+            <Text style={{ color: t.status.danger, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.deleteAllReminders}</Text>
           </TouchableOpacity>
         </>
       )}
@@ -331,18 +333,16 @@ export function ScheduledReminders({ isDark, colors: c, header, contentStyle }: 
 
   const listEmpty = permGranted === false ? null : (
     <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-      <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
-        <IconSymbol name="bell.slash" size={32} color={c.accent} />
-      </View>
-      <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontWeight: '700' }}>{tr.noNotifications}</Text>
+      <AccentIcon isDark={t === dsTheme(true)} icon="bell.slash" accent="lavender" size="lg" style={st.emptyIcon} />
+      <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontFamily: fontFamily.semibold }}>{tr.noNotifications}</Text>
       <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center' }}>{tr.noNotifSub}</Text>
       <TouchableOpacity
         onPress={() => router.push('/(tabs)')}
         accessibilityRole="button"
         accessibilityLabel={tr.addTask}
-        style={[st.emptyBtn, { backgroundColor: c.accent }]}>
-        <IconSymbol name="plus" size={15} color="#fff" />
-        <Text style={st.emptyBtnText}>{tr.addTask}</Text>
+        style={[st.emptyBtn, { backgroundColor: t.action.primary }]}>
+        <IconSymbol name="plus" size={15} color={t.text.onAction} />
+        <Text style={[st.emptyBtnText, { color: t.text.onAction }]}>{tr.addTask}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -378,19 +378,20 @@ interface CardProps {
 
 const ReminderCard = React.memo(function ReminderCard({ item, meta, dateText, isDark, colors, deleteLabel, onDelete }: CardProps) {
   const handleDelete = useCallback(() => onDelete(item), [onDelete, item]);
+  const t = dsTheme(isDark);
   return (
-    <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.itemCard, { borderColor: colors.border }]}>
+    <View style={[st.itemCard, { borderColor: colors.border }, { backgroundColor: glassOf(t).surface }]}>
       <View style={[st.iconBox, { backgroundColor: meta.color + '20' }]}>
         <IconSymbol name={meta.icon} size={17} color={meta.color} />
       </View>
       <View style={{ flex: 1, marginLeft: 12 }}>
         {item.title ? (
-          <Text style={{ color: colors.sub, fontSize: 11, fontWeight: '600', marginBottom: 1 }} numberOfLines={1}>{item.title}</Text>
+          <Text style={{ color: colors.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 1 }} numberOfLines={1}>{item.title}</Text>
         ) : null}
-        <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }} numberOfLines={2}>{item.body || item.title}</Text>
+        <Text style={{ color: colors.text, fontSize: 14, fontFamily: fontFamily.semibold }} numberOfLines={2}>{item.body || item.title}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
           <IconSymbol name={item.isRecurring ? 'arrow.clockwise' : 'clock'} size={11} color={meta.color} />
-          <Text style={{ color: meta.color, fontSize: 12, fontWeight: '600' }}>{dateText}</Text>
+          <Text style={{ color: colors.sub, fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{dateText}</Text>
         </View>
       </View>
       <TouchableOpacity
@@ -398,28 +399,28 @@ const ReminderCard = React.memo(function ReminderCard({ item, meta, dateText, is
         accessibilityRole="button"
         accessibilityLabel={`${deleteLabel}: ${item.body || item.title}`}
         style={st.deleteBtnTarget}>
-        <View style={[st.deleteBtn, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
-          <IconSymbol name="xmark" size={13} color="#EF4444" />
+        <View style={[st.deleteBtn, { backgroundColor: t.status.danger + '18' }]}>
+          <IconSymbol name="xmark" size={13} color={t.status.danger} />
         </View>
       </TouchableOpacity>
-    </BlurView>
+    </View>
   );
 });
 
 const st = StyleSheet.create({
-  sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 8, marginLeft: 2 },
-  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden' },
-  toggleRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13 },
-  iconBox:      { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  statCard:     { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', paddingVertical: 14, paddingHorizontal: 14 },
-  itemCard:     { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', paddingVertical: 6, paddingLeft: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  sectionLabel: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, marginBottom: 8, marginLeft: 2 },
+  card:         { borderRadius: Atlas.radius.xlarge, overflow: 'hidden' },
+  toggleRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+  iconBox:      { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  statCard:     { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', paddingVertical: 16, paddingHorizontal: 16 },
+  itemCard:     { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', paddingVertical: 10, paddingLeft: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   deleteBtnTarget: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  deleteBtn:    { width: 28, height: 28, borderRadius: Atlas.radius.small, alignItems: 'center', justifyContent: 'center' },
-  banner:       { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  bannerIcon:   { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  hint:         { fontSize: 12, lineHeight: 17, marginBottom: 8, marginHorizontal: 2 },
-  deleteAll:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: Atlas.radius.medium, minHeight: 44, marginBottom: 16 },
-  emptyIcon:    { width: 72, height: 72, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
-  emptyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 18, paddingVertical: 11, borderRadius: 13, marginTop: 20 },
-  emptyBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  deleteBtn:    { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  banner:       { borderRadius: Atlas.radius.xlarge, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  bannerIcon:   { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  hint:         { fontFamily: fontFamily.regular, fontSize: 12, lineHeight: 17, marginBottom: 8, marginHorizontal: 2 },
+  deleteAll:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 999, minHeight: 44, marginBottom: 16 },
+  emptyIcon:    { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  emptyBtn:     { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 20, minHeight: 44, borderRadius: 999, marginTop: 20 },
+  emptyBtnText: { fontSize: 14, fontFamily: fontFamily.semibold },
 });

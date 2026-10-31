@@ -15,6 +15,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Polygon } from 'react-native-svg';
 
+import { fontFamily } from '@/constants/theme';
 import { useClockTick } from '@/hooks/use-clock-tick';
 import { formatClock } from '@/utils/durationFormat';
 import { elapsedSince } from '@/utils/taskTimer';
@@ -123,7 +124,7 @@ export function DotsDial({ startedAt, size, colors, material: m }: DialRenderPro
               <View key={i} style={{ width: 3, height: dot * 0.8, borderRadius: 1, backgroundColor: colors.accent }} />
             ))
           : (
-            <Text style={{ color: colors.sub, fontSize: size * 0.07, fontWeight: '700', letterSpacing: 0.6 }}>
+            <Text style={{ color: colors.sub, fontSize: size * 0.07, fontFamily: fontFamily.semibold, letterSpacing: 0.6 }}>
               {minutes} хв
             </Text>
           )}

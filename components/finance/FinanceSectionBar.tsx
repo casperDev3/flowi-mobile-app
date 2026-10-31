@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/FinanceSectionBar.tsx — смуга вкладок і спільний фільтр
  * розділу «Фінанси» (finance-revamp.md §2.1, §3, §9.4).
@@ -14,7 +13,9 @@ import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 
 
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, shadow, space, touchTarget, type as dsType } from '@/constants/theme';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
+import { useDS } from '@/hooks/use-ds';
 import { useResponsive } from '@/hooks/use-responsive';
 import type { Translations } from '@/store/translations';
 import { MONEY_SCOPES, type MoneyScope } from '@/utils/budgetScope';
@@ -27,6 +28,8 @@ import { activeFinanceFilterCount, splitFinanceTabs, type FinanceTab } from '@/u
 import {
   financeTabLabel, moneyScopeText, periodPresetLabel, type FinColors,
 } from './financeLabels';
+import { GlassBackdrop } from '@/components/ds';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
 const HIT = { top: 8, bottom: 8, left: 4, right: 4 } as const;
 
@@ -45,6 +48,8 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
   stretch?: boolean;
 }) {
   const { isWide, height } = useResponsive();
+  const { t, isDark } = useDS();
+  const gs = useGlassStyles();
   const [moreOpen, setMoreOpen] = useState(false);
   const { inline, more } = splitFinanceTabs(tabs);
   const moreActive = more.includes(active);
@@ -59,8 +64,8 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
       accessibilityLabel={label}
       accessibilityHint={hint}
       hitSlop={SEG_HIT}
-      style={[st.seg, stretch && st.segStretch, on && { backgroundColor: c.accent }]}>
-      <Text numberOfLines={1} style={{ color: on ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }}>{label}</Text>
+      style={[st.seg, stretch && st.segStretch, on && { backgroundColor: t.action.primary }]}>
+      <Text numberOfLines={1} style={{ color: on ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
       {extra}
     </TouchableOpacity>
   );
@@ -70,21 +75,22 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
       <View
         accessibilityRole="tablist"
         accessibilityLabel={tr.finTabsLabel}
-        style={[st.segBar, { borderColor: c.border, backgroundColor: c.dim }, stretch ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' }]}>
+        style={[st.segBar, { ...gs.card }, stretch ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' }]}>
         {inline.map(tab => segment(tab, financeTabLabel(tab, tr), tab === active, () => onChange(tab)))}
         {more.length > 0 ? segment(
           'more',
           moreLabel,
           moreActive,
           () => setMoreOpen(true),
-          <IconSymbol name="chevron.down" size={10} color={moreActive ? '#fff' : c.sub} style={{ marginLeft: 3 }} />,
+          <IconSymbol name="chevron.down" size={10} color={moreActive ? t.text.onAction : t.text.secondary} style={{ marginLeft: 3 }} />,
           tr.finMoreSections,
         ) : null}
       </View>
 
       <SheetModal visible={moreOpen} onClose={() => setMoreOpen(false)}>
-        <View style={[st.sheet, sheetColumnStyle(isWide), { maxHeight: height * 0.88, backgroundColor: c.sheet, borderColor: c.border }]}>
-          <Text style={[st.sheetLabel, { color: c.sub }]}>{tr.finMoreSections}</Text>
+        <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+          <Text style={[st.sheetLabel, { color: t.text.secondary }]}>{tr.finMoreSections}</Text>
           <View style={{ gap: 6 }}>
             {more.map(tab => {
               const on = tab === active;
@@ -95,12 +101,12 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
                   accessibilityRole="menuitem"
                   accessibilityState={{ selected: on }}
                   accessibilityLabel={financeTabLabel(tab, tr)}
-                  style={[st.row, { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent + '15' : c.dim }]}>
-                  <IconSymbol name={TAB_ICON[tab]} size={16} color={on ? c.accent : c.sub} />
-                  <Text style={{ color: on ? c.accent : c.text, fontSize: 15, fontWeight: '600', flex: 1, marginLeft: 10 }}>
+                  style={[st.row, { backgroundColor: on ? t.action.primary : (gs.subtle.backgroundColor as string) }]}>
+                  <IconSymbol name={TAB_ICON[tab]} size={16} color={on ? t.text.onAction : t.text.secondary} />
+                  <Text style={{ color: on ? t.text.onAction : t.text.primary, fontSize: 15, fontFamily: fontFamily.medium, flex: 1, marginLeft: 10 }}>
                     {financeTabLabel(tab, tr)}
                   </Text>
-                  {on ? <IconSymbol name="checkmark" size={14} color={c.accent} /> : <IconSymbol name="chevron.right" size={12} color={c.sub} />}
+                  {on ? <IconSymbol name="checkmark" size={14} color={t.text.onAction} /> : <IconSymbol name="chevron.right" size={12} color={t.text.secondary} />}
                 </TouchableOpacity>
               );
             })}
@@ -155,6 +161,8 @@ export function FinanceFilterBar({
   isDark: boolean;
 }) {
   const { isWide, height } = useResponsive();
+  const { t } = useDS();
+  const gs = useGlassStyles();
   const [periodOpen, setPeriodOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const periodLabel = labelPeriodLocalized(filter.period, tr.months, tr.monthsShort);
@@ -176,22 +184,22 @@ export function FinanceFilterBar({
 
   return (
     <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 }, !isWide && { flexWrap: 'wrap' }]}>
-      <View style={[st.periodBox, { borderColor: c.border, backgroundColor: c.dim }]}>
+      <View style={[st.periodBox, { ...gs.card }]}>
         <TouchableOpacity
           onPress={() => onPeriod(shiftPeriod(filter.period, -1))}
           accessibilityRole="button"
           accessibilityLabel={tr.finPeriodPrev}
           hitSlop={HIT}
           style={st.arrow}>
-          <IconSymbol name="chevron.left" size={14} color={c.sub} />
+          <IconSymbol name="chevron.left" size={14} color={t.text.secondary} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setPeriodOpen(true)}
           accessibilityRole="button"
           accessibilityLabel={`${tr.finFilterPeriod}: ${periodLabel}`}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, minHeight: 36 }}>
-          <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontWeight: '700', maxWidth: 180 }}>{periodLabel}</Text>
-          <IconSymbol name="chevron.down" size={11} color={c.sub} />
+          <Text numberOfLines={1} style={{ color: t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold, maxWidth: 180, ...dsType.numeric }}>{periodLabel}</Text>
+          <IconSymbol name="chevron.down" size={11} color={t.text.secondary} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => onPeriod(shiftPeriod(filter.period, 1))}
@@ -199,7 +207,7 @@ export function FinanceFilterBar({
           accessibilityLabel={tr.finPeriodNext}
           hitSlop={HIT}
           style={st.arrow}>
-          <IconSymbol name="chevron.right" size={14} color={c.sub} />
+          <IconSymbol name="chevron.right" size={14} color={t.text.secondary} />
         </TouchableOpacity>
       </View>
 
@@ -211,9 +219,9 @@ export function FinanceFilterBar({
         accessibilityRole="button"
         accessibilityLabel={tr.finFilterButton}
         accessibilityValue={{ text: isWide ? countLabel : chipLabel }}
-        style={[st.chip, { borderColor: chipActive ? c.accent : c.border, backgroundColor: chipActive ? c.accent + '18' : c.dim, flexDirection: 'row', gap: 5 }]}>
-        <IconSymbol name="line.3.horizontal.decrease" size={12} color={chipActive ? c.accent : c.sub} />
-        <Text numberOfLines={1} style={{ color: chipActive ? c.accent : c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>
+        style={[st.chip, { backgroundColor: chipActive ? t.action.primary : (gs.card.backgroundColor as string), flexDirection: 'row', gap: 5 }]}>
+        <IconSymbol name="line.3.horizontal.decrease" size={12} color={chipActive ? t.text.onAction : t.text.secondary} />
+        <Text numberOfLines={1} style={{ color: chipActive ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold }}>
           {isWide ? countLabel : chipLabel}
         </Text>
       </TouchableOpacity>
@@ -230,9 +238,10 @@ export function FinanceFilterBar({
       />
 
       <SheetModal visible={filterOpen} onClose={() => setFilterOpen(false)}>
-        <View style={[st.sheet, sheetColumnStyle(isWide), { maxHeight: height * 0.88, backgroundColor: c.sheet, borderColor: c.border }]}>
+        <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={[st.sheetLabel, { color: c.sub }]}>{tr.finFilterCurrency}</Text>
+          <Text style={[st.sheetLabel, { color: t.text.secondary }]}>{tr.finFilterCurrency}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }} accessibilityRole="radiogroup">
             {currencies.map(code => {
               const on = code === filter.currency;
@@ -243,29 +252,29 @@ export function FinanceFilterBar({
                   accessibilityRole="radio"
                   accessibilityState={{ selected: on, checked: on }}
                   accessibilityLabel={code}
-                  style={[st.chip, { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent + '18' : c.dim }]}>
-                  <Text style={{ color: on ? c.accent : c.sub, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>{code}</Text>
+                  style={[st.chip, { backgroundColor: on ? t.action.primary : (gs.subtle.backgroundColor as string) }]}>
+                  <Text style={{ color: on ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold }}>{code}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
           {showScope ? (
             <>
-              <Text style={[st.sheetLabel, { color: c.sub, marginTop: 18 }]}>{tr.budgetScopeLabel}</Text>
+              <Text style={[st.sheetLabel, { color: t.text.secondary, marginTop: 20 }]}>{tr.budgetScopeLabel}</Text>
               <ScopeRadios scope={filter.scope} onScope={onScope} c={c} tr={tr} />
             </>
           ) : null}
           {txType && onTxType ? (
             <>
-              <Text style={[st.sheetLabel, { color: c.sub, marginTop: 18 }]}>{tr.finTxTypeLabel}</Text>
+              <Text style={[st.sheetLabel, { color: t.text.secondary, marginTop: 20 }]}>{tr.finTxTypeLabel}</Text>
               <TxTypeRadios type={txType} onType={onTxType} c={c} tr={tr} />
             </>
           ) : null}
           <TouchableOpacity
             onPress={() => setFilterOpen(false)}
             accessibilityRole="button"
-            style={[st.primaryBtn, { backgroundColor: c.accent, marginTop: 20 }]}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.close}</Text>
+            style={[st.primaryBtn, { backgroundColor: t.action.primary, marginTop: 24 }]}>
+            <Text style={{ ...dsType.label, color: t.text.onAction }}>{tr.close}</Text>
           </TouchableOpacity>
           </ScrollView>
         </View>
@@ -280,15 +289,16 @@ function TxTypeRadios({ type, onType, c, tr }: {
   c: FinColors;
   tr: Translations;
 }) {
+  const { t } = useDS();
+  const gs = useGlassStyles();
   return (
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={tr.finTxTypeLabel}
-      style={[st.segment, { borderColor: c.border, backgroundColor: c.dim, alignSelf: 'flex-start' }]}>
+      style={[st.segment, { ...gs.subtle, alignSelf: 'flex-start' }]}>
       {(['all', 'income', 'expense'] as const).map(option => {
         const on = option === type;
         const label = txTypeText(option, tr);
-        const tint = option === 'income' ? c.green : option === 'expense' ? c.red : c.accent;
         return (
           <TouchableOpacity
             key={option}
@@ -297,8 +307,8 @@ function TxTypeRadios({ type, onType, c, tr }: {
             accessibilityState={{ selected: on, checked: on }}
             accessibilityLabel={label}
             hitSlop={{ top: 6, bottom: 6 }}
-            style={[st.segmentBtn, on && { backgroundColor: tint }]}>
-            <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{label}</Text>
+            style={[st.segmentBtn, on && { backgroundColor: t.action.primary }]}>
+            <Text style={{ color: on ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -312,11 +322,13 @@ function ScopeRadios({ scope, onScope, c, tr }: {
   c: FinColors;
   tr: Translations;
 }) {
+  const { t } = useDS();
+  const gs = useGlassStyles();
   return (
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel={tr.budgetScopeLabel}
-      style={[st.segment, { borderColor: c.border, backgroundColor: c.dim }]}>
+      style={[st.segment, { ...gs.subtle }]}>
       {MONEY_SCOPES.map(option => {
         const on = option === scope;
         const label = moneyScopeText(option, tr);
@@ -327,8 +339,8 @@ function ScopeRadios({ scope, onScope, c, tr }: {
             accessibilityRole="radio"
             accessibilityState={{ selected: on, checked: on }}
             accessibilityLabel={label}
-            style={[st.segmentBtn, on && { backgroundColor: c.accent }]}>
-            <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>{label}</Text>
+            style={[st.segmentBtn, on && { backgroundColor: t.action.primary }]}>
+            <Text style={{ color: on ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
           </TouchableOpacity>
         );
       })}
@@ -354,15 +366,18 @@ function PeriodSheet({ visible, onClose, period, onPick, c, tr, isWide, isDark }
   }, [visible, period.from, period.to]);
   const customValid = isDateKey(from.trim()) && isDateKey(to.trim());
   const presets = useMemo(() => PERIOD_PRESETS.filter(p => p !== 'custom'), []);
-  const inputBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+  const { t } = useDS();
+  const gs = useGlassStyles();
+  const inputBg = (gs.subtle.backgroundColor as string);
 
   const pick = (preset: PeriodPreset) => onPick(resolvePeriod(preset, '', new Date()));
 
   return (
     <SheetModal visible={visible} onClose={onClose}>
-      <View style={[st.sheet, sheetColumnStyle(isWide), { maxHeight: height * 0.88, backgroundColor: c.sheet, borderColor: c.border }]}>
+      <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+        <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={[st.sheetLabel, { color: c.sub }]}>{tr.finFilterPeriod}</Text>
+          <Text style={[st.sheetLabel, { color: t.text.secondary }]}>{tr.finFilterPeriod}</Text>
           <View style={{ gap: 6 }} accessibilityRole="radiogroup">
             {presets.map(preset => {
               const on = period.preset === preset && resolvePeriod(preset, '', new Date()).key === period.key;
@@ -372,23 +387,23 @@ function PeriodSheet({ visible, onClose, period, onPick, c, tr, isWide, isDark }
                   onPress={() => pick(preset)}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: on, checked: on }}
-                  style={[st.row, { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent + '15' : c.dim }]}>
-                  <Text style={{ color: on ? c.accent : c.text, fontSize: 14, fontWeight: '600', flex: 1 }}>
+                  style={[st.row, { backgroundColor: on ? t.action.primary : (gs.subtle.backgroundColor as string) }]}>
+                  <Text style={{ color: on ? t.text.onAction : t.text.primary, fontSize: 14, fontFamily: fontFamily.medium, flex: 1 }}>
                     {periodPresetLabel(preset, tr)}
                   </Text>
-                  {on ? <IconSymbol name="checkmark" size={14} color={c.accent} /> : null}
+                  {on ? <IconSymbol name="checkmark" size={14} color={t.text.onAction} /> : null}
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          <Text style={[st.sheetLabel, { color: c.sub, marginTop: 18 }]}>{tr.finPresetCustom}</Text>
+          <Text style={[st.sheetLabel, { color: t.text.secondary, marginTop: 20 }]}>{tr.finPresetCustom}</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TextInput
               value={from}
               onChangeText={setFrom}
               placeholder="2026-01-01"
-              placeholderTextColor={c.sub}
+              placeholderTextColor={t.text.muted}
               accessibilityLabel={tr.finCustomFrom}
               autoCapitalize="none"
               style={[st.input, { color: c.text, backgroundColor: inputBg }]}
@@ -397,7 +412,7 @@ function PeriodSheet({ visible, onClose, period, onPick, c, tr, isWide, isDark }
               value={to}
               onChangeText={setTo}
               placeholder="2026-03-31"
-              placeholderTextColor={c.sub}
+              placeholderTextColor={t.text.muted}
               accessibilityLabel={tr.finCustomTo}
               autoCapitalize="none"
               style={[st.input, { color: c.text, backgroundColor: inputBg }]}
@@ -408,8 +423,8 @@ function PeriodSheet({ visible, onClose, period, onPick, c, tr, isWide, isDark }
             onPress={() => onPick(resolvePeriod('custom', `${from.trim()}..${to.trim()}`, new Date()))}
             accessibilityRole="button"
             accessibilityState={{ disabled: !customValid }}
-            style={[st.primaryBtn, { backgroundColor: customValid ? c.accent : c.dim, marginTop: 12 }]}>
-            <Text style={{ color: customValid ? '#fff' : c.sub, fontWeight: '700' }}>{tr.finApply}</Text>
+            style={[st.primaryBtn, { backgroundColor: customValid ? t.action.primary : t.state.disabledBg, marginTop: 12 }]}>
+            <Text style={{ ...dsType.label, color: customValid ? t.text.onAction : t.state.disabledText }}>{tr.finApply}</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -418,17 +433,18 @@ function PeriodSheet({ visible, onClose, period, onPick, c, tr, isWide, isDark }
 }
 
 const st = StyleSheet.create({
-  segBar: { flexDirection: 'row', borderWidth: 1, borderRadius: Atlas.radius.large, padding: 3, marginTop: 10, gap: 2 },
-  seg: { flexDirection: 'row', minHeight: 40, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  // Сегментований перемикач DS v2: біла pill-доріжка, активний сегмент — pill action.primary.
+  segBar: { flexDirection: 'row', borderRadius: radius.pill, padding: 3, marginTop: 10, gap: 2 },
+  seg: { flexDirection: 'row', minHeight: 40, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   segStretch: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 6 },
-  periodBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 2 },
+  periodBox: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, paddingHorizontal: 4 },
   arrow: { width: 32, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
-  chip: { minHeight: 36, paddingHorizontal: 12, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  segment: { flexDirection: 'row', borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 2 },
-  segmentBtn: { minHeight: 32, paddingHorizontal: 10, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
-  sheet: { borderTopLeftRadius: Atlas.radius.xlarge, borderTopRightRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, paddingBottom: 36 },
-  sheetLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 44, borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 14 },
-  input: { flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, fontSize: 14 },
-  primaryBtn: { minHeight: 46, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center' },
+  chip: { minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  segment: { flexDirection: 'row', borderRadius: radius.pill, padding: 3 },
+  segmentBtn: { minHeight: 34, paddingHorizontal: 14, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  sheet: { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.cardPadding, paddingBottom: 36 },
+  sheetLabel: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: touchTarget, borderRadius: radius.pill, paddingHorizontal: 16 },
+  input: { flex: 1, minHeight: touchTarget, borderRadius: radius.control, paddingHorizontal: space[4], fontSize: 15, fontFamily: fontFamily.regular, ...dsType.numeric },
+  primaryBtn: { minHeight: 48, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

@@ -6,18 +6,19 @@
  * вигляд, групування, фільтри — пункти меню. Пункт-перемикач (вигляд,
  * «лише мої») показує галочку й озвучується як `checked`.
  *
- * Меню — випадне вікно під кнопкою (Modal fade, BlurView), як і раніше на
+ * Меню — випадне вікно під кнопкою (Modal fade, непрозорий поповер DS v2), як і раніше на
  * екрані Завдань: позиція `top: верхній інсет + 62, right: 16`.
  */
-import { BlurView } from 'expo-blur';
 import React from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { Atlas } from '@/constants/atlas';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { useResponsive } from '@/hooks/use-responsive';
+import { fontFamily, radius, shadow } from '@/constants/theme';
+import { dsTokens, useDS } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export interface TasksMenuItem {
   key: string;
@@ -49,12 +50,14 @@ export function TasksMenuButton({ onPress, label, active, colors: c }: {
   active?: boolean;
   colors: TasksMenuColors;
 }) {
+  const { t } = useDS();
   return (
     <HeaderButton
       onPress={onPress}
       accessibilityLabel={label}
-      style={{ backgroundColor: active ? c.accent : c.dim, borderColor: active ? c.accent : c.border }}>
-      <IconSymbol name="ellipsis" size={17} color={active ? '#fff' : c.sub} />
+      // DS v2: є активні фільтри — кнопка pill action.primary.
+      style={{ backgroundColor: active ? t.action.primary : glassOf(t).surface, borderColor: 'transparent' }}>
+      <IconSymbol name="ellipsis" size={17} color={active ? t.text.onAction : c.text} />
     </HeaderButton>
   );
 }
@@ -68,20 +71,19 @@ export function TasksHeaderMenu({ visible, onClose, items, colors: c, isDark }: 
 }) {
   const topInset = useTopInset();
   const { height } = useResponsive();
+  const t = dsTokens(isDark);
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable
         accessible={false}
-        style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
+        style={{ flex: 1, backgroundColor: t.surface.overlay }}
         onPress={onClose}>
-        <BlurView
-          intensity={isDark ? 55 : 75}
-          tint={isDark ? 'dark' : 'light'}
-          style={[st.menu, {
+        {/* DS v2: непрозорий поповер surface.elevated + м'яка тінь, без блюру й рамки. */}
+        <View
+          style={[st.menu, shadow[isDark ? 'dark' : 'light'].popover, {
             top: topInset + 62,
-            borderColor: c.border,
+            backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong'),
             maxHeight: Math.max(240, height - topInset - 96),
-            ...(Platform.OS === 'android' ? { backgroundColor: isDark ? '#1C1A2E' : '#F2EFFF' } : null),
           }]}>
           <ScrollView bounces={false} accessibilityRole="menu">
             {items.map((item, index) => (
@@ -95,25 +97,25 @@ export function TasksHeaderMenu({ visible, onClose, items, colors: c, isDark }: 
                   accessibilityState={item.checked === undefined ? undefined : { checked: item.checked }}
                   accessibilityLabel={item.badge ? `${item.label}, ${item.badge}` : item.label}
                   style={st.item}>
-                  <View style={[st.iconBox, { backgroundColor: (item.color ?? c.sub) + '20' }]}>
+                  <View style={[st.iconBox, { backgroundColor: glassOf(t).surfaceSubtle }]}>
                     <IconSymbol name={item.icon} size={15} color={item.color ?? c.sub} />
                   </View>
-                  <Text numberOfLines={1} style={[st.label, { color: item.checked ? c.accent : c.text }]}>{item.label}</Text>
+                  <Text numberOfLines={1} style={[st.label, { color: c.text, fontFamily: item.checked ? fontFamily.semibold : fontFamily.medium }]}>{item.label}</Text>
                   {item.badge ? (
-                    <View style={[st.badge, { backgroundColor: (item.color ?? c.accent) + '20' }]}>
-                      <Text style={{ color: item.color ?? c.accent, fontSize: 11, fontWeight: '700' }}>{item.badge}</Text>
+                    <View style={[st.badge, { backgroundColor: glassOf(t).surfaceSubtle }]}>
+                      <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{item.badge}</Text>
                     </View>
                   ) : null}
                   {item.checked === undefined
                     ? <IconSymbol name="chevron.right" size={12} color={c.sub} />
                     : item.checked
-                      ? <IconSymbol name="checkmark" size={14} color={c.accent} />
+                      ? <IconSymbol name="checkmark" size={14} color={c.text} />
                       : <View style={{ width: 14 }} />}
                 </TouchableOpacity>
               </View>
             ))}
           </ScrollView>
-        </BlurView>
+        </View>
       </Pressable>
     </Modal>
   );
@@ -123,20 +125,14 @@ const st = StyleSheet.create({
   menu: {
     position: 'absolute',
     right: 16,
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
-    overflow: 'hidden',
+    borderRadius: radius.cardCompact,
+    paddingVertical: 6,
     minWidth: 238,
     maxWidth: 320,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 14,
   },
   item: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, minHeight: 48, gap: 10 },
-  iconBox: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  label: { flex: 1, fontSize: 15, fontWeight: '600' },
-  badge: { borderRadius: Atlas.radius.small, paddingHorizontal: 7, paddingVertical: 2 },
+  iconBox: { width: 28, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  label: { flex: 1, fontSize: 15 },
+  badge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
   divider: { marginHorizontal: 14 },
 });

@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/store/i18n';
 import type { TimelineBucket } from '@/utils/projectStats';
+import { fontFamily } from '@/constants/theme';
 
 /** Короткий місяць мовою інтерфейсу — свого словника місяців тут не тримаємо. */
 function monthLabel(iso: string, locale: string): string {
@@ -101,5 +102,5 @@ const st = StyleSheet.create({
   markerRow:  { height: 5, flexDirection: 'row', gap: 3, marginTop: 3 },
   marker:     { width: 4, height: 4, borderRadius: 2 },
   labels:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  labelText:  { fontSize: 10, fontWeight: '600' },
+  labelText:  { fontSize: 10, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
 });

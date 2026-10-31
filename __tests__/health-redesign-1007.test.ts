@@ -4,6 +4,7 @@
  * Тут — чисті правила компонування й палітри.
  */
 import fs from 'fs';
+import { theme } from '@/constants/theme';
 import path from 'path';
 
 import {
@@ -97,14 +98,19 @@ describe('HEALTH_TAB_META — один акцент і короткі підпи
 });
 
 describe('getHealthColors — палітра Фінансів', () => {
-  it('має суцільний фон картки й ті самі рамки/текст, що explore.tsx', () => {
+  it('має суцільний фон картки й ті самі токени DS, що explore.tsx', () => {
     const dark = getHealthColors(true);
     const light = getHealthColors(false);
-    expect(dark.card).toBe('rgba(255,255,255,0.06)');
-    expect(light.card).toBe('rgba(255,255,255,0.72)');
+    // DS v2: surface.card — непрозорий
+    expect(dark.card).toBe(theme.dark.surface.card);
+    expect(light.card).toBe(theme.light.surface.card);
+    expect(light.bg1).toBe(theme.light.bg.canvas);
+    expect(dark.border).toBe(theme.dark.border.hairline);
+    expect(light.text).toBe(theme.light.text.primary);
     const explore = fs.readFileSync(path.join(ROOT, 'app/(tabs)/explore.tsx'), 'utf8');
-    for (const v of [dark.border, light.border, dark.text, light.text, dark.card, light.card, dark.bg1, light.bg1]) {
-      expect(explore).toContain(`'${v}'`);
+    // DS v2.1 (Liquid Glass): картки explore.tsx — скло glassOf(t).surface замість t.surface.card
+    for (const tok of ['t.bg.canvas', 'glassOf(t).surface', 't.border.hairline', 't.text.primary']) {
+      expect(explore).toContain(tok);
     }
   });
 });
@@ -146,6 +152,7 @@ describe('аудит iPad 07.10 — вкладки й палітра', () => {
     expect(read('components/health/tabs/NutritionTab.tsx')).not.toMatch(/ACCENT_PROT/);
     const overview = read('components/health/tabs/OverviewTab.tsx');
     expect(overview).not.toMatch(/ACCENT_PROT/);
-    expect(overview).toMatch(/s\.banner, \{ borderColor: c\.border, backgroundColor: c\.card \}/);
+    // DS v2: суцільна картка без рамки.
+    expect(overview).toMatch(/s\.banner, \{ backgroundColor: c\.card \}/);
   });
 });

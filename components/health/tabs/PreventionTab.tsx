@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/PreventionTab.tsx — вкладка «Профілактика».
  *
@@ -24,11 +23,14 @@ import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { Events, track } from '@/utils/analytics';
-import { ACCENT, ACCENT_CAL, ACCENT_PROT, ACCENT_PULSE, HEALTH_ACCENTS, getHealthColors } from '@/utils/healthTheme';
+import { ACCENT, ACCENT_CAL, ACCENT_PROT, ACCENT_PULSE, HEALTH_ACCENTS } from '@/utils/healthTheme';
+import { getHealthDSColors } from '@/components/health/palette';
 import {
   CHECKUPS_KEY, Checkup, HABITS_KEY, Habit, MEDS_KEY, Medication, VACCINES_KEY, Vaccine,
   buildHealthReport, habitDoneToday, medDueToday,
 } from '@/utils/preventionUtils';
+import { fontFamily } from '@/constants/theme';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
 export function PreventionTab({ h }: HealthTabProps) {
   const grid = useHealthTabGrid();
@@ -41,7 +43,8 @@ export function PreventionTab({ h }: HealthTabProps) {
   const router = useRouter();
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const c = getHealthColors(isDark);
+  const c = getHealthDSColors(isDark);
+  const gs = useGlassStyles();
 
   const [meds, setMeds] = useState<Medication[]>([]);
   const [checkups, setCheckups] = useState<Checkup[]>([]);
@@ -94,7 +97,7 @@ export function PreventionTab({ h }: HealthTabProps) {
     <ScrollView
       contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
 
       {/* Відʼємні поля сітки гасять padding крайніх комірок, тож на телефоні
           зовнішні відступи лишаються такими самими, як були з gap: 12. */}
@@ -124,12 +127,12 @@ export function PreventionTab({ h }: HealthTabProps) {
       {/* Експорт звіту для лікаря */}
       <TouchableOpacity onPress={exportReport} activeOpacity={0.85} style={{ marginTop: 12 }}
         accessibilityRole="button" accessibilityLabel={tr.exportReport}>
-        <View style={[s.report, { borderColor: c.border, backgroundColor: c.card }]}>
-          <View style={{ width: 38, height: 38, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={[s.report, { ...gs.card }]}>
+          <View style={{ width: 38, height: 38, borderRadius: 999, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
             <IconSymbol name="square.and.arrow.up" size={18} color={ACCENT} />
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>{tr.exportReport}</Text>
+            <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.exportReport}</Text>
             <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.reportSub}</Text>
           </View>
           <IconSymbol name="chevron.right" size={13} color={c.sub} />
@@ -142,5 +145,5 @@ export function PreventionTab({ h }: HealthTabProps) {
 const s = StyleSheet.create({
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -6, marginVertical: -6 },
   tileCell: { padding: 6 },
-  report:   { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 16, flexDirection: 'row', alignItems: 'center' },
+  report:   { borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center' },
 });

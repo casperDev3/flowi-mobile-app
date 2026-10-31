@@ -1,5 +1,4 @@
 import { TeamButton } from '@/components/projects/TeamControls';
-import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/members.tsx — Учасники проєкту
  * (WORKSPACE_PROJECTS_PLAN.md §4, контракт §4.2–4.3).
@@ -51,6 +50,9 @@ import {
   type MemberOut,
 } from '@/store/project-team';
 import { haptic } from '@/utils/haptics';
+import { fontFamily, radius } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 const EXPIRY_OPTIONS: { hours: number; labelKey: 'projectMembersExpiry24h' | 'projectMembersExpiry7d' | 'projectMembersExpiry30d' }[] = [
   { hours: 24, labelKey: 'projectMembersExpiry24h' },
@@ -84,6 +86,9 @@ export default function ProjectMembersScreen() {
   const isOwner = role === 'owner';
   const canManage = isOwner || role === 'manager';
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
+  // DS v2: картки — surface.card, головні дії — pill action.primary (tk — щоб не
+  // плутати з `t` у колбеках).
+  const tk = dsTokens(isDark);
 
   const [members, setMembers] = useState<MemberOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -493,7 +498,7 @@ export default function ProjectMembersScreen() {
         onPress: () => router.back(),
         label: tr.back,
         color: c.text,
-        style: { backgroundColor: c.dim, borderColor: c.border },
+        style: { backgroundColor: glassOf(tk).surface, borderColor: 'transparent' },
       }}>
       <ScrollView
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
@@ -503,29 +508,29 @@ export default function ProjectMembersScreen() {
         keyboardShouldPersistTaps="handled">
 
         {loadError && (
-          <View style={[st.hint, { borderColor: '#EF4444', backgroundColor: c.dim, marginBottom: 12 }]}>
-            <IconSymbol name="exclamationmark.circle" size={14} color="#EF4444" />
+          <View style={[st.hint, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 12 }]}>
+            <IconSymbol name="exclamationmark.circle" size={14} color={tk.accent.coral} />
             <Text style={{ color: c.text, fontSize: 12, marginLeft: 6, flex: 1 }}>{tr.projectMembersError}</Text>
             <TouchableOpacity
               onPress={() => { void load(); void loadInvites(); }}
               accessibilityRole="button"
               accessibilityLabel={tr.adminRetry}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700' }}>{tr.adminRetry}</Text>
+              <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>{tr.adminRetry}</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {offline && (
-          <View style={[st.hint, { borderColor: c.border, backgroundColor: c.dim, marginBottom: 12 }]}>
+          <View style={[st.hint, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 12 }]}>
             <IconSymbol name="exclamationmark.circle" size={14} color={c.sub} />
             <Text style={{ color: c.sub, fontSize: 12, marginLeft: 6, flex: 1 }}>{tr.projectMembersOfflineHint}</Text>
           </View>
         )}
 
         {transferring && (
-          <View style={[st.linkCard, { borderColor: c.accent, backgroundColor: c.dim, marginBottom: 14 }]}>
-            <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginBottom: 10 }}>{tr.projectMembersTransferOwnershipHint}</Text>
+          <View style={[st.linkCard, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 14 }]}>
+            <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, marginBottom: 10 }}>{tr.projectMembersTransferOwnershipHint}</Text>
             {members.filter(m => m.role !== 'owner').length === 0 ? (
               <Text style={{ color: c.sub, fontSize: 12, marginBottom: 10 }}>{tr.projectMembersTransferOwnershipNoMembers}</Text>
             ) : members.filter(m => m.role !== 'owner').map(member => (
@@ -533,24 +538,24 @@ export default function ProjectMembersScreen() {
                 key={member.user.id}
                 onPress={() => handleTransferOwnership(member)}
                 disabled={busyUserId != null}
-                style={[st.memberRow, { borderColor: c.border, backgroundColor: c.bg2, marginBottom: 8 }]}>
+                style={[st.memberRow, { backgroundColor: c.dim, marginBottom: 8 }]}>
                 <View style={{ flex: 1 }}>
-                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>{member.user.name || member.user.email}</Text>
+                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{member.user.name || member.user.email}</Text>
                   <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{member.user.email}</Text>
                 </View>
-                {busyUserId === member.user.id ? <ActivityIndicator size="small" color={c.accent} /> : (
-                  <IconSymbol name="chevron.right" size={18} color={c.accent} />
+                {busyUserId === member.user.id ? <ActivityIndicator size="small" color={c.sub} /> : (
+                  <IconSymbol name="chevron.right" size={18} color={c.sub} />
                 )}
               </TouchableOpacity>
             ))}
             <TouchableOpacity onPress={() => setTransferring(false)} style={{ alignItems: 'center', paddingVertical: 6 }}>
-              <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600' }}>{tr.cancel}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.cancel}</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {loading && members.length === 0 ? (
-          <ActivityIndicator color={c.accent} style={{ marginTop: 30 }} />
+          <ActivityIndicator color={c.sub} style={{ marginTop: 30 }} />
         ) : loadError && members.length === 0 ? (
           // Порожній список малюється ЛИШЕ після успішної відповіді:
           // «нікого немає» і «не вдалося дізнатись» — різні стани.
@@ -563,18 +568,18 @@ export default function ProjectMembersScreen() {
               return (
                 <View
                   key={member.user.id}
-                  style={[st.memberRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+                  style={[st.memberRow, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
                   <View style={{ flex: 1 }}>
-                    <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>
+                    <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>
                       {member.user.name || member.user.email}{isMe ? ` (${tr.projectMembersYou})` : ''}
                     </Text>
                     <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{member.user.email}</Text>
                   </View>
-                  <View style={[st.roleBadge, { borderColor: c.border, backgroundColor: c.accent + '14' }]}>
-                    <Text style={{ color: c.accent, fontSize: 11, fontWeight: '700' }}>{roleLabel(member.role)}</Text>
+                  <View style={[st.roleBadge, { backgroundColor: c.dim }]}>
+                    <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.medium }}>{roleLabel(member.role)}</Text>
                   </View>
                   {busy ? (
-                    <ActivityIndicator size="small" color={c.accent} style={{ marginLeft: 10 }} />
+                    <ActivityIndicator size="small" color={c.sub} style={{ marginLeft: 10 }} />
                   ) : canManage && !isMe && member.role !== 'owner' && (isOwner || member.role !== 'manager') ? (
                     <TouchableOpacity
                       onPress={() => {
@@ -592,7 +597,7 @@ export default function ProjectMembersScreen() {
                     </TouchableOpacity>
                   ) : isMe && !isOwner ? (
                     <TouchableOpacity onPress={handleLeave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ marginLeft: 8 }}>
-                      <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{tr.projectMembersLeave}</Text>
+                      <Text style={{ color: tk.status.danger, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.projectMembersLeave}</Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>
@@ -603,34 +608,34 @@ export default function ProjectMembersScreen() {
 
         {canManage && (
           <>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>{tr.projectMembersInviteSection}</Text>
+            <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersInviteSection}</Text>
 
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
               {(isOwner ? ['manager', 'member', 'viewer'] as const : ['member', 'viewer'] as const).map(r => (
                 <TouchableOpacity
                   key={r}
                   onPress={() => setInviteRole(r)}
-                  style={[st.segment, { backgroundColor: inviteRole === r ? c.accent : c.dim, borderColor: inviteRole === r ? c.accent : c.border }]}>
-                  <Text style={{ color: inviteRole === r ? '#fff' : c.text, fontSize: 12, fontWeight: '700' }}>
+                  style={[st.segment, { backgroundColor: inviteRole === r ? tk.action.primary : c.dim, borderColor: 'transparent' }]}>
+                  <Text style={{ color: inviteRole === r ? tk.text.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold }}>
                     {r === 'manager' ? tr.roleManager : r === 'member' ? tr.roleMember : tr.roleViewer}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>{tr.projectMembersLinkExpiry}</Text>
+            <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersLinkExpiry}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
               {EXPIRY_OPTIONS.map(opt => (
                 <TouchableOpacity
                   key={opt.hours}
                   onPress={() => setInviteHours(opt.hours)}
-                  style={[st.segment, { backgroundColor: inviteHours === opt.hours ? c.accent : c.dim, borderColor: inviteHours === opt.hours ? c.accent : c.border }]}>
-                  <Text style={{ color: inviteHours === opt.hours ? '#fff' : c.text, fontSize: 12, fontWeight: '700' }}>{String(tr[opt.labelKey])}</Text>
+                  style={[st.segment, { backgroundColor: inviteHours === opt.hours ? tk.action.primary : c.dim, borderColor: 'transparent' }]}>
+                  <Text style={{ color: inviteHours === opt.hours ? tk.text.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold }}>{String(tr[opt.labelKey])}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>{tr.projectMembersInviteMaxUses}</Text>
+            <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersInviteMaxUses}</Text>
             {/* Один рядок без переносу: «Без обмежень» отримує ширшу комірку
                 (flex 2), підписи — в один рядок; висота й вирівнювання ті самі,
                 що в рядках «Роль» і «Термін дії» (st.segment). */}
@@ -645,12 +650,12 @@ export default function ProjectMembersScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`${tr.projectMembersInviteMaxUses}: ${label}`}
                     accessibilityState={{ selected: on }}
-                    style={[st.segment, opt === null && { flex: 2 }, { backgroundColor: on ? c.accent : c.dim, borderColor: on ? c.accent : c.border }]}>
+                    style={[st.segment, opt === null && { flex: 2 }, { backgroundColor: on ? tk.action.primary : c.dim, borderColor: 'transparent' }]}>
                     <Text
                       numberOfLines={1}
                       adjustsFontSizeToFit
                       minimumFontScale={0.85}
-                      style={{ color: on ? '#fff' : c.text, fontSize: 12, fontWeight: '700', textAlign: 'center' }}>
+                      style={{ color: on ? tk.text.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold, textAlign: 'center' }}>
                       {label}
                     </Text>
                   </TouchableOpacity>
@@ -661,27 +666,27 @@ export default function ProjectMembersScreen() {
             <TouchableOpacity
               onPress={handleCreateLink}
               disabled={creatingLink}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: c.accent, borderRadius: Atlas.radius.medium, paddingVertical: 12, marginBottom: 14, opacity: creatingLink ? 0.7 : 1 }}>
-              {creatingLink ? <ActivityIndicator color="#fff" /> : (
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: tk.action.primary, borderRadius: radius.pill, minHeight: 48, paddingVertical: 12, marginBottom: 14, opacity: creatingLink ? 0.7 : 1 }}>
+              {creatingLink ? <ActivityIndicator color={tk.text.onAction} /> : (
                 <>
-                  <IconSymbol name="link" size={15} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.projectMembersCreateLink}</Text>
+                  <IconSymbol name="link" size={15} color={tk.text.onAction} />
+                  <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.projectMembersCreateLink}</Text>
                 </>
               )}
             </TouchableOpacity>
 
             {createdInvite?.url && (
-              <View style={[st.linkCard, { borderColor: c.accent, backgroundColor: c.dim }]}>
-                <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', marginBottom: 8 }}>{tr.projectMembersLinkCreated}</Text>
+              <View style={[st.linkCard, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
+                <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersLinkCreated}</Text>
                 <Text numberOfLines={2} style={{ color: c.sub, fontSize: 12, marginBottom: 10 }}>{createdInvite.url}</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity onPress={handleShareLink} style={[st.smallBtn, { backgroundColor: c.accent }]}>
-                    <IconSymbol name="square.and.arrow.up" size={14} color="#fff" />
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', marginLeft: 6 }}>{tr.projectMembersShareLink}</Text>
+                  <TouchableOpacity onPress={handleShareLink} style={[st.smallBtn, { backgroundColor: tk.action.primary }]}>
+                    <IconSymbol name="square.and.arrow.up" size={14} color={tk.text.onAction} />
+                    <Text style={{ color: tk.text.onAction, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{tr.projectMembersShareLink}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={handleCopyLink} style={[st.smallBtn, { backgroundColor: c.border }]}>
+                  <TouchableOpacity onPress={handleCopyLink} style={[st.smallBtn, { backgroundColor: glassOf(tk).surfaceSubtle, ...glassRim(tk, 'subtle') }]}>
                     <IconSymbol name={copied ? 'checkmark' : 'doc.on.doc'} size={14} color={c.text} />
-                    <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', marginLeft: 6 }}>
+                    <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 6 }}>
                       {copied ? tr.projectMembersLinkCopied : tr.projectMembersCopyLink}
                     </Text>
                   </TouchableOpacity>
@@ -691,11 +696,11 @@ export default function ProjectMembersScreen() {
 
             {invites.length > 0 && (
               <View style={{ marginBottom: 14 }}>
-                <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>{tr.projectMembersActiveLinks}</Text>
+                <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersActiveLinks}</Text>
                 {invites.map(invite => (
-                  <View key={invite.id} style={[st.memberRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+                  <View key={invite.id} style={[st.memberRow, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card') }]}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{roleLabel(invite.role)}</Text>
+                      <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{roleLabel(invite.role)}</Text>
                       <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
                         {tr.inviteExpiresLabel} {new Date(invite.expires_at).toLocaleDateString(dateLocale)}
                         {' · '}{inviteUsesLabel(invite)}
@@ -706,14 +711,14 @@ export default function ProjectMembersScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={tr.projectMembersRevokeLink}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                      <IconSymbol name="trash" size={16} color="#EF4444" />
+                      <IconSymbol name="trash" size={16} color={tk.status.danger} />
                     </TouchableOpacity>
                   </View>
                 ))}
               </View>
             )}
 
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>{tr.projectMembersInviteByEmail}</Text>
+            <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 }}>{tr.projectMembersInviteByEmail}</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}>
               <TextInput
                 value={email}
@@ -726,7 +731,7 @@ export default function ProjectMembersScreen() {
                 keyboardType="email-address"
                 returnKeyType="send"
                 onSubmitEditing={() => { void handleInviteEmail(); }}
-                style={{ flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, paddingHorizontal: 12, paddingVertical: 10, color: c.text, fontSize: 14 }}
+                style={{ flex: 1, minHeight: 44, borderRadius: radius.pill, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), paddingHorizontal: 16, paddingVertical: 10, color: c.text, fontSize: 14, fontFamily: fontFamily.regular }}
               />
               <TouchableOpacity
                 onPress={handleInviteEmail}
@@ -734,19 +739,19 @@ export default function ProjectMembersScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={tr.projectMembersSendInvite}
                 accessibilityState={{ disabled: !email.trim() || sendingEmail, busy: sendingEmail }}
-                style={{ minHeight: 44, borderRadius: Atlas.radius.medium, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: email.trim() ? c.accent : c.border }}>
-                {sendingEmail ? <ActivityIndicator color="#fff" size="small" /> : (
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{tr.projectMembersSendInvite}</Text>
+                style={{ minHeight: 44, borderRadius: radius.pill, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: email.trim() ? tk.action.primary : tk.state.disabledBg }}>
+                {sendingEmail ? <ActivityIndicator color={tk.text.onAction} size="small" /> : (
+                  <Text style={{ color: email.trim() ? tk.text.onAction : tk.state.disabledText, fontFamily: fontFamily.semibold, fontSize: 13 }}>{tr.projectMembersSendInvite}</Text>
                 )}
               </TouchableOpacity>
             </View>
             <Text style={{ color: c.sub, fontSize: 11, lineHeight: 15, marginBottom: emailError || emailNotice ? 8 : 20 }}>
               {emailConfigured ? tr.projectMembersInviteEmailHint : tr.projectMembersInviteEmailHintNoSmtp}
             </Text>
-            {emailError ? <Text accessibilityLiveRegion="polite" style={{ color: '#EF4444', fontSize: 12, marginBottom: 20 }}>{emailError}</Text> : null}
+            {emailError ? <Text accessibilityLiveRegion="polite" style={{ color: tk.status.danger, fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 20 }}>{emailError}</Text> : null}
             {emailNotice ? (
-              <View accessibilityLiveRegion="polite" style={[st.hint, { borderColor: c.border, backgroundColor: c.dim, marginBottom: 20, alignItems: 'flex-start' }]}>
-                <IconSymbol name="bell" size={14} color={c.accent} />
+              <View accessibilityLiveRegion="polite" style={[st.hint, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), marginBottom: 20, alignItems: 'flex-start' }]}>
+                <IconSymbol name="bell" size={14} color={c.text} />
                 <View style={{ flex: 1, marginLeft: 8, gap: 4 }}>
                   {emailNotice.map((line, i) => (
                     <Text key={i} style={{ color: i === emailNotice.length - 1 ? c.sub : c.text, fontSize: 12, lineHeight: 17 }}>{line}</Text>
@@ -764,7 +769,7 @@ export default function ProjectMembersScreen() {
 
             {pendingInvites.length > 0 && (
               <View style={{ marginBottom: 20 }}>
-                <Text accessibilityRole="header" style={{ color: c.sub, fontSize: 11, fontWeight: '700', marginBottom: 8 }}>
+                <Text accessibilityRole="header" style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 8 }}>
                   {tr.projectMembersPendingSection} · {pendingInvites.length}
                 </Text>
                 {pendingInvites.map(invite => {
@@ -775,9 +780,9 @@ export default function ProjectMembersScreen() {
                     : tr.projectMembersInviteSentAt.replace('{date}', new Date(sentAt).toLocaleDateString(dateLocale))
                       + ((invite.send_count ?? 1) > 1 ? ` · ×${invite.send_count}` : '');
                   return (
-                    <View key={invite.id} style={[st.memberRow, { borderColor: c.border, backgroundColor: c.dim, paddingVertical: 6 }]}>
+                    <View key={invite.id} style={[st.memberRow, { backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), paddingVertical: 6 }]}>
                       <View style={{ flex: 1, paddingVertical: 6 }}>
-                        <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>
+                        <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>
                           {invite.invitee?.name || invite.email}
                         </Text>
                         <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
@@ -787,21 +792,21 @@ export default function ProjectMembersScreen() {
                           <Text numberOfLines={2} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.projectMembersInviteNoAccountShort}</Text>
                         ) : null}
                       </View>
-                      {busy ? <ActivityIndicator size="small" color={c.accent} style={{ width: 44 }} /> : (
+                      {busy ? <ActivityIndicator size="small" color={c.sub} style={{ width: 44 }} /> : (
                         <>
                           <TouchableOpacity
                             onPress={() => { void handleResend(invite); }}
                             accessibilityRole="button"
                             accessibilityLabel={`${tr.projectMembersInviteResend}: ${invite.email ?? ''}`}
                             style={st.iconBtn}>
-                            <IconSymbol name="arrow.clockwise" size={16} color={c.accent} />
+                            <IconSymbol name="arrow.clockwise" size={16} color={c.text} />
                           </TouchableOpacity>
                           <TouchableOpacity
                             onPress={() => handleCancelInvite(invite)}
                             accessibilityRole="button"
                             accessibilityLabel={`${tr.projectMembersInviteCancel}: ${invite.email ?? ''}`}
                             style={st.iconBtn}>
-                            <IconSymbol name="xmark" size={15} color="#EF4444" />
+                            <IconSymbol name="xmark" size={15} color={tk.status.danger} />
                           </TouchableOpacity>
                         </>
                       )}
@@ -813,19 +818,19 @@ export default function ProjectMembersScreen() {
           </>
         )}
       </ScrollView>
-    {removing && <Modal visible transparent animationType="slide" onRequestClose={()=>setRemoving(null)}><View style={{flex:1,justifyContent:'center',backgroundColor:'rgba(0,0,0,0.5)',padding:20}}><ScrollView style={{maxHeight:modalHeight * 0.8,backgroundColor:c.bg1,borderRadius:16}} contentContainerStyle={{padding:20,gap:10}}><Text style={{color:c.text,fontSize:18,fontWeight:'700'}}>{tr.projectReassignTitle}</Text>{members.filter(m=>m.user.id!==removing?.user.id&&m.role!=='viewer').map(m=><TeamButton key={m.user.id} label={m.user.name||m.user.email} onPress={()=>{if(removing)handleRemove(removing,m.user.id);setRemoving(null);}}/>)}<TeamButton label={tr.projectLeaveUnassigned} onPress={()=>{if(removing)handleRemove(removing);setRemoving(null);}}/><TeamButton label={tr.cancel} onPress={()=>setRemoving(null)}/></ScrollView></View></Modal>}
+    {removing && <Modal visible transparent animationType="slide" onRequestClose={()=>setRemoving(null)}><View style={{flex:1,justifyContent:'center',backgroundColor:tk.surface.overlay,padding:20}}><ScrollView style={{maxHeight:modalHeight * 0.8,backgroundColor: glassOf(tk).sheet, ...glassRim(tk, 'strong'),borderRadius:radius.card}} contentContainerStyle={{padding:24,gap:10}}><Text style={{color:c.text,fontSize:18,fontFamily:fontFamily.semibold}}>{tr.projectReassignTitle}</Text>{members.filter(m=>m.user.id!==removing?.user.id&&m.role!=='viewer').map(m=><TeamButton key={m.user.id} label={m.user.name||m.user.email} onPress={()=>{if(removing)handleRemove(removing,m.user.id);setRemoving(null);}}/>)}<TeamButton label={tr.projectLeaveUnassigned} onPress={()=>{if(removing)handleRemove(removing);setRemoving(null);}}/><TeamButton label={tr.cancel} onPress={()=>setRemoving(null)}/></ScrollView></View></Modal>}
       </ProjectScreenShell>
   );
 }
 
 const st = StyleSheet.create({
-  hint: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10 },
-  memberRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 12, marginBottom: 8 },
-  roleBadge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4, marginLeft: 8 },
+  hint: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, padding: 14 },
+  memberRow: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, padding: 14, marginBottom: 8 },
+  roleBadge: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
   // 44 pt мін. висота й центр по обох осях — усі три ряди сегментів
   // (роль / термін / ліміт) однакові навіть коли підпис довший за комірку.
-  segment: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 6 },
-  linkCard: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, marginBottom: 14 },
+  segment: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 6 },
+  linkCard: { borderRadius: radius.cardCompact, padding: 20, marginBottom: 14 },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  smallBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: Atlas.radius.medium, paddingVertical: 9 },
+  smallBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, minHeight: 44, paddingVertical: 9 },
 });

@@ -52,6 +52,8 @@ import { expandMeetings, withMeetingProject, type Meeting } from '@/utils/meetin
 import type { Sprint } from '@/utils/sprintUtils';
 import { isTaskDoneByType, type TaskStatusColumn } from '@/utils/taskStatuses';
 import type { Task } from '@/utils/taskUtils';
+import { radius } from '@/constants/theme';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 interface CreateTarget { day: string; time?: string }
 
@@ -73,14 +75,14 @@ export default function ProjectCalendar() {
   const isDark = useColorScheme() === 'dark';
   const projectColor = project?.color ?? DEFAULT_COLOR;
 
-  // Палітра сітки — від оболонки проєкту (фон, текст, рамки), акцент і
-  // смуги спринтів — колір проєкту.
+  // Палітра сітки — від оболонки проєкту (фон, текст, рамки). Смуги спринтів
+  // і так мають колір проєкту; акцент «сьогодні» лишається календарним (DS v2),
+  // бо довільний колір проєкту не завжди тримає контраст дрібного тексту.
   const c = useMemo<CalendarColors>(() => {
     const shell = projectShellColors(isDark, projectColor, project?.appearance);
     return {
       ...calendarColors(isDark),
       bg1: shell.bg1, bg2: shell.bg2, text: shell.text, sub: shell.sub, border: shell.border, dim: shell.dim,
-      accent: projectColor,
     };
   }, [isDark, projectColor, project?.appearance]);
 
@@ -257,19 +259,22 @@ export default function ProjectCalendar() {
   if (view === 'month') {
     content = (
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
-        <MonthGrid
-          rows={monthRows}
-          month={anchorDate.getMonth()}
-          todayKey={todayKey}
-          selectedKey={anchor}
-          tasksByDay={tasksByDay}
-          meetingsByDay={meetingsByDay}
-          sprintBars={sprintBars}
-          onSelectDay={setAnchor}
-          mode={isWide ? 'labels' : 'dots'}
-          c={c}
-          tr={tr}
-        />
+        {/* DS v2: сітка місяця — у білій картці на canvas. */}
+        <View style={{ backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: radius.cardCompact, padding: 12 }}>
+          <MonthGrid
+            rows={monthRows}
+            month={anchorDate.getMonth()}
+            todayKey={todayKey}
+            selectedKey={anchor}
+            tasksByDay={tasksByDay}
+            meetingsByDay={meetingsByDay}
+            sprintBars={sprintBars}
+            onSelectDay={setAnchor}
+            mode={isWide ? 'labels' : 'dots'}
+            c={c}
+            tr={tr}
+          />
+        </View>
         <View style={{ marginTop: 18 }}>{agenda}</View>
       </ScrollView>
     );
@@ -292,7 +297,7 @@ export default function ProjectCalendar() {
     );
   } else {
     content = (
-      <View style={{ flex: 1, paddingHorizontal: 16 }}>
+      <View style={{ flex: 1, marginHorizontal: 16, marginBottom: 12, backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: radius.cardCompact, overflow: 'hidden', paddingTop: 8, paddingRight: 4 }}>
         <TimeGrid
           days={range.days}
           todayKey={todayKey}
@@ -325,15 +330,15 @@ export default function ProjectCalendar() {
           <HeaderButton
             onPress={() => setAnchor(todayKey)}
             accessibilityLabel={tr.today}
-            style={{ borderColor: isCurrentPeriod ? c.accent + '50' : c.border, backgroundColor: isCurrentPeriod ? c.accent + '14' : c.dim }}>
-            <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? c.accent : c.sub} />
+            style={{ borderColor: 'transparent', backgroundColor: c.card }}>
+            <IconSymbol name="calendar" size={16} color={isCurrentPeriod ? c.accent : c.text} />
           </HeaderButton>
           {canEdit ? (
             <HeaderButton
               onPress={() => setCreateTarget({ day: anchor })}
               accessibilityLabel={tr.calProjectAdd}
-              style={{ borderColor: c.accent + '50', backgroundColor: c.accent + '14' }}>
-              <IconSymbol name="plus" size={18} color={c.accent} />
+              style={{ borderColor: 'transparent', backgroundColor: c.action }}>
+              <IconSymbol name="plus" size={18} color={c.onAction} />
             </HeaderButton>
           ) : null}
         </>

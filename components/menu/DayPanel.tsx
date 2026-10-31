@@ -7,13 +7,15 @@
  */
 import { Atlas } from '@/constants/atlas';
 import React from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { meals, type Meal, type MenuEntry } from '@/store/menu-api';
 
 import { entriesOf, longDayLabel, MEAL_META } from './model';
 import type { MenuColors } from './theme';
+import { fontFamily } from '@/constants/theme';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 export function DayPanel({
   day,
@@ -61,7 +63,7 @@ export function DayPanel({
           opacity: pressed ? 0.6 : 1,
         })}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text style={{ color: c.text, fontWeight: '600', fontSize: 16, lineHeight: 22 }}>
+          <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 16, lineHeight: 22 }}>
             {e.title || e.description}
           </Text>
           {!!e.title && !!e.description && (
@@ -100,23 +102,21 @@ export function DayPanel({
         justifyContent: 'center',
         opacity: pressed ? 0.6 : 1,
       })}>
-      <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600' }}>＋ Додати</Text>
+      <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>＋ Додати</Text>
     </Pressable>
   );
 
   return (
     <View
       style={{
-        borderWidth: 1,
-        borderColor: c.border,
-        backgroundColor: c.card,
+        backgroundColor: c.card, ...glassRimFor(c.card, 'card'),
         borderRadius: Atlas.radius.xlarge,
-        paddingHorizontal: wide ? 20 : 16,
-        paddingTop: 16,
+        paddingHorizontal: 20,
+        paddingTop: 20,
         paddingBottom: 4,
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <Text accessibilityRole="header" style={{ color: c.text, fontSize: wide ? 20 : 17, fontWeight: '600' }}>
+        <Text accessibilityRole="header" style={{ color: c.text, fontSize: wide ? 20 : 17, fontFamily: fontFamily.semibold }}>
           {longDayLabel(day)}
         </Text>
         {day === today && todayPill}
@@ -130,12 +130,12 @@ export function DayPanel({
               flexDirection: 'row',
               gap: 12,
               paddingVertical: 12,
-              borderTopWidth: i === 0 ? 0 : 1,
+              borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
               borderColor: c.border,
             }}>
             <View style={{ width: wide ? 104 : 92, gap: 4, paddingTop: 2 }}>
               <IconSymbol name={MEAL_META[m].icon} size={18} color={MEAL_META[m].color} />
-              <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', letterSpacing: 0.3 }}>{meals[m]}</Text>
+              <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{meals[m]}</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
               {list.map(dish)}

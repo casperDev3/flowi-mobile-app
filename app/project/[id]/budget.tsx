@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/project/[id]/budget.tsx — Бюджет проєкту (WORKSPACE_PROJECTS_CONTRACT
  * §3.3 `project_budgets`, §4.1: «бюджет бачить лише власник»).
@@ -43,6 +42,10 @@ import { categoryOptions } from '@/utils/financeCategories';
 import type { CategoryRowLike } from '@/utils/financeCategories';
 import { haptic } from '@/utils/haptics';
 import { MODULES_BY_TEMPLATE, projectModules } from '@/utils/projectUtils';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { ProgressBar } from '@/components/ds';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 interface ProjectBudgetRecord {
   id: string;
@@ -63,6 +66,7 @@ export default function ProjectBudgetScreen() {
   const { project } = useProject(projectId);
   const role = useProjectRole(projectId);
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
+  const tk = dsTokens(isDark);
 
   const [budgets, setBudgets] = useState<ProjectBudgetRecord[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -222,21 +226,21 @@ export default function ProjectBudgetScreen() {
         // виглядає мертвою.
         keyboardShouldPersistTaps="handled">
 
-        <View style={{ borderRadius: Atlas.radius.large, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, padding: 16, marginBottom: 20 }}>
-          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 8 }}>{tr.projectBudgetLimit}</Text>
+        <View style={{ borderRadius: radius.card, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 24, marginBottom: 16 }}>
+          <Text style={[type.h2, { color: c.text, marginBottom: 8 }]}>{tr.projectBudgetLimit}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <TextInput
               placeholder={budget ? String(budget.amount) : '0'}
               accessibilityLabel={tr.projectBudgetLimit}
-              placeholderTextColor={c.sub}
+              placeholderTextColor={tk.text.muted}
               value={amountDraft}
               onChangeText={setAmountDraft}
               keyboardType="decimal-pad"
               onSubmitEditing={() => saveAmount(currency)}
-              style={{ flex: 1, color: c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, borderBottomWidth: 1, borderColor: c.border, paddingVertical: 6 }}
+              style={{ flex: 1, color: c.text, fontSize: 32, fontFamily: fontFamily.light, letterSpacing: -0.64, fontVariant: ['tabular-nums'], borderBottomWidth: 1, borderColor: c.border, paddingVertical: 6 }}
             />
-            <TouchableOpacity onPress={() => saveAmount(currency)} style={{ backgroundColor: c.accent, borderRadius: Atlas.radius.medium, paddingHorizontal: 14, paddingVertical: 10 }}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.save}</Text>
+            <TouchableOpacity onPress={() => saveAmount(currency)} style={{ backgroundColor: tk.action.primary, borderRadius: radius.pill, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20 }}>
+              <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold }}>{tr.save}</Text>
             </TouchableOpacity>
           </View>
           <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -244,28 +248,39 @@ export default function ProjectBudgetScreen() {
               <TouchableOpacity
                 key={cur.code}
                 onPress={() => saveAmount(cur.code)}
-                style={{ borderRadius: 9, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderColor: cur.code === currency ? c.accent : c.border, backgroundColor: cur.code === currency ? c.accent + '18' : 'transparent' }}>
-                <Text style={{ color: cur.code === currency ? c.accent : c.sub, fontWeight: '700', fontSize: 12 }}>{cur.code}</Text>
+                style={{ borderRadius: radius.pill, minHeight: 32, justifyContent: 'center', paddingHorizontal: 12, backgroundColor: cur.code === currency ? tk.action.primary : glassOf(tk).surfaceSubtle }}>
+                <Text style={{ color: cur.code === currency ? tk.text.onAction : c.text, fontFamily: fontFamily.semibold, fontSize: 12 }}>{cur.code}</Text>
               </TouchableOpacity>
             ))}
           </View>
           {budget ? (
-            <Text style={{ color: spent > budget.amount ? '#EF4444' : c.text, fontSize: 14, fontWeight: '700', marginTop: 14 }}>
-              {tr.overviewBudgetSpent}: {formatSubscriptionMoney(spent, currency, allCurrencies, locale)} / {formatSubscriptionMoney(budget.amount, currency, allCurrencies, locale)}
-            </Text>
+            <>
+              {/* DS v2: витрачене — display-цифри, прогрес — amber (перевитрата — coral). */}
+              <Text style={[type.caption, { color: c.sub, marginTop: 18 }]}>{tr.overviewBudgetSpent}</Text>
+              <Text style={[type.displaySm, { color: c.text, marginTop: 4 }]} numberOfLines={1} adjustsFontSizeToFit>
+                {formatSubscriptionMoney(spent, currency, allCurrencies, locale)}
+                <Text style={[type.displayUnit, { color: c.sub }]}> / {formatSubscriptionMoney(budget.amount, currency, allCurrencies, locale)}</Text>
+              </Text>
+              <ProgressBar
+                value={budget.amount > 0 ? spent / budget.amount : 0}
+                tone={spent > budget.amount ? 'coral' : 'amber'}
+                height={8}
+                style={{ marginTop: 12 }}
+              />
+            </>
           ) : null}
           {totals && (totals.income > 0 || projectIncome.length > 0) ? (
             <>
-              <Text style={{ color: '#10B981', fontSize: 14, fontWeight: '700', marginTop: 6 }}>
+              <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginTop: 12 }}>
                 {tr.finProjectIncomeTitle}: {formatSubscriptionMoney(totals.income, currency, allCurrencies, locale)}
               </Text>
-              <Text style={{ color: totals.net < 0 ? '#EF4444' : c.text, fontSize: 13, fontWeight: '600', marginTop: 4 }}>
+              <Text style={{ color: totals.net < 0 ? tk.status.danger : c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginTop: 4 }}>
                 {tr.finProjectNet}: {totals.net < 0 ? '−' : ''}{formatSubscriptionMoney(Math.abs(totals.net), currency, allCurrencies, locale)}
               </Text>
             </>
           ) : null}
           {uncountedLine ? (
-            <Text style={{ color: c.sub, fontSize: 12, marginTop: 6 }}>{tr.finProjectUncounted.replace('{list}', uncountedLine)}</Text>
+            <Text style={[type.caption, { color: c.sub, marginTop: 6 }]}>{tr.finProjectUncounted.replace('{list}', uncountedLine)}</Text>
           ) : null}
         </View>
 
@@ -274,29 +289,29 @@ export default function ProjectBudgetScreen() {
           onPress={() => { setTxError(null); setTxFormOpen(true); }}
           accessibilityRole="button"
           accessibilityLabel={tr.finProjectAddTx}
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.accent + '55', backgroundColor: c.accent + '14', marginBottom: 20 }}>
-          <IconSymbol name="plus" size={15} color={c.accent} />
-          <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.finProjectAddTx}</Text>
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, borderRadius: radius.pill, backgroundColor: tk.action.primary, marginBottom: 20 }}>
+          <IconSymbol name="plus" size={15} color={tk.text.onAction} />
+          <Text style={{ color: tk.text.onAction, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.finProjectAddTx}</Text>
         </TouchableOpacity>
 
         {/* Підписки проєкту: та сама секція, що раніше жила в деталі
             (app/projects.tsx) — тепер тут, поруч із рештою бюджету, бо й
             підписки з projectId бачить лише власник (contract §4.1). */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <Text style={{ flex: 1, color: c.sub, fontSize: 12, fontWeight: '700' }}>{tr.navSubscriptions}</Text>
+          <Text style={[type.h2, { flex: 1, color: c.text }]}>{tr.navSubscriptions}</Text>
           <TouchableOpacity
             onPress={() => router.push({ pathname: '/subscriptions', params: { create: '1', projectId } } as never)}
             accessibilityRole="button"
             accessibilityLabel={tr.subNew}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <IconSymbol name="plus" size={17} color={c.accent} />
+            <IconSymbol name="plus" size={17} color={c.text} />
           </TouchableOpacity>
         </View>
         {projectSubscriptions.live.length === 0 ? (
-          <Text style={{ color: c.sub, fontSize: 13, opacity: 0.8, marginBottom: 20 }}>{tr.subProjectEmpty}</Text>
+          <Text style={[type.body, { color: c.sub, fontSize: 13, marginBottom: 20 }]}>{tr.subProjectEmpty}</Text>
         ) : (
           <View style={{ marginBottom: 20 }}>
-            <Text style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight, marginBottom: 6 }}>{projectSubscriptions.monthlyLine}</Text>
+            <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'], marginBottom: 8 }}>{projectSubscriptions.monthlyLine}</Text>
             {projectSubscriptions.live.map(sub => {
               const overdue = subscriptionStatus(sub, projectSubscriptions.today ?? '') === 'overdue';
               return (
@@ -304,15 +319,15 @@ export default function ProjectBudgetScreen() {
                   key={sub.id}
                   onPress={() => router.push({ pathname: '/subscriptions', params: { open: sub.id } } as never)}
                   activeOpacity={0.75}
-                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
-                  <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: sub.color || (project?.color ?? c.accent), marginRight: 10 }} />
+                  style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 14, marginBottom: 8 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: sub.color || (project?.color ?? c.accent), marginRight: 10 }} />
                   <View style={{ flex: 1 }}>
-                    <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{sub.name}</Text>
-                    <Text style={{ color: overdue ? '#EF4444' : c.sub, fontSize: 11, marginTop: 2, fontWeight: overdue ? '700' : '400' }}>
+                    <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{sub.name}</Text>
+                    <Text style={{ color: overdue ? tk.status.danger : c.sub, fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'], fontFamily: overdue ? fontFamily.semibold : fontFamily.regular }}>
                       {overdue ? `${tr.subOverdue} · ` : ''}{new Date(`${sub.nextPaymentDate}T00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                     </Text>
                   </View>
-                  <Text style={{ color: overdue ? '#EF4444' : c.text, fontSize: 13, fontWeight: '700' }}>
+                  <Text style={{ color: overdue ? tk.status.danger : c.text, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                     {formatSubscriptionMoney(sub.amount, sub.currency, allCurrencies, locale)}
                   </Text>
                 </TouchableOpacity>
@@ -321,41 +336,41 @@ export default function ProjectBudgetScreen() {
           </View>
         )}
 
-        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 8 }}>{tr.projectBudgetTransactions}</Text>
+        <Text style={[type.h2, { color: c.text, marginBottom: 8 }]}>{tr.projectBudgetTransactions}</Text>
         {projectTx.length === 0 ? (
-          <Text style={{ color: c.sub, fontSize: 13, opacity: 0.8 }}>{tr.projectBudgetNoTransactions}</Text>
+          <Text style={[type.body, { color: c.sub, fontSize: 13 }]}>{tr.projectBudgetNoTransactions}</Text>
         ) : projectTx.map(tx => (
-          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
+          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 14, marginBottom: 8 }}>
             <View style={{ flex: 1 }}>
-              <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{tx.category || tx.note || '—'}</Text>
-              <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+              <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tx.category || tx.note || '—'}</Text>
+              <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
                 {new Date(tx.date).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
               </Text>
             </View>
-            <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '700' }}>-{tx.amount.toLocaleString(locale)}</Text>
+            <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>-{tx.amount.toLocaleString(locale)}</Text>
           </View>
         ))}
 
         {/* П4: доходи проєкту окремим списком — як на вебі. */}
-        <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', marginBottom: 8, marginTop: 20 }}>{tr.finProjectIncomeTitle}</Text>
+        <Text style={[type.h2, { color: c.text, marginBottom: 8, marginTop: 20 }]}>{tr.finProjectIncomeTitle}</Text>
         {projectIncome.length === 0 ? (
-          <Text style={{ color: c.sub, fontSize: 13, opacity: 0.8 }}>{tr.finProjectNoIncome}</Text>
+          <Text style={[type.body, { color: c.sub, fontSize: 13 }]}>{tr.finProjectNoIncome}</Text>
         ) : projectIncome.map(tx => (
-          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, padding: 12, marginBottom: 8 }}>
+          <View key={tx.id} style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.nested, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), padding: 14, marginBottom: 8 }}>
             <View style={{ flex: 1 }}>
-              <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{tx.category || tx.note || '—'}</Text>
-              <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+              <Text numberOfLines={1} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tx.category || tx.note || '—'}</Text>
+              <Text style={[type.caption, type.numeric, { color: c.sub, marginTop: 2 }]}>
                 {new Date(tx.date).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
               </Text>
             </View>
-            <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '700' }}>+{Number(tx.amount).toLocaleString(locale)}</Text>
+            <Text style={{ color: tk.status.success, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>+{Number(tx.amount).toLocaleString(locale)}</Text>
           </View>
         ))}
 
         {/* Регулярні доходи проєкту — та сама секція, що у вкладці «Підписки». */}
         {projectId ? (
           <RecurringIncomesSection
-            c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: c.dim, accent: c.accent, green: '#10B981', red: '#EF4444', sheet: isDark ? 'rgba(12,12,20,0.98)' : 'rgba(248,246,255,0.98)' }}
+            c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, card: glassOf(tk).surface, accent: c.accent, green: tk.status.success, red: tk.status.danger, sheet: glassOf(tk).sheet }}
             tr={tr}
             lang={lang === 'en' ? 'en' : 'uk'}
             isDark={isDark}
@@ -371,7 +386,7 @@ export default function ProjectBudgetScreen() {
           projectId={projectId}
           accounts={accounts}
           categories={formCategories}
-          c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: isDark ? 'rgba(12,12,20,0.98)' : 'rgba(248,246,255,0.98)' }}
+          c={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: glassOf(tk).sheet }}
           tr={tr}
           isDark={isDark}
           busy={txBusy}

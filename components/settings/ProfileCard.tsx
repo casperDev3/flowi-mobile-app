@@ -4,7 +4,6 @@
  * Увійшли: аватар з ініціалами, ім'я, пошта, крапка стану мережі; тап —
  * «Керування акаунтом». Не увійшли: підказка + «Увійти» / «Зареєструватися».
  */
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -14,6 +13,9 @@ import type { AuthUser } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 
 import { profileInitials, profileTitle } from './model';
+import { fontFamily } from '@/constants/theme';
+import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
+import { AccentIcon, AccentWash } from '@/components/shared/GlassBits';
 
 export interface ProfileCardColors {
   text: string;
@@ -36,16 +38,18 @@ export function ProfileCard({
 }) {
   const { tr } = useI18n();
   const c = colors;
-  const statusColor = online ? '#10B981' : '#9CA3AF';
+  // DS v2: картка — surface.card; дії — pill action.primary / secondary; аватар — action.primary.
+  const t = dsTheme(isDark);
+  const statusColor = online ? t.status.success : t.text.muted;
   const statusLabel = online ? tr.modeOnline : tr.modeOffline;
 
   if (!user) {
     return (
-      <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+      <View style={[st.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+        {/* DS v2.1: картка профілю — KPI «Налаштувань»: легка змивка lavender. */}
+        <AccentWash isDark={isDark} accent="lavender" strength={0.7} />
         <View style={st.head}>
-          <View style={[st.avatar, { backgroundColor: c.accent + '20' }]}>
-            <IconSymbol name="person.fill" size={24} color={c.accent} />
-          </View>
+          <AccentIcon isDark={isDark} icon="person.fill" accent="lavender" size="lg" style={st.avatar} />
           <View style={st.info}>
             <Text style={[st.title, { color: c.text }]} numberOfLines={1}>{tr.settingsHub.profileGuest}</Text>
             <Text style={[st.sub, { color: c.sub }]} numberOfLines={2}>{tr.syncGuestHint}</Text>
@@ -56,18 +60,18 @@ export function ProfileCard({
             onPress={onLogin}
             accessibilityRole="button"
             accessibilityLabel={tr.authLogin}
-            style={[st.btn, { backgroundColor: c.accent }]}>
-            <Text style={[st.btnText, { color: '#fff' }]} numberOfLines={1}>{tr.authLogin}</Text>
+            style={[st.btn, { backgroundColor: t.action.primary }]}>
+            <Text style={[st.btnText, { color: t.text.onAction }]} numberOfLines={1}>{tr.authLogin}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={onRegister}
             accessibilityRole="button"
             accessibilityLabel={tr.authRegister}
-            style={[st.btn, { borderWidth: 1, borderColor: c.accent }]}>
-            <Text style={[st.btnText, { color: c.accent }]} numberOfLines={1}>{tr.authRegister}</Text>
+            style={[st.btn, { backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+            <Text style={[st.btnText, { color: t.action.secondaryText }]} numberOfLines={1}>{tr.authRegister}</Text>
           </TouchableOpacity>
         </View>
-      </BlurView>
+      </View>
     );
   }
 
@@ -80,14 +84,15 @@ export function ProfileCard({
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${statusLabel}`}
       accessibilityHint={tr.accountManage}>
-      <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+      <View style={[st.card, { backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }]}>
+        <AccentWash isDark={isDark} accent="lavender" strength={0.7} />
         <View style={st.head}>
           <View>
-            <View style={[st.avatar, { backgroundColor: c.accent }]}>
-              <Text style={st.initials}>{profileInitials(user.name, user.email)}</Text>
+            <View style={[st.avatar, { backgroundColor: glassOf(t).accent.lavender.solid }]}>
+              <Text style={[st.initials, { color: glassOf(t).accent.lavender.onSolid }]}>{profileInitials(user.name, user.email)}</Text>
             </View>
             <View
-              style={[st.dot, { backgroundColor: statusColor, borderColor: isDark ? '#14121E' : '#FFFFFF' }]}
+              style={[st.dot, { backgroundColor: statusColor, borderColor: glassOf(t).sheet }]}
               accessible={false}
             />
           </View>
@@ -101,25 +106,25 @@ export function ProfileCard({
           </View>
           <IconSymbol name="chevron.right" size={16} color={c.sub} />
         </View>
-      </BlurView>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const st = StyleSheet.create({
-  card:      { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', padding: 16 },
+  card:      { borderRadius: Atlas.radius.xxlarge, overflow: 'hidden', padding: 20 },
   head:      { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatar:    { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  initials:  { color: '#fff', fontSize: 20, fontWeight: Atlas.type.headingWeight },
+  initials:  { fontSize: 20, fontFamily: fontFamily.medium },
   dot:       { position: 'absolute', right: 0, bottom: 0, width: 16, height: 16, borderRadius: 8, borderWidth: 3 },
   info:      { flex: 1, minWidth: 0, gap: 2 },
-  title:     { fontSize: 17, fontWeight: Atlas.type.headingWeight },
-  sub:       { fontSize: 13, fontWeight: '500' },
+  title:     { fontSize: 17, fontFamily: fontFamily.semibold },
+  sub:       { fontSize: 13, fontFamily: fontFamily.medium },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
-  statusText:{ fontSize: 12, fontWeight: '600' },
+  statusText:{ fontSize: 12, fontFamily: fontFamily.regular },
   actions:   { flexDirection: 'row', gap: 10, marginTop: 14 },
   // 44 — мінімальний тач-таргет.
-  btn:       { flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
-  btnText:   { fontSize: 15, fontWeight: '700' },
+  btn:       { flex: 1, minHeight: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  btnText:   { fontSize: 15, fontFamily: fontFamily.semibold },
 });

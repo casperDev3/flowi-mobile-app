@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
 /**
  * Тихі години (notifications-module.md §4.5, §8.3): у цей проміжок сервер
  * відкладає push до кінця вікна, а в застосунку сповіщення з'являються
@@ -16,6 +17,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 
 import { fillTemplate } from './labels';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 const STEP_MINUTES = 30;
 
@@ -51,13 +53,13 @@ export function QuietHoursCard({ enabled, start, end, timezone, tr, colors: c, o
     { edge: 'end', label: tr.ncQuietTo, value: end ?? '08:00', fallback: '08:00' },
   ];
   return (
-    <View style={[st.card, { borderColor: c.border, backgroundColor: c.card }]}>
+    <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
       <View style={st.toggleRow}>
-        <View style={[st.iconBox, { backgroundColor: '#6366F120' }]}>
-          <IconSymbol name="moon.fill" size={16} color="#6366F1" />
+        <View style={[st.iconBox, { backgroundColor: c.dim }]}>
+          <IconSymbol name="moon.fill" size={16} color={c.text} />
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{tr.ncQuietHours}</Text>
+          <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold }}>{tr.ncQuietHours}</Text>
           <Text style={{ color: c.sub, fontSize: 12, marginTop: 2, lineHeight: 16 }}>{tr.ncQuietHoursSub}</Text>
         </View>
         <Switch
@@ -71,15 +73,15 @@ export function QuietHoursCard({ enabled, start, end, timezone, tr, colors: c, o
         />
       </View>
       {enabled ? (
-        <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+        <View style={{ paddingHorizontal: 20, paddingBottom: 16 }}>
           {rows.map(row => (
             <View key={row.edge} style={[st.timeRow, { borderTopColor: c.border }]}>
-              <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', width: 36 }}>{row.label}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, width: 36 }}>{row.label}</Text>
               <TouchableOpacity
                 onPress={() => onChangeTime(row.edge, stepTime(row.value, row.fallback, -STEP_MINUTES))}
                 accessibilityRole="button"
                 accessibilityLabel={`${row.label} ${row.value}: ${tr.ncEarlier}`}
-                style={[st.stepBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
+                style={[st.stepBtn, { backgroundColor: c.dim }]}>
                 <IconSymbol name="minus" size={14} color={c.text} />
               </TouchableOpacity>
               <Text
@@ -91,13 +93,13 @@ export function QuietHoursCard({ enabled, start, end, timezone, tr, colors: c, o
                 onPress={() => onChangeTime(row.edge, stepTime(row.value, row.fallback, STEP_MINUTES))}
                 accessibilityRole="button"
                 accessibilityLabel={`${row.label} ${row.value}: ${tr.ncLater}`}
-                style={[st.stepBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
+                style={[st.stepBtn, { backgroundColor: c.dim }]}>
                 <IconSymbol name="plus" size={14} color={c.text} />
               </TouchableOpacity>
             </View>
           ))}
           {timezone ? (
-            <Text style={{ color: c.sub, fontSize: 11.5, marginTop: 8 }}>{fillTemplate(tr.ncTimezone, { tz: timezone })}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, marginTop: 8 }}>{fillTemplate(tr.ncTimezone, { tz: timezone })}</Text>
           ) : null}
         </View>
       ) : null}
@@ -106,10 +108,10 @@ export function QuietHoursCard({ enabled, start, end, timezone, tr, colors: c, o
 }
 
 const st = StyleSheet.create({
-  card:      { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
-  iconBox:   { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  card:      { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', marginBottom: 12 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
+  iconBox:   { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   timeRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 10, marginTop: 4, borderTopWidth: StyleSheet.hairlineWidth },
-  stepBtn:   { width: 44, height: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  time:      { fontSize: 20, fontWeight: Atlas.type.headingWeight, minWidth: 72, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  stepBtn:   { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  time:      { fontSize: 24, fontFamily: fontFamily.light, letterSpacing: -0.48, minWidth: 72, textAlign: 'center', fontVariant: ['tabular-nums'] },
 });

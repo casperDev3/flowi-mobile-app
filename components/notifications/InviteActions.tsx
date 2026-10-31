@@ -6,7 +6,6 @@
  * переходом у проєкт / «Запрошення відхилено»): сервер архівує картку, але
  * інбокс перечитується не миттєво — людина не мусить гадати, чи спрацювало.
  */
-import { Atlas } from '@/constants/atlas';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -16,6 +15,9 @@ import { useI18n } from '@/store/i18n';
 import { respondToInvite, type InviteDecision } from '@/store/invite-inbox';
 import { inviteFailureText } from '@/store/invite-messages';
 import { haptic } from '@/utils/haptics';
+import { fontFamily } from '@/constants/theme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
+import { glassOf } from '@/components/shared/dsTheme';
 
 interface Props {
   inviteId: string;
@@ -34,8 +36,10 @@ type State =
   | { kind: 'declined' }
   | { kind: 'gone'; message: string };
 
-export function InviteActions({ inviteId, accent, text, sub, border, onDone }: Props) {
+export function InviteActions({ inviteId, accent: _accent, text, sub, border: _border, onDone }: Props) {
   const { tr } = useI18n();
+  // DS v2: «Прийняти» — pill action.primary, «Відхилити» — вторинна pill.
+  const { t } = useDSTheme();
   const router = useRouter();
   const [state, setState] = useState<State>({ kind: 'idle' });
 
@@ -69,14 +73,14 @@ export function InviteActions({ inviteId, accent, text, sub, border, onDone }: P
   if (state.kind === 'accepted') {
     return (
       <View style={st.row}>
-        <IconSymbol name="checkmark.circle.fill" size={16} color="#10B981" />
+        <IconSymbol name="checkmark.circle.fill" size={16} color={t.status.success} />
         <Text style={[st.result, { color: text }]}>{tr.inviteAcceptedShort}</Text>
         {state.projectId ? (
           <TouchableOpacity
             onPress={() => router.push({ pathname: '/project/[id]/overview', params: { id: state.projectId! } } as never)}
             accessibilityRole="button"
-            style={[st.btn, { backgroundColor: accent, flex: 0, paddingHorizontal: 14 }]}>
-            <Text style={st.btnPrimaryText}>{tr.inviteJoinedOpenProject}</Text>
+            style={[st.btn, { backgroundColor: t.action.primary, flex: 0, paddingHorizontal: 18 }]}>
+            <Text style={[st.btnPrimaryText, { color: t.text.onAction }]}>{tr.inviteJoinedOpenProject}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -99,20 +103,20 @@ export function InviteActions({ inviteId, accent, text, sub, border, onDone }: P
         disabled={busy}
         accessibilityRole="button"
         accessibilityState={{ disabled: busy, busy: busy && state.decision === 'accept' }}
-        style={[st.btn, { backgroundColor: accent, opacity: busy ? 0.7 : 1 }]}>
+        style={[st.btn, { backgroundColor: t.action.primary, opacity: busy ? 0.7 : 1 }]}>
         {busy && state.decision === 'accept'
-          ? <ActivityIndicator color="#fff" size="small" />
-          : <Text style={st.btnPrimaryText}>{tr.inviteAccept}</Text>}
+          ? <ActivityIndicator color={t.text.onAction} size="small" />
+          : <Text style={[st.btnPrimaryText, { color: t.text.onAction }]}>{tr.inviteAccept}</Text>}
       </TouchableOpacity>
       <TouchableOpacity
         onPress={confirmDecline}
         disabled={busy}
         accessibilityRole="button"
         accessibilityState={{ disabled: busy, busy: busy && state.decision === 'decline' }}
-        style={[st.btn, { borderWidth: 1, borderColor: border, opacity: busy ? 0.7 : 1 }]}>
+        style={[st.btn, { backgroundColor: glassOf(t).surfaceSubtle, opacity: busy ? 0.7 : 1 }]}>
         {busy && state.decision === 'decline'
           ? <ActivityIndicator color={sub} size="small" />
-          : <Text style={[st.btnText, { color: text }]}>{tr.inviteDecline}</Text>}
+          : <Text style={[st.btnText, { color: t.action.secondaryText }]}>{tr.inviteDecline}</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -120,8 +124,8 @@ export function InviteActions({ inviteId, accent, text, sub, border, onDone }: P
 
 const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  btn: { flex: 1, minHeight: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
-  btnPrimaryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  btnText: { fontSize: 14, fontWeight: '700' },
-  result: { flex: 1, fontSize: 13, fontWeight: '600' },
+  btn: { flex: 1, minHeight: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  btnPrimaryText: { fontSize: 14, fontFamily: fontFamily.semibold },
+  btnText: { fontSize: 14, fontFamily: fontFamily.semibold },
+  result: { flex: 1, fontSize: 13, fontFamily: fontFamily.semibold },
 });

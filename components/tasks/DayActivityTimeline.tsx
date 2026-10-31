@@ -16,14 +16,16 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { layoutDayMeetings } from '@/components/calendar/calendarModel';
-import { Atlas } from '@/constants/atlas';
 import type { Translations } from '@/store/translations';
 import { timelineHourRange, type DayActivityBlock } from '@/utils/dayActivity';
 import type { Meeting } from '@/utils/meetings';
+import { fontFamily, radius, theme } from '@/constants/theme';
 
 const GUTTER = 44;
-const NOW_COLOR = '#EF4444';
-const TRACK_COLOR = '#10B981';
+// DS v2: «зараз» — coral-тік, відстежений час — success, наради — info.
+const NOW_COLOR = theme.light.accent.coral;
+const TRACK_COLOR = theme.light.status.success;
+const MEETING_COLOR = theme.light.status.info;
 
 export interface DayActivityTimelineProps {
   meetings: readonly Meeting[];
@@ -56,10 +58,10 @@ export function DayActivityTimeline({
   return (
     <View testID="day-activity-timeline">
       <View style={st.legend}>
-        <LegendDot color="#6366F1" label={tr.todayPaneMeetings} textColor={c.sub} />
+        <LegendDot color={MEETING_COLOR} label={tr.todayPaneMeetings} textColor={c.sub} />
         <LegendDot color={TRACK_COLOR} label={tr.todayPaneTracked} textColor={c.sub} />
       </View>
-      <View style={[st.grid, { height, borderColor: c.border, backgroundColor: c.dim }]}>
+      <View style={[st.grid, { height, backgroundColor: c.dim }]}>
         {Array.from({ length: hours }, (_, i) => (
           <React.Fragment key={i}>
             {i > 0 && <View pointerEvents="none" style={[st.hourLine, { top: i * hourHeight, backgroundColor: c.border }]} />}
@@ -84,7 +86,7 @@ export function DayActivityTimeline({
                   left: `${(p.col / p.cols) * 100}%`, width: `${100 / p.cols}%`,
                 }]}>
                 <View style={[st.blockFill, { backgroundColor: p.meeting.color + '33', borderLeftColor: p.meeting.color }]}>
-                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontWeight: '700' }}>{p.meeting.title}</Text>
+                  <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontFamily: fontFamily.semibold }}>{p.meeting.title}</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -107,7 +109,7 @@ export function DayActivityTimeline({
                   backgroundColor: TRACK_COLOR + (b.running ? '66' : '40'),
                   borderLeftColor: TRACK_COLOR,
                 }]}>
-                {h >= 14 && <Text numberOfLines={1} style={{ color: c.text, fontSize: 9, fontWeight: '600' }}>{b.label}</Text>}
+                {h >= 14 && <Text numberOfLines={1} style={{ color: c.text, fontSize: 9, fontFamily: fontFamily.semibold }}>{b.label}</Text>}
               </View>
             );
           })}
@@ -132,21 +134,21 @@ export function DayActivityTimeline({
 function LegendDot({ color, label, textColor }: { color: string; label: string; textColor: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-      <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
-      <Text style={{ color: textColor, fontSize: 11 }}>{label}</Text>
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+      <Text style={{ color: textColor, fontSize: 12, fontFamily: fontFamily.regular }}>{label}</Text>
     </View>
   );
 }
 
 const st = StyleSheet.create({
   legend:    { flexDirection: 'row', gap: 14, marginBottom: 8 },
-  grid:      { borderWidth: 1, borderRadius: Atlas.radius.medium, overflow: 'hidden' },
-  hourLabel: { position: 'absolute', left: 0, width: GUTTER, fontSize: 9, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  grid:      { borderRadius: radius.nested, overflow: 'hidden' },
+  hourLabel: { position: 'absolute', left: 0, width: GUTTER, fontSize: 10, fontFamily: fontFamily.medium, textAlign: 'center', fontVariant: ['tabular-nums'] },
   hourLine:  { position: 'absolute', left: GUTTER, right: 0, height: StyleSheet.hairlineWidth },
   lane:      { position: 'absolute', top: 0, bottom: 0 },
   block:     { position: 'absolute', paddingHorizontal: 1, paddingVertical: 1 },
-  blockFill: { flex: 1, borderLeftWidth: 3, borderRadius: 4, paddingHorizontal: 4, paddingTop: 1, overflow: 'hidden' },
-  trackFill: { borderLeftWidth: 3, borderRadius: 4, paddingHorizontal: 4, overflow: 'hidden' },
+  blockFill: { flex: 1, borderLeftWidth: 3, borderRadius: 6, paddingHorizontal: 4, paddingTop: 1, overflow: 'hidden' },
+  trackFill: { borderLeftWidth: 3, borderRadius: 6, paddingHorizontal: 4, overflow: 'hidden' },
   nowLine:   { position: 'absolute', left: GUTTER - 4, right: 0, height: 8, marginTop: -4, flexDirection: 'row', alignItems: 'center' },
   nowDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: NOW_COLOR },
   nowBar:    { flex: 1, height: 1.5, backgroundColor: NOW_COLOR },

@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/TimerCell.tsx
  *
@@ -15,20 +14,20 @@ import { Atlas } from '@/constants/atlas';
  * Розміри приходять пропами, а не рахуються тут: скільки клітинок влазить на
  * екран, знає лише сітка — вона ж і ділить між ними простір.
  */
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { TimerDial } from '@/components/time/dials/TimerDial';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { TimerProjectTag } from '@/components/time/ActiveTimerRow';
+import { fontFamily, radius, shadow } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
 import type { Translations } from '@/store/translations';
 import type { ActiveTimer, TimerProject } from '@/utils/activeTimers';
 import type { DialId } from '@/utils/timerDials';
 import { timerCellSubtaskRows } from '@/utils/timerGrid';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
-/** Червоний «Стоп» — той самий, що в деталі завдання (TaskTimerTab). */
-const STOP = '#EF4444';
 
 export interface TimerCellColors {
   text: string;
@@ -121,13 +120,12 @@ export function TimerCell({
   const pending = all.filter(s => !s.done).slice(0, maxRows);
   const hiddenCount = all.filter(s => !s.done).length - pending.length;
   const showSubtasks = all.length > 0 && maxRows > 0;
+  const t = dsTokens(isDark);
+  const gs = useGlassStyles();
 
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={style}>
-      <BlurView
-        intensity={isDark ? 22 : 42}
-        tint={isDark ? 'dark' : 'light'}
-        style={[st.card, { height, borderColor: c.border }]}>
+      <View style={[st.card, { ...gs.card, height }, shadow[isDark ? 'dark' : 'light'].card]}>
         <View style={st.head}>
           <Text numberOfLines={1} style={[st.label, { color: c.sub }]}>{timer.label}</Text>
           {/* Вибір циферблата належить конкретному таймеру, тому кнопка стоїть
@@ -138,7 +136,7 @@ export function TimerCell({
             accessibilityRole="button"
             accessibilityLabel={dialLabel}
             hitSlop={10}
-            style={[st.dialBtn, { borderColor: c.border }]}>
+            style={[st.dialBtn, { ...gs.subtle }]}>
             <IconSymbol name="square.grid.2x2" size={12} color={c.sub} />
           </Pressable>
         </View>
@@ -181,33 +179,26 @@ export function TimerCell({
             accessibilityRole="button"
             accessibilityLabel={stopLabel}
             hitSlop={8}
-            style={[st.stop, { borderColor: STOP + '55', backgroundColor: STOP + '16' }]}>
-            <IconSymbol name="stop.fill" size={13} color={STOP} />
-            <Text style={st.stopText}>{stopLabel}</Text>
+            style={[st.stop, { ...gs.subtle }]}>
+            <IconSymbol name="stop.fill" size={13} color={t.status.danger} />
+            <Text style={[st.stopText, { color: t.text.primary }]}>{stopLabel}</Text>
           </Pressable>
         </View>
-      </BlurView>
+      </View>
     </Pressable>
   );
 }
 
 const st = StyleSheet.create({
   card: {
-    borderRadius: Atlas.radius.xlarge,
-    borderWidth: 1,
-    overflow: 'hidden',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: radius.cardCompact,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     justifyContent: 'space-between',
-    // Тінь без свічення — правило CLAUDE.md.
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
   },
   head:     { flexDirection: 'row', alignItems: 'center' },
-  label:    { flex: 1, fontSize: 12, fontWeight: '700' },
-  dialBtn:  { width: 24, height: 24, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+  label:    { flex: 1, fontSize: 13, fontFamily: fontFamily.semibold },
+  dialBtn:  { width: 28, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
   clockRow: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   foot:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   tag:      { flex: 1 },
@@ -215,15 +206,15 @@ const st = StyleSheet.create({
     marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    minHeight: 32,
+    paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  stopText: { color: STOP, fontSize: 12, fontWeight: '700', marginLeft: 6 },
+  stopText: { fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 6 },
   subs:     { marginBottom: 10 },
   subRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
   subDot:   { width: 7, height: 7, borderRadius: 4, borderWidth: 1.2, marginRight: 7 },
-  subText:  { flex: 1, fontSize: 11, opacity: 0.85 },
-  subCount: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3, marginTop: 1 },
+  subText:  { flex: 1, fontSize: 12, fontFamily: fontFamily.regular },
+  subCount: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.3, marginTop: 1, fontVariant: ['tabular-nums'] },
 });

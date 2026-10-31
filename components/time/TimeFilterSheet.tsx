@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/TimeFilterSheet.tsx — фільтри, сортування і режим показу.
  *
@@ -12,7 +11,6 @@ import { Atlas } from '@/constants/atlas';
  * продукти.
  */
 
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import {
   Modal,
@@ -28,6 +26,7 @@ import {
 import type { TimeColors } from '@/components/time/TimePalette';
 import type { Translations } from '@/store/translations';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, shadow, space, type as dsType } from '@/constants/theme';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import {
   TIME_PERIODS,
@@ -38,6 +37,7 @@ import {
   type TimePeriod,
   type TimeSort,
 } from '@/utils/timeEntries';
+import { GlassBackdrop } from '@/components/ds';
 
 export interface TimeFilterSheetProps {
   visible: boolean;
@@ -87,16 +87,14 @@ export function TimeFilterSheet({
 }: TimeFilterSheetProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <Pressable accessible={false} style={s.overlay} onPress={onClose}>
+      <Pressable accessible={false} style={[s.overlay, { backgroundColor: c.t.surface.overlay }]} onPress={onClose}>
         <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
-          <BlurView
-            intensity={isDark ? 50 : 70}
-            tint={isDark ? 'dark' : 'light'}
-            style={[s.sheet, { maxHeight: height * 0.85, borderColor: c.border, backgroundColor: c.sheet }]}>
+          <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.85 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+            <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
-                <View style={[s.handle, { backgroundColor: c.border }]} />
+                <View style={[s.handle, { backgroundColor: c.t.text.muted }]} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
                   <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <IconSymbol name="xmark" size={17} color={c.sub} />
@@ -185,15 +183,15 @@ export function TimeFilterSheet({
               )}
 
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 22 }}>
-                <TouchableOpacity onPress={onReset} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                  <Text style={{ color: c.sub, fontWeight: '600' }}>{tr.reset}</Text>
+                <TouchableOpacity onPress={onReset} style={[s.btn, { ...c.gl.subtle, flex: 1 }]}>
+                  <Text style={{ ...dsType.label, color: c.t.action.secondaryText }}>{tr.reset}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 2, backgroundColor: c.indigo }]}>
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.close}</Text>
+                <TouchableOpacity onPress={onClose} style={[s.btn, { flex: 2, backgroundColor: c.t.action.primary }]}>
+                  <Text style={{ ...dsType.label, color: c.t.text.onAction }}>{tr.close}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          </BlurView>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -230,15 +228,14 @@ function Chip({
   color?: string;
   onPress: () => void;
 }) {
-  const accent = color ?? c.indigo;
   return (
     <TouchableOpacity
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      style={[s.chip, { borderColor: active ? accent : c.border, backgroundColor: active ? accent + '22' : c.dim }]}>
+      style={[s.chip, { backgroundColor: active ? c.t.action.primary : c.dim }]}>
       {color && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 6 }} />}
-      <Text numberOfLines={1} style={{ color: active ? accent : c.sub, fontSize: 12, fontWeight: '600' }}>
+      <Text numberOfLines={1} style={{ color: active ? c.t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -246,14 +243,14 @@ function Chip({
 }
 
 const s = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
+  sheet: { borderRadius: radius.card, padding: space.cardPaddingCompact, overflow: 'hidden' },
   handleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle: { fontSize: 20, fontWeight: Atlas.type.headingWeight },
-  label: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  chip: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 7 },
-  btn: { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  sheetTitle: { fontSize: 20, lineHeight: 26, fontFamily: fontFamily.semibold },
+  label: { fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', minHeight: 36, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
+  btn: { minHeight: 48, borderRadius: radius.pill, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

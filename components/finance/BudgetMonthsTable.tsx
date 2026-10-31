@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/BudgetMonthsTable.tsx — «категорія × місяць» для
  * періоду, довшого за місяць (finance-revamp.md §5.5). Кожна клітинка —
@@ -7,7 +6,10 @@ import { Atlas } from '@/constants/atlas';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import type { BudgetMonthRow } from '@/utils/budgetMonths';
+import { GlassSurface } from '@/components/ds';
 
 interface Colors {
   text: string;
@@ -30,33 +32,38 @@ export function BudgetMonthsTable({ rows, monthsShort, fmt, c, title, hint, empt
   hint: string;
   empty: string;
 }) {
+  const { t } = useDS();
   const months = rows[0]?.cells.map(cell => cell.month) ?? [];
   const monthLabel = (m: string) => `${monthsShort[Number(m.slice(5, 7)) - 1] ?? m.slice(5, 7)} ${m.slice(2, 4)}`;
   return (
-    <View style={[st.card, { borderColor: c.border, backgroundColor: c.card }]}>
-      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 }}>{title}</Text>
-      <Text style={{ color: c.sub, fontSize: 11, marginTop: 2, marginBottom: 10 }}>{hint}</Text>
+    <GlassSurface radius={radius.cardCompact} style={st.card}>
+      <Text style={{ ...dsType.h2, color: t.text.primary }}>{title}</Text>
+      <Text style={{ ...dsType.caption, color: t.text.secondary, marginTop: 2, marginBottom: 12 }}>{hint}</Text>
       {rows.length === 0 ? (
-        <Text style={{ color: c.sub, fontSize: 13 }}>{empty}</Text>
+        <Text style={{ ...dsType.body, color: t.text.secondary }}>{empty}</Text>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View>
             <View style={st.row}>
               <View style={st.nameCell} />
               {months.map(m => (
-                <Text key={m} style={[st.cell, { color: c.sub, fontWeight: '700' }]}>{monthLabel(m)}</Text>
+                <Text key={m} style={[st.cell, { color: t.text.secondary, fontFamily: fontFamily.semibold }]}>{monthLabel(m)}</Text>
               ))}
             </View>
             {rows.map(row => (
-              <View key={row.category} style={[st.row, { borderTopColor: c.border, borderTopWidth: StyleSheet.hairlineWidth }]}>
-                <Text numberOfLines={1} style={[st.nameCell, { color: c.text, fontWeight: '600' }]}>{row.category}</Text>
+              <View key={row.category} style={[st.row, { borderTopColor: t.border.hairline, borderTopWidth: StyleSheet.hairlineWidth }]}>
+                <Text numberOfLines={1} style={[st.nameCell, { color: t.text.primary, fontFamily: fontFamily.medium }]}>{row.category}</Text>
                 {row.cells.map(cell => {
                   const ratio = cell.limit > 0 ? cell.spent / cell.limit : 0;
-                  const color = ratio > 1 ? c.red : ratio >= 0.8 ? c.amber : c.green;
+                  // Перевищення — коралова крапка-тік, близько до ліміту — бурштинова; суми — text.primary.
+                  const tick = ratio > 1 ? t.accent.coral : ratio >= 0.8 ? t.accent.amber : null;
                   return (
-                    <View key={cell.month} style={{ width: CELL_W, paddingVertical: 6 }}>
-                      <Text style={{ color, fontSize: 13, fontWeight: '700', textAlign: 'right' }}>{fmt(cell.spent)}</Text>
-                      <Text style={{ color: c.sub, fontSize: 10, textAlign: 'right' }}>/ {fmt(cell.limit)}</Text>
+                    <View key={cell.month} style={{ width: CELL_W, paddingVertical: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
+                        {tick ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tick }} /> : null}
+                        <Text style={{ color: t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold, textAlign: 'right', ...dsType.numeric }}>{fmt(cell.spent)}</Text>
+                      </View>
+                      <Text style={{ color: t.text.secondary, fontSize: 11, fontFamily: fontFamily.regular, textAlign: 'right', ...dsType.numeric }}>/ {fmt(cell.limit)}</Text>
                     </View>
                   );
                 })}
@@ -65,13 +72,13 @@ export function BudgetMonthsTable({ rows, monthsShort, fmt, c, title, hint, empt
           </View>
         </ScrollView>
       )}
-    </View>
+    </GlassSurface>
   );
 }
 
 const st = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: Atlas.radius.xlarge, padding: 14, marginBottom: 16 },
+  card: { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact, marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center' },
   nameCell: { width: 110, fontSize: 13, paddingRight: 6 },
-  cell: { width: CELL_W, fontSize: 11, textAlign: 'right', paddingVertical: 4 },
+  cell: { width: CELL_W, fontSize: 11, textAlign: 'right', paddingVertical: 4, fontVariant: ['tabular-nums'] },
 });

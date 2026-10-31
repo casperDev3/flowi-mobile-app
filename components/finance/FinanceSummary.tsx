@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/FinanceSummary.tsx — шапка екрана фінансів.
  *
@@ -16,12 +15,15 @@ import { Atlas } from '@/constants/atlas';
  * Під стрічкою — оборот місяця (доходи/витрати) по валютах. Перекази в нього не
  * входять: гроші не заробили й не витратили, а переклали з місця на місце.
  */
-import { BlurView } from 'expo-blur';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, shadow, space, type as dsType } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import type { Account, AccountKind } from '@/utils/accounts';
 import type { Currency, CurrencyTotals } from '@/utils/financeUtils';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { GlassSurface, IconChip } from '@/components/ds';
 
 interface Colors {
   border: string;
@@ -76,9 +78,10 @@ interface FinanceSummaryProps {
 
 /** Кольори за видом рахунку — коли користувач не задав власний. */
 export const KIND_COLOR: Record<AccountKind, string> = {
-  cash: '#10B981',
-  card: '#0EA5E9',
-  savings: '#8B5CF6',
+  // Ідентичність рахунку (крапка/іконка), не семантика: status.success / status.info / глибока лаванда DS v2.
+  cash: '#22A55B',
+  card: '#4F7CF7',
+  savings: '#8B6CFF',
 };
 
 export const KIND_ICON: Record<AccountKind, IconSymbolName> = {
@@ -97,6 +100,8 @@ export function FinanceSummary({
   accountTotals, totalLabel, onLongPressAccount, breakdownHint,
   unassignedLabel, unassignedActive, onPressUnassigned,
 }: FinanceSummaryProps) {
+  const { t, g } = useDS();
+  const gs = useGlassStyles();
   const curOf = (code: string): Currency =>
     currencies.find(cu => cu.code === code) ?? { code, symbol: code, kind: 'fiat', decimals: 2 };
 
@@ -107,13 +112,13 @@ export function FinanceSummary({
     <View>
       {/* ─── Стрічка рахунків ─── */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={[s.sectionLabel, { color: c.sub, flex: 1 }]}>{accountsLabel}</Text>
+        <Text style={[s.sectionLabel, { color: t.text.secondary, flex: 1 }]}>{accountsLabel}</Text>
       </View>
 
       {/* «На рахунках» — та сама цифра, що на плитці «Сьогодні». */}
       {accounts.length > 0 && totalCodes.length > 0 && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 14, rowGap: 4, marginBottom: 10 }}>
-          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{totalLabel}</Text>
+          <Text style={{ ...dsType.caption, color: t.text.secondary }}>{totalLabel}</Text>
           {totalCodes.map(code => {
             const value = accountTotals![code];
             return (
@@ -121,7 +126,7 @@ export function FinanceSummary({
                 key={code}
                 numberOfLines={1}
                 accessibilityLabel={`${totalLabel ?? ''} ${fmt(value, curOf(code))}`}
-                style={{ color: value < 0 ? c.red : c.text, fontSize: 20, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5, flexShrink: 1 }}>
+                style={{ ...dsType.displaySm, fontSize: 32, lineHeight: 36, color: value < 0 ? t.status.danger : t.text.primary, flexShrink: 1 }}>
                 {fmt(value, curOf(code))}
               </Text>
             );
@@ -135,32 +140,29 @@ export function FinanceSummary({
           accessibilityRole="button"
           accessibilityState={{ selected: !!unassignedActive }}
           accessibilityLabel={unassignedLabel}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: unassignedActive ? '#F59E0B' : '#F59E0B66', backgroundColor: '#F59E0B' + (unassignedActive ? '26' : '12'), marginBottom: 10 }}>
-          <IconSymbol name="exclamationmark.triangle.fill" size={14} color="#F59E0B" />
-          <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', flex: 1 }}>{unassignedLabel}</Text>
-          <IconSymbol name={unassignedActive ? 'xmark' : 'chevron.right'} size={12} color={c.sub} />
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: unassignedActive ? t.action.primary : (gs.card.backgroundColor as string), marginBottom: 10 }}>
+          <IconSymbol name="exclamationmark.triangle.fill" size={14} color={t.status.warning} />
+          <Text style={{ color: unassignedActive ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.medium, flex: 1 }}>{unassignedLabel}</Text>
+          <IconSymbol name={unassignedActive ? 'xmark' : 'chevron.right'} size={12} color={unassignedActive ? t.text.onAction : t.text.secondary} />
         </TouchableOpacity>
       ) : null}
 
       {accounts.length === 0 ? (
-        <BlurView
-          intensity={isDark ? 25 : 45}
-          tint={isDark ? 'dark' : 'light'}
-          style={[s.card, { borderColor: c.border, alignItems: 'center' }]}>
-          <IconSymbol name="banknote" size={26} color={c.sub} />
-          <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginTop: 8 }}>{noAccountsLabel}</Text>
-          <Text style={{ color: c.sub, fontSize: 12, textAlign: 'center', marginTop: 4, lineHeight: 17 }}>
+        <View style={[s.card, { ...gs.card, alignItems: 'center' }, shadow[isDark ? 'dark' : 'light'].card]}>
+          <IconChip icon="banknote" accent="lime" size="lg" />
+          <Text style={{ ...dsType.h2, color: t.text.primary, marginTop: 8 }}>{noAccountsLabel}</Text>
+          <Text style={{ ...dsType.caption, color: t.text.secondary, textAlign: 'center', marginTop: 4, lineHeight: 17 }}>
             {noAccountsHint}
           </Text>
           <TouchableOpacity
             onPress={onNewAccount}
             accessibilityRole="button"
             accessibilityLabel={newAccountLabel}
-            style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: Atlas.radius.medium, backgroundColor: c.accent }}>
-            <IconSymbol name="plus" size={14} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{newAccountLabel}</Text>
+            style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, minHeight: 44, borderRadius: radius.pill, backgroundColor: t.action.primary }}>
+            <IconSymbol name="plus" size={14} color={t.text.onAction} />
+            <Text style={{ ...dsType.label, color: t.text.onAction }}>{newAccountLabel}</Text>
           </TouchableOpacity>
-        </BlurView>
+        </View>
       ) : (
         <ScrollView
           horizontal
@@ -182,37 +184,39 @@ export function FinanceSummary({
                 onAccessibilityAction={onLongPressAccount ? (e => { if (e.nativeEvent.actionName === 'longpress') onLongPressAccount(account); }) : undefined}
                 accessibilityState={{ selected }}
                 accessibilityLabel={`${account.name}, ${fmt(balance, curOf(account.currency))}`}>
-                <BlurView
-                  intensity={isDark ? 25 : 45}
-                  tint={isDark ? 'dark' : 'light'}
-                  style={[s.accountCard, {
-                    borderColor: selected ? c.accent : c.border,
-                    backgroundColor: selected ? c.accent + '14' : 'transparent',
+                {/* Вибраний рахунок — 2px рамка акценту модуля (lime ink) + змивка;
+                    у спокої — скляний обідок (без сіпання розміру). */}
+                <View style={[s.accountCard, {
+                    ...gs.card,
+                    borderWidth: 2,
+                    ...(selected
+                      ? { backgroundColor: g.accent.lime.tint, borderColor: g.accent.lime.ink, borderTopColor: g.accent.lime.ink, borderBottomColor: g.accent.lime.ink }
+                      : null),
                   }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View style={[s.accountIcon, { backgroundColor: tint + (isDark ? '25' : '18') }]}>
+                    <View style={[s.accountIcon, { backgroundColor: tint + (isDark ? '2E' : '1F') }]}>
                       <IconSymbol name={(account.icon as IconSymbolName) ?? KIND_ICON[account.kind]} size={15} color={tint} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text numberOfLines={1} style={{ color: c.text, fontSize: 13, fontWeight: '700' }}>
+                      <Text numberOfLines={1} style={{ color: t.text.primary, fontSize: 13, fontFamily: fontFamily.semibold }}>
                         {account.name}
                       </Text>
-                      <Text numberOfLines={1} style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginTop: 1 }}>
+                      <Text numberOfLines={1} style={{ color: t.text.secondary, fontSize: 11, fontFamily: fontFamily.regular, marginTop: 1 }}>
                         {kindLabel(account.kind)} · {account.currency}
                       </Text>
                     </View>
                   </View>
                   <Text
                     numberOfLines={1}
-                    style={{ marginTop: 10, fontSize: 17, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4, color: balance < 0 ? c.red : c.text }}>
+                    style={{ marginTop: 12, fontSize: 22, lineHeight: 26, fontFamily: fontFamily.light, letterSpacing: -0.44, ...dsType.numeric, color: balance < 0 ? t.status.danger : t.text.primary }}>
                     {fmt(balance, curOf(account.currency))}
                   </Text>
                   {account.goal ? (
-                    <Text numberOfLines={1} style={{ color: c.sub, fontSize: 10, fontWeight: '600', marginTop: 2 }}>
+                    <Text numberOfLines={1} style={{ color: t.text.secondary, fontSize: 11, fontFamily: fontFamily.regular, marginTop: 2, ...dsType.numeric }}>
                       {fmt(account.goal, curOf(account.currency))}
                     </Text>
                   ) : null}
-                </BlurView>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -223,9 +227,9 @@ export function FinanceSummary({
             onPress={onNewAccount}
             accessibilityRole="button"
             accessibilityLabel={newAccountLabel}
-            style={[s.accountCard, s.accountAdd, { borderColor: c.accent + '55' }]}>
-            <IconSymbol name="plus" size={18} color={c.accent} />
-            <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700', marginTop: 6, textAlign: 'center' }}>
+            style={[s.accountCard, s.accountAdd, { backgroundColor: (gs.subtle.backgroundColor as string), borderColor: t.border.hairline }]}>
+            <IconSymbol name="plus" size={18} color={t.text.primary} />
+            <Text style={{ color: t.text.primary, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 6, textAlign: 'center' }}>
               {newAccountLabel}
             </Text>
           </TouchableOpacity>
@@ -276,6 +280,8 @@ export function PeriodFlowCard({
   title?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { t: ds } = useDS();
+  const gs = useGlassStyles();
   const curOf = (code: string): Currency =>
     currencies.find(cu => cu.code === code) ?? { code, symbol: code, kind: 'fiat', decimals: 2 };
   const flowCodes = Object.keys(totalsByCurrency)
@@ -285,30 +291,27 @@ export function PeriodFlowCard({
     })
     .sort((a, b) => (a === primaryCode ? -1 : b === primaryCode ? 1 : a.localeCompare(b)));
   return (
-      <BlurView
-        intensity={isDark ? 25 : 45}
-        tint={isDark ? 'dark' : 'light'}
-        style={[s.card, { borderColor: c.border }, style]}>
+      <GlassSurface radius={radius.cardCompact} tint="lime" style={[s.card, style]}>
 
         {onPickPrimary && (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            {title ? <Text style={[s.sectionLabel, { color: c.sub, flex: 1 }]}>{title}</Text> : <View style={{ flex: 1 }} />}
+            {title ? <Text style={[s.cardTitle, { color: ds.text.primary, flex: 1 }]}>{title}</Text> : <View style={{ flex: 1 }} />}
             <TouchableOpacity
               onPress={onPickPrimary}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel={primaryCode}
-              style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Atlas.radius.small, borderWidth: 1, borderColor: c.border }}>
-              <Text style={{ fontSize: 11, fontWeight: Atlas.type.headingWeight, color: c.sub, letterSpacing: 0.5 }}>{primaryCode}</Text>
-              <IconSymbol name="chevron.down" size={10} color={c.sub} style={{ marginLeft: 4 }} />
+              style={{ ...gs.subtle, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, minHeight: 32, borderRadius: radius.pill }}>
+              <Text style={{ fontSize: 12, fontFamily: fontFamily.semibold, color: ds.text.primary, letterSpacing: 0.5 }}>{primaryCode}</Text>
+              <IconSymbol name="chevron.down" size={10} color={ds.text.secondary} style={{ marginLeft: 4 }} />
             </TouchableOpacity>
           </View>
         )}
 
         {flowCodes.length === 0 ? (
           <View style={{ flexDirection: 'row', gap: 18 }}>
-            <FlowCell label={incomeLabel} value={fmt(0, curOf(primaryCode))} color={c.green} sub={c.sub} />
-            <FlowCell label={expenseLabel} value={fmt(0, curOf(primaryCode))} color={c.red} sub={c.sub} />
+            <FlowCell label={incomeLabel} value={fmt(0, curOf(primaryCode))} color={ds.text.primary} sub={ds.text.secondary} dot={ds.status.success} />
+            <FlowCell label={expenseLabel} value={fmt(0, curOf(primaryCode))} color={ds.text.primary} sub={ds.text.secondary} dot={ds.status.danger} />
           </View>
         ) : (
           flowCodes.map((code, idx) => {
@@ -324,24 +327,27 @@ export function PeriodFlowCard({
                   paddingTop: idx === 0 ? 0 : 10,
                   marginTop: idx === 0 ? 0 : 10,
                   borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth,
-                  borderTopColor: c.border,
+                  borderTopColor: ds.border.hairline,
                 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 10, fontWeight: Atlas.type.headingWeight, letterSpacing: 0.5, color: c.sub }}>{cur.code}</Text>
+                  <Text style={{ fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.5, color: ds.text.secondary }}>{cur.code}</Text>
                   {t.income > 0 && (
                     <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={{ color: c.sub, fontSize: 11 }}>{savingsLabel}</Text>
-                      <Text style={{ color: c.green, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>{savingsPct}%</Text>
+                      <Text style={{ ...dsType.caption, color: ds.text.secondary }}>{savingsLabel}</Text>
+                      {/* Значення-бейдж — лайм (правило DS для бейджів значень). */}
+                      <View style={{ backgroundColor: ds.accent.lime, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 }}>
+                        <Text style={{ color: ds.text.onAccent, fontSize: 12, fontFamily: fontFamily.semibold, ...dsType.numeric }}>{savingsPct}%</Text>
+                      </View>
                     </View>
                   )}
                 </View>
                 <View style={{ flexDirection: 'row', gap: 18, marginTop: 6 }}>
-                  <FlowCell label={incomeLabel} value={fmt(t.income, cur)} color={c.green} sub={c.sub} />
-                  <FlowCell label={expenseLabel} value={fmt(t.expense, cur)} color={c.red} sub={c.sub} />
+                  <FlowCell label={incomeLabel} value={fmt(t.income, cur)} color={ds.text.primary} sub={ds.text.secondary} dot={ds.status.success} />
+                  <FlowCell label={expenseLabel} value={fmt(t.expense, cur)} color={ds.text.primary} sub={ds.text.secondary} dot={ds.status.danger} />
                 </View>
                 {t.income > 0 && (
-                  <View style={{ height: 3, marginTop: 8, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' }}>
-                    <View style={{ height: '100%', borderRadius: 2, width: `${savingsPct}%` as any, backgroundColor: c.green }} />
+                  <View style={{ ...gs.subtle, height: 6, marginTop: 10, borderRadius: radius.pill, overflow: 'hidden' }}>
+                    <View style={{ height: '100%', borderRadius: radius.pill, width: `${savingsPct}%` as any, backgroundColor: ds.accent.amber }} />
                   </View>
                 )}
               </View>
@@ -350,19 +356,23 @@ export function PeriodFlowCard({
         )}
 
         {showTransfersNote && (
-          <Text style={{ color: c.sub, fontSize: 10, marginTop: 12, lineHeight: 14 }}>
+          <Text style={{ ...dsType.caption, color: ds.text.secondary, marginTop: 12 }}>
             {transfersNoteLabel}
           </Text>
         )}
-      </BlurView>
+      </GlassSurface>
   );
 }
 
-function FlowCell({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
+function FlowCell({ label, value, color, sub, dot }: { label: string; value: string; color: string; sub: string; dot?: string }) {
   return (
     <View style={{ flexShrink: 1 }}>
-      <Text style={{ color: sub, fontSize: 11 }}>{label}</Text>
-      <Text numberOfLines={1} style={{ color, fontSize: 16, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.4, marginTop: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {dot ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dot }} /> : null}
+        <Text style={{ ...dsType.caption, color: sub }}>{label}</Text>
+      </View>
+      {/* Сума — тонкі табличні цифри (display-рівень картки). */}
+      <Text numberOfLines={1} style={{ color, fontSize: 24, lineHeight: 28, fontFamily: fontFamily.light, letterSpacing: -0.48, marginTop: 4, ...dsType.numeric }}>
         {value}
       </Text>
     </View>
@@ -370,10 +380,11 @@ function FlowCell({ label, value, color, sub }: { label: string; value: string; 
 }
 
 const s = StyleSheet.create({
-  card:         { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 14, overflow: 'hidden' },
-  sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
+  card:         { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact },
+  cardTitle:    { ...dsType.h2 },
+  sectionLabel: { fontSize: 11, fontFamily: fontFamily.semibold, letterSpacing: 0.6, textTransform: 'uppercase' },
   // 158pt тримає в один рядок і «Основний UAH», і суму на шість знаків.
-  accountCard:  { width: 158, borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, overflow: 'hidden' },
-  accountAdd:   { borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  accountIcon:  { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  accountCard:  { width: 158, borderRadius: radius.cardCompact, borderWidth: 2, padding: 14, overflow: 'hidden' },
+  accountAdd:   { borderStyle: 'dashed', borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  accountIcon:  { width: 30, height: 30, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

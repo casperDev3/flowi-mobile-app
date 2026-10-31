@@ -7,6 +7,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useProject } from '@/hooks/use-project';
 import { useI18n } from '@/store/i18n';
 import { projectModules } from '@/utils/projectUtils';
+import { fontFamily } from '@/constants/theme';
 
 export default function ProjectNotesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -17,6 +18,6 @@ export default function ProjectNotesScreen() {
   const available = project && projectModules(project).notes;
   return <ProjectScreenShell project={project} isDark={isDark} title={tr.notes}>
     {available ? <NotesWorkspace key={id} projectId={id} isDark={isDark} /> :
-      <View style={{ padding: 24 }}><Text style={{ color: c.text }}>{loading ? tr.loading : !project ? tr.projectNotFound : tr.projectModuleDisabled}</Text></View>}
+      <View style={{ padding: 24 }}><Text style={{ color: c.text, fontFamily: fontFamily.regular, fontSize: 14 }}>{loading ? tr.loading : !project ? tr.projectNotFound : tr.projectModuleDisabled}</Text></View>}
   </ProjectScreenShell>;
 }

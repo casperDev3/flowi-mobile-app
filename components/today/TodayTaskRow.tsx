@@ -1,5 +1,4 @@
 import { Atlas } from '@/constants/atlas';
-import { BlurView } from 'expo-blur';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -12,6 +11,8 @@ import { Motion } from '@/constants/motion';
 import { useMotion } from '@/hooks/use-motion';
 import type { Translations } from '@/store/translations';
 import { Task, isOverdue, normalizePriority } from '@/utils/taskUtils';
+import { fontFamily } from '@/constants/theme';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 
 interface Props {
   tasks: Task[];
@@ -50,6 +51,8 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen, project }: RowProps)
   const { reduced } = useMotion();
 
   const done = task.status === 'done';
+  // DS v2: рядок — вкладений subtle-блок без рамки; прострочка — coral.
+  const t = dsTheme(isDark);
 
   // Локальна відмітка веде анімацію, поки зміна не долетіла зі сховища.
   // Завершене завдання більше не зникає зі списку — воно лишається в дні
@@ -75,14 +78,12 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen, project }: RowProps)
       onPress={() => (onOpen ? onOpen(task.id) : handleToggle())}
       accessibilityRole="button"
       accessibilityLabel={task.title}>
-      <BlurView
-        intensity={isDark ? 18 : 36}
-        tint={isDark ? 'dark' : 'light'}
-        style={[s.row, { borderColor: c.border }]}>
+      <View
+        style={[s.row, { backgroundColor: glassOf(t).surfaceSubtle }]}>
         <AnimatedCheck
           checked={localChecked}
           size={20}
-          color="#10B981"
+          color={t.status.success}
           borderColor={c.sub + '60'}
           radius={10}  /* circle */
           onPress={handleToggle}
@@ -108,14 +109,14 @@ function TodayTaskItem({ task, isDark, c, onToggle, onOpen, project }: RowProps)
             проєктів, і без мітки незрозуміло, звідки саме кожна з них. */}
         {project ? <MeetingProjectChip project={project} textColor={c.sub} maxWidth={90} /> : null}
         {!done && isOverdue(task) && (
-          <View style={s.overdueBadge}>
-            <Text style={s.overdueText}>!</Text>
+          <View style={[s.overdueBadge, { backgroundColor: t.accent.coral + '22' }]}>
+            <Text style={[s.overdueText, { color: t.accent.coral }]}>!</Text>
           </View>
         )}
         {/* Пріоритет — бейдж P0–P5 у правому кінці рядка (рішення власника,
             п. 4: в особистих картках/рядках пріоритет стоїть праворуч). */}
         <PriorityBadge level={normalizePriority(task)} />
-      </BlurView>
+      </View>
     </PressableScale>
   );
 }
@@ -162,20 +163,19 @@ const s = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Atlas.radius.medium,
-    borderWidth: 1,
+    borderRadius: Atlas.radius.large,
+    minHeight: 44,
     paddingVertical: 10,
     paddingLeft: 16,
     paddingRight: 12,
     gap: 10,
     overflow: 'hidden',
   },
-  title: { flex: 1, fontSize: 14, fontWeight: '500' },
+  title: { flex: 1, fontSize: 14, fontFamily: fontFamily.medium },
   overdueBadge: {
-    backgroundColor: '#EF444420',
-    borderRadius: 6,
+    borderRadius: 999,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  overdueText: { color: '#EF4444', fontSize: 12, fontWeight: '700' },
+  overdueText: { fontSize: 12, fontFamily: fontFamily.bold },
 });

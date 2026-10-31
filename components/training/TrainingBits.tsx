@@ -1,14 +1,12 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/training/TrainingBits.tsx — дрібні спільні блоки екранів
- * тренувань: картка (BlurView), заголовок секції, чип, кнопка, поле,
- * степер, порожній стан, плашка-повідомлення, тло екрана.
+ * тренувань: картка, заголовок секції, чип, кнопка, поле, степер, порожній
+ * стан, плашка-повідомлення, тло екрана. Стиль — Design System v2:
+ * суцільні картки без рамок, pill-кнопки й чипи, тонкі табличні цифри.
  *
  * Мінімальна ціль дотику — 44×44 (A11Y-08 у CLAUDE.md): розмір задає сам
  * контрол, а не hitSlop.
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -23,11 +21,17 @@ import {
 } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, space, type } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 
-import { TG_ACCENT, TG_ERR, TG_WARN, type TrainingColors } from './theme';
+import { TG_ACCENT, TG_ERR, TG_WARN, TG_XP, type TrainingColors } from './theme';
+import { MeshBackground } from '@/components/ds';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
+/** Фон екрана — кольоровий mesh DS v2.1 (скло карток має що заломлювати). */
 export function ScreenBackground({ c }: { c: TrainingColors }) {
-  return <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />;
+  void c;
+  return <MeshBackground />;
 }
 
 export function Card({ c, children, style, accent }: {
@@ -37,12 +41,19 @@ export function Card({ c, children, style, accent }: {
   accent?: string;
 }) {
   return (
-    <BlurView
-      intensity={c.isDark ? 22 : 42}
-      tint={c.blurTint}
-      style={[styles.card, { borderColor: accent ? accent + '55' : c.border }, style]}>
+    <View
+      style={[
+        styles.card,
+        // DS v2.1: скло (заливка + спекулярний обідок) без власного блюру —
+        // картки тренувань живуть у списках (лідерборд, учасники, сесії).
+        { ...c.gl.card, ...c.g.shadow },
+        // Стан (виконано / увага) — тонована рамка акцентом + легка змивка.
+        accent ? { borderWidth: 1, borderColor: accent + '66', borderTopColor: accent + '66', borderBottomColor: accent + '66' } : null,
+        style,
+      ]}>
+      {accent ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: accent + '14', borderRadius: radius.cardCompact }]} /> : null}
       {children}
-    </BlurView>
+    </View>
   );
 }
 
@@ -53,10 +64,14 @@ export function SectionTitle({ c, children, action }: {
 }) {
   return (
     <View style={styles.sectionRow}>
-      <Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.sub }]}>{children}</Text>
+      {/* DS v2.1: крапка акценту модуля перед заголовком секції. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.g.accent.success.fill }} />
+        <Text accessibilityRole="header" style={[styles.sectionTitle, { color: c.text }]}>{children}</Text>
+      </View>
       {action && (
         <TouchableOpacity onPress={action.onPress} accessibilityRole="button" style={styles.sectionAction}>
-          <Text style={{ color: TG_ACCENT, fontSize: 13, fontWeight: '700' }}>{action.label}</Text>
+          <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>{action.label}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -81,23 +96,26 @@ export function Chip({ c, label, active, onPress, color = TG_ACCENT, icon, acces
       accessibilityLabel={accessibilityLabel ?? label}
       style={[
         styles.chip,
-        { backgroundColor: active ? color + '22' : c.chip, borderColor: active ? color + '88' : c.border },
+        // Активний чип — pill action.primary; color лишився в API для сумісності.
+        { backgroundColor: active ? c.t.action.primary : c.chip },
       ]}>
-      {icon && <IconSymbol name={icon} size={13} color={active ? color : c.sub} />}
-      <Text style={{ color: active ? color : c.sub, fontSize: 13, fontWeight: '700' }}>{label}</Text>
+      {icon && <IconSymbol name={icon} size={13} color={active ? c.t.text.onAction : (color !== TG_ACCENT ? color : c.sub)} />}
+      <Text style={{ color: active ? c.t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 export function Badge({ label, color }: { label: string; color: string }) {
+  const { t } = useDS();
+  // Тон — лише тло; підпис завжди text.primary (бурштин/лайм не тримають текст).
   return (
-    <View style={[styles.badge, { backgroundColor: color + '22', borderColor: color + '55' }]}>
-      <Text style={{ color, fontSize: 11, fontWeight: Atlas.type.headingWeight }}>{label}</Text>
+    <View style={[styles.badge, { backgroundColor: color + '29' }]}>
+      <Text style={{ color: t.text.primary, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{label}</Text>
     </View>
   );
 }
 
-export function PrimaryButton({ label, onPress, disabled, busy, color = TG_ACCENT, icon, style, variant = 'solid' }: {
+export function PrimaryButton({ label, onPress, disabled, busy, color, icon, style, variant = 'solid' }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
@@ -107,7 +125,13 @@ export function PrimaryButton({ label, onPress, disabled, busy, color = TG_ACCEN
   style?: StyleProp<ViewStyle>;
   variant?: 'solid' | 'soft';
 }) {
+  const { t } = useDS();
+  const gs = useGlassStyles();
   const solid = variant === 'solid';
+  // Без явного кольору — головна дія DS: pill action.primary / вторинна subtle.
+  const tone = color ?? (solid ? t.action.primary : t.action.secondaryText);
+  const fg = solid ? (color ? '#fff' : t.text.onAction) : tone;
+  const bg = solid ? tone : color ? color + '18' : (gs.subtle.backgroundColor as string);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -117,19 +141,15 @@ export function PrimaryButton({ label, onPress, disabled, busy, color = TG_ACCEN
       accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
       style={[
         styles.button,
-        {
-          backgroundColor: solid ? color : color + '18',
-          borderColor: solid ? color : color + '55',
-          opacity: disabled ? 0.45 : 1,
-        },
+        { backgroundColor: disabled ? t.state.disabledBg : bg },
         style,
       ]}>
       {busy
-        ? <ActivityIndicator color={solid ? '#fff' : color} />
+        ? <ActivityIndicator color={fg} />
         : (
           <>
-            {icon && <IconSymbol name={icon} size={16} color={solid ? '#fff' : color} />}
-            <Text style={{ color: solid ? '#fff' : color, fontSize: 15, fontWeight: Atlas.type.headingWeight }}>{label}</Text>
+            {icon && <IconSymbol name={icon} size={16} color={disabled ? t.state.disabledText : fg} />}
+            <Text style={[type.label, { color: disabled ? t.state.disabledText : fg, fontSize: 15 }]}>{label}</Text>
           </>
         )}
     </TouchableOpacity>
@@ -151,7 +171,7 @@ export function Field({ c, label, style,
         placeholderTextColor={c.faint}
         accessibilityLabel={label}
         {...input}
-        style={[styles.input, { color: c.text, backgroundColor: c.input, borderColor: error ? TG_ERR : c.border }]}
+        style={[styles.input, { color: c.text, backgroundColor: c.input }, error ? { borderWidth: 1, borderColor: TG_ERR } : null]}
       />
     </View>
   );
@@ -171,7 +191,7 @@ export function Stepper({ c, label, value, onChange, min = 0, max = 999, step = 
   return (
     <View style={styles.stepper}>
       <Text style={[styles.fieldLabel, { color: c.sub, marginBottom: 6 }]} numberOfLines={1}>{label}</Text>
-      <View style={[styles.stepperRow, { backgroundColor: c.input, borderColor: c.border }]}>
+      <View style={[styles.stepperRow, { backgroundColor: c.input }]}>
         <TouchableOpacity
           onPress={() => onChange(Math.max(min, value - step))}
           accessibilityRole="button"
@@ -181,7 +201,7 @@ export function Stepper({ c, label, value, onChange, min = 0, max = 999, step = 
         </TouchableOpacity>
         <Text
           accessibilityLabel={`${label}: ${shown}`}
-          style={{ color: c.text, fontSize: 15, fontWeight: Atlas.type.headingWeight, minWidth: 36, textAlign: 'center' }}>
+          style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], minWidth: 36, textAlign: 'center' }}>
           {shown}
         </Text>
         <TouchableOpacity
@@ -205,14 +225,14 @@ export function EmptyState({ c, icon, title, body, action }: {
 }) {
   return (
     <View style={styles.empty}>
-      <View style={[styles.emptyIcon, { backgroundColor: TG_ACCENT + '18' }]}>
-        <IconSymbol name={icon} size={26} color={TG_ACCENT} />
+      <View style={[styles.emptyIcon, { ...c.gl.subtle, backgroundColor: c.accentTint }]}>
+        <IconSymbol name={icon} size={26} color={c.accent} />
       </View>
-      <Text style={{ color: c.text, fontSize: 17, fontWeight: Atlas.type.headingWeight, textAlign: 'center' }}>
+      <Text style={[type.h2, { color: c.text, fontSize: 17, textAlign: 'center' }]}>
         {title}
       </Text>
       {body ? (
-        <Text style={{ color: c.sub, fontSize: 14, textAlign: 'center', marginTop: 6 }}>
+        <Text style={[type.body, { color: c.sub, textAlign: 'center', marginTop: 6 }]}>
           {body}
         </Text>
       ) : null}
@@ -230,13 +250,13 @@ export function Notice({ c, text, tone = 'warn', onRetry, retryLabel }: {
 }) {
   const color = tone === 'error' ? TG_ERR : tone === 'info' ? TG_ACCENT : TG_WARN;
   return (
-    <Card c={c} accent={color} style={{ marginBottom: 12 }}>
+    <Card c={c} style={{ marginBottom: 12, backgroundColor: color + '14', ...(c.isDark ? null : { shadowOpacity: 0, elevation: 0 }) }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} accessibilityRole="alert">
         <IconSymbol name={tone === 'info' ? 'info.circle.fill' : 'exclamationmark.triangle.fill'} size={16} color={color} />
         <Text style={{ color: c.text, fontSize: 13, flex: 1 }}>{text}</Text>
         {onRetry && retryLabel ? (
           <TouchableOpacity onPress={onRetry} accessibilityRole="button" style={styles.noticeRetry}>
-            <Text style={{ color, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>
+            <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>
               {retryLabel}
             </Text>
           </TouchableOpacity>
@@ -246,14 +266,14 @@ export function Notice({ c, text, tone = 'warn', onRetry, retryLabel }: {
   );
 }
 
-export function ProgressBar({ c, fraction, color = TG_ACCENT }: { c: TrainingColors; fraction: number; color?: string }) {
+export function ProgressBar({ c, fraction, color = TG_XP }: { c: TrainingColors; fraction: number; color?: string }) {
   const pct = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
   return (
     <View
       accessibilityRole="progressbar"
       accessibilityValue={{ min: 0, max: 100, now: pct }}
-      style={{ height: 8, borderRadius: 4, backgroundColor: c.chip, overflow: 'hidden' }}>
-      <View style={{ width: `${pct}%`, height: '100%', backgroundColor: color, borderRadius: 4 }} />
+      style={{ height: 8, borderRadius: radius.pill, backgroundColor: c.chip, overflow: 'hidden' }}>
+      <View style={{ width: `${pct}%`, height: '100%', backgroundColor: color, borderRadius: radius.pill }} />
     </View>
   );
 }
@@ -262,7 +282,7 @@ export function Avatar({ name, color = TG_ACCENT, size = 34 }: { name: string; c
   const letter = (name.trim()[0] ?? "?").toUpperCase();
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color + '26', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color, fontWeight: Atlas.type.headingWeight, fontSize: size * 0.42 }}>
+      <Text style={{ color, fontFamily: fontFamily.semibold, fontSize: size * 0.42 }}>
         {letter}
       </Text>
     </View>
@@ -270,25 +290,25 @@ export function Avatar({ name, color = TG_ACCENT, size = 34 }: { name: string; c
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden', padding: 14 },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 8 },
-  sectionTitle: { fontSize: 13, fontWeight: Atlas.type.headingWeight, textTransform: 'uppercase', letterSpacing: 0.6 },
+  card: { borderRadius: radius.cardCompact, padding: space.cardPaddingCompact },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 8 },
+  sectionTitle: { ...type.h2 },
   sectionAction: { minHeight: 44, minWidth: 44, alignItems: 'flex-end', justifyContent: 'center' },
   chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14,
-    borderRadius: Atlas.radius.medium, borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 16,
+    borderRadius: radius.pill,
   },
-  badge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2, alignSelf: 'flex-start' },
+  badge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
   button: {
-    minHeight: 48, borderRadius: Atlas.radius.large, borderWidth: 1, flexDirection: 'row', gap: 8,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16,
+    minHeight: 48, borderRadius: radius.pill, flexDirection: 'row', gap: 8,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20,
   },
-  fieldLabel: { fontSize: 12, fontWeight: '700', marginBottom: 6 },
-  input: { minHeight: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, fontSize: 15 },
+  fieldLabel: { ...type.caption, fontFamily: fontFamily.medium, marginBottom: 6 },
+  input: { minHeight: 44, borderRadius: radius.control, paddingHorizontal: 14, fontSize: 15, fontFamily: fontFamily.regular },
   stepper: { flex: 1, minWidth: 120 },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: Atlas.radius.medium, borderWidth: 1 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: radius.pill },
   stepperBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 24 },
-  emptyIcon: { width: 56, height: 56, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyIcon: { width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   noticeRetry: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 import React, { useState } from 'react';
 import {
   Modal,
@@ -8,9 +7,11 @@ import {
   Pressable,
   Platform,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { formatMonthYear } from '@/utils/dateUtils';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 interface MonthPickerProps {
   month: Date;
@@ -38,6 +39,9 @@ export function MonthPicker({
   dimColor,
   borderColor,
 }: MonthPickerProps) {
+  // DS v2: аркуш — surface.elevated, клітинки — subtle-плашки, вибраний — action.primary.
+  const { t } = useDSTheme();
+  void dimColor; void borderColor;
   const now = new Date();
   const isCurrent =
     month.getFullYear() === now.getFullYear() && month.getMonth() === now.getMonth();
@@ -69,7 +73,7 @@ export function MonthPicker({
           <Text
             style={{
               fontSize: 15,
-              fontWeight: '700',
+              fontFamily: fontFamily.bold,
               color: isCurrent ? accentColor : textColor,
               letterSpacing: -0.3,
             }}>
@@ -86,19 +90,14 @@ export function MonthPicker({
         animationType="slide"
         onRequestClose={() => setOpen(false)}>
         <Pressable accessible={false}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+          style={{ flex: 1, backgroundColor: t.surface.overlay, justifyContent: 'flex-end' }}
           onPress={() => setOpen(false)}>
           <Pressable accessible={false} onPress={e => e.stopPropagation()}>
-            <BlurView
-              intensity={72}
-              tint="dark"
+            <View
               style={{
-                borderTopLeftRadius: 26,
-                borderTopRightRadius: 26,
-                borderTopWidth: 1,
-                borderLeftWidth: 1,
-                borderRightWidth: 1,
-                borderColor,
+                borderTopLeftRadius: radius.card,
+                borderTopRightRadius: radius.card,
+                backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong'),
                 overflow: 'hidden',
                 paddingTop: 12,
                 paddingHorizontal: 20,
@@ -111,7 +110,7 @@ export function MonthPicker({
                   width: 36,
                   height: 4,
                   borderRadius: 2,
-                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  backgroundColor: t.border.hairline,
                   alignSelf: 'center',
                   marginBottom: 22,
                 }}
@@ -128,12 +127,10 @@ export function MonthPicker({
                 <TouchableOpacity
                   onPress={() => setPickerYear(y => y - 1)}
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 11,
-                    backgroundColor: dimColor,
-                    borderWidth: 1,
-                    borderColor,
+                    width: 44,
+                    height: 44,
+                    borderRadius: radius.pill,
+                    backgroundColor: glassOf(t).surfaceSubtle,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
@@ -143,18 +140,18 @@ export function MonthPicker({
                 <View style={{ alignItems: 'center', gap: 3 }}>
                   <Text
                     style={{
-                      fontSize: 24,
-                      fontWeight: Atlas.type.headingWeight,
+                      ...type.displaySm,
+                      fontSize: 32,
+                      lineHeight: 36,
                       color: textColor,
-                      letterSpacing: -0.6,
                     }}>
                     {pickerYear}
                   </Text>
                   <Text
                     style={{
                       fontSize: 12,
-                      fontWeight: '500',
-                      color: pickerYear === now.getFullYear() ? accentColor : subColor,
+                      fontFamily: fontFamily.medium,
+                      color: subColor,
                       letterSpacing: -0.1,
                     }}>
                     {pickerYear === now.getFullYear()
@@ -166,12 +163,10 @@ export function MonthPicker({
                 <TouchableOpacity
                   onPress={() => setPickerYear(y => y + 1)}
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 11,
-                    backgroundColor: dimColor,
-                    borderWidth: 1,
-                    borderColor,
+                    width: 44,
+                    height: 44,
+                    borderRadius: radius.pill,
+                    backgroundColor: glassOf(t).surfaceSubtle,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
@@ -183,9 +178,8 @@ export function MonthPicker({
               <View
                 style={{
                   height: 1,
-                  backgroundColor: borderColor,
+                  backgroundColor: t.border.hairline,
                   marginBottom: 14,
-                  opacity: 0.6,
                 }}
               />
 
@@ -208,26 +202,17 @@ export function MonthPicker({
                           style={{
                             flex: 1,
                             paddingVertical: 14,
-                            borderRadius: Atlas.radius.large,
+                            borderRadius: radius.pill,
+                            minHeight: 44,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            backgroundColor: isSelected
-                              ? accentColor
-                              : isNow
-                              ? accentColor + '1C'
-                              : 'rgba(255,255,255,0.05)',
-                            borderWidth: 1,
-                            borderColor: isSelected
-                              ? accentColor
-                              : isNow
-                              ? accentColor + '55'
-                              : 'rgba(255,255,255,0.07)',
+                            backgroundColor: isSelected ? t.action.primary : glassOf(t).surfaceSubtle,
                           }}>
                           <Text
                             style={{
                               fontSize: 14,
-                              fontWeight: isSelected ? '700' : '500',
-                              color: isSelected ? '#fff' : isNow ? accentColor : textColor,
+                              fontFamily: isSelected ? fontFamily.semibold : fontFamily.medium,
+                              color: isSelected ? t.text.onAction : textColor,
                               letterSpacing: -0.1,
                             }}>
                             {name}
@@ -249,7 +234,7 @@ export function MonthPicker({
                   </View>
                 ))}
               </View>
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

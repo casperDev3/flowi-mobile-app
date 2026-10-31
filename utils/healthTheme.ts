@@ -1,4 +1,5 @@
 // Спільні кольори/акценти екранів «Здоров'я» (хаб + модулі)
+import { theme } from '@/constants/theme';
 
 export const HEALTH_ACCENTS = {
   water:  '#10B981', // зелений — основний акцент розділу
@@ -30,21 +31,23 @@ export interface HealthColors {
 }
 
 /**
- * Палітра розділу «Здоровʼя». Фон, рамки, текст і картки — ті самі, що на
- * екрані Фінансів (еталон вигляду застосунку): розділ не має виглядати
- * окремим застосунком. Ключі стабільні — їх читає й екран «Сьогодні».
+ * Палітра розділу «Здоровʼя» на токенах Design System v2 — ті самі, що на
+ * екрані Фінансів (app/(tabs)/explore.tsx) і в components/health/palette.ts:
+ * розділ не має виглядати окремим застосунком. Ключі стабільні — їх читає й
+ * екран «Сьогодні».
  */
 export function getHealthColors(isDark: boolean): HealthColors {
+  const t = isDark ? theme.dark : theme.light;
   return {
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(180,170,240,0.4)',
-    text:   isDark ? '#F4F2FF' : '#0A0818',
-    sub:    isDark ? 'rgba(244,242,255,0.62)' : 'rgba(10,8,24,0.60)',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(12,12,20,0.98)' : 'rgba(248,246,255,0.98)',
-    track:  isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
+    bg1:    t.bg.canvas,
+    bg2:    t.bg.canvas,
+    border: t.border.hairline,
+    text:   t.text.primary,
+    sub:    t.text.secondary,
+    dim:    t.surface.subtle,
+    sheet:  t.surface.elevated,
+    track:  t.surface.subtle,
+    card:   t.surface.card,
   };
 }
 

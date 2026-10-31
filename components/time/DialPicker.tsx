@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/DialPicker.tsx — вибір циферблата.
  *
@@ -10,17 +9,20 @@ import { Atlas } from '@/constants/atlas';
  * Передпогляд навмисно показує ЧАС ІЗ ХВИЛИНАМИ, а не нуль: циферблат із
  * порожньою дугою й «00:00» не дає зрозуміти, як він виглядатиме в роботі.
  */
-import { BlurView } from 'expo-blur';
 import React, { useMemo } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TimerDial } from '@/components/time/dials/TimerDial';
+import { fontFamily, radius } from '@/constants/theme';
 import { CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
+import { dsTokens } from '@/hooks/use-ds';
 import { useResponsive } from '@/hooks/use-responsive';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 import { DIALS, type DialId } from '@/utils/timerDials';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { GlassBackdrop } from '@/components/ds';
 
 /** Скільки «пройшло» на передпогляді: 23 хвилини 41 секунда. */
 const PREVIEW_SECONDS = 23 * 60 + 41;
@@ -61,6 +63,8 @@ export function DialPicker({
   const dialIsDefault = defaultDial !== undefined && dial === defaultDial;
   const insets = useSafeAreaInsets();
   const { isWide } = useResponsive();
+  const t = dsTokens(isDark);
+  const gs = useGlassStyles();
 
   // На планшеті аркуш на всю ширину дав би дві колонки по ~590pt під передпогляд
   // у 96pt — колонок стає більше, а сам аркуш звужується до читабельної смуги.
@@ -77,15 +81,16 @@ export function DialPicker({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={st.backdrop} onPress={onClose} accessibilityRole="button" />
+      <Pressable style={[st.backdrop, { backgroundColor: t.surface.overlay }]} onPress={onClose} accessibilityRole="button" />
 
       <View
         style={[
           st.sheet,
-          { backgroundColor: c.sheet, paddingBottom: insets.bottom + 16 },
+          { ...gs.strong, backgroundColor: c.sheet, paddingBottom: insets.bottom + 16 },
           isWide && { maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
         ]}>
-        <View style={[st.handle, { backgroundColor: c.border }]} />
+        <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+        <View style={[st.handle, { backgroundColor: t.text.muted }]} />
 
         <View style={st.head}>
           <View style={{ flex: 1 }}>
@@ -118,14 +123,13 @@ export function DialPicker({
                 accessibilityState={{ selected: active }}
                 accessibilityHint={canMakeDefault ? tr.dialMakeDefaultHint : undefined}
                 style={{ width: cellWidth }}>
-                <BlurView
-                  intensity={isDark ? 20 : 40}
-                  tint={isDark ? 'dark' : 'light'}
+                {/* Вибраний — 2px рамка action.primary (товщина стала: прозора у спокої). */}
+                <View
                   style={[
                     st.cell,
                     {
-                      borderColor: active ? c.accent : c.border,
-                      borderWidth: active ? 2 : StyleSheet.hairlineWidth,
+                      backgroundColor: (gs.subtle.backgroundColor as string),
+                      borderColor: active ? t.action.primary : 'transparent',
                     },
                   ]}>
                   <View style={st.preview}>
@@ -142,16 +146,16 @@ export function DialPicker({
                   </View>
                   <Text
                     numberOfLines={1}
-                    style={[st.name, { color: active ? c.accent : c.sub, fontWeight: active ? '700' : '600' }]}>
+                    style={[st.name, { color: active ? t.text.primary : t.text.secondary, fontFamily: active ? fontFamily.semibold : fontFamily.medium }]}>
                     {String(tr[meta.labelKey])}
                   </Text>
                   {canMakeDefault && meta.id === defaultDial && (
-                    <View style={[st.defaultTag, { borderColor: c.accent }]}>
-                      <IconSymbol name="star.fill" size={9} color={c.accent} />
-                      <Text style={[st.defaultTagText, { color: c.accent }]}>{tr.dialIsDefault}</Text>
+                    <View style={[st.defaultTag, { backgroundColor: t.accent.amber }]}>
+                      <IconSymbol name="star.fill" size={9} color={t.text.onAccent} />
+                      <Text style={[st.defaultTagText, { color: t.text.onAccent }]}>{tr.dialIsDefault}</Text>
                     </View>
                   )}
-                </BlurView>
+                </View>
               </Pressable>
             );
           })}
@@ -168,12 +172,12 @@ export function DialPicker({
             style={({ pressed }) => [
               st.makeDefault,
               {
-                borderColor: dialIsDefault ? c.border : c.accent,
+                backgroundColor: dialIsDefault ? t.state.disabledBg : t.action.primary,
                 opacity: pressed ? 0.7 : 1,
               },
             ]}>
-            <IconSymbol name="star.fill" size={13} color={dialIsDefault ? c.sub : c.accent} />
-            <Text numberOfLines={1} style={[st.makeDefaultText, { color: dialIsDefault ? c.sub : c.accent }]}>
+            <IconSymbol name="star.fill" size={13} color={dialIsDefault ? t.state.disabledText : t.text.onAction} />
+            <Text numberOfLines={1} style={[st.makeDefaultText, { color: dialIsDefault ? t.text.secondary : t.text.onAction }]}>
               {dialIsDefault
                 ? `${tr.dialIsDefault}: ${String(tr[DIALS.find(d => d.id === dial)?.labelKey ?? 'dialDigits'])}`
                 : `${tr.dialMakeDefault}: ${String(tr[DIALS.find(d => d.id === dial)?.labelKey ?? 'dialDigits'])}`}
@@ -186,23 +190,24 @@ export function DialPicker({
 }
 
 const st = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
     maxHeight: '82%',
-    borderTopLeftRadius: Atlas.radius.xlarge,
-    borderTopRightRadius: Atlas.radius.xlarge,
-    paddingHorizontal: 14,
+    borderTopLeftRadius: radius.card,
+    borderTopRightRadius: radius.card,
+    paddingHorizontal: 16,
     paddingTop: 10,
   },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   head:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 2 },
-  title:  { fontSize: 17, fontWeight: '700' },
-  subtitle: { fontSize: 12, marginTop: 2 },
+  title:  { fontSize: 18, fontFamily: fontFamily.semibold },
+  subtitle: { fontSize: 12, fontFamily: fontFamily.regular, marginTop: 2 },
   grid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 8 },
   cell: {
-    borderRadius: Atlas.radius.xlarge,
+    borderRadius: radius.nested,
+    borderWidth: 2,
     overflow: 'hidden',
     paddingVertical: 12,
     alignItems: 'center',
@@ -212,12 +217,12 @@ const st = StyleSheet.create({
   name:    { fontSize: 12 },
   defaultTag: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    borderWidth: StyleSheet.hairlineWidth, borderRadius: Atlas.radius.small, paddingHorizontal: 5, paddingVertical: 1,
+    borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2,
   },
-  defaultTagText: { fontSize: 10, fontWeight: '700' },
+  defaultTagText: { fontSize: 10, fontFamily: fontFamily.semibold },
   makeDefault: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    minHeight: 44, borderRadius: Atlas.radius.large, borderWidth: 1, marginTop: 8, paddingHorizontal: 12,
+    minHeight: 48, borderRadius: radius.pill, marginTop: 10, paddingHorizontal: 16,
   },
-  makeDefaultText: { fontSize: 14, fontWeight: '600' },
+  makeDefaultText: { fontSize: 14, fontFamily: fontFamily.semibold },
 });

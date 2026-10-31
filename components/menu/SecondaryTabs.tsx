@@ -12,6 +12,7 @@ import { confirmAction } from './confirm';
 import type { MenuBitsApi } from './MenuBits';
 import { dateLabel, type Editor } from './model';
 import type { MenuColors } from './theme';
+import { fontFamily } from '@/constants/theme';
 
 type Run = (fn: () => Promise<unknown>, note?: string) => Promise<void>;
 
@@ -60,7 +61,7 @@ export function RequestsTab({
       {shown.map((f) =>
         panel(
           <>
-            <Text style={{ color: c.text, fontWeight: '700' }}>
+            <Text style={{ color: c.text, fontFamily: fontFamily.bold }}>
               {f.kind === 'complaint' ? f.snapshot.title || 'Скарга' : f.text}
             </Text>
             {text(
@@ -186,7 +187,7 @@ export function GroupTab({
   const { btn, panel, text, row } = bits;
   return panel(
     <>
-      <Text style={{ color: c.text, fontSize: 20, fontWeight: '700' }}>{menu.name}</Text>
+      <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.bold }}>{menu.name}</Text>
       {text(menu.timezone + ' · Понеділок — неділя', true)}
       {text(menu.meals.map((m) => meals[m]).join(' · '))}
       {text('Нові прийоми їжі застосовуються лише до ще не створених тижнів.', true)}

@@ -11,6 +11,8 @@ import { addDays, type MenuDetail } from '@/store/menu-api';
 import type { MenuBitsApi } from './MenuBits';
 import { dateLabel, weekKindLabel } from './model';
 import type { MenuColors } from './theme';
+import { fontFamily } from '@/constants/theme';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 export function WeekStatusCard({
   menu,
@@ -46,17 +48,15 @@ export function WeekStatusCard({
   return (
     <View
       style={{
-        borderWidth: 1,
-        borderColor: c.border,
-        backgroundColor: c.card,
+        backgroundColor: c.card, ...glassRimFor(c.card, 'card'),
         borderRadius: Atlas.radius.xlarge,
-        padding: 12,
+        padding: 16,
         gap: 12,
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {iconBtn('chevron.left', 'Попередній тиждень', () => onWeek(addDays(menu.week, -7)))}
         <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={{ color: c.text, fontSize: 17, fontWeight: '600', textAlign: 'center' }}>
+          <Text style={{ color: c.text, fontSize: 17, fontFamily: fontFamily.semibold, textAlign: 'center' }}>
             {dateLabel(menu.week)} — {dateLabel(addDays(menu.week, 6))}
           </Text>
           <Text style={{ color: c.sub, fontSize: 12 }}>
@@ -110,7 +110,7 @@ export function WeekStatusCard({
               accessibilityRole="link"
               onPress={() => onWeek(w)}
               style={{ minHeight: 44, justifyContent: 'center' }}>
-              <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600' }}>{label}</Text>
+              <Text style={{ color: c.accent, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
             </Pressable>
           ))}
       </View>

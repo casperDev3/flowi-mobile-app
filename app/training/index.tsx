@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/training/index.tsx — мої групи тренувань (training-module.md §10.1):
  * бейдж ролі, «Створити групу», «Приєднатись за запрошенням».
@@ -10,7 +9,7 @@ import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { CreateGroupSheet, JoinGroupSheet } from '@/components/training/GroupSheets';
 import { useTrainingGroups, useTrainingScope } from '@/components/training/hooks';
-import { fmt, TG_ACCENT, TG_XP, useTrainingColors } from '@/components/training/theme';
+import { fmt, TG_ACCENT, useTrainingColors } from '@/components/training/theme';
 import {
   Badge,
   Card,
@@ -26,6 +25,7 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { trainingRoutes } from '@/components/training/routes';
 import { useI18n } from '@/store/i18n';
 import type { TrainingGroupSummary } from '@/utils/trainingTypes';
+import { fontFamily } from '@/constants/theme';
 
 export default function TrainingGroupsScreen() {
   const router = useRouter();
@@ -75,7 +75,7 @@ export default function TrainingGroupsScreen() {
       </View>
       <ScrollView
         contentContainerStyle={[contentWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TG_ACCENT} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
         {!online && <Notice c={c} text={tr.tgOnlineOnly} tone="info" />}
         {online && issue === 'offline' && <Notice c={c} text={tr.tgOfflineNotice} />}
         {online && issue === 'error' && <Notice c={c} text={tr.tgErrorGeneric} tone="error" onRetry={onRefresh} retryLabel={tr.loadErrorRetry} />}
@@ -95,7 +95,7 @@ export default function TrainingGroupsScreen() {
           />
         ) : null}
 
-        <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={10}>
+        <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12}>
         {active.map(g => (
           <TouchableOpacity
             key={g.id}
@@ -105,11 +105,11 @@ export default function TrainingGroupsScreen() {
             style={{ flex: 1 }}>
             <Card c={c} accent={g.color} style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={{ width: 44, height: 44, borderRadius: Atlas.radius.large, backgroundColor: g.color + '26', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: g.color + '26', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name="dumbbell.fill" size={20} color={g.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight }} numberOfLines={1}>{g.name}</Text>
+                  <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold }} numberOfLines={1}>{g.name}</Text>
                   <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
                     {fmt(tr.tgMembersCount, { n: g.member_count })}
                     {g.description ? ` · ${g.description}` : ''}
@@ -118,7 +118,7 @@ export default function TrainingGroupsScreen() {
                 <View style={{ alignItems: 'flex-end', gap: 6 }}>
                   <Badge label={g.role === 'coach' ? tr.tgRoleCoach : tr.tgRoleMember} color={g.role === 'coach' ? TG_ACCENT : c.sub} />
                   {g.role === 'member' ? (
-                    <Text style={{ color: TG_XP, fontSize: 12, fontWeight: Atlas.type.headingWeight }}>
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                       {`${g.xp_total} XP · 🔥${g.streak_days}`}
                     </Text>
                   ) : null}

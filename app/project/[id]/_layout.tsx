@@ -15,16 +15,17 @@ import {ThemeProvider} from '@/store/theme-context';
  * `href: null` (як `time` у (tabs)/_layout) — файл лишається на
  * місці, просто не показаний у таб-барі й недосяжний з нього.
  */
-import { BlurView } from 'expo-blur';
 import { Tabs, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useMemo } from 'react';
-import { AppState, type AppStateStatus, StyleSheet, Text, View } from 'react-native';
+import { AppState, type AppStateStatus, Text, View } from 'react-native';
+
+import { fontFamily } from '@/constants/theme';
 
 import { ActiveTimersBar } from '@/components/time/ActiveTimersBar';
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type IconSymbolName } from '@/components/ui/icon-symbol';
 import {
-  TAB_BAR_BG_MEASURED,
+  TAB_BAR_BG,
   TAB_BAR_HEIGHT,
   TAB_BAR_TINT,
   TAB_LABEL_FONT_SIZE,
@@ -43,6 +44,7 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { enterProject, leaveProject, syncProject } from '@/store/project-sync';
 import { MODULES_BY_TEMPLATE, projectModules, readableTint } from '@/utils/projectUtils';
+import { GlassTabBarBackground, GlassTabIcon } from '@/components/shared/GlassTabBar';
 
 export const unstable_settings = { initialRouteName: 'overview' };
 
@@ -65,12 +67,24 @@ function tabLabel(label: string) {
         numberOfLines={1}
         allowFontScaling
         maxFontSizeMultiplier={TAB_LABEL_MAX_FONT_SCALE}
-        style={{ fontSize: TAB_LABEL_FONT_SIZE, fontWeight: '600', marginTop: -2, textAlign: 'center', color }}>
+        style={{ fontSize: TAB_LABEL_FONT_SIZE, fontFamily: fontFamily.semibold, marginTop: -2, textAlign: 'center', color }}>
         {label}
       </Text>
     );
   }
   return TabLabel;
+}
+
+/**
+ * Іконка таба DS v2 — той самий прийом, що в `app/(tabs)/_layout.tsx`:
+ * активна вкладка — іконка в pill action.primary з text.onAction, неактивна —
+ * просто іконка. `forceActive` — для «Ще», поки відкритий розділ із нього
+ * (навігатор тоді вважає таб не сфокусованим).
+ */
+function ProjectTabIcon({ name, color, focused }: { name: IconSymbolName; color: string; focused: boolean }) {
+  // DS v2.1: скляна pill з тоном акценту «Проєктів» (lavender) + іконка ink.
+  // Колір самого проєкту не гарантує контрасту іконки — тому акцент модуля.
+  return <GlassTabIcon name={name} color={color} focused={focused} accent="lavender" />;
 }
 
 export default function ProjectThemeLayout(){const {id}=useLocalSearchParams<{id:string}>();return <ThemeProvider key={id} storageKey={`project-theme-${id}`}><ProjectLayout/></ThemeProvider>;}
@@ -161,16 +175,16 @@ function ProjectLayout() {
   // інакше на цих екранах жодна кнопка панелі не показує «ви тут».
   const overflowActive = isProjectOverflowActive(pathname, overflow);
 
-  const tabBarBg = isDark ? TAB_BAR_BG_MEASURED.dark : TAB_BAR_BG_MEASURED.light;
+  // DS v2: суцільна панель surface.card (TAB_BAR_BG), як в особистих табах.
+  const tabBarBg = isDark ? TAB_BAR_BG.dark : TAB_BAR_BG.light;
   const inactiveTint = isDark ? TAB_BAR_TINT.dark.inactive : TAB_BAR_TINT.light.inactive;
   /**
-   * NAT-08: активний таб брав колір проєкту як є, і `#F59E0B` з палітри дав
-   * 1.95:1 на світлому тлі панелі — активна вкладка була видна ГІРШЕ за
-   * неактивні. Колір лишається кольором проєкту, але доведеним до 4.5:1
-   * проти зміряного тла панелі.
+   * NAT-08: активний підпис мусить тримати 4.5:1 проти тла панелі. У DS v2
+   * активна вкладка — нейтральна (text.primary + pill action.primary), а колір
+   * проєкту лишається на аватарі/сайдбарі; readableTint — страховка.
    */
   const activeTint = readableTint(
-    project?.color ?? (isDark ? TAB_BAR_TINT.dark.active : TAB_BAR_TINT.light.active),
+    isDark ? TAB_BAR_TINT.dark.active : TAB_BAR_TINT.light.active,
     tabBarBg,
   );
 
@@ -198,13 +212,8 @@ function ProjectLayout() {
             // зсередини: верхні 10pt було видно, але не натиснути. Те саме
             // вже прибрано в особистій панелі.
           },
-          tabBarBackground: () => (
-            <BlurView
-              intensity={80}
-              tint={isDark ? 'dark' : 'light'}
-              style={[StyleSheet.absoluteFill, isDark ? {} : { backgroundColor: 'rgba(244,240,255,0.88)' }]}
-            />
-          ),
+          // DS v2.1: Liquid Glass (як особиста панель табів).
+          tabBarBackground: () => <GlassTabBarBackground />,
           tabBarIconStyle: { marginTop: 2 },
         }}>
         {PROJECT_NAV_ITEMS.map(item => (
@@ -221,7 +230,7 @@ function ProjectLayout() {
               tabBarAccessibilityLabel: String(tr[item.labelKey]),
               href: visibleKeys.has(item.key) ? undefined : null,
               tabBarLabel: tabLabel(String(tr[item.labelKey])),
-              tabBarIcon: ({ color }) => <IconSymbol size={24} name={item.icon} color={color} />,
+              tabBarIcon: ({ color, focused }) => <ProjectTabIcon name={item.icon} color={color} focused={focused} />,
             }}
           />
         ))}
@@ -239,7 +248,7 @@ function ProjectLayout() {
             tabBarAccessibilityLabel: tr.navGroupMore,
             href: overflow.length > 0 ? undefined : null,
             tabBarLabel: tabLabel(tr.navGroupMore),
-            tabBarIcon: ({ color }) => <IconSymbol size={24} name="ellipsis" color={color} />,
+            tabBarIcon: ({ color, focused }) => <ProjectTabIcon name="ellipsis" color={color} focused={focused || overflowActive} />,
             // Поки відкритий розділ із «Ще», навігатор вважає цей таб
             // неактивним — підміна робить «неактивний» колір активним.
             ...(overflowActive ? { tabBarInactiveTintColor: activeTint } : {}),
@@ -262,3 +271,4 @@ function ProjectLayout() {
     </View>
   );
 }
+

@@ -28,7 +28,7 @@ export interface AnimatedCheckProps {
   checked: boolean;
   /** Outer diameter in points. Default 22. */
   size?: number;
-  /** Fill colour (and border when checked). Default '#10B981'. */
+  /** Fill colour (and border when checked). Default status.success ('#22A55B'). */
   color?: string;
   /** Border colour when unchecked. Defaults to `color + '80'`. */
   borderColor?: string;
@@ -54,7 +54,7 @@ export interface AnimatedCheckProps {
 export function AnimatedCheck({
   checked,
   size = 22,
-  color = '#10B981',
+  color = '#22A55B',
   borderColor,
   iconSize: iconSizeProp,
   radius,

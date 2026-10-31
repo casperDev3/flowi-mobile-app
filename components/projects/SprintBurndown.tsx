@@ -18,6 +18,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/store/i18n';
 import type { Burndown } from '@/utils/projectStatsMetrics';
+import { fontFamily } from '@/constants/theme';
 
 export interface BurndownPalette {
   text: string;
@@ -118,7 +119,7 @@ export const SprintBurndown = React.memo(function SprintBurndown({
 });
 
 const st = StyleSheet.create({
-  note:   { fontSize: 11, lineHeight: 15 },
-  axis:   { fontSize: 9, fontWeight: '600' },
+  note:   { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },
+  axis:   { fontSize: 10, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
   legend: { flexDirection: 'row', alignItems: 'center', gap: 5 },
 });

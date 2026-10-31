@@ -51,10 +51,11 @@ import Animated, {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Motion } from '@/constants/motion';
 import { type SheetPresentation, Layout, resolveSheetPresentation } from '@/constants/tokens';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { dialogColumnStyle, sheetColumnStyle, sidePanelColumnStyle } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
+import { glassOf } from '@/components/shared/dsTheme';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -141,7 +142,8 @@ export function SheetModal({
   // I18N-06: ця модалка обгортає КОЖНУ шторку застосунку, тож
   // захардкоджене «Закрити» озвучувало українською й англійський інтерфейс.
   const { tr } = useI18n();
-  const isDark = useColorScheme() === 'dark';
+  // DS v2: ✕-чип — surface.elevated + text.primary.
+  const { t } = useDSTheme();
   /**
    * На широкому вікні рядок «ручка + ✕» висить над карткою на бекдропі —
    * сірий гліф без підкладки там майже не видно (аудит iPad). Тож ✕ отримує
@@ -398,13 +400,13 @@ export function SheetModal({
                       accessibilityRole="button"
                       testID="sheet-close"
                       style={closeChip
-                        ? [styles.closeChip, { backgroundColor: isDark ? '#2C2C2E' : '#FFFFFF' }]
+                        ? [styles.closeChip, { backgroundColor: glassOf(t).sheet }]
                         : undefined}
                     >
                       <IconSymbol
                         name="xmark"
                         size={closeChip ? 15 : 17}
-                        color={closeChip ? (isDark ? '#F2F2F7' : '#1C1C1E') : 'rgba(128,128,128,0.6)'}
+                        color={closeChip ? t.text.primary : t.text.secondary}
                       />
                     </TouchableOpacity>
                   </View>
@@ -430,7 +432,8 @@ export function SheetModal({
 
 const styles = StyleSheet.create({
   backdrop: {
-    backgroundColor: '#000',
+    // DS v2: затемнення під модалкою — відтінок text.primary (#111113), не чистий чорний.
+    backgroundColor: '#111113',
   },
   // alignItems тут НЕ ставимо: 'center' стиснув би аркуш до ширини вмісту
   // на телефоні. Центрування робить сам аркуш через alignSelf.
@@ -491,14 +494,14 @@ const styles = StyleSheet.create({
   closeChip: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    shadowColor: '#111113',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   handle: {
     width: 36,

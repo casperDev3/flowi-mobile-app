@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/projects/SprintVelocity.tsx — таблиця велосіті під спринтами
  * проєкту (docs/specs/projects-analytics.md §6.1, §8.4).
@@ -12,6 +11,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/store/i18n';
 import type { VelocityWindow } from '@/utils/projectStatsMetrics';
+import { fontFamily, radius } from '@/constants/theme';
 
 export interface VelocityPalette {
   text: string;
@@ -39,7 +39,7 @@ export function SprintVelocity({
     iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : '';
 
   return (
-    <View style={[st.panel, { borderColor: palette.border, backgroundColor: palette.dim }]}>
+    <View style={[st.panel, { backgroundColor: palette.dim }]}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
         <Text style={[st.title, { color: palette.text, flex: 1 }]}>{tr.velocityTitle}</Text>
         {velocity.sampleSize > 0 ? (
@@ -58,12 +58,12 @@ export function SprintVelocity({
           accessibilityLabel={`${row.sprint.name}, ${shortDate(row.sprint.startDate)} – ${shortDate(row.sprint.endDate)}, `
             + `${fill(tr.velocityDays, { n: row.days })}, ${fill(tr.velocityTasks, { n: row.velocity })}`}
           style={[st.row, { borderTopColor: palette.border }]}>
-          <Text numberOfLines={1} style={{ flex: 1.3, color: palette.text, fontSize: 12, fontWeight: '600' }}>{row.sprint.name}</Text>
-          <Text numberOfLines={1} style={{ flex: 1.6, color: palette.sub, fontSize: 11 }}>
+          <Text numberOfLines={1} style={{ flex: 1.3, color: palette.text, fontSize: 12, fontFamily: fontFamily.semibold }}>{row.sprint.name}</Text>
+          <Text numberOfLines={1} style={{ flex: 1.6, color: palette.sub, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] }}>
             {shortDate(row.sprint.startDate)} – {shortDate(row.sprint.endDate)}
           </Text>
           <Text style={[st.num, { color: palette.sub }]}>{fill(tr.velocityDays, { n: row.days })}</Text>
-          <Text style={[st.num, { color: palette.text, fontWeight: '700' }]}>{fill(tr.velocityTasks, { n: row.velocity })}</Text>
+          <Text style={[st.num, { color: palette.text, fontFamily: fontFamily.semibold }]}>{fill(tr.velocityTasks, { n: row.velocity })}</Text>
         </View>
       ))}
 
@@ -82,9 +82,9 @@ export function SprintVelocity({
 }
 
 const st = StyleSheet.create({
-  panel: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 8 },
-  title: { fontSize: 14, fontWeight: Atlas.type.headingWeight },
-  note:  { fontSize: 11, lineHeight: 15 },
+  panel: { borderRadius: radius.nested, padding: 16, marginTop: 8 },
+  title: { fontSize: 16, fontFamily: fontFamily.semibold },
+  note:  { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.regular },
   row:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth },
-  num:   { fontSize: 11, textAlign: 'right', fontVariant: ['tabular-nums'], minWidth: 58 },
+  num:   { fontSize: 12, fontFamily: fontFamily.regular, textAlign: 'right', fontVariant: ['tabular-nums'], minWidth: 58 },
 });

@@ -24,6 +24,7 @@ import { Radius } from '@/constants/tokens';
 import { useAppMode } from '@/store/app-mode';
 import { useI18n } from '@/store/i18n';
 import { getProjectSyncStatus, refreshProjectNow, subscribeProjectSyncStatus } from '@/store/project-sync';
+import { fontFamily, theme } from '@/constants/theme';
 
 export const PROJECT_SYNC_HIT_SLOP = { top: 10, bottom: 10, left: 8, right: 8 } as const;
 
@@ -95,7 +96,7 @@ export function ProjectSyncIndicator({
       accessibilityLabel={time ? `${tr.lastSyncAt}: ${time}` : tr.syncNow}>
       {time ? (
         <>
-          <View style={[s.dot, { backgroundColor: '#10B981' }]} />
+          <View style={[s.dot, { backgroundColor: theme.light.status.success }]} />
           <Text style={[s.text, { color: subColor }]}>{time}</Text>
         </>
       ) : (
@@ -114,7 +115,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     borderRadius: Radius.xxl,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     minHeight: 24,
   },
@@ -122,5 +123,5 @@ const s = StyleSheet.create({
   // components/today/SyncBadge.tsx.
   spinner: { transform: [{ scale: 0.7 }] },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  text: { fontSize: 11, fontWeight: '700' },
+  text: { fontSize: 12, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
 });

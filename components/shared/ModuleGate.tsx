@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius, moduleAccent, type ModuleKey } from '@/constants/theme';
 /**
  * components/shared/ModuleGate.tsx — заглушка вимкненого розділу ЗА МАРШРУТОМ.
  *
@@ -26,18 +26,20 @@ import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   MODULE_SETTINGS_ROUTE,
   disabledModuleForPathname,
   moduleLabelKey,
   type ModuleId,
 } from '@/constants/nav';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useI18n } from '@/store/i18n';
 import { useUiModules } from '@/store/ui-preferences';
+import { glassOf } from '@/components/shared/dsTheme';
+import { AccentIcon } from '@/components/shared/GlassBits';
+import { MeshCanvas } from '@/components/shared/MeshCanvas';
 
-const ACCENT = '#7C3AED';
+// DS v2: модуль вимкнено — нейтральна заглушка, головна дія — pill action.primary.
 
 export interface ModuleDisabledStubProps {
   module: ModuleId;
@@ -54,33 +56,40 @@ export interface ModuleDisabledStubProps {
  * йде просто зараз, зупиняють з будь-якого екрана.
  */
 export function ModuleDisabledStub({ module, bottomInset = 0, onOpenSettings, onBack }: ModuleDisabledStubProps) {
-  const isDark = useColorScheme() === 'dark';
+  const { t, isDark } = useDSTheme();
   const { tr } = useI18n();
   const labelKey = moduleLabelKey(module);
   const label = labelKey ? String(tr[labelKey]) : '';
   const c = {
-    bg:   isDark ? '#0C0C14' : '#F5F5FA',
-    text: isDark ? '#F0EEFF' : '#1A1433',
-    sub:  isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    dim:  isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+    bg:   t.bg.canvas,
+    text: t.text.primary,
+    sub:  t.text.secondary,
+    dim:  glassOf(t).surfaceSubtle,
   };
   return (
     <View
       style={[st.stub, { bottom: bottomInset, backgroundColor: c.bg }]}
       accessibilityViewIsModal
       testID={`module-disabled-${module}`}>
-      <View style={[st.stubIcon, { backgroundColor: ACCENT + '1A' }]}>
-        <IconSymbol name="eye.slash" size={30} color={ACCENT} />
-      </View>
+      {/* DS v2.1: заглушка непрозора (ховає вимкнений вміст), але на mesh;
+          іконка — тонований скляний кружок акценту модуля. */}
+      <MeshCanvas isDark={isDark} />
+      <AccentIcon
+        isDark={isDark}
+        icon="eye.slash"
+        accent={(module as string) in moduleAccent ? moduleAccent[module as unknown as ModuleKey] : 'lavender'}
+        size="lg"
+        style={st.stubIcon}
+      />
       <Text accessibilityRole="header" style={[st.stubTitle, { color: c.text }]}>{tr.modulesDisabledTitle}</Text>
-      {label ? <Text style={[st.stubModule, { color: ACCENT }]}>{label}</Text> : null}
+      {label ? <Text style={[st.stubModule, { color: t.text.primary }]}>{label}</Text> : null}
       <Text style={[st.stubBody, { color: c.sub }]}>{tr.modulesDisabledBody}</Text>
       <TouchableOpacity
         onPress={onOpenSettings}
         accessibilityRole="button"
         accessibilityLabel={tr.modulesOpenSettings}
-        style={[st.stubButton, { backgroundColor: ACCENT }]}>
-        <Text style={st.stubButtonLabel}>{tr.modulesOpenSettings}</Text>
+        style={[st.stubButton, { backgroundColor: t.action.primary }]}>
+        <Text style={[st.stubButtonLabel, { color: t.text.onAction }]}>{tr.modulesOpenSettings}</Text>
       </TouchableOpacity>
       {onBack ? (
         <TouchableOpacity
@@ -88,7 +97,7 @@ export function ModuleDisabledStub({ module, bottomInset = 0, onOpenSettings, on
           accessibilityRole="button"
           accessibilityLabel={tr.back}
           style={[st.stubButton, { backgroundColor: c.dim, marginTop: 0 }]}>
-          <Text style={[st.stubButtonLabel, { color: c.text }]}>{tr.back}</Text>
+          <Text style={[st.stubButtonLabel, { color: t.action.secondaryText }]}>{tr.back}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -133,11 +142,11 @@ export function ModuleGate({
 
 const st = StyleSheet.create({
   stub:            { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
-  stubIcon:        { width: 64, height: 64, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  stubTitle:       { fontSize: 20, fontWeight: Atlas.type.headingWeight, textAlign: 'center', letterSpacing: -0.3 },
-  stubModule:      { fontSize: 14, fontWeight: '700' },
-  stubBody:        { fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  stubIcon:        { width: 64, height: 64, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  stubTitle:       { fontSize: 24, fontFamily: fontFamily.medium, textAlign: 'center', letterSpacing: -0.24 },
+  stubModule:      { fontSize: 14, fontFamily: fontFamily.semibold },
+  stubBody:        { fontFamily: fontFamily.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   // 48 заввишки — вище мінімальних 44pt за HIG: це головна дія на екрані.
-  stubButton:      { marginTop: 12, height: 48, minWidth: 200, borderRadius: Atlas.radius.large, paddingHorizontal: 22, alignItems: 'center', justifyContent: 'center' },
-  stubButtonLabel: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  stubButton:      { marginTop: 12, height: 48, minWidth: 200, borderRadius: radius.pill, paddingHorizontal: 22, alignItems: 'center', justifyContent: 'center' },
+  stubButtonLabel: { fontSize: 15, fontFamily: fontFamily.semibold },
 });

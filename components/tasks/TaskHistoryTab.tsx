@@ -12,6 +12,7 @@ import { Text, View } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
+import { fontFamily, radius, theme, type } from '@/constants/theme';
 
 export type HistoryEventType =
   | 'created' | 'edited' | 'done' | 'active'
@@ -26,20 +27,23 @@ export interface TaskHistoryEvent {
 }
 
 /** Іконка, колір і ключ підпису — разом, щоб їх не можна було розсинхронити. */
+// DS v2: семантичні кольори подій — зі статус-/акцент-токенів.
+const DS = theme.light;
+
 export const HISTORY_EVENT_STYLE: Record<HistoryEventType, {
   icon: IconSymbolName;
   color: string;
   labelKey: keyof Translations;
 }> = {
-  created:        { icon: 'plus.circle.fill',                   color: '#10B981', labelKey: 'historyCreated' },
-  edited:         { icon: 'pencil.circle.fill',                 color: '#F59E0B', labelKey: 'historyEdited' },
-  done:           { icon: 'checkmark.circle.fill',              color: '#10B981', labelKey: 'historyDone' },
-  active:         { icon: 'arrow.counterclockwise.circle.fill', color: '#6366F1', labelKey: 'historyRestored' },
-  timer_start:    { icon: 'play.circle.fill',                   color: '#6366F1', labelKey: 'historyTimerStart' },
-  timer_stop:     { icon: 'stop.circle.fill',                   color: '#EF4444', labelKey: 'historyTimerStop' },
-  subtask_add:    { icon: 'plus.square.fill',                   color: '#0EA5E9', labelKey: 'historySubtaskAdd' },
-  subtask_done:   { icon: 'checkmark.square.fill',              color: '#10B981', labelKey: 'historySubtaskDone' },
-  subtask_undone: { icon: 'square.dashed',                      color: '#F59E0B', labelKey: 'historySubtaskUndone' },
+  created:        { icon: 'plus.circle.fill',                   color: DS.status.success, labelKey: 'historyCreated' },
+  edited:         { icon: 'pencil.circle.fill',                 color: DS.status.warning, labelKey: 'historyEdited' },
+  done:           { icon: 'checkmark.circle.fill',              color: DS.status.success, labelKey: 'historyDone' },
+  active:         { icon: 'arrow.counterclockwise.circle.fill', color: DS.status.info, labelKey: 'historyRestored' },
+  timer_start:    { icon: 'play.circle.fill',                   color: DS.status.info, labelKey: 'historyTimerStart' },
+  timer_stop:     { icon: 'stop.circle.fill',                   color: DS.accent.coral, labelKey: 'historyTimerStop' },
+  subtask_add:    { icon: 'plus.square.fill',                   color: DS.accent.lavender, labelKey: 'historySubtaskAdd' },
+  subtask_done:   { icon: 'checkmark.square.fill',              color: DS.status.success, labelKey: 'historySubtaskDone' },
+  subtask_undone: { icon: 'square.dashed',                      color: DS.status.warning, labelKey: 'historySubtaskUndone' },
 };
 
 export interface TaskHistoryTabProps {
@@ -54,7 +58,7 @@ export interface TaskHistoryTabProps {
 export function TaskHistoryTab({ events, textColor, subColor, tr, locale }: TaskHistoryTabProps) {
   if (events.length === 0) {
     return (
-      <Text style={{ color: subColor, fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>
+      <Text style={[type.body, { color: subColor, fontSize: 13, textAlign: 'center', paddingVertical: 24 }]}>
         {tr.historyEmpty}
       </Text>
     );
@@ -68,15 +72,15 @@ export function TaskHistoryTab({ events, textColor, subColor, tr, locale }: Task
         const at = new Date(event.at);
         return (
           <View key={event.id} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14, gap: 10 }}>
-            <View style={{ width: 30, height: 30, borderRadius: 9, backgroundColor: style.color + '20', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+            <View style={{ width: 30, height: 30, borderRadius: radius.pill, backgroundColor: style.color + '20', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
               <IconSymbol name={style.icon} size={14} color={style.color} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: textColor, fontSize: 13, fontWeight: '600' }}>{String(tr[style.labelKey])}</Text>
+              <Text style={{ color: textColor, fontSize: 14, fontFamily: fontFamily.semibold }}>{String(tr[style.labelKey])}</Text>
               {event.note ? (
-                <Text style={{ color: subColor, fontSize: 12, marginTop: 1 }} numberOfLines={2}>{event.note}</Text>
+                <Text style={[type.caption, { color: subColor, marginTop: 1 }]} numberOfLines={2}>{event.note}</Text>
               ) : null}
-              <Text style={{ color: subColor, fontSize: 11, marginTop: 3 }}>
+              <Text style={[type.caption, type.numeric, { color: subColor, marginTop: 3 }]}>
                 {at.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                 {' · '}
                 {at.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}

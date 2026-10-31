@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -12,10 +11,12 @@ import {
 } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useAppMode } from '@/store/app-mode';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
+import { fontFamily, radius, space } from '@/constants/theme';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 /**
  * Реюзабельна обгортка для онлайн-екранів. Два режими через `reason`:
@@ -41,11 +42,12 @@ export function OfflineOverlay({
 }) {
   const { online, ready, setOnline } = useAppMode();
   const { status } = useAuth();
-  const isDark = useColorScheme() === 'dark';
+  const { t, isDark } = useDSTheme();
   const { tr } = useI18n();
   const router = useRouter();
 
-  const accent = '#0EA5E9';
+  // DS v2: стан мережі — status.info; головні дії — pill action.primary.
+  const accent = t.status.info;
 
   // ── Завантаження AppMode (тільки для reason='offline') ────────────────────
   if (reason === 'offline' && !ready) {
@@ -55,7 +57,7 @@ export function OfflineOverlay({
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: isDark ? '#0C0C14' : '#F4F2FF',
+          backgroundColor: t.bg.canvas,
         }}>
         <ActivityIndicator color={accent} />
       </View>
@@ -67,8 +69,8 @@ export function OfflineOverlay({
   if (reason === 'guest' && (status === 'authed' || status === 'loading')) return <>{children}</>;
 
   // ── Колір ─────────────────────────────────────────────────────────────────
-  const text = isDark ? '#F0EEFF' : '#1A1433';
-  const sub  = isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)';
+  const text = t.text.primary;
+  const sub  = t.text.secondary;
 
   const isGuestCard = reason === 'guest';
 
@@ -91,8 +93,8 @@ export function OfflineOverlay({
 
   // ── Банер-режим: контент повністю видимий, лише компактна смуга зверху ────
   if (mode === 'banner' && !isGuestCard) {
-    const bannerBg   = isDark ? 'rgba(12,12,20,0.92)' : 'rgba(255,255,255,0.92)';
-    const bannerBord = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+    const bannerBg   = glassOf(t).surface;
+    const bannerBord = t.border.hairline;
     return (
       <View style={{ flex: 1 }}>
         {/* Компактний банер «Офлайн: лише перегляд» */}
@@ -125,8 +127,7 @@ export function OfflineOverlay({
             style={[
               s.card,
               {
-                backgroundColor: isDark ? 'rgba(18,15,30,0.92)' : 'rgba(255,255,255,0.92)',
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong'),
               },
             ]}>
             {/* Іконка */}
@@ -154,16 +155,16 @@ export function OfflineOverlay({
                 <TouchableOpacity
                   onPress={() => router.push('/login')}
                   accessibilityRole="button"
-                  style={[s.btn, { backgroundColor: accent }]}>
-                  <IconSymbol name="person.fill" size={15} color="#fff" />
-                  <Text style={s.btnLabel}>{tr.authLogin}</Text>
+                  style={[s.btn, { backgroundColor: t.action.primary }]}>
+                  <IconSymbol name="person.fill" size={15} color={t.text.onAction} />
+                  <Text style={[s.btnLabel, { color: t.text.onAction }]}>{tr.authLogin}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={() => router.push('/register')}
                   accessibilityRole="button"
-                  style={[s.btn, s.btnOutline, { borderColor: accent, marginTop: 8 }]}>
-                  <Text style={[s.btnLabel, { color: accent }]}>{tr.authRegister}</Text>
+                  style={[s.btn, { backgroundColor: glassOf(t).surfaceSubtle, marginTop: 8 }]}>
+                  <Text style={[s.btnLabel, { color: t.action.secondaryText }]}>{tr.authRegister}</Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -171,9 +172,9 @@ export function OfflineOverlay({
                 onPress={handleEnableOnline}
                 accessibilityRole="button"
                 accessibilityLabel={tr.enableOnline}
-                style={[s.btn, { backgroundColor: accent }]}>
-                <IconSymbol name="wifi" size={15} color="#fff" />
-                <Text style={s.btnLabel}>{tr.enableOnline}</Text>
+                style={[s.btn, { backgroundColor: t.action.primary }]}>
+                <IconSymbol name="wifi" size={15} color={t.text.onAction} />
+                <Text style={[s.btnLabel, { color: t.text.onAction }]}>{tr.enableOnline}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -185,13 +186,12 @@ export function OfflineOverlay({
 
 const s = StyleSheet.create({
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  card:       { width: '100%', maxWidth: 340, borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 24, alignItems: 'center' },
-  iconBox:    { width: 56, height: 56, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  title:      { fontSize: 17, fontWeight: Atlas.type.headingWeight, textAlign: 'center', marginBottom: 8 },
-  desc:       { fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 18 },
-  btn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', paddingHorizontal: 20, paddingVertical: 12, borderRadius: Atlas.radius.large },
-  btnOutline: { backgroundColor: 'transparent', borderWidth: 1 },
-  btnLabel:   { color: '#fff', fontWeight: Atlas.type.headingWeight, fontSize: 14, marginLeft: 6 },
-  banner:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1 },
-  bannerText: { fontSize: 12, fontWeight: '700' },
+  card:       { width: '100%', maxWidth: 340, borderRadius: radius.card, padding: space.cardPadding, alignItems: 'center' },
+  iconBox:    { width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  title:      { fontSize: 17, fontFamily: fontFamily.semibold, textAlign: 'center', marginBottom: 8 },
+  desc:       { fontFamily: fontFamily.regular, fontSize: 13, lineHeight: 19, textAlign: 'center', marginBottom: 18 },
+  btn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 48, paddingHorizontal: 20, paddingVertical: 12, borderRadius: radius.pill },
+  btnLabel:   { fontFamily: fontFamily.semibold, fontSize: 14, marginLeft: 6 },
+  banner:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  bannerText: { fontSize: 12, fontFamily: fontFamily.bold },
 });

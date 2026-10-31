@@ -8,24 +8,24 @@
  * надіслані на мою пошту ще до реєстрації. Запрошення з `?invite=` стоїть
  * першим і підсвічене.
  */
-import { Atlas } from '@/constants/atlas';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { BlurView } from 'expo-blur';
 
 import { InviteActions } from '@/components/notifications/InviteActions';
 import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { OfflineError } from '@/store/api';
 import { useI18n } from '@/store/i18n';
 import { syncMyInvites } from '@/store/invite-inbox';
 import { fetchMyInvites, type MyInvite } from '@/store/project-team';
+import { fontFamily } from '@/constants/theme';
 
-const ACCENT = '#7C3AED';
+// DS v2: глибока лаванда (акцент tasks, 5.25:1 з білим) замість легасі #7C3AED
+const ACCENT = { light: '#6D4CF5', dark: '#8B6CFF' } as const;
 
 export default function InvitesScreen() {
   const isDark = useColorScheme() === 'dark';
@@ -35,15 +35,18 @@ export default function InvitesScreen() {
   const dateLocale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const { invite: focusId } = useLocalSearchParams<{ invite?: string }>();
 
+  const k = dsTokens(isDark);
+
   const c = useMemo(() => ({
-    bg1: isDark ? '#0C0C14' : '#F4F2FF',
-    bg2: isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text: isDark ? '#F0EEFF' : '#1A1433',
-    sub: isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: ACCENT,
-    dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  }), [isDark]);
+    bg1: k.bg.canvas,
+    bg2: k.bg.canvas,
+    border: k.border.hairline,
+    text: k.text.primary,
+    sub: k.text.secondary,
+    accent: isDark ? ACCENT.dark : ACCENT.light,
+    dim: k.surface.subtle,
+    card:   k.surface.card,
+  }), [k, isDark]);
 
   const [invites, setInvites] = useState<MyInvite[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'offline'>('loading');
@@ -78,7 +81,7 @@ export default function InvitesScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg1 }]} />
       <View style={contentWidth}>
         <ScreenHeader
           title={tr.invitesTitle}
@@ -88,43 +91,41 @@ export default function InvitesScreen() {
             onPress: () => (router.canGoBack() ? router.back() : router.replace('/notifications' as never)),
             label: tr.back,
             color: c.sub,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { backgroundColor: c.card, borderColor: 'transparent' },
           }}
         />
       </View>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: 100 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
         {status === 'loading' && !invites.length ? (
-          <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={c.sub} style={{ marginTop: 40 }} />
         ) : status === 'error' || status === 'offline' ? (
-          <View style={[st.banner, { borderColor: '#EF444440', backgroundColor: '#EF444412' }]}>
-            <IconSymbol name="exclamationmark.circle" size={16} color="#EF4444" />
+          <View style={[st.banner, { backgroundColor: k.status.danger + '14' }]}>
+            <IconSymbol name="exclamationmark.circle" size={16} color={k.status.danger} />
             <Text style={{ flex: 1, color: c.text, fontSize: 13, marginLeft: 8 }}>
               {status === 'offline' ? tr.inviteNetworkError : tr.invitesLoadError}
             </Text>
             <TouchableOpacity onPress={() => { void load(); }} accessibilityRole="button" style={st.retry}>
-              <Text style={{ color: c.accent, fontWeight: '700', fontSize: 13 }}>{tr.adminRetry}</Text>
+              <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 13, textDecorationLine: 'underline' }}>{tr.adminRetry}</Text>
             </TouchableOpacity>
           </View>
         ) : ordered.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 56 }}>
-            <View style={[st.emptyIcon, { backgroundColor: c.accent + '18' }]}>
-              <IconSymbol name="person.badge.plus" size={30} color={c.accent} />
+            <View style={[st.emptyIcon, { backgroundColor: c.card }]}>
+              <IconSymbol name="person.badge.plus" size={30} color={c.sub} />
             </View>
-            <Text style={{ color: c.text, fontSize: 16, fontWeight: '700', marginTop: 16, textAlign: 'center' }}>{tr.invitesEmptyTitle}</Text>
+            <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginTop: 16, textAlign: 'center' }}>{tr.invitesEmptyTitle}</Text>
             <Text style={{ color: c.sub, fontSize: 13, marginTop: 6, textAlign: 'center', lineHeight: 18 }}>{tr.invitesEmptySub}</Text>
           </View>
         ) : ordered.map(invite => (
-          <BlurView
+          <View
             key={invite.id}
-            intensity={isDark ? 20 : 40}
-            tint={isDark ? 'dark' : 'light'}
-            style={[st.card, { borderColor: invite.id === focusId ? c.accent : c.border }]}>
+            style={[st.card, { backgroundColor: c.card }, invite.id === focusId ? { borderWidth: 2, borderColor: k.focus.ring } : null]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <View style={[st.dot, { backgroundColor: invite.project.color || c.accent }]} />
-              <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontSize: 16, fontWeight: Atlas.type.headingWeight }}>
+              <Text numberOfLines={2} style={{ flex: 1, color: c.text, fontSize: 16, fontFamily: fontFamily.semibold }}>
                 {invite.project.name}
               </Text>
             </View>
@@ -142,7 +143,7 @@ export default function InvitesScreen() {
               sub={c.sub}
               border={c.border}
             />
-          </BlurView>
+          </View>
         ))}
       </ScrollView>
     </View>
@@ -150,10 +151,10 @@ export default function InvitesScreen() {
 }
 
 const st = StyleSheet.create({
-  pageTitle: { fontSize: 28, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.6 },
-  card: { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', padding: 16, marginBottom: 10 },
+  pageTitle: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32 },
+  card: { borderRadius: 20, overflow: 'hidden', padding: 20, marginBottom: 12 },
   dot: { width: 12, height: 12, borderRadius: 6 },
-  banner: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: Atlas.radius.large, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8 },
+  banner: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginTop: 8 },
   retry: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
-  emptyIcon: { width: 72, height: 72, borderRadius: Atlas.radius.xlarge, alignItems: 'center', justifyContent: 'center' },
+  emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
 });

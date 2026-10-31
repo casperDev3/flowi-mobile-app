@@ -1,4 +1,6 @@
 import { Atlas } from '@/constants/atlas';
+import { fontFamily } from '@/constants/theme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 /**
  * components/feedback/FeedbackDetail.tsx — деталь звернення: повний текст,
  * кроки / очікувалось / сталось окремими блоками, стан і коментар власника
@@ -47,15 +49,15 @@ export function FeedbackDetailHeader({
   const kindColor = KIND_COLOR[entry.kind];
   return (
     <View style={st.header}>
-      <View style={[st.kindChip, { backgroundColor: kindColor + '18', borderColor: kindColor + '40' }]}>
+      <View style={[st.kindChip, { backgroundColor: kindColor + '18' }]}>
         <IconSymbol name={entry.kind === 'bug' ? 'ladybug.fill' : 'lightbulb.fill'} size={11} color={kindColor} />
-        <Text style={{ color: kindColor, fontSize: 12, fontWeight: '700' }}>{entry.kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}</Text>
+        <Text style={{ color: kindColor, fontSize: 12, fontFamily: fontFamily.bold }}>{entry.kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}</Text>
       </View>
       <View style={{ flex: 1 }} />
-      <TouchableOpacity onPress={onEdit} accessibilityRole="button" accessibilityLabel={tr.edit} style={[st.iconBtn, { borderColor: c.border }]}>
+      <TouchableOpacity onPress={onEdit} accessibilityRole="button" accessibilityLabel={tr.edit} style={[st.iconBtn, { backgroundColor: c.dim }]}>
         <IconSymbol name="pencil" size={ACTION.iconOnly} color={c.text} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close} style={[st.iconBtn, { borderColor: c.border }]}>
+      <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close} style={[st.iconBtn, { backgroundColor: c.dim }]}>
         <IconSymbol name="xmark" size={ACTION.iconOnly} color={c.text} />
       </TouchableOpacity>
     </View>
@@ -100,20 +102,21 @@ export function FeedbackDetailBody({
   const actionColors = { ...c, accent: KIND_COLOR[entry.kind] };
   const created = new Date(item.createdAt);
   const bug = entry.kind === 'bug' ? entry.item : null;
+  const { t } = useDSTheme();
 
   return (
     <View>
       <Text style={[st.title, { color: c.text }]} selectable>{item.title}</Text>
       <View style={st.chips}>
-        <View style={[st.chip, { backgroundColor: ws.color + '18', borderColor: ws.color + '35' }]}>
-          <Text style={{ color: ws.color, fontSize: 12, fontWeight: '700' }}>{weightLabel(tr, entry.kind, weight)}</Text>
+        <View style={[st.chip, { backgroundColor: ws.color + '18' }]}>
+          <Text style={{ color: ws.color, fontSize: 12, fontFamily: fontFamily.bold }}>{weightLabel(tr, entry.kind, weight)}</Text>
         </View>
-        <View style={[st.chip, { borderColor: c.border }]}>
-          <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{moduleLabel(tr, item.module)}</Text>
+        <View style={[st.chip, { backgroundColor: c.dim }]}>
+          <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{moduleLabel(tr, item.module)}</Text>
         </View>
         {item.platforms?.length ? (
-          <View style={[st.chip, { borderColor: c.border }]}>
-            <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{platformsLabel(tr, item.platforms)}</Text>
+          <View style={[st.chip, { backgroundColor: c.dim }]}>
+            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{platformsLabel(tr, item.platforms)}</Text>
           </View>
         ) : null}
         {Number.isFinite(created.getTime()) ? (
@@ -124,8 +127,8 @@ export function FeedbackDetailBody({
       </View>
 
       {/* Стан і зворотний зв'язок */}
-      <View style={[st.stateBox, { borderColor: stateColor + '50', backgroundColor: stateColor + '12' }]} accessibilityLiveRegion="polite">
-        <Text style={{ color: stateColor, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>{stateLabel(tr, state.key)}</Text>
+      <View style={[st.stateBox, { backgroundColor: stateColor + '12' }]} accessibilityLiveRegion="polite">
+        <Text style={{ color: stateColor, fontSize: 14, fontFamily: fontFamily.semibold }}>{stateLabel(tr, state.key)}</Text>
         {state.key === 'failed' && state.comment ? (
           <Text style={{ color: c.text, fontSize: 13, marginTop: 4 }}>{tr.fbSendError.replace('{reason}', state.comment)}</Text>
         ) : null}
@@ -143,15 +146,15 @@ export function FeedbackDetailBody({
         ) : null}
 
         {state.canSend && state.key === 'draft' ? (
-          <TouchableOpacity onPress={onSend} disabled={busy} accessibilityRole="button" style={[st.primary, { backgroundColor: KIND_COLOR[entry.kind] }]}>
-            {busy ? <ActivityIndicator color="#fff" size="small" /> : <IconSymbol name="paperplane.fill" size={14} color="#fff" />}
-            <Text style={st.primaryText}>{tr.fbSend}</Text>
+          <TouchableOpacity onPress={onSend} disabled={busy} accessibilityRole="button" style={[st.primary, { backgroundColor: t.action.primary }]}>
+            {busy ? <ActivityIndicator color={t.text.onAction} size="small" /> : <IconSymbol name="paperplane.fill" size={14} color={t.text.onAction} />}
+            <Text style={[st.primaryText, { color: t.text.onAction }]}>{tr.fbSend}</Text>
           </TouchableOpacity>
         ) : null}
         {state.retry !== 'none' ? (
-          <TouchableOpacity onPress={onRetry} disabled={busy} accessibilityRole="button" style={[st.primary, { backgroundColor: stateColor }]}>
-            {busy ? <ActivityIndicator color="#fff" size="small" /> : <IconSymbol name="arrow.clockwise" size={14} color="#fff" />}
-            <Text style={st.primaryText}>{tr.fbRetry}</Text>
+          <TouchableOpacity onPress={onRetry} disabled={busy} accessibilityRole="button" style={[st.primary, { backgroundColor: t.action.primary }]}>
+            {busy ? <ActivityIndicator color={t.text.onAction} size="small" /> : <IconSymbol name="arrow.clockwise" size={14} color={t.text.onAction} />}
+            <Text style={[st.primaryText, { color: t.text.onAction }]}>{tr.fbRetry}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -165,10 +168,10 @@ export function FeedbackDetailBody({
         <View style={{ marginTop: 14 }}>
           <Text style={[st.label, { color: c.sub }]}>{tr.fbFieldAttachments}</Text>
           {item.attachments.map(att => (
-            <View key={att.uid} style={[st.attRow, { borderColor: c.border, backgroundColor: c.dim }]}>
+            <View key={att.uid} style={[st.attRow, { backgroundColor: c.dim }]}>
               <IconSymbol name={att.kind === 'video' ? 'play.circle.fill' : 'camera.fill'} size={15} color={c.sub} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{att.name}</Text>
+                <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }} numberOfLines={1}>{att.name}</Text>
                 <Text style={{ color: c.sub, fontSize: 11 }}>
                   {formatBytes(att.bytes, tr)} · {attachmentStateLabel(tr, att.state, localFileUids.has(att.uid))}
                 </Text>
@@ -209,15 +212,15 @@ export function FeedbackDetailBody({
 
 const st = StyleSheet.create({
   header:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 8 },
-  kindChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 4 },
-  iconBtn:     { width: 44, height: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  title:       { fontSize: 20, fontWeight: Atlas.type.headingWeight, lineHeight: 26 },
+  kindChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  iconBtn:     { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  title:       { fontSize: 20, fontFamily: fontFamily.semibold, lineHeight: 26 },
   chips:       { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 8 },
-  chip:        { borderWidth: 1, borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 3 },
-  stateBox:    { borderWidth: 1, borderRadius: Atlas.radius.large, padding: 12, marginTop: 14 },
-  primary:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 11, paddingVertical: 11, marginTop: 10, minHeight: 44 },
-  primaryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  label:       { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  attRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Atlas.radius.medium, padding: 10, marginBottom: 6 },
+  chip:        { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  stateBox:    { borderRadius: Atlas.radius.large, padding: 16, marginTop: 14 },
+  primary:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 999, paddingVertical: 11, marginTop: 10, minHeight: 44 },
+  primaryText: { fontSize: 14, fontFamily: fontFamily.semibold },
+  label:       { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 6 },
+  attRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: Atlas.radius.large, padding: 10, marginBottom: 6 },
   ctxRow:      { flexDirection: 'row', gap: 8, paddingVertical: 5, borderBottomWidth: StyleSheet.hairlineWidth },
 });

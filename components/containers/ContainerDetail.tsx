@@ -1,4 +1,4 @@
-import { Atlas } from '@/constants/atlas';
+import { fontFamily, radius, type as dsType } from '@/constants/theme';
 import React, { useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -30,9 +30,9 @@ function HeadButton({ icon, label, onPress, c, danger }: {
 }) {
   return (
     <TouchableOpacity onPress={onPress} accessibilityRole="button" accessibilityLabel={label}
-      style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
-        borderColor: danger ? 'rgba(239,68,68,0.3)' : c.border, backgroundColor: danger ? 'rgba(239,68,68,0.08)' : c.dim }}>
-      <IconSymbol name={icon} size={14} color={danger ? '#EF4444' : c.sub} />
+      style={{ width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: danger ? c.t.status.danger + '14' : c.dim }}>
+      <IconSymbol name={icon} size={14} color={danger ? c.t.status.danger : c.text} />
     </TouchableOpacity>
   );
 }
@@ -83,11 +83,11 @@ export function ContainerDetail({
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text accessibilityRole="header" style={{ color: c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{container.name}</Text>
+          <Text accessibilityRole="header" style={{ color: c.text, fontSize: 24, lineHeight: 30, fontFamily: fontFamily.medium, letterSpacing: -0.3 }}>{container.name}</Text>
           {place ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
               <IconSymbol name="location.fill" size={12} color={c.sub} />
-              <Text style={{ color: c.sub, fontSize: 13, flexShrink: 1 }}>{place}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, flexShrink: 1 }}>{place}</Text>
             </View>
           ) : null}
         </View>
@@ -106,34 +106,34 @@ export function ContainerDetail({
 
       <View style={{ marginTop: 16 }}>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.dim, borderRadius: Atlas.radius.medium,
-            borderWidth: 1, borderColor: c.border, paddingHorizontal: 12, minHeight: 44 }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.dim, borderRadius: radius.pill,
+            paddingHorizontal: 14, minHeight: 44 }}>
             <IconSymbol name="plus" size={14} color={c.sub} />
-            <TextInput placeholder={tr.ctrNewItemPlaceholder} placeholderTextColor={c.sub} value={name} onChangeText={setName}
+            <TextInput placeholder={tr.ctrNewItemPlaceholder} placeholderTextColor={c.muted} value={name} onChangeText={setName}
               onSubmitEditing={add} returnKeyType="done" accessibilityLabel={tr.addItem}
-              style={{ flex: 1, fontSize: 14, color: c.text, paddingVertical: 10 }} />
+              style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: c.text, paddingVertical: 10 }} />
           </View>
           <TouchableOpacity onPress={add} disabled={!name.trim()} accessibilityRole="button" accessibilityLabel={tr.addItem}
             accessibilityState={{ disabled: !name.trim() }}
-            style={{ width: 44, height: 44, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: name.trim() ? color : c.dim }}>
-            <IconSymbol name="arrow.up" size={18} color={name.trim() ? '#fff' : c.sub} />
+            style={{ width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: name.trim() ? c.t.action.primary : c.t.state.disabledBg }}>
+            <IconSymbol name="arrow.up" size={18} color={name.trim() ? c.t.text.onAction : c.t.state.disabledText} />
           </TouchableOpacity>
         </View>
         {name.length > 0 ? (
           <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, backgroundColor: c.dim, borderRadius: Atlas.radius.medium,
-              borderWidth: 1, borderColor: c.border, paddingHorizontal: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, backgroundColor: c.dim, borderRadius: radius.control,
+              paddingHorizontal: 14 }}>
               <IconSymbol name="tag" size={12} color={c.sub} />
-              <TextInput placeholder={tr.ctrTagsPlaceholder} placeholderTextColor={c.sub} value={tags} onChangeText={setTags}
+              <TextInput placeholder={tr.ctrTagsPlaceholder} placeholderTextColor={c.muted} value={tags} onChangeText={setTags}
                 onSubmitEditing={add} returnKeyType="done" accessibilityLabel={tr.itemTags}
-                style={{ flex: 1, fontSize: 13, color: c.text, paddingVertical: 9 }} />
+                style={{ flex: 1, fontSize: 13, fontFamily: fontFamily.regular, color: c.text, paddingVertical: 10 }} />
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 6, backgroundColor: c.dim, borderRadius: Atlas.radius.medium,
-              borderWidth: 1, borderColor: c.border, paddingHorizontal: 12, paddingVertical: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 6, backgroundColor: c.dim, borderRadius: radius.control,
+              paddingHorizontal: 14, paddingVertical: 10 }}>
               <IconSymbol name="text.alignleft" size={12} color={c.sub} style={{ marginTop: 2 }} />
-              <TextInput placeholder={tr.ctrNotePlaceholder} placeholderTextColor={c.sub} value={note} onChangeText={setNote}
-                multiline accessibilityLabel={tr.itemNote} style={{ flex: 1, fontSize: 13, color: c.text }} />
+              <TextInput placeholder={tr.ctrNotePlaceholder} placeholderTextColor={c.muted} value={note} onChangeText={setNote}
+                multiline accessibilityLabel={tr.itemNote} style={{ flex: 1, fontSize: 13, fontFamily: fontFamily.regular, color: c.text }} />
             </View>
           </>
         ) : null}
@@ -142,7 +142,7 @@ export function ContainerDetail({
       {stats.count > 0 || stats.discarded > 0 ? (
         <View style={{ marginTop: 18, gap: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 1 }}>
+            <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 1, ...dsType.numeric }}>
               {itemsCount(tr, stats.count, lang)}
               {stats.units !== stats.count ? ` · ${fill(tr.ctrUnits, { n: stats.units })}` : ''}
               {stats.lent ? ` · ${fill(tr.ctrLentCount, { n: stats.lent })}` : ''}
@@ -150,7 +150,7 @@ export function ContainerDetail({
             {stats.discarded ? (
               <TouchableOpacity onPress={() => setShowDiscarded(v => !v)} accessibilityRole="switch"
                 accessibilityState={{ checked: showDiscarded }} style={{ minHeight: 44, justifyContent: 'center' }}>
-                <Text style={{ color: color, fontSize: 12, fontWeight: '700' }}>
+                <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>
                   {showDiscarded ? tr.ctrHideDiscarded : fill(tr.ctrShowDiscarded, { n: stats.discarded })}
                 </Text>
               </TouchableOpacity>
@@ -163,11 +163,11 @@ export function ContainerDetail({
         </View>
       ) : (
         <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-          <View style={{ width: 52, height: 52, borderRadius: Atlas.radius.large, backgroundColor: color + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-            <IconSymbol name="archivebox" size={26} color={color} />
+          <View style={{ width: 52, height: 52, borderRadius: radius.pill, backgroundColor: c.dim, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <IconSymbol name="archivebox" size={26} color={c.sub} />
           </View>
-          <Text style={{ color: c.text, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>{tr.noItems}</Text>
-          <Text style={{ color: c.sub, fontSize: 13 }}>{tr.ctrAddItemHint}</Text>
+          <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginBottom: 4 }}>{tr.noItems}</Text>
+          <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, textAlign: 'center' }}>{tr.ctrAddItemHint}</Text>
         </View>
       )}
     </View>

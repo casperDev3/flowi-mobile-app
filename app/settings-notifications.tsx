@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/settings-notifications.tsx — налаштування сповіщень
  * (notifications-module.md §4.4–§4.5, §6.3, §11).
@@ -12,7 +11,6 @@ import { Atlas } from '@/constants/atlas';
  * Кожен дотик — окремий частковий PATCH (лише змінене поле), тож дві правки
  * з різних пристроїв конфліктують лише на тому самому перемикачі.
  */
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, router } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
@@ -25,11 +23,15 @@ import { useNotificationPreferences } from '@/components/notifications/use-notif
 import { ScreenHeader } from '@/components/shared/ScreenHeader';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens, useDS } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { useUiModules } from '@/store/ui-preferences';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
 
-const ACCENT = '#7C3AED';
+// DS v2: глибока лаванда (акцент tasks, 5.25:1 з білим) замість легасі #7C3AED
 const MEETING_LEAD_OPTIONS = [5, 10, 15, 30, 60];
 
 export default function NotificationSettingsScreen() {
@@ -40,16 +42,19 @@ export default function NotificationSettingsScreen() {
   const prefs = useNotificationPreferences();
   const doc = prefs.doc;
 
+  const k = dsTokens(isDark);
+
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F5F5FA',
-    bg2:    isDark ? '#14121E' : '#EBEBF5',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    card:   isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-    accent: ACCENT,
-  }), [isDark]);
+    bg1:    k.bg.canvas,
+    bg2:    k.bg.canvas,
+    border: k.border.hairline,
+    text:   k.text.primary,
+    sub:    k.text.secondary,
+    dim:    glassOf(k).surfaceSubtle,
+    card:   glassOf(k).surface,
+    accent: glassOf(k).accent.lavender.ink,
+
+  }), [k]);
 
   const save = useCallback((patch: PreferencesPatch) => {
     updatePreferences(patch).catch(() => {
@@ -70,7 +75,7 @@ export default function NotificationSettingsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
 
       <View style={contentWidth}>
         <ScreenHeader
@@ -82,14 +87,14 @@ export default function NotificationSettingsScreen() {
             onPress: () => router.back(),
             label: tr.back,
             color: c.sub,
-            style: { backgroundColor: c.dim, borderColor: c.border },
+            style: { backgroundColor: c.card, borderColor: 'transparent' },
           }}
           crumbs={[
             { label: tr.tabOptions, onPress: () => router.push('/(tabs)/settings') },
             { label: tr.ncSettingsTitle },
           ]}
           crumbColor={c.sub}
-          actions={prefs.saving ? <ActivityIndicator color={c.accent} /> : null}
+          actions={prefs.saving ? <ActivityIndicator color={c.sub} /> : null}
         />
       </View>
 
@@ -100,21 +105,21 @@ export default function NotificationSettingsScreen() {
 
         {!doc ? (
           unavailable ? (
-            <View style={[st.card, st.notice, { borderColor: c.border, backgroundColor: c.card }]}>
+            <View style={[st.card, st.notice, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               <IconSymbol name={prefs.status === 'offline' ? 'wifi.slash' : 'info.circle'} size={18} color={c.sub} />
               <Text style={{ color: c.sub, fontSize: 13, flex: 1, lineHeight: 18 }}>
                 {prefs.status === 'offline' ? tr.ncSettingsOffline : prefs.status === 'unavailable' ? tr.ncUnavailable : tr.ncLoadFailed}
               </Text>
             </View>
           ) : (
-            <ActivityIndicator color={c.accent} style={{ marginTop: 32 }} />
+            <ActivityIndicator color={c.sub} style={{ marginTop: 32 }} />
           )
         ) : (
           <>
-            <View style={[st.card, { borderColor: c.border, backgroundColor: c.card }]}>
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
               <ToggleRow
                 icon="bell.badge"
-                iconColor="#F59E0B"
+                iconColor={k.accent.amber}
                 title={tr.ncMaster}
                 subtitle={tr.ncMasterSub}
                 value={doc.enabled}
@@ -124,7 +129,7 @@ export default function NotificationSettingsScreen() {
               <View style={[st.divider, { backgroundColor: c.border }]} />
               <ToggleRow
                 icon="paperplane.fill"
-                iconColor="#0EA5E9"
+                iconColor={k.status.info}
                 title={tr.ncPushMaster}
                 subtitle={tr.ncPushMasterSub}
                 value={doc.push_enabled}
@@ -137,7 +142,7 @@ export default function NotificationSettingsScreen() {
                   <View style={[st.divider, { backgroundColor: c.border }]} />
                   <ToggleRow
                     icon="doc.text"
-                    iconColor="#10B981"
+                    iconColor={k.status.success}
                     title={tr.ncEmailMaster}
                     value={doc.email_enabled}
                     disabled={!doc.enabled}
@@ -181,8 +186,8 @@ export default function NotificationSettingsScreen() {
                         onPress={() => save({ meeting_lead_minutes: minutes })}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
-                        style={[st.chip, { borderColor: active ? c.accent : c.border, backgroundColor: active ? c.accent + '1F' : 'transparent' }]}>
-                        <Text style={{ color: active ? c.accent : c.text, fontSize: 13, fontWeight: '700' }}>
+                        style={[st.chip, { backgroundColor: active ? k.action.primary : c.card }]}>
+                        <Text style={{ color: active ? k.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                           {fillTemplate(tr.ncMinutesBefore, { n: minutes })}
                         </Text>
                       </TouchableOpacity>
@@ -214,13 +219,14 @@ interface ToggleRowProps {
 }
 
 function ToggleRow({ icon, iconColor, title, subtitle, value, disabled, onChange, colors: c }: ToggleRowProps) {
+  const { t: k } = useDS();
   return (
     <View style={[st.toggleRow, disabled && { opacity: 0.5 }]}>
       <View style={[st.iconBox, { backgroundColor: iconColor + '20' }]}>
         <IconSymbol name={icon} size={16} color={iconColor} />
       </View>
       <View style={{ flex: 1, marginLeft: 12, marginRight: 8 }}>
-        <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{title}</Text>
+        <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{title}</Text>
         {subtitle ? <Text style={{ color: c.sub, fontSize: 12, marginTop: 2, lineHeight: 16 }}>{subtitle}</Text> : null}
       </View>
       <Switch
@@ -229,9 +235,9 @@ function ToggleRow({ icon, iconColor, title, subtitle, value, disabled, onChange
         onValueChange={onChange}
         accessibilityLabel={title}
         accessibilityState={{ checked: value, disabled: !!disabled }}
-        trackColor={{ false: 'rgba(128,128,128,0.3)', true: c.accent }}
+        trackColor={{ false: k.border.hairline, true: k.action.primary }}
         thumbColor="#fff"
-        ios_backgroundColor="rgba(128,128,128,0.3)"
+        ios_backgroundColor={k.border.hairline}
       />
     </View>
   );
@@ -239,12 +245,12 @@ function ToggleRow({ icon, iconColor, title, subtitle, value, disabled, onChange
 
 const st = StyleSheet.create({
   intro:     { fontSize: 13, lineHeight: 18, marginTop: 6, marginBottom: 14 },
-  card:      { borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden', marginBottom: 12 },
-  notice:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
-  iconBox:   { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  divider:   { height: StyleSheet.hairlineWidth, marginLeft: 58 },
-  section:   { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginTop: 10, marginBottom: 8, marginLeft: 2 },
+  card:      { borderRadius: 24, overflow: 'hidden', marginBottom: 12 },
+  notice:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 20 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+  iconBox:   { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  divider:   { height: StyleSheet.hairlineWidth, marginLeft: 64 },
+  section:   { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginTop: 12, marginBottom: 8, marginLeft: 2 },
   chips:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  chip:      { minHeight: 40, paddingHorizontal: 14, borderRadius: Atlas.radius.xlarge, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chip:      { minHeight: 40, paddingHorizontal: 16, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
 });

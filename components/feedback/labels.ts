@@ -17,19 +17,20 @@ import type {
   RequiredField,
 } from './model';
 
-export const KIND_COLOR: Record<FeedbackKind, string> = { idea: '#8B5CF6', bug: '#EF4444' };
-export const DONE_COLOR = '#10B981';
+// DS v2: кольори на status.* / акцентах (пріоритет «високий» — coral).
+export const KIND_COLOR: Record<FeedbackKind, string> = { idea: '#6D4CF5', bug: '#E8543F' };
+export const DONE_COLOR = '#22A55B';
 
 export const SEVERITY_STYLE: Record<BugSeverity, { color: string; icon: string }> = {
-  critical: { color: '#EF4444', icon: 'exclamationmark.triangle.fill' },
-  major:    { color: '#F59E0B', icon: 'exclamationmark.circle.fill' },
-  minor:    { color: '#6366F1', icon: 'info.circle.fill' },
+  critical: { color: '#E8543F', icon: 'exclamationmark.triangle.fill' },
+  major:    { color: '#F6B93B', icon: 'exclamationmark.circle.fill' },
+  minor:    { color: '#4F7CF7', icon: 'info.circle.fill' },
 };
 
 export const PRIORITY_STYLE: Record<IdeaPriority, { color: string; icon: string }> = {
-  high:   { color: '#8B5CF6', icon: 'bolt.fill' },
-  medium: { color: '#0EA5E9', icon: 'circle.fill' },
-  low:    { color: '#6B7280', icon: 'clock.fill' },
+  high:   { color: '#E8543F', icon: 'bolt.fill' },
+  medium: { color: '#F6B93B', icon: 'circle.fill' },
+  low:    { color: '#6B6B73', icon: 'clock.fill' },
 };
 
 export function weightStyle(kind: FeedbackKind, weight: string): { color: string; icon: string } {
@@ -71,17 +72,17 @@ export function moduleLabel(tr: Translations, module: string | undefined): strin
 }
 
 export const STATE_COLOR: Record<FeedbackStateKey, string> = {
-  draft: '#6B7280',
-  queued: '#F59E0B',
-  sent: '#0EA5E9',
-  sentNew: '#0EA5E9',
-  inProgress: '#6366F1',
-  done: '#10B981',
-  rejected: '#EF4444',
-  failed: '#EF4444',
-  undelivered: '#EF4444',
-  localOnly: '#6B7280',
-  legacy: '#6B7280',
+  draft: '#6B6B73',
+  queued: '#F6B93B',
+  sent: '#4F7CF7',
+  sentNew: '#4F7CF7',
+  inProgress: '#6D4CF5',
+  done: '#22A55B',
+  rejected: '#E8543F',
+  failed: '#E8543F',
+  undelivered: '#E8543F',
+  localOnly: '#6B6B73',
+  legacy: '#6B6B73',
 };
 
 export function stateLabel(tr: Translations, key: FeedbackStateKey): string {

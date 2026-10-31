@@ -1,8 +1,6 @@
 import { copyMeeting } from '@/utils/meetingSharing';
 import { Atlas } from '@/constants/atlas';
 import { AdSlot } from '@/components/advertising/Advertising';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -36,7 +34,7 @@ import { SheetHandle, SheetModal } from '@/components/shared/SheetModal';
 import { SkeletonRow } from '@/components/shared/Skeleton';
 import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useSyncedList } from '@/hooks/use-synced-list';
 import { useAuth } from '@/store/auth';
@@ -144,6 +142,10 @@ import { monthGrid } from '@/utils/dateUtils';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
+import { fontFamily, shadow } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassOf, glassRim, dsGlass, glassRimFor } from '@/components/shared/dsTheme';
+import { AccentWash } from '@/components/shared/GlassBits';
 
 
 /**
@@ -235,7 +237,8 @@ export default function TasksScreen() {
   // займає 232pt, і колонка вийшла б вужчою за 260pt — гірше, ніж на
   // весь екран. Там деталь лишається модалкою.
   const showDetailColumn = isExpanded;
-  const isDark = useColorScheme() === 'dark';
+  // DS v2: нейтральна палітра; акцент завдань — глибока лаванда; головні дії — action.primary (c.primary).
+  const { t, isDark } = useDSTheme();
   useScreenView('tasks');
   const router = useRouter();
   // Меню опцій живе в окремому Modal і мусить лягти рівно під кнопкою хедера,
@@ -1449,16 +1452,21 @@ export default function TasksScreen() {
   // щорендеру ламав би React.memo на них — а рендери тут часті, бо тік
   // таймера смикає екран щосекунди.
   const c = useMemo(() => ({
-    bg1:    isDark ? '#0C0C14' : '#F4F2FF',
-    bg2:    isDark ? '#14121E' : '#EAE6FF',
-    card:   isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text:   isDark ? '#F0EEFF' : '#1A1433',
-    sub:    isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    accent: '#7C3AED',
-    dim:    isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    sheet:  isDark ? 'rgba(18,15,30,0.98)' : 'rgba(252,250,255,0.98)',
-  }), [isDark]);
+    bg1:    t.bg.canvas,
+    bg2:    t.bg.canvas,
+    card:   glassOf(t).surface,
+    border: t.border.hairline,
+    text:   t.text.primary,
+    sub:    t.text.secondary,
+    // DS v2.1: акцент «Завдань» — lavender (ink на склі ≥ 4.5:1 в обох темах).
+    accent: dsGlass(isDark).accent.lavender.ink,
+    dim:    glassOf(t).surfaceSubtle,
+    sheet:  glassOf(t).sheet,
+    /** Головна дія / вибраний сегмент (action.primary) і текст на ній. */
+    primary:   t.action.primary,
+    onPrimary: t.text.onAction,
+    danger:    t.status.danger,
+  }), [isDark, t]);
 
   // Три календарі — фільтр, дедлайн нового завдання, дедлайн у редагуванні —
   // будували сітку місяця трьома однаковими копіями. Тепер monthGrid.
@@ -1565,15 +1573,15 @@ export default function TasksScreen() {
             <TouchableOpacity
               onPress={() => deleteTask(selectedTask.id, selectedTask.title)}
               accessibilityRole="button"
-              style={[s.btn, { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.25)', borderWidth: 1 }]}>
-              <IconSymbol name="trash" size={15} color="#EF4444" />
-              <Text style={{ color: '#EF4444', fontWeight: '600', marginLeft: 5 }}>{tr.delete}</Text>
+              style={[s.btn, { flex: 1, backgroundColor: c.danger + '14' }]}>
+              <IconSymbol name="trash" size={15} color={c.danger} />
+              <Text style={{ color: c.danger, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.delete}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => toggleTask(selectedTask.id)}
               accessibilityRole="button"
-              style={[s.btn, { flex: 2, backgroundColor: selectedTask.status === 'done' ? '#374151' : c.accent }]}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>{selectedTask.status === 'done' ? tr.restore : tr.completed}</Text>
+              style={[s.btn, { flex: 2, backgroundColor: selectedTask.status === 'done' ? glassOf(t).surfaceSubtle : c.primary }]}>
+              <Text style={{ color: selectedTask.status === 'done' ? t.action.secondaryText : c.onPrimary, fontFamily: fontFamily.semibold }}>{selectedTask.status === 'done' ? tr.restore : tr.completed}</Text>
             </TouchableOpacity>
           </View>
         ) : null;
@@ -1747,7 +1755,7 @@ export default function TasksScreen() {
       leading={
         <AnimatedCheck
           checked={selectedTask.status === 'done'}
-          color="#10B981"
+          color={t.status.success}
           borderColor={c.border}
           size={22}
           radius={7}
@@ -1947,7 +1955,7 @@ export default function TasksScreen() {
   const filterBar = (
     <>
             {/* Search bar */}
-            <View style={[s.searchBar, { backgroundColor: c.dim, borderColor: c.border }]}>
+            <View style={[s.searchBar, { backgroundColor: c.card, ...glassRim(t, 'card') }]}>
               <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
               <TextInput
                 placeholder={tr.searchPlaceholder}
@@ -1976,7 +1984,7 @@ export default function TasksScreen() {
                 обрізало рамкою — ряд не мав ні куди перенестись, ні як
                 стиснутись (NAT-06). */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <View style={{ flexDirection: 'row', gap: 6, flexShrink: 1, backgroundColor: c.dim, borderRadius: Atlas.radius.medium, padding: 3, borderWidth: 1, borderColor: c.border }}>
+                <View style={{ flexDirection: 'row', gap: 4, flexShrink: 1, backgroundColor: c.card, ...glassRim(t, 'card'), borderRadius: 999, padding: 4 }}>
                   {([
                     { key: 'today' as const, label: tr.today, count: scopeCounts.today },
                     { key: 'week' as const, label: tr.tasksScopeWeek, count: scopeCounts.week },
@@ -1990,9 +1998,9 @@ export default function TasksScreen() {
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
                         accessibilityLabel={`${option.label}, ${option.count}`}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Atlas.radius.medium, backgroundColor: active ? c.accent : 'transparent' }}>
-                        <Text numberOfLines={1} style={{ color: active ? '#fff' : c.sub, fontSize: 13, fontWeight: '700', flexShrink: 1 }}>{option.label}</Text>
-                        <Text style={{ color: active ? 'rgba(255,255,255,0.75)' : c.sub, fontSize: 11, fontWeight: '600' }}>{option.count}</Text>
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 6, minHeight: 36, borderRadius: 999, backgroundColor: active ? c.primary : 'transparent' }}>
+                        <Text numberOfLines={1} style={{ color: active ? c.onPrimary : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{option.label}</Text>
+                        <Text style={{ color: active ? c.onPrimary : c.sub, opacity: active ? 0.75 : 1, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{option.count}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -2008,10 +2016,10 @@ export default function TasksScreen() {
                     accessibilityState={{ checked: noDeadline }}
                     accessibilityLabel={`${tr.withoutDeadline}, ${scopeCounts.noDeadline}`}
                     accessibilityHint={tr.tasksNoDeadlineA11y}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: noDeadline ? c.accent : c.border, backgroundColor: noDeadline ? c.accent + '22' : c.dim }}>
-                    <IconSymbol name="calendar" size={13} color={noDeadline ? c.accent : c.sub} />
-                    <Text numberOfLines={1} style={{ color: noDeadline ? c.accent : c.sub, fontSize: 13, fontWeight: '700', flexShrink: 1 }}>{tr.withoutDeadline}</Text>
-                    <Text style={{ color: noDeadline ? c.accent : c.sub, fontSize: 11, fontWeight: '600' }}>{scopeCounts.noDeadline}</Text>
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, minHeight: 36, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: noDeadline ? c.primary : c.card }}>
+                    <IconSymbol name="calendar" size={13} color={noDeadline ? c.onPrimary : c.sub} />
+                    <Text numberOfLines={1} style={{ color: noDeadline ? c.onPrimary : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{tr.withoutDeadline}</Text>
+                    <Text style={{ color: noDeadline ? c.onPrimary : c.sub, fontSize: 11, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>{scopeCounts.noDeadline}</Text>
                   </TouchableOpacity>
                 )}
 
@@ -2030,13 +2038,12 @@ export default function TasksScreen() {
                   accessibilityHint={hasActiveFilters ? tr.filters : undefined}
                   style={{
                     marginLeft: 'auto',
-                    backgroundColor: hasActiveFilters ? '#EF444418' : c.dim,
-                    borderColor: hasActiveFilters ? '#EF444440' : c.border,
+                    backgroundColor: hasActiveFilters ? c.danger + '18' : c.card,
                   }}>
                   <IconSymbol
                     name={hasActiveFilters ? 'arrow.counterclockwise' : 'line.3.horizontal.decrease'}
                     size={17}
-                    color={hasActiveFilters ? '#EF4444' : c.sub}
+                    color={hasActiveFilters ? c.danger : c.sub}
                   />
                 </HeaderButton>
               </View>
@@ -2052,23 +2059,23 @@ export default function TasksScreen() {
                     <TouchableOpacity
                       onPress={() => setFilter('active')}
                       accessibilityRole="button"
-                      style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
-                      <Text style={[s.activeChipText, { color: c.accent }]}>
+                      style={[s.activeChip, { backgroundColor: c.primary }]}>
+                      <Text style={[s.activeChipText, { color: c.onPrimary }]}>
                         {filter === 'all' ? tr.allTasks : tr.allCompleted}
                       </Text>
-                      <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
+                      <IconSymbol name="xmark" size={10} color={c.onPrimary} style={{ marginLeft: 4 }} />
                     </TouchableOpacity>
                   )}
                   {sort !== 'status' && (
                     <TouchableOpacity
                       onPress={() => setSort('status')}
                       accessibilityRole="button"
-                      style={[s.activeChip, { backgroundColor: c.accent + '15', borderColor: c.accent + '40' }]}>
-                      <IconSymbol name="arrow.up.arrow.down" size={10} color={c.accent} />
-                      <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
+                      style={[s.activeChip, { backgroundColor: c.primary }]}>
+                      <IconSymbol name="arrow.up.arrow.down" size={10} color={c.onPrimary} />
+                      <Text style={[s.activeChipText, { color: c.onPrimary, marginLeft: 4 }]}>
                         {SORT_OPTIONS.find(o => o.key === sort)?.label}
                       </Text>
-                      <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
+                      <IconSymbol name="xmark" size={10} color={c.onPrimary} style={{ marginLeft: 4 }} />
                     </TouchableOpacity>
                   )}
                   {filterProject && (() => {
@@ -2077,7 +2084,7 @@ export default function TasksScreen() {
                       <TouchableOpacity
                         onPress={() => setFilterProject(null)}
                         accessibilityRole="button"
-                        style={[s.activeChip, { backgroundColor: proj.color + '20', borderColor: proj.color + '50' }]}>
+                        style={[s.activeChip, { backgroundColor: proj.color + '20' }]}>
                         <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color }} />
                         <Text style={[s.activeChipText, { color: proj.color, marginLeft: 4 }]}>{proj.name}</Text>
                         <IconSymbol name="xmark" size={10} color={proj.color} style={{ marginLeft: 4 }} />
@@ -2089,7 +2096,7 @@ export default function TasksScreen() {
                       onPress={() => setFilterPriorities([])}
                       accessibilityRole="button"
                       accessibilityLabel={`${tr.priority}: ${filterPriorities.map(l => priorityLevelLabel(l)).join(', ')}. ${tr.priorityFilterReset}`}
-                      style={[s.activeChip, { backgroundColor: c.dim, borderColor: c.border, gap: 4 }]}>
+                      style={[s.activeChip, { backgroundColor: c.dim, gap: 4 }]}>
                       {filterPriorities.map(l => <PriorityBadge key={l} level={l} />)}
                       <IconSymbol name="xmark" size={10} color={c.sub} style={{ marginLeft: 2 }} />
                     </TouchableOpacity>
@@ -2098,20 +2105,20 @@ export default function TasksScreen() {
                     <TouchableOpacity
                       onPress={() => setDateFilter(null)}
                       accessibilityRole="button"
-                      style={[s.activeChip, { backgroundColor: c.accent + '20', borderColor: c.accent + '60' }]}>
-                      <IconSymbol name="calendar" size={10} color={c.accent} />
-                      <Text style={[s.activeChipText, { color: c.accent, marginLeft: 4 }]}>
+                      style={[s.activeChip, { backgroundColor: c.primary }]}>
+                      <IconSymbol name="calendar" size={10} color={c.onPrimary} />
+                      <Text style={[s.activeChipText, { color: c.onPrimary, marginLeft: 4 }]}>
                         {new Date(dateFilter).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })}
                       </Text>
-                      <IconSymbol name="xmark" size={10} color={c.accent} style={{ marginLeft: 4 }} />
+                      <IconSymbol name="xmark" size={10} color={c.onPrimary} style={{ marginLeft: 4 }} />
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
                     onPress={clearAllFilters}
                     accessibilityRole="button"
                     accessibilityLabel={tr.resetAllFilters}
-                    style={[s.activeChip, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
-                    <Text style={[s.activeChipText, { color: '#EF4444' }]}>{tr.resetAll}</Text>
+                    style={[s.activeChip, { backgroundColor: c.danger + '18' }]}>
+                    <Text style={[s.activeChipText, { color: c.danger }]}>{tr.resetAll}</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -2135,33 +2142,33 @@ export default function TasksScreen() {
 
             {/* Stats — today (deadline = today) */}
             <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
-              <View style={[s.statsRow, { borderColor: c.border, backgroundColor: c.card }]}>
-                <StatCell value={activeCount}          label={tr.active} color="#F59E0B" sub={c.sub} />
-                <View style={{ width: 1, backgroundColor: c.border }} />
-                <StatCell value={doneCount}            label={tr.done}           color="#10B981" sub={c.sub} />
-                <View style={{ width: 1, backgroundColor: c.border }} />
-                <StatCell value={todayMeetings.length} label={tr.meetings} color="#0EA5E9" sub={c.sub} />
-                <View style={{ width: 1, backgroundColor: c.border }} />
-                <StatCell value={`${efficiency}%`}    label={tr.efficiency}                                                         color={c.accent} sub={c.sub} />
+              <View style={[s.statsRow, { backgroundColor: c.card, ...glassRim(t, 'card') }]}>
+                {/* DS v2.1: KPI-картка — скло зі змивкою акценту модуля (lavender);
+                    цифри text.primary, колір несуть крапки-тіки (fill акцентів). */}
+                <AccentWash isDark={isDark} accent="lavender" strength={0.6} />
+                <StatCell value={activeCount}          label={tr.active} color={c.text} dot={dsGlass(isDark).accent.amber.fill} sub={c.sub} />
+                <StatCell value={doneCount}            label={tr.done}           color={c.text} dot={dsGlass(isDark).accent.success.fill} sub={c.sub} />
+                <StatCell value={todayMeetings.length} label={tr.meetings} color={c.text} dot={dsGlass(isDark).accent.info.fill} sub={c.sub} />
+                <StatCell value={efficiency} unit="%"  label={tr.efficiency}                                                         color={c.text} dot={c.accent} sub={c.sub} />
               </View>
               {totalSubtasks > 0 && (
-                <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card }]}>
-                  <IconSymbol name="list.bullet.circle.fill" size={14} color="#6366F1" />
-                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 7 }}>{tr.subtasksToday}</Text>
+                <View style={[s.subtaskStatRow, { backgroundColor: c.card, ...glassRim(t, 'card') }]}>
+                  <IconSymbol name="list.bullet.circle.fill" size={14} color={c.accent} />
+                  <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginLeft: 7 }}>{tr.subtasksToday}</Text>
                   <View style={{ flex: 1, marginHorizontal: 12 }}>
                     <View style={[s.progressBg, { flex: 1 }]}>
-                      <View style={[s.progressFill, { width: `${Math.round((doneSubtasks / totalSubtasks) * 100)}%`, backgroundColor: '#6366F1' }]} />
+                      <View style={[s.progressFill, { width: `${Math.round((doneSubtasks / totalSubtasks) * 100)}%`, backgroundColor: dsGlass(isDark).accent.lavender.fill }]} />
                     </View>
                   </View>
-                  <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '700' }}>
+                  <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
                     {doneSubtasks}/{totalSubtasks}
                   </Text>
                 </View>
               )}
               {dueTodayTasks.length === 0 && (
-                <View style={[s.subtaskStatRow, { borderColor: c.border, backgroundColor: c.card, justifyContent: 'center' }]}>
+                <View style={[s.subtaskStatRow, { backgroundColor: c.card, ...glassRim(t, 'card'), justifyContent: 'center' }]}>
                   <IconSymbol name="checkmark.seal" size={13} color={c.sub} />
-                  <Text style={{ color: c.sub, fontSize: 12, fontWeight: '500', marginLeft: 6 }}>{tr.noTasksToday}</Text>
+                  <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginLeft: 6 }}>{tr.noTasksToday}</Text>
                 </View>
               )}
             </View>
@@ -2183,14 +2190,14 @@ export default function TasksScreen() {
                     accessibilityLabel={tr.meetings}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                    <IconSymbol name="calendar.circle.fill" size={16} color="#6366F1" />
-                    <Text style={{ color: c.text, fontSize: 14, fontWeight: '700', marginLeft: 6 }}>{tr.meetings}</Text>
+                    <IconSymbol name="calendar.circle.fill" size={16} color={c.accent} />
+                    <Text style={{ color: c.text, fontSize: 16, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{tr.meetings}</Text>
                     {/* Шеврон — інакше немає жодної підказки, що заголовок клікабельний */}
                     <IconSymbol name="chevron.right" size={12} color={c.sub} style={{ marginLeft: 2 }} />
                   </TouchableOpacity>
                   {todayMeetings2.length > 0 && (
-                    <View style={{ backgroundColor: '#6366F120', borderRadius: Atlas.radius.small, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
-                      <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{todayMeetings2.length}</Text>
+                    <View style={{ backgroundColor: c.card, ...glassRimFor(c.card, 'card'), borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, marginRight: 8 }}>
+                      <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{todayMeetings2.length}</Text>
                     </View>
                   )}
                 </View>
@@ -2207,13 +2214,13 @@ export default function TasksScreen() {
                         : `${mtg.durationMinutes} хв`;
                       return (
                         <TouchableOpacity key={mtg.id} onPress={() => openMeetingView(mtg)} activeOpacity={0.75}>
-                          <View style={{ borderRadius: 11, paddingVertical: 7, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, overflow: 'hidden', opacity: isPast ? 0.5 : 1, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+                          <View style={{ borderRadius: Atlas.radius.large, paddingVertical: 8, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, overflow: 'hidden', opacity: isPast ? 0.5 : 1, backgroundColor: c.card, ...glassRim(t, 'card') }}>
                             {/* Accent bar */}
                             <View style={{ width: 2.5, alignSelf: 'stretch', backgroundColor: mtg.color, borderRadius: 2, marginLeft: 0, minHeight: 36 }} />
                             {/* Time + day */}
                             <View style={{ alignItems: 'center', minWidth: 44 }}>
-                              <Text style={{ color: mtg.color, fontSize: 13, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.3 }}>{mtg.time || '--:--'}</Text>
-                              <Text style={{ color: mtg.color, fontSize: 9, fontWeight: '600', opacity: 0.75, marginTop: 1 }}>{dFmt}</Text>
+                              <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, letterSpacing: -0.3, fontVariant: ['tabular-nums'] }}>{mtg.time || '--:--'}</Text>
+                              <Text style={{ color: c.sub, fontSize: 10, fontFamily: fontFamily.medium, marginTop: 1 }}>{dFmt}</Text>
                             </View>
                             {/* Divider */}
                             <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: mtg.color + '30', marginVertical: 4 }} />
@@ -2221,7 +2228,7 @@ export default function TasksScreen() {
                             <View style={{ flex: 1, gap: 2 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                 {isNow && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: mtg.color }} />}
-                                <Text style={{ color: c.text, fontSize: 12, fontWeight: '700', flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
+                                <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.bold, flex: 1 }} numberOfLines={1}>{mtg.title}</Text>
                                 <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr.copyText} onPress={event => { event.stopPropagation(); void copyMeeting(mtg, locale.startsWith('en')); }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><IconSymbol name="doc.on.doc" size={15} color={c.sub} /></TouchableOpacity>
                               </View>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -2238,8 +2245,8 @@ export default function TasksScreen() {
                                 ) : null}
                                 {mtg.link ? (
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                                    <IconSymbol name="link" size={9} color={'#6366F1'} />
-                                    <Text style={{ color: '#6366F1', fontSize: 10, fontWeight: '600' }}>Join</Text>
+                                    <IconSymbol name="link" size={9} color={c.accent} />
+                                    <Text style={{ color: c.accent, fontSize: 10, fontFamily: fontFamily.semibold }}>Join</Text>
                                   </View>
                                 ) : null}
                                 {mtg.notes ? (
@@ -2264,12 +2271,12 @@ export default function TasksScreen() {
                         accessibilityState={{ expanded: showAllTodayMeetings }}
                         hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
                         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8 }}>
-                        <Text style={{ color: '#6366F1', fontSize: 12, fontWeight: '700' }}>
+                        <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold }}>
                           {showAllTodayMeetings
                             ? tr.collapseList
                             : tr.showAllCount.replace('{count}', String(todayMeetings2.length))}
                         </Text>
-                        <IconSymbol name={showAllTodayMeetings ? 'chevron.up' : 'chevron.down'} size={11} color="#6366F1" />
+                        <IconSymbol name={showAllTodayMeetings ? 'chevron.up' : 'chevron.down'} size={11} color={c.text} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -2283,15 +2290,15 @@ export default function TasksScreen() {
             {todayEmpty && (
               <View style={{ alignItems: 'center', paddingVertical: 56 }}>
                 <IconSymbol name="checkmark.seal" size={40} color={c.sub} />
-                <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>{tr.noTasksToday}</Text>
-                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7, textAlign: 'center' }}>{tr.noTasksTodayHint}</Text>
+                <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontFamily: fontFamily.semibold }}>{tr.noTasksToday}</Text>
+                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, textAlign: 'center' }}>{tr.noTasksTodayHint}</Text>
                 <TouchableOpacity
                   onPress={() => selectScope(emptyTodayTarget.scope, emptyTodayTarget.noDeadline)}
                   accessibilityRole="button"
                   accessibilityLabel={`${emptyTodayTarget.label}, ${emptyTodayTarget.count}`}
-                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <IconSymbol name="list.bullet" size={15} color={c.accent} />
-                  <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{emptyTodayTarget.label} · {emptyTodayTarget.count}</Text>
+                  style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, minHeight: 44, borderRadius: 999, backgroundColor: glassOf(t).surfaceSubtle, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <IconSymbol name="list.bullet" size={15} color={c.text} />
+                  <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 14, fontVariant: ['tabular-nums'] }}>{emptyTodayTarget.label} · {emptyTodayTarget.count}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -2300,10 +2307,10 @@ export default function TasksScreen() {
             {!todayEmpty && filtered.length === 0 && (
               <View style={{ alignItems: 'center', paddingVertical: 56 }}>
                 <IconSymbol name="checklist" size={40} color={c.sub} />
-                <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontWeight: '600' }}>
+                <Text style={{ color: c.sub, fontSize: 15, marginTop: 14, fontFamily: fontFamily.semibold }}>
                   {search.trim() ? tr.nothingFound : hasFiltersBesidesSearch ? tr.noTasksMatchFilters : scope === 'week' ? tr.noTasksWeekTitle : tr.noTasks}
                 </Text>
-                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, opacity: 0.7, textAlign: 'center' }}>
+                <Text style={{ color: c.sub, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
                   {search.trim() ? tr.tryAnotherQuery : hasFiltersBesidesSearch ? tr.noTasksMatchFiltersHint
                     // «Всі» з дедлайном порожні, а без дедлайну є — сказати, де
                     // вони, інакше людина вирішить, що задачі зникли.
@@ -2319,18 +2326,18 @@ export default function TasksScreen() {
                     onPress={clearAllFilters}
                     accessibilityRole="button"
                     accessibilityLabel={tr.resetAllFilters}
-                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <IconSymbol name="arrow.clockwise" size={15} color={c.accent} />
-                    <Text style={{ color: c.accent, fontWeight: '700', fontSize: 14 }}>{tr.resetAllFilters}</Text>
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, minHeight: 44, borderRadius: 999, backgroundColor: glassOf(t).surfaceSubtle, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconSymbol name="arrow.clockwise" size={15} color={c.text} />
+                    <Text style={{ color: c.text, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.resetAllFilters}</Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
                     onPress={openAddTask}
                     accessibilityRole="button"
                     accessibilityLabel={tr.addTask}
-                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, borderRadius: Atlas.radius.medium, backgroundColor: c.accent, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <IconSymbol name="plus" size={15} color="#fff" />
-                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{tr.addTask}</Text>
+                    style={{ marginTop: 18, paddingHorizontal: 20, paddingVertical: 11, minHeight: 44, borderRadius: 999, backgroundColor: c.primary, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <IconSymbol name="plus" size={15} color={c.onPrimary} />
+                    <Text style={{ color: c.onPrimary, fontFamily: fontFamily.semibold, fontSize: 14 }}>{tr.addTask}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -2340,9 +2347,9 @@ export default function TasksScreen() {
             {overdueItems.length > 0 && (
               <View style={{ marginBottom: 16 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-                  <Text style={[s.groupLabel, { color: '#EF4444', marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
-                  <View style={{ backgroundColor: '#EF444420', borderRadius: Atlas.radius.small, paddingHorizontal: 7, paddingVertical: 2 }}>
-                    <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>{overdueItems.length}</Text>
+                  <Text style={[s.groupLabel, { color: c.danger, marginBottom: 0, marginTop: 0 }]}>{tr.overdueSection}</Text>
+                  <View style={{ backgroundColor: t.accent.coral + '20', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                    <Text style={{ color: c.danger, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{overdueItems.length}</Text>
                   </View>
                 </View>
                 <View style={{ gap: 6 }}>
@@ -2386,7 +2393,7 @@ export default function TasksScreen() {
                     title={tr.overdueSection}
                     total={overdueLimited.total}
                     onPress={openGroup}
-                    color="#EF4444"
+                    color={c.danger}
                     label={tr.groupShowAll}
                     a11yLabel={tr.groupShowAllA11y}
                   />
@@ -2399,7 +2406,7 @@ export default function TasksScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <View style={{ flex: 1, flexDirection: 'row' }}>
       <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
@@ -2423,8 +2430,8 @@ export default function TasksScreen() {
               <HeaderButton
                 onPress={() => setShowOptionsMenu(v => !v)}
                 accessibilityLabel={tr.a11yOptions}
-                style={{ backgroundColor: hasActiveFilters ? c.accent : c.dim, borderColor: hasActiveFilters ? c.accent : c.border }}>
-                <IconSymbol name="ellipsis" size={17} color={hasActiveFilters ? '#fff' : c.sub} />
+                style={{ backgroundColor: hasActiveFilters ? c.primary : c.card }}>
+                <IconSymbol name="ellipsis" size={17} color={hasActiveFilters ? c.onPrimary : c.sub} />
               </HeaderButton>
             </>
           }>
@@ -2531,42 +2538,32 @@ export default function TasksScreen() {
       {/* ─── Options Dropdown ─── */}
       <Modal visible={showOptionsMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowOptionsMenu(false)}>
         <Pressable accessible={false}
-          style={{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)' }}
+          style={{ flex: 1, backgroundColor: t.surface.overlay }}
           onPress={() => setShowOptionsMenu(false)}>
-          <BlurView
-            intensity={isDark ? 55 : 75}
-            tint={isDark ? 'dark' : 'light'}
-            style={{
+          <View
+            style={[{
               position: 'absolute',
               top: topInset + 62,
               right: 16,
               borderRadius: Atlas.radius.xlarge,
-              borderWidth: 1,
-              borderColor: c.border,
               overflow: 'hidden',
               minWidth: 238,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.2,
-              shadowRadius: 20,
-              elevation: 14,
-              ...(Platform.OS === 'android' && {
-                backgroundColor: isDark ? '#1C1A2E' : '#F2EFFF',
-              }),
-            }}>
+              // DS v2: поповер — surface.elevated + shadow.popover, без рамки.
+              ...shadow[isDark ? 'dark' : 'light'].popover,
+            }, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
             {/* Meetings */}
             <TouchableOpacity
               onPress={() => { setShowOptionsMenu(false); router.push('/calendar' as never); }}
               accessibilityRole="menuitem"
               accessibilityLabel={tr.calendar}
               style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#6366F120' }]}>
-                <IconSymbol name="calendar.circle.fill" size={15} color="#6366F1" />
+              <View style={[s.menuIconBox, { backgroundColor: c.accent + '20' }]}>
+                <IconSymbol name="calendar.circle.fill" size={15} color={c.accent} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.calendar}</Text>
               {meetings.length > 0 && (
-                <View style={{ backgroundColor: '#6366F120', borderRadius: Atlas.radius.small, paddingHorizontal: 7, paddingVertical: 2, marginRight: 4 }}>
-                  <Text style={{ color: '#6366F1', fontSize: 11, fontWeight: '700' }}>{meetings.length}</Text>
+                <View style={{ backgroundColor: c.dim, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, marginRight: 4 }}>
+                  <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{meetings.length}</Text>
                 </View>
               )}
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
@@ -2580,8 +2577,8 @@ export default function TasksScreen() {
               accessibilityRole="menuitem"
               accessibilityLabel={tr.archive}
               style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#10B98120' }]}>
-                <IconSymbol name="archivebox.fill" size={15} color="#10B981" />
+              <View style={[s.menuIconBox, { backgroundColor: t.status.success + '20' }]}>
+                <IconSymbol name="archivebox.fill" size={15} color={t.status.success} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.archive}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
@@ -2595,12 +2592,12 @@ export default function TasksScreen() {
               accessibilityRole="menuitem"
               accessibilityLabel={tr.filtersAndSort}
               style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: hasActiveFilters ? '#F59E0B20' : c.dim }]}>
-                <IconSymbol name="line.3.horizontal.decrease" size={15} color={hasActiveFilters ? '#F59E0B' : c.sub} />
+              <View style={[s.menuIconBox, { backgroundColor: hasActiveFilters ? t.accent.amber + '26' : c.dim }]}>
+                <IconSymbol name="line.3.horizontal.decrease" size={15} color={hasActiveFilters ? t.accent.amber : c.sub} />
               </View>
-              <Text style={[s.menuItemLabel, { color: hasActiveFilters ? '#F59E0B' : c.text }]}>{tr.filtersAndSort}</Text>
+              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.filtersAndSort}</Text>
               {hasActiveFilters
-                ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#F59E0B' }} />
+                ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.accent.amber }} />
                 : <IconSymbol name="chevron.right" size={12} color={c.sub} />}
             </TouchableOpacity>
 
@@ -2612,8 +2609,8 @@ export default function TasksScreen() {
               accessibilityRole="menuitem"
               accessibilityLabel={tr.projects}
               style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#0EA5E920' }]}>
-                <IconSymbol name="folder.fill" size={15} color="#0EA5E9" />
+              <View style={[s.menuIconBox, { backgroundColor: t.status.info + '20' }]}>
+                <IconSymbol name="folder.fill" size={15} color={t.status.info} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.projects}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
@@ -2627,13 +2624,13 @@ export default function TasksScreen() {
               accessibilityRole="menuitem"
               accessibilityLabel={tr.notes}
               style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: '#F59E0B20' }]}>
-                <IconSymbol name="note.text" size={15} color="#F59E0B" />
+              <View style={[s.menuIconBox, { backgroundColor: t.accent.amber + '26' }]}>
+                <IconSymbol name="note.text" size={15} color={t.accent.amber} />
               </View>
               <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.notes}</Text>
               <IconSymbol name="chevron.right" size={12} color={c.sub} />
             </TouchableOpacity>
-          </BlurView>
+          </View>
         </Pressable>
       </Modal>
 
@@ -2641,7 +2638,7 @@ export default function TasksScreen() {
       <Modal visible={showFilterSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
         <Pressable accessible={false} style={s.overlay} onPress={() => setShowFilterSheet(false)}>
           <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
-            <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+            <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRim(t, 'strong') }]}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -2666,9 +2663,9 @@ export default function TasksScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={tr.resetAllFilters}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 32, paddingHorizontal: 10, borderRadius: 9, borderWidth: 1, backgroundColor: '#EF444414', borderColor: '#EF444438' }}>
-                      <IconSymbol name="arrow.counterclockwise" size={12} color="#EF4444" />
-                      <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>{tr.resetAll}</Text>
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 32, paddingHorizontal: 12, borderRadius: 999, backgroundColor: c.danger + '14' }}>
+                      <IconSymbol name="arrow.counterclockwise" size={12} color={c.danger} />
+                      <Text style={{ color: c.danger, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.resetAll}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -2677,16 +2674,16 @@ export default function TasksScreen() {
                 <Text style={[s.label, { color: c.sub }]}>{tr.creationDate}</Text>
                 <TouchableOpacity
                   onPress={() => { setShowFilterSheet(false); setShowCal(true); }}
-                  style={[s.filterActionBtn, { backgroundColor: dateFilter ? c.accent + '20' : c.dim, borderColor: dateFilter ? c.accent + '60' : c.border }]}>
-                  <IconSymbol name="calendar" size={15} color={dateFilter ? c.accent : c.sub} />
-                  <Text style={{ color: dateFilter ? c.accent : c.sub, fontSize: 13, fontWeight: '600', flex: 1, marginLeft: 10 }}>
+                  style={[s.filterActionBtn, { backgroundColor: c.dim, borderColor: dateFilter ? c.text : 'transparent' }]}>
+                  <IconSymbol name="calendar" size={15} color={dateFilter ? c.text : c.sub} />
+                  <Text style={{ color: dateFilter ? c.text : c.sub, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1, marginLeft: 10 }}>
                     {dateFilter
                       ? new Date(dateFilter).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
                       : tr.select}
                   </Text>
                   {dateFilter && (
                     <TouchableOpacity onPress={() => setDateFilter(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <IconSymbol name="xmark.circle.fill" size={16} color={c.accent} />
+                      <IconSymbol name="xmark.circle.fill" size={16} color={c.sub} />
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
@@ -2701,13 +2698,13 @@ export default function TasksScreen() {
                       accessibilityRole="radio"
                       accessibilityState={{ selected: filter === f, checked: filter === f }}
                       accessibilityLabel={f === 'all' ? tr.allTasks : f === 'active' ? tr.allActive : tr.allCompleted}
-                      style={[s.filterSegBtn, { flex: 1, backgroundColor: filter === f ? c.accent : c.dim, borderColor: filter === f ? c.accent : c.border }]}>
+                      style={[s.filterSegBtn, { flex: 1, backgroundColor: filter === f ? c.primary : c.dim }]}>
                       <IconSymbol
                         name={f === 'all' ? 'tray.full' : f === 'active' ? 'circle.dotted' : 'checkmark.circle.fill'}
                         size={14}
-                        color={filter === f ? '#fff' : c.sub}
+                        color={filter === f ? c.onPrimary : c.sub}
                       />
-                      <Text style={{ color: filter === f ? '#fff' : c.sub, fontSize: 12, fontWeight: '600', marginTop: 4 }}>
+                      <Text style={{ color: filter === f ? c.onPrimary : c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 4 }}>
                         {f === 'all' ? tr.allTasks : f === 'active' ? tr.allActive : tr.allCompleted}
                       </Text>
                     </TouchableOpacity>
@@ -2733,8 +2730,8 @@ export default function TasksScreen() {
                         onPress={() => setFilterProject(null)}
                         accessibilityRole="button"
                         accessibilityState={{ selected: !filterProject }}
-                        style={[s.sortChip, { minHeight: 36, backgroundColor: !filterProject ? c.accent + '18' : c.dim, borderColor: !filterProject ? c.accent : c.border }]}>
-                        <Text style={{ color: !filterProject ? c.accent : c.sub, fontSize: 12, fontWeight: '600' }}>{tr.allProjects}</Text>
+                        style={[s.sortChip, { minHeight: 36, backgroundColor: !filterProject ? c.primary : c.dim }]}>
+                        <Text style={{ color: !filterProject ? c.onPrimary : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{tr.allProjects}</Text>
                       </TouchableOpacity>
                       {pickableProjects.map(proj => {
                         const on = filterProject === proj.id;
@@ -2744,9 +2741,9 @@ export default function TasksScreen() {
                             onPress={() => setFilterProject(on ? null : proj.id)}
                             accessibilityRole="button"
                             accessibilityState={{ selected: on }}
-                            style={[s.sortChip, { minHeight: 36, maxWidth: 190, backgroundColor: on ? proj.color + '18' : c.dim, borderColor: on ? proj.color : c.border }]}>
+                            style={[s.sortChip, { minHeight: 36, maxWidth: 190, backgroundColor: on ? proj.color + '22' : c.dim, borderWidth: 1.5, borderColor: on ? proj.color : 'transparent' }]}>
                             <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: proj.color, marginRight: 6 }} />
-                            <Text numberOfLines={1} style={{ color: on ? proj.color : c.text, fontSize: 12, fontWeight: '600', flexShrink: 1 }}>{proj.name}</Text>
+                            <Text numberOfLines={1} style={{ color: on ? proj.color : c.text, fontSize: 12, fontFamily: fontFamily.semibold, flexShrink: 1 }}>{proj.name}</Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -2765,9 +2762,9 @@ export default function TasksScreen() {
                         onPress={() => setSort(opt.key)}
                         accessibilityRole="button"
                         accessibilityState={{ selected: on }}
-                        style={[s.sortChip, { minHeight: 36, backgroundColor: on ? c.accent + '18' : c.dim, borderColor: on ? c.accent : c.border }]}>
-                        <IconSymbol name={opt.icon as any} size={13} color={on ? c.accent : c.sub} />
-                        <Text style={{ color: on ? c.accent : c.text, fontSize: 12, fontWeight: '600', marginLeft: 6 }}>{opt.label}</Text>
+                        style={[s.sortChip, { minHeight: 36, backgroundColor: on ? c.primary : c.dim }]}>
+                        <IconSymbol name={opt.icon as any} size={13} color={on ? c.onPrimary : c.sub} />
+                        <Text style={{ color: on ? c.onPrimary : c.text, fontSize: 12, fontFamily: fontFamily.semibold, marginLeft: 6 }}>{opt.label}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -2778,13 +2775,13 @@ export default function TasksScreen() {
                 <TouchableOpacity
                   onPress={() => setShowFilterSheet(false)}
                   accessibilityRole="button"
-                  style={[s.btn, { marginTop: 22, backgroundColor: c.accent }]}>
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.applyFilters}</Text>
+                  style={[s.btn, { marginTop: 22, backgroundColor: c.primary }]}>
+                  <Text style={{ color: c.onPrimary, fontFamily: fontFamily.semibold }}>{tr.applyFilters}</Text>
                 </TouchableOpacity>
 
                 <View style={{ height: 8 }} />
               </ScrollView>
-            </BlurView>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -2794,7 +2791,7 @@ export default function TasksScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={s.overlay} onPress={() => setShowCal(false)}>
             <Pressable onPress={e => e.stopPropagation()} accessible={false} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
-              <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.sheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+              <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRim(t, 'strong') }]}>
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -2820,12 +2817,12 @@ export default function TasksScreen() {
                   c={c}
                 />
                 {dateFilter && (
-                  <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { borderColor: c.border }]}>
+                  <TouchableOpacity onPress={() => { setDateFilter(null); setShowCal(false); }} style={[s.clearBtn, { backgroundColor: c.dim }]}>
                     <IconSymbol name="xmark" size={13} color={c.sub} />
-                    <Text style={{ color: c.sub, fontSize: 13, fontWeight: '600', marginLeft: 5 }}>{tr.resetFilter}</Text>
+                    <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.resetFilter}</Text>
                   </TouchableOpacity>
                 )}
-              </BlurView>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -2836,7 +2833,7 @@ export default function TasksScreen() {
           окремим рядком над нею на бекдропі (P2: рядок «висів у повітрі» і
           стрибав разом із клавіатурою). */}
       <SheetModal visible={showAdd} onClose={() => setShowAdd(false)} handle="inside">
-        <BlurView intensity={isDark ? 50 : 70} tint={isDark ? 'dark' : 'light'} style={[s.detailSheet, { maxHeight: height * 0.88, borderColor: c.border, backgroundColor: c.sheet }]}>
+        <View style={[s.detailSheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRim(t, 'strong') }]}>
           <SheetHandle />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <TaskQuickCreate
@@ -2853,7 +2850,7 @@ export default function TasksScreen() {
               locale={locale}
             />
           </ScrollView>
-        </BlurView>
+        </View>
       </SheetModal>
 
 
@@ -2973,8 +2970,8 @@ const GroupShowAllButton = React.memo(function GroupShowAllButton({
       onPress={() => onPress(groupKey, title)}
       accessibilityRole="button"
       accessibilityLabel={a11yLabel.replace('{name}', title).replace('{count}', String(total))}
-      style={[s.groupShowAll, { backgroundColor: color + '12', borderColor: color + '40' }]}>
-      <Text style={{ color, fontSize: 13, fontWeight: '600', flex: 1 }}>
+      style={[s.groupShowAll, { backgroundColor: color + '12' }]}>
+      <Text style={{ color, fontSize: 13, fontFamily: fontFamily.semibold, flex: 1 }}>
         {label.replace('{count}', String(total))}
       </Text>
       <IconSymbol name="chevron.right" size={12} color={color} />
@@ -2994,85 +2991,99 @@ const GroupShowAllButton = React.memo(function GroupShowAllButton({
  */
 const STAT_MAX_FONT_SCALE = 1.6;
 
-function StatCell({ value, label, color, sub }: any) {
+/**
+ * DS v2: KPI-комірка — тонке велике число (Light 300, tabular-nums, −2%),
+ * одиниця (%) дрібніша й text.secondary; колір категорії — лише крапка-тік.
+ */
+function StatCell({ value, unit, label, color, dot, sub }: any) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', paddingVertical: 14, minWidth: 0 }}>
-      <Text
-        numberOfLines={1}
-        maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
-        style={{ color, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>{value}</Text>
-      <Text
-        numberOfLines={2}
-        maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
-        style={{ color: sub, fontSize: 10, fontWeight: '500', marginTop: 3, textAlign: 'center' }}>{label}</Text>
+    <View style={{ flex: 1, alignItems: 'flex-start', paddingVertical: 16, paddingHorizontal: 14, minWidth: 0 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+        <Text
+          numberOfLines={1}
+          maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
+          style={{ color, fontSize: 30, lineHeight: 34, fontFamily: fontFamily.light, letterSpacing: -0.6, fontVariant: ['tabular-nums'] }}>{value}</Text>
+        {unit ? (
+          <Text
+            maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
+            style={{ color: sub, fontSize: 14, fontFamily: fontFamily.regular, marginLeft: 2 }}>{unit}</Text>
+        ) : null}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+        {dot ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dot }} /> : null}
+        <Text
+          numberOfLines={2}
+          maxFontSizeMultiplier={STAT_MAX_FONT_SCALE}
+          style={{ color: sub, fontSize: 12, fontFamily: fontFamily.regular, flexShrink: 1 }}>{label}</Text>
+      </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  searchBar:      { flexDirection: 'row', alignItems: 'center', borderRadius: 13, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 10, marginBottom: 0 },
-  searchInput:    { flex: 1, fontSize: 14, fontWeight: '400', marginLeft: 8, paddingVertical: 0 },
-  activeChip:     { flexDirection: 'row', alignItems: 'center', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5 },
-  activeChipText: { fontSize: 11, fontWeight: '600' },
-  statsRow:       { flexDirection: 'row', borderRadius: Atlas.radius.large, borderWidth: 1, overflow: 'hidden' },
-  subtaskStatRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, overflow: 'hidden' },
-  sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 7, borderRadius: Atlas.radius.medium, borderWidth: 1 },
-  sortLabel:      { fontSize: 12, fontWeight: '600' },
-  groupLabel:     { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10, marginTop: 6 },
-  taskCard:       { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 14, overflow: 'hidden' },
-  boardCard:      { borderRadius: 13, padding: 11, overflow: 'hidden' },
-  taskTitle:      { fontSize: 14, fontWeight: '600' },
+  searchBar:      { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 44, paddingHorizontal: 16, paddingVertical: 10, marginBottom: 0 },
+  searchInput:    { flex: 1, fontSize: 14, fontFamily: fontFamily.regular, marginLeft: 8, paddingVertical: 0 },
+  activeChip:     { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, minHeight: 32 },
+  activeChipText: { fontSize: 11, fontFamily: fontFamily.semibold },
+  statsRow:       { flexDirection: 'row', borderRadius: Atlas.radius.xlarge, paddingHorizontal: 6, overflow: 'hidden' },
+  subtaskStatRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.large, paddingHorizontal: 16, paddingVertical: 12, minHeight: 44, overflow: 'hidden' },
+  sortChip:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
+  sortLabel:      { fontSize: 12, fontFamily: fontFamily.semibold },
+  groupLabel:     { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2, marginBottom: 10, marginTop: 6 },
+  taskCard:       { borderRadius: Atlas.radius.xlarge, padding: 16, overflow: 'hidden' },
+  boardCard:      { borderRadius: Atlas.radius.large, padding: 12, overflow: 'hidden' },
+  taskTitle:      { fontSize: 14, fontFamily: fontFamily.semibold },
   checkbox:       { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   dot:            { width: 8, height: 8, borderRadius: 4 },
   colorDot:       { width: 12, height: 12, borderRadius: 4 },
-  badge:          { flexDirection: 'row', alignItems: 'center', borderRadius: 8, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
-  progressBg:     { height: 3, backgroundColor: 'rgba(128,128,128,0.15)', borderRadius: 2, overflow: 'hidden' },
-  progressFill:   { height: '100%', borderRadius: 2 },
+  badge:          { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  progressBg:     { height: 6, backgroundColor: 'rgba(128,128,128,0.18)', borderRadius: 999, overflow: 'hidden' },
+  progressFill:   { height: '100%', borderRadius: 999 },
   // tabular-nums: без них ширина «7%» і «71%» різна, і прогрес-рядок сіпається
   // при кожній зміні.
-  pct:            { fontSize: 11, fontWeight: '600', minWidth: 30, fontVariant: ['tabular-nums'] },
-  colLabel:       { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  pct:            { fontSize: 11, fontFamily: fontFamily.semibold, minWidth: 30, fontVariant: ['tabular-nums'] },
+  colLabel:       { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
   emptyCol:       { borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 24, alignItems: 'center' },
-  overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay:        { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)', justifyContent: 'flex-end' },
   sheetWrapper:   { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
-  sheet:          { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  detailSheet:    { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 20, overflow: 'hidden' },
-  inlineCalendar: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginBottom: 8 },
-  reminderPickerBox: { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12, marginTop: 8 },
+  sheet:          { borderRadius: Atlas.radius.xxlarge, padding: 24, overflow: 'hidden' },
+  detailSheet:    { borderRadius: Atlas.radius.xxlarge, padding: 24, overflow: 'hidden' },
+  inlineCalendar: { borderRadius: Atlas.radius.large, padding: 12, marginBottom: 8 },
+  reminderPickerBox: { borderRadius: Atlas.radius.large, padding: 12, marginTop: 8 },
   handleRow:      { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   handle:         { width: 36, height: 4, borderRadius: 2, alignSelf: 'center' },
-  sheetTitle:     { fontSize: 20, fontWeight: Atlas.type.headingWeight, marginBottom: 18 },
-  detailTitle:    { fontSize: 18, fontWeight: '700', lineHeight: 24 },
-  detailDesc:     { fontSize: 13, lineHeight: 19, marginBottom: 8, opacity: 0.7 },
-  input:          { borderRadius: Atlas.radius.medium, padding: 13, fontSize: 14, fontWeight: '500' },
-  label:          { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
+  sheetTitle:     { fontSize: 20, fontFamily: fontFamily.semibold, marginBottom: 18 },
+  detailTitle:    { fontSize: 20, fontFamily: fontFamily.semibold, lineHeight: 26 },
+  detailDesc:     { fontFamily: fontFamily.regular, fontSize: 14, lineHeight: 20, marginBottom: 8 },
+  input:          { borderRadius: Atlas.radius.medium, minHeight: 44, padding: 13, fontSize: 14, fontFamily: fontFamily.regular },
+  label:          { fontSize: 12, fontFamily: fontFamily.medium, marginBottom: 8, marginTop: 16 },
   priorityBtn:    { flex: 1, paddingVertical: 9, borderRadius: Atlas.radius.medium, borderWidth: 1.5, alignItems: 'center' },
-  btn:            { paddingVertical: 13, borderRadius: Atlas.radius.medium, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  subRow:         { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, padding: 10 },
+  btn:            { paddingVertical: 13, minHeight: 48, borderRadius: 999, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  subRow:         { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, padding: 10 },
   subCheck:       { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  subTitle:       { fontSize: 13, fontWeight: '500' },
+  subTitle:       { fontSize: 13, fontFamily: fontFamily.medium },
   addSubRow:      { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 10, paddingVertical: 10 },
-  subInput:       { fontSize: 13, paddingVertical: 0 },
+  subInput:       { fontFamily: fontFamily.regular, fontSize: 13, paddingVertical: 0 },
   navBtn:         { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  dayCell:        { width: 32, height: 32, borderRadius: Atlas.radius.medium, alignItems: 'center', justifyContent: 'center' },
+  dayCell:        { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   daydot:         { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
-  clearBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1 },
+  clearBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 11, minHeight: 44, borderRadius: 999 },
   // Filter sheet
-  filterActionBtn:{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
-  filterSegBtn:   { paddingVertical: 11, borderRadius: Atlas.radius.medium, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  viewAllBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11 },
+  filterActionBtn:{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1.5, minHeight: 44, paddingHorizontal: 14, paddingVertical: 11 },
+  filterSegBtn:   { paddingVertical: 11, borderRadius: Atlas.radius.large, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  viewAllBtn:     { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 11 },
   itemSeparator:  { height: 6 },
   cardRow:        { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
   cardCell:       { flex: 1, minWidth: 0 },
   stickyFilters:  { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  groupShowAll:   { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, marginTop: 6 },
-  dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11 },
-  dropdownList:   { borderRadius: Atlas.radius.medium, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
+  groupShowAll:   { flexDirection: 'row', alignItems: 'center', borderRadius: 999, minHeight: 44, paddingHorizontal: 14, paddingVertical: 11, marginTop: 6 },
+  dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, paddingHorizontal: 14, paddingVertical: 11 },
+  dropdownList:   { borderRadius: Atlas.radius.medium, marginTop: 6, overflow: 'hidden' },
   dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 11 },
   menuItem:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 13, minHeight: 48 },
-  menuIconBox:    { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  menuItemLabel:  { fontSize: 14, fontWeight: '600', flex: 1 },
-  menuPill:       { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
-  menuPillText:   { fontSize: 11, fontWeight: '600' },
+  menuIconBox:    { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  menuItemLabel:  { fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 },
+  menuPill:       { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  menuPillText:   { fontSize: 11, fontFamily: fontFamily.semibold },
   menuDivider:    { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
 });

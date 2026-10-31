@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/tasks/card/fields.tsx — поля картки завдання.
  *
@@ -30,6 +29,9 @@ import {
   type CardColors,
   type TriggerVariant,
 } from './primitives';
+import { fontFamily, radius } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 // ─── Дати ────────────────────────────────────────────────────────────────────
 
@@ -110,6 +112,7 @@ export function OptionField({
   search, createOption, disabled, colors: c, isDark,
 }: OptionFieldProps) {
   const { tr } = useI18n();
+  const { t } = useDS();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const selected = options.find(o => o.id === value) ?? null;
@@ -140,12 +143,12 @@ export function OptionField({
         {withSearch ? (
           <TextInput
             placeholder={tr.pickerSearch}
-            placeholderTextColor={c.sub}
+            placeholderTextColor={t.text.muted}
             value={query}
             onChangeText={setQuery}
             autoCorrect={false}
             accessibilityLabel={tr.pickerSearch}
-            style={[st.search, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]}
+            style={[st.search, { color: c.text, backgroundColor: c.dim }]}
           />
         ) : null}
         {createOption && draftName ? (
@@ -153,9 +156,9 @@ export function OptionField({
             onPress={() => { createOption.onCreate(draftName); close(); }}
             accessibilityRole="button"
             accessibilityLabel={createText}
-            style={[st.create, { borderColor: c.accent }]}>
-            <IconSymbol name="plus" size={14} color={c.accent} />
-            <Text numberOfLines={1} style={{ flex: 1, color: c.accent, fontWeight: '700', fontSize: 14 }}>{createText}</Text>
+            style={[st.create, { backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle') }]}>
+            <IconSymbol name="plus" size={14} color={t.action.secondaryText} />
+            <Text numberOfLines={1} style={{ flex: 1, color: t.action.secondaryText, fontFamily: fontFamily.semibold, fontSize: 14 }}>{createText}</Text>
           </TouchableOpacity>
         ) : null}
         {emptyOption && !query.trim() ? (
@@ -188,6 +191,7 @@ export function MultiOptionField({
   isDark: boolean;
 }) {
   const { tr } = useI18n();
+  const { t } = useDS();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>([...value]);
   const [query, setQuery] = useState('');
@@ -215,9 +219,9 @@ export function MultiOptionField({
           secondary={{ label: tr.cancel, onPress: () => setOpen(false) }}
           primary={{ label: tr.cardDone, onPress: () => { onChange(draft); setOpen(false); } }} />}>
         {options.length > 6 ? (
-          <TextInput placeholder={tr.pickerSearch} placeholderTextColor={c.sub} value={query} onChangeText={setQuery}
+          <TextInput placeholder={tr.pickerSearch} placeholderTextColor={t.text.muted} value={query} onChangeText={setQuery}
             accessibilityLabel={tr.pickerSearch}
-            style={[st.search, { color: c.text, borderColor: c.border, backgroundColor: c.dim }]} />
+            style={[st.search, { color: c.text, backgroundColor: c.dim }]} />
         ) : null}
         {visible.map(o => (
           <OptionRow key={o.id} label={o.label} sub={o.sub} icon={draft.includes(o.id) ? 'checkmark.square.fill' : 'square.dashed'}
@@ -250,6 +254,7 @@ export interface DateFieldProps {
 
 export function DateField({ variant, icon = 'calendar', label, value, onChange, danger, disabled, today, colors: c, isDark, locale }: DateFieldProps) {
   const { tr } = useI18n();
+  const { t } = useDS();
   const [open, setOpen] = useState(false);
   const base = value ? new Date(value) : today;
   const [year, setYear] = useState(base.getFullYear());
@@ -295,13 +300,13 @@ export function DateField({ variant, icon = 'calendar', label, value, onChange, 
             return (
               <TouchableOpacity key={p.label} onPress={() => pick(day)} accessibilityRole="button"
                 accessibilityState={{ selected: on }}
-                style={[cardStyles.chip, { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent : c.dim }]}>
-                <Text style={{ color: on ? '#fff' : c.text, fontSize: 13, fontWeight: '600' }}>{p.label}</Text>
+                style={[cardStyles.chip, { borderColor: 'transparent', backgroundColor: on ? t.action.primary : c.dim }]}>
+                <Text style={{ color: on ? t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{p.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
-        <View style={[st.calendar, { borderColor: c.border, backgroundColor: c.dim }]}>
+        <View style={[st.calendar, { backgroundColor: c.dim }]}>
           <CalendarGrid
             year={year}
             month={month}
@@ -366,6 +371,7 @@ export function EstimateField({ value, onChange, disabled, colors: c, isDark }: 
   isDark: boolean;
 }) {
   const { tr } = useI18n();
+  const { t } = useDS();
   const units = { h: tr.cardHourShort, m: tr.cardMinShort };
   const [open, setOpen] = useState(false);
   const [hours, setHours] = useState('');
@@ -396,20 +402,20 @@ export function EstimateField({ value, onChange, disabled, colors: c, isDark }: 
             const on = value === m;
             return (
               <TouchableOpacity key={m} onPress={() => apply(m)} accessibilityRole="button" accessibilityState={{ selected: on }}
-                style={[cardStyles.chip, { borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent : c.dim }]}>
-                <Text style={{ color: on ? '#fff' : c.text, fontSize: 13, fontWeight: '600' }}>{formatMinutes(m, units)}</Text>
+                style={[cardStyles.chip, { borderColor: 'transparent', backgroundColor: on ? t.action.primary : c.dim }]}>
+                <Text style={{ color: on ? t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{formatMinutes(m, units)}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
           <TextInput value={hours} onChangeText={v => setHours(v.replace(/\D/g, '').slice(0, 3))} keyboardType="number-pad"
-            placeholder={tr.hoursPlaceholder} placeholderTextColor={c.sub} accessibilityLabel={tr.hoursPlaceholder}
-            style={[st.numInput, { backgroundColor: c.dim, color: c.text, borderColor: c.border }]} />
-          <Text style={{ color: c.sub, fontWeight: '700' }}>:</Text>
+            placeholder={tr.hoursPlaceholder} placeholderTextColor={t.text.muted} accessibilityLabel={tr.hoursPlaceholder}
+            style={[st.numInput, { backgroundColor: c.dim, color: c.text }]} />
+          <Text style={{ color: c.sub, fontFamily: fontFamily.semibold }}>:</Text>
           <TextInput value={mins} onChangeText={v => setMins(v.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad"
-            placeholder={tr.minutesPlaceholder} placeholderTextColor={c.sub} accessibilityLabel={tr.minutesPlaceholder}
-            style={[st.numInput, { backgroundColor: c.dim, color: c.text, borderColor: c.border }]} />
+            placeholder={tr.minutesPlaceholder} placeholderTextColor={t.text.muted} accessibilityLabel={tr.minutesPlaceholder}
+            style={[st.numInput, { backgroundColor: c.dim, color: c.text }]} />
         </View>
       </PropertySheet>
     </>
@@ -440,6 +446,7 @@ export function RepeatField({ value, onChange, disabled, today, colors: c, isDar
   locale: string;
 }) {
   const { tr } = useI18n();
+  const { t } = useDS();
   const [open, setOpen] = useState(false);
   const [freq, setFreq] = useState<RecurrenceRule['freq']>('weekly');
   const [interval, setInterval_] = useState(1);
@@ -472,7 +479,7 @@ export function RepeatField({ value, onChange, disabled, today, colors: c, isDar
   return (
     <>
       <FieldTrigger icon="repeat" label={tr.cardRepeat} value={recurrenceLabel(value, tr, locale)} placeholder={tr.cardRepeatNone}
-        valueColor={value ? c.accent : undefined}
+        valueColor={undefined}
         onPress={disabled ? undefined : () => setOpen(true)} colors={c} />
       <PropertySheet
         visible={open}
@@ -488,24 +495,24 @@ export function RepeatField({ value, onChange, disabled, today, colors: c, isDar
             const on = freq === f.key;
             return (
               <TouchableOpacity key={f.key} onPress={() => setFreq(f.key)} accessibilityRole="radio" accessibilityState={{ selected: on }}
-                style={[st.segBtn, { backgroundColor: on ? c.accent : c.dim, borderColor: on ? c.accent : c.border }]}>
-                <Text style={{ color: on ? '#fff' : c.text, fontSize: 12, fontWeight: '700' }}>{f.label}</Text>
+                style={[st.segBtn, { backgroundColor: on ? t.action.primary : c.dim, borderColor: 'transparent' }]}>
+                <Text style={{ color: on ? t.text.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold }}>{f.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
         <View style={st.stepRow}>
-          <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600', flex: 1 }}>{tr.cardRepeatEvery}</Text>
+          <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 }}>{tr.cardRepeatEvery}</Text>
           <TouchableOpacity onPress={() => setInterval_(n => Math.max(1, n - 1))} accessibilityRole="button" accessibilityLabel="−"
-            style={[st.stepBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
+            style={[st.stepBtn, { backgroundColor: c.dim }]}>
             <IconSymbol name="minus" size={14} color={c.text} />
           </TouchableOpacity>
-          <Text style={{ color: c.accent, fontSize: 17, fontWeight: '700', minWidth: 30, textAlign: 'center' }}>{interval}</Text>
+          <Text style={{ color: c.text, fontSize: 20, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], minWidth: 30, textAlign: 'center' }}>{interval}</Text>
           <TouchableOpacity onPress={() => setInterval_(n => Math.min(99, n + 1))} accessibilityRole="button" accessibilityLabel="+"
-            style={[st.stepBtn, { backgroundColor: c.dim, borderColor: c.border }]}>
+            style={[st.stepBtn, { backgroundColor: c.dim }]}>
             <IconSymbol name="plus" size={14} color={c.text} />
           </TouchableOpacity>
-          <Text style={{ color: c.sub, fontSize: 14, fontWeight: '600', minWidth: 44 }}>{unit}</Text>
+          <Text style={{ color: c.sub, fontSize: 14, fontFamily: fontFamily.semibold, minWidth: 44 }}>{unit}</Text>
         </View>
         {freq === 'weekly' ? (
           <View style={[st.segment, { marginTop: 4 }]}>
@@ -514,8 +521,8 @@ export function RepeatField({ value, onChange, disabled, today, colors: c, isDar
               return (
                 <TouchableOpacity key={i} onPress={() => setDays(p => on ? p.filter(x => x !== i) : [...p, i])}
                   accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={d}
-                  style={[st.dayBtn, { backgroundColor: on ? c.accent : c.dim, borderColor: on ? c.accent : c.border }]}>
-                  <Text style={{ color: on ? '#fff' : c.sub, fontSize: 12, fontWeight: '700' }}>{d}</Text>
+                  style={[st.dayBtn, { backgroundColor: on ? t.action.primary : c.dim, borderColor: 'transparent' }]}>
+                  <Text style={{ color: on ? t.text.onAction : c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{d}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -530,8 +537,8 @@ export function RepeatField({ value, onChange, disabled, today, colors: c, isDar
             return (
               <TouchableOpacity key={key} accessibilityRole="radio" accessibilityState={{ selected: on }}
                 onPress={() => setUntil(key === 'never' ? null : (until ?? dayToIso(addDays(today, 30))))}
-                style={[st.segBtn, { backgroundColor: on ? c.accent : c.dim, borderColor: on ? c.accent : c.border }]}>
-                <Text style={{ color: on ? '#fff' : c.text, fontSize: 12, fontWeight: '700' }}>
+                style={[st.segBtn, { backgroundColor: on ? t.action.primary : c.dim, borderColor: 'transparent' }]}>
+                <Text style={{ color: on ? t.text.onAction : c.text, fontSize: 12, fontFamily: fontFamily.semibold }}>
                   {key === 'until' && until ? `${text} · ${formatDay(until, locale)}` : text}
                 </Text>
               </TouchableOpacity>
@@ -556,7 +563,7 @@ function InlineCalendar({ value, onChange, today, colors: c }: {
   const [month, setMonth] = useState(base.getMonth());
   const weeks = useMemo(() => monthGrid(year, month), [year, month]);
   return (
-    <View style={[st.calendar, { borderColor: c.border, backgroundColor: c.dim }]}>
+    <View style={[st.calendar, { backgroundColor: c.dim }]}>
       <CalendarGrid
         year={year}
         month={month}
@@ -599,6 +606,7 @@ export function ReminderSheet({ visible, title, reminderAt, onSave, onRemove, on
   isDark: boolean;
 }) {
   const { tr } = useI18n();
+  const { t } = useDS();
   const [date, setDate] = useState<string | null>(null);
   const [hours, setHours] = useState('');
   const [mins, setMins] = useState('');
@@ -634,20 +642,20 @@ export function ReminderSheet({ visible, title, reminderAt, onSave, onRemove, on
                 next.setHours(parseInt(hours || '0', 10), parseInt(mins || '0', 10), 0, 0);
                 setDate(next.toISOString());
               }}
-              style={[cardStyles.chip, { borderColor: on ? '#F59E0B' : c.border, backgroundColor: on ? '#F59E0B' : c.dim }]}>
-              <Text style={{ color: on ? '#fff' : c.text, fontSize: 13, fontWeight: '600' }}>{p.label}</Text>
+              style={[cardStyles.chip, { borderColor: 'transparent', backgroundColor: on ? t.action.primary : c.dim }]}>
+              <Text style={{ color: on ? t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{p.label}</Text>
             </TouchableOpacity>
           );
         })}
       </View>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 }}>
         <TextInput value={hours} onChangeText={v => setHours(v.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad"
-          placeholder={tr.hoursShort} placeholderTextColor={c.sub} accessibilityLabel={tr.hoursShort}
-          style={[st.numInput, { backgroundColor: c.dim, color: c.text, borderColor: c.border }]} />
-        <Text style={{ color: c.sub, fontSize: 18, fontWeight: '700' }}>:</Text>
+          placeholder={tr.hoursShort} placeholderTextColor={t.text.muted} accessibilityLabel={tr.hoursShort}
+          style={[st.numInput, { backgroundColor: c.dim, color: c.text }]} />
+        <Text style={{ color: c.sub, fontSize: 18, fontFamily: fontFamily.semibold }}>:</Text>
         <TextInput value={mins} onChangeText={v => setMins(v.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad"
-          placeholder={tr.minutesShort} placeholderTextColor={c.sub} accessibilityLabel={tr.minutesShort}
-          style={[st.numInput, { backgroundColor: c.dim, color: c.text, borderColor: c.border }]} />
+          placeholder={tr.minutesShort} placeholderTextColor={t.text.muted} accessibilityLabel={tr.minutesShort}
+          style={[st.numInput, { backgroundColor: c.dim, color: c.text }]} />
       </View>
     </PropertySheet>
   );
@@ -671,7 +679,7 @@ export function ReminderField({ value, onSave, onRemove, disabled, today, colors
   return (
     <>
       <FieldTrigger icon="bell" label={tr.reminderAtLabel} value={label} placeholder={tr.cardNotSet}
-        valueColor={value ? '#F59E0B' : undefined}
+        valueColor={undefined}
         onPress={disabled ? undefined : () => setOpen(true)} colors={c} />
       <ReminderSheet visible={open} title={tr.reminderAtLabel} reminderAt={value} onSave={onSave} onRemove={onRemove}
         onClose={() => setOpen(false)} today={today} colors={c} isDark={isDark} />
@@ -694,6 +702,7 @@ export function InlineTextArea({ value, onCommit, placeholder, label, editable =
   minHeight?: number;
   colors: CardColors;
 }) {
+  const { t } = useDS();
   const [text, setText] = useState(value);
   const [focused, setFocused] = useState(false);
   // Поки людина друкує, синк не має перезаписувати набране.
@@ -715,29 +724,30 @@ export function InlineTextArea({ value, onCommit, placeholder, label, editable =
       editable={editable}
       multiline
       placeholder={placeholder}
-      placeholderTextColor={c.sub}
+      placeholderTextColor={t.text.muted}
       accessibilityLabel={label}
       style={[st.area, {
         color: c.text,
         minHeight,
-        borderColor: focused ? c.accent : c.border,
-        backgroundColor: focused ? c.dim : 'transparent',
+        // DS v2: subtle-тло без рамки; у фокусі — 2px lavender-кільце.
+        borderColor: focused ? t.focus.ring : 'transparent',
+        backgroundColor: c.dim,
       }]}
     />
   );
 }
 
 const st = StyleSheet.create({
-  search:    { borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, marginBottom: 10 },
-  create:    { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: Atlas.radius.medium, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 13, gap: 9, marginBottom: 7 },
+  search:    { borderRadius: radius.pill, minHeight: 44, paddingHorizontal: 16, paddingVertical: 11, fontSize: 14, fontFamily: fontFamily.regular, marginBottom: 10 },
+  create:    { flexDirection: 'row', alignItems: 'center', minHeight: 48, borderRadius: radius.pill, paddingHorizontal: 16, gap: 9, marginBottom: 8 },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  calendar:  { borderRadius: Atlas.radius.large, borderWidth: 1, padding: 12 },
-  numInput:  { flex: 1, borderWidth: 1, borderRadius: Atlas.radius.medium, minHeight: 46, fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  calendar:  { borderRadius: radius.nested, padding: 12 },
+  numInput:  { flex: 1, borderRadius: radius.control, minHeight: 46, fontSize: 18, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'], textAlign: 'center' },
   segment:   { flexDirection: 'row', gap: 6, marginBottom: 12 },
-  segBtn:    { flex: 1, minHeight: 40, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  dayBtn:    { flex: 1, minHeight: 40, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  segBtn:    { flex: 1, minHeight: 40, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  dayBtn:    { flex: 1, minHeight: 40, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   stepRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  caption:   { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 7, marginTop: 4 },
-  stepBtn:   { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  area:      { borderWidth: 1, borderRadius: Atlas.radius.medium, paddingHorizontal: 12, paddingTop: 11, paddingBottom: 11, fontSize: 14, lineHeight: 20, textAlignVertical: 'top' },
+  caption:   { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 7, marginTop: 4 },
+  stepBtn:   { width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  area:      { borderWidth: 2, borderRadius: radius.control, fontFamily: fontFamily.regular, paddingHorizontal: 12, paddingTop: 11, paddingBottom: 11, fontSize: 14, lineHeight: 20, textAlignVertical: 'top' },
 });

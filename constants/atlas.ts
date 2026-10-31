@@ -1,9 +1,17 @@
 /** Native adaptation of @atlaskit/tokens 20 shape/spacing foundations.
  * Atlaskit is React DOM; native controls retain touch targets and Dynamic Type.
- * Brand colours remain in the existing Flowi screen palettes.
+ *
+ * DS v2 («м'який мінімалізм»): радіуси перепризначено на шкалу дизайн-системи
+ * (constants/theme.ts → radius), бо ~700 стилів беруть їх саме звідси:
+ *   small   4 → 8   дрібні бейджі, чекбокси, лічильники
+ *   medium  6 → 12  контроли, рядки, кнопки (radius.control)
+ *   large   8 → 14  поля вводу, вкладені блоки (radius.nestedCompact)
+ *   xlarge 12 → 20  картки, аркуші (radius.cardCompact)
+ *   xxlarge 16 → 24 великі картки, верх bottom-sheet (radius.card)
+ * Нові стилі беріть із constants/theme.ts (radius.*) напряму.
  */
 export const Atlas = {
-  radius: { xsmall: 2, small: 4, medium: 6, large: 8, xlarge: 12, xxlarge: 16 },
+  radius: { xsmall: 4, small: 6, medium: 10, large: 10, xlarge: 14, xxlarge: 16 },
   space: { s025: 2, s050: 4, s075: 6, s100: 8, s150: 12, s200: 16, s300: 24, s400: 32 },
   type: {
     headingWeight: '600' as const,

@@ -4,6 +4,7 @@ import {useResponsive} from '@/hooks/use-responsive';
 import {useI18n} from '@/store/i18n';
 import {projectAppearance,appearanceTokens,type ProjectAppearance} from '@/utils/projectAppearance';
 import {useTheme} from '@/store/theme-context';
+import {dsTokens} from '@/hooks/use-ds';
 /**
  * components/projects/ProjectScreenShell.tsx — спільна обв'язка розділу
  * простору проєкту.
@@ -20,7 +21,6 @@ import {useTheme} from '@/store/theme-context';
  * контейнер йому потрібен, — оболонка лише дає шапку й тло.
  */
 import * as ExpoRouter from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -29,6 +29,8 @@ import { ProjectSwitcherSheet, ProjectSwitcherTrigger } from '@/components/proje
 import { ScreenHeader, type Crumb, type ScreenBack } from '@/components/shared/ScreenHeader';
 import { goProjectsList, projectRoute, projectSectionFromPathname } from '@/constants/projectNav';
 import type { Project } from '@/app/projects';
+import { MeshBackground } from '@/components/ds';
+import { glassOf } from '@/components/shared/dsTheme';
 
 /**
  * `usePathname`/`useRouter`, що переживають відсутність маршрутизатора — та
@@ -46,13 +48,17 @@ const useRouterSafe: () => ShellRouter =
 
 export function projectShellColors(isDark: boolean, accent: string, appearance?:ProjectAppearance) {
   if(appearance){const p=projectAppearance(appearance)[isDark?'dark':'light'],t=appearanceTokens(p);return {bg1:p.background,bg2:p.background,border:t['--flowi-border'],text:t['--flowi-text'],sub:t['--flowi-muted'],dim:p.surface,accent:p.accent};}
+  // DS v2: тло — bg.canvas, текст — text.primary/secondary, вкладені блоки —
+  // surface.subtle, роздільники — border.hairline. Колір проєкту лишається
+  // акцентом (ідентичність проєкту), але головні дії — action.primary.
+  const t = dsTokens(isDark);
   return {
-    bg1: isDark ? '#0C0C14' : '#F4F2FF',
-    bg2: isDark ? '#14121E' : '#EAE6FF',
-    border: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(200,195,255,0.5)',
-    text: isDark ? '#F0EEFF' : '#1A1433',
-    sub: isDark ? 'rgba(240,238,255,0.62)' : 'rgba(26,20,51,0.58)',
-    dim: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    bg1: t.bg.canvas,
+    bg2: t.bg.canvas,
+    border: t.border.hairline,
+    text: t.text.primary,
+    sub: t.text.secondary,
+    dim: glassOf(t).surfaceSubtle,
     accent,
   };
 }
@@ -127,7 +133,11 @@ export function ProjectScreenShell({
 
   return (
     <ProjectPaletteContext.Provider value={c}><View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      {/* DS v2.1: mesh під склом; власне оформлення проєкту (appearance) —
+          його суцільне тло, як і раніше. */}
+      {project?.appearance
+        ? <View style={[StyleSheet.absoluteFill, { backgroundColor: c.bg1 }]} />
+        : <MeshBackground />}
       {/* Без нативного SafeAreaView(edges=['top']) — ScreenHeader сам додає
           верхній інсет через useTopInset() (CLAUDE.md: «нативний SafeAreaView
           edges={['top']} в екранах не використовуємо»). Обидва разом двічі

@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/health/tabs/OverviewTab.tsx — вкладка «Огляд».
  *
@@ -33,9 +32,13 @@ import type { Translations } from '@/store/translations';
 import { Agg, Period, buildTrend } from '@/utils/healthPeriods';
 import {
   ACCENT, ACCENT_CAL, ACCENT_MOOD, ACCENT_PULSE, ACCENT_SLEEP, ACCENT_STEPS, ACCENT_WEIGHT,
-  type HealthColors, fmtSleep, getHealthColors,
+  type HealthColors, fmtSleep,
 } from '@/utils/healthTheme';
+import { getHealthDSColors } from '@/components/health/palette';
+import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { EntryType, HealthEntry, getWeeklyInsights } from '@/utils/healthUtils';
+import { fontFamily } from '@/constants/theme';
+import { useGlassStyles } from '@/components/finance/finPalette';
 
 interface Metric { type: EntryType; label: string; color: string; agg: Agg; unit: string; goal?: number }
 
@@ -56,7 +59,10 @@ export function OverviewTab({ h }: HealthTabProps) {
   // Палітра й список метрик — у useMemo: SummaryCard обгорнутий у React.memo,
   // і новий обʼєкт на кожен ререндер зводив би memo нанівець, а кожна картка
   // заново перебирає всі записи через buildTrend.
-  const c = useMemo(() => getHealthColors(isDark), [isDark]);
+  const c = useMemo(() => getHealthDSColors(isDark), [isDark]);
+  const gs = useGlassStyles();
+  const k = dsTokens(isDark);
+  const coral = glassTokens(isDark).accent.coral;
 
   const { today, goals, cal, latestWeight, bmi, bmiCategory, profile } = h;
   const [refreshing, setRefreshing] = useState(false);
@@ -116,19 +122,20 @@ export function OverviewTab({ h }: HealthTabProps) {
     items.push({
       key: 'insights',
       node: (
-        <HealthCard c={c} title={tr.insights} style={{ paddingVertical: 12 }}>
+        // Інсайти — AI-блок DS v2: м'яке лавандове тло замість білої картки.
+        <HealthCard c={c} title={tr.insights} style={{ backgroundColor: k.accent.lavenderSoft }}>
           {insights.map((ins, i) => {
             const up = ins.deltaPct > 0;
-            const col = ins.good ? ACCENT : ACCENT_PULSE;
+            const col = ins.good ? k.status.success : k.status.danger;
             return (
               <View key={ins.type} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 9,
-                borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth, borderTopColor: c.border }}>
-                <View style={{ width: 26, height: 26, borderRadius: Atlas.radius.small, backgroundColor: col + '20', alignItems: 'center', justifyContent: 'center' }}>
+                borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth, borderTopColor: k.accent.lavender + '55' }}>
+                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: col + '20', alignItems: 'center', justifyContent: 'center' }}>
                   <IconSymbol name={up ? 'arrow.up.right' : 'arrow.down.right'} size={13} color={col} />
                 </View>
-                <Text style={{ color: c.text, fontSize: 13, fontWeight: '700', marginLeft: 10, flex: 1 }}>{insightLabel[ins.type]}</Text>
-                <Text style={{ color: col, fontSize: 13, fontWeight: Atlas.type.headingWeight }}>{up ? '+' : ''}{ins.deltaPct}%</Text>
-                <Text style={{ color: c.sub, fontSize: 11, marginLeft: 6 }}>{tr.thisWeek}</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.medium, marginLeft: 10, flex: 1 }}>{insightLabel[ins.type]}</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{up ? '+' : ''}{ins.deltaPct}%</Text>
+                <Text style={{ color: c.sub, fontSize: 12, marginLeft: 6 }}>{tr.thisWeek}</Text>
               </View>
             );
           })}
@@ -145,7 +152,7 @@ export function OverviewTab({ h }: HealthTabProps) {
     <ScrollView
       contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
 
       {/* ERR-01: якщо читання провалилось, initialized НЕ вмикається — без
           цієї гілки екран крутив би скелетони нескінченно. */}
@@ -164,14 +171,14 @@ export function OverviewTab({ h }: HealthTabProps) {
       {h.initialized && !profile && (
         <TouchableOpacity onPress={() => router.push('/health-profile')} activeOpacity={0.85}
           accessibilityRole="button" accessibilityLabel={tr.healthProfile}
-          // Суцільна картка, як решта розділу (не зелена напівпрозора заливка).
-          style={[s.banner, { borderColor: c.border, backgroundColor: c.card }]}>
-          <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: ACCENT + '20', alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name="person.fill" size={18} color={ACCENT} />
+          // DS v2.1: скляна картка (заливка + обідок), icon-chip — корал модуля.
+          style={[gs.card, s.banner, { backgroundColor: c.card }]}>
+          <View style={{ ...gs.subtle, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: coral.tint }}>
+            <IconSymbol name="person.fill" size={18} color={coral.ink} />
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: Atlas.type.headingWeight }}>{tr.healthProfile}</Text>
-            <Text style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>{tr.profileHint}</Text>
+            <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.healthProfile}</Text>
+            <Text style={{ color: c.sub, fontSize: 12, marginTop: 2 }}>{tr.profileHint}</Text>
           </View>
           <IconSymbol name="chevron.right" size={13} color={c.sub} />
         </TouchableOpacity>
@@ -183,7 +190,7 @@ export function OverviewTab({ h }: HealthTabProps) {
       {/* Телефон: підпис над селектором (п'ять сегментів просять усю ширину);
           планшет: в один рядок, селектор не ширший за 420pt. */}
       <View style={grid.isWide ? s.periodRow : s.periodStack}>
-        <Text style={[s.kicker, { color: c.sub }]}>{tr.dynamics}</Text>
+        <Text style={[s.kicker, { color: c.text }]}>{tr.dynamics}</Text>
         <View style={grid.isWide ? { flex: 1, maxWidth: 420 } : undefined}>
           <PeriodSelector period={period} onChange={setPeriod} color={ACCENT} c={c} tr={tr} />
         </View>
@@ -195,10 +202,13 @@ export function OverviewTab({ h }: HealthTabProps) {
 }
 
 function VitalMini({ label, value, color, sub }: { label: string; value: string; color: string; sub: string }) {
+  const { t } = useDS();
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ color, fontSize: 15, fontWeight: Atlas.type.headingWeight }} numberOfLines={1}>{value}</Text>
-      <Text style={{ color: sub, fontSize: 10, fontWeight: '600', marginTop: 2 }}>{label}</Text>
+      <Text style={{ color: t.text.primary, fontSize: 18, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.36 }} numberOfLines={1}>{value}</Text>
+      {/* Колір метрики — тонкою позначкою під числом. */}
+      <View style={{ width: 12, height: 3, borderRadius: 2, backgroundColor: color, marginTop: 4 }} />
+      <Text style={{ color: sub, fontSize: 11, fontFamily: fontFamily.regular, marginTop: 4 }}>{label}</Text>
     </View>
   );
 }
@@ -218,13 +228,13 @@ const SummaryCard = React.memo(function SummaryCard({ m, period, entries, c, tr 
 
   return (
     <HealthCard c={c} title={m.label} right={<>
-        <Text style={{ color: m.color, fontSize: 17, fontWeight: Atlas.type.headingWeight }}>{hasAny ? fmtMetric(m, headline) : '—'}</Text>
+        <Text style={{ color: c.text, fontSize: 22, fontFamily: fontFamily.light, fontVariant: ['tabular-nums'], letterSpacing: -0.44 }}>{hasAny ? fmtMetric(m, headline) : '—'}</Text>
         <ChartTypeToggle value={chartType} onChange={setChartType} color={ACCENT} c={c} tr={tr} />
       </>}>
       {hasAny ? (
         <>
           <TrendChart data={d} color={m.color} sub={c.sub} goal={m.goal} height={90} chartType={chartType} />
-          <Text style={{ color: c.sub, fontSize: 11, marginTop: 6 }}>{sub2}</Text>
+          <Text style={{ color: c.sub, fontSize: 12, marginTop: 6, fontVariant: ['tabular-nums'] }}>{sub2}</Text>
         </>
       ) : (
         <Text style={{ color: c.sub, fontSize: 12, paddingVertical: 16, textAlign: 'center' }}>{tr.noDataPeriod}</Text>
@@ -235,8 +245,8 @@ const SummaryCard = React.memo(function SummaryCard({ m, period, entries, c, tr 
 
 const s = StyleSheet.create({
   // Та сама типографіка, що й заголовки карток (HealthCard / Фінанси).
-  kicker:    { fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase' },
+  kicker:    { fontSize: 16, fontFamily: fontFamily.semibold },
   periodRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4, marginBottom: 12 },
   periodStack: { gap: 8, marginTop: 4, marginBottom: 12 },
-  banner:    { borderRadius: Atlas.radius.xlarge, borderWidth: 1, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  banner:    { borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
 });

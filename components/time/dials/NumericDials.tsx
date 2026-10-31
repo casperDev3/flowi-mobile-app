@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/time/dials/NumericDials.tsx — циферблати, що показують саме цифри.
  *
@@ -29,6 +28,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 
+import { fontFamily } from '@/constants/theme';
 import { useClockTick } from '@/hooks/use-clock-tick';
 import { formatClock } from '@/utils/durationFormat';
 import { elapsedSince } from '@/utils/taskTimer';
@@ -186,7 +186,8 @@ export function FlipDial({ startedAt, size, colors, material: m }: DialRenderPro
 }
 
 const st = StyleSheet.create({
-  digits:   { fontWeight: Atlas.type.headingWeight, letterSpacing: -1 },
+  // DS v2: годинник — display-цифри (тонкі Manrope Light, tight tracking).
+  digits:   { fontFamily: fontFamily.light, letterSpacing: -1 },
   flipRow:  { flexDirection: 'row', alignItems: 'center' },
   flipCard: {
     borderRadius: 9,
@@ -194,6 +195,6 @@ const st = StyleSheet.create({
     paddingVertical: 6,
     overflow: 'hidden',
   },
-  flipText: { fontWeight: Atlas.type.headingWeight, textAlign: 'center' },
+  flipText: { fontFamily: fontFamily.medium, textAlign: 'center' },
   seam:     { position: 'absolute', left: 0, right: 0, top: '50%', height: StyleSheet.hairlineWidth },
 });

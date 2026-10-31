@@ -1,5 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -7,7 +5,6 @@ import {
   FlatList,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -32,7 +29,9 @@ import { CONTAINERS_ACCENT as ACCENT, useContainersColors } from '@/components/c
 import { useContainersData, type PhotoTarget } from '@/components/containers/useContainersData';
 import { DetailPane } from '@/components/shared/DetailPane';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { EmptyState, MeshBackground } from '@/components/ds';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, type as dsType } from '@/constants/theme';
 import { detailColumnWidthFor, sizeClassFor } from '@/constants/tokens';
 import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
@@ -263,24 +262,14 @@ export default function ContainersScreen() {
   );
 
   const emptyState = (
-    <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-      <View style={{ width: 64, height: 64, borderRadius: Atlas.radius.xlarge, backgroundColor: ACCENT + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-        <IconSymbol name="shippingbox.fill" size={32} color={ACCENT} />
-      </View>
-      <Text style={{ color: c.text, fontSize: 17, fontWeight: '700', marginBottom: 6 }}>
-        {data.containers.length ? tr.ctrNoBoxesHere : tr.noContainers}
-      </Text>
-      {!data.containers.length ? (
-        <>
-          <Text style={{ color: c.sub, fontSize: 14, textAlign: 'center', marginBottom: 24 }}>{tr.ctrEmptyHint}</Text>
-          <TouchableOpacity onPress={openNew} accessibilityRole="button"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, minHeight: 48,
-              borderRadius: 13, borderWidth: 1, borderColor: ACCENT + '50', backgroundColor: ACCENT + '12' }}>
-            <IconSymbol name="plus" size={15} color={ACCENT} />
-            <Text style={{ color: ACCENT, fontWeight: '700' }}>{tr.newContainer}</Text>
-          </TouchableOpacity>
-        </>
-      ) : null}
+    <View style={{ paddingVertical: 28 }}>
+      <EmptyState
+        icon="shippingbox.fill"
+        title={data.containers.length ? tr.ctrNoBoxesHere : tr.noContainers}
+        caption={data.containers.length ? undefined : tr.ctrEmptyHint}
+        actionLabel={data.containers.length ? undefined : tr.newContainer}
+        onAction={data.containers.length ? undefined : openNew}
+      />
     </View>
   );
 
@@ -294,7 +283,7 @@ export default function ContainersScreen() {
       contentContainerStyle={[gridWidth, { paddingHorizontal: 16, paddingBottom: 100 }]}
       columnWrapperStyle={{ gap: GRID_GAP, marginBottom: GRID_GAP }}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}
       renderItem={({ item: m }) => (
         <ContainerTile
           container={m.container}
@@ -322,14 +311,14 @@ export default function ContainersScreen() {
       ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
       ListHeaderComponent={
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <Text style={{ color: c.sub, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}
+          <Text style={{ color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, textTransform: 'uppercase', letterSpacing: 0.5, ...dsType.numeric }}
             accessibilityLiveRegion="polite">
             {matches.length > 0 ? fill(tr.ctrFound, { n: matches.length }) : tr.ctrNothingFound}
           </Text>
           {discardedTotal ? (
             <TouchableOpacity onPress={() => setShowDiscarded(v => !v)} accessibilityRole="switch"
               accessibilityState={{ checked: showDiscarded }} style={{ minHeight: 44, justifyContent: 'center' }}>
-              <Text style={{ color: ACCENT, fontSize: 12, fontWeight: '700' }}>
+              <Text style={{ color: c.text, fontSize: 12, fontFamily: fontFamily.semibold, textDecorationLine: 'underline' }}>
                 {showDiscarded ? tr.ctrHideDiscarded : fill(tr.ctrShowDiscarded, { n: discardedTotal })}
               </Text>
             </TouchableOpacity>
@@ -359,11 +348,11 @@ export default function ContainersScreen() {
     // ERR-01: «не прочиталось» ≠ «порожньо»; запис вимкнено, доки не прочитаємо.
     body = (
       <View style={{ alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24, gap: 14 }}>
-        <IconSymbol name="exclamationmark.triangle" size={28} color={ACCENT} />
-        <Text style={{ color: c.text, fontSize: 15, textAlign: 'center' }}>{tr.ctrReadFailed}</Text>
+        <IconSymbol name="exclamationmark.triangle" size={28} color={c.t.status.warning} />
+        <Text style={{ ...dsType.body, fontSize: 15, color: c.text, textAlign: 'center' }}>{tr.ctrReadFailed}</Text>
         <TouchableOpacity onPress={() => void data.retry()} accessibilityRole="button"
-          style={{ minHeight: 48, paddingHorizontal: 20, borderRadius: Atlas.radius.medium, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>{tr.ctrRetry}</Text>
+          style={{ minHeight: 48, paddingHorizontal: 24, borderRadius: radius.pill, backgroundColor: c.t.action.primary, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ ...dsType.label, color: c.t.text.onAction }}>{tr.ctrRetry}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -372,15 +361,16 @@ export default function ContainersScreen() {
   } else if (placesMode && !treeColumn) {
     body = (
       <ScrollView contentContainerStyle={[contentWidth, { paddingHorizontal: 8, paddingBottom: 100 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
         <PlaceTreeList {...treeProps} mode="nested" />
       </ScrollView>
     );
   } else if (treeColumn) {
     body = (
       <View style={{ flex: 1, flexDirection: 'row' }}>
-        <ScrollView style={{ width: TREE_COLUMN_WIDTH, flexGrow: 0, borderRightWidth: 1, borderRightColor: c.border }}
-          contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 100 }}>
+        {/* Колонка дерева — біла картка на canvas, без рамки-роздільника (DS v2). */}
+        <ScrollView style={{ ...c.gl.card, width: TREE_COLUMN_WIDTH, flexGrow: 0, marginLeft: 16, marginBottom: 16, borderRadius: radius.cardCompact }}
+          contentContainerStyle={{ padding: 8, paddingBottom: 100 }}>
           <PlaceTreeList {...treeProps} mode="column" selected={selectedPlace} onSelect={setSelectedPlace} />
         </ScrollView>
         <View style={{ flex: 1 }}>{grid}</View>
@@ -394,18 +384,18 @@ export default function ContainersScreen() {
     const active = view === value;
     return (
       <TouchableOpacity onPress={() => setView(value)} accessibilityRole="tab" accessibilityState={{ selected: active }}
-        style={{ flex: 1, flexDirection: 'row', gap: 6, minHeight: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
-          backgroundColor: active ? (c.isDark ? 'rgba(255,255,255,0.12)' : '#fff') : 'transparent' }}>
-        <IconSymbol name={icon} size={13} color={active ? ACCENT : c.sub} />
-        <Text style={{ color: active ? c.text : c.sub, fontSize: 13, fontWeight: active ? '700' : '600' }}>{label}</Text>
+        style={{ flex: 1, flexDirection: 'row', gap: 6, minHeight: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: active ? c.t.action.primary : 'transparent' }}>
+        <IconSymbol name={icon} size={13} color={active ? c.t.text.onAction : c.sub} />
+        <Text style={{ color: active ? c.t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{label}</Text>
       </TouchableOpacity>
     );
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: c.bg1 }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       {/* Широкий екран: коробки зліва, вміст обраної — праворуч. Вузький:
           деталь — модальний лист поверх списку. Верхній інсет дає ScreenHeader. */}
       <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
@@ -418,33 +408,34 @@ export default function ContainersScreen() {
               onPress: () => router.back(),
               label: tr.back,
               color: c.sub,
-              style: { backgroundColor: c.dim, borderColor: c.border },
+              style: { ...c.gl.card, borderColor: 'transparent' },
             }}
             actions={
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <HeaderButton onPress={() => setScanning(true)} accessibilityLabel={tr.ctrScan}
-                  style={{ backgroundColor: c.dim, borderColor: c.border }}>
-                  <IconSymbol name="viewfinder" size={17} color={c.sub} />
+                  style={{ ...c.gl.card, borderColor: 'transparent', borderRadius: radius.pill }}>
+                  <IconSymbol name="viewfinder" size={17} color={c.text} />
                 </HeaderButton>
                 <HeaderButton onPress={() => setPrintIds([])} accessibilityLabel={tr.ctrPrint}
-                  style={{ backgroundColor: c.dim, borderColor: c.border }}>
-                  <IconSymbol name="doc.text" size={16} color={c.sub} />
+                  style={{ ...c.gl.card, borderColor: 'transparent', borderRadius: radius.pill }}>
+                  <IconSymbol name="doc.text" size={16} color={c.text} />
                 </HeaderButton>
+                {/* Головна дія екрана — pill action.primary. */}
                 <HeaderButton onPress={openNew} accessibilityLabel={tr.add}
-                  style={{ backgroundColor: c.dim, borderColor: c.border }}>
-                  <IconSymbol name="plus" size={17} color={c.sub} />
+                  style={{ backgroundColor: c.t.action.primary, borderColor: 'transparent', borderRadius: radius.pill }}>
+                  <IconSymbol name="plus" size={17} color={c.t.text.onAction} />
                 </HeaderButton>
               </View>
             }
           />
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, borderWidth: 1,
-            paddingHorizontal: 12, gap: 8, marginHorizontal: 20, marginBottom: 10, minHeight: 44,
-            backgroundColor: c.dim, borderColor: c.border }}>
-            <IconSymbol name="magnifyingglass" size={15} color={c.sub} />
-            <TextInput placeholder={tr.searchItems} placeholderTextColor={c.sub} value={search} onChangeText={setSearch}
+          <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill,
+            paddingHorizontal: 16, gap: 8, marginHorizontal: 20, marginBottom: 12, minHeight: 44,
+            ...c.gl.card }}>
+            <IconSymbol name="magnifyingglass" size={15} color={c.accent} />
+            <TextInput placeholder={tr.searchItems} placeholderTextColor={c.muted} value={search} onChangeText={setSearch}
               accessibilityLabel={tr.searchItems} returnKeyType="search"
-              style={{ flex: 1, fontSize: 14, fontWeight: '500', color: c.text, paddingVertical: 10 }} />
+              style={{ flex: 1, fontSize: 14, fontFamily: fontFamily.regular, color: c.text, paddingVertical: 10 }} />
             {search.length > 0 ? (
               <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel={tr.close}
                 style={{ width: 36, height: 44, alignItems: 'center', justifyContent: 'center' }}>
@@ -454,8 +445,8 @@ export default function ContainersScreen() {
           </View>
 
           {!isSearching && data.status !== 'failed' ? (
-            <View accessibilityRole="tablist" style={{ flexDirection: 'row', marginHorizontal: 20, marginBottom: 14, padding: 3,
-              borderRadius: Atlas.radius.medium, backgroundColor: c.dim }}>
+            <View accessibilityRole="tablist" style={{ flexDirection: 'row', marginHorizontal: 20, marginBottom: 16, padding: 4,
+              borderRadius: radius.pill, ...c.gl.card }}>
               {segment('grid', tr.ctrViewGrid, 'square.grid.2x2')}
               {segment('places', tr.ctrViewPlaces, 'folder')}
             </View>
@@ -475,7 +466,7 @@ export default function ContainersScreen() {
           maxHeight={height * 0.86}
           scrollRef={detailScrollRef}
           empty={
-            <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 }}>
+            <Text style={{ ...dsType.caption, fontSize: 13, color: c.sub, textAlign: 'center', paddingHorizontal: 24 }}>
               {tr.containerPickHint}
             </Text>
           }>

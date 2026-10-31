@@ -21,7 +21,6 @@ import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { ActionBar, ActionButton, ActionChip } from '@/components/shared/ActionBar';
 import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Atlas } from '@/constants/atlas';
 import { Layout } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useProject } from '@/hooks/use-project';
@@ -40,6 +39,10 @@ import { ProjectScreenShell, projectShellColors } from './ProjectScreenShell';
 import { ProjectTaskSheet } from './ProjectTaskSheet';
 import { TeamInput } from './TeamTaskPanel';
 import { saveProjectRecord, useProjectRecords } from './useProjectRecords';
+import { fontFamily, radius, type } from '@/constants/theme';
+import { dsTokens } from '@/hooks/use-ds';
+import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { MeshBackground } from '@/components/ds';
 
 type Tab = 'backlog' | 'idea' | 'bug';
 interface Choice { id: string; name: string }
@@ -53,6 +56,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
   const { tr } = useI18n();
   const dark = useColorScheme() === 'dark';
   const c = projectShellColors(dark, project?.color ?? '#7C3AED', project?.appearance);
+  const tk = dsTokens(dark);
 
   const allTasks = useProjectRecords<Task>('tasks');
   const allSprints = useProjectRecords<Sprint>('sprints');
@@ -121,7 +125,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
   /** Рядок чипів-фільтрів: підпис зверху, чипи — горизонтальною стрічкою. */
   const choices = (label: string, value: string, onChange: (v: string) => void, options: Choice[]) => (
     <View style={{ gap: 6 }}>
-      <Text style={{ color: c.sub, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold }}>{label}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
         {options.map(o => <ActionChip key={o.id} label={o.name} selected={value === o.id} onPress={() => onChange(o.id)} colors={c} />)}
       </ScrollView>
@@ -151,7 +155,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
     const lead = !archive && isLead(role);
     const sprintName = t.sprintId ? projectSprints.find(s => s.id === t.sprintId)?.name : undefined;
     return (
-      <View key={t.id} style={{ flex: 1, borderWidth: 1, borderColor: c.border, backgroundColor: c.dim, borderRadius: Atlas.radius.large, padding: 12, gap: 10 }}>
+      <View key={t.id} style={{ flex: 1, backgroundColor: glassOf(tk).surface, ...glassRim(tk, 'card'), borderRadius: radius.cardCompact, padding: 16, gap: 10 }}>
         <Pressable
           onPress={() => (t.backlogKind ? setDraft(t) : setOpenTaskId(t.id))}
           accessibilityRole="button"
@@ -160,11 +164,11 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
           <IconSymbol
             name={t.backlogKind === 'bug' ? 'exclamationmark.circle' : t.backlogKind === 'idea' ? 'lightbulb.fill' : t.status === 'done' ? 'checkmark.circle' : 'circle'}
             size={16}
-            color={t.status === 'done' ? '#10B981' : c.sub}
+            color={t.backlogKind === 'bug' ? tk.accent.coral : t.status === 'done' ? tk.status.success : c.sub}
           />
           <View style={{ flex: 1, gap: 2 }}>
-            <Text numberOfLines={2} style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{t.title}</Text>
-            {sprintName ? <Text numberOfLines={1} style={{ color: c.sub, fontSize: 12 }}>{sprintName}</Text> : null}
+            <Text numberOfLines={2} style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold }}>{t.title}</Text>
+            {sprintName ? <Text numberOfLines={1} style={[type.caption, { color: c.sub }]}>{sprintName}</Text> : null}
           </View>
           <IconSymbol name="chevron.right" size={12} color={c.sub} />
         </Pressable>
@@ -233,23 +237,26 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
           {filtersActive ? <ActionButton label={tr.pbResetFilters} icon="xmark" tone="neutral" onPress={resetFilters} colors={c} /> : null}
           {!archive && role !== 'viewer' ? <ActionButton label={newLabel} icon="plus" tone="primary" onPress={onNew} colors={c} /> : null}
         </ActionBar>
-        {!!error && <Text accessibilityRole="alert" style={{ color: '#DB4444' }}>{error}</Text>}
+        {!!error && <Text accessibilityRole="alert" style={{ color: tk.status.danger, fontFamily: fontFamily.medium }}>{error}</Text>}
         {groups.filter(g => g.tasks.length).map(g => (
           <View key={g.id} style={{ gap: 8 }}>
-            <Text accessibilityRole="header" style={{ color: c.text, fontWeight: '700', fontSize: 15 }}>{g.name} · {g.tasks.length}</Text>
-            <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={8}>{g.tasks.map(renderCard)}</ResponsiveGrid>
+            <Text accessibilityRole="header" style={[type.h2, type.numeric, { color: c.text }]}>{g.name} · {g.tasks.length}</Text>
+            <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12}>{g.tasks.map(renderCard)}</ResponsiveGrid>
           </View>
         ))}
-        {!filtered.length && <Text style={{ color: c.sub, textAlign: 'center', marginTop: 12 }}>{tr.pbEmpty}</Text>}
+        {!filtered.length && <Text style={[type.body, { color: c.sub, textAlign: 'center', marginTop: 12 }]}>{tr.pbEmpty}</Text>}
       </ScrollView>
 
       <Modal visible={!!draft} animationType="slide" onRequestClose={() => setDraft(null)}>
+        {/* DS v2.1: повноекранна форма — на mesh, як і екрани. */}
+        <View style={{ flex: 1, backgroundColor: c.bg1 }}>
+        <MeshBackground />
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          style={{ backgroundColor: c.bg1 }}
+          style={{ flex: 1 }}
           contentContainerStyle={{ padding: 24, paddingTop: 60, paddingBottom: 80, gap: 12, width: '100%', maxWidth: Layout.readingMaxWidth, alignSelf: 'center' }}>
           {draft && <>
-            <Text accessibilityRole="header" style={{ color: c.text, fontWeight: '700', fontSize: 22 }}>{draft.backlogKind === 'bug' ? tr.pbBug : tr.pbIdea}</Text>
+            <Text accessibilityRole="header" style={[type.h1, { color: c.text, fontSize: 28 }]}>{draft.backlogKind === 'bug' ? tr.pbBug : tr.pbIdea}</Text>
             <TeamInput label={draft.backlogKind === 'bug' ? tr.pbBugTitle : tr.pbIdeaTitle} value={draft.title ?? ''} onChange={v => setDraft({ ...draft, title: v })} />
             <TeamInput label={draft.backlogKind === 'bug' ? tr.pbBugBody : tr.pbIdeaBody} value={draft.description ?? ''} onChange={v => setDraft({ ...draft, description: v })} multiline />
             {draft.backlogKind === 'bug' && <>
@@ -278,6 +285,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
             </ActionBar>
           </>}
         </ScrollView>
+        </View>
       </Modal>
       <ProjectTaskSheet projectId={id} taskId={openTaskId} onClose={() => setOpenTaskId(null)} isDark={dark} />
     </ProjectScreenShell>

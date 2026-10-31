@@ -5,7 +5,6 @@
  * Телефон: сегменти на всю ширину. Планшет: за вмістом, ліворуч під
  * заголовком. Лічильник звернень на розгляді — пігулкою в сегменті.
  */
-import { Atlas } from '@/constants/atlas';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -13,6 +12,8 @@ import { useI18n } from '@/store/i18n';
 
 import type { MenuTab } from './model';
 import type { MenuColors } from './theme';
+import { fontFamily } from '@/constants/theme';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 const LABELS: Record<MenuTab, string> = {
   menu: 'Меню',
@@ -47,7 +48,7 @@ export function MenuTabBar({
       accessibilityLabel={tr.menu.tabsLabel}
       style={[
         st.bar,
-        { borderColor: c.border, backgroundColor: c.dim },
+        { backgroundColor: c.card, ...glassRimFor(c.card, 'card') },
         stretch ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' },
       ]}>
       {tabs.map((tab) => {
@@ -62,13 +63,13 @@ export function MenuTabBar({
             accessibilityState={{ selected: on }}
             accessibilityLabel={label}
             hitSlop={SEG_HIT}
-            style={[st.seg, stretch && st.segStretch, on && { backgroundColor: c.accent }]}>
-            <Text numberOfLines={1} style={{ color: on ? '#fff' : c.sub, fontSize: 13, fontWeight: '700' }}>
+            style={[st.seg, stretch && st.segStretch, on && { backgroundColor: c.primary }]}>
+            <Text numberOfLines={1} style={{ color: on ? c.onPrimary : c.sub, fontSize: 13, fontFamily: fontFamily.semibold }}>
               {LABELS[tab]}
             </Text>
             {count > 0 ? (
-              <View style={[st.count, { backgroundColor: on ? 'rgba(255,255,255,0.25)' : c.accent }]}>
-                <Text style={st.countText}>{count > 99 ? '99+' : count}</Text>
+              <View style={[st.count, { backgroundColor: on ? c.onPrimary : c.primary }]}>
+                <Text style={[st.countText, { color: on ? c.primary : c.onPrimary }]}>{count > 99 ? '99+' : count}</Text>
               </View>
             ) : null}
           </TouchableOpacity>
@@ -79,17 +80,17 @@ export function MenuTabBar({
 }
 
 const st = StyleSheet.create({
-  bar: { flexDirection: 'row', borderWidth: 1, borderRadius: Atlas.radius.large, padding: 3, gap: 2 },
+  bar: { flexDirection: 'row', borderRadius: 999, padding: 4, gap: 2 },
   seg: {
     flexDirection: 'row',
     minHeight: 40,
-    paddingHorizontal: 14,
-    borderRadius: Atlas.radius.medium,
+    paddingHorizontal: 16,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   segStretch: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingHorizontal: 6 },
   count: { minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
-  countText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  countText: { fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
 });

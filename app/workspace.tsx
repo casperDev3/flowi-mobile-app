@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * app/workspace.tsx — «Адреса workspace» (§2 плану, контракт §2.1–2.2).
  *
@@ -10,8 +9,6 @@ import { Atlas } from '@/constants/atlas';
  *  - користувач сам хоче змінити workspace (кнопка в Налаштуваннях/акаунті,
  *    `router.push('/workspace?change=1')` — тоді видно «Скасувати»).
  */
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -29,6 +26,7 @@ import {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { setWorkspaceIncompatibility } from '@/store/api-config';
@@ -48,6 +46,9 @@ import {
 } from '@/store/workspace';
 import { haptic } from '@/utils/haptics';
 import type { Translations } from '@/store/translations';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassRimFor } from '@/components/shared/dsTheme';
 
 type ScreenState = 'idle' | 'checking' | 'error' | 'success';
 
@@ -87,6 +88,8 @@ export default function WorkspaceScreen() {
   // хедер устигає намалюватись іще без нього (докладно — hooks/use-top-inset.ts).
   const topInset = useTopInset();
   const { status: authStatus, switchWorkspace } = useAuth();
+
+  const k = dsTokens(isDark);
 
   const c = getScreenColors('auth', isDark);
 
@@ -220,7 +223,7 @@ export default function WorkspaceScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
       <View style={{ flex: 1, paddingTop: topInset }}>
         {isChange && router.canGoBack() ? (
           <View style={st.header}>
@@ -229,7 +232,7 @@ export default function WorkspaceScreen() {
               accessibilityRole="button"
               accessibilityLabel={tr.back}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <IconSymbol name="chevron.left" size={22} color={c.accent} />
+              <IconSymbol name="chevron.left" size={22} color={c.text} />
             </TouchableOpacity>
           </View>
         ) : null}
@@ -243,16 +246,12 @@ export default function WorkspaceScreen() {
             <Text style={[st.title, { color: c.text }]}>{tr.workspaceScreenTitle}</Text>
             <Text style={[st.subtitle, { color: c.sub }]}>{tr.workspaceSubtitle}</Text>
 
-            <BlurView
-              intensity={isDark ? 20 : 40}
-              tint={isDark ? 'dark' : 'light'}
-              style={[st.card, { borderColor: error && isBlocking(error) ? '#EF4444' : c.border }]}
-            >
+            <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }, error && isBlocking(error) ? { borderWidth: 1, borderColor: k.status.danger } : null]}>
               <View style={st.fieldWrap}>
                 <Text style={[st.fieldLabel, { color: c.sub }]}>{tr.workspaceAddressLabel}</Text>
                 <TextInput
                   style={[st.input, { color: c.text }]}
-                  placeholderTextColor={c.sub}
+                  placeholderTextColor={k.text.muted}
                   placeholder={tr.workspaceAddressPlaceholder}
                   value={address}
                   onChangeText={v => { setAddress(v); setState('idle'); setError(null); setSuccess(null); }}
@@ -265,21 +264,21 @@ export default function WorkspaceScreen() {
                   onSubmitEditing={handleCheck}
                 />
               </View>
-            </BlurView>
+            </View>
 
             {state === 'error' && error && (
               <View
                 accessible
                 accessibilityRole="alert"
                 accessibilityLabel={errorMessage(tr, error)}
-                style={[st.hintRow, { backgroundColor: '#EF444414', borderColor: '#EF444430' }]}>
-                <IconSymbol name="exclamationmark.circle" size={16} color="#EF4444" />
-                <Text style={[st.hintText, { color: '#EF4444' }]}>{errorMessage(tr, error)}</Text>
+                style={[st.hintRow, { backgroundColor: k.status.danger + '14' }]}>
+                <IconSymbol name="exclamationmark.circle" size={16} color={k.status.danger} />
+                <Text style={[st.hintText, { color: k.status.danger }]}>{errorMessage(tr, error)}</Text>
               </View>
             )}
 
             {state === 'success' && success && (
-              <View style={[st.successCard, { borderColor: success.info.color ?? c.accent }]}>
+              <View style={[st.successCard, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
                 <View style={[st.colorDot, { backgroundColor: success.info.color || c.accent }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={[st.workspaceName, { color: c.text }]} numberOfLines={1}>
@@ -294,7 +293,7 @@ export default function WorkspaceScreen() {
 
             {state !== 'success' && (
               <TouchableOpacity
-                style={[st.primaryBtn, { backgroundColor: c.accent, opacity: busy || !address.trim() ? 0.6 : 1 }]}
+                style={[st.primaryBtn, { backgroundColor: k.action.primary, opacity: busy || !address.trim() ? 0.6 : 1 }]}
                 activeOpacity={0.82}
                 onPress={handleCheck}
                 disabled={busy || !address.trim()}
@@ -302,15 +301,15 @@ export default function WorkspaceScreen() {
                 accessibilityLabel={tr.workspaceCheckButton}
                 accessibilityState={{ disabled: busy || !address.trim(), busy }}
               >
-                {busy ? <ActivityIndicator color="#fff" /> : (
-                  <Text style={st.primaryBtnText}>{tr.workspaceCheckButton}</Text>
+                {busy ? <ActivityIndicator color={k.text.onAction} /> : (
+                  <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.workspaceCheckButton}</Text>
                 )}
               </TouchableOpacity>
             )}
 
             {state === 'success' && (
               <TouchableOpacity
-                style={[st.primaryBtn, { backgroundColor: c.accent, opacity: switching ? 0.6 : 1 }]}
+                style={[st.primaryBtn, { backgroundColor: k.action.primary, opacity: switching ? 0.6 : 1 }]}
                 activeOpacity={0.82}
                 onPress={handleContinue}
                 disabled={switching}
@@ -318,8 +317,8 @@ export default function WorkspaceScreen() {
                 accessibilityLabel={tr.workspaceContinueButton}
                 accessibilityState={{ disabled: switching, busy: switching }}
               >
-                {switching ? <ActivityIndicator color="#fff" /> : (
-                  <Text style={st.primaryBtnText}>{tr.workspaceContinueButton}</Text>
+                {switching ? <ActivityIndicator color={k.text.onAction} /> : (
+                  <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.workspaceContinueButton}</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -333,27 +332,26 @@ export default function WorkspaceScreen() {
 const st = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 4 },
   scroll: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 60 },
-  title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.4, marginBottom: 8 },
+  title: { fontSize: 32, fontFamily: fontFamily.medium, letterSpacing: -0.32, marginBottom: 8 },
   subtitle: { fontSize: 14, lineHeight: 20, marginBottom: 24 },
   card: {
-    borderRadius: Atlas.radius.xlarge, borderWidth: 1, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
+    borderRadius: 24, overflow: 'hidden',
   },
-  fieldWrap: { paddingHorizontal: 16, paddingVertical: 12 },
-  fieldLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 4 },
-  input: { fontSize: 16, paddingVertical: 2 },
+  fieldWrap: { paddingHorizontal: 20, paddingVertical: 14 },
+  fieldLabel: { fontSize: 12, fontFamily: fontFamily.medium, letterSpacing: 0.3, marginBottom: 4 },
+  input: { fontSize: 16, fontFamily: fontFamily.regular, paddingVertical: 4 },
   hintRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: Atlas.radius.medium, borderWidth: 1, marginTop: 14,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, marginTop: 14,
   },
   hintText: { fontSize: 13, lineHeight: 18, flex: 1 },
   successCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderRadius: Atlas.radius.large, borderWidth: 1.5, padding: 14, marginTop: 14,
+    borderRadius: 20, padding: 20, marginTop: 14,
   },
   colorDot: { width: 14, height: 14, borderRadius: 7 },
-  workspaceName: { fontSize: 16, fontWeight: '700' },
+  workspaceName: { fontSize: 16, fontFamily: fontFamily.bold },
   hintSmall: { fontSize: 12, marginTop: 3, lineHeight: 16 },
-  primaryBtn: { borderRadius: Atlas.radius.large, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  primaryBtn: { borderRadius: 999, minHeight: 52, justifyContent: 'center', paddingVertical: 15, alignItems: 'center', marginTop: 20 },
+  primaryBtnText: { fontSize: 16, fontFamily: fontFamily.semibold },
 });

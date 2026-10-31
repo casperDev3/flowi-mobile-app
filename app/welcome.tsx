@@ -1,5 +1,3 @@
-import { Atlas } from '@/constants/atlas';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -7,9 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Radius, getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { dsTokens } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 import { loadWorkspaceConfig } from '@/store/workspace';
+import { fontFamily } from '@/constants/theme';
+import { MeshBackground } from '@/components/ds';
+import { glassRimFor, glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export default function WelcomeScreen() {
   const cs = useColorScheme();
@@ -20,6 +22,8 @@ export default function WelcomeScreen() {
   // на всю ширину — три кнопки завширшки з вікно виглядають як панель, а не
   // як вибір із трьох варіантів.
   const contentWidth = useContentWidth();
+
+  const k = dsTokens(isDark);
 
   const c = getScreenColors('auth', isDark);
 
@@ -34,7 +38,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={[c.bg1, c.bg2]} style={StyleSheet.absoluteFill} />
+      <MeshBackground />
 
       <SafeAreaView style={st.safe}>
         <View style={[st.column, contentWidth]}>
@@ -50,25 +54,25 @@ export default function WelcomeScreen() {
           </View>
 
           {/* Buttons block */}
-          <View style={[st.card, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={[st.card, { backgroundColor: c.card, ...glassRimFor(c.card, 'card') }]}>
             <TouchableOpacity
-              style={[st.primaryBtn, { backgroundColor: c.accent }]}
+              style={[st.primaryBtn, { backgroundColor: k.action.primary }]}
               activeOpacity={0.82}
               onPress={() => router.push('/login')}
               accessibilityRole="button"
               accessibilityLabel={tr.authLogin}
             >
-              <Text style={st.primaryBtnText}>{tr.authLogin}</Text>
+              <Text style={[st.primaryBtnText, { color: k.text.onAction }]}>{tr.authLogin}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[st.secondaryBtn, { borderColor: c.accent }]}
+              style={[st.secondaryBtn, { backgroundColor: glassOf(k).surfaceSubtle, ...glassRim(k, 'subtle') }]}
               activeOpacity={0.82}
               onPress={() => router.push('/register')}
               accessibilityRole="button"
               accessibilityLabel={tr.authRegister}
             >
-              <Text style={[st.secondaryBtnText, { color: c.accent }]}>{tr.authRegister}</Text>
+              <Text style={[st.secondaryBtnText, { color: k.action.secondaryText }]}>{tr.authRegister}</Text>
             </TouchableOpacity>
           </View>
 
@@ -83,7 +87,7 @@ export default function WelcomeScreen() {
               <Text style={[st.workspaceText, { color: c.sub }]}>
                 {tr.workspaceCurrentLabel}: {workspaceName}
               </Text>
-              <Text style={[st.workspaceLink, { color: c.accent }]}>{tr.workspaceChangeLink}</Text>
+              <Text style={[st.workspaceLink, { color: c.text, textDecorationLine: 'underline' }]}>{tr.workspaceChangeLink}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -114,9 +118,9 @@ const st = StyleSheet.create({
     marginBottom: 12,
   },
   appName: {
-    fontSize: 36,
-    fontWeight: '700',
-    letterSpacing: -0.5,
+    fontSize: 48,
+    fontFamily: fontFamily.light,
+    letterSpacing: -0.96,
     marginBottom: 8,
   },
   subtitle: {
@@ -127,34 +131,30 @@ const st = StyleSheet.create({
   },
   card: {
     borderRadius: Radius.xxl,
-    borderWidth: 1,
-    padding: 20,
+    padding: 24,
     gap: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
   },
   primaryBtn: {
-    borderRadius: Atlas.radius.large,
+    borderRadius: 999,
+    minHeight: 52,
+    justifyContent: 'center',
     paddingVertical: 16,
     alignItems: 'center',
   },
   primaryBtnText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.1,
+    fontFamily: fontFamily.semibold,
   },
   secondaryBtn: {
-    borderRadius: Atlas.radius.large,
-    borderWidth: 1.5,
+    borderRadius: 999,
+    minHeight: 52,
+    justifyContent: 'center',
     paddingVertical: 15,
     alignItems: 'center',
   },
   secondaryBtnText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fontFamily.semibold,
   },
   workspaceRow: {
     marginTop: 20,
@@ -166,6 +166,6 @@ const st = StyleSheet.create({
   },
   workspaceLink: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fontFamily.semibold,
   },
 });

@@ -1,4 +1,3 @@
-import { Atlas } from '@/constants/atlas';
 /**
  * components/finance/OperationsSummary.tsx — компактні «Залишки» над стрічкою
  * вкладки «Операції» (на телефоні) або в бічній колонці (планшет ≥840).
@@ -14,9 +13,13 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
+import { useDS } from '@/hooks/use-ds';
 import type { Translations } from '@/store/translations';
 import type { CurrencyTotals } from '@/utils/financeUtils';
 import type { FinColors } from './financeLabels';
+import { useGlassStyles } from '@/components/finance/finPalette';
+import { GlassSurface } from '@/components/ds';
 
 export interface OperationsSummaryProps {
   /** Валюта → сума балансів активних рахунків (financeOverview.totalByCurrency). */
@@ -51,22 +54,24 @@ export function OperationsSummary({
   onOpenAccounts, onNewAccount, unassignedLabel, unassignedActive, onPressUnassigned,
   accountFilterName, onClearAccountFilter, style,
 }: OperationsSummaryProps) {
+  const { t } = useDS();
+  const gs = useGlassStyles();
   const codes = orderCurrencies(Object.keys(totals), primaryCode);
   const shown = codes.length > 0 ? codes : [primaryCode];
 
   return (
     <View style={style}>
-      <View style={[st.card, { borderColor: c.border, backgroundColor: c.card }]}>
+      <GlassSurface radius={radius.cardCompact} tint="lime" style={st.card}>
         <View style={st.head}>
-          <Text style={[st.label, { color: c.sub }]}>{tr.finBalances}</Text>
+          <Text style={[st.label, { color: t.text.primary }]}>{tr.finBalances}</Text>
           <TouchableOpacity
             onPress={onOpenAccounts}
             accessibilityRole="button"
             accessibilityLabel={tr.finOpenAccounts}
             hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
             style={st.link}>
-            <Text style={{ color: c.accent, fontSize: 12, fontWeight: '700' }}>{tr.finOpenAccounts}</Text>
-            <IconSymbol name="chevron.right" size={11} color={c.accent} />
+            <Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{tr.finOpenAccounts}</Text>
+            <IconSymbol name="chevron.right" size={11} color={t.text.secondary} />
           </TouchableOpacity>
         </View>
 
@@ -82,12 +87,12 @@ export function OperationsSummary({
                     adjustsFontSizeToFit
                     minimumFontScale={0.7}
                     accessibilityLabel={`${tr.totalOnAccounts} ${fmt(value, code)}`}
-                    style={{ color: value < 0 ? c.red : c.text, fontSize: 22, fontWeight: Atlas.type.headingWeight, letterSpacing: -0.5 }}>
+                    style={{ ...dsType.display, color: value < 0 ? t.status.danger : t.text.primary }}>
                     {fmt(value, code)}
                   </Text>
                   {/* Перенесений залишок — ПІД сумою (як і раніше на головній картці). */}
                   {carry !== 0 ? (
-                    <Text numberOfLines={1} style={{ color: c.sub, fontSize: 11, marginTop: 2 }}>
+                    <Text numberOfLines={1} style={{ ...dsType.caption, ...dsType.numeric, color: t.text.secondary, marginTop: 4 }}>
                       {tr.carryover}: {carry > 0 ? '+' : ''}{fmt(carry, code)}
                     </Text>
                   ) : null}
@@ -97,19 +102,19 @@ export function OperationsSummary({
           </View>
         ) : (
           <View style={{ marginTop: 6 }}>
-            <Text style={{ color: c.text, fontSize: 14, fontWeight: '700' }}>{tr.noAccounts}</Text>
-            <Text style={{ color: c.sub, fontSize: 12, marginTop: 2, lineHeight: 17 }}>{tr.noAccountsHint}</Text>
+            <Text style={{ ...dsType.h2, color: t.text.primary }}>{tr.noAccounts}</Text>
+            <Text style={{ ...dsType.caption, color: t.text.secondary, marginTop: 2, lineHeight: 17 }}>{tr.noAccountsHint}</Text>
             <TouchableOpacity
               onPress={onNewAccount}
               accessibilityRole="button"
               accessibilityLabel={tr.newAccount}
-              style={[st.newBtn, { backgroundColor: c.accent }]}>
-              <IconSymbol name="plus" size={14} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{tr.newAccount}</Text>
+              style={[st.newBtn, { backgroundColor: t.action.primary }]}>
+              <IconSymbol name="plus" size={14} color={t.text.onAction} />
+              <Text style={{ ...dsType.label, color: t.text.onAction }}>{tr.newAccount}</Text>
             </TouchableOpacity>
           </View>
         )}
-      </View>
+      </GlassSurface>
 
       {unassignedLabel ? (
         <TouchableOpacity
@@ -117,10 +122,10 @@ export function OperationsSummary({
           accessibilityRole="button"
           accessibilityState={{ selected: !!unassignedActive }}
           accessibilityLabel={unassignedLabel}
-          style={[st.warn, { borderColor: unassignedActive ? '#F59E0B' : '#F59E0B66', backgroundColor: '#F59E0B' + (unassignedActive ? '26' : '12') }]}>
-          <IconSymbol name="exclamationmark.triangle.fill" size={14} color="#F59E0B" />
-          <Text style={{ color: c.text, fontSize: 12, fontWeight: '600', flex: 1 }}>{unassignedLabel}</Text>
-          <IconSymbol name={unassignedActive ? 'xmark' : 'chevron.right'} size={12} color={c.sub} />
+          style={[st.warn, { backgroundColor: unassignedActive ? t.action.primary : (gs.card.backgroundColor as string) }]}>
+          <IconSymbol name="exclamationmark.triangle.fill" size={14} color={t.status.warning} />
+          <Text style={{ color: unassignedActive ? t.text.onAction : t.text.primary, fontSize: 13, fontFamily: fontFamily.medium, flex: 1 }}>{unassignedLabel}</Text>
+          <IconSymbol name={unassignedActive ? 'xmark' : 'chevron.right'} size={12} color={unassignedActive ? t.text.onAction : t.text.secondary} />
         </TouchableOpacity>
       ) : null}
 
@@ -129,12 +134,12 @@ export function OperationsSummary({
           onPress={onClearAccountFilter}
           accessibilityRole="button"
           accessibilityLabel={`${tr.finAccountFilterChip.replace('{name}', accountFilterName)}. ${tr.resetFilter}`}
-          style={[st.chip, { backgroundColor: c.accent + '18', borderColor: c.accent + '60' }]}>
-          <IconSymbol name="creditcard.fill" size={12} color={c.accent} />
-          <Text numberOfLines={1} style={{ color: c.accent, fontSize: 12, fontWeight: '700', flexShrink: 1 }}>
+          style={[st.chip, { backgroundColor: t.action.primary }]}>
+          <IconSymbol name="creditcard.fill" size={12} color={t.text.onAction} />
+          <Text numberOfLines={1} style={{ color: t.text.onAction, fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 }}>
             {tr.finAccountFilterChip.replace('{name}', accountFilterName)}
           </Text>
-          <IconSymbol name="xmark" size={12} color={c.accent} />
+          <IconSymbol name="xmark" size={12} color={t.text.onAction} />
         </TouchableOpacity>
       ) : null}
     </View>
@@ -142,12 +147,12 @@ export function OperationsSummary({
 }
 
 const st = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: Atlas.radius.xlarge, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 14 },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 36 },
-  label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  card: { borderRadius: radius.cardCompact, paddingHorizontal: space.cardPaddingCompact, paddingTop: 10, paddingBottom: space.cardPaddingCompact },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 36, marginBottom: 6 },
+  label: { ...dsType.h2 },
   link: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 32 },
-  amounts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 22, rowGap: 8 },
-  newBtn: { marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, minHeight: 44, borderRadius: Atlas.radius.medium },
-  warn: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Atlas.radius.medium, borderWidth: 1, marginTop: 10 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 36, paddingHorizontal: 12, borderRadius: Atlas.radius.xlarge, borderWidth: 1, marginTop: 10, maxWidth: '100%' },
+  amounts: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 28, rowGap: 12 },
+  newBtn: { marginTop: 12, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, minHeight: 44, borderRadius: radius.pill },
+  warn: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill, marginTop: 12 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', minHeight: 36, paddingHorizontal: 14, borderRadius: radius.pill, marginTop: 12, maxWidth: '100%' },
 });

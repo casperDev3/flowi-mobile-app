@@ -10,8 +10,8 @@ describe('healthTheme', () => {
   test('getHealthColors відрізняє dark/light і має всі ключі', () => {
     const dark = getHealthColors(true);
     const light = getHealthColors(false);
-    expect(dark.bg1).toBe('#0C0C14');
-    expect(light.bg1).toBe('#F4F2FF');
+    expect(dark.bg1).toBe('#0D0D0F');
+    expect(light.bg1).toBe('#F1F1F3');
     for (const k of ['bg1', 'bg2', 'border', 'text', 'sub', 'dim', 'sheet', 'track', 'card'] as const) {
       expect(typeof dark[k]).toBe('string');
       expect(typeof light[k]).toBe('string');

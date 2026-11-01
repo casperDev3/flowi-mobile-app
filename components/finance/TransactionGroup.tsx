@@ -6,6 +6,7 @@ import { fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import type { Currency, TxGroup, Transaction } from '@/utils/financeUtils';
 import { accountById, creditedAmount, isTransfer, resolveTxCurrency, type Account } from '@/utils/accounts';
+import { SwipeRow, type SwipeAction, type SwipeRowA11y } from '@/components/layout-zones/SwipeRow';
 
 /*
  * Omni (DS v2.2): день — ОДНА суцільна картка (surface.card + м'яка тінь), у
@@ -46,12 +47,25 @@ interface TransactionGroupProps {
   incomeLabel: string;
   expenseLabel: string;
   transferLabel: string;
+  /**
+   * Layout System v2.4 — свайп рядка вліво (дії без входу в деталі). Без
+   * пропа рядок не свайпається (екрани, що лише показують стрічку).
+   */
+  swipeActionsFor?: (tx: Transaction) => SwipeAction[];
+  /** Операція, відкрита в панелі/аркуші деталей (підсвічується). */
+  activeId?: string | null;
+  /** Масовий вибір: вибрані id і чи ввімкнено режим вибору. */
+  bulkIds?: ReadonlySet<string>;
+  selectionMode?: boolean;
+  /** Довгий дотик — увімкнути масовий вибір із цим рядком. */
+  onLongPress?: (tx: Transaction) => void;
 }
 
 export function TransactionGroup({
   group, compact, isDark, c, fmt, currencyByCode, primaryCode = 'UAH', accounts,
   getCatIcon, onSelect,
   todayLabel, yesterdayLabel, incomeLabel, expenseLabel, transferLabel,
+  swipeActionsFor, activeId = null, bulkIds, selectionMode = false, onLongPress,
 }: TransactionGroupProps) {
   const displayLabel =
     group.label === '__today__' ? todayLabel :
@@ -96,7 +110,10 @@ export function TransactionGroup({
       </View>
 
       {/* Transactions */}
-      <View style={compact ? { gap: 8 } : [{ backgroundColor: t.surface.card, borderRadius: radius.cardCompact, paddingVertical: 4 }, sh]}>
+      {/* Тінь — на зовнішній, обрізання — на внутрішній: рядок, зсунутий
+          свайпом, не вилазить за картку дня, а тінь лишається. */}
+      <View style={compact ? undefined : [{ borderRadius: radius.cardCompact }, sh]}>
+      <View style={compact ? { gap: 8 } : { backgroundColor: t.surface.card, borderRadius: radius.cardCompact, paddingVertical: 4, overflow: 'hidden' }}>
         {group.items.map((tx, idx) => {
           // Вигляд переказу вмикає САМ `type`, а не звужувач `isTransfer`:
           // запис без адресата — зламані дані, але малювати його червоною
@@ -128,11 +145,9 @@ export function TransactionGroup({
 
           if (compact) {
             return (
-              <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => onSelect(tx)}>
-                <View style={[{ backgroundColor: t.surface.card, borderRadius: radius.cardCompact, paddingLeft: 14, paddingRight: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center' }, sh]}>
-                  <View style={{ width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
-                    <IconSymbol name={iconName} size={19} color={color} />
-                  </View>
+              <React.Fragment key={tx.id}>{row(tx, radius.cardCompact, (
+                <View style={[{ backgroundColor: rowBg(tx.id), borderRadius: radius.cardCompact, paddingLeft: 14, paddingRight: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center' }, sh]}>
+                  {lead(tx.id, 40, iconName, 19, color)}
                   <View style={{ flex: 1, marginLeft: 11 }}>
                     <Text style={{ ...dsType.bodyMedium, color: t.text.primary }} numberOfLines={1}>{title}</Text>
                     {tx.note ? <Text style={{ ...dsType.caption, color: t.text.secondary, marginTop: 2 }} numberOfLines={1}>{tx.note}</Text> : null}
@@ -165,14 +180,15 @@ export function TransactionGroup({
                     )}
                   </View>
                 </View>
-              </TouchableOpacity>
+              ))}</React.Fragment>
             );
           }
 
           return (
-            <TouchableOpacity key={tx.id} activeOpacity={0.75} onPress={() => onSelect(tx)}>
+            <React.Fragment key={tx.id}>{row(tx, 0, (
               <View
                 style={{
+                  backgroundColor: rowBg(tx.id),
                   paddingHorizontal: 16, paddingVertical: 10,
                   flexDirection: 'row', alignItems: 'center', minHeight: 56,
                   // Omni-список: рядки в одній картці дня, між ними — волосина
@@ -180,9 +196,7 @@ export function TransactionGroup({
                   borderTopWidth: isFirst ? 0 : StyleSheet.hairlineWidth,
                   borderTopColor: t.border.hairline,
                 }}>
-                <View style={{ width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
-                  <IconSymbol name={iconName} size={15} color={color} />
-                </View>
+                {lead(tx.id, 36, iconName, 15, color)}
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={{ fontSize: 14, fontFamily: fontFamily.medium, color: t.text.primary }} numberOfLines={1}>{title}</Text>
                   {tx.note ? <Text style={{ ...dsType.caption, marginTop: 1, color: t.text.secondary }} numberOfLines={1}>{tx.note}</Text> : null}
@@ -198,10 +212,63 @@ export function TransactionGroup({
                   )}
                 </View>
               </View>
-            </TouchableOpacity>
+            ))}</React.Fragment>
           );
         })}
       </View>
+      </View>
     </View>
   );
+
+  /** Тло рядка: суцільне (щоб під свайпом не просвічували дії) + підсвітка вибору. */
+  function rowBg(id: string): string {
+    if (bulkIds?.has(id) || (!selectionMode && id === activeId)) return t.surface.subtle;
+    return t.surface.card;
+  }
+
+  /** Кружок категорії; у режимі вибору — галочка-чекбокс. */
+  function lead(id: string, size: number, icon: IconSymbolName, iconSize: number, color: string) {
+    if (selectionMode) {
+      const on = !!bulkIds?.has(id);
+      return (
+        <View style={{
+          width: size, height: size, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: on ? t.action.primary : 'transparent',
+          borderWidth: on ? 0 : 1.5, borderColor: t.text.secondary,
+        }}>
+          {on ? <IconSymbol name="checkmark" size={iconSize} color={t.text.onAction} /> : null}
+        </View>
+      );
+    }
+    return (
+      <View style={{ width: size, height: size, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: color + (isDark ? '24' : '14') }}>
+        <IconSymbol name={icon} size={iconSize} color={color} />
+      </View>
+    );
+  }
+
+  /**
+   * Рядок: тап — деталі (або перемкнути вибір у режимі вибору), довгий
+   * дотик — масовий вибір, свайп уліво — дії. Ті самі дії VoiceOver отримує
+   * як accessibilityActions (свайп — лише прискорення).
+   */
+  function row(tx: Transaction, radiusPx: number, children: React.ReactNode) {
+    const actions = swipeActionsFor && !selectionMode ? swipeActionsFor(tx) : [];
+    const checked = !!bulkIds?.has(tx.id);
+    const body = (a11y?: SwipeRowA11y) => (
+      <TouchableOpacity
+        activeOpacity={0.75}
+        onPress={() => onSelect(tx)}
+        onLongPress={onLongPress ? () => onLongPress(tx) : undefined}
+        delayLongPress={350}
+        accessibilityRole="button"
+        accessibilityState={selectionMode ? { checked } : { selected: tx.id === activeId }}
+        accessibilityActions={a11y?.accessibilityActions}
+        onAccessibilityAction={a11y?.onAccessibilityAction}>
+        {children}
+      </TouchableOpacity>
+    );
+    if (actions.length === 0) return body();
+    return <SwipeRow actions={actions} radius={radiusPx}>{a11y => body(a11y)}</SwipeRow>;
+  }
 }

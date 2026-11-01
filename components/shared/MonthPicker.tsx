@@ -12,6 +12,7 @@ import { formatMonthYear } from '@/utils/dateUtils';
 import { fontFamily, radius, type } from '@/constants/theme';
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 interface MonthPickerProps {
   month: Date;
@@ -40,7 +41,7 @@ export function MonthPicker({
   borderColor,
 }: MonthPickerProps) {
   // DS v2: аркуш — surface.elevated, клітинки — subtle-плашки, вибраний — action.primary.
-  const { t } = useDSTheme();
+  const { t, isDark } = useDSTheme();
   void dimColor; void borderColor;
   const now = new Date();
   const isCurrent =
@@ -103,6 +104,8 @@ export function MonthPicker({
                 paddingHorizontal: 20,
                 paddingBottom: Platform.OS === 'ios' ? 36 : 24,
               }}>
+              {/* Layout System v2.4: «брудне скло» — блюр + зерно під заливкою. */}
+              <OverlayMaterial isDark={isDark} />
 
               {/* Handle */}
               <View

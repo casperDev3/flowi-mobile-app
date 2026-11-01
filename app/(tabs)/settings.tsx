@@ -1,4 +1,6 @@
 import { Atlas } from '@/constants/atlas';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { OverlayScrim } from '@/components/ds/OverlaySurface';
 import { AdvertisingSettings } from '@/components/advertising/Advertising';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -636,12 +638,15 @@ export default function SettingsScreen() {
       <Modal visible={showThemeModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeThemeModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={closeThemeModal}>
+            {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+            <OverlayScrim />
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
               style={[st.sheetWrapper, wm.column]}>
               <View style={[st.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+                <OverlayMaterial isDark={isDark} />
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
@@ -680,12 +685,15 @@ export default function SettingsScreen() {
       <Modal visible={showLangModal} transparent animationType="fade" statusBarTranslucent onRequestClose={closeLangModal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={closeLangModal}>
+            {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+            <OverlayScrim />
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
               style={[st.sheetWrapper, wm.column]}>
               <View style={[st.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+                <OverlayMaterial isDark={isDark} />
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />
                   <View style={[st.handle, { backgroundColor: c.border }]} />
@@ -947,7 +955,7 @@ const st = StyleSheet.create({
   footerLogo:  { width: 26, height: 26, borderRadius: 7 },
   footerName:  { fontSize: 15, fontFamily: fontFamily.semibold, letterSpacing: -0.3 },
   footerBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
-  overlay:     { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)', justifyContent: 'flex-end' },
+  overlay:     { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16, flexShrink: 1 },
   // Стеля висоти приходить із useSheetSurface() на місці використання.
   sheet:       { borderRadius: Atlas.radius.xxlarge, padding: 24, overflow: 'hidden' },

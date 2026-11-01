@@ -1,4 +1,7 @@
 import { router } from 'expo-router';
+import { OverlayScrim } from '@/components/ds/OverlaySurface';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
@@ -31,7 +34,7 @@ import { wideModalStyles } from '@/components/finance/wideModal';
 import { CONTENT_MAX_WIDTH, WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { defaultCategories, type CategoryDef } from '@/utils/financeCategories';
 import {
-  BentoCard, GlassBackdrop, HatchedBars, KpiCounter, MeshBackground, PageHeader, SectionTabs,
+  BentoCard, HatchedBars, KpiCounter, MeshBackground, PageHeader, SectionTabs,
 } from '@/components/ds';
 import { type GlassAccent } from '@/constants/theme';
 
@@ -947,15 +950,17 @@ export default function FinanceStatsScreen() {
 
       {/* ─── Calendar Range Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
-        <Pressable accessible={false} style={[{ flex: 1, backgroundColor: isDark ? 'rgba(0,0,0,0.60)' : 'rgba(0,0,0,0.40)', justifyContent: 'flex-end' }, wm.overlay]} onPress={() => setShowCal(false)}>
+        <Pressable accessible={false} style={[{ flex: 1, justifyContent: 'flex-end' }, wm.overlay]} onPress={() => setShowCal(false)}>
+          {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+          <OverlayScrim />
           <Pressable
             onPress={e => e.stopPropagation()}
             accessible={false}
             accessibilityViewIsModal
             importantForAccessibility="yes"
             style={[{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 }, readingWidth, wm.column]}>
-            <View style={[s.calSheet, { ...c.gl.strong }, shadow[isDark ? 'dark' : 'light'].popover]}>
-              <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+            <View style={[s.calSheet, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet }, shadow[isDark ? 'dark' : 'light'].popover]}>
+              <OverlayMaterial isDark={isDark} radius={24} />
 
               {/* Handle + close */}
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>

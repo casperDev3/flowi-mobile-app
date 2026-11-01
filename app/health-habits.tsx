@@ -22,7 +22,7 @@ import { useWideModal } from '@/components/health/HealthLayout';
 import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { fontFamily, shadow } from '@/constants/theme';
 import { useGlassStyles } from '@/components/finance/finPalette';
-import { GlassBackdrop, KpiCounter, MeshBackground, PageHeader, SegmentedProgress } from '@/components/ds';
+import { OverlayMaterial, KpiCounter, MeshBackground, PageHeader, SegmentedProgress } from '@/components/ds';
 
 // Типізовано: раніше це був string[], і назва без відповідника в маппінгу
 // мовчки малювала порожнє місце на Android.
@@ -191,7 +191,8 @@ export default function HabitsScreen() {
           <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setAdd(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrap, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <View style={[s.sheet, sheetSurface, { ...gs.strong }]}>
-                <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+                {/* Брудне скло (Layout System v2.4): аркуш поверх вмісту не просвічує. */}
+                <OverlayMaterial isDark={isDark} radius={24} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addHabit}</Text>
                 <Field label={tr.title} value={title} onChange={setTitle} placeholder="Випити вітаміни" autoFocus c={c} />

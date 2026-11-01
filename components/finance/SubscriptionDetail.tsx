@@ -9,7 +9,7 @@
  * оплати на один період і дописує запис в історію (renewSubscription).
  */
 import React, { useEffect, useState } from 'react';
-import { Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Linking, StyleSheet, Text, TextInput, TouchableOpacity, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from 'react-native';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { fontFamily, radius, shadow, space, touchTarget, type as dsType } from '@/constants/theme';
@@ -59,6 +59,7 @@ export function paymentWhenLabel(nextPaymentDate: string, today: string, tr: Tra
 
 export const SubscriptionRow = React.memo(function SubscriptionRow({
   sub, today, selected, currencies, locale, lang, project, onPress, onRenew, colors: c, tr,
+  accessibilityActions, onAccessibilityAction,
 }: {
   sub: Subscription;
   today: string;
@@ -72,6 +73,9 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
   onRenew?: (id: string) => void;
   colors: SubscriptionUiColors;
   tr: Translations;
+  /** Layout System v2.4: дії свайпу рядка — і для VoiceOver (SwipeRow). */
+  accessibilityActions?: AccessibilityActionInfo[];
+  onAccessibilityAction?: (e: AccessibilityActionEvent) => void;
 }) {
   const status = subscriptionStatus(sub, today);
   const overdue = status === 'overdue';
@@ -87,6 +91,8 @@ export const SubscriptionRow = React.memo(function SubscriptionRow({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={sub.name}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       style={[st.row, {
         // Вибраний — 2px рамка action.primary (прозора у спокої — без сіпання).
         borderColor: selected ? ds.action.primary : 'transparent',

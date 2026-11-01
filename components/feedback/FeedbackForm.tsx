@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { fontFamily } from '@/constants/theme';
 /**
  * components/feedback/FeedbackForm.tsx — форма ідеї / бага (§10.2).
@@ -147,6 +148,8 @@ export function FeedbackForm({
   return (
     <View
       style={[st.sheet, { maxHeight, backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
+      {/* Layout System v2.4: «брудне скло» — блюр + зерно під overlay-заливкою. */}
+      <OverlayMaterial isDark={isDark} />
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={[st.sheetTitle, { color: c.text }]} accessibilityRole="header">{title}</Text>
 

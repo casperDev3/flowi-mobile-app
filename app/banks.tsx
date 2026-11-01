@@ -15,6 +15,9 @@
  * `accountBalance(account, transactions)` — інакше збережене число й історія
  * операцій розійшлися б і жодне з них не було б правдою.
  */
+import { OverlayScrim } from '@/components/ds/OverlaySurface';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -63,7 +66,7 @@ import {
 } from '@/utils/financeUtils';
 import { haptic } from '@/utils/haptics';
 import {
-  BentoCard, GlassBackdrop, KpiCounter, MeshBackground, SegmentedProgress,
+  BentoCard, KpiCounter, MeshBackground, SegmentedProgress,
 } from '@/components/ds';
 
 const JAR_ICONS: IconSymbolName[] = [
@@ -574,14 +577,16 @@ export default function BanksScreen() {
       <Modal visible={showForm} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowForm(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setShowForm(false)}>
+            {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+            <OverlayScrim />
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
               accessibilityViewIsModal
               importantForAccessibility="yes"
               style={[s.sheetWrapper, readingWidth, wm.column]}>
-              <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.92 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-                <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+              <View style={[s.sheet, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.92 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+                <OverlayMaterial isDark={isDark} radius={24} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={s.handleRow}>
                     <View style={{ flex: 1 }} />
@@ -741,6 +746,8 @@ export default function BanksScreen() {
       <Modal visible={showDeposit} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowDeposit(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setShowDeposit(false)}>
+            {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+            <OverlayScrim />
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
@@ -748,8 +755,8 @@ export default function BanksScreen() {
               importantForAccessibility="yes"
               style={[s.sheetWrapper, readingWidth, wm.column]}>
               {depositAccount && (
-                <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.92 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-                  <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+                <View style={[s.sheet, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.92 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+                  <OverlayMaterial isDark={isDark} radius={24} />
                   <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     <View style={s.handleRow}>
                       <View style={{ flex: 1 }} />
@@ -1008,7 +1015,7 @@ const s = StyleSheet.create({
   pctLabel:     { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   depositBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, minHeight: touchTarget, paddingHorizontal: 16 },
   fab:          { position: 'absolute', right: 20, bottom: FAB_BOTTOM, width: 56, height: 56, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', shadowColor: '#111113', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 6 },
-  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay:      { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheetWrapper: { paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:        { borderRadius: radius.card, padding: space.cardPaddingCompact, overflow: 'hidden' },
   handleRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },

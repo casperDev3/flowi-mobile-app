@@ -25,6 +25,7 @@ import type { Project } from '@/app/projects';
 import { isProjectArchived } from '@/utils/projectUtils';
 import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
 
 export interface ProjectSwitcherColors {
@@ -165,6 +166,9 @@ export function ProjectSwitcherSheet({
       <Pressable accessible={false} style={[st.overlay, { backgroundColor: t.surface.overlay }, wm.overlay]} onPress={onClose}>
         <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[st.sheetWrap, wm.column]}>
           <View style={[st.sheet, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }, shadow[isDark ? 'dark' : 'light'].popover]}>
+            {/* Layout System v2.4: «брудне скло» — блюр + тонування + зерно, щоб
+                екран під свічером не просвічував. */}
+            <OverlayMaterial isDark={isDark} radius={radius.card} />
             {!isWide && <View style={[st.handle, { backgroundColor: t.border.hairline }]} />}
             <Text style={[st.title, { color: c.text }]}>{tr.projectSwitcherTitle}</Text>
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>

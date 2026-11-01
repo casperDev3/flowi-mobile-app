@@ -7,6 +7,8 @@
  * рахунку потрапляє в «без рахунку» і не входить у жоден видимий баланс, тож
  * кожна така витрата додавала б людині ручної роботи. Валюта — рахунку.
  */
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -19,7 +21,6 @@ import type { Translations } from '@/store/translations';
 import { activeAccounts, defaultAccountId, type Account } from '@/utils/accounts';
 import { buildProjectTransaction } from '@/utils/budgetProject';
 import type { Transaction } from '@/utils/financeUtils';
-import { GlassBackdrop } from '@/components/ds';
 import { useGlassStyles } from '@/components/finance/finPalette';
 
 interface Colors {
@@ -80,8 +81,8 @@ export function ProjectTransactionForm({
 
   return (
     <SheetModal visible={visible} onClose={onClose}>
-      <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-        <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+      <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+        <OverlayMaterial isDark={isDark} radius={24} />
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={[st.handle, { backgroundColor: ds.text.muted }]} />
           <Text style={{ color: ds.text.primary, fontSize: 20, lineHeight: 26, fontFamily: fontFamily.semibold, marginBottom: 12 }}>{tr.finProjectTxTitle}</Text>

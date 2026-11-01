@@ -1,8 +1,21 @@
+/**
+ * app/archive.tsx — Архів завдань (виконані).
+ *
+ * Layout System v2.4: архів — одна головна зона (список/сітка карток без
+ * окремої картки деталей: у виконаної задачі дії — лише «Відновити» й
+ * «Видалити», і вони вже на рядку). Тому динамічної зони тут немає, а є:
+ *   • свайп рядка вліво — «Відновити» / «Видалити» без кнопок;
+ *   • масовий вибір — довгий тап по картці, далі тапи додають/знімають;
+ *     BulkActionBar «N вибрано · Дії ▾ · ✕» з тими самими операціями;
+ *   • стани зони — скелет під час читання, «Повторити» при збої читання
+ *     (а не «порожньо», ERR-01), порожньо з однією дією (скинути фільтр).
+ */
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -18,7 +31,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useI18n } from '@/store/i18n';
-import { loadData } from '@/store/storage';
+import { loadData, loadDataResult, retryStorageRead } from '@/store/storage';
+import { haptic } from '@/utils/haptics';
+import { BulkActionBar, SwipeRow, ZoneEmpty, ZoneError, ZoneSkeleton, type BulkAction } from '@/components/layout-zones';
 import { updateSynced } from '@/store/synced-storage';
 import { isSameDay } from '@/utils/dateUtils';
 import { restoredColumnIdForTask, type TaskStatusColumn } from '@/utils/taskStatuses';
@@ -85,6 +100,10 @@ interface ArchiveCardProps {
   deleteLabel: string;
   onRestore: (id: string) => void;
   onDelete: (id: string) => void;
+  /** Масовий вибір (Layout System v2.4). */
+  selected: boolean;
+  selectionMode: boolean;
+  onToggleSelect: (id: string) => void;
 }
 
 /**
@@ -92,14 +111,24 @@ interface ArchiveCardProps {
  * перемальовування всіх рядків на кожен tap по фільтру помітне оком.
  */
 const ArchiveCard = React.memo(function ArchiveCard({
-  task, isDark, c, restoreLabel, deleteLabel, onRestore, onDelete,
+  task, isDark, c, restoreLabel, deleteLabel, onRestore, onDelete, selected, selectionMode, onToggleSelect,
 }: ArchiveCardProps) {
   // Задача без (валідного) пріоритету — без бейджа, а не TypeError.
   const prioLevel = normalizePriority(task);
   return (
     // Omni (DS v2.2): суцільна картка surface.card з м'якою тінню, без рамки,
-    // скла й бічної смуги.
-    <View style={[ar.card, { backgroundColor: c.card }, shadow[isDark ? 'dark' : 'light'].card]}>
+    // скла й бічної смуги. Довгий тап — масовий вибір; у режимі вибору тап
+    // перемикає вибір (вибрана — контур action.primary, як у списку Завдань).
+    <Pressable
+      onLongPress={() => { haptic.light(); onToggleSelect(task.id); }}
+      onPress={selectionMode ? () => onToggleSelect(task.id) : undefined}
+      accessibilityState={selectionMode ? { selected } : undefined}
+      style={[ar.card, { backgroundColor: c.card, borderWidth: 2, borderColor: selected ? c.text : 'transparent' }, shadow[isDark ? 'dark' : 'light'].card]}>
+      {selectionMode ? (
+        <View style={{ marginRight: 10 }} accessible={false}>
+          <IconSymbol name={selected ? 'checkmark.circle.fill' : 'circle'} size={20} color={selected ? c.text : c.sub} />
+        </View>
+      ) : null}
       <View style={{ flex: 1 }}>
         {/* Title row */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7 }}>
@@ -163,7 +192,7 @@ const ArchiveCard = React.memo(function ArchiveCard({
           <IconSymbol name="trash" size={14} color={c.danger} />
         </TouchableOpacity>
       </View>
-    </View>
+    </Pressable>
   );
 });
 
@@ -195,14 +224,23 @@ export default function ArchiveScreen() {
   // асинхронно, і замикання на значенні зі стану читало б застарілий набір.
   const statusColumnsRef = useRef<TaskStatusColumn[]>([]);
 
-  const reloadTasks = useCallback(async () => {
+  /** Стан головної зони: скелет → список; збій читання → «Повторити» (ERR-01). */
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const readTasks = useCallback(async (retry: boolean) => {
     const [stored, columns] = await Promise.all([
-      loadData<Task[]>('tasks', []),
+      (retry ? retryStorageRead : loadDataResult)<Task[]>('tasks', []),
       loadData<TaskStatusColumn[]>('task_statuses', []),
     ]);
     statusColumnsRef.current = columns;
-    setTasks(stored);
+    if (!stored.ok || !Array.isArray(stored.value)) {
+      if (__DEV__) console.warn('[archive] задачі не прочитались:', stored.ok ? 'не масив' : stored.error);
+      setLoadState('error');
+      return;
+    }
+    setTasks(stored.value);
+    setLoadState('ready');
   }, []);
+  const reloadTasks = useCallback(() => readTasks(false), [readTasks]);
   useFocusEffect(useCallback(() => {
     void reloadTasks();
   }, [reloadTasks]));
@@ -264,6 +302,47 @@ export default function ArchiveScreen() {
       ]
     );
   }, [mutateTasks, tr]);
+
+  // ─── Масовий вибір (Layout System v2.4) ──────────────────────────────────
+  const [bulkIds, setBulkIds] = useState<ReadonlySet<string>>(() => new Set());
+  const selectionMode = bulkIds.size > 0;
+  const clearBulk = useCallback(() => setBulkIds(new Set()), []);
+  const toggleSelect = useCallback((id: string) => {
+    setBulkIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const bulkRestore = useCallback(() => {
+    const ids = new Set(bulkIds);
+    clearBulk();
+    void mutateTasks(fresh => fresh.map(t => (ids.has(t.id)
+      ? { ...t, status: 'active' as Status, kanbanColumnId: restoredColumnIdForTask(t, statusColumnsRef.current) }
+      : t)))
+      .catch(() => {});
+  }, [bulkIds, clearBulk, mutateTasks]);
+  const bulkDelete = useCallback(() => {
+    const ids = new Set(bulkIds);
+    if (!ids.size) return;
+    Alert.alert(
+      tr.deletePermanently,
+      `${ids.size} × ${tr.tasks}\n${tr.cannotUndo}`,
+      [
+        { text: tr.cancel, style: 'cancel' },
+        { text: tr.delete, style: 'destructive', onPress: () => {
+          clearBulk();
+          // Як і «Очистити архів»: лише ті, що досі виконані.
+          void mutateTasks(fresh => fresh.filter(t => !(ids.has(t.id) && (t.status === 'done' || t.integrationArchived))))
+            .catch(() => {});
+        }},
+      ],
+    );
+  }, [bulkIds, clearBulk, mutateTasks, tr]);
+  const bulkActions = useMemo<BulkAction[]>(() => [
+    { key: 'restore', label: tr.restore, icon: 'arrow.uturn.backward', onPress: bulkRestore, testID: 'archive-bulk-restore' },
+    { key: 'delete', label: tr.delete, icon: 'trash.fill', tone: 'danger', onPress: bulkDelete, testID: 'archive-bulk-delete' },
+  ], [tr.restore, tr.delete, bulkRestore, bulkDelete]);
 
   const filtersApplied = filterPriorities.length > 0;
   const withSubtasks = useMemo(() => done.filter(t => t.subtasks.length > 0).length, [done]);
@@ -331,17 +410,29 @@ export default function ArchiveScreen() {
     // У сітці комірка ділить рядок порівну (flex:1); minWidth:0 — щоб довга
     // назва не розпирала колонку. На телефоні обгортка нічого не змінює.
     <View style={columns > 1 ? ar.gridCell : undefined}>
-    <ArchiveCard
-      task={item}
-      isDark={isDark}
-      c={c}
-      restoreLabel={tr.restore}
-      deleteLabel={tr.delete}
-      onRestore={restore}
-      onDelete={deleteForever}
-    />
+    {/* Свайп вліво — «Відновити» / «Видалити» без кнопок; у режимі вибору — ні. */}
+    <SwipeRow
+      enabled={!selectionMode}
+      radius={radius.nested}
+      actions={[
+        { key: 'restore', label: tr.restore, icon: 'arrow.uturn.backward', onPress: () => restore(item.id), testID: `archive-swipe-restore-${item.id}` },
+        { key: 'delete', label: tr.delete, icon: 'trash.fill', tone: 'danger', onPress: () => deleteForever(item.id), testID: `archive-swipe-delete-${item.id}` },
+      ]}>
+      <ArchiveCard
+        task={item}
+        isDark={isDark}
+        c={c}
+        restoreLabel={tr.restore}
+        deleteLabel={tr.delete}
+        onRestore={restore}
+        onDelete={deleteForever}
+        selected={bulkIds.has(item.id)}
+        selectionMode={selectionMode}
+        onToggleSelect={toggleSelect}
+      />
+    </SwipeRow>
     </View>
-  )), [isDark, c, tr.restore, tr.delete, restore, deleteForever, columns]);
+  )), [isDark, c, tr.restore, tr.delete, restore, deleteForever, columns, bulkIds, selectionMode, toggleSelect]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -422,6 +513,11 @@ export default function ArchiveScreen() {
 
         {/* Архів росте без стелі — список віртуалізований, інакше
             кількасот карток монтуються всі одразу. */}
+        {loadState === 'loading' ? (
+          <ZoneSkeleton variant="list" rows={5} style={[contentWidth, { paddingHorizontal: 20 }]} />
+        ) : loadState === 'error' ? (
+          <ZoneError testID="archive-error" onRetry={() => { setLoadState('loading'); void readTasks(true); }} />
+        ) : (
         <FlatList
           // numColumns не можна міняти «на льоту» — при повороті планшета
           // список перемонтовується з новим ключем.
@@ -434,13 +530,29 @@ export default function ArchiveScreen() {
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={ArchiveSeparator}
           renderItem={renderItem}
-          ListEmptyComponent={
+          ListEmptyComponent={filtersApplied ? (
+            // Порожньо через фільтр — одна дія: скинути фільтр.
+            <ZoneEmpty
+              testID="archive-empty-filtered"
+              icon="archivebox"
+              title={tr.archiveEmpty}
+              actionLabel={tr.resetFilter}
+              onAction={() => setFilterPriorities([])}
+            />
+          ) : (
             <View style={{ alignItems: 'center', paddingVertical: 72 }}>
               <AccentIcon isDark={isDark} icon="archivebox.fill" accent="lavender" size="lg" style={ar.emptyIcon} />
-              <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontFamily: fontFamily.semibold }}>Архів порожній</Text>
-              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 5 }}>Виконані завдання з’являться тут</Text>
+              <Text style={{ color: c.text, fontSize: 16, marginTop: 18, fontFamily: fontFamily.semibold }}>{tr.archiveEmpty}</Text>
+              <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular, marginTop: 5 }}>{tr.completedTasksAppear}</Text>
             </View>
-          }
+          )}
+        />
+        )}
+        <BulkActionBar
+          testID="archive-bulk-bar"
+          count={bulkIds.size}
+          actions={bulkActions}
+          onClear={clearBulk}
         />
       </SafeAreaView>
     </View>

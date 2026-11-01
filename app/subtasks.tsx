@@ -1,3 +1,13 @@
+/**
+ * app/subtasks.tsx — підзавдання одного завдання (чек-лист).
+ *
+ * Layout System v2.4: екран сам є деталлю одного запису, тож зон «список +
+ * деталі» тут немає. Застосовано: свайп рядка вліво («Копіювати» /
+ * «Видалити» — ті самі дії, що й кнопки рядка) і стани головної зони —
+ * скелет під час читання та «Повторити» при збої читання (не порожній
+ * чек-лист, ERR-01). Масового вибору немає: пункт чек-листа відмічається
+ * одним тапом, а видаляють їх поодинці.
+ */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -20,7 +30,8 @@ import { useUndoToast } from '@/components/shared/UndoToast';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/store/i18n';
 import { copyTextToClipboard } from '@/utils/clipboard';
-import { loadData } from '@/store/storage';
+import { loadData, loadDataResult, retryStorageRead } from '@/store/storage';
+import { SwipeRow, ZoneError, ZoneSkeleton } from '@/components/layout-zones';
 import { updateSynced } from '@/store/synced-storage';
 import { useTimerContext } from '@/store/timer-context';
 import { subtaskToggleTransition, type TaskStatusColumn } from '@/utils/taskStatuses';
@@ -70,9 +81,18 @@ const SubRow = React.memo(function SubRow({
   sub, textColor, subColor, borderColor: _borderColor, dimColor, onToggle, onDelete, onCopy, copyLabel, deleteLabel,
 }: SubRowProps) {
   return (
+    <SwipeRow
+      radius={radius.nested}
+      actions={[
+        { key: 'copy', label: copyLabel, icon: 'doc.on.doc', onPress: () => onCopy(sub) },
+        { key: 'delete', label: deleteLabel, icon: 'trash.fill', tone: 'danger', onPress: () => onDelete(sub.id) },
+      ]}>
+    {a11y => (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={() => onToggle(sub.id)}
+      accessibilityActions={a11y.accessibilityActions}
+      onAccessibilityAction={a11y.onAccessibilityAction}
       // Omni: рядок чек-листа — суцільна картка surface.card (dimColor), без
       // рамки; виконане — закреслене й text.secondary.
       accessibilityRole="checkbox"
@@ -105,6 +125,8 @@ const SubRow = React.memo(function SubRow({
         <IconSymbol name="trash" size={14} color={subColor} />
       </TouchableOpacity>
     </TouchableOpacity>
+    )}
+    </SwipeRow>
   );
 });
 
@@ -137,12 +159,20 @@ export default function SubtasksScreen() {
     dim:    glassOf(dsTokens(isDark)).surfaceSubtle,
   }), [isDark]);
 
-  useEffect(() => {
-    loadData<Task[]>('tasks', []).then(tasks => {
-      const found = tasks.find(t => t.id === taskId);
-      if (found) setTask(found);
-    });
+  /** Стан головної зони: скелет → чек-лист; збій читання → «Повторити». */
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const readTask = useCallback(async (retry: boolean) => {
+    const result = await (retry ? retryStorageRead : loadDataResult)<Task[]>('tasks', []);
+    if (!result.ok || !Array.isArray(result.value)) {
+      if (__DEV__) console.warn('[subtasks] задачі не прочитались:', result.ok ? 'не масив' : result.error);
+      setLoadState('error');
+      return;
+    }
+    const found = result.value.find(t => t.id === taskId);
+    if (found) setTask(found);
+    setLoadState('ready');
   }, [taskId]);
+  useEffect(() => { void readTask(false); }, [readTask]);
 
   const persistTask = useCallback(async (updated: Task) => {
     setTask(updated);
@@ -242,6 +272,11 @@ export default function SubtasksScreen() {
           <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.regular, fontVariant: ['tabular-nums'] }}>{doneCount}/{total} {tr.done}</Text>
         </ScreenHeader>
 
+        {loadState === 'loading' ? (
+          <ZoneSkeleton variant="list" rows={4} style={[contentWidth, { paddingHorizontal: 20 }]} />
+        ) : loadState === 'error' ? (
+          <ZoneError testID="subtasks-error" onRetry={() => { setLoadState('loading'); void readTask(true); }} />
+        ) : (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           {/* FlatList, а не ScrollView+map: зазвичай підзавдань одиниці, але
               імпортований чек-лист на сотні пунктів монтувався б цілком. */}
@@ -296,6 +331,7 @@ export default function SubtasksScreen() {
             }
           />
         </KeyboardAvoidingView>
+        )}
       </SafeAreaView>
       {toastElement}
     </View>

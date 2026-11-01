@@ -8,7 +8,7 @@ import { fontFamily, shadow } from '@/constants/theme';
  * VoiceOver, ні людина з порушенням кольоросприйняття.
  */
 import React, { useCallback } from 'react';
-import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View, type AccessibilityActionEvent, type AccessibilityActionInfo, type StyleProp, type ViewStyle } from 'react-native';
 
 import type { InboxItem } from '@/api/notifications';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -36,15 +36,29 @@ interface Props {
   onArchive: (item: InboxItem) => void;
   /** Дії під текстом картки (напр. «Прийняти/Відхилити» запрошення в проєкт). */
   footer?: React.ReactNode;
+  /**
+   * Layout System v2.4 — масовий вибір: довгий дотик вмикає, у режимі вибору
+   * тап перемикає рядок (екран передає відповідний onOpen), а кружок події
+   * стає чекбоксом.
+   */
+  selectionMode?: boolean;
+  selected?: boolean;
+  onLongPress?: (item: InboxItem) => void;
+  /** Дії свайпу рядка — і для VoiceOver (SwipeRow). */
+  accessibilityActions?: AccessibilityActionInfo[];
+  onAccessibilityAction?: (e: AccessibilityActionEvent) => void;
+  style?: StyleProp<ViewStyle>;
 }
 
 export const NotificationRow = React.memo(function NotificationRow({
   item, timeText, isDark, colors, unreadLabel, archiveLabel, collapsedText, onOpen, onArchive, footer,
+  selectionMode = false, selected = false, onLongPress, accessibilityActions, onAccessibilityAction, style,
 }: Props) {
   const unread = !item.read_at;
   const look = eventLook(item.category, item.event_type);
   const handleOpen = useCallback(() => onOpen(item), [onOpen, item]);
   const handleArchive = useCallback(() => onArchive(item), [onArchive, item]);
+  const handleLongPress = useCallback(() => onLongPress?.(item), [onLongPress, item]);
   const meta = [item.project?.name, timeText].filter(Boolean).join(' · ');
   // Omni (DS v2.2): суцільна картка surface.card з м'якою тінню, без рамки й
   // скла; непрочитана — тінт lavenderSoft.
@@ -53,16 +67,29 @@ export const NotificationRow = React.memo(function NotificationRow({
 
   return (
     <View
-      style={[styles.card, { backgroundColor: t.surface.card }, shadow[isDark ? 'dark' : 'light'].card, unread && { backgroundColor: colors.unreadBg }]}>
+      style={[styles.card, { backgroundColor: t.surface.card }, shadow[isDark ? 'dark' : 'light'].card, unread && { backgroundColor: colors.unreadBg }, selected && { backgroundColor: t.surface.subtle }, style]}>
       <View style={styles.row}>
       <Pressable
         onPress={handleOpen}
+        onLongPress={onLongPress ? handleLongPress : undefined}
+        delayLongPress={350}
         accessibilityRole="button"
         accessibilityLabel={a11y}
+        accessibilityState={selectionMode ? { checked: selected } : undefined}
+        accessibilityActions={accessibilityActions}
+        onAccessibilityAction={onAccessibilityAction}
         style={({ pressed }) => [styles.main, pressed && { opacity: 0.7 }]}>
-        <View style={[styles.iconBox, { backgroundColor: look.color + '20' }]}>
-          <IconSymbol name={look.icon} size={17} color={look.color} />
-        </View>
+        {selectionMode ? (
+          <View style={[styles.iconBox, selected
+            ? { backgroundColor: t.action.primary }
+            : { borderWidth: 1.5, borderColor: t.text.secondary }]}>
+            {selected ? <IconSymbol name="checkmark" size={15} color={t.text.onAction} /> : null}
+          </View>
+        ) : (
+          <View style={[styles.iconBox, { backgroundColor: look.color + '20' }]}>
+            <IconSymbol name={look.icon} size={17} color={look.color} />
+          </View>
+        )}
         <View style={styles.textCol}>
           <View style={styles.titleRow}>
             <Text

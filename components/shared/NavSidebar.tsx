@@ -113,15 +113,20 @@ export type NavSidebarProps = {
   onNavigate?: () => void;
   /** Кнопка «Закрити» у шапці шухляди. */
   onClose?: () => void;
+  /**
+   * Низ шухляди (Layout System v2.4): перемикач «Список / Колонки» поточного
+   * розділу. Стоїть над карткою таймерів, поза прокруткою.
+   */
+  footer?: React.ReactNode;
 };
 
-export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavigate, onClose }: NavSidebarProps) {
+export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavigate, onClose, footer }: NavSidebarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tr } = useI18n();
   const { user } = useAuth();
-  const { sizeClass } = useResponsive();
-  const mode = useNavSidebarMode(sizeClass);
+  const { sizeClass, width: windowWidth } = useResponsive();
+  const mode = useNavSidebarMode(sizeClass, windowWidth);
   const drawer = variant === 'drawer';
   const rail = !drawer && mode === 'rail';
   const go = useCallback((route: string) => {
@@ -340,7 +345,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
 
   return (
     <View
-      style={[st.root, { width: drawer ? (width ?? SIDEBAR_WIDTH) : SIDEBAR_WIDTH, backgroundColor: reduceTransparency || drawer ? t.surface.card : 'transparent', paddingTop: insets.top + 14 }, drawer && { flex: 1 }]}
+      style={[st.root, { width: drawer ? (width ?? SIDEBAR_WIDTH) : SIDEBAR_WIDTH, backgroundColor: reduceTransparency && !drawer ? t.surface.card : 'transparent', paddingTop: insets.top + 14 }, drawer && { flex: 1 }]}
       accessibilityRole="menu">
       {drawer ? null : glassLayer}
       <View style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:12}}><Image source={require('@/assets/logo_app.png')} style={{width:34,height:34,borderRadius:Atlas.radius.medium}} accessible={false}/><Text style={[st.brand, { color: c.text, marginBottom:0, flex: 1 }]}>Flowi</Text>{toggleButton}</View>
@@ -419,7 +424,9 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
       {/* Активні таймери — ПОЗА скролом, притиснуті до низу: зупинити таймер
           мусить бути можна з будь-якого розділу без прокрутки сайдбара.
           Картка сама ховається, коли таймерів немає. */}
-      <View style={{ paddingBottom: insets.bottom + 10 }}>
+      <View style={{ paddingBottom: insets.bottom + 10, gap: 10 }}>
+        {/* Шухляда: тло малює SidebarDrawer («брудне скло» OverlaySurface). */}
+        {footer}
         <ActiveTimersSidebarCard colors={timerCardColors} />
       </View>
     </View>

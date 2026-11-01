@@ -37,7 +37,7 @@ import {
   type TimePeriod,
   type TimeSort,
 } from '@/utils/timeEntries';
-import { GlassBackdrop } from '@/components/ds';
+import { OverlayMaterial } from '@/components/ds';
 
 export interface TimeFilterSheetProps {
   visible: boolean;
@@ -90,7 +90,7 @@ export function TimeFilterSheet({
       <Pressable accessible={false} style={[s.overlay, { backgroundColor: c.t.surface.overlay }]} onPress={onClose}>
         <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
           <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.85 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-            <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+            <OverlayMaterial isDark={isDark} />
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />

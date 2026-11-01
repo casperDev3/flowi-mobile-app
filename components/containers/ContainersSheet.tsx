@@ -1,8 +1,10 @@
 /**
- * Аркуш модуля: SheetModal + скло DS v2.1 (surfaceStrong + <GlassBackdrop/>) зі стелею
+ * Аркуш модуля: SheetModal + скло DS v2.1 («брудне скло» Layout System v2.4: overlay-заливка + <OverlayMaterial/>) зі стелею
  * висоти ЧИСЛОМ (useSheetSurface, NEW-01) і ScrollView всередині; кнопки дії —
  * pill у футері поза прокруткою.
  */
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -13,7 +15,6 @@ import { useSheetSurface } from '@/hooks/use-content-width';
 import { useI18n } from '@/store/i18n';
 
 import type { ContainersColors } from './theme';
-import { GlassBackdrop } from '@/components/ds';
 
 export function ContainersSheet({ visible, onClose, c, title, children, footer }: {
   visible: boolean;
@@ -27,8 +28,8 @@ export function ContainersSheet({ visible, onClose, c, title, children, footer }
   const { tr } = useI18n();
   return (
     <SheetModal visible={visible} onClose={onClose}>
-      <View style={[styles.sheet, surface, { ...c.gl.strong }, shadow[c.isDark ? 'dark' : 'light'].popover]}>
-        <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+      <View style={[styles.sheet, surface, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(c.isDark)).sheet }, shadow[c.isDark ? 'dark' : 'light'].popover]}>
+        <OverlayMaterial isDark={c.isDark} radius={24} />
         <View style={styles.head}>
           <Text accessibilityRole="header" style={[styles.title, { color: c.text }]} numberOfLines={2}>{title}</Text>
           <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel={tr.close}

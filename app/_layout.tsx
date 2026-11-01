@@ -21,6 +21,7 @@ import { ModuleGate } from '@/components/shared/ModuleGate';
 import { ProjectSidebar } from '@/components/shared/ProjectSidebar';
 import { SIDEBAR_HIDDEN_ON, sidebarVisible } from '@/constants/nav';
 import { MeshBackground } from '@/components/ds/MeshBackground';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { glass as dsGlass, theme as dsTheme } from '@/constants/theme';
 import { projectIdFromPathname } from '@/constants/projectNav';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -549,6 +550,10 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError && !fontWaitOver) return null;
 
   return (
+    // Кореневий GestureHandlerRootView (Layout System v2.4): свайп рядків
+    // (SwipeRow) і жести панелей працюють у дереві екранів, а не лише в
+    // модалках, що мали власний root.
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ErrorBoundary>
       <I18nProvider>
         <AppModeProvider>
@@ -566,5 +571,6 @@ export default function RootLayout() {
         </AppModeProvider>
       </I18nProvider>
     </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }

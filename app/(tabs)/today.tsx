@@ -21,7 +21,7 @@ import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
 import { PressableScale } from '@/components/shared/PressableScale';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
 import { AppHeader } from '@/components/shared/AppHeader';
-import { SkeletonCard } from '@/components/shared/Skeleton';
+import { ZoneSkeleton } from '@/components/layout-zones/ZoneStates';
 import { SyncBadge } from '@/components/today/SyncBadge';
 import { QuickActions } from '@/components/today/QuickActions';
 import { TodayTaskRow } from '@/components/today/TodayTaskRow';
@@ -905,14 +905,10 @@ export default function TodayScreen() {
             </View>
           ) : null}
 
-          {/* Skeleton — перше завантаження */}
-          {!loaded && (
-            <>
-              <SkeletonCard style={{ marginTop: 4 }} />
-              <SkeletonCard />
-              <SkeletonCard />
-            </>
-          )}
+          {/* Skeleton — перше завантаження. Layout System v2.4: «Сьогодні» —
+              це статична зона (KPI + зустрічі дня) на телефоні й iPad, де
+              вона не вміщається поруч зі списком; скелет — у формі її вмісту. */}
+          {!loaded && <ZoneSkeleton variant="static" style={{ marginTop: 4 }} />}
 
           {loaded && (
             <TodaySectionGrid items={sections} columnCount={columnCount} />

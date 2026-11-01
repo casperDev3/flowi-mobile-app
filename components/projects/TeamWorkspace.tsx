@@ -13,13 +13,20 @@ import { isExecutableTask } from '@/utils/task-contract';
  * «⋯» (стартовий екран проєкту, усі завдання, календар). Нова задача
  * відкриває швидке створення на екрані «Завдань» проєкту — у просторі
  * проєкту, а не в особистому.
+ *
+ * Layout System v2.4: окремий екран (не вбудований в «Огляд») — зони через
+ * ProjectScreenShell `zone`: черги — головна зона, повна картка задачі —
+ * динамічна (панель праворуч з ✕ на iPad, нижній аркуш ~60% → весь екран на
+ * телефоні), відкрита задача — у `?task=` (як і раніше). Рядки черг
+ * свайпаються вліво: «В архів» (виконано) і «Видалити» (лише лід). Створення
+ * — плаваюча «+» на всіх розмірах.
  */
 import { ProjectDiscussions } from './ProjectDiscussions';
 import { actualWorkload } from '@/utils/workloadActual';
 import { TeamOfflineStatus } from './TeamOfflineStatus';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useProject } from '@/hooks/use-project';
 import { useProjectRole } from '@/hooks/use-project-role';
@@ -39,9 +46,10 @@ import { ActionBar, ActionButton, ActionChip } from '@/components/shared/ActionB
 import { useProjectTaskCard, useProjectTaskHost } from './ProjectTaskCard';
 import { saveProjectRecord, useProjectRecords } from './useProjectRecords';
 import { DetailPane } from '@/components/shared/DetailPane';
-import { ListDetailLayout, useListDetail } from '@/components/shared/ListDetailLayout';
+import { SwipeRow, useZoneState, type SwipeAction } from '@/components/layout-zones';
+import { taskCardZone } from './ProjectTaskSheet';
 import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
-import { AddTaskFab, AddTaskHeaderButton, FAB_LIST_CLEARANCE } from '@/components/tasks/AddTaskButton';
+import { AddTaskFab, FAB_LIST_CLEARANCE } from '@/components/tasks/AddTaskButton';
 import { TASK_CARD_SHEET_RATIO } from '@/components/tasks/card/primitives';
 import { TaskCompactCard } from '@/components/tasks/TaskCompactCard';
 import type { TaskDetailTab } from '@/components/tasks/TaskDetailHeader';
@@ -88,7 +96,15 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
   const prefs = allPrefs.find(p => p.userId === uid);
   const members = useProjectMembers(pid);
 
-  const [selected, setSelected] = useState<string | null>(taskId ?? null);
+  /**
+   * Відкрита задача. Окремий екран — у параметрі `?task=` (useZoneState,
+   * Layout System v2.4); вбудований в «Огляд» — локально (адреса Огляду не
+   * повинна мінятися від чужого віджета).
+   */
+  const zoneState = useZoneState({ section: `project-${mode}`, selectedParam: 'task' });
+  const [localSelected, setLocalSelected] = useState<string | null>(taskId ?? null);
+  const selected = embedded ? localSelected : zoneState.selectedId;
+  const setSelected = embedded ? setLocalSelected : zoneState.select;
   const [detailTab, setDetailTab] = useState<TaskDetailTab>('main');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -119,9 +135,8 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
   const label = mode === 'discussions' ? tr.projectDiscussions : mode === 'workload' ? tr.projectWorkload : mode === 'overview' ? tr.twTeamProgress : tr.projectMyWork;
 
   // ─── Повна картка задачі (та сама, що в «Завданнях» проєкту) ────────────
-  const listDetail = useListDetail();
   const detailScrollRef = useRef<InstanceType<typeof ScrollView> | null>(null);
-  const openTask = useCallback((task: Task, tab: TaskDetailTab = 'main') => { setSelected(task.id); setDetailTab(tab); }, []);
+  const openTask = useCallback((task: Task, tab: TaskDetailTab = 'main') => { setSelected(task.id); setDetailTab(tab); }, [setSelected]);
   const card = useProjectTaskCard({
     task: selectedTask,
     projectId: pid,
@@ -135,7 +150,9 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
     onDelete: task => host.deleteTask(task, () => setSelected(null)),
     onMoved: name => host.showToast(tr.taskMovedToProject.replace('{project}', name)),
     onClose: () => setSelected(null),
-    wide: !embedded && listDetail.wide,
+    // Окремий екран: ручку малює нижній аркуш зони (BottomSheet), панель
+    // iPad її не має. Вбудований — модальний DetailPane зі своєю ручкою.
+    wide: !embedded,
     tab: detailTab,
     onTabChange: setDetailTab,
     colors: cardColors,
@@ -174,6 +191,19 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
   }, [tr]);
   const projectForBadge = project ? [{ id: project.id, name: project.name, color: project.color }] : [];
 
+  /** Свайп рядка вліво — ті самі права, що в картці (виконати / видалити — лише лід). */
+  const swipeActionsFor = (task: Task): SwipeAction[] => {
+    const canRun = taskRights(task, role, uid).execute;
+    return [
+      ...(canRun && task.status !== 'done'
+        ? [{ key: 'archive', label: tr.archive, icon: 'archivebox.fill' as const, tone: 'success' as const, onPress: () => toggleTask(task) }]
+        : []),
+      ...(canRun && isLead(role)
+        ? [{ key: 'delete', label: tr.delete, icon: 'trash.fill' as const, tone: 'danger' as const, onPress: () => host.deleteTask(task, () => { if (selected === task.id) setSelected(null); }) }]
+        : []),
+    ];
+  };
+
   const newTask = useCallback(() => {
     router.push({ pathname: '/project/[id]/tasks', params: { id: pid, create: '1' } } as never);
   }, [router, pid]);
@@ -193,9 +223,10 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
       }
       style={{ gap: 8 }}>
       {items.slice(0, 5).map(t => (
+        <SwipeRow key={t.id} actions={embedded ? [] : swipeActionsFor(t)} radius={radius.nested}>
+          {a11y => (
         <TaskCompactCard
           hideProject
-          key={t.id}
           task={t}
           statusColumn={boardColumnForTask(t, host.boardColumns, host.columns) ?? host.boardColumns[0]}
           onPress={task => openTask(task)}
@@ -209,7 +240,11 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
           subtasksLabel={tr.subtasks}
           assigneeLabel={assigneeDisplayName(t.assigneeId, members, user?.id, tr.taskAssigneeMe)}
           priorityPlacement="corner"
+          rowAccessibilityActions={embedded ? undefined : a11y.accessibilityActions}
+          onRowAccessibilityAction={embedded ? undefined : a11y.onAccessibilityAction}
         />
+          )}
+        </SwipeRow>
       ))}
       {items.length > 5 && (
         <ActionBar align="end">
@@ -356,7 +391,8 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
   }
 
   const taskMode = mode === 'my-work' || mode === 'overview';
-  const showFab = taskMode && canCreate && !isWide;
+  // Плаваюча «+» — на всіх розмірах (Layout System v2.4).
+  const showFab = taskMode && canCreate;
   return (
     <ProjectScreenShell
       project={project}
@@ -373,39 +409,22 @@ export function TeamWorkspace({ mode = 'my-work', embedded = false }: { mode?: '
       actions={taskMode ? (
         <>
           <ProjectSyncIndicator projectId={pid} accent={c.accent} subColor={c.sub} dimColor={c.dim} />
-          {isWide && canCreate && <AddTaskHeaderButton label={tr.projectAddTask} onPress={newTask} color={c.accent} />}
           <TasksMenuButton onPress={() => setShowMenu(true)} label={tr.projectWorkMenu} colors={c} />
         </>
-      ) : <ProjectSyncIndicator projectId={pid} accent={c.accent} subColor={c.sub} dimColor={c.dim} />}>
-      <ListDetailLayout
-        open={!!selectedTask}
-        onClose={() => setSelected(null)}
-        isDark={isDark}
-        sheetColor={cardColors.sheet}
-        borderColor={c.border}
-        maxHeight={height * 0.88}
-        sheetHeight={Math.round(height * TASK_CARD_SHEET_RATIO)}
-        scrollRef={detailScrollRef}
-        header={card.header}
-        footer={card.footer}
-        // P2: на ландшафті iPad колонка деталі була порожньою білою панеллю.
-        empty={
-          <View style={{ alignItems: 'center', gap: 8 }}>
-            <IconSymbol name="checklist" size={28} color={c.sub} />
-            <Text style={[type.h2, { color: c.text, textAlign: 'center' }]}>{tr.detailEmptyTitle}</Text>
-            <Text style={[type.body, { color: c.sub, fontSize: 13, textAlign: 'center' }]}>{tr.detailEmptyHint}</Text>
-          </View>
-        }
-        list={
-          <ScrollView
-            contentContainerStyle={{ paddingBottom: tabBarInset + (showFab ? FAB_LIST_CLEARANCE : 40), width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center' }}
-            keyboardShouldPersistTaps="handled">
-            {content}
-          </ScrollView>
-        }>
-        {card.body}
-      </ListDetailLayout>
-      {showFab && !host.undoVisible && <AddTaskFab label={tr.projectAddTask} onPress={newTask} color={c.accent} bottom={tabBarInset + 20} />}
+      ) : <ProjectSyncIndicator projectId={pid} accent={c.accent} subColor={c.sub} dimColor={c.dim} />}
+      zone={{
+        // Повна картка задачі — динамічна зона: панель праворуч з ✕ (iPad,
+        // список розтягується, коли її закрито), нижній аркуш на телефоні.
+        ...taskCardZone({ card, open: !!selectedTask, onClose: () => setSelected(null), label: selectedTask?.title, scrollRef: detailScrollRef }),
+        fab: showFab && !host.undoVisible ? (
+          <AddTaskFab label={tr.projectAddTask} onPress={newTask} color={c.accent} bottom={tabBarInset + 20} />
+        ) : null,
+      }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: tabBarInset + (showFab ? FAB_LIST_CLEARANCE : 40), width: '100%', maxWidth: isWide ? undefined : Layout.wideMaxWidth, alignSelf: 'center' }}
+        keyboardShouldPersistTaps="handled">
+        {content}
+      </ScrollView>
       {taskMode && <TasksHeaderMenu visible={showMenu} onClose={() => setShowMenu(false)} items={menuItems} colors={c} isDark={isDark} />}
       {host.undoElement}
     </ProjectScreenShell>

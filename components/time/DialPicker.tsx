@@ -22,7 +22,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Translations } from '@/store/translations';
 import { DIALS, type DialId } from '@/utils/timerDials';
 import { useGlassStyles } from '@/components/finance/finPalette';
-import { GlassBackdrop } from '@/components/ds';
+import { OverlayMaterial } from '@/components/ds';
 
 /** Скільки «пройшло» на передпогляді: 23 хвилини 41 секунда. */
 const PREVIEW_SECONDS = 23 * 60 + 41;
@@ -89,7 +89,7 @@ export function DialPicker({
           { ...gs.strong, backgroundColor: c.sheet, paddingBottom: insets.bottom + 16 },
           isWide && { maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
         ]}>
-        <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+        <OverlayMaterial isDark={isDark} radius={{ borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card }} />
         <View style={[st.handle, { backgroundColor: t.text.muted }]} />
 
         <View style={st.head}>

@@ -110,6 +110,10 @@ describe('рейка сайдбара', () => {
   it('medium за замовчуванням — рейка, expanded — повний', () => {
     expect(sidebarModeFor('medium', null)).toBe('rail');
     expect(sidebarModeFor('expanded', null)).toBe('full');
+    // Layout System: планшет до 1280pt — рейка; від 1280 — повний.
+    expect(sidebarModeFor('expanded', null, 1024)).toBe('rail');
+    expect(sidebarModeFor('expanded', null, 1366)).toBe('full');
+    expect(sidebarModeFor('expanded', 'full', 1024)).toBe('full');
     expect(sidebarModeFor('medium', 'full')).toBe('full');
   });
   it('ширина для useScreenWidth відповідає режиму', () => {

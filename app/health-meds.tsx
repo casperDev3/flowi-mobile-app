@@ -23,7 +23,7 @@ import { useContentWidth, useSheetSurface } from '@/hooks/use-content-width';
 import { LoadErrorNotice, ReminderBlockedNotice, useSheetScreenMinHeight } from '@/components/health/HealthNotices';
 import { fontFamily } from '@/constants/theme';
 import { useGlassStyles } from '@/components/finance/finPalette';
-import { BentoCard, GlassBackdrop, KpiCounter, MeshBackground, PageHeader, SegmentedProgress } from '@/components/ds';
+import { BentoCard, OverlayMaterial, KpiCounter, MeshBackground, PageHeader, SegmentedProgress } from '@/components/ds';
 
 const ACC = HEALTH_ACCENTS.prevention;
 
@@ -199,7 +199,8 @@ export default function MedsScreen() {
           <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setAdd(false)}>
             <Pressable onPress={e => e.stopPropagation()} style={[s.sheetWrap, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <View style={[s.sheet, sheetSurface, { ...gs.strong }]}>
-                <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+                {/* Брудне скло (Layout System v2.4): аркуш поверх вмісту не просвічує. */}
+                <OverlayMaterial isDark={isDark} radius={24} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={[s.sheetTitle, { color: c.text }]}>{tr.addMed}</Text>
                 <Field label={tr.medName} value={name} onChange={setName} placeholder="Вітамін D" autoFocus c={c} />

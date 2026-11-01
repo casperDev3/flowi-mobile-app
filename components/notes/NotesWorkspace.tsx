@@ -11,7 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NoteMarkdown } from '@/components/notes/NoteMarkdown';
 import { PickerField, type PickerOption } from '@/components/shared/PickerField';
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
+import { SwipeRow, ZoneEmpty, ZoneLayout, ZoneSkeleton, useZoneState, zoneWidths, type SwipeAction } from '@/components/layout-zones';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useI18n } from '@/store/i18n';
 import { loadData, loadDataResult, retryStorageRead, subscribeToStorage } from '@/store/storage';
@@ -61,6 +62,15 @@ function linkOptions(items: readonly LinkTarget[]): PickerOption[] {
  * Наявна нотатка відкривається в РЕЖИМІ ЧИТАННЯ (як у вебі): розмітка, живий
  * чек-бокс і закріплення зберігаються одразу (`patchNote` + `saveSyncedChanges`),
  * а текст правиться лише після «Редагувати». Нова нотатка — одразу редактор.
+ *
+ * Layout System v2.4 (зони): список — ГОЛОВНА зона (завжди найширша), читалка
+ * й редактор — ДИНАМІЧНА: панель праворуч з «Закрити» на iPad (коли
+ * вміщається поруч зі списком), нижній аркуш ~60% → весь екран на телефоні
+ * для читання. Редагування на телефоні (і на вузькому iPad) — на весь екран,
+ * як і було: документ із клавіатурою в аркуші на 60% — тісно. Відкрита
+ * нотатка — у параметрі `?note=<id>`. Рядки свайпаються вліво
+ * («Закріпити/Відкріпити», «Видалити»; ті самі права й запис, що в читалці).
+ * Стани зони: скелет під час читання, «Повторити» при збої, порожньо.
  */
 export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHandled }: {
   projectId?: string;
@@ -72,16 +82,18 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
 }) {
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
-  const { isExpanded, isWide, width } = useResponsive();
+  const { isWide, width } = useResponsive();
+  const screenWidth = useScreenWidth();
   /**
-   * Список + читалка поруч. На expanded — завжди; на портреті iPad (medium,
-   * ≥720pt вікна) — теж, але лише в особистих нотатках: там сайдбар — рейка
-   * (76pt), і читалці лишається ~400pt. У проєкті сайдбар повний (232pt) —
-   * читалка вийшла б вужчою за телефонну, тож там як на телефоні.
+   * Читалка/редактор — панель поруч зі списком, коли вона вміщається і
+   * список лишається найширшою зоною (zoneWidths — те саме правило, що в
+   * ZoneLayout); інакше читання — нижній аркуш, редагування — на весь екран.
    */
-  const split = isExpanded || (!!isWide && !projectId && (width ?? 0) >= 720);
-  /** Список вужчий на портреті, ширший на дуже широкому вікні. */
-  const listWidth = !isExpanded ? 260 : (width ?? 0) >= 1180 ? 340 : 300;
+  const split = !!isWide && zoneWidths({
+    windowWidth: width ?? 0, screenWidth: screenWidth ?? width ?? 0, wide: !!isWide, wantStatic: false, wantDynamic: true,
+  }).dynamicMode === 'panel';
+  // Відкрита нотатка — у параметрі маршруту `?note=` (Layout System v2.4).
+  const zone = useZoneState({ section: projectId ? 'project-notes' : 'notes', selectedParam: 'note' });
   const insets = useSafeAreaInsets();
   const tabBarInset = useTabBarInset();
   const navigation = useNavigation();
@@ -250,6 +262,72 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
     addRef.current();
     onCreateHandled?.();
   }, [createRequested, ready, onCreateHandled]);
+  // `?note=<id>`: щойно сховище прочитане — відкрити нотатку з адреси (один
+  // раз); далі відкрита ЗБЕРЕЖЕНА нотатка дзеркалиться в адресу (нова — ні:
+  // її ще немає в сховищі, і посилання на неї нікуди б не вело).
+  const zoneSelect = zone.select;
+  const noteParamConsumed = useRef(false);
+  useEffect(() => {
+    if (!ready || noteParamConsumed.current) return;
+    noteParamConsumed.current = true;
+    const target = zone.selectedId ? notes.find(n => n.id === zone.selectedId) : undefined;
+    if (target && !selected) open(target);
+    // Лише на перше прочитання сховища.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+  const mirrorId = selected && !isNew ? selected.id : null;
+  useEffect(() => {
+    if (!noteParamConsumed.current) return;
+    zoneSelect(mirrorId);
+  }, [mirrorId, zoneSelect]);
+
+  /**
+   * Свайп рядка (Layout System v2.4): закріпити/відкріпити і видалити — без
+   * відкриття нотатки. Той самий запис, що й з читалки (`patchNote` /
+   * `saveSyncedChanges`), ті самі права (canEditNote) і той самий замок `busy`.
+   */
+  const quickPatch = async (note: Note, change: { pinned?: boolean }) => {
+    if (!canEditNote(note, canEditProject) || busy.current || readError || !ready) return;
+    const next = patchNote(note, change, new Date().toISOString());
+    busy.current = true; setSaving(true);
+    try {
+      const result = await saveSyncedChanges('notes', [note], [next], { checked: true });
+      if (mounted.current && result) setNotes(normalizeNotes(result));
+      if (mounted.current && selected?.id === note.id && mode === 'read') setSelected(next);
+    } catch {
+      Alert.alert(tr.error, tr.notesSaveError);
+    } finally {
+      busy.current = false;
+      if (mounted.current) setSaving(false);
+    }
+  };
+  const quickRemove = (note: Note) => {
+    if (!canEditNote(note, canEditProject) || busy.current || readError) return;
+    Alert.alert(tr.delete, tr.notesDeleteConfirm, [
+      { text: tr.cancel, style: 'cancel' },
+      { text: tr.delete, style: 'destructive', onPress: async () => {
+        if (busy.current) return;
+        busy.current = true; setSaving(true);
+        try {
+          const result = await saveSyncedChanges('notes', [note], [], { checked: true });
+          if (mounted.current) {
+            if (result) setNotes(normalizeNotes(result));
+            if (selected?.id === note.id) closeEditor();
+          }
+        } catch { Alert.alert(tr.error, tr.notesSaveError); }
+        finally { busy.current = false; if (mounted.current) setSaving(false); }
+      } },
+    ]);
+  };
+  const swipeActionsFor = (note: Note): SwipeAction[] => {
+    // Відкрита в редакторі нотатка не свайпається: чернетка важливіша.
+    if (!ready || readError || !canEditNote(note, canEditProject) || (selected?.id === note.id && mode === 'edit')) return [];
+    return [
+      { key: 'pin', label: note.pinned ? tr.notesUnpin : tr.notesPin, icon: 'star.fill', onPress: () => { void quickPatch(note, { pinned: !note.pinned }); }, testID: `note-swipe-pin-${note.id}` },
+      { key: 'delete', label: tr.delete, icon: 'trash.fill', tone: 'danger', onPress: () => quickRemove(note), testID: `note-swipe-delete-${note.id}` },
+    ];
+  };
+
   const save = async () => {
     if (!selected || !canEdit || busy.current || readError || !ready) return;
     if (!title.trim() && !body.trim()) { setEmptyError(true); Alert.alert(tr.error, tr.notesEmptyError); return; }
@@ -382,8 +460,15 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const readTask = current ? linkLabel(current.linkedTaskId, tasks) : null;
   const readMeeting = current ? linkLabel(current.linkedMeetingId, meetings) : null;
 
+  /**
+   * Редактор у динамічній зоні (панель iPad) чи на весь екран (телефон).
+   * У зоні прокрутку дає сама зона, тож без вкладених ScrollView з flex:1
+   * (у прокрутці вони схлопуються в нуль) — текст росте разом із вмістом.
+   */
+  const editorInZone = split;
   const reader = reading && current ? (
-    <View testID="notes-reader" style={[s.editor, { backgroundColor: c.panelStrong }, cardShadow]}>
+    // Читалка завжди в динамічній зоні: суцільна картка й прокрутка — від зони.
+    <View testID="notes-reader" style={s.zoneDetail}>
       <View style={s.toolbar}>
         {button(tr.close, () => confirmLeave(closeEditor), 'notes-close', saving)}
         {canEdit && button(tr.edit, startEdit, 'notes-edit', saving || readError)}
@@ -402,17 +487,17 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
       {(readTask || readMeeting) && <Text style={{ color: c.sub, fontSize: 13, paddingTop: 6 }}>
         {[readTask && `${tr.notesLinkTask}: ${readTask}`, readMeeting && `${tr.notesLinkMeeting}: ${readMeeting}`].filter(Boolean).join(' · ')}
       </Text>}
-      <ScrollView style={s.previewPane} contentContainerStyle={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
+      <View style={{ paddingVertical: 10 }}>
         <NoteMarkdown body={current.body} colors={{ text: c.text, sub: c.sub, border: tk.border.hairline, accent: c.accent, panel: c.panelStrong }}
           emptyLabel={tr.notesEmptyBody} createTaskLabel={tr.notesCreateTask}
           onToggle={canEdit && !saving && !readError ? toggleReadLine : undefined}
           onCreateTask={canEdit && !saving ? line => { void createTaskFromLine(line); } : undefined} />
-      </ScrollView>
+      </View>
     </View>
   ) : null;
 
   const editor = selected && !reading ? (
-    <View testID="notes-editor" style={[s.editor, { backgroundColor: c.panelStrong }, cardShadow]}>
+    <View testID="notes-editor" style={editorInZone ? s.zoneDetail : [s.editor, { backgroundColor: c.panelStrong }, cardShadow]}>
       <View style={s.toolbar}>
         {button(tr.close, () => confirmLeave(closeEditor), 'notes-close', saving)}
         {!isNew && button(tr.cancel, cancelEdit, 'notes-cancel-edit', saving)}
@@ -444,7 +529,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
         </View>
       </View>
       {preview ? (
-        <ScrollView style={s.previewPane} contentContainerStyle={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
+        <ScrollView style={editorInZone ? null : s.previewPane} scrollEnabled={!editorInZone} contentContainerStyle={{ paddingVertical: 10 }} keyboardShouldPersistTaps="handled">
           <NoteMarkdown body={body} colors={{ text: c.text, sub: c.sub, border: tk.border.hairline, accent: c.accent, panel: c.panelStrong }}
             emptyLabel={tr.notesEmptyBody} createTaskLabel={tr.notesCreateTask}
             onToggle={canEdit && !saving ? line => setBody(current => toggleChecklistAt(current, line)) : undefined}
@@ -453,21 +538,40 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
       ) : (
         <TextInput testID="notes-body" accessibilityLabel={tr.noteBodyPlaceholder} placeholder={tr.noteBodyPlaceholder}
           placeholderTextColor={c.sub} value={body} onChangeText={setBody} editable={canEdit && !saving}
-          multiline textAlignVertical="top" scrollEnabled style={[s.body, { color: c.text }, emptyError && !title.trim() && !body.trim() ? {borderWidth:1,borderColor:'#EF4444'} : null]} />
+          multiline textAlignVertical="top" scrollEnabled={!editorInZone} style={[s.body, editorInZone ? s.bodyInZone : null, { color: c.text }, emptyError && !title.trim() && !body.trim() ? {borderWidth:1,borderColor:'#EF4444'} : null]} />
       )}
       <Text style={[s.hint, { color: c.sub }]}>{tr.notesMarkdownHint}</Text>
     </View>
-  ) : reader ?? (split ? <View style={s.empty}><Text style={{ color: c.sub }}>{tr.notesSelectHint}</Text></View> : null);
+  ) : null;
 
-  return (
+  const readErrorBlock = readError ? (
+    // Помилка всередині зони: зрозумілий текст + «Повторити» (Layout System v2.4).
+    <View accessibilityRole="alert" style={{ padding: 12 }}>
+      <Text style={{ color: c.text }}>{tr.notesReadError}</Text>
+      {button(tr.notesRetry, () => { void reload(true); }, 'notes-retry')}
+    </View>
+  ) : null;
+
+  // Телефон / вузький iPad: редагування — на весь екран (список ховається),
+  // як і раніше; чернетка живе в стані й переживає поворот екрана.
+  if (selected && !reading && !split) {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={[s.root, { backgroundColor: c.bg }]}>
+        {readErrorBlock}
+        <View style={[s.panes, { paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
+          {editor}
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  const listZone = (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[s.root, { backgroundColor: c.bg }]}>
-      {readError && <View accessibilityRole="alert" style={{ padding: 12 }}>
-        <Text style={{ color: c.text }}>{tr.notesReadError}</Text>
-        {button(tr.notesRetry, () => { void reload(true); }, 'notes-retry')}
-      </View>}
-      <View style={[s.panes, { flexDirection: split ? 'row' : 'column', paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
-        {(split || !selected) && <View testID="notes-list" style={split ? { width: listWidth } : s.list}>
+      {readErrorBlock}
+      <View style={[s.panes, { paddingBottom: Math.max(insets.bottom, projectId ? tabBarInset : 0, 12) }]}>
+        <View testID="notes-list" style={s.list}>
           {/* Omni KPI — з уже прочитаних нотаток цього зрізу. */}
           {ready && !readError && scoped.length > 0 ? (
             <PageHeader
@@ -511,12 +615,27 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
           <SectionList sections={readError ? [] : sections} keyExtractor={n => n.id} keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 16 }} stickySectionHeadersEnabled={false}
             ListFooterComponent={notes.length >= 10 && !selected ? <AdSlot slot="M2" /> : null}
-            ListEmptyComponent={<Text style={{ padding: 20, color: c.sub }}>{!ready ? tr.loading : readError ? '' : query || tagFilter ? tr.notesNoResults : tr.noNotes}</Text>}
+            ListEmptyComponent={!ready
+              // Стани головної зони (Layout System v2.4): скелет у формі списку…
+              ? <ZoneSkeleton variant="list" rows={4} />
+              : readError ? null
+                // …і порожньо з однією дією: скинути пошук/тег, якщо вони
+                // звузили список; інакше дія — «Створити нотатку» вгорі.
+                : <ZoneEmpty
+                    testID="notes-empty"
+                    icon="note.text"
+                    title={query || tagFilter ? tr.notesNoResults : tr.noNotes}
+                    actionLabel={query || tagFilter ? tr.resetFilter : undefined}
+                    onAction={query || tagFilter ? () => { setQuery(''); setTagFilter(null); } : undefined}
+                  />}
             renderSectionHeader={({ section }) => <Text style={[s.section, { color: c.sub }]}>{section.title} · {section.data.length}</Text>}
             renderItem={({ item }) => {
               const checklist = checklistProgress(item.body);
               const chips = noteTags(item);
-              return <TouchableOpacity accessibilityRole="button" testID={`note-${item.id}`}
+              const swipe = swipeActionsFor(item);
+              return <SwipeRow actions={swipe} radius={Atlas.radius.large}>{a11y => <TouchableOpacity accessibilityRole="button" testID={`note-${item.id}`}
+                accessibilityActions={swipe.length ? a11y.accessibilityActions : undefined}
+                onAccessibilityAction={swipe.length ? a11y.onAccessibilityAction : undefined}
                 accessibilityLabel={`${item.pinned ? `${tr.notesPinned}, ` : ''}${item.title || tr.untitled}`}
                 accessibilityState={{ selected: selected?.id === item.id }} onPress={() => open(item)}
                 style={[s.card, { backgroundColor: c.panel, borderColor: selected?.id === item.id ? tk.action.primary : 'transparent' }, cardShadow]}>
@@ -532,12 +651,24 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
                     {tr.notesChecklist} {checklist.done}/{checklist.total}
                   </Text>}
                 </View>
-              </TouchableOpacity>;
+              </TouchableOpacity>}</SwipeRow>;
             }} />
-        </View>}
-        {editor}
+        </View>
       </View>
     </KeyboardAvoidingView>
+  );
+
+  return (
+    <ZoneLayout
+      testID="notes-zones"
+      main={listZone}
+      dynamic={reader ?? editor}
+      dynamicOpen={!!selected}
+      onCloseDynamic={() => confirmLeave(closeEditor)}
+      dynamicLabel={current ? current.title || tr.untitled : tr.notes}
+      // «Закрити» вже є в панелі інструментів читалки/редактора.
+      dynamicChrome={false}
+    />
   );
 }
 const s = StyleSheet.create({
@@ -551,6 +682,8 @@ const s = StyleSheet.create({
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cardFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 8 },
   editor: { flex: 1, minWidth: 0, padding: 20, borderRadius: Atlas.radius.large },
+  // У динамічній зоні картку й поля дає сама зона (панель / нижній аркуш).
+  zoneDetail: { minWidth: 0, paddingTop: 4 },
   context: { fontSize: 13, paddingVertical: 8 },
   readTitle: { fontSize: 24, fontFamily: fontFamily.semibold }, title: { fontSize: 24, fontFamily: fontFamily.semibold, minHeight: 52, borderBottomWidth: 1 },
   tagsInput: { minHeight: 44, fontSize: 15, borderBottomWidth: 1, paddingVertical: 8 },
@@ -558,6 +691,7 @@ const s = StyleSheet.create({
   link: { flexGrow: 1, flexShrink: 1, minWidth: 140 },
   previewPane: { flex: 1, paddingTop: 8 },
   body: { flex: 1, fontSize: 17, lineHeight: 26, paddingTop: 14 },
+  bodyInZone: { flex: 0, minHeight: 320 },
   hint: { fontSize: 12, paddingTop: 8 },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
 });

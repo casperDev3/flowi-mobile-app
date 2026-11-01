@@ -13,6 +13,7 @@ import type { CalendarColors } from './palette';
 import { fontFamily, radius, shadow, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 export function RecordingModal({ visible, isRecording, startedAt, onStart, onStop, onClose, isDark, c }: {
   visible: boolean;
@@ -36,6 +37,7 @@ export function RecordingModal({ visible, isRecording, startedAt, onStart, onSto
         <Pressable accessible={false} onPress={e => e.stopPropagation()}
           accessibilityViewIsModal importantForAccessibility="yes"
           style={[st.card, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }, shadow[isDark ? 'dark' : 'light'].popover]}>
+          <OverlayMaterial isDark={isDark} radius={radius.card} />
           <View style={[st.circle, { backgroundColor: isRecording ? t.accent.coral + '1F' : c.dim }]}>
             <IconSymbol name={isRecording ? 'stop.fill' : 'mic.fill'} size={32} color={isRecording ? t.accent.coral : c.sub} />
           </View>

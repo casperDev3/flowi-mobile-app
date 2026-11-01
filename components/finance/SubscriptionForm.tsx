@@ -13,6 +13,8 @@
  * Календар дат розкривається ІНЛАЙН, а не другою модалкою: аркуш уже модалка,
  * і iOS надійно не показує модалку поверх модалки.
  */
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -35,7 +37,6 @@ import {
   type SubscriptionDraft,
   type SubscriptionDraftError,
 } from '@/utils/subscriptions';
-import { GlassBackdrop } from '@/components/ds';
 import { useGlassStyles } from '@/components/finance/finPalette';
 
 export const SUBSCRIPTION_ICONS: IconSymbolName[] = [
@@ -128,8 +129,8 @@ export function SubscriptionForm({
 
   return (
     <SheetModal visible={visible} onClose={onClose}>
-      <View style={[st.sheet, { ...gs.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-        <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+      <View style={[st.sheet, { ...gs.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+        <OverlayMaterial isDark={isDark} radius={24} />
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <Text style={[st.title, { color: c.text }]}>{editing ? tr.subEditTitle : tr.subNew}</Text>
 

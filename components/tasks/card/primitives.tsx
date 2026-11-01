@@ -26,6 +26,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -204,7 +205,7 @@ export function ToggleRow({ icon, label, value, onChange, disabled, colors: c }:
  * Свій Modal (як і PickerField): у деталі на телефоні він відкривається поверх
  * модального листа деталі — цей шлях уже перевірений у застосунку.
  */
-export function PropertySheet({ visible, title, onClose, children, colors: c, footer }: {
+export function PropertySheet({ visible, title, onClose, children, colors: c, footer, isDark }: {
   visible: boolean;
   title: string;
   onClose: () => void;
@@ -236,6 +237,7 @@ export function PropertySheet({ visible, title, onClose, children, colors: c, fo
                 ? st.sheetWide
                 : { paddingBottom: Math.max(insets.bottom, 12) + 4 },
             ]}>
+            <OverlayMaterial isDark={isDark} radius={isWide ? radius.card : { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card }} />
             {!isWide ? <View style={[st.handle, { backgroundColor: c.border }]} /> : null}
             <View style={st.sheetHead}>
               <Text accessibilityRole="header" style={[st.sheetTitle, { color: c.text }]} numberOfLines={1}>{title}</Text>

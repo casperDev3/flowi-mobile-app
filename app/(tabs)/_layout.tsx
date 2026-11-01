@@ -217,15 +217,18 @@ export default function TabLayout() {
                     tabBarIcon: tabIcon('figure.run', moduleAccent.health),
                 }}
             />
+            {/* Layout System v2.4 (рішення 04): нижній бар — ЧОТИРИ головні
+                розділи (Сьогодні · Задачі · Фінанси · Здоров'я). Налаштування,
+                Час і решта — у шухляді ☰ (SidebarDrawer). Маршрут лишається
+                робочим (href: null ховає лише кнопку бару): диплінки,
+                router.push('/(tabs)/settings') і пункт сайдбара ведуть сюди
+                як і раніше. Крапка непрочитаних сповіщень — на дзвонику шапки
+                й пункті «Налаштування» сайдбара. */}
             <Tabs.Screen
                 name="settings"
                 options={{
                     title: tr.tabOptions,
-                    tabBarAccessibilityLabel: tr.tabOptions,
-                    tabBarLabel: tabLabel(tr.tabOptions),
-                    // Крапка непрочитаних сповіщень (notifications-module.md §11). Бейдж
-                    // сам тримає лічильник живим — на старті й після фону.
-                    tabBarIcon: tabIcon('gearshape.fill', moduleAccent.settings, true),
+                    href: null,
                 }}
             />
             <Tabs.Screen

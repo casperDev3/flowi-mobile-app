@@ -20,6 +20,12 @@ jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: 'SafeAreaView',
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
+// Layout System v2.4: свайп рядка (ReanimatedSwipeable) потребує справжнього
+// gesture-handler — у тесті рядок рендериться як є.
+jest.mock('@/components/layout-zones/SwipeRow', () => ({
+  SwipeRow: ({ children }: { children: unknown }) =>
+    (typeof children === 'function' ? children({ accessibilityActions: [], onAccessibilityAction: () => {} }) : children),
+}));
 jest.mock('expo-router', () => ({
   Stack: { Screen: 'StackScreen' },
   useRouter: () => ({ back: jest.fn(), push: jest.fn() }),

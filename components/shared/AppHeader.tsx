@@ -4,7 +4,7 @@
  * Будується НА ScreenHeader (верхній інсет у JS, стеля Dynamic Type для
  * заголовка, «Назад»/крихти) — лише додає Omni-набір кнопок:
  *
- *   Телефон (compact): рядок [☰ меню] ……… [дії] [🔔] [аватар], під ним —
+ *   Телефон (compact): рядок [☰ меню] ……… [пошук] [дії] [🔔] [аватар], під ним —
  *     великий заголовок на всю ширину (з «Назад», якщо є).
  *     ☰ відкриває сайдбар-шухляду (SidebarDrawer) з усіма модулями;
  *     аватар — меню акаунта (AccountSheet).
@@ -28,10 +28,12 @@ import { NotificationBadge } from '@/components/notifications/NotificationBadge'
 import { AccountSheet } from '@/components/shared/AccountSheet';
 import { HEADER_BUTTON_HIT_SLOP, HeaderButton, ScreenHeader, type ScreenBack } from '@/components/shared/ScreenHeader';
 import { SidebarDrawer } from '@/components/shared/SidebarDrawer';
+import { ViewModeSwitch } from '@/components/layout-zones/ViewModeSwitch';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import { useResponsive } from '@/hooks/use-responsive';
+import type { ZoneView } from '@/hooks/use-zone-state';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { useTimerContext } from '@/store/timer-context';
@@ -60,6 +62,12 @@ export type AppHeaderProps = {
   /** Під заголовком: SectionTabs тощо. */
   children?: React.ReactNode;
   paddingBottom?: number;
+  /**
+   * Layout System v2.4: перемикач «Список / Колонки» розділу. Планшет —
+   * у тонкій смузі інструментів поруч із пошуком (рішення 03); телефон —
+   * не тут, а внизу шухляди ☰ (SidebarDrawer, через useZoneState).
+   */
+  viewSwitch?: { value: ZoneView; onChange: (v: ZoneView) => void };
 };
 
 function BellButton() {
@@ -97,7 +105,7 @@ function TimerPill() {
 
 export function AppHeader({
   title, eyebrow, subtitle, kpis, actions, showMenu = true, onSearch, searchLabel,
-  back, titleStyle, children, paddingBottom,
+  back, titleStyle, children, paddingBottom, viewSwitch,
 }: AppHeaderProps) {
   const { t, g, reduceTransparency } = useDS();
   const { tr } = useI18n();
@@ -176,6 +184,12 @@ export function AppHeader({
         ) : null}
         <View style={{ flex: 1 }} />
         <View style={st.toolbarRight}>
+          {/* Layout System v2.4: телефон — [☰] заголовок [пошук]. */}
+          {onSearch ? (
+            <HeaderButton onPress={onSearch} accessibilityLabel={searchLabel ?? tr.searchPlaceholder}>
+              <IconSymbol name="magnifyingglass" size={17} color={t.text.primary} />
+            </HeaderButton>
+          ) : null}
           {actions}
           <BellButton />
           {avatarButton(false)}
@@ -199,6 +213,12 @@ export function AppHeader({
     );
   }
 
+  // Вузька головна зона (iPad у портреті з відкритою панеллю деталей): рядок
+  // інструментів не переноситься, тож спершу ховаємо ім'я в акаунт-пілюлі,
+  // далі — підписи перемикача Список/Колонки (лишаються іконки з a11y-підписами).
+  // Інакше пілюля вилазила під панель деталей.
+  const roomyToolbar = headerW === 0 || headerW >= 640;
+  const tightToolbar = headerW > 0 && headerW < 480;
   const toolbar = (
     <View style={st.toolbar}>
       {onSearch ? (
@@ -214,11 +234,14 @@ export function AppHeader({
           <Text numberOfLines={1} style={[st.searchText, { color: t.text.secondary }]}>{searchLabel ?? tr.searchPlaceholder}</Text>
         </Pressable>
       ) : <View style={{ flex: 1 }} />}
+      {viewSwitch ? (
+        <ViewModeSwitch value={viewSwitch.value} onChange={viewSwitch.onChange} compact={tightToolbar} testID="header-view-switch" />
+      ) : null}
       <View style={st.toolbarRight}>
         <TimerPill />
         {actions}
         <BellButton />
-        {avatarButton(true)}
+        {avatarButton(roomyToolbar)}
       </View>
     </View>
   );

@@ -138,9 +138,11 @@ describe('L1 / NAT-07: панель табів', () => {
     expect(src).not.toMatch(/tabBarLabelStyle:/);
   });
 
-  test('усі п’ять видимих вкладок віддають підпис через tabLabel()', () => {
+  // Layout System v2.4 (рішення 04): у нижньому барі ЧОТИРИ вкладки —
+  // Сьогодні · Задачі · Фінанси · Здоров'я; Налаштування — у шухляді ☰.
+  test('усі чотири видимі вкладки віддають підпис через tabLabel()', () => {
     const labels = src.match(/tabBarLabel: tabLabel\(tr\.\w+\)/g) ?? [];
-    expect(labels).toHaveLength(5);
+    expect(labels).toHaveLength(4);
   });
 
   test('кегль і стеля лишаються в межах, де підпис не ріжеться', () => {

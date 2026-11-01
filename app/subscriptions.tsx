@@ -18,6 +18,8 @@
  * id, і запис застарілого React-стану видалив би підписки, що прийшли синком.
  * Єдине видалення — явна дія «Видалити» з підтвердженням.
  */
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -44,8 +46,9 @@ import {
 } from '@/components/finance/SubscriptionDetail';
 import type { Translations } from '@/store/translations';
 import { useTodayKey } from '@/hooks/use-today-key';
-import { DetailPane } from '@/components/shared/DetailPane';
-import { detailColumnWidthFor } from '@/constants/tokens';
+import { SwipeRow, ZoneError, ZoneLayout, ZoneSkeleton, zoneWidths, type SwipeAction } from '@/components/layout-zones';
+import { useZoneState } from '@/hooks/use-zone-state';
+import { useFinanceLayoutStrings } from '@/components/finance/layoutStrings';
 import { RecurringIncomesSection } from '@/components/finance/RecurringIncomesSection';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -56,7 +59,7 @@ import { fontFamily, radius, shadow, space, touchTarget, type as dsType } from '
 import { useDS } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
 import { useProjectRoles } from '@/hooks/use-project-roles';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { useI18n } from '@/store/i18n';
 import type { CategoryRow } from '@/store/migrations';
@@ -93,7 +96,7 @@ import {
   type SubscriptionDraftError,
 } from '@/utils/subscriptions';
 import {
-  BentoCard, BentoGrid, GlassBackdrop, KpiCounter, MeshBackground, useBentoColors,
+  BentoCard, BentoGrid, KpiCounter, MeshBackground, useBentoColors,
 } from '@/components/ds';
 
 const ALL = '__all';
@@ -143,7 +146,20 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   // де сервер однаково відхилить запис `forbidden`, і локальна копія лишалась
   // би висіти, ніколи не долетівши.
   const projectRoles = useProjectRoles();
-  const { isExpanded, height, width } = useResponsive();
+  const { isWide, height, width } = useResponsive();
+  const screenWidth = useScreenWidth();
+  /**
+   * Layout System v2.4: деталь підписки — панель праворуч (планшет, коли
+   * вміщається поруч зі списком) або нижній аркуш ~60% (телефон / вузьке
+   * вікно). Аркуш — RN Modal: форму після нього відкриваємо з паузою (NAT-02).
+   */
+  const detailInPanel = isWide && zoneWidths({
+    windowWidth: width, screenWidth, wide: isWide, wantStatic: false, wantDynamic: true,
+  }).dynamicMode === 'panel';
+  const lz = useFinanceLayoutStrings();
+  // Вибрана підписка дзеркалиться в `?sub=<id>` (диплінк відкриває ту саму
+  // деталь); старі `?open=<id>` працюють як і раніше (див. ефект нижче).
+  const zoneState = useZoneState({ section: 'subscriptions', selectedParam: 'sub', label: tr.navSubscriptions });
   const c = useMemo(() => makeColors(isDark, reduceTransparency), [isDark, reduceTransparency]);
   const uiColors: SubscriptionUiColors = useMemo(
     () => ({ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, red: c.red, green: c.green }),
@@ -189,11 +205,19 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     setPrimaryCurrency(typeof primary === 'string' && primary ? primary : 'UAH');
   }, []);
 
-  useFocusEffect(useCallback(() => {
+  // Layout System v2.4 — стан помилки зони: збій читання показує текст і
+  // «Повторити» у списку, а не вічний скелет.
+  const [loadError, setLoadError] = useState(false);
+  const runLoad = useCallback(() => {
     load()
-      .then(() => setInitialized(true))
-      .catch(e => { if (__DEV__) console.warn('[subscriptions] завантаження не вдалося:', e); });
-  }, [load]));
+      .then(() => { setLoadError(false); setInitialized(true); })
+      .catch(e => {
+        if (__DEV__) console.warn('[subscriptions] завантаження не вдалося:', e);
+        setLoadError(true);
+      });
+  }, [load]);
+  const retryLoad = runLoad;
+  useFocusEffect(runLoad);
 
   const trackWrite = useStorageRefresh(
     ['subscriptions', 'projects', 'finance_currencies', 'categories', 'accounts', 'finance_primary_currency'],
@@ -233,6 +257,24 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   const reopenAfterForm = useRef<string | null>(null);
 
   const selected = useMemo(() => subs.find(s => s.id === selectedId) ?? null, [subs, selectedId]);
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => { selectedIdRef.current = selectedId; });
+
+  // ?sub=<id>: першим проходом після читання сховища відкриваємо деталь з
+  // адреси, далі вибір дзеркалиться в адресу (select стабілізовано ref-ом).
+  const zoneSelectRef = useRef(zoneState.select);
+  useEffect(() => { zoneSelectRef.current = zoneState.select; });
+  const zoneParamConsumed = useRef(false);
+  const zoneParamId = zoneState.selectedId;
+  useEffect(() => {
+    if (!initialized || zoneParamConsumed.current) return;
+    zoneParamConsumed.current = true;
+    if (zoneParamId && subs.some(x => x.id === zoneParamId)) setSelectedId(zoneParamId);
+  }, [initialized, zoneParamId, subs]);
+  useEffect(() => {
+    if (!zoneParamConsumed.current) return;
+    zoneSelectRef.current(selectedId);
+  }, [selectedId]);
 
   // Видалена деінде підписка просто закриває деталь.
   useEffect(() => {
@@ -284,10 +326,10 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   // ─── Дії ───────────────────────────────────────────────────────────────────
 
   const selectSub = useCallback((id: string) => {
-    setSelectedId(prev => (prev === id && isExpanded ? prev : id));
+    setSelectedId(prev => (prev === id && detailInPanel ? prev : id));
     setRenewOpen(false);
     detailScrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [isExpanded]);
+  }, [detailInPanel]);
 
   const quickRenew = useCallback((id: string) => {
     const sub = subs.find(s => s.id === id);
@@ -323,7 +365,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   /** Форма — аркуш. На телефоні деталь теж модалка: спершу закриваємо її, потім 300 мс. */
   const openForm = useCallback((next: FormState) => {
     setFormError(null);
-    if (!isExpanded && selectedId) {
+    if (!detailInPanel && selectedId) {
       reopenAfterForm.current = next.editingId;
       setSelectedId(null);
       setRenewOpen(false);
@@ -332,7 +374,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     }
     reopenAfterForm.current = null;
     setForm(next);
-  }, [isExpanded, selectedId]);
+  }, [detailInPanel, selectedId]);
 
   const openCreate = useCallback((projectId?: string | null) => {
     openForm({
@@ -355,8 +397,8 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     setForm(null);
     const reopen = reopenAfterForm.current;
     reopenAfterForm.current = null;
-    if (reopen && !isExpanded) setTimeout(() => setSelectedId(reopen), 300);
-  }, [isExpanded]);
+    if (reopen && !detailInPanel) setTimeout(() => setSelectedId(reopen), 300);
+  }, [detailInPanel]);
 
   const submitForm = useCallback(async (draft: SubscriptionDraft) => {
     if (!form || busy) return;
@@ -403,10 +445,10 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     setForm(null);
     reopenAfterForm.current = null;
     if (id) {
-      if (isExpanded) setSelectedId(id);
+      if (detailInPanel) setSelectedId(id);
       else if (editingId) setTimeout(() => setSelectedId(id), 300);
     }
-  }, [form, busy, mutateSubscriptions, tr, lang, isExpanded]);
+  }, [form, busy, mutateSubscriptions, tr, lang, detailInPanel]);
 
   const renewSelected = useCallback(async (amount: number) => {
     if (!selected || busy) return;
@@ -513,34 +555,44 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     }
   }, [paySub, payFor, busy, payAmountText, payAccount, fallbackCategory, updateOne, reportError, tr]);
 
-  const archiveSelected = useCallback(async () => {
-    if (!selected || busy) return;
+  /*
+   * Архів / відновлення / видалення — за id: ті самі дії кличе і деталь
+   * (вибрана підписка), і свайп рядка списку (Layout System v2.4).
+   */
+  const archiveById = useCallback(async (id: string) => {
+    if (busy) return;
     setBusy(true);
     try {
-      await updateOne(selected.id, sub => archiveSubscription(sub, new Date()));
+      await updateOne(id, sub => archiveSubscription(sub, new Date()));
       setRenewOpen(false);
     } catch (e) {
       reportError(e);
     } finally {
       setBusy(false);
     }
-  }, [selected, busy, updateOne, reportError]);
+  }, [busy, updateOne, reportError]);
+  const archiveSelected = useCallback(async () => {
+    if (!selected) return;
+    await archiveById(selected.id);
+  }, [selected, archiveById]);
 
-  const restoreSelected = useCallback(async () => {
-    if (!selected || busy) return;
+  const restoreById = useCallback(async (id: string) => {
+    if (busy) return;
     setBusy(true);
     try {
-      await updateOne(selected.id, sub => restoreSubscription(sub, dateKeyOf(new Date())));
+      await updateOne(id, sub => restoreSubscription(sub, dateKeyOf(new Date())));
     } catch (e) {
       reportError(e);
     } finally {
       setBusy(false);
     }
-  }, [selected, busy, updateOne, reportError]);
-
-  const deleteSelected = useCallback(() => {
+  }, [busy, updateOne, reportError]);
+  const restoreSelected = useCallback(async () => {
     if (!selected) return;
-    const target = selected;
+    await restoreById(selected.id);
+  }, [selected, restoreById]);
+
+  const deleteSub = useCallback((target: Subscription) => {
     Alert.alert(tr.subDeleteTitle, tr.subDeleteMsg.replace('{name}', target.name), [
       { text: tr.cancel, style: 'cancel' },
       {
@@ -549,12 +601,15 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
         onPress: () => {
           // Явне видалення користувачем — єдине місце, де запис зникає.
           mutateSubscriptions(raw => raw.filter(item => item?.id !== target.id))
-            .then(() => closeDetail())
+            .then(() => { if (selectedIdRef.current === target.id) closeDetail(); })
             .catch(reportError);
         },
       },
     ]);
-  }, [selected, tr, mutateSubscriptions, closeDetail, reportError]);
+  }, [tr, mutateSubscriptions, closeDetail, reportError]);
+  const deleteSelected = useCallback(() => {
+    if (selected) deleteSub(selected);
+  }, [selected, deleteSub]);
 
   /**
    * Свіжі значення для ефекту переходу нижче.
@@ -653,9 +708,22 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
 
   // ─── Рендер ────────────────────────────────────────────────────────────────
 
+  /** Свайп уліво: «В архів» / «Відновити» і «Видалити» — без входу в деталь. */
+  const swipeActionsFor = (sub: Subscription): SwipeAction[] => {
+    const archivedNow = subscriptionStatus(sub, today) === 'archived';
+    return [
+      archivedNow
+        ? { key: 'restore', label: lz.swipeRestore, icon: 'arrow.uturn.backward', tone: 'neutral', onPress: () => { void restoreById(sub.id); } }
+        : { key: 'archive', label: lz.swipeArchive, icon: 'archivebox.fill', tone: 'neutral', onPress: () => { void archiveById(sub.id); } },
+      { key: 'delete', label: lz.swipeDelete, icon: 'trash.fill', tone: 'danger', onPress: () => deleteSub(sub) },
+    ];
+  };
+
   const renderRow = (sub: Subscription) => (
+    <SwipeRow key={sub.id} actions={swipeActionsFor(sub)} radius={radius.nested} enabled={!busy}>
+      {a11y => (
     <SubscriptionRow
-      key={sub.id}
+      {...a11y}
       sub={sub}
       today={today}
       selected={sub.id === selectedId}
@@ -668,6 +736,8 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
       colors={uiColors}
       tr={tr}
     />
+      )}
+    </SwipeRow>
   );
 
   const accountFor = (sub: Subscription) => {
@@ -697,7 +767,15 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
       {!embedded ? <Stack.Screen options={{ headerShown: false }} /> : null}
       {!embedded ? <MeshBackground /> : null}
 
-      <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
+      {/*
+        Layout System v2.4: [список — головна зона, завжди найширша]
+        [деталь підписки — панель праворуч з ✕ (планшет) / нижній аркуш ~60%
+        (телефон)]. Статичної зони тут немає: підсумки й найближча оплата —
+        частина самого списку (як і на вебі).
+      */}
+      <ZoneLayout
+        testID="subscriptions-zones"
+        main={
         <View style={{ flex: 1 }}>
           {/* Шапка — спільна: на планшеті «Підписки» відкриваються прямо з
               сайдбара, і стрілку «Назад» ScreenHeader там сам ховає. */}
@@ -807,6 +885,11 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
               </ScrollView>
             ) : null}
 
+            {/* Стани зони: скелет у формі рядків, поки сховище не прочитане;
+                збій читання — текст і «Повторити» всередині списку. */}
+            {!initialized && !loadError ? <ZoneSkeleton variant="list" rows={4} /> : null}
+            {loadError && !initialized ? <ZoneError onRetry={retryLoad} testID="subscriptions-load-error" /> : null}
+
             {/* Живі підписки */}
             <View style={{ gap: 10 }}>{live.map(renderRow)}</View>
 
@@ -854,32 +937,8 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
             />
           </ScrollView>
         </View>
-
-        <DetailPane
-          open={!!selected}
-          wide={isExpanded}
-          columnWidth={detailColumnWidthFor(width)}
-          onClose={closeDetail}
-          isDark={isDark}
-          sheetColor={c.sheet}
-          borderColor={c.border}
-          maxHeight={height * 0.88}
-          scrollRef={detailScrollRef}
-          header={selected ? (
-            <SubscriptionDetailHeader
-              sub={selected}
-              onEdit={() => openEdit(selected)}
-              onClose={closeDetail}
-              colors={uiColors}
-              tr={tr}
-            />
-          ) : undefined}
-          empty={
-            <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 }}>
-              {tr.subSelectHint}
-            </Text>
-          }>
-          {selected ? (
+        }
+        dynamic={selected ? (
             <SubscriptionDetailBody
               sub={selected}
               today={today}
@@ -899,14 +958,30 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
               colors={uiColors}
               tr={tr}
             />
-          ) : null}
-        </DetailPane>
-      </View>
+        ) : null}
+        dynamicOpen={!!selected && zoneState.panels.dynamic}
+        onCloseDynamic={closeDetail}
+        dynamicHeader={selected ? (
+            <SubscriptionDetailHeader
+              sub={selected}
+              onEdit={() => openEdit(selected)}
+              onClose={closeDetail}
+              colors={uiColors}
+              tr={tr}
+            />
+          ) : undefined}
+        // ✕ дає сама шапка деталі (SubscriptionDetailHeader).
+        dynamicChrome={false}
+        dynamicLabel={selected?.name ?? lz.subDetails}
+        dynamicScrollRef={detailScrollRef}
+        panels={detailInPanel ? zoneState.panels : undefined}
+        onTogglePanel={zoneState.togglePanel}
+      />
 
       {/* «Оплачено»: підтвердження суми перед створенням витрати */}
       <SheetModal visible={!!paySub} onClose={closePay}>
-        <View style={[st.sheet, { ...c.gl.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+        <View style={[st.sheet, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+          <OverlayMaterial isDark={isDark} radius={24} />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={st.handleRow}>
               <View style={{ flex: 1 }} />

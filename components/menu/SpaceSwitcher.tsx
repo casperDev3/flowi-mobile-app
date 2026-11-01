@@ -21,6 +21,7 @@ import { visibleSpaces } from './model';
 import type { MenuColors } from './theme';
 import { fontFamily } from '@/constants/theme';
 import { glassRimFor } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 /**
  * Пауза між закриттям аркуша й відкриттям наступної модалки: SheetModal ще
@@ -108,6 +109,7 @@ export function SpaceSwitcher({
             sheetColumnStyle(isWide),
             { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') },
           ]}>
+          <OverlayMaterial isDark={c.isDark} radius={Atlas.radius.xxlarge} />
           <Text style={[st.sheetLabel, { color: c.sub }]}>{tr.menu.spacesTitle}</Text>
           <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: 6 }} keyboardShouldPersistTaps="handled">
             {list.map((x) => {

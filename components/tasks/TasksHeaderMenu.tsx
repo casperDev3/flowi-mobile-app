@@ -19,6 +19,7 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens, useDS } from '@/hooks/use-ds';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 export interface TasksMenuItem {
   key: string;
@@ -85,6 +86,8 @@ export function TasksHeaderMenu({ visible, onClose, items, colors: c, isDark }: 
             backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong'),
             maxHeight: Math.max(240, height - topInset - 96),
           }]}>
+          {/* Layout System v2.4: «брудне скло» (блюр + зерно); тінь лишається на рамці. */}
+          <OverlayMaterial isDark={isDark} radius={radius.cardCompact} />
           <ScrollView bounces={false} accessibilityRole="menu">
             {items.map((item, index) => (
               <View key={item.key}>

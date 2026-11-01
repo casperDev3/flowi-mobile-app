@@ -28,6 +28,7 @@ import { Platform, StyleSheet, View, type StyleProp, type ViewProps, type ViewSt
 import { useResolvedAccent } from '@/components/ds/AccentContext';
 import { radius as R, type GlassAccent } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
+import { splitStyle } from '@/components/ds/splitStyle';
 
 // ─── Нативне Liquid Glass (iOS 26+) ──────────────────────────────────────────
 
@@ -79,22 +80,8 @@ export function GlassBackdrop({ intensityBoost = 0, style }: { intensityBoost?: 
 
 // ─── Розщеплення стилю: компонування — зовні, вміст — усередині ─────────────
 
-const OUTER_KEYS = new Set([
-  'margin', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginHorizontal', 'marginVertical',
-  'marginStart', 'marginEnd', 'position', 'top', 'bottom', 'left', 'right', 'start', 'end', 'zIndex',
-  'flex', 'flexGrow', 'flexShrink', 'flexBasis', 'alignSelf', 'width', 'height', 'minWidth', 'maxWidth',
-  'minHeight', 'maxHeight', 'aspectRatio', 'transform', 'opacity', 'display',
-  // Тінь — на зовнішньому шарі: внутрішній обрізає (overflow hidden) і з'їв би її.
-  'shadowColor', 'shadowOpacity', 'shadowRadius', 'shadowOffset', 'elevation',
-]);
-
-function splitStyle(style: StyleProp<ViewStyle>): { outer: ViewStyle; inner: ViewStyle } {
-  const flat = (StyleSheet.flatten(style) ?? {}) as Record<string, unknown>;
-  const outer: Record<string, unknown> = {};
-  const inner: Record<string, unknown> = {};
-  for (const k of Object.keys(flat)) (OUTER_KEYS.has(k) ? outer : inner)[k] = flat[k];
-  return { outer: outer as ViewStyle, inner: inner as ViewStyle };
-}
+// Спільне з OverlaySurface — у модулі без залежностей від теми/сховища.
+export { splitStyle } from '@/components/ds/splitStyle';
 
 // ─── GlassSurface ────────────────────────────────────────────────────────────
 

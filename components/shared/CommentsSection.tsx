@@ -38,6 +38,7 @@ import {
   type CommentTargetType,
 } from '@/utils/comments';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 const COMMENTS_KEY = 'comments';
 /** Хвіст тексту після останнього `@` без пробілів — курсор трактується як «в кінці». */
@@ -261,6 +262,7 @@ export function CommentsSection({
 
       {!readOnly && mentionCandidates.length > 0 ? (
         <View style={{ backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong'), borderRadius: Atlas.radius.large, marginBottom: 6, overflow: 'hidden', ...shadow[isDark ? 'dark' : 'light'].popover }}>
+          <OverlayMaterial isDark={isDark} />
           {mentionCandidates.map(m => (
             <TouchableOpacity
               key={m.user.id}

@@ -14,7 +14,7 @@ import { dsTokens } from '@/hooks/use-ds';
 import { EntryType } from '@/utils/healthUtils';
 import { useSheetSurface } from '@/hooks/use-content-width';
 import { useGlassStyles } from '@/components/finance/finPalette';
-import { GlassBackdrop } from '@/components/ds';
+import { OverlayMaterial } from '@/components/ds';
 
 export interface QuickRecord { type: EntryType; value: number; }
 
@@ -72,7 +72,8 @@ export function QuickAddSheet({ visible, onClose, onSubmit, isDark, tr }: {
             importantForAccessibility="yes"
           >
             <View style={[s.sheet, sheetSurface, { ...gs.strong }]}>
-              <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+              {/* Брудне скло (Layout System v2.4): аркуш поверх вмісту не просвічує. */}
+              <OverlayMaterial isDark={isDark} radius={24} />
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />

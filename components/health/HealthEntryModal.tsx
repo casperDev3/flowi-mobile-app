@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { useWideModal } from '@/components/health/HealthLayout';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
@@ -96,6 +97,8 @@ export function HealthEntryModal({ modalKey, onClose, onSubmit, isDark, tr }: {
             importantForAccessibility="yes"
           >
             <View style={[s.sheet, sheetSurface, { ...gs.strong }]}>
+              {/* Брудне скло (Layout System v2.4): аркуш поверх вмісту не просвічує. */}
+              <OverlayMaterial isDark={isDark} radius={24} />
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />

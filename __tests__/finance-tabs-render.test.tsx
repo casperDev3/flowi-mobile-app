@@ -15,6 +15,12 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   multiGet: jest.fn(async (keys: string[]) => keys.map(k => [k, mockStore.get(k) ?? null])),
 }));
 jest.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
+// Layout System v2.4: свайп рядка (ReanimatedSwipeable) у jest-середовищі
+// не має Gesture.Tap — рядок рендеримо без жесту, дії лишаються в a11y.
+jest.mock('@/components/layout-zones/SwipeRow', () => ({
+  SwipeRow: ({ children }: { children: unknown }) =>
+    (typeof children === 'function' ? children({ accessibilityActions: [], onAccessibilityAction: () => {} }) : children),
+}));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: 'SafeAreaView',
@@ -256,7 +262,7 @@ describe('Фінанси: вкладки розділу', () => {
     expect(selectedTab(tree).filter(l => SECTION_TABS.has(l))).toEqual([tr.finTabTransactions]);
   });
 
-  it('планшет-ландшафт: ті самі вкладки + «Ще», один чип «Фільтри», залишки — у бічній колонці', async () => {
+  it('планшет-ландшафт: ті самі вкладки + «Ще», один чип «Фільтри», залишки над стрічкою', async () => {
     seed();
     mockWindow = { width: 1194, height: 834 };
     const tree = await mount();
@@ -269,7 +275,10 @@ describe('Фінанси: вкладки розділу', () => {
       && n.props?.accessibilityLabel === tr.budgetScopeLabel);
     expect(inlineScope).toHaveLength(0);
     expect(hasText(tree, tr.finBalances)).toBe(true);
-    expect(hasText(tree, tr.txEmptyTitle)).toBe(true);
+    // Layout System v2.4: на планшеті (< 1280) статичної зони немає, а панель
+    // деталей з'являється лише ПІСЛЯ вибору операції — порожньої колонки
+    // «оберіть операцію» поруч зі стрічкою більше немає.
+    expect(hasText(tree, tr.txEmptyTitle)).toBe(false);
   });
 
   it('планшет-портрет: три вкладки + «Ще», залишки над стрічкою', async () => {

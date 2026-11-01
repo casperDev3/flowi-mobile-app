@@ -1,7 +1,7 @@
 /**
  * components/training/TrainingSheet.tsx — аркуш-форма модуля тренувань.
  *
- * SheetModal + скло DS v2.1 (surfaceStrong + <GlassBackdrop/>) зі стелею висоти ЧИСЛОМ (useSheetSurface, NEW-01:
+ * SheetModal + скло DS v2.1 (surfaceStrong + брудне скло <OverlayMaterial/>, Layout System v2.4) зі стелею висоти ЧИСЛОМ (useSheetSurface, NEW-01:
  * відсоток без прокрутки ховав кнопку «Зберегти») і ScrollView всередині.
  * Кнопки дії — у футері поза прокруткою, щоб завжди були видимі.
  */
@@ -13,7 +13,7 @@ import { radius, shadow, type } from '@/constants/theme';
 import { useSheetSurface } from '@/hooks/use-content-width';
 
 import type { TrainingColors } from './theme';
-import { GlassBackdrop } from '@/components/ds';
+import { OverlayMaterial } from '@/components/ds';
 
 export function TrainingSheet({ visible, onClose, c, title, children, footer }: {
   visible: boolean;
@@ -28,7 +28,7 @@ export function TrainingSheet({ visible, onClose, c, title, children, footer }: 
     <SheetModal visible={visible} onClose={onClose}>
       <View
         style={[styles.sheet, surface, { ...c.gl.strong, ...shadow[c.isDark ? 'dark' : 'light'].popover }]}>
-        <GlassBackdrop style={{ borderRadius: radius.card, overflow: 'hidden' }} />
+        <OverlayMaterial isDark={c.isDark} radius={radius.card} />
         <Text accessibilityRole="header" style={[styles.title, { color: c.text }]}>{title}</Text>
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {children}

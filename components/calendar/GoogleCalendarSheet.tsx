@@ -19,6 +19,7 @@ import type { GoogleCalendarState } from './useGoogleCalendar';
 import { fontFamily, radius } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 /** Фірмовий синій Google — лише на логотипі інтеграції. */
 const GOOGLE_BLUE = '#4285F4';
@@ -40,6 +41,7 @@ export function GoogleCalendarSheet({ visible, onClose, gcal, isDark, c }: {
       <Pressable accessible={false} style={[st.overlay, { backgroundColor: t.surface.overlay }]} onPress={onClose}>
         <Pressable accessible={false} onPress={e => e.stopPropagation()} style={st.sheetWrapper} accessibilityViewIsModal importantForAccessibility="yes">
           <View style={[st.sheet, sheetSurface, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
+            <OverlayMaterial isDark={isDark} />
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <View style={{ alignItems: 'center', marginBottom: 20 }}>
                 <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />

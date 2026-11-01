@@ -46,7 +46,7 @@ import { primaryTimer, timerKind, timersCountLabel } from '@/utils/activeTimersB
 import { formatClock } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
 import { elapsedSince } from '@/utils/taskTimer';
-import { GlassBackdrop } from '@/components/ds';
+import { OverlayMaterial } from '@/components/ds';
 import { useGlassStyles } from '@/components/finance/finPalette';
 
 const BAR_BODY_HEIGHT = 44;
@@ -151,7 +151,7 @@ export function ActiveTimersBar() {
       <Modal visible={sheetOpen} transparent animationType="slide" onRequestClose={() => setSheetOpen(false)}>
         <Pressable style={[st.backdrop, { backgroundColor: t.surface.overlay }]} onPress={() => setSheetOpen(false)} accessibilityRole="button" accessibilityLabel={tr.close} />
         <View style={[st.sheet, { ...gs.strong, paddingBottom: insets.bottom + 16 }]}>
-          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+          <OverlayMaterial isDark={isDark} radius={{ borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card }} />
           <View style={[st.handle, { backgroundColor: t.text.muted }]} />
           <View style={st.head}>
             <Text style={[st.sheetTitle, { color: c.text }]}>

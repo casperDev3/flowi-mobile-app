@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { fontFamily } from '@/constants/theme';
 /**
  * app/(tabs)/health.tsx — розділ «Здоровʼя» однією сторінкою з вкладками.
@@ -66,8 +67,9 @@ import { AccentIcon } from '@/components/shared/GlassBits';
 
 export default function HealthHubScreen() {
   const tabBarInset = useTabBarInset();
-  // Планшет: головна дія «додати» — кнопкою в шапці, як на інших екранах
-  // (рішення 6); FAB лишається телефону, де до шапки тягнутись далеко.
+  // Layout System v2.4 (стор. 08/09): головна дія «додати» — плаваюча «+» у
+  // правому нижньому куті на ВСІХ розмірах, як у Задачах і Фінансах (шапка
+  // планшета — тонка смуга без кнопки створення).
   const { isWide } = useResponsive();
   // Смуга вкладок: на планшеті — шість в один ряд без прокрутки (рішення 07.10).
   const tabBarLayout = healthTabBarLayout(useScreenWidth(), isWide);
@@ -144,12 +146,6 @@ export default function HealthHubScreen() {
           kpis={kpis}
           actions={
             <>
-              {isWide && (
-                <HeaderButton onPress={() => setQuickOpen(true)} accessibilityLabel={tr.add}
-                  style={{ backgroundColor: t.action.primary }}>
-                  <IconSymbol name="plus" size={17} color={t.text.onAction} />
-                </HeaderButton>
-              )}
               <HeaderButton onPress={() => setHistoryOpen(true)} accessibilityLabel={tr.history}
                 style={{ backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }}>
                 <IconSymbol name="clock.arrow.circlepath" size={17} color={c.text} />
@@ -176,7 +172,6 @@ export default function HealthHubScreen() {
       {/* L5: інсет із useTabBarInset() — він додає висоту ActiveTimersBar,
           коли йде хоч один таймер. Зашите 108 ховало нижню третину кнопки
           під панеллю таймерів, і тап потрапляв у панель. */}
-      {!isWide && (
       <View style={[s.fabContainer, { bottom: tabBarInset + 20 }]} pointerEvents="box-none">
         <TouchableOpacity onPress={() => setQuickOpen(true)} activeOpacity={0.85}
           accessibilityRole="button" accessibilityLabel={tr.add}
@@ -185,7 +180,6 @@ export default function HealthHubScreen() {
           <IconSymbol name="plus" size={26} color={t.text.onAction} />
         </TouchableOpacity>
       </View>
-      )}
 
       <QuickAddSheet visible={quickOpen} onClose={() => setQuickOpen(false)} onSubmit={onQuickSubmit} isDark={isDark} tr={tr} />
 
@@ -219,6 +213,8 @@ function HistoryModal({ open, onClose, entries, activeMonth, setActiveMonth, onD
     <SheetModal visible={open} onClose={onClose} presentation="side">
           <View
             style={[s.sheet, isWide ? s.sheetSide : sheetSurface, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
+            {/* Layout System v2.4: «брудне скло» — блюр + зерно під overlay-заливкою. */}
+            <OverlayMaterial isDark={_isDark} />
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
               <Text style={[s.sheetTitle, { color: c.text, flex: 1 }]}>{tr.history}</Text>
               <MonthPicker month={activeMonth} onChange={setActiveMonth} months={tr.months}

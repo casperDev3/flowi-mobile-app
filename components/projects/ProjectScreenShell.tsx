@@ -34,6 +34,13 @@ import { AccountSheet } from '@/components/shared/AccountSheet';
 import { HEADER_BUTTON_HIT_SLOP } from '@/components/shared/ScreenHeader';
 import { fontFamily } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ZoneLayout, type ZoneLayoutProps } from '@/components/layout-zones';
+
+/**
+ * Зони Layout System v2.4 для розділу проєкту — усе, крім головної зони
+ * (її оболонка складає сама: шапка розділу + вміст екрана).
+ */
+export type ProjectShellZone = Omit<ZoneLayoutProps, 'main'>;
 
 /**
  * `usePathname`/`useRouter`, що переживають відсутність маршрутизатора — та
@@ -68,7 +75,7 @@ export function projectShellColors(isDark: boolean, accent: string, appearance?:
 
 export function ProjectScreenShell({
   project, isDark, title, actions, children, headerChildren, back, crumbs, hideSpaceExit,
-  subtitle, kpis, tabs,
+  subtitle, kpis, tabs, zone,
 }: {
   project: Project | null;
   isDark: boolean;
@@ -106,6 +113,13 @@ export function ProjectScreenShell({
   kpis?: React.ReactNode;
   /** Omni: <SectionTabs/> підвидів розділу (Список · Дошка…) — під KPI. */
   tabs?: React.ReactNode;
+  /**
+   * Layout System v2.4: розділ із зонами. Шапка розділу (PageHeader/KPI/
+   * вкладки) разом із `children` стає ГОЛОВНОЮ зоною, а `zone` дає решту:
+   * панель деталей праворуч на iPad (нижній аркуш на телефоні), статичну
+   * зону, плаваючу «+», панель масового вибору. Без `zone` — як раніше.
+   */
+  zone?: ProjectShellZone;
 }) {
   const { user } = useAuth();
   const [account, setAccount] = useState(false);
@@ -153,6 +167,82 @@ export function ProjectScreenShell({
     ];
   }, [crumbs, project, pathname, title, router]);
 
+  // Головна зона: шапка розділу (PageHeader/KPI/вкладки) + вміст екрана.
+  // З `zone` панель деталей стоїть поруч на всю висоту (iPad) або виїжджає
+  // нижнім аркушем (телефон) — Layout System v2.4.
+  const mainZone = (
+    <View style={{ flex: 1 }}>
+      <ScreenHeader
+        title={title}
+        color={c.accent}
+        actions={
+          // Дії розділу + сповіщення + тема — один рядок зі сталим проміжком;
+          // іконки — спільні IconAction 44×44; праворуч — аватар (Omni).
+          <View style={st.actions}>
+            {actions}
+            <IconAction icon="bell" label={tr.notifications} color={c.text} onPress={() => router.push?.('/notifications' as never)} colors={c} />
+            {/* Omni: аватар → меню акаунта (Керування акаунтом · Сповіщення ·
+                Налаштування · тема Системна/Світла/Темна). Перемикач теми, що
+                стояв тут окремою кнопкою, живе в цьому ж меню. */}
+            <Pressable
+              onPress={() => setAccount(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${tr.accountManage}: ${displayName}`}
+              hitSlop={HEADER_BUTTON_HIT_SLOP}
+              style={({ pressed }) => [st.avatarBtn, { opacity: pressed ? 0.7 : 1 }]}>
+              {user ? (
+                <Avatar person={{ id: user.id, name: displayName }} size={36} ringColor="transparent" />
+              ) : (
+                <View style={[st.guest, { backgroundColor: c.dim }]}>
+                  <IconSymbol name="person.fill" size={16} color={c.sub} />
+                </View>
+              )}
+              {isWide ? (
+                <>
+                  <Text numberOfLines={1} style={[st.accountName, { color: c.text }]}>{displayName}</Text>
+                  <IconSymbol name="chevron.down" size={11} color={c.sub} />
+                </>
+              ) : null}
+            </Pressable>
+          </View>
+        }
+        back={back}
+        crumbs={derivedCrumbs}
+        crumbColor={c.sub}
+        eyebrow={project && !isWide ? (
+          <View style={st.eyebrow}>
+            {hideSpaceExit ? null : (
+              <TouchableOpacity
+                accessibilityRole="link"
+                accessibilityLabel={tr.projectBackToProjectsA11y}
+                onPress={() => goProjectsList(router)}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                style={st.exit}>
+                <IconSymbol name="chevron.left" size={16} color={c.sub} />
+              </TouchableOpacity>
+            )}
+            <ProjectSwitcherTrigger
+              name={project.name}
+              color={project.color}
+              textColor={c.sub}
+              onPress={() => setSwitcherOpen(true)}
+              accessibilityLabel={tr.projectSwitchProjectA11y.replace('{name}', project.name)}
+            />
+          </View>
+        ) : undefined}>
+        {(subtitle || kpis || tabs || headerChildren) ? (
+          <View style={{ gap: 14 }}>
+            {subtitle ? <Text numberOfLines={2} style={[st.subtitle, { color: c.sub }]}>{subtitle}</Text> : null}
+            {kpis ? <PageHeader kpis={kpis} bleed={isWide ? 0 : sidePad} /> : null}
+            {tabs}
+            {headerChildren}
+          </View>
+        ) : null}
+      </ScreenHeader>
+      {children}
+    </View>
+  );
+
   return (
     <ProjectPaletteContext.Provider value={c}><View style={{ flex: 1 }}>
       {/* DS v2.1: mesh під склом; власне оформлення проєкту (appearance) —
@@ -164,76 +254,7 @@ export function ProjectScreenShell({
           верхній інсет через useTopInset() (CLAUDE.md: «нативний SafeAreaView
           edges={['top']} в екранах не використовуємо»). Обидва разом двічі
           зсували шапку вниз на висоту статус-бару. */}
-      <View style={{ flex: 1 }}>
-        <ScreenHeader
-          title={title}
-          color={c.accent}
-          actions={
-            // Дії розділу + сповіщення + тема — один рядок зі сталим проміжком;
-            // іконки — спільні IconAction 44×44; праворуч — аватар (Omni).
-            <View style={st.actions}>
-              {actions}
-              <IconAction icon="bell" label={tr.notifications} color={c.text} onPress={() => router.push?.('/notifications' as never)} colors={c} />
-              {/* Omni: аватар → меню акаунта (Керування акаунтом · Сповіщення ·
-                  Налаштування · тема Системна/Світла/Темна). Перемикач теми, що
-                  стояв тут окремою кнопкою, живе в цьому ж меню. */}
-              <Pressable
-                onPress={() => setAccount(true)}
-                accessibilityRole="button"
-                accessibilityLabel={`${tr.accountManage}: ${displayName}`}
-                hitSlop={HEADER_BUTTON_HIT_SLOP}
-                style={({ pressed }) => [st.avatarBtn, { opacity: pressed ? 0.7 : 1 }]}>
-                {user ? (
-                  <Avatar person={{ id: user.id, name: displayName }} size={36} ringColor="transparent" />
-                ) : (
-                  <View style={[st.guest, { backgroundColor: c.dim }]}>
-                    <IconSymbol name="person.fill" size={16} color={c.sub} />
-                  </View>
-                )}
-                {isWide ? (
-                  <>
-                    <Text numberOfLines={1} style={[st.accountName, { color: c.text }]}>{displayName}</Text>
-                    <IconSymbol name="chevron.down" size={11} color={c.sub} />
-                  </>
-                ) : null}
-              </Pressable>
-            </View>
-          }
-          back={back}
-          crumbs={derivedCrumbs}
-          crumbColor={c.sub}
-          eyebrow={project && !isWide ? (
-            <View style={st.eyebrow}>
-              {hideSpaceExit ? null : (
-                <TouchableOpacity
-                  accessibilityRole="link"
-                  accessibilityLabel={tr.projectBackToProjectsA11y}
-                  onPress={() => goProjectsList(router)}
-                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                  style={st.exit}>
-                  <IconSymbol name="chevron.left" size={16} color={c.sub} />
-                </TouchableOpacity>
-              )}
-              <ProjectSwitcherTrigger
-                name={project.name}
-                color={project.color}
-                textColor={c.sub}
-                onPress={() => setSwitcherOpen(true)}
-                accessibilityLabel={tr.projectSwitchProjectA11y.replace('{name}', project.name)}
-              />
-            </View>
-          ) : undefined}>
-          {(subtitle || kpis || tabs || headerChildren) ? (
-            <View style={{ gap: 14 }}>
-              {subtitle ? <Text numberOfLines={2} style={[st.subtitle, { color: c.sub }]}>{subtitle}</Text> : null}
-              {kpis ? <PageHeader kpis={kpis} bleed={isWide ? 0 : sidePad} /> : null}
-              {tabs}
-              {headerChildren}
-            </View>
-          ) : null}
-        </ScreenHeader>
-        {children}
-      </View>
+      {zone ? <ZoneLayout {...zone} main={mainZone} /> : mainZone}
       {project ? (
         <ProjectSwitcherSheet
           visible={switcherOpen}

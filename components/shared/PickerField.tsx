@@ -45,6 +45,7 @@ import { useResponsive } from '@/hooks/use-responsive';
 import type { Translations } from '@/store/translations';
 import { haptic } from '@/utils/haptics';
 import { filterPickerOptions, pickerCreateName } from '@/utils/pickerOptions';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 /** Понад стільки варіантів — показуємо пошук. */
 export const SEARCH_THRESHOLD = 5;
@@ -257,6 +258,8 @@ export function PickerField({
             // На планшеті аркуш на всю ширину дав би рядки завдовжки з екран.
             isWide && { maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
           ]}>
+          {/* Layout System v2.4: «брудне скло» — блюр + зерно під заливкою. */}
+          <OverlayMaterial isDark={isDark} radius={{ borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card }} />
           <View style={[st.handle, { backgroundColor: t.border.hairline }]} />
           <Text style={[st.sheetTitle, { color: c.text }]}>{label}</Text>
 

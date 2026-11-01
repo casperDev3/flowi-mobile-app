@@ -81,8 +81,10 @@ import {
   type FeedbackSort,
   type Idea,
 } from '@/components/feedback/model';
-import { DetailPane } from '@/components/shared/DetailPane';
-import { detailColumnWidthFor } from '@/constants/tokens';
+import { SwipeRow, ZoneLayout, ZoneSkeleton, zoneWidths, type SwipeAction } from '@/components/layout-zones';
+import { useZoneState } from '@/hooks/use-zone-state';
+import { Atlas } from '@/constants/atlas';
+import { useFinanceLayoutStrings } from '@/components/finance/layoutStrings';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
@@ -90,7 +92,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { useContentWidth } from '@/hooks/use-content-width';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useSyncedList } from '@/hooks/use-synced-list';
 import { CLIENT_VERSION, getCachedWorkspace } from '@/store/api-config';
 import { useI18n } from '@/store/i18n';
@@ -114,7 +116,19 @@ export default function FeedbackScreen() {
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
-  const { width, height, isExpanded } = useResponsive();
+  const { width, height, isWide } = useResponsive();
+  const screenWidth = useScreenWidth();
+  /**
+   * Layout System v2.4: деталь — панель праворуч (планшет, коли вміщається)
+   * або нижній аркуш ~60% (телефон / вузьке вікно; це Modal — форма після
+   * нього відкривається з паузою, NEW-02).
+   */
+  const detailInPanel = isWide && zoneWidths({
+    windowWidth: width, screenWidth, wide: isWide, wantStatic: false, wantDynamic: true,
+  }).dynamicMode === 'panel';
+  const lz = useFinanceLayoutStrings();
+  // Вибраний запис дзеркалиться в `?fb=<kind>:<id>`; старий `?open=` працює.
+  const zoneState = useZoneState({ section: 'feedback', selectedParam: 'fb', label: tr.fbTitle });
   const contentWidth = useContentWidth();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
 
@@ -234,6 +248,28 @@ export default function FeedbackScreen() {
     [entries, selected],
   );
 
+  // ?fb=<kind>:<id> (Layout System v2.4): перший прохід після читання
+  // відкриває запис з адреси, далі вибір дзеркалиться в адресу.
+  const zoneSelectRef = useRef(zoneState.select);
+  useEffect(() => { zoneSelectRef.current = zoneState.select; });
+  const fbParamConsumed = useRef(false);
+  const fbParam = zoneState.selectedId;
+  useEffect(() => {
+    if (!loaded || fbParamConsumed.current) return;
+    fbParamConsumed.current = true;
+    const m = fbParam ? /^(idea|bug):(.+)$/.exec(fbParam) : null;
+    if (!m) return;
+    const target = entries.find(e => e.kind === m[1] && e.item.id === m[2]);
+    if (!target) return;
+    setKind(target.kind);
+    setSelected({ kind: target.kind, id: target.item.id });
+  }, [loaded, fbParam, entries]);
+  const selectedKey = selected ? `${selected.kind}:${selected.id}` : null;
+  useEffect(() => {
+    if (!fbParamConsumed.current) return;
+    zoneSelectRef.current(selectedKey);
+  }, [selectedKey]);
+
   // Deep link `?open=<id>` (push feedback.status_changed): id шукаємо в обох
   // колекціях — з нього ж видно, яку вкладку відкрити.
   const openParam = firstParam(params.open);
@@ -300,13 +336,13 @@ export default function FeedbackScreen() {
     const initial = entry ? draftFromEntry(entry) : emptyDraft(kind);
     const show = () => setForm(prev => ({ key: (prev?.key ?? 0) + 1, entry, initial }));
     // На вузькому екрані деталь — теж модалка: спершу закриваємо її.
-    if (selected && !isExpanded) {
+    if (selected && !detailInPanel) {
       setSelected(null);
       setTimeout(show, SHEET_HANDOFF_MS);
     } else {
       show();
     }
-  }, [kind, selected, isExpanded]);
+  }, [kind, selected, detailInPanel]);
 
   const closeForm = useCallback(() => {
     const leftovers = [...sessionFilesRef.current];
@@ -338,9 +374,9 @@ export default function FeedbackScreen() {
     setForm(null);
     void discardLocalFiles(removed);
     setKind(draft.kind);
-    if (isExpanded) setSelected({ kind: draft.kind, id });
+    if (detailInPanel) setSelected({ kind: draft.kind, id });
     if (sendNow) void send(draft.kind, id);
-  }, [form, writeRecord, isExpanded, send]);
+  }, [form, writeRecord, detailInPanel, send]);
 
   const pickAttachments = useCallback(async (existing: readonly FeedbackAttachment[]): Promise<FeedbackAttachment[]> => {
     let result: DocumentPicker.DocumentPickerResult;
@@ -466,8 +502,23 @@ export default function FeedbackScreen() {
     setSelected({ kind: entry.kind, id: entry.item.id });
   }, []);
 
+  /**
+   * Свайп уліво (Layout System v2.4): «Виконано / Відкрити знову» і
+   * «Видалити» без входу в деталь — ті самі toggleDone і deleteEntry (з
+   * підтвердженням), що й у картці та деталі.
+   */
+  const swipeActionsFor = useCallback((entry: FeedbackEntry): SwipeAction[] => [
+    isDone(entry)
+      ? { key: 'reopen', label: tr.fbReopen, icon: 'arrow.uturn.backward', tone: 'neutral', onPress: () => toggleDone(entry) }
+      : { key: 'done', label: entry.kind === 'bug' ? tr.fbDoneBug : tr.fbDoneIdea, icon: 'checkmark', tone: 'success', onPress: () => toggleDone(entry) },
+    { key: 'delete', label: lz.swipeDelete, icon: 'trash.fill', tone: 'danger', onPress: () => deleteEntry(entry) },
+  ], [tr, lz, toggleDone, deleteEntry]);
+
   const renderItem = useCallback(({ item }: { item: FeedbackEntry }) => (
+    <SwipeRow actions={swipeActionsFor(item)} radius={Atlas.radius.xlarge}>
+      {a11y => (
     <FeedbackCard
+      {...a11y}
       entry={item}
       state={stateOf(item)}
       selected={!!selected && selected.kind === item.kind && selected.id === item.item.id}
@@ -478,7 +529,9 @@ export default function FeedbackScreen() {
       onOpen={openEntry}
       onToggleDone={toggleDone}
     />
-  ), [stateOf, selected, isDark, cardColors, locale, tr, openEntry, toggleDone]);
+      )}
+    </SwipeRow>
+  ), [stateOf, selected, isDark, cardColors, locale, tr, openEntry, toggleDone, swipeActionsFor]);
 
   const selectedState = selectedEntry ? stateOf(selectedEntry) : null;
   const forwardingOff = statusCache.forwardingConfigured === false;
@@ -500,7 +553,11 @@ export default function FeedbackScreen() {
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
-      <View style={{ flex: 1, flexDirection: 'row' }}>
+      {/* Layout System v2.4: [стрічка — головна зона] [деталь — панель
+          праворуч з ✕ / нижній аркуш ~60% на телефоні]. */}
+      <ZoneLayout
+        testID="feedback-zones"
+        main={
         <View style={{ flex: 1 }}>
           {/* Omni: AppHeader (ScreenHeader + 🔔 + аватар), KPI стану праворуч/
               стрічкою, під ними — SectionTabs «Ідеї | Баги» (§10.1). */}
@@ -585,7 +642,8 @@ export default function FeedbackScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}
             renderItem={renderItem}
             ListEmptyComponent={
-              !loaded ? null : loadFailed ? (
+              // Стан зони «завантаження» — скелет рядків, а не порожнеча.
+              !loaded ? <ZoneSkeleton variant="list" rows={4} /> : loadFailed ? (
                 // «Не прочиталось» і «порожньо» — різні речі (CLAUDE.md, ERR-01).
                 <View style={st.empty}>
                   <IconSymbol name="exclamationmark.triangle.fill" size={36} color={k.status.danger} />
@@ -604,30 +662,8 @@ export default function FeedbackScreen() {
             }
           />
         </View>
-
-        <DetailPane
-          open={!!selectedEntry}
-          wide={isExpanded}
-          columnWidth={detailColumnWidthFor(width)}
-          onClose={() => setSelected(null)}
-          isDark={isDark}
-          sheetColor={c.sheet}
-          borderColor={c.border}
-          maxHeight={height * 0.88}
-          scrollRef={detailScrollRef}
-          header={selectedEntry ? (
-            <FeedbackDetailHeader
-              entry={selectedEntry}
-              colors={c}
-              tr={tr}
-              onEdit={() => openForm(selectedEntry)}
-              onClose={() => setSelected(null)}
-            />
-          ) : undefined}
-          empty={
-            <Text style={{ color: c.sub, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 }}>{tr.fbSelectHint}</Text>
-          }>
-          {selectedEntry && selectedState ? (
+        }
+        dynamic={selectedEntry && selectedState ? (
             <FeedbackDetailBody
               entry={selectedEntry}
               state={selectedState}
@@ -643,9 +679,25 @@ export default function FeedbackScreen() {
               onCopy={() => { void copyEntry(selectedEntry); }}
               onDelete={() => deleteEntry(selectedEntry)}
             />
-          ) : null}
-        </DetailPane>
-      </View>
+        ) : null}
+        dynamicOpen={!!selectedEntry && zoneState.panels.dynamic}
+        onCloseDynamic={() => setSelected(null)}
+        dynamicHeader={selectedEntry ? (
+            <FeedbackDetailHeader
+              entry={selectedEntry}
+              colors={c}
+              tr={tr}
+              onEdit={() => openForm(selectedEntry)}
+              onClose={() => setSelected(null)}
+            />
+          ) : undefined}
+        // ✕ дає шапка самої деталі (FeedbackDetailHeader).
+        dynamicChrome={false}
+        dynamicLabel={selectedEntry?.item.title ?? lz.feedbackDetails}
+        dynamicScrollRef={detailScrollRef}
+        panels={detailInPanel ? zoneState.panels : undefined}
+        onTogglePanel={zoneState.togglePanel}
+      />
 
       <SheetModal visible={!!form} onClose={closeForm}>
         {form ? (

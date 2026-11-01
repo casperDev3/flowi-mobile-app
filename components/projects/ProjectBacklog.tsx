@@ -13,6 +13,15 @@
  * Архівні спринти (`archivedAt`) не пропонуються ні у фільтрі, ні в «Перенести
  * у спринт» і не дають власної групи — їхні задачі лишаються видимими в групі
  * «Без спринта», щоб не зникнути з очей.
+ *
+ * Layout System v2.4: список — головна зона, повна картка задачі — динамічна
+ * (`useProjectTaskPanel`: панель праворуч з ✕ на iPad, нижній аркуш ~60% →
+ * весь екран на телефоні; відкрита задача — у `?task=`). Головна зона має
+ * три стани: скелет під час читання, «Повторити» при збої, порожньо з однією
+ * дією. Рядки АРХІВУ свайпаються вліво: «Відновити» і «Видалити» (лише лід,
+ * як у футері картки). Рядки беклогу — ні: у картці ліда стоїть
+ * горизонтальна стрічка чипів «Перенести у спринт», і свайп рядка з нею
+ * конфліктував би.
  */
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -34,11 +43,16 @@ import { isProjectWork } from '@/utils/projectBacklog';
 import { isSprintArchived, type Sprint } from '@/utils/sprintUtils';
 import { mergeTaskStatusColumns, projectColumnIdFor, type TaskStatusColumn } from '@/utils/taskStatuses';
 import { completedAt, type Task } from '@/utils/taskUtils';
-import { isLead } from '@/utils/teamwork';
+import { isLead, taskRights } from '@/utils/teamwork';
+import { appendHistory } from '@/utils/taskHistory';
+import { reopenColumnId, reopenSubtasks } from '@/utils/taskCompletion';
+import { scopedColumnFor } from '@/utils/taskStatuses';
+import { haptic } from '@/utils/haptics';
 import { ProjectScreenShell, projectShellColors } from './ProjectScreenShell';
-import { ProjectTaskSheet } from './ProjectTaskSheet';
+import { useProjectTaskPanel } from './ProjectTaskSheet';
 import { TeamInput } from './TeamTaskPanel';
-import { saveProjectRecord, useProjectRecords } from './useProjectRecords';
+import { saveProjectRecord, useProjectRecords, useProjectRecordsState } from './useProjectRecords';
+import { SwipeRow, ZoneEmpty, ZoneError, ZoneSkeleton, useZoneState, type SwipeAction } from '@/components/layout-zones';
 import { fontFamily, radius, shadow, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import { BentoCard, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
@@ -59,7 +73,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
   const c = projectShellColors(dark, project?.color ?? '#7C3AED', project?.appearance);
   const tk = dsTokens(dark);
 
-  const allTasks = useProjectRecords<Task>('tasks');
+  const { rows: allTasks, status: tasksStatus, retry: retryTasks } = useProjectRecordsState<Task>('tasks');
   const allSprints = useProjectRecords<Sprint>('sprints');
   const allColumns = useProjectRecords<TaskStatusColumn>('task_statuses');
   const tasks = useMemo(() => allTasks.filter(t => t.projectId === id), [allTasks, id]);
@@ -83,7 +97,34 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
   const [error, setError] = useState('');
   const [draft, setDraft] = useState<Partial<Task> | null>(null);
   const [busy, setBusy] = useState(false);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  // Відкрита задача — у параметрі `?task=` (Layout System v2.4).
+  const zoneState = useZoneState({ section: archive ? 'project-archive' : 'project-backlog', selectedParam: 'task' });
+  const openTaskId = zoneState.selectedId;
+  const setOpenTaskId = zoneState.select;
+  const panel = useProjectTaskPanel({ projectId: id, taskId: openTaskId, onClose: () => setOpenTaskId(null), isDark: dark });
+  const userId = String(user?.id ?? '');
+
+  /** Свайп рядка архіву: «Відновити» (як «Відновити» у футері картки) і «Видалити» (лід). */
+  const restoreTask = (t: Task) => {
+    if (!taskRights(t, role, userId).execute) return;
+    const fallback = scopedColumnFor(panel.host.columns, id, 'todo')?.id ?? t.kanbanColumnId;
+    void panel.host.write(t.id, cur => ({
+      ...cur,
+      status: 'active',
+      kanbanColumnId: reopenColumnId(cur, panel.host.boardColumns, fallback),
+      subtasks: reopenSubtasks(cur),
+      history: appendHistory(cur, 'active'),
+    })).then(() => haptic.light());
+  };
+  const archiveSwipe = (t: Task): SwipeAction[] => {
+    const canRun = taskRights(t, role, userId).execute;
+    return [
+      ...(canRun ? [{ key: 'restore', label: tr.restore, icon: 'arrow.uturn.backward' as const, onPress: () => restoreTask(t) }] : []),
+      ...(canRun && isLead(role)
+        ? [{ key: 'delete', label: tr.delete, icon: 'trash.fill' as const, tone: 'danger' as const, onPress: () => panel.host.deleteTask(t, () => { if (openTaskId === t.id) setOpenTaskId(null); }) }]
+        : []),
+    ];
+  };
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true); setError('');
@@ -156,13 +197,19 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
   const renderCard = (t: Task) => {
     const lead = !archive && isLead(role);
     const sprintName = t.sprintId ? projectSprints.find(s => s.id === t.sprintId)?.name : undefined;
+    const swipe = archive ? archiveSwipe(t) : [];
     return (
+      <SwipeRow key={t.id} actions={swipe} radius={radius.card} testID={`backlog-row-${t.id}`}>
+        {a11y => (
       // Omni: суцільна картка задачі (surface.card + м'яка тінь).
-      <View key={t.id} style={[{ flex: 1, backgroundColor: tk.surface.card, borderRadius: radius.card, padding: 16, gap: 10 }, shadow[dark ? 'dark' : 'light'].card]}>
+      <View style={[{ flex: 1, backgroundColor: tk.surface.card, borderRadius: radius.card, padding: 16, gap: 10 }, shadow[dark ? 'dark' : 'light'].card, openTaskId === t.id ? { borderWidth: 2, borderColor: tk.action.primary } : null]}>
         <Pressable
           onPress={() => (t.backlogKind ? setDraft(t) : setOpenTaskId(t.id))}
           accessibilityRole="button"
           accessibilityLabel={t.title}
+          accessibilityState={{ selected: openTaskId === t.id }}
+          accessibilityActions={swipe.length ? a11y.accessibilityActions : undefined}
+          onAccessibilityAction={swipe.length ? a11y.onAccessibilityAction : undefined}
           style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, opacity: pressed ? 0.7 : 1 })}>
           <IconSymbol
             name={t.backlogKind === 'bug' ? 'exclamationmark.circle' : t.backlogKind === 'idea' ? 'lightbulb.fill' : t.status === 'done' ? 'checkmark.circle' : 'circle'}
@@ -193,6 +240,8 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
           </>
         ) : null}
       </View>
+        )}
+      </SwipeRow>
     );
   };
 
@@ -227,7 +276,8 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
           accessibilityLabel={tr.pbSection}
           bleed={isWide ? 0 : 20}
         />
-      ) : undefined}>
+      ) : undefined}
+      zone={panel.zone}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 14, width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center' }}>
@@ -258,11 +308,15 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
         {/* Дії списку — один рядок: другорядна ліворуч, створення праворуч. */}
         <ActionBar align="end">
           {filtersActive ? <ActionButton label={tr.pbResetFilters} icon="xmark" tone="neutral" onPress={resetFilters} colors={c} /> : null}
-          {!archive && role !== 'viewer' ? <ActionButton label={newLabel} icon="plus" tone="primary" onPress={onNew} colors={c} /> : null}
+          {!archive && role !== 'viewer' && (tasksStatus !== 'ready' || filtered.length > 0) ? <ActionButton label={newLabel} icon="plus" tone="primary" onPress={onNew} colors={c} /> : null}
         </ActionBar>
         </BentoCard>
         {!!error && <Text accessibilityRole="alert" style={{ color: tk.status.danger, fontFamily: fontFamily.medium }}>{error}</Text>}
-        {groups.filter(g => g.tasks.length).map(g => (
+        {/* Стани головної зони (Layout System v2.4): скелет, помилка з
+            «Повторити», порожньо з однією дією. Фільтри вище лишаються робочими. */}
+        {tasksStatus === 'loading' ? <ZoneSkeleton variant="list" rows={4} /> : null}
+        {tasksStatus === 'error' ? <ZoneError testID="backlog-error" onRetry={retryTasks} /> : null}
+        {tasksStatus === 'ready' && groups.filter(g => g.tasks.length).map(g => (
           <View key={g.id} style={{ gap: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text accessibilityRole="header" accessibilityLabel={`${g.name} · ${g.tasks.length}`} style={[type.h2, { color: c.text }]}>{g.name}</Text>
@@ -273,7 +327,17 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
             <ResponsiveGrid minItemWidth={320} maxColumns={3} gap={12}>{g.tasks.map(renderCard)}</ResponsiveGrid>
           </View>
         ))}
-        {!filtered.length && <Text style={[type.body, { color: c.sub, textAlign: 'center', marginTop: 12 }]}>{tr.pbEmpty}</Text>}
+        {tasksStatus === 'ready' && !filtered.length && (
+          <ZoneEmpty
+            testID="backlog-empty"
+            icon={archive ? 'archivebox' : tab === 'idea' ? 'lightbulb.fill' : tab === 'bug' ? 'exclamationmark.circle' : 'tray'}
+            title={tr.pbEmpty}
+            // Одна головна дія: скинути фільтри, якщо вони звузили список;
+            // інакше — створити запис (не в архіві й не для глядача).
+            actionLabel={filtersActive ? tr.pbResetFilters : !archive && role !== 'viewer' ? newLabel : undefined}
+            onAction={filtersActive ? resetFilters : !archive && role !== 'viewer' ? onNew : undefined}
+          />
+        )}
       </ScrollView>
 
       <Modal visible={!!draft} animationType="slide" onRequestClose={() => setDraft(null)}>
@@ -316,7 +380,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
         </ScrollView>
         </View>
       </Modal>
-      <ProjectTaskSheet projectId={id} taskId={openTaskId} onClose={() => setOpenTaskId(null)} isDark={dark} />
+      {panel.undoElement}
     </ProjectScreenShell>
   );
 }

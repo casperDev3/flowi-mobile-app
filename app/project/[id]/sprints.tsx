@@ -12,8 +12,9 @@
  * Призначення завдання конкретному спринту (поле «Спринт») лишається в
  * картці завдання — тут керування самими спринтами (створення/
  * перейменування/закриття/архів) і швидке додавання нового завдання просто
- * в цей спринт. Тап по задачі відкриває ПОВНУ картку тут же, аркушем
- * (ProjectTaskSheet), — без переходу в «Завдання» чи в особисте.
+ * в цей спринт. Тап по задачі відкриває ПОВНУ картку тут же — у динамічній
+ * зоні (Layout System v2.4: панель праворуч на iPad, нижній аркуш на
+ * телефоні; useProjectTaskPanel), — без переходу в «Завдання» чи в особисте.
  *
  * Список: усі спринти ЗГОРНУТІ за замовчуванням (розгорнуте запамʼятовується
  * до кінця сесії), сортування (новіші/старіші за початком, назва,
@@ -25,7 +26,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ScrollView, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
-import { ProjectTaskSheet } from '@/components/projects/ProjectTaskSheet';
+import { useProjectTaskPanel } from '@/components/projects/ProjectTaskSheet';
+import { useZoneState } from '@/components/layout-zones';
 import { ActionButton, ActionChip, IconAction } from '@/components/shared/ActionBar';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { TasksHeaderMenu, TasksMenuButton, type TasksMenuItem } from '@/components/tasks/TasksHeaderMenu';
@@ -114,7 +116,13 @@ export default function ProjectSprintsScreen() {
     setView(prev => ({ ...prev, expanded: patch(prev.expanded) }));
   }, []);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  // Layout System v2.4: список спринтів — головна зона, картка задачі —
+  // динамічна (панель праворуч з ✕ на iPad, нижній аркуш на телефоні);
+  // відкрита задача — у `?task=`.
+  const zoneState = useZoneState({ section: 'project-sprints', selectedParam: 'task' });
+  const openTaskId = zoneState.selectedId;
+  const setOpenTaskId = zoneState.select;
+  const taskPanel = useProjectTaskPanel({ projectId: String(projectId ?? ''), taskId: openTaskId, onClose: () => setOpenTaskId(null), isDark });
   const [draft, setDraft] = useState<{ sprint: Sprint | null } | null>(null);
   const [draftName, setDraftName] = useState('');
   const [draftStart, setDraftStart] = useState('');
@@ -620,7 +628,8 @@ export default function ProjectSprintsScreen() {
           ) : null}
           <TasksMenuButton onPress={() => setMenuOpen(true)} label={tr.sprintListMenu} active={filtersActive} colors={c} />
         </>
-      )}>
+      )}
+      zone={projectId ? taskPanel.zone : undefined}>
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: tabBarInset + 40 }]}
@@ -666,9 +675,7 @@ export default function ProjectSprintsScreen() {
         ) : null}
       </ScrollView>
       <TasksHeaderMenu visible={menuOpen} onClose={() => setMenuOpen(false)} items={menuItems} colors={c} isDark={isDark} />
-      {projectId ? (
-        <ProjectTaskSheet projectId={String(projectId)} taskId={openTaskId} onClose={() => setOpenTaskId(null)} isDark={isDark} />
-      ) : null}
+      {taskPanel.undoElement}
     </ProjectScreenShell>
   );
 }

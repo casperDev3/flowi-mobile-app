@@ -32,3 +32,4 @@ export { SegmentedProgress, type SegmentedProgressProps } from './SegmentedProgr
 export { HatchedBars, type HatchedBar, type HatchedBarsProps } from './HatchedBars';
 export { Tag, PriorityFlag, type TagProps, type PriorityFlagProps, type Priority } from './Tag';
 export { Avatar, AvatarStack, initialsOf, type AvatarPerson, type AvatarProps, type AvatarStackProps } from './AvatarStack';
+export { OverlaySurface, OverlayScrim, OverlayMaterial, overlayFillStyle, type OverlaySurfaceProps } from './OverlaySurface';

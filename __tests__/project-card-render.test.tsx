@@ -21,6 +21,8 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
   useLocalSearchParams: () => ({ id: 'p1' }),
+  // Layout System v2.4: ZoneLayout (через useScreenWidth) читає шлях.
+  usePathname: () => '/project/p1/sprints',
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
 }));
 jest.mock('@/utils/haptics', () => ({

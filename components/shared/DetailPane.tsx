@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Layout } from '@/constants/tokens';
 import { radius, space } from '@/constants/theme';
 import { dsTheme, glassOf, glassRim } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 /** Підібрано під найдовший рядок деталі («Дедлайн: 12 листопада 2026»). */
 export const DETAIL_COLUMN_WIDTH = Layout.detailWidth;
@@ -110,6 +111,8 @@ export function DetailPane({
             {open && (
               <View
                 style={[st.sheet, sheetHeight ? { height: Math.min(sheetHeight, maxHeight), flexShrink: 1 } : null, { maxHeight, backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
+                {/* Layout System v2.4: «брудне скло» — блюр + зерно під заливкою. */}
+                <OverlayMaterial isDark={isDark} />
                 {/* Шапка поза ScrollView: лист обмежений maxHeight, і
                     flexShrink у прокрутки віддає місце саме їй, а не шапці. */}
                 {header}

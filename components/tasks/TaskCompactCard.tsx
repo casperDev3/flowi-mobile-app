@@ -11,7 +11,7 @@
  * загортати в стрілку, нову при кожному рендері.
  */
 import React, { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AnimatedCheck } from '@/components/shared/AnimatedCheck';
@@ -77,11 +77,23 @@ export interface TaskCompactCardProps<T extends Task> {
    * лишаємо тільки спринт, якщо він є.
    */
   hideProject?: boolean;
+  /**
+   * Layout System v2.4 — масовий вибір: картка вибрана (рамка action.primary
+   * + стан selected для VoiceOver). Тап у режимі вибору перемикає вибір —
+   * це вирішує екран через onPress.
+   */
+  selected?: boolean;
+  /** Режим вибору увімкнено: чекбокс статусу ховається, щоб тап не міняв статус. */
+  selectionMode?: boolean;
+  /** Дії свайпу рядка для VoiceOver (SwipeRow → accessibilityActions). */
+  rowAccessibilityActions?: AccessibilityActionInfo[];
+  onRowAccessibilityAction?: (e: AccessibilityActionEvent) => void;
 }
 
 function TaskCompactCardInner<T extends Task>({
   task, statusColumn, onPress, onToggle, onLongPress, c, isDark, projects, sprints, overdueLabel, priorityLabel, subtasksLabel, assigneeLabel,
   priorityPlacement = 'footer', hideProject = false,
+  selected = false, selectionMode = false, rowAccessibilityActions, onRowAccessibilityAction,
 }: TaskCompactCardProps<T>) {
   const { tr } = useI18n();
   const priorityLevel = normalizePriority(task);
@@ -145,14 +157,25 @@ function TaskCompactCardInner<T extends Task>({
           без рамки й блюру — як картка канбану в референсі. Вкладені чипи —
           пастельні (тінт кольору статусу/проєкту), а не скло: скляна
           підкладка на білій картці не видна. */}
-      <View style={[st.card, { backgroundColor: t.surface.card, ...shadow[isDark ? 'dark' : 'light'].card }]}>
+      <View style={[
+        st.card,
+        { backgroundColor: t.surface.card, ...shadow[isDark ? 'dark' : 'light'].card },
+        // Вибрана в масовому виборі — чорна рамка «ви тут» (action.primary).
+        selected ? { borderWidth: 2, borderColor: t.action.primary } : { borderWidth: 2, borderColor: 'transparent' },
+      ]}>
         {/* Ціль дотику чекбокса — справжні 44×44, а не 18 + hitSlop: hitSlop
             не виходить за межі картки (у неї відступ 12/9), тож фактично
             лишалось ~36. Колонка 44pt на всю висоту картки, сам квадратик —
             лише малюнок усередині. Підпис каже ДІЮ: «Позначити виконаним:
             <назва>» — інакше VoiceOver читав ту саму назву двічі (чекбокс і
             рядок), і не було чути, що з них що. */}
-        {onToggle ? (
+        {selectionMode ? (
+          // Режим вибору: замість статусу — позначка вибору (тап по картці
+          // перемикає вибір, статус тут не змінюється).
+          <View style={st.checkHit} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+            <IconSymbol name={selected ? 'checkmark.circle.fill' : 'circle'} size={20} color={selected ? t.action.primary : c.sub} />
+          </View>
+        ) : onToggle ? (
           <Pressable
             onPress={() => onToggle(task)}
             accessibilityRole="checkbox"
@@ -177,6 +200,9 @@ function TaskCompactCardInner<T extends Task>({
           accessible
           accessibilityRole="button"
           accessibilityLabel={a11ySummary}
+          accessibilityState={selectionMode ? { selected } : undefined}
+          accessibilityActions={rowAccessibilityActions}
+          onAccessibilityAction={onRowAccessibilityAction}
           onAccessibilityTap={() => onPress(task)}>
           <AnimatedText
             style={[{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, textDecorationLine: isDone ? 'line-through' : 'none' } as any, titleAnimStyle]}

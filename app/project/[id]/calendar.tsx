@@ -15,6 +15,14 @@
  * Завдання; завдання створюється тут же аркушем (CalendarTaskCreate).
  * Тап по задачі (і «Відкрити повністю» після створення) відкриває ПОВНУ
  * картку тут же, аркушем (ProjectTaskSheet), — календар лишається під ним.
+ *
+ * Layout System v2.4: сітка календаря — головна зона (вона й лишається
+ * найширшою), повна картка задачі — динамічна зона (useProjectTaskPanel:
+ * панель праворуч з ✕ на iPad, нижній аркуш ~60% → весь екран на телефоні);
+ * відкрита задача — у `?task=`. Зустрічі відкриваються формою наради
+ * (MeetingFormSheet — «брудне скло» поверх календаря), бо картки перегляду
+ * наради, окремої від форми, у проєкті немає. «Список / Колонки» тут не
+ * застосовний: вигляди календаря — Місяць / Тиждень / День.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -35,7 +43,8 @@ import { TimeGrid } from '@/components/calendar/TimeGrid';
 import { WeekStrip } from '@/components/calendar/WeekStrip';
 import { ProjectScreenShell, projectShellColors } from '@/components/projects/ProjectScreenShell';
 import { KpiCounter } from '@/components/ds';
-import { ProjectTaskSheet } from '@/components/projects/ProjectTaskSheet';
+import { useProjectTaskPanel } from '@/components/projects/ProjectTaskSheet';
+import { useZoneState } from '@/components/layout-zones';
 import { useProjectRecords } from '@/components/projects/useProjectRecords';
 import { MeetingFormSheet, type MeetingFormData } from '@/components/shared/MeetingFormSheet';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
@@ -228,7 +237,10 @@ export default function ProjectCalendar() {
     if (target) setTimeout(() => setTaskDay(target.day), 300);
   }, [createTarget]);
 
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const zoneState = useZoneState({ section: 'project-calendar', selectedParam: 'task' });
+  const openTaskId = zoneState.selectedId;
+  const setOpenTaskId = zoneState.select;
+  const taskPanel = useProjectTaskPanel({ projectId: id, taskId: openTaskId, onClose: () => setOpenTaskId(null), isDark });
   const createTask = useCallback(async (task: Task, openFull: boolean) => {
     setTaskDay(null);
     try {
@@ -238,9 +250,9 @@ export default function ProjectCalendar() {
     } catch (e) {
       if (__DEV__) console.warn('[project/calendar] створення завдання не вдалося:', e);
     }
-  }, []);
+  }, [setOpenTaskId]);
 
-  const openTask = useCallback((task: Task) => setOpenTaskId(task.id), []);
+  const openTask = useCallback((task: Task) => setOpenTaskId(task.id), [setOpenTaskId]);
   // Смуга спринта — у «Спринти» з ?sprint=: саме цей спринт розгорнеться.
   const openSprint = useCallback((bar: SprintBar) => {
     router.push({ pathname: '/project/[id]/sprints', params: { id: String(id), sprint: bar.sprint.id } } as never);
@@ -363,7 +375,8 @@ export default function ProjectCalendar() {
             </HeaderButton>
           ) : null}
         </>
-      }>
+      }
+      zone={taskPanel.zone}>
       <View style={{ flex: 1 }}>
         <CalendarToolbar
           view={view}
@@ -429,7 +442,7 @@ export default function ProjectCalendar() {
         isProjectOwner={role === 'owner'}
       />
 
-      <ProjectTaskSheet projectId={id} taskId={openTaskId} onClose={() => setOpenTaskId(null)} isDark={isDark} />
+      {taskPanel.undoElement}
     </ProjectScreenShell>
   );
 }

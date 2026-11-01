@@ -15,7 +15,7 @@
  * дані центру — у `components/notifications/` та `api/notifications.ts`.
  */
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -49,6 +49,9 @@ import { useI18n } from '@/store/i18n';
 import { INVITE_EVENT_PENDING, inviteIdFromPayload, syncMyInvites } from '@/store/invite-inbox';
 import { notificationRoute } from '@/utils/pushLink';
 import { fontFamily } from '@/constants/theme';
+import { Atlas } from '@/constants/atlas';
+import { BulkActionBar, SwipeRow, ZoneSkeleton, type BulkAction, type SwipeAction } from '@/components/layout-zones';
+import { useFinanceLayoutStrings } from '@/components/finance/layoutStrings';
 import { KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
@@ -128,6 +131,46 @@ export default function NotificationsScreen() {
     void archiveNotifications([item.id]);
   }, []);
 
+  /*
+   * Layout System v2.4. Деталь сповіщення — це екран, куди воно веде, тож
+   * динамічної зони тут немає (тап = перехід). Із патернів зон працюють:
+   * свайп рядка («Прочитано» / «В архів» без переходу) і масовий вибір
+   * (довгий дотик → «N вибрано · Дії ▾ · ✕»). Ті самі API, що й кнопки.
+   */
+  const lz = useFinanceLayoutStrings();
+  const [bulkIds, setBulkIds] = useState<ReadonlySet<string>>(() => new Set());
+  const selectionMode = bulkIds.size > 0;
+  const clearBulk = useCallback(() => setBulkIds(new Set()), []);
+  const toggleBulk = useCallback((item: InboxItem) => {
+    setBulkIds(prev => {
+      const next = new Set(prev);
+      if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+      return next;
+    });
+  }, []);
+  // Вибір — лише серед того, що видно: інша вкладка/фільтр — скидаємо.
+  useEffect(() => { clearBulk(); }, [tab, filter, clearBulk]);
+  const bulkActions = useMemo<BulkAction[]>(() => {
+    const ids = [...bulkIds];
+    const anyUnread = items.some(item => bulkIds.has(item.id) && !item.read_at);
+    return [
+      {
+        key: 'read', label: lz.bulkRead, icon: 'checkmark.circle', disabled: !anyUnread, testID: 'nc-bulk-read',
+        onPress: () => { void markNotificationsRead(ids); clearBulk(); },
+      },
+      {
+        key: 'archive', label: tr.ncArchive, icon: 'archivebox.fill', testID: 'nc-bulk-archive',
+        onPress: () => { void archiveNotifications(ids); clearBulk(); },
+      },
+    ];
+  }, [bulkIds, items, lz, tr, clearBulk]);
+  const swipeActionsFor = useCallback((item: InboxItem): SwipeAction[] => [
+    ...(!item.read_at
+      ? [{ key: 'read', label: lz.swipeRead, icon: 'checkmark.circle' as const, tone: 'success' as const, onPress: () => { void markNotificationsRead([item.id]); } }]
+      : []),
+    { key: 'archive', label: tr.ncArchive, icon: 'archivebox.fill', tone: 'neutral', onPress: () => archiveItem(item) },
+  ], [lz, tr, archiveItem]);
+
   /** «Прийняти/Відхилити» прямо в картці запрошення в проєкт (decision 7). */
   const inviteFooter = useCallback((item: InboxItem) => {
     if (item.event_type !== INVITE_EVENT_PENDING) return null;
@@ -146,7 +189,17 @@ export default function NotificationsScreen() {
   }, [c]);
 
   const renderItem = useCallback(({ item }: { item: InboxItem }) => (
+    // Відступ між картками — на обгортці: інакше кнопки свайпу тягнулись би
+    // і на поле під карткою.
+    <View style={{ marginBottom: 8 }}>
+    <SwipeRow actions={swipeActionsFor(item)} enabled={!selectionMode} radius={Atlas.radius.xlarge}>
+      {a11y => (
     <NotificationRow
+      {...a11y}
+      style={{ marginBottom: 0 }}
+      selectionMode={selectionMode}
+      selected={bulkIds.has(item.id)}
+      onLongPress={toggleBulk}
       item={item}
       timeText={formatNotificationTime(item.created_at, now, tr, lang)}
       isDark={isDark}
@@ -154,11 +207,14 @@ export default function NotificationsScreen() {
       unreadLabel={tr.ncUnreadA11y}
       archiveLabel={tr.ncArchive}
       collapsedText={item.collapse_count > 1 ? fillTemplate(tr.ncCollapsedMore, { count: item.collapse_count - 1 }) : null}
-      onOpen={openItem}
+      onOpen={selectionMode ? toggleBulk : openItem}
       onArchive={archiveItem}
       footer={inviteFooter(item)}
     />
-  ), [now, tr, lang, isDark, rowColors, openItem, archiveItem, inviteFooter]);
+      )}
+    </SwipeRow>
+    </View>
+  ), [now, tr, lang, isDark, rowColors, openItem, archiveItem, inviteFooter, swipeActionsFor, selectionMode, bulkIds, toggleBulk]);
 
   const header = (
     <ScreenHeader
@@ -284,10 +340,9 @@ export default function NotificationsScreen() {
     </View>
   );
 
+  // Стан зони «завантаження» — скелет у формі карток, а не спінер.
   const inboxEmpty = inbox.status === 'loading' && !inbox.items.length ? (
-    <View style={{ paddingVertical: 48, alignItems: 'center' }}>
-      <ActivityIndicator color={c.sub} />
-    </View>
+    <ZoneSkeleton variant="list" rows={5} />
   ) : (
     <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: 12 }}>
       <AccentIcon isDark={isDark} icon={filter === 'unread' ? 'checkmark.circle' : 'bell'} accent="lavender" size="lg" style={st.emptyIcon} />
@@ -329,7 +384,7 @@ export default function NotificationsScreen() {
           onEndReachedThreshold={0.4}
           onEndReached={() => { if (filter === 'all') void loadMoreInbox(); }}
           style={{ flex: 1 }}
-          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24 }]}
+          contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingBottom: (Platform.OS === 'ios' ? 40 : 24) + (selectionMode ? 72 : 0) }]}
           showsVerticalScrollIndicator={false}
         />
       ) : (
@@ -340,6 +395,15 @@ export default function NotificationsScreen() {
           contentStyle={contentWidth}
         />
       )}
+      {tab === 'inbox' ? (
+        <BulkActionBar
+          testID="nc-bulk-bar"
+          count={bulkIds.size}
+          actions={bulkActions}
+          onClear={clearBulk}
+          bottom={Platform.OS === 'ios' ? 28 : 16}
+        />
+      ) : null}
     </View>
   );
 }

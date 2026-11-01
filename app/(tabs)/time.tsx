@@ -47,9 +47,13 @@ import {
   Text,
   TouchableOpacity,
   View,
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
 } from 'react-native';
 
 import { PressableScale } from '@/components/shared/PressableScale';
+import { SwipeRow, type SwipeAction } from '@/components/layout-zones';
+import { useFinanceLayoutStrings } from '@/components/finance/layoutStrings';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -152,6 +156,12 @@ export default function TimeScreen() {
   const screenWidth = useScreenWidth();
   /** Широко: KPI рядком, історія зліва, панель справа. */
   const twoPane = isExpanded && screenWidth >= TWO_PANE_MIN;
+  /**
+   * «+» на широкому — у правому нижньому куті КОЛОНКИ історії: відступ справа
+   * = поле центрованого тіла + гуттер + права панель + проміжок колонок.
+   */
+  const wideFabRight = Math.max(screenWidth - WIDE_CONTENT_MAX_WIDTH, 0) / 2
+    + Layout.gutter.expanded + detailColumnWidthFor(width) + 20 + 16;
   /** Портрет планшета: одна колонка, таймери сіткою в 2. */
   const timerColumns = isWide && !twoPane ? 2 : 1;
   const { user } = useAuth();
@@ -165,6 +175,7 @@ export default function TimeScreen() {
   const projectOf = useTimerProjects(activeTimers);
   const { tr, lang } = useI18n();
   const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
+  const lz = useFinanceLayoutStrings();
 
   const durationUnits = useMemo(
     () => ({ hour: tr.unitHour, hourLong: tr.unitHourLong, minute: tr.unitMinute }),
@@ -616,12 +627,24 @@ export default function TimeScreen() {
     </View>
   );
 
+  /** Layout System v2.4: свайп уліво — «Змінити» / «Видалити» без входу в запис. */
+  const swipeActionsFor = (entry: TimeRecord): SwipeAction[] => [
+    { key: 'edit', label: lz.swipeEdit, icon: 'pencil', tone: 'neutral', onPress: () => openEntry(entry) },
+    { key: 'delete', label: lz.swipeDelete, icon: 'trash.fill', tone: 'danger', onPress: () => deleteEntry(entry) },
+  ];
+
   const renderItem = ({ item }: { item: TimeRecord }) => {
     const anomaly: RowAnomaly | undefined = rowAnomalies.get(item.id);
     const severity = anomalySeverity(anomaly?.kinds ?? []);
     const trim = severity ? trimmedSeconds(item) : null;
     return (
+      <SwipeRow actions={swipeActionsFor(item)} radius={Atlas.radius.xlarge}>
+        {a11y => (
+      // Суцільна підкладка: тоноване тло аномалії напівпрозоре, і без неї під
+      // ним просвічували б кнопки свайпу.
+      <View style={{ backgroundColor: t.surface.card, borderRadius: Atlas.radius.xlarge }}>
       <EntryRow
+        {...a11y}
         entry={item}
         selected={selectedId === item.id}
         severity={severity}
@@ -643,6 +666,9 @@ export default function TimeScreen() {
         onDelete={deleteEntry}
         onTrim={trimEntry}
       />
+      </View>
+        )}
+      </SwipeRow>
     );
   };
 
@@ -809,16 +835,6 @@ export default function TimeScreen() {
                   <IconSymbol name="slider.horizontal.3" size={17} color={hasFilters ? c.indigo : c.sub} />
                 </HeaderButton>
               )}
-              {/* FAB на широкому висів би над історією посеред екрана —
-                  головна дія переїжджає в шапку. */}
-              {twoPane && (
-                <HeaderButton
-                  onPress={() => openEntry(null)}
-                  accessibilityLabel={tr.timeAddEntry}
-                  style={{ backgroundColor: t.action.primary }}>
-                  <IconSymbol name="plus" size={17} color={t.text.onAction} />
-                </HeaderButton>
-              )}
             </>
           }
         />
@@ -881,15 +897,16 @@ export default function TimeScreen() {
         )}
       </View>
 
-      {!twoPane && (
-        <PressableScale
-          onPress={() => openEntry(null)}
-          scaleTo={0.92}
-          accessibilityLabel={tr.timeAddEntry}
-          style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: t.action.primary }]}>
-          <IconSymbol name="plus" size={26} color={t.text.onAction} />
-        </PressableScale>
-      )}
+      {/* Layout System v2.4: «+» — плаваюча в правому нижньому куті СПИСКУ на
+          всіх розмірах. На широкому список — ліва колонка, тож кнопка стоїть
+          лівіше від правої панелі, а не посеред екрана. */}
+      <PressableScale
+        onPress={() => openEntry(null)}
+        scaleTo={0.92}
+        accessibilityLabel={tr.timeAddEntry}
+        style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: t.action.primary }, twoPane && { right: wideFabRight }]}>
+        <IconSymbol name="plus" size={26} color={t.text.onAction} />
+      </PressableScale>
 
       <TimeEntrySheet
         visible={sheetOpen}
@@ -1029,6 +1046,9 @@ interface EntryRowProps {
   onPress: (entry: TimeRecord) => void;
   onDelete: (entry: TimeRecord) => void;
   onTrim: (entry: TimeRecord, seconds: number) => void;
+  /** Layout System v2.4: дії свайпу рядка — і для VoiceOver (SwipeRow). */
+  accessibilityActions?: AccessibilityActionInfo[];
+  onAccessibilityAction?: (e: AccessibilityActionEvent) => void;
 }
 
 /**
@@ -1038,7 +1058,7 @@ interface EntryRowProps {
  */
 const EntryRow = React.memo(function EntryRow({
   entry, selected = false, severity, reason, trimSeconds, trimLabel, warn, projectName, projectColor, accent, border: _border, text, sub, danger,
-  duration, when, tr, onPress, onDelete, onTrim,
+  duration, when, tr, onPress, onDelete, onTrim, accessibilityActions, onAccessibilityAction,
 }: EntryRowProps) {
   const flag = severity === 'red' ? danger : severity === 'amber' ? warn : null;
   const title = entry.task || tr.untitled;
@@ -1051,6 +1071,8 @@ const EntryRow = React.memo(function EntryRow({
       onPress={() => onPress(entry)}
       accessibilityRole="button"
       accessibilityState={{ selected }}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       accessibilityLabel={`${title}, ${duration}.${reason ? ` ${tr.timeRowAnomalyA11y.replace('{kinds}', reason)}.` : ''} ${tr.edit}`}
       style={[
         s.entryCard,

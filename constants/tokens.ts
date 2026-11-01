@@ -273,11 +273,18 @@ export function resolveSheetPresentation(
 /**
  * Режим особистого сайдбара. На medium (600–839) повний сайдбар (232pt)
  * з'їдав третину вікна — там за замовчуванням «рейка» з іконками; людина
- * може розгорнути її (override). На expanded за замовчуванням повний.
+ * може розгорнути її (override). На expanded за замовчуванням повний, але
+ * Layout System (планшет 768–1279) теж хоче рейку: якщо відома ширина вікна
+ * і вона менша за RAIL_UNTIL_WIDTH, і там рейка.
  */
 export type SidebarMode = 'full' | 'rail';
 
-export function sidebarModeFor(sizeClass: SizeClass, override: SidebarMode | null): SidebarMode {
+/** Layout System: до цієї ширини (pt) навігація — рейка з іконками. */
+export const RAIL_UNTIL_WIDTH = 1280;
+
+export function sidebarModeFor(sizeClass: SizeClass, override: SidebarMode | null, width?: number): SidebarMode {
   if (override) return override;
-  return sizeClass === 'medium' ? 'rail' : 'full';
+  if (sizeClass === 'medium') return 'rail';
+  if (sizeClass === 'expanded' && typeof width === 'number' && width < RAIL_UNTIL_WIDTH) return 'rail';
+  return 'full';
 }

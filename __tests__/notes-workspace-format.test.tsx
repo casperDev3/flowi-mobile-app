@@ -17,9 +17,30 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(async (key: string, value: string) => { mockStore.set(key, value); }),
   removeItem: jest.fn(async (key: string) => { mockStore.delete(key); }),
 }));
-jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ dispatch: jest.fn() }), usePreventRemove: jest.fn() }));
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({ dispatch: jest.fn() }), usePreventRemove: jest.fn(),
+  // BottomSheet (Layout System v2.4) слухає blur екрана через контекст навігації.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  NavigationContext: require('react').createContext(undefined),
+}));
 jest.mock('@/hooks/use-tab-bar-inset', () => ({ useTabBarInset: () => 0 }));
-jest.mock('@/hooks/use-responsive', () => ({ useResponsive: () => ({ isExpanded: mockExpanded, isWide: mockExpanded, height: 800 }) }));
+jest.mock('@/hooks/use-responsive', () => ({
+  useResponsive: () => ({ isExpanded: mockExpanded, isWide: mockExpanded, width: mockExpanded ? 1200 : 390, height: 800 }),
+  useScreenWidth: () => (mockExpanded ? 1200 : 390),
+}));
+// Layout System v2.4: зони (ZoneLayout / useZoneState / SwipeRow) — маршрут
+// і жести поза навігатором підмінено; ширина вікна — з mockExpanded.
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ setParams: jest.fn(), push: jest.fn(), back: jest.fn() }),
+  useLocalSearchParams: () => ({}),
+  usePathname: () => '/notes',
+  useFocusEffect: () => {},
+}));
+jest.mock('@/components/layout-zones/SwipeRow', () => ({
+  SwipeRow: ({ children }: { children: unknown }) =>
+    (typeof children === 'function' ? children({ accessibilityActions: [], onAccessibilityAction: () => {} }) : children),
+}));
+
 jest.mock('@/hooks/use-project-roles', () => ({
   useProjectRoles: () => ({}),
   canEditProjectItem: () => true,

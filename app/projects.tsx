@@ -21,6 +21,7 @@ import { HEADER_BUTTON_HIT_SLOP, useHeaderLead } from '@/components/shared/Scree
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { useI18n } from '@/store/i18n';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
@@ -1212,6 +1213,7 @@ export default function ProjectsScreen() {
           <Pressable accessible={false} style={[st.overlay, { backgroundColor: tk.surface.overlay }, wm.overlay]} onPress={closeModal}>
             <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
               <View style={[st.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+                <OverlayMaterial isDark={isDark} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={st.handleRow}>
                   <View style={{ flex: 1 }} />

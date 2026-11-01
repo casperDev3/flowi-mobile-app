@@ -79,7 +79,7 @@ export function useScreenWidth(): number {
   // components/shared/sidebar-mode.ts).
   const sidebarWidth = pathname.startsWith('/project/')
     ? projectSidebarWidthFor(projectCollapsed)
-    : navSidebarWidthFor(sizeClass, overrides);
+    : navSidebarWidthFor(sizeClass, overrides, width);
   return screenContentWidth(width, isWide, pathname, sidebarWidth);
 }
 

@@ -19,6 +19,12 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async (k: string) => { mockStore.delete(k); }),
 }));
 jest.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
+// Layout System v2.4: свайп рядка (ReanimatedSwipeable) у jest-середовищі
+// без нативного RNGH — рядок рендеримо без жесту, дії лишаються в a11y.
+jest.mock('@/components/layout-zones/SwipeRow', () => ({
+  SwipeRow: ({ children }: { children: unknown }) =>
+    (typeof children === 'function' ? children({ accessibilityActions: [], onAccessibilityAction: () => {} }) : children),
+}));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: 'SafeAreaView',

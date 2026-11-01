@@ -30,6 +30,7 @@ import { assigneeForPersonalProjectTask, priorityFields, type Task } from '@/uti
 
 import type { CalendarColors } from './palette';
 import { glassRimFor } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 /**
  * Нове завдання з чернетки — ті самі правила, що й `addTask` на екрані
@@ -128,6 +129,7 @@ export function CalendarTaskCreate({
       <View
         testID="calendar-task-create"
         style={[st.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+        <OverlayMaterial isDark={isDark} />
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <TaskQuickCreate
             editor={editor}

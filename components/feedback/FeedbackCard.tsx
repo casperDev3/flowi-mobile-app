@@ -7,7 +7,7 @@ import { fontFamily, shadow } from '@/constants/theme';
  * їхніми BlurView (та сама причина, що була в ideas.tsx / bugs.tsx).
  */
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { dsTheme } from '@/components/shared/dsTheme';
@@ -26,10 +26,14 @@ export interface FeedbackCardProps {
   tr: Translations;
   onOpen: (entry: FeedbackEntry) => void;
   onToggleDone: (entry: FeedbackEntry) => void;
+  /** Layout System v2.4: дії свайпу рядка — і для VoiceOver (SwipeRow). */
+  accessibilityActions?: AccessibilityActionInfo[];
+  onAccessibilityAction?: (e: AccessibilityActionEvent) => void;
 }
 
 export const FeedbackCard = React.memo(function FeedbackCard({
   entry, state, selected, isDark, colors, locale, tr, onOpen, onToggleDone,
+  accessibilityActions, onAccessibilityAction,
 }: FeedbackCardProps) {
   const done = isDone(entry);
   const weight = weightOf(entry);
@@ -47,6 +51,8 @@ export const FeedbackCard = React.memo(function FeedbackCard({
       onPress={() => onOpen(entry)}
       accessibilityRole="button"
       accessibilityState={{ selected }}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       accessibilityLabel={`${entry.kind === 'bug' ? tr.fbTypeBug : tr.fbTypeIdea}: ${entry.item.title}. ${stateLabel(tr, state.key)}`}
       style={{ borderRadius: Atlas.radius.xlarge, ...shadow[isDark ? 'dark' : 'light'].card }}>
       <View

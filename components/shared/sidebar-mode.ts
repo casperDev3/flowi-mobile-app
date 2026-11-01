@@ -56,14 +56,14 @@ export function useSidebarOverrides(): SidebarOverrides {
 }
 
 /** Чиста функція: ширина особистого сайдбара для класу вікна й вибору. */
-export function navSidebarWidthFor(sizeClass: SizeClass, ov: SidebarOverrides): number {
-  return sidebarModeFor(sizeClass, ov[sizeClass] ?? null) === 'rail' ? Layout.railWidth : SIDEBAR_WIDTH;
+export function navSidebarWidthFor(sizeClass: SizeClass, ov: SidebarOverrides, width?: number): number {
+  return sidebarModeFor(sizeClass, ov[sizeClass] ?? null, width) === 'rail' ? Layout.railWidth : SIDEBAR_WIDTH;
 }
 
 /** Поточний режим особистого сайдбара (реактивно). */
-export function useNavSidebarMode(sizeClass: SizeClass): SidebarMode {
+export function useNavSidebarMode(sizeClass: SizeClass, width?: number): SidebarMode {
   const ov = useSidebarOverrides();
-  return sidebarModeFor(sizeClass, ov[sizeClass] ?? null);
+  return sidebarModeFor(sizeClass, ov[sizeClass] ?? null, width);
 }
 
 // ─── Сайдбар ПРОЄКТУ: згорнутий (рейка) чи повний ───────────────────────────

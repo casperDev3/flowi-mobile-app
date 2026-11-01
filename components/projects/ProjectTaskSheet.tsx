@@ -14,6 +14,13 @@
  * «Завдання» й «Моя робота» мають власний ListDetailLayout і цим не
  * користуються.
  *
+ * Layout System v2.4: розділи, що мають власний список (Беклог, Архів,
+ * Спринти, «Моя робота»), показують картку НЕ модальним аркушем, а в
+ * динамічній зоні — `useProjectTaskPanel` повертає пропси зони для
+ * ProjectScreenShell `zone` (панель праворуч на iPad з ✕, нижній аркуш ~60%
+ * → весь екран на телефоні). ProjectTaskSheet лишається для екранів без
+ * власних зон (особисті екрани, вбудований «Огляд»).
+ *
  * Особисті екрани (вкладка «Завдання», «Сьогодні», Календар, групи задач)
  * теж показують сюди задачу ПРОЄКТУ (з `projectId`) — через
  * `useInPlaceProjectTask`: картка проєкту відкривається поверх того ж екрана,
@@ -32,6 +39,7 @@ import { projectShellColors } from './ProjectScreenShell';
 import { useProjectTaskCard, useProjectTaskHost } from './ProjectTaskCard';
 import { dsTokens } from '@/hooks/use-ds';
 import { glassOf } from '@/components/shared/dsTheme';
+import type { ProjectShellZone } from './ProjectScreenShell';
 
 export interface ProjectTaskSheetProps {
   projectId: string;
@@ -102,6 +110,80 @@ export function ProjectTaskSheet({ projectId, taskId, onClose, initialTab = 'mai
       {host.undoElement}
     </>
   );
+}
+
+/** Картка задачі (useProjectTaskCard) → пропси динамічної зони ZoneLayout. */
+export function taskCardZone({ card, open, onClose, label, scrollRef }: {
+  card: { header: React.ReactNode; body: React.ReactNode; footer: React.ReactNode };
+  open: boolean;
+  onClose: () => void;
+  label?: string;
+  scrollRef?: React.RefObject<ScrollView | null>;
+}): Pick<ProjectShellZone, 'dynamic' | 'dynamicHeader' | 'dynamicFooter' | 'dynamicOpen' | 'onCloseDynamic' | 'dynamicLabel' | 'dynamicScrollRef' | 'dynamicChrome'> {
+  return {
+    dynamic: card.body,
+    dynamicHeader: card.header,
+    dynamicFooter: card.footer,
+    dynamicOpen: open && !!card.body,
+    onCloseDynamic: onClose,
+    dynamicLabel: label,
+    dynamicScrollRef: scrollRef,
+    // ✕ і вкладки дає сама шапка картки (TaskDetailHeader).
+    dynamicChrome: false,
+  };
+}
+
+/**
+ * Повна картка задачі проєкту в ДИНАМІЧНІЙ ЗОНІ розділу (Layout System
+ * v2.4): ті самі дані, права й запис, що в ProjectTaskSheet, але замість
+ * модального аркуша — пропси для `<ProjectScreenShell zone={…}>`.
+ * `undoElement` (тост «Скасувати» після видалення) екран рендерить сам.
+ */
+export function useProjectTaskPanel({ projectId, taskId, onClose, initialTab = 'main', isDark }: ProjectTaskSheetProps) {
+  const { tr } = useI18n();
+  const { project } = useProject(projectId);
+  const role = useProjectRole(projectId);
+  const host = useProjectTaskHost(projectId);
+  const c = projectShellColors(isDark, project?.color ?? '#7C3AED', project?.appearance);
+  const colors = { ...c, sheet: glassOf(dsTokens(isDark)).sheet };
+  const scrollRef = useRef<InstanceType<typeof ScrollView> | null>(null);
+  const [tab, setTab] = useState<TaskDetailTab>(initialTab);
+  useEffect(() => { if (taskId) setTab(initialTab); }, [taskId, initialTab]);
+  // Нова задача — з початку картки, а не з тієї прокрутки, де лишили минулу.
+  useEffect(() => { scrollRef.current?.scrollTo?.({ y: 0, animated: false }); }, [taskId]);
+
+  const task = taskId
+    ? host.tasks.find(t => t.id === taskId && (t.projectId === projectId
+      || (!!t.sprintId && host.sprints.some(sp => sp.id === t.sprintId && sp.projectId === projectId)))) ?? null
+    : null;
+  const card = useProjectTaskCard({
+    task,
+    projectId,
+    projectName: project?.name ?? '',
+    projectColor: project?.color ?? c.accent,
+    role,
+    boardColumns: host.boardColumns,
+    allColumns: host.columns,
+    sprints: host.sprints,
+    write: host.write,
+    onDelete: t => host.deleteTask(t, onClose),
+    onMoved: name => host.showToast(tr.taskMovedToProject.replace('{project}', name)),
+    onClose,
+    // Ручку малює нижній аркуш зони (BottomSheet), панель iPad її не має.
+    wide: true,
+    tab,
+    onTabChange: setTab,
+    colors,
+    isDark,
+  });
+
+  return {
+    task,
+    host,
+    zone: taskCardZone({ card, open: !!task, onClose, label: task?.title, scrollRef }),
+    undoElement: host.undoElement,
+    undoVisible: host.undoVisible,
+  };
 }
 
 /** Проєкт, у чиїй картці відкривати задачу; null — задача особиста. */

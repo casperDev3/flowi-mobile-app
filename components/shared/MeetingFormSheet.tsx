@@ -19,6 +19,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSheetSurface } from '@/hooks/use-content-width';
 import { fontFamily } from '@/constants/theme';
 import { dsTheme as dsTokens, glassOf, glassRimFor, glassRim } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 // ─── Exported types ────────────────────────────────────────────────────────────
 
@@ -313,6 +314,8 @@ export function MeetingFormSheet({
           <Pressable onPress={e => e.stopPropagation()} style={s.wrapper} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
             <View
               style={[s.sheet, sheetSurface, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+              {/* Layout System v2.4: «брудне скло» — блюр + зерно під заливкою. */}
+              <OverlayMaterial isDark={isDark} />
               {/* bounces тут був false — на обрізаному аркуші це остаточно
                   вбивало будь-який натяк на те, що вміст можна прогорнути. */}
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

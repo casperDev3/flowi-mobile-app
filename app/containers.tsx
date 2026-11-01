@@ -27,14 +27,15 @@ import { QrSheet } from '@/components/containers/QrSheet';
 import { SearchHitRow } from '@/components/containers/SearchHitRow';
 import { CONTAINERS_ACCENT as ACCENT, useContainersColors } from '@/components/containers/theme';
 import { useContainersData, type PhotoTarget } from '@/components/containers/useContainersData';
-import { DetailPane } from '@/components/shared/DetailPane';
+import { ZoneLayout, ZoneSkeleton, zoneWidths } from '@/components/layout-zones';
+import { useZoneState } from '@/hooks/use-zone-state';
 // Omni (DS v2.2): шапка — AppHeader поверх ScreenHeader (інсет, «Назад», 🔔, аватар).
 import { AppHeader } from '@/components/shared/AppHeader';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { EmptyState, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
-import { detailColumnWidthFor, sizeClassFor } from '@/constants/tokens';
+import { sizeClassFor } from '@/constants/tokens';
 import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
@@ -73,7 +74,7 @@ export default function ContainersScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ open?: string; slug?: string; qr?: string; scan?: string; q?: string }>();
   const contentWidth = useContentWidth();
-  const { width, height, isWide, isExpanded } = useResponsive();
+  const { width, isWide, isExpanded } = useResponsive();
   const screenWidth = useScreenWidth();
   const data = useContainersData();
   useUploadQueueRunner();
@@ -99,16 +100,22 @@ export default function ContainersScreen() {
   }, []);
 
   const placesMode = view === 'places';
-  /** Колонка деталі росте на дуже широкому вікні — та сама, що в DetailPane нижче. */
-  const detailWidth = detailColumnWidthFor(width);
   const treeColumn = placesMode && isExpanded;
+  /**
+   * Layout System v2.4: деталь коробки — динамічна зона. Планшет: панель
+   * праворуч після вибору (✕ ховає, сітка розтягується); телефон або вузьке
+   * вікно — нижній аркуш ~60%. Вибір дзеркалиться в `?box=<id>`.
+   */
+  const zoneState = useZoneState({ section: 'containers', selectedParam: 'box', label: tr.containers });
+  const zone = zoneWidths({ windowWidth: width, screenWidth, wide: isWide, wantStatic: false, wantDynamic: !!detailId && zoneState.panels.dynamic });
+  const detailInPanel = isWide && zone.dynamicMode === 'panel';
 
   /**
-   * Ширина, що лишається сітці: мінус колонка деталі на expanded і мінус
+   * Ширина, що лишається сітці: мінус відкрита панель деталі і мінус
    * колонка дерева в режимі «За місцями» (§8.2).
    */
   const listWidth = Math.max(
-    screenWidth - (isExpanded ? detailWidth : 0) - (treeColumn ? TREE_COLUMN_WIDTH : 0),
+    screenWidth - (detailInPanel ? zone.dynamicWidth : 0) - (treeColumn ? TREE_COLUMN_WIDTH : 0),
     0,
   );
   const listClass = sizeClassFor(listWidth);
@@ -148,6 +155,22 @@ export default function ContainersScreen() {
 
   const detail = useMemo(() => data.containers.find(box => box.id === detailId) ?? null, [data.containers, detailId]);
   const qrBox = useMemo(() => data.containers.find(box => box.id === qrBoxId) ?? null, [data.containers, qrBoxId]);
+
+  // ?box=<id>: перший прохід після читання відкриває коробку з адреси, далі
+  // вибір дзеркалиться в адресу (select — через ref, він залежить від router).
+  const zoneSelectRef = useRef(zoneState.select);
+  useEffect(() => { zoneSelectRef.current = zoneState.select; });
+  const boxParamConsumed = useRef(false);
+  const boxParam = zoneState.selectedId;
+  useEffect(() => {
+    if (data.status !== 'ready' || boxParamConsumed.current) return;
+    boxParamConsumed.current = true;
+    if (boxParam && data.containers.some(box => box.id === boxParam)) setDetailId(boxParam);
+  }, [data.status, data.containers, boxParam]);
+  useEffect(() => {
+    if (!boxParamConsumed.current) return;
+    zoneSelectRef.current(detailId);
+  }, [detailId]);
 
   const openBox = useCallback((id: string) => {
     setDetailId(id);
@@ -213,9 +236,9 @@ export default function ContainersScreen() {
    * результати можна перебирати, не набираючи запит заново.
    */
   const openSearchHit = useCallback((id: string) => {
-    if (!isExpanded) setSearch('');
+    if (!detailInPanel) setSearch('');
     openBox(id);
-  }, [isExpanded, openBox]);
+  }, [detailInPanel, openBox]);
 
   // ── Дії ───────────────────────────────────────────────────────────────
   const confirmDeleteContainer = useCallback((box: Container) => {
@@ -353,7 +376,10 @@ export default function ContainersScreen() {
   };
 
   let body: React.ReactNode;
-  if (data.status === 'failed') {
+  if (data.status === 'loading') {
+    // Стан зони «завантаження»: скелет у формі плиток/рядків, не порожньо.
+    body = <ZoneSkeleton variant="list" rows={5} style={[contentWidth, { paddingHorizontal: 16 }]} />;
+  } else if (data.status === 'failed') {
     // ERR-01: «не прочиталось» ≠ «порожньо»; запис вимкнено, доки не прочитаємо.
     body = (
       <View style={{ alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24, gap: 14 }}>
@@ -399,9 +425,12 @@ export default function ContainersScreen() {
     <View style={{ flex: 1, backgroundColor: c.bg1 }}>
       <Stack.Screen options={{ headerShown: false }} />
       <MeshBackground />
-      {/* Широкий екран: коробки зліва, вміст обраної — праворуч. Вузький:
-          деталь — модальний лист поверх списку. Верхній інсет дає ScreenHeader. */}
-      <View style={{ flex: 1, flexDirection: isExpanded ? 'row' : 'column' }}>
+      {/* Layout System v2.4: [коробки — головна зона, завжди найширша]
+          [вміст обраної — панель праворуч з ✕ / нижній аркуш ~60% на
+          телефоні]. Верхній інсет дає ScreenHeader. */}
+      <ZoneLayout
+        testID="containers-zones"
+        main={
         <View style={{ flex: 1 }}>
           <AppHeader
             title={tr.containers}
@@ -461,25 +490,17 @@ export default function ContainersScreen() {
 
           {body}
         </View>
-
-        <DetailPane
-          open={!!detail}
-          wide={isExpanded}
-          columnWidth={detailWidth}
-          onClose={() => setDetailId(null)}
-          isDark={c.isDark}
-          sheetColor={c.sheet}
-          borderColor={c.border}
-          maxHeight={height * 0.86}
-          scrollRef={detailScrollRef}
-          empty={
-            <Text style={{ ...dsType.caption, fontSize: 13, color: c.sub, textAlign: 'center', paddingHorizontal: 24 }}>
-              {tr.containerPickHint}
-            </Text>
-          }>
-          {detail ? renderDetail(detail) : null}
-        </DetailPane>
-      </View>
+        }
+        dynamic={detail ? renderDetail(detail) : null}
+        dynamicOpen={!!detail && zoneState.panels.dynamic}
+        onCloseDynamic={() => setDetailId(null)}
+        // ✕ дає шапка самої деталі (ContainerDetail).
+        dynamicChrome={false}
+        dynamicLabel={detail?.name ?? tr.containers}
+        dynamicScrollRef={detailScrollRef}
+        panels={detailInPanel ? zoneState.panels : undefined}
+        onTogglePanel={zoneState.togglePanel}
+      />
 
       <ContainerFormSheet
         request={containerForm}

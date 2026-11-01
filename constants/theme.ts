@@ -349,6 +349,114 @@ const glassDark: GlassTokens = {
 /** Токени скла: `glass.light` / `glass.dark` (у компоненті — `useDS().g`). */
 export const glass: Readonly<Record<DSScheme, GlassTokens>> = { light: glassLight, dark: glassDark };
 
+// ─── «Брудне скло» оверлеїв (Layout System v2.4) ─────────────────────────────
+
+/**
+ * Матове («брудне») скло для ВСЬОГО, що з'являється поверх вмісту: аркуші,
+ * модалки, меню, поповери, тости, шухляда сайдбара, панель масових дій.
+ *
+ * На відміну від функціонального Liquid Glass (шапка, таб-бар — прозоре, щоб
+ * читався mesh), оверлей мусить ПРИХОВАТИ те, що під ним: щільна заливка
+ * ≈0.90–0.92 + сильний блюр (systemThickMaterial) + дрібне зерно ≈3–4% —
+ * під ним видно лише розмиту пляму кольору, а не текст. «Зменшити
+ * прозорість» → суцільна `solid`. Паритет із вебом `--ds-overlay-*`.
+ *
+ * Контраст: text.secondary на `solid` — 4.9:1 (світла #6B6B73 на #F6F6F8),
+ * 7.0:1 (темна #A1A1AA на #1A1A1E); на композиті fill+blur — не гірше.
+ */
+export type OverlayTokens = {
+  /** Заливка поверх блюру. */
+  fill: string;
+  /** Android (без блюру) — непрозора заливка: без блюру будь-яка прозорість дає «привид» тексту під аркушем. */
+  fillNoBlur: string;
+  /** «Зменшити прозорість» / фолбек — суцільна. */
+  solid: string;
+  blurIntensity: number;
+  blurTint: 'systemThickMaterialLight' | 'systemThickMaterialDark';
+  /** Непрозорість текстури зерна (assets/images/overlay-noise.png). */
+  noiseOpacity: number;
+  /** Обідок: верх/боки і низ. */
+  rim: string;
+  rimShade: string;
+  /** Затемнення під модальними оверлеями (аркуш, шухляда, діалог). */
+  scrim: string;
+  /** Розмиття під scrim (iOS) — фон за модалкою стає нечитабельним. */
+  scrimBlurIntensity: number;
+};
+
+export const overlay: Readonly<Record<DSScheme, OverlayTokens>> = {
+  light: {
+    fill: 'rgba(246,246,248,0.90)',
+    fillNoBlur: 'rgba(246,246,248,1)',
+    solid: '#F6F6F8',
+    blurIntensity: 90,
+    blurTint: 'systemThickMaterialLight',
+    noiseOpacity: 0.035,
+    rim: 'rgba(255,255,255,0.85)',
+    rimShade: 'rgba(17,17,19,0.08)',
+    scrim: 'rgba(17,17,19,0.40)',
+    scrimBlurIntensity: 18,
+  },
+  dark: {
+    fill: 'rgba(26,26,30,0.92)',
+    fillNoBlur: 'rgba(26,26,30,1)',
+    solid: '#1A1A1E',
+    blurIntensity: 90,
+    blurTint: 'systemThickMaterialDark',
+    noiseOpacity: 0.04,
+    rim: 'rgba(255,255,255,0.12)',
+    rimShade: 'rgba(0,0,0,0.45)',
+    scrim: 'rgba(0,0,0,0.60)',
+    scrimBlurIntensity: 18,
+  },
+};
+
+/** Токени оверлею поза хуками: `overlayTokens(isDark)`. */
+export function overlayTokens(isDark: boolean): OverlayTokens {
+  return overlay[isDark ? 'dark' : 'light'];
+}
+
+// ─── Зони (Layout System v2.4) ────────────────────────────────────────────────
+
+/**
+ * Розміри п'яти зон (Header · Navigation · Static · Main · Dynamic) на
+ * планшеті. Main ЗАВЖДИ найширша; Dynamic — друга; Static — найвужча і
+ * з'являється поруч лише від `staticFrom` (iPad 13" у ландшафті), інакше живе
+ * на вкладці «Сьогодні». Паритет із вебом `--ds-zone-*`.
+ */
+export const zone = {
+  /**
+   * Мінімальна ширина головної зони — панелі не стискають її нижче. Не
+   * вміщається панель деталей поруч (iPad mini у портреті, Split View) —
+   * деталі відкриваються нижнім аркушем, як на телефоні.
+   */
+  mainMin: 360,
+  /** Ширина динамічної панелі (деталі): вузький планшет / звичайна / широке вікно. */
+  dynamicCompact: 340,
+  /** Нижче цієї ширини ВІКНА — dynamicCompact (iPad у портреті). */
+  dynamicCompactBelow: 1000,
+  dynamic: 380,
+  dynamicLarge: 440,
+  /** Від цієї ширини ВІКНА панель деталей стає ширшою. */
+  dynamicLargeFrom: 1180,
+  /** Ширина статичної зони (контекст: зустрічі дня, KPI). */
+  static: 300,
+  /** Від цієї ширини ВІКНА статична зона стоїть поруч (інакше — «Сьогодні»). */
+  staticFrom: 1280,
+  /** Проміжок між зонами й поле від краю. */
+  gap: 12,
+  /** Нижній аркуш деталей на телефоні: стартова частка висоти й повна. */
+  sheetPeek: 0.6,
+  sheetFull: 0.94,
+  /** Плаваюча «+»: розмір і поле від краю. */
+  fab: 56,
+  fabInset: 20,
+  /** Панель масових дій: висота. */
+  bulkBar: 56,
+  /** Рядок списку: висота дій свайпу (кожна кнопка). */
+  swipeAction: 76,
+} as const;
+
 /** Модулі, що мають власний акцент (ключі — як у вебі `--ds-glass-accent-*`). */
 export type ModuleKey =
   | 'today' | 'tasks' | 'projects' | 'finance' | 'health' | 'time' | 'notes'

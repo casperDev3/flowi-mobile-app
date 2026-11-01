@@ -31,7 +31,7 @@ import type { Translations } from '@/store/translations';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import type { TaskProjects, TimeRecord } from '@/utils/timeEntries';
 import type { EditableTask } from '@/utils/timeEntryEdit';
-import { GlassBackdrop } from '@/components/ds';
+import { OverlayMaterial } from '@/components/ds';
 
 export type TimeEntrySheetProject = TimeEntryFormProject;
 
@@ -77,7 +77,7 @@ export function TimeEntrySheet({
         <Pressable accessible={false} style={[s.overlay, { backgroundColor: c.t.surface.overlay }]} onPress={onClose}>
           <Pressable accessible={false} onPress={e => e.stopPropagation()} style={[s.sheetWrapper, sheetColumnStyle(isWide)]}>
             <View style={[s.sheet, { ...c.gl.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-              <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+              <OverlayMaterial isDark={isDark} />
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={[s.handle, { backgroundColor: c.t.text.muted }]} />
                 <TimeEntryForm

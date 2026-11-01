@@ -16,6 +16,7 @@ import { PERSONAL_TASK_COLOR, type CalendarColors } from './palette';
 import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import { glassRimFor } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 export interface CreateChooserProps {
   visible: boolean;
@@ -65,6 +66,7 @@ export function CreateChooser({ visible, subtitle, onClose, onMeeting, onTask, i
           style={wide ? { width: 420 } : { marginHorizontal: 12 }}>
           {/* DS v2: непрозорий surface.elevated замість блюру — frosted лише для promo/AI. */}
           <View style={[st.sheet, { backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }, shadow[isDark ? 'dark' : 'light'].popover]}>
+            <OverlayMaterial isDark={isDark} radius={radius.card} />
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
               <View style={{ flex: 1 }}>
                 <Text accessibilityRole="header" style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold }}>{tr.calCreateTitle}</Text>

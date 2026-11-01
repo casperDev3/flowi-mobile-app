@@ -8,6 +8,8 @@
  * стоять в одному ряду (раніше валюти й радіо ракурсу розповзались на 2–3
  * ряди — скарга власника 2026-10-07).
  */
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -28,7 +30,6 @@ import { activeFinanceFilterCount, splitFinanceTabs, type FinanceTab } from '@/u
 import {
   financeTabLabel, moneyScopeText, periodPresetLabel, type FinColors,
 } from './financeLabels';
-import { GlassBackdrop } from '@/components/ds';
 import { useGlassStyles } from '@/components/finance/finPalette';
 
 const HIT = { top: 8, bottom: 8, left: 4, right: 4 } as const;
@@ -101,8 +102,8 @@ export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }:
       </View>
 
       <SheetModal visible={moreOpen} onClose={() => setMoreOpen(false)}>
-        <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+        <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+          <OverlayMaterial isDark={isDark} radius={24} />
           <Text style={[st.sheetLabel, { color: t.text.secondary }]}>{tr.finMoreSections}</Text>
           <View style={{ gap: 6 }}>
             {more.map(tab => {
@@ -252,8 +253,8 @@ export function FinanceFilterBar({
       />
 
       <SheetModal visible={filterOpen} onClose={() => setFilterOpen(false)}>
-        <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+        <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+          <OverlayMaterial isDark={isDark} radius={24} />
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Text style={[st.sheetLabel, { color: t.text.secondary }]}>{tr.finFilterCurrency}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }} accessibilityRole="radiogroup">
@@ -388,8 +389,8 @@ function PeriodSheet({ visible, onClose, period, onPick, c, tr, isWide, isDark }
 
   return (
     <SheetModal visible={visible} onClose={onClose}>
-      <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
-        <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+      <View style={[st.sheet, sheetColumnStyle(isWide), { ...gs.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.88 }, shadow[isDark ? 'dark' : 'light'].popover]}>
+        <OverlayMaterial isDark={isDark} radius={24} />
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Text style={[st.sheetLabel, { color: t.text.secondary }]}>{tr.finFilterPeriod}</Text>
           <View style={{ gap: 6 }} accessibilityRole="radiogroup">

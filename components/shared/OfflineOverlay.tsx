@@ -17,6 +17,7 @@ import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
 import { fontFamily, radius, space } from '@/constants/theme';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 /**
  * Реюзабельна обгортка для онлайн-екранів. Два режими через `reason`:
@@ -130,6 +131,7 @@ export function OfflineOverlay({
                 backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong'),
               },
             ]}>
+            <OverlayMaterial isDark={isDark} radius={radius.card} />
             {/* Іконка */}
             <View style={[s.iconBox, { backgroundColor: accent + '20' }]}>
               <IconSymbol

@@ -13,6 +13,8 @@
  * операція: гірший випадок — зсунутий цикл без операції, яку людина бачить і
  * додасть руками, а не подвійний дохід.
  */
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -41,7 +43,7 @@ import {
 import { uuidV4 } from '@/utils/uuid';
 import type { FinColors } from './financeLabels';
 import { useFinPalette } from './finPalette';
-import { BentoCard, GlassBackdrop } from '@/components/ds';
+import { BentoCard } from '@/components/ds';
 
 type RawItem = { id: string } & Record<string, unknown>;
 
@@ -331,8 +333,8 @@ export function RecurringIncomesSection({ tr, lang, isDark, projectId }: {
 
       {/* Форма доходу */}
       <SheetModal visible={!!form} onClose={() => setForm(null)}>
-        <View style={[st.sheet, sheetColumnStyle(isWide), { ...c.gl.strong, maxHeight: height * 0.88 }, popover]}>
-          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+        <View style={[st.sheet, sheetColumnStyle(isWide), { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.88 }, popover]}>
+          <OverlayMaterial isDark={isDark} radius={24} />
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={[st.handle, { backgroundColor: c.muted }]} />
             <Text style={{ color: c.text, fontSize: 18, fontFamily: fontFamily.semibold, marginBottom: 12 }}>
@@ -455,8 +457,8 @@ export function RecurringIncomesSection({ tr, lang, isDark, projectId }: {
 
       {/* «Отримано» */}
       <SheetModal visible={!!receive} onClose={() => setReceive(null)}>
-        <View style={[st.sheet, sheetColumnStyle(isWide), { ...c.gl.strong, maxHeight: height * 0.88 }, popover]}>
-          <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+        <View style={[st.sheet, sheetColumnStyle(isWide), { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet, maxHeight: height * 0.88 }, popover]}>
+          <OverlayMaterial isDark={isDark} radius={24} />
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={[st.handle, { backgroundColor: c.muted }]} />
             {receive && receiveItem ? (

@@ -1,4 +1,6 @@
 import { Atlas } from '@/constants/atlas';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { OverlayScrim } from '@/components/ds/OverlaySurface';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -61,17 +63,18 @@ import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated'
 import { useMotion } from '@/hooks/use-motion';
 import { isSameDay } from '@/utils/dateUtils';
 import { haptic } from '@/utils/haptics';
-import { useResponsive } from '@/hooks/use-responsive';
+import { useResponsive, useScreenWidth } from '@/hooks/use-responsive';
 import { CONTENT_MAX_WIDTH } from '@/hooks/use-content-width';
 import { wideModalStyles } from '@/components/finance/wideModal';
-import { detailColumnWidthFor } from '@/constants/tokens';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import {
   DEFAULT_CATEGORIES_EN, DEFAULT_CATEGORIES_UK, categoryNameIssue, categoryOptions,
   type CategoryDef,
 } from '@/utils/financeCategories';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
-import { DetailPane } from '@/components/shared/DetailPane';
+import { BulkActionBar, ZoneLayout, ZoneSkeleton, zoneWidths, type BulkAction, type SwipeAction } from '@/components/layout-zones';
+import { useZoneState } from '@/hooks/use-zone-state';
+import { useFinanceLayoutStrings } from '@/components/finance/layoutStrings';
 import { categoryGroupLabel, costKindLabel, type FinColors } from '@/components/finance/financeLabels';
 import { AccountsTab } from '@/components/finance/AccountsTab';
 import { CategoryMetaEditor } from '@/components/finance/CategoryMetaEditor';
@@ -152,7 +155,7 @@ function chunk<T>(arr: T[], n: number): T[][] {
 
 export default function FinanceScreen() {
   const tabBarInset = useTabBarInset();
-  const { width, height, isExpanded, isWide } = useResponsive();
+  const { width, height, isWide } = useResponsive();
   // Рукописні модалки (календар, валюта, категорії) — діалогом на планшеті,
   // як і SheetModal-и цього ж екрана.
   const wm = wideModalStyles(isWide);
@@ -221,7 +224,37 @@ export default function FinanceScreen() {
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [selected, setSelected] = useState<Transaction | null>(null);
+  /**
+   * Layout System v2.4: вибрана операція — у параметрі маршруту `?tx=<id>`
+   * (поряд із `?panel=`), тож диплінк відкриває ту саму деталь. Сам запис
+   * береться зі стрічки: правка чи синк одразу видно в панелі, а видалена
+   * деінде операція просто закриває її.
+   */
+  const zoneState = useZoneState({ section: 'finance', selectedParam: 'tx', label: tr.finance });
+  const zoneSelect = zoneState.select;
+  const selected = useMemo(
+    () => (zoneState.selectedId ? txs.find(x => x.id === zoneState.selectedId) ?? null : null),
+    [txs, zoneState.selectedId],
+  );
+  // Стабільна посилання (через ref): select залежить від router, і нова
+  // функція щорендера перемальовувала б усю стрічку (PERF-4).
+  const zoneSelectRef = useRef(zoneSelect);
+  useEffect(() => { zoneSelectRef.current = zoneSelect; });
+  const setSelected = useCallback((tx: Transaction | null) => zoneSelectRef.current(tx ? tx.id : null), []);
+  const lz = useFinanceLayoutStrings();
+  const screenWidth = useScreenWidth();
+  /**
+   * Деталь — панель праворуч (планшет, коли вміщається) чи нижній аркуш
+   * (телефон / вузьке вікно). Аркуш — це RN Modal, тож друге вікно (форма,
+   * «позначити переказом») відкриваємо лише після його зникнення (NAT-02).
+   */
+  const detailInPanel = isWide && zoneWidths({
+    windowWidth: width, screenWidth, wide: isWide, wantStatic: false, wantDynamic: true,
+  }).dynamicMode === 'panel';
+  /** Масовий вибір операцій (довгий дотик по рядку). */
+  const [bulkIds, setBulkIds] = useState<ReadonlySet<string>>(() => new Set());
+  const selectionMode = bulkIds.size > 0;
+  const clearBulk = useCallback(() => setBulkIds(new Set()), []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [txType, setTxType] = useState<FormType>('expense');
   const [amount, setAmount] = useState('');
@@ -800,7 +833,9 @@ export default function FinanceScreen() {
     // На телефоні деталь — окремий Modal, і відкрити форму в тому ж тіку, у
     // якому він зникає, означає презентувати друге вікно поверх ще живого
     // першого (NAT-02).
-    if (isExpanded) {
+    // Аркуш деталі не відкритий (свайп «Змінити» з рядка) або деталь — панель:
+    // мінятись нема з чим, форма відкривається одразу.
+    if (detailInPanel || !selected) {
       setSelected(null);
       openForm();
       return;
@@ -1103,6 +1138,30 @@ export default function FinanceScreen() {
     sheetHandoff.release();
   };
 
+  /**
+   * Масове видалення — та сама операція, що й з одного рядка (deleteTx), але
+   * одним записом і з одним «Скасувати» на весь набір. Підтвердження — лише
+   * для кількох: одну операцію й досі видаляють без діалогу (є undo).
+   */
+  const deleteTxs = (ids: string[]) => {
+    const set = new Set(ids);
+    const removed = txs.filter(x => set.has(x.id));
+    if (removed.length === 0) return;
+    setTxs(p => p.filter(x => !set.has(x.id)));
+    if (selected && set.has(selected.id)) setSelected(null);
+    clearBulk();
+    showUndo(removed.length === 1 ? tr.transactionDeleted : lz.bulkDeleted(removed.length), () => {
+      setTxs(prev => [...prev, ...removed.filter(r => !prev.some(p => p.id === r.id))]);
+    });
+  };
+  const confirmDeleteTxs = (ids: string[]) => {
+    if (ids.length <= 1) { deleteTxs(ids); return; }
+    Alert.alert(lz.bulkDeleteTitle(ids.length), lz.bulkDeleteBody, [
+      { text: tr.cancel, style: 'cancel' },
+      { text: lz.bulkDelete, style: 'destructive', onPress: () => deleteTxs(ids) },
+    ]);
+  };
+
   const deleteTx = (id: string) => {
     const txToDelete = txs.find(t => t.id === id);
     setTxs(p => p.filter(t => t.id !== id));
@@ -1240,6 +1299,39 @@ export default function FinanceScreen() {
 
 
   /**
+   * Layout System v2.4 — дії рядка без входу в деталі: свайп уліво
+   * («Змінити» / «Видалити», ті самі startEdit і deleteTx з undo), довгий
+   * дотик — масовий вибір, тап у режимі вибору — перемкнути рядок. Свіжі
+   * функції — у ref, щоб renderGroup лишався стабільним (PERF-4).
+   */
+  const rowOpsRef = useRef({ startEdit, deleteTx, confirmDelete: confirmDeleteTxs });
+  useEffect(() => { rowOpsRef.current = { startEdit, deleteTx, confirmDelete: confirmDeleteTxs }; });
+  const swipeActionsFor = useCallback((tx: Transaction): SwipeAction[] => [
+    { key: 'edit', label: lz.swipeEdit, icon: 'pencil', tone: 'neutral', onPress: () => rowOpsRef.current.startEdit(tx), testID: 'tx-swipe-edit' },
+    { key: 'delete', label: lz.swipeDelete, icon: 'trash.fill', tone: 'danger', onPress: () => rowOpsRef.current.deleteTx(tx.id), testID: 'tx-swipe-delete' },
+  ], [lz]);
+  const toggleBulk = useCallback((tx: Transaction) => {
+    setBulkIds(prev => {
+      const next = new Set(prev);
+      if (next.has(tx.id)) next.delete(tx.id); else next.add(tx.id);
+      return next;
+    });
+  }, []);
+  const onRowPress = useCallback((tx: Transaction) => {
+    if (selectionMode) { haptic.light(); toggleBulk(tx); return; }
+    setSelected(tx);
+  }, [selectionMode, toggleBulk, setSelected]);
+  const onRowLongPress = useCallback((tx: Transaction) => {
+    haptic.medium();
+    toggleBulk(tx);
+  }, [toggleBulk]);
+  // Вибір живе лише в стрічці «Операцій»: інша вкладка — інший список.
+  useEffect(() => { clearBulk(); }, [tab, clearBulk]);
+  const bulkActions = useMemo<BulkAction[]>(() => [
+    { key: 'delete', label: lz.bulkDelete, icon: 'trash.fill', tone: 'danger', testID: 'tx-bulk-delete', onPress: () => rowOpsRef.current.confirmDelete([...bulkIds]) },
+  ], [lz, bulkIds]);
+
+  /**
    * Рядок стрічки. useCallback обовʼязковий: FlatList тримає renderItem у
    * рендері комірок, тож нова функція щорендера перемальовувала б увесь
    * видимий місяць на кожну натиснуту клавішу у формі (PERF-4).
@@ -1258,7 +1350,12 @@ export default function FinanceScreen() {
         primaryCode={primaryCurrency}
         accounts={accounts}
         getCatIcon={getCatIcon}
-        onSelect={setSelected}
+        onSelect={onRowPress}
+        onLongPress={onRowLongPress}
+        swipeActionsFor={swipeActionsFor}
+        activeId={selected?.id ?? null}
+        bulkIds={bulkIds}
+        selectionMode={selectionMode}
         todayLabel={tr.today}
         yesterdayLabel={tr.yesterday}
         incomeLabel={tr.income}
@@ -1269,6 +1366,7 @@ export default function FinanceScreen() {
   ), [
     accounts, compact, currencyByCode, fmtCur, getCatIcon, groupColors, isDark,
     motion, primaryCurrency, shouldAnimateGroup, tr,
+    onRowPress, onRowLongPress, swipeActionsFor, selected?.id, bulkIds, selectionMode,
   ]);
 
   /** Суми «Залишків» — тією самою точністю валюти, що й стрічка. */
@@ -1323,6 +1421,16 @@ export default function FinanceScreen() {
     />
   ), [upcomingPayments, isDark, c.text, c.sub, c.border, tr, lang]);
 
+  /**
+   * Layout System v2.4 — статична зона «Залишки + сьогоднішні оплати» поруч
+   * зі стрічкою лише там, де вона вміщається поряд із деталлю (вікно ≥ 1280,
+   * стрічка лишається найширшою). Інакше той самий контекст — у шапці стрічки.
+   */
+  const detailOpen = tab === 'transactions' && !!selected && zoneState.panels.dynamic;
+  const staticShown = tab === 'transactions' && zoneWidths({
+    windowWidth: width, screenWidth, wide: isWide, wantStatic: zoneState.panels.static, wantDynamic: detailOpen,
+  }).showStatic;
+
   // Шапка списку: фільтри, баланси, порожній стан. Мемоізуємо, щоб FlatList
   // не перебудовував її на кожен символ, надрукований у формі операції
   // (PERF-4): у змінній без useMemo вона перестворювалась щорендера, попри
@@ -1363,9 +1471,9 @@ export default function FinanceScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Залишки + «Сьогодні до оплати» над стрічкою. На ландшафті
-                планшета (≥840) вони — у бічній колонці (див. DetailPane нижче). */}
-            {!isExpanded && (
+            {/* Залишки + «Сьогодні до оплати» над стрічкою. На дуже
+                широкому вікні вони — у статичній зоні ліворуч (ZoneLayout). */}
+            {!staticShown && (
               <View style={isWide ? s.summaryRow : undefined}>
                 <View style={isWide ? s.summaryCell : undefined}>{opsSummary}</View>
                 {hasTodayDue ? (
@@ -1379,7 +1487,7 @@ export default function FinanceScreen() {
             {/* Заголовок стрічки. Перемикач Всі/Доходи/Витрати переїхав у
                 фільтр-чип ряду періоду (FinanceFilterBar): під табами й
                 періодом він був третім рядом контролів (P2 аудиту 2026-10). */}
-            <View style={[s.feedHead, { marginTop: isExpanded ? 4 : 18 }]}>
+            <View style={[s.feedHead, { marginTop: staticShown ? 4 : 18 }]}>
               <Text style={[s.feedTitle, { color: c.text }]} accessibilityRole="header">{tr.finTabTransactions}</Text>
               {filter !== 'all' ? (
                 <TouchableOpacity
@@ -1416,7 +1524,7 @@ export default function FinanceScreen() {
     </>
   ), [
     c.accent, c.onAccent, c.green, c.red, c.sub, c.text, dateFilter, filter,
-    groups.length, initialized, isDark, isExpanded, isWide, lang, loadFailed, locale, openAdd,
+    groups.length, initialized, isDark, staticShown, isWide, lang, loadFailed, locale, openAdd,
     retryLoad, tr, todayDueCard, opsSummary, hasTodayDue,
   ]);
 
@@ -1441,20 +1549,7 @@ export default function FinanceScreen() {
     const canMark = !transfer && visibleAccounts.some(a => a.id !== selected.accountId);
     return (
     <>
-                        <View style={s.handleRow}>
-                          <View style={{ flex: 1 }} />
-                          <View style={[s.handle, { backgroundColor: c.border }]} />
-                          <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                            <TouchableOpacity
-                              onPress={() => setSelected(null)}
-                              accessibilityRole="button"
-                              accessibilityLabel={tr.close}
-                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                              <IconSymbol name="xmark" size={17} color={c.sub} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-
+                        {/* Ручку, ✕ і «Закрити» дає каркас зон (панель / аркуш). */}
                         {/* Hero */}
                         <View style={[s.detailHero, { backgroundColor: c.dim }]}>
                           <View style={[s.detailIcon, { backgroundColor: color + '25' }]}>
@@ -1516,7 +1611,7 @@ export default function FinanceScreen() {
                               const openMark = () => { setMarkTxId(txId); setMarkTargetId(null); };
                               // Деталь на телефоні — модалка; аркуш переказу
                               // поверх неї не презентується взагалі (NAT-02).
-                              if (isExpanded) { openMark(); return; }
+                              if (detailInPanel) { openMark(); return; }
                               openAfterModalExit(() => setSelected(null), openMark);
                             }}
                             accessibilityRole="button"
@@ -1549,22 +1644,31 @@ export default function FinanceScreen() {
                           </View>
                         )}
 
-                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
-                          <TouchableOpacity onPress={() => deleteTx(selected.id)} style={[s.btn, { flex: 1, backgroundColor: c.red + '14' }]}>
-                            <IconSymbol name="trash" size={15} color={c.red} />
-                            <Text style={{ color: c.red, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.delete}</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => startEdit(selected)} style={[s.btn, { flex: 1, backgroundColor: c.dim }]}>
-                            <IconSymbol name="pencil" size={15} color={c.accent} />
-                            <Text style={{ color: c.accent, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.edit}</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => setSelected(null)} style={[s.btn, { flex: 1, backgroundColor: c.accent }]}>
-                            <Text style={{ color: c.onAccent, fontFamily: fontFamily.bold }}>{tr.close}</Text>
-                          </TouchableOpacity>
-                        </View>
     </>
     );
   })() : null;
+
+  /** Липкий низ деталі: «Видалити» і головна дія «Змінити» (чорна pill DS). */
+  const txDetailFooter = selected ? (
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      <TouchableOpacity
+        onPress={() => deleteTx(selected.id)}
+        accessibilityRole="button"
+        testID="tx-detail-delete"
+        style={[s.btn, { flex: 1, backgroundColor: c.red + '14' }]}>
+        <IconSymbol name="trash" size={15} color={c.red} />
+        <Text style={{ color: c.red, fontFamily: fontFamily.semibold, marginLeft: 5 }}>{tr.delete}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => startEdit(selected)}
+        accessibilityRole="button"
+        testID="tx-detail-edit"
+        style={[s.btn, { flex: 1.4, backgroundColor: c.accent }]}>
+        <IconSymbol name="pencil" size={15} color={c.onAccent} />
+        <Text style={{ color: c.onAccent, fontFamily: fontFamily.bold, marginLeft: 5 }}>{tr.edit}</Text>
+      </TouchableOpacity>
+    </View>
+  ) : null;
 
   // ─── KPI розділу (Omni: великі тонкі числа в шапці) ─────────────────────────
   // Оборот ПЕРІОДУ спільного фільтра у валюті фільтра — ті самі цифри, що й
@@ -1596,11 +1700,47 @@ export default function FinanceScreen() {
     </>
   ) : undefined;
 
+  // FAB «+ Операція». На «Бюджеті» й «Підписках» у вкладки своя дія
+  // «додати», і друга кнопка поверх неї лише заступала б список. Під час
+  // масового вибору її місце — у панелі дій.
+  const fab = tab !== 'budget' && tab !== 'subscriptions' && !(tab === 'reports' && reportsFabOff) && !selectionMode ? (
+    <PressableScale
+      onPress={() => { haptic.medium(); openAdd(); }}
+      accessibilityRole="button"
+      accessibilityLabel={tr.add}
+      scaleTo={0.92}
+      style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
+      <IconSymbol name="plus" size={26} color={c.onAccent} />
+    </PressableScale>
+  ) : null;
+
+  /**
+   * Статична зона (лише вікно ≥ 1280 і лише «Операції»): залишки й
+   * сьогоднішні оплати — контекст, що не залежить від вибору. Поки сховище
+   * не прочитане — скелет у формі вмісту, а не нулі.
+   */
+  const staticPane = tab === 'transactions' ? (
+    initialized ? (
+      <View style={{ paddingRight: 4 }}>
+        {opsSummary}
+        {todayDueCard({ marginTop: 16, marginBottom: 0 })}
+      </View>
+    ) : <ZoneSkeleton variant="static" />
+  ) : undefined;
+
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
-      <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ flex: 1 }}>
+      {/*
+        Layout System v2.4 — зони «Операцій»: [статична «Залишки» (≥1280)]
+        [стрічка — завжди найширша] [деталь операції — панель праворуч з ✕ /
+        нижній аркуш ~60% на телефоні]. Інші вкладки (Рахунки, Бюджет,
+        Підписки, Звіти) — лише головна зона: деталі в них мають власні
+        панелі (Підписки) або не існують.
+      */}
+      <ZoneLayout
+        testID="finance-zones"
+        main={
       <View style={{ flex: 1 }}>
 
         {/* Omni: глобальна шапка (☰ · дзвіник · акаунт; на планшеті — рядок
@@ -1731,55 +1871,28 @@ export default function FinanceScreen() {
         />
         )}
       </View>
-
-      {/* FAB «+ Операція». На «Бюджеті» й «Підписках» у вкладки своя дія
-          «додати», і друга кнопка поверх неї лише заступала б список. */}
-      {tab !== 'budget' && tab !== 'subscriptions' && !(tab === 'reports' && reportsFabOff) ? (
-      <PressableScale
-        onPress={() => { haptic.medium(); openAdd(); }}
-        accessibilityRole="button"
-        accessibilityLabel={tr.add}
-        scaleTo={0.92}
-        style={[s.fab, { bottom: tabBarInset + 20, backgroundColor: c.accent }]}>
-        <IconSymbol name="plus" size={26} color={c.onAccent} />
-      </PressableScale>
-      ) : null}
-      </View>
-
-      {/* Колонка деталі операції — лише на вкладці «Операції». На інших
-          вкладках вона була порожньою колонкою «оберіть операцію» на 380pt,
-          а на «Підписках» стояла ДРУГОЮ поруч із колонкою деталі підписки.
-          На телефоні деталь — модалка, її показуємо завжди (вибір живе). */}
-      {tab === 'transactions' || !isExpanded ? (
-      <DetailPane
-        open={!!selected}
-        wide={isExpanded}
-        columnWidth={detailColumnWidthFor(width)}
-        onClose={() => setSelected(null)}
-        isDark={isDark}
-        sheetColor={c.sheet}
-        borderColor={c.border}
-        maxHeight={height * 0.88}
-        scrollRef={txDetailScrollRef}
-        empty={
-          // Ландшафт планшета: «список + бічне зведення». Поки операцію не
-          // вибрано, колонка показує залишки й сьогоднішні оплати; вибір
-          // підміняє її деталлю, «×» повертає зведення.
-          <ScrollView style={s.sidePane} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-            {opsSummary}
-            {todayDueCard({ marginTop: 16, marginBottom: 0 })}
-            <View style={{ alignItems: 'center', marginTop: 32 }}>
-              <IconSymbol name="banknote" size={32} color={c.sub} />
-              <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.bold, marginTop: 10 }}>{tr.txEmptyTitle}</Text>
-              <Text style={{ color: c.sub, fontSize: 12, textAlign: 'center', marginTop: 4 }}>{tr.txEmptyHint}</Text>
-            </View>
-          </ScrollView>
-        }>
-        {txDetailBody}
-      </DetailPane>
-      ) : null}
-      </View>
-
+        }
+        dynamic={tab === 'transactions' ? txDetailBody : null}
+        dynamicOpen={detailOpen}
+        onCloseDynamic={() => setSelected(null)}
+        dynamicFooter={tab === 'transactions' ? txDetailFooter : undefined}
+        dynamicLabel={lz.txDetails}
+        dynamicScrollRef={txDetailScrollRef}
+        static={staticPane}
+        showStatic={zoneState.panels.static}
+        panels={isWide && tab === 'transactions' ? zoneState.panels : undefined}
+        onTogglePanel={zoneState.togglePanel}
+        fab={fab}
+        overlay={tab === 'transactions' ? (
+          <BulkActionBar
+            testID="tx-bulk-bar"
+            count={bulkIds.size}
+            actions={bulkActions}
+            onClear={clearBulk}
+            bottom={tabBarInset + 16}
+          />
+        ) : null}
+      />
 
       {/* Undo-тост */}
       {undoElement}
@@ -1787,8 +1900,9 @@ export default function FinanceScreen() {
       {/* ─── Context Menu Modal ─── */}
       <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>
         <Pressable accessible={false}
-          style={{ flex: 1, backgroundColor: t.surface.overlay }}
+          style={{ flex: 1 }}
           onPress={() => setShowMenu(false)}>
+          <OverlayScrim />
             {/* NAT-03: Pressable з onPress на iOS сам стає елементом
                 доступності й склеює ВСЕ піддерево в один вузол — VoiceOver
                 читає аркуш однією фразою й не має в ньому жодного контролу.
@@ -1801,6 +1915,7 @@ export default function FinanceScreen() {
             importantForAccessibility="yes"
             style={{ position: 'absolute', top: insets.top + 62, right: 16, width: 220 }}>
             <View style={[s.menuBox, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
+              <OverlayMaterial isDark={isDark} />
 
               {/* Статистика */}
               <TouchableOpacity
@@ -1888,6 +2003,8 @@ export default function FinanceScreen() {
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setShowCal(false)}>
+            {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+            <OverlayScrim />
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
@@ -1895,6 +2012,7 @@ export default function FinanceScreen() {
               importantForAccessibility="yes"
               style={[s.sheetWrapper, wm.column]}>
               <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+                <OverlayMaterial isDark={isDark} />
 
                 <View style={s.handleRow}>
                   <View style={{ flex: 1 }} />
@@ -1987,6 +2105,7 @@ export default function FinanceScreen() {
       {/* ─── Add Modal ─── */}
       <SheetModal visible={showAdd} onClose={handleAddSheetClosed}>
         <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+          <OverlayMaterial isDark={isDark} />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                   {editingId ? (
@@ -2165,6 +2284,8 @@ export default function FinanceScreen() {
       {/* ─── Primary Currency Picker ─── */}
       <Modal visible={showPrimaryPicker} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowPrimaryPicker(false)}>
         <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => setShowPrimaryPicker(false)}>
+          {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+          <OverlayScrim />
           <Pressable
             onPress={e => e.stopPropagation()}
             accessible={false}
@@ -2172,6 +2293,7 @@ export default function FinanceScreen() {
             importantForAccessibility="yes"
             style={[s.sheetWrapper, wm.column]}>
             <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+              <OverlayMaterial isDark={isDark} />
               <View style={s.handleRow}>
                 <View style={{ flex: 1 }} />
                 <View style={[s.handle, { backgroundColor: c.border }]} />
@@ -2230,6 +2352,8 @@ export default function FinanceScreen() {
       <Modal visible={showCats} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { setShowCats(false); setShowAddCat(false); }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[s.overlay, wm.overlay]} onPress={() => { setShowCats(false); setShowAddCat(false); }}>
+            {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+            <OverlayScrim />
             <Pressable
               onPress={e => e.stopPropagation()}
               accessible={false}
@@ -2237,6 +2361,7 @@ export default function FinanceScreen() {
               importantForAccessibility="yes"
               style={[s.sheetWrapper, wm.column]}>
               <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+                <OverlayMaterial isDark={isDark} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                   {/* Handle + close */}
@@ -2395,6 +2520,7 @@ export default function FinanceScreen() {
       {/* ─── Рахунки: створення, перейменування, архівація ─── */}
       <SheetModal visible={showAccounts} onClose={handleAccountsSheetClosed}>
         <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+          <OverlayMaterial isDark={isDark} />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             <View style={s.handleRow}>
@@ -2658,6 +2784,7 @@ export default function FinanceScreen() {
       {/* ─── Позначити операцію переказом ─── */}
       <SheetModal visible={!!markTxId} onClose={() => { setMarkTxId(null); setMarkTargetId(null); }}>
         <View style={[s.sheet, { maxHeight: height * 0.88, backgroundColor: c.sheet, ...glassRimFor(c.sheet, 'strong') }]}>
+          <OverlayMaterial isDark={isDark} />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={s.handleRow}>
               <View style={{ flex: 1 }} />
@@ -2742,7 +2869,7 @@ const s = StyleSheet.create({
   sidePane:    { alignSelf: 'stretch', flex: 1 },
   groupLabel:  { fontSize: 12, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
   fab:         { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', shadowColor: '#111113', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 6 },
-  overlay:     { flex: 1, backgroundColor: 'rgba(17,17,19,0.40)', justifyContent: 'flex-end' },
+  overlay:     { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheetWrapper:{ paddingHorizontal: 12, paddingBottom: Platform.OS === 'ios' ? 34 : 16 },
   sheet:       { borderRadius: Atlas.radius.xxlarge, padding: 24, overflow: 'hidden' },
   amountBlock: { borderRadius: Atlas.radius.large, padding: 20, marginBottom: 4 },

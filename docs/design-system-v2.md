@@ -452,3 +452,157 @@ const bc = useBentoColors();                        // text / textSecondary / ne
 4. Прогрес → `SegmentedProgress`; тижневі/місячні ряди → `HatchedBars`; мітки → `Tag`;
    пріоритет → `PriorityFlag`; учасники → `AvatarStack`.
 5. Одна найважливіша «подія» сторінки → `BentoCard variant="dark"`; AI-блок → `variant="ai"`.
+
+## Layout System (v2.4)
+
+> П'ять зон із `Layout_System.pdf` власника поверх DS v2.3 (токени, Manrope,
+> чорні pill, Liquid Glass лише на функціональному шарі, суцільний вміст,
+> акценти модулів). Кольори зон у PDF — ЛИШЕ анотація: у UI зон не фарбуємо.
+> Ті самі назви компонентів і параметрів, що на вебі (`components/layout-zones`).
+>
+> **Перекриває «Omni layout → Каркас»:** нижній бар телефона — ЧОТИРИ розділи
+> (Сьогодні · Задачі · Фінанси · Здоров'я); Налаштування, Час і решта — у
+> шухляді ☰. Маршрут `/(tabs)/settings` лишається (вкладка `href: null`).
+
+### Зони
+
+| Зона | Що | Телефон | iPad (не compact) |
+|---|---|---|---|
+| Header | лого/заголовок, пошук, «Список / Колонки», акаунт | `AppHeader`: `[☰] … [пошук] [дії] [🔔] [аватар]` + H1 | тонка смуга `[пошук] [Список/Колонки] … [акаунт]` (`viewSwitch`) |
+| Navigation | меню модулів | 4 вкладки + шухляда ☰ (`SidebarDrawer`) | рейка/сайдбар (`NavSidebar`, app/_layout.tsx) |
+| Static | контекст: KPI, зустрічі дня | вкладка «Сьогодні» | колонка ліворуч від main лише від вікна **1280pt** і коли main лишається найширшою; інакше — «Сьогодні» |
+| Main | список / канбан — **завжди найширша** | на весь екран; «+» праворуч над баром | `flex:1`, `minWidth zone.mainMin`; «+» праворуч унизу; три крапки панелей під нею |
+| Dynamic | деталі вибраного запису (вкладки картки) | **нижній аркуш** ~60% → свайп угору на весь екран | панель праворуч після вибору, ✕ закриває (список розтягується); не вміщається (iPad mini портрет, Split View) → аркуш |
+
+Стан у **параметрах маршруту**: `?task=<id>&view=list|columns&panel=open|closed`
+(старі посилання без параметрів працюють — типові значення з налаштувань пристрою).
+Вибір людини (режим, статична/динамічна панель) — локально, AsyncStorage
+`layout_zones_prefs_v1` (як `projects_list_prefs_v1`: звичка пристрою, НЕ
+`ui_preferences`; у синк, outbox і бекапи не йде, даних акаунта не містить).
+
+### Токени (`constants/theme.ts`)
+
+`zone` (паритет із вебом `--ds-zone-*`): `mainMin 360` · `dynamicCompact 340`
+(вікно < `dynamicCompactBelow 1000`) · `dynamic 380` · `dynamicLarge 440`
+(вікно ≥ `dynamicLargeFrom 1180`) · `static 300` · `staticFrom 1280` · `gap 12` ·
+`sheetPeek 0.6` · `sheetFull 0.94` · `fab 56` · `fabInset 20` · `bulkBar 56` ·
+`swipeAction 76`.
+
+`overlay.light / overlay.dark` (`overlayTokens(isDark)`; веб `--ds-overlay-*`) —
+**«брудне скло»** для ВСЬОГО, що поверх вмісту:
+
+| Токен | Світла | Темна |
+|---|---|---|
+| `fill` (поверх блюру, iOS і веб — CSS `backdrop-filter`) | `rgba(246,246,248,.90)` | `rgba(26,26,30,.92)` |
+| `fillNoBlur` (Android, без блюру — непрозора) | `rgba(246,246,248,1)` | `rgba(26,26,30,1)` |
+| `solid` («Зменшити прозорість») | `#F6F6F8` | `#1A1A1E` |
+| `blurIntensity` / `blurTint` | 90 / `systemThickMaterialLight` | 90 / `systemThickMaterialDark` |
+| `noiseOpacity` (зерно `assets/images/overlay-noise.png`) | .035 | .04 |
+| `rim` / `rimShade` | `rgba(255,255,255,.85)` / `rgba(17,17,19,.08)` | `rgba(255,255,255,.12)` / `rgba(0,0,0,.45)` |
+| `scrim` + `scrimBlurIntensity` | `rgba(17,17,19,.40)` + 18 | `rgba(0,0,0,.60)` + 18 |
+
+Контраст: `text.secondary` на `solid` ≥ 4.9:1 (світла), ≥ 7:1 (темна). Деструктивний
+текст на оверлеї — `g.accent.coral.ink`, не `status.danger` (≈ 3.4:1).
+`glassOf(t).sheet` (усі наявні аркуші/меню/поповери) тепер = `overlay.fill`
+(Android — `fillNoBlur`; «Зменшити прозорість» — `solid`) — тобто правило
+діє глобально, не лише на мігрованих екранах. Нативне Liquid Glass (iOS 26
+`GlassView`) для оверлеїв НЕ використовується — воно прозоре за задумом.
+
+**Важливо:** сама заливка `glassOf(t).sheet` = 0.90 на iOS — без блюру крізь неї
+видно «привид» тексту (≈1.1:1). Тому КОЖЕН контейнер оверлею мусить мати
+матеріал: `<OverlaySurface>` або першою дитиною `<OverlayMaterial isDark radius>`;
+`GlassBackdrop` (Liquid Glass) і `ds.glass(…,'strong')`/`c.gl.strong` (0.72)
+для оверлеїв не годяться.
+
+### Компоненти — API
+
+```tsx
+import {
+  ZoneLayout, zoneWidths, BottomSheet, SwipeRow, KanbanPager, BulkActionBar,
+  ZoneSkeleton, ZoneEmpty, ZoneError, ViewModeSwitch, PanelToggles,
+  OverlaySurface, OverlayScrim, OverlayMaterial, overlayFillStyle,
+  useZoneState, useZonePrefs, useActiveZone, setZonePrefs,
+} from '@/components/layout-zones';
+
+const zone = useZoneState({ section: 'tasks', selectedParam: 'task', columns: true, label: 'Завдання' });
+// → { view, setView, panels: {static, dynamic}, setPanel, togglePanel, selectedId, select, panelOpen, closePanel }
+//   columns: true — розділ у фокусі показує «Список / Колонки» внизу шухляди ☰.
+
+<ZoneLayout
+  main={<Header+List/>}                         // головна зона з власною шапкою й прокруткою
+  dynamic={<Details/>} dynamicOpen onCloseDynamic
+  dynamicHeader? dynamicFooter? dynamicLabel? dynamicScrollRef?
+  dynamicChrome?={true}                         // false — ✕ дає сама шапка вмісту
+  static?={<TodayPane/>} showStatic?            // лише ≥1280 і коли main лишається найширшою
+  panels?={zone.panels} onTogglePanel?={zone.togglePanel}   // три крапки (лише iPad)
+  fab?={<AddFab/>} overlay?={<BulkActionBar/>} testID? />
+
+zoneWidths({ windowWidth, screenWidth, wide, wantStatic, wantDynamic })
+// → { dynamicMode: 'panel'|'sheet', showStatic, staticWidth, showDynamic, dynamicWidth, mainWidth }
+
+<BottomSheet visible onClose header? footer? peek?={0.6} full?={0.94} scrollRef? scroll? showClose? accessibilityLabel? testID? />
+<SwipeRow actions={[{ key, label, icon, tone?: 'neutral'|'danger'|'success', onPress, testID? }]} enabled? radius?>
+  {a11y => <Row accessibilityActions={a11y.accessibilityActions} onAccessibilityAction={a11y.onAccessibilityAction} />}
+</SwipeRow>
+<KanbanPager columns={[{ key, title, count?, color? }]} renderColumn={(col, i) => …} paging={isCompact}
+             columnWidth?={300} contentBottom? gutter? onIndexChange? testID? />
+<BulkActionBar count actions={[{ key, label, icon, tone?: 'default'|'danger', onPress, disabled?, testID? }]} onClear bottom? testID? />
+<ZoneSkeleton variant?="list|columns|details|static" rows? />
+<ZoneEmpty details? icon? title? caption? actionLabel? onAction? />   // details → «Виберіть запис»
+<ZoneError title? message? onRetry />                                  // «Повторити» всередині зони
+<ViewModeSwitch value onChange compact? fullWidth? testID? />          // radiogroup, активний — чорна pill
+<PanelToggles panels onToggle staticAvailable? testID? />              // switch × 3 (main — завжди on)
+
+<OverlaySurface radius? noise? shadow? rim? style …ViewProps />        // блюр thick + fill + зерно + обідок + тінь
+<OverlayScrim onPress? accessibilityLabel? blur? />                    // затемнення + легкий блюр фону
+<OverlayMaterial isDark radius? noise? />                              // лише блюр+fill+зерно — для наявних контейнерів
+overlayFillStyle(isDark, reduceTransparency?)                          // заливка+обідок без блюру
+```
+
+`AppHeader` отримав `viewSwitch?: { value, onChange }` (планшет) і кнопку пошуку
+на телефоні (коли екран дав `onSearch`). `NavSidebar` — `footer?` (низ шухляди).
+`TaskCompactCard` — `selected?`, `selectionMode?`, `rowAccessibilityActions?`,
+`onRowAccessibilityAction?`. `app/_layout.tsx` обгорнуто в `GestureHandlerRootView`
+(свайпи рядків у дереві екранів).
+
+### Взаємодія
+
+- **Масовий вибір**: довгий тап по рядку → рядок вибрано (чорна рамка, кружок
+  ✓ замість чекбокса статусу) → короткі тапи додають/знімають → `BulkActionBar`
+  «N вибрано · Дії ▾ · ✕» над баром; «Назад» (Android) / ✕ знімають вибір. Дії
+  — ті самі операції, що з одного рядка (права ролі проєкту, зупинка таймера,
+  undo). «Копіювати» (колишнє меню довгого тапу) — у «Дії ▾», коли вибрано один.
+- **Свайп рядка вліво** відкриває «В архів» (= виконано; виконані живуть в
+  Архіві) і «Видалити» (з підтвердженням і undo). Дія — тапом по кнопці, не
+  самим змахом. VoiceOver — ті самі дії як accessibilityActions рядка.
+- **Канбан на телефоні** — одна колонка на екран, горизонтальний свайп, крапки
+  колонок угорі (кнопки 44×44 «Колонка 2 з 4: У роботі»). Перенесення між
+  колонками — статусом у картці (перетягування на телефоні не робимо).
+- **Шухляда ☰**: тап по затемненню / свайп уліво / «Назад» закривають; унизу —
+  «Список / Колонки» розділу в фокусі.
+
+### Доступність
+
+Цілі ≥ 44 (крапки панелей і колонок, ✕ панелі/аркуша, сегменти перемикача 36 +
+hitSlop, кнопки свайпу 76×висота рядка, панель дій 44–48). Ролі: перемикач —
+radiogroup/radio; крапки панелей — switch; крапки колонок — tablist/tab; меню дій
+— menu/menuitem; аркуш і шухляда — `accessibilityViewIsModal`; ручка аркуша —
+кнопка з діями increment/decrement. «Зменшити рух» — без пружин і в'їздів.
+«Зменшити прозорість» — оверлеї суцільні (`overlay.solid`), без блюру й зерна.
+
+### Сторінка-зразок: «Завдання»
+
+`app/(tabs)/index.tsx`: `useZoneState({section:'tasks', selectedParam:'task'})` →
+`ZoneLayout` (main = AppHeader + липкі фільтри + `SectionList` | `KanbanPager`;
+dynamic = картка завдання/зустрічі з наявними `TaskDetailHeader`/вкладками; static =
+`TasksTodayPane` на ≥1280; FAB «+» на всіх розмірах; `BulkActionBar`; `SwipeRow` на
+кожному рядку). «Сьогодні» (`app/(tabs)/today.tsx`) — статична зона телефона й
+планшета, скелет `ZoneSkeleton variant="static"`.
+
+### Рецепт для решти екранів
+
+1. `const zone = useZoneState({ section: '<розділ>', selectedParam: '<id-param>', columns: <вміє дошку?> })`.
+2. Корінь екрана: `<MeshBackground/>` + `<ZoneLayout main={…} dynamic={…} dynamicOpen={zone.panelOpen} onCloseDynamic={zone.closePanel} …/>`.
+3. Деталі — наявний компонент деталей як `dynamic` (вкладки — у `dynamicHeader`, дії — `dynamicFooter`).
+4. Стани кожної зони окремо: `ZoneSkeleton` / `ZoneEmpty` / `ZoneError` — не блокувати сусідні.
+5. Будь-який новий оверлей — `OverlaySurface` (+ `OverlayScrim` для модальних); наявний контейнер з `glassOf(t).sheet` — додати першим дочірнім `<OverlayMaterial isDark={isDark} />`.

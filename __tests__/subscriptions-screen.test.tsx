@@ -29,6 +29,20 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: mockPush, setParams: jest.fn() }),
   useLocalSearchParams: () => mockParams,
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
+  usePathname: () => '/subscriptions',
+}));
+// Layout System v2.4: свайп рядка (ReanimatedSwipeable) у jest-середовищі
+// не має Gesture.Tap — рядок рендеримо без жесту, дії лишаються в a11y.
+jest.mock('@/components/layout-zones/SwipeRow', () => ({
+  SwipeRow: ({ children }: { children: unknown }) =>
+    (typeof children === 'function' ? children({ accessibilityActions: [], onAccessibilityAction: () => {} }) : children),
+}));
+// Нижній аркуш деталей (жести RNGH) — як SheetModal вище: видимий → вміст.
+jest.mock('@/components/layout-zones/BottomSheet', () => ({
+  BottomSheet: ({ visible, header, footer, children }: { visible: boolean; header?: any; footer?: any; children: any }) => {
+    const React = require('react');
+    return visible ? React.createElement(React.Fragment, null, header, children, footer) : null;
+  },
 }));
 jest.mock('@/utils/haptics', () => ({
   haptic: { light: () => {}, medium: () => {}, success: () => {}, warning: () => {}, error: () => {} },

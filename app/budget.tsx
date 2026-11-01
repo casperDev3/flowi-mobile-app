@@ -34,6 +34,11 @@ import { fontFamily, radius, shadow, space, touchTarget, type as dsType } from '
  * обох платформах: бюджет — це порівняння двох чисел, і якщо телефон і браузер
  * рахують «витрачено» по-різному, людина бачить не дві думки, а зіпсовані дані.
  */
+import { OverlayScrim } from '@/components/ds/OverlaySurface';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
+import { SwipeRow, type SwipeAction } from '@/components/layout-zones';
+import { useFinanceLayoutStrings } from '@/components/finance/layoutStrings';
+import { dsTheme, glassOf } from '@/components/shared/dsTheme';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -48,6 +53,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
 } from 'react-native';
 
 import { BudgetMonthsTable } from '@/components/finance/BudgetMonthsTable';
@@ -97,7 +104,7 @@ import { wideModalStyles } from '@/components/finance/wideModal';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import {
-  BentoCard, BentoGrid, BentoPeriodPill, GlassBackdrop, KpiCounter, MeshBackground, PageHeader, SegmentedProgress,
+  BentoCard, BentoGrid, BentoPeriodPill, KpiCounter, MeshBackground, PageHeader, SegmentedProgress,
 } from '@/components/ds';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -504,6 +511,16 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
     setShowEditModal(false);
   }
 
+  const lz = useFinanceLayoutStrings();
+  const rowSwipeActions = (item: BudgetRow): SwipeAction[] => [
+    { key: 'edit', label: lz.swipeEdit, icon: 'pencil', tone: 'neutral', onPress: () => openEdit(item) },
+    ...(item.isAutoAdded ? [] : [{
+      key: 'delete', label: lz.swipeDelete, icon: 'trash.fill' as const, tone: 'danger' as const,
+      // Той самий «лише читання», що й у формі: незчитане сховище не переписуємо.
+      onPress: () => { if (loadFailed) { explainReadOnly(); return; } deleteCategory(item.category); },
+    }]),
+  ];
+
   function deleteCategory(cat: string) {
     Alert.alert(tr.budgetDeleteTitle, tr.budgetDeleteMsg.replace('{name}', cat), [
       { text: tr.cancel, style: 'cancel' },
@@ -784,9 +801,15 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         {/* Category rows */}
         {displayBudgets.length > 0 ? (
           <BentoCard key="rows" compact padded={false} span={splitColumns ? 2 : 1}>
+            {/* Layout System v2.4: свайп уліво — «Змінити» / «Видалити» ліміт
+                без відкриття форми (ті самі openEdit і deleteCategory з
+                підтвердженням). Автододані рядки ліміту ще не мають — лише
+                «Змінити». */}
             {displayBudgets.map((item, idx) => (
+              <SwipeRow key={item.category} actions={rowSwipeActions(item)} radius={0}>
+                {a11y => (
               <BudgetCategoryRow
-                key={item.category}
+                {...a11y}
                 item={item}
                 uncounted={formatUncounted(uncountedByCategory[item.category], symbolFor, locale)}
                 uncountedLabel={tr.budgetUncounted}
@@ -797,6 +820,8 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
                 fmt={fmt}
                 onPress={openEdit}
               />
+                )}
+              </SwipeRow>
             ))}
           </BentoCard>
         ) : null}
@@ -837,9 +862,11 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         onRequestClose={() => setShowEditModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={() => setShowEditModal(false)}>
+            {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+            <OverlayScrim />
             <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, readingWidth, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-              <View style={[st.sheet, sheetSurface, { ...c.gl.strong }, shadow[isDark ? 'dark' : 'light'].popover]}>
-                <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+              <View style={[st.sheet, sheetSurface, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet }, shadow[isDark ? 'dark' : 'light'].popover]}>
+                <OverlayMaterial isDark={isDark} radius={24} />
                 <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
                 {/* Handle */}
@@ -935,9 +962,11 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
         onRequestClose={() => setShowAddModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable accessible={false} style={[st.overlay, wm.overlay]} onPress={() => setShowAddModal(false)}>
+            {/* Layout System v2.4: затемнення + легкий блюр під «брудним склом» аркуша. */}
+            <OverlayScrim />
             <Pressable onPress={e => e.stopPropagation()} style={[st.sheetWrapper, readingWidth, wm.column]} accessible={false} accessibilityViewIsModal importantForAccessibility="yes">
-              <View style={[st.sheet, sheetSurface, { ...c.gl.strong }, shadow[isDark ? 'dark' : 'light'].popover]}>
-                <GlassBackdrop style={{ borderRadius: 24, overflow: 'hidden' }} />
+              <View style={[st.sheet, sheetSurface, { ...c.gl.strong, backgroundColor: glassOf(dsTheme(isDark)).sheet }, shadow[isDark ? 'dark' : 'light'].popover]}>
+                <OverlayMaterial isDark={isDark} radius={24} />
 
                 <ScrollView keyboardShouldPersistTaps="handled">
                   {/* Handle */}
@@ -1021,6 +1050,7 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
  */
 const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
   item, uncounted, uncountedLabel, unsyncableLabel, tapHint, divider, c, fmt, onPress,
+  accessibilityActions, onAccessibilityAction,
 }: {
   item: BudgetRow;
   /** Витрати в чужих валютах, уже відформатовані: «120 $ · 45 €». */
@@ -1032,12 +1062,22 @@ const BudgetCategoryRow = React.memo(function BudgetCategoryRow({
   c: BudgetColors;
   fmt: (n: number) => string;
   onPress: (item: BudgetRow) => void;
+  /** Layout System v2.4: дії свайпу рядка — і для VoiceOver (SwipeRow). */
+  accessibilityActions?: AccessibilityActionInfo[];
+  onAccessibilityAction?: (e: AccessibilityActionEvent) => void;
 }) {
   const pct = barRatio(item.spent, item.limit);
   const isOver = isOverLimit(item.spent, item.limit);
   const barColor = isOver ? c.coral : pct > 0.8 ? c.amber : c.limeFill;
   return (
-    <TouchableOpacity onPress={() => onPress(item)} activeOpacity={0.75}>
+    <TouchableOpacity
+      onPress={() => onPress(item)}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
+      // Суцільне тло: під свайпом рядок не просвічує кнопки дій.
+      style={{ backgroundColor: c.t.surface.card }}>
       <View style={[st.categoryRow,
         divider && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }]}>
         {/* Icon */}
@@ -1094,7 +1134,7 @@ const st = StyleSheet.create({
   inlineAdd:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, borderRadius: radius.pill, marginBottom: 12 },
   emptyIcon:    { width: 80, height: 80, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   addBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, minHeight: 52, borderRadius: radius.pill },
-  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay:      { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheetWrapper: { width: '100%', flexShrink: 1 },
   sheet:        { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: space.cardPadding, paddingBottom: 36 },
   input:        { borderRadius: radius.control, minHeight: touchTarget, paddingHorizontal: space[4], paddingVertical: 13, fontSize: 18, fontFamily: fontFamily.medium, marginBottom: 8, fontVariant: ['tabular-nums'] },

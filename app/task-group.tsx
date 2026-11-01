@@ -16,14 +16,20 @@
  *
  * Екран лише для перегляду: тап по особистій задачі відкриває ту саму деталь,
  * що й на екрані завдань (через ?open=), по задачі проєкту — картку проєкту
- * тут же, аркушем (ProjectTaskSheet); довгий тап — меню з копіюванням.
+ * тут же, аркушем (ProjectTaskSheet).
+ *
+ * Layout System v2.4: добірка — одна головна зона й лише для перегляду, тож
+ * свайпів «архів/видалити» тут немає (мутації живуть на екрані-джерелі), а
+ * деталь особистої задачі — повна картка екрана Завдань (?open=), не панель
+ * тут. Довгий тап — масовий вибір, як у списку Завдань: BulkActionBar
+ * «N вибрано · Дії ▾ · ✕» з «Копіювати» (Markdown вибраних). Поки сховище
+ * читається — скелет у формі списку.
  */
 import { useInPlaceProjectTask } from '@/components/projects/ProjectTaskSheet';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -32,6 +38,7 @@ import {
 } from 'react-native';
 
 import { TaskCompactCard } from '@/components/tasks/TaskCompactCard';
+import { BulkActionBar, ZoneSkeleton, type BulkAction } from '@/components/layout-zones';
 import { useUndoToast } from '@/components/shared/UndoToast';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -193,7 +200,7 @@ export default function TaskGroupScreen() {
 
   // Поки сховище не прочитане — заголовок із маршруту, щоб шапка не блимала.
   const title = group?.title ?? params.title ?? '';
-  const data = group?.tasks ?? [];
+  const data = useMemo(() => group?.tasks ?? [], [group]);
 
   const openTask = useCallback((task: Task) => {
     if (openProjectTask(task)) return;
@@ -205,13 +212,34 @@ export default function TaskGroupScreen() {
     void copyTextToClipboard(text).then(ok => { if (ok) showToast(tr.taskCopied); });
   }, [projects, sprints, columns, tr, showToast]);
 
-  const showTaskMenu = useCallback((task: Task) => {
+  /** Масовий вибір: довгий тап по рядку, далі тапи додають/знімають. */
+  const [bulkIds, setBulkIds] = useState<ReadonlySet<string>>(() => new Set());
+  const selectionMode = bulkIds.size > 0;
+  const clearBulk = useCallback(() => setBulkIds(new Set()), []);
+  const toggleBulk = useCallback((task: Task) => {
     haptic.light();
-    Alert.alert(task.title, undefined, [
-      { text: tr.copyTask, onPress: () => copyTask(task) },
-      { text: tr.cancel, style: 'cancel' },
-    ]);
-  }, [tr, copyTask]);
+    setBulkIds(prev => {
+      const next = new Set(prev);
+      if (next.has(task.id)) next.delete(task.id); else next.add(task.id);
+      return next;
+    });
+  }, []);
+  const pressTask = useCallback((task: Task) => {
+    if (selectionMode) { toggleBulk(task); return; }
+    openTask(task);
+  }, [selectionMode, toggleBulk, openTask]);
+  /** «Копіювати» для вибраних — той самий Markdown, що й для однієї задачі. */
+  const copySelected = useCallback(() => {
+    const picked = data.filter(task => bulkIds.has(task.id));
+    clearBulk();
+    if (picked.length === 1) { copyTask(picked[0]); return; }
+    const labels = taskMarkdownLabels(tr);
+    const text = picked.map(task => taskToMarkdown(task, { projects, sprints, columns }, labels)).join('\n\n');
+    void copyTextToClipboard(text).then(ok => { if (ok) showToast(tr.taskCopied); });
+  }, [data, bulkIds, clearBulk, copyTask, tr, projects, sprints, columns, showToast]);
+  const bulkActions = useMemo<BulkAction[]>(() => [
+    { key: 'copy', label: tr.copyTask, icon: 'doc.on.doc', onPress: copySelected, testID: 'task-group-bulk-copy' },
+  ], [tr.copyTask, copySelected]);
 
   const renderItem = useCallback(({ item }: ListRenderItemInfo<Task>) => {
     const level = normalizePriority(item);
@@ -219,8 +247,10 @@ export default function TaskGroupScreen() {
       <TaskCompactCard
         task={item}
         statusColumn={taskStatusColumn(item, columns)}
-        onPress={openTask}
-        onLongPress={showTaskMenu}
+        onPress={pressTask}
+        onLongPress={toggleBulk}
+        selected={bulkIds.has(item.id)}
+        selectionMode={selectionMode}
         c={c}
         isDark={isDark}
         projects={projects}
@@ -231,7 +261,7 @@ export default function TaskGroupScreen() {
         assigneeLabel={assigneeLabelFor(item)}
       />
     );
-  }, [columns, openTask, showTaskMenu, c, isDark, projects, sprints, tr.overdueSection, tr.priorityA11y, tr.subtasks, assigneeLabelFor]);
+  }, [columns, pressTask, toggleBulk, bulkIds, selectionMode, c, isDark, projects, sprints, tr.overdueSection, tr.priorityA11y, tr.subtasks, assigneeLabelFor]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -290,7 +320,14 @@ export default function TaskGroupScreen() {
             <IconSymbol name="checklist" size={36} color={c.sub} />
             <Text style={{ color: c.sub, fontSize: 14, marginTop: 14, fontFamily: fontFamily.semibold }}>{tr.groupEmpty}</Text>
           </View>
-        ) : null}
+        ) : <ZoneSkeleton variant="list" rows={5} />}
+      />
+
+      <BulkActionBar
+        testID="task-group-bulk-bar"
+        count={bulkIds.size}
+        actions={bulkActions}
+        onClear={clearBulk}
       />
 
       {toastElement}

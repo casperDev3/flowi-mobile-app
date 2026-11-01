@@ -40,6 +40,12 @@ jest.mock('expo-router', () => ({
   Redirect: (props: any) => { mockRedirect(props.href); return null; },
   useFocusEffect: (cb: any) => { const React = require('react'); React.useEffect(() => cb(), []); },
 }));
+// Layout System v2.4: рядки списку — SwipeRow (ReanimatedSwipeable), якому
+// потрібен справжній gesture-handler; у тесті рядок рендериться як є.
+jest.mock('@/components/layout-zones/SwipeRow', () => ({
+  SwipeRow: ({ children }: { children: unknown }) =>
+    (typeof children === 'function' ? children({ accessibilityActions: [], onAccessibilityAction: () => {} }) : children),
+}));
 jest.mock('@/utils/haptics', () => ({
   haptic: { light: () => {}, medium: () => {}, success: () => {}, warning: () => {}, error: () => {} },
 }));

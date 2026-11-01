@@ -56,6 +56,7 @@ import { dialogColumnStyle, sheetColumnStyle, sidePanelColumnStyle } from '@/hoo
 import { useResponsive } from '@/hooks/use-responsive';
 import { useI18n } from '@/store/i18n';
 import { glassOf } from '@/components/shared/dsTheme';
+import { OverlayScrim } from '@/components/ds/OverlaySurface';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -295,8 +296,11 @@ export function SheetModal({
     });
 
   // ── Animated styles ───────────────────────────────────────────────────────
+  // backdropOpacity живе в шкалі 0…0.5 (історично — непрозорість чорного
+  // шару); «брудне» затемнення OverlayScrim має власну щільність, тож шар
+  // проявляємо повністю: 0.5 → 1.
   const backdropStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
+    opacity: Math.min(1, backdropOpacity.value * 2),
   }));
 
   const sheetStyle = useAnimatedStyle(() => (
@@ -344,11 +348,15 @@ export function SheetModal({
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Backdrop — тільки візуальний, без перехоплення дотиків */}
+        {/* Backdrop — тільки візуальний, без перехоплення дотиків.
+            Layout System v2.4: «брудне» затемнення — scrim + легкий блюр фону
+            (iOS), щоб крізь аркуш не читався вміст під ним. */}
         <Animated.View
-          style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
+          style={[StyleSheet.absoluteFill, backdropStyle]}
           pointerEvents="none"
-        />
+        >
+          <OverlayScrim />
+        </Animated.View>
 
         {/* Dismiss-область (за листом) */}
         {backdropDismiss && (
@@ -431,10 +439,6 @@ export function SheetModal({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  backdrop: {
-    // DS v2: затемнення під модалкою — відтінок text.primary (#111113), не чистий чорний.
-    backgroundColor: '#111113',
-  },
   // alignItems тут НЕ ставимо: 'center' стиснув би аркуш до ширини вмісту
   // на телефоні. Центрування робить сам аркуш через alignSelf.
   outer: {

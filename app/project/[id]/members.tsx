@@ -54,6 +54,7 @@ import { fontFamily, radius } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import { Avatar, KpiCounter } from '@/components/ds';
 import { glassOf, glassRim } from '@/components/shared/dsTheme';
+import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 
 const EXPIRY_OPTIONS: { hours: number; labelKey: 'projectMembersExpiry24h' | 'projectMembersExpiry7d' | 'projectMembersExpiry30d' }[] = [
   { hours: 24, labelKey: 'projectMembersExpiry24h' },
@@ -831,7 +832,7 @@ export default function ProjectMembersScreen() {
           </>
         )}
       </ScrollView>
-    {removing && <Modal visible transparent animationType="slide" onRequestClose={()=>setRemoving(null)}><View style={{flex:1,justifyContent:'center',backgroundColor:tk.surface.overlay,padding:20}}><ScrollView style={{maxHeight:modalHeight * 0.8,backgroundColor: glassOf(tk).sheet, ...glassRim(tk, 'strong'),borderRadius:radius.card}} contentContainerStyle={{padding:24,gap:10}}><Text style={{color:c.text,fontSize:18,fontFamily:fontFamily.semibold}}>{tr.projectReassignTitle}</Text>{members.filter(m=>m.user.id!==removing?.user.id&&m.role!=='viewer').map(m=><TeamButton key={m.user.id} label={m.user.name||m.user.email} onPress={()=>{if(removing)handleRemove(removing,m.user.id);setRemoving(null);}}/>)}<TeamButton label={tr.projectLeaveUnassigned} onPress={()=>{if(removing)handleRemove(removing);setRemoving(null);}}/><TeamButton label={tr.cancel} onPress={()=>setRemoving(null)}/></ScrollView></View></Modal>}
+    {removing && <Modal visible transparent animationType="slide" onRequestClose={()=>setRemoving(null)}><View style={{flex:1,justifyContent:'center',backgroundColor:tk.surface.overlay,padding:20}}><View style={{maxHeight:modalHeight * 0.8,backgroundColor: glassOf(tk).sheet, ...glassRim(tk, 'strong'),borderRadius:radius.card,overflow:'hidden'}}><OverlayMaterial isDark={isDark} /><ScrollView contentContainerStyle={{padding:24,gap:10}}><Text style={{color:c.text,fontSize:18,fontFamily:fontFamily.semibold}}>{tr.projectReassignTitle}</Text>{members.filter(m=>m.user.id!==removing?.user.id&&m.role!=='viewer').map(m=><TeamButton key={m.user.id} label={m.user.name||m.user.email} onPress={()=>{if(removing)handleRemove(removing,m.user.id);setRemoving(null);}}/>)}<TeamButton label={tr.projectLeaveUnassigned} onPress={()=>{if(removing)handleRemove(removing);setRemoving(null);}}/><TeamButton label={tr.cancel} onPress={()=>setRemoving(null)}/></ScrollView></View></View></Modal>}
       </ProjectScreenShell>
   );
 }

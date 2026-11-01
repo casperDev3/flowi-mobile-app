@@ -9,7 +9,7 @@
  */
 import type { ViewStyle } from 'react-native';
 
-import { glass, theme, type DSTheme, type GlassAccent, type GlassTokens } from '@/constants/theme';
+import { glass, overlay, theme, type DSTheme, type GlassAccent, type GlassTokens } from '@/constants/theme';
 
 export function dsTheme(isDark: boolean): DSTheme {
   return isDark ? theme.dark : theme.light;
@@ -86,7 +86,24 @@ export type GlassOf = GlassTokens & {
   sheet: string;
 };
 
-const SHEET_FILL = { light: 'rgba(255,255,255,0.88)', dark: 'rgba(30,30,36,0.88)' } as const;
+/**
+ * Layout System v2.4: заливка аркушів/модалок/поповерів = «брудне скло»
+ * оверлею (constants/theme.ts `overlay`): 0.90 / 0.92 — під ним не
+ * просвічує текст. Без блюру (Android/веб, де споживач не малює BlurView) —
+ * майже непрозора fillNoBlur. Повний рецепт із блюром і зерном —
+ * <OverlaySurface> (components/ds/OverlaySurface.tsx).
+ */
+function sheetFillFor(scheme: 'light' | 'dark'): string {
+  let ios = true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    ios = (require('react-native') as typeof import('react-native')).Platform.OS === 'ios';
+  } catch {
+    // немає RN (чисті тести) — як на iOS
+  }
+  return ios ? overlay[scheme].fill : overlay[scheme].fillNoBlur;
+}
+const SHEET_FILL = { light: sheetFillFor('light'), dark: sheetFillFor('dark') } as const;
 const glassOfCache = new Map<string, GlassOf>();
 
 /**
@@ -103,7 +120,7 @@ export function glassOf(t: DSTheme): GlassOf {
   if (hit) return hit;
   const g = dsGlass(isDark);
   const v: GlassOf = rtNow
-    ? { ...g, surface: g.solid.card, surfaceStrong: g.solid.strong, surfaceSubtle: g.solid.subtle, sheet: g.solid.strong }
+    ? { ...g, surface: g.solid.card, surfaceStrong: g.solid.strong, surfaceSubtle: g.solid.subtle, sheet: overlay[isDark ? 'dark' : 'light'].solid }
     : { ...g, sheet: SHEET_FILL[isDark ? 'dark' : 'light'] };
   glassOfCache.set(key, v);
   return v;
@@ -125,7 +142,7 @@ export function glassRim(t: DSTheme, variant: GlassFillVariant = 'card'): ViewSt
 const DARK_FILLS = new Set<string>([
   glass.dark.surface, glass.dark.surfaceStrong, glass.dark.surfaceSubtle,
   glass.dark.solid.card, glass.dark.solid.strong, glass.dark.solid.subtle,
-  SHEET_FILL.dark, theme.dark.surface.card, theme.dark.surface.elevated, theme.dark.surface.subtle,
+  SHEET_FILL.dark, overlay.dark.fill, overlay.dark.fillNoBlur, overlay.dark.solid, theme.dark.surface.card, theme.dark.surface.elevated, theme.dark.surface.subtle,
 ]);
 
 /**
@@ -141,7 +158,7 @@ const GLASS_FILLS = new Set<string>([
   ...DARK_FILLS,
   glass.light.surface, glass.light.surfaceStrong, glass.light.surfaceSubtle,
   glass.light.solid.card, glass.light.solid.strong, glass.light.solid.subtle,
-  SHEET_FILL.light, theme.light.surface.card, theme.light.surface.elevated, theme.light.surface.subtle,
+  SHEET_FILL.light, overlay.light.fill, overlay.light.fillNoBlur, overlay.light.solid, theme.light.surface.card, theme.light.surface.elevated, theme.light.surface.subtle,
 ]);
 
 /** Чи заливка — скло/поверхня DS (а не акцент чи action.primary). */

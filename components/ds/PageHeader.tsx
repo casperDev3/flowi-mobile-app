@@ -2,8 +2,15 @@
  * components/ds/PageHeader.tsx — шапка сторінки Omni + KPI-лічильники.
  *
  * Omni: велике H1 + однорядковий підзаголовок ліворуч, праворуч 2–3
- * лічильники (величезне тонке число + дворядковий підпис + маленька кольорова
- * дельта над підписом), за потреби — головна дія.
+ * лічильники, за потреби — головна дія.
+ *
+ * Лічильник (11.2026, рішення власника): ПІДПИС ПІД ЧИСЛОМ, не поруч —
+ *   12           ← велике тонке число (tabular-nums)
+ *   Активних     ← підпис 12 / Medium, text.secondary, до 2 рядків
+ *   3 прострочено ← дельта (коли є), колір тону
+ * Поруч підпис «плив» за шириною числа: «1 Задачі» і «16 Задачі» стояли з
+ * різним відступом. Тепер усі підписи стрічки починаються з лівого краю
+ * свого числа, а стрічка вирівняна по верху.
  *
  * Телефон (compact): заголовок малює AppHeader, тож PageHeader зазвичай без
  * `title`; лічильники — горизонтальна стрічка з прокруткою (не переносяться й
@@ -24,9 +31,9 @@ export type KpiDeltaTone = 'up' | 'down' | 'neutral';
 
 export type KpiCounterProps = {
   value: string | number;
-  /** Дворядковий підпис («Нових / завдань»). */
+  /** Підпис ПІД числом, до двох рядків («Задачі на тиждень»). */
   label: string;
-  /** Маленька дельта над підписом («+12 сьогодні»). */
+  /** Маленька дельта під підписом («+12 сьогодні», «3 прострочено»). */
   delta?: string;
   /** up — зелена (success ink), down — червона (coral ink), neutral — secondary. */
   deltaTone?: KpiDeltaTone;
@@ -53,12 +60,10 @@ export function KpiCounter({ value, label, delta, deltaTone = 'neutral', valueCo
         style={[st.kpiValue, isCompact ? st.kpiValueCompact : null, { color: valueColor ?? t.text.primary }]}>
         {value}
       </Text>
-      <View style={st.kpiMeta}>
-        {delta ? (
-          <Text numberOfLines={1} maxFontSizeMultiplier={KPI_MAX_FONT_SCALE} style={[st.kpiDelta, { color: deltaColor }]}>{delta}</Text>
-        ) : null}
-        <Text numberOfLines={2} maxFontSizeMultiplier={KPI_MAX_FONT_SCALE} style={[st.kpiLabel, { color: t.text.secondary }]}>{label}</Text>
-      </View>
+      <Text numberOfLines={2} maxFontSizeMultiplier={KPI_MAX_FONT_SCALE} style={[st.kpiLabel, { color: t.text.secondary }]}>{label}</Text>
+      {delta ? (
+        <Text numberOfLines={1} maxFontSizeMultiplier={KPI_MAX_FONT_SCALE} style={[st.kpiDelta, { color: deltaColor }]}>{delta}</Text>
+      ) : null}
     </View>
   );
   if (onPress) {
@@ -138,14 +143,17 @@ export function PageHeader({ title, subtitle, kpis, action, bleed = 0, style }: 
 }
 
 const st = StyleSheet.create({
-  kpiHit: { minHeight: 44, justifyContent: 'center' },
-  kpi: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  kpiHit: { minHeight: 44, justifyContent: 'flex-start' },
+  // Колонка: число → підпис → дельта. alignItems flex-start — ширина підпису
+  // не прив'язана до ширини числа («2» не стискає «Активних» у стовпчик).
+  kpi: { flexDirection: 'column', alignItems: 'flex-start', minWidth: 64 },
   kpiValue: { fontFamily: fontFamily.light, fontSize: 48, lineHeight: 52, letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
   kpiValueCompact: { fontSize: 40, lineHeight: 44, letterSpacing: -1 },
-  kpiMeta: { maxWidth: 110 },
-  kpiDelta: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
-  kpiLabel: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.medium },
-  kpiRow: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  kpiLabel: { marginTop: 4, maxWidth: 132, fontSize: 12, lineHeight: 16, fontFamily: fontFamily.medium },
+  kpiDelta: { marginTop: 2, maxWidth: 132, fontSize: 12, lineHeight: 16, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
+  // Верхнє вирівнювання: числа стоять на одній лінії, навіть коли в одного
+  // лічильника підпис у два рядки або є дельта.
+  kpiRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 24 },
   wideRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16 },
-  wideRight: { flexDirection: 'row', alignItems: 'center', gap: 24, flexWrap: 'wrap' },
+  wideRight: { flexDirection: 'row', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' },
 });

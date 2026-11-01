@@ -18,20 +18,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KIND_COLOR, KIND_ICON, PeriodFlowCard } from '@/components/finance/FinanceSummary';
-import { OperationsSummary } from '@/components/finance/OperationsSummary';
+import { OperationsNotices, orderCurrencies } from '@/components/finance/OperationsSummary';
 import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
-import { createSheetHandoff, openAfterModalExit } from '@/components/finance/sheetHandoff';
+import { afterModalExit, createSheetHandoff, openAfterModalExit } from '@/components/finance/sheetHandoff';
 import { UpcomingPaymentsCard, useUpcomingPayments } from '@/components/finance/UpcomingPaymentsCard';
 import { TransactionGroup } from '@/components/finance/TransactionGroup';
 import { FAB_LIST_CLEARANCE } from '@/components/tasks/AddTaskButton';
 import { PickerField, type PickerOption } from '@/components/shared/PickerField';
 import { PressableScale } from '@/components/shared/PressableScale';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
-import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { AppHeader } from '@/components/shared/AppHeader';
+import type { TitleMenuItem } from '@/components/shared/TitleMenu';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { SkeletonCard } from '@/components/shared/Skeleton';
 import { useUndoToast } from '@/components/shared/UndoToast';
@@ -96,7 +95,7 @@ import { parseFinanceTab, reportsFabHidden, visibleFinanceTabs, type FinanceTab 
 import { formatSubscriptionMoney, parseDateKey } from '@/utils/subscriptions';
 import { fontFamily } from '@/constants/theme';
 import { KpiCounter, MeshBackground } from '@/components/ds';
-import { glassOf, glassRim, glassRimFor, dsGlass } from '@/components/shared/dsTheme';
+import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
 
 /**
@@ -163,7 +162,6 @@ export default function FinanceScreen() {
   // DS v2: нейтральна палітра; головні дії/вибрані чипи — action.primary (c.accent).
   const { t, isDark } = useDSTheme();
   useScreenView('finance');
-  const insets = useSafeAreaInsets();
   /**
    * Вкладка розділу (finance-revamp.md §2). Живе в параметрі `?tab=`: сайдбар,
    * deep link і «Змінити підписки» з попередження відкривають потрібну
@@ -282,7 +280,6 @@ export default function FinanceScreen() {
    * створено. Саме втрату введеної суми й категорії описує NAT-02.
    */
   const txDraftPausedRef = useRef(false);
-  const [showMenu, setShowMenu] = useState(false);
   const [compact, setCompact] = useState(false);
 
   const [showCal, setShowCal] = useState(false);
@@ -1383,20 +1380,11 @@ export default function FinanceScreen() {
   /** Чи є оплата з датою сьогодні — інакше блок не малюємо зовсім. */
   const hasTodayDue = useMemo(() => upcomingPayments.items.some(i => i.daysUntil === 0), [upcomingPayments.items]);
   /**
-   * «Залишки» (рішення власника): у «Операціях» одразу видно і стрічку, і
-   * скільки грошей. Рахунки й оборот місяця — у вкладці «Рахунки».
+   * Плашки над стрічкою: операції без рахунку й чип фільтра за рахунком.
+   * Самі залишки (колишня картка «Залишки») — KPI під заголовком (headerKpis).
    */
-  const opsSummary = useMemo(() => (
-    <OperationsSummary
-      totals={overview.totalByCurrency}
-      periodTotals={totalsByCurrency}
-      primaryCode={primaryCurrency}
-      hasAccounts={visibleAccounts.length > 0}
-      fmt={fmtCode}
-      c={finColors}
-      tr={tr}
-      onOpenAccounts={openAccountsTab}
-      onNewAccount={() => openAccountForm(null)}
+  const opsNotices = useMemo(() => (
+    <OperationsNotices
       unassignedLabel={overview.unassigned.count > 0
         ? tr.unassignedTxWarning.replace('{n}', String(overview.unassigned.count))
         : null}
@@ -1405,11 +1393,7 @@ export default function FinanceScreen() {
       accountFilterName={accountFilterName}
       onClearAccountFilter={() => { haptic.light(); setAccountFilter(null); }}
     />
-  ), [
-    overview.totalByCurrency, overview.unassigned.count, totalsByCurrency, primaryCurrency,
-    visibleAccounts.length, fmtCode, finColors, tr, openAccountsTab, openAccountForm,
-    unassignedOnly, accountFilterName,
-  ]);
+  ), [overview.unassigned.count, tr, unassignedOnly, accountFilterName]);
   const todayDueCard = useCallback((style: object) => (
     <UpcomingPaymentsCard
       data={upcomingPayments}
@@ -1423,7 +1407,7 @@ export default function FinanceScreen() {
   ), [upcomingPayments, isDark, c.text, c.sub, c.border, tr, lang]);
 
   /**
-   * Layout System v2.4 — статична зона «Залишки + сьогоднішні оплати» поруч
+   * Layout System v2.4 — статична зона «плашки + сьогоднішні оплати» поруч
    * зі стрічкою лише там, де вона вміщається поряд із деталлю (вікно ≥ 1280,
    * стрічка лишається найширшою). Інакше той самий контекст — у шапці стрічки.
    */
@@ -1472,14 +1456,15 @@ export default function FinanceScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Залишки + «Сьогодні до оплати» над стрічкою. На дуже
-                широкому вікні вони — у статичній зоні ліворуч (ZoneLayout). */}
+            {/* Плашки (без рахунку / фільтр рахунку) + «Сьогодні до оплати»
+                над стрічкою. Залишки — KPI у шапці. На дуже широкому вікні
+                це — у статичній зоні ліворуч (ZoneLayout). */}
             {!staticShown && (
               <View style={isWide ? s.summaryRow : undefined}>
-                <View style={isWide ? s.summaryCell : undefined}>{opsSummary}</View>
+                <View style={isWide ? s.summaryCell : undefined}>{opsNotices}</View>
                 {hasTodayDue ? (
                   <View style={isWide ? s.summaryCell : undefined}>
-                    {todayDueCard({ marginTop: isWide ? 0 : 14, marginBottom: 0 })}
+                    {todayDueCard({ marginTop: 14, marginBottom: 0 })}
                   </View>
                 ) : null}
               </View>
@@ -1526,7 +1511,7 @@ export default function FinanceScreen() {
   ), [
     c.accent, c.onAccent, c.green, c.red, c.sub, c.text, dateFilter, filter,
     groups.length, initialized, isDark, staticShown, isWide, lang, loadFailed, locale, openAdd,
-    retryLoad, tr, todayDueCard, opsSummary, hasTodayDue,
+    retryLoad, tr, todayDueCard, opsNotices, hasTodayDue,
   ]);
 
   // Той самий вміст показується модалкою на телефоні й колонкою на
@@ -1671,35 +1656,89 @@ export default function FinanceScreen() {
     </View>
   ) : null;
 
-  // ─── KPI розділу (Omni: великі тонкі числа в шапці) ─────────────────────────
-  // Оборот ПЕРІОДУ спільного фільтра у валюті фільтра — ті самі цифри, що й
-  // «Оборот за період»/стрічка (totalsByCurrency). Без копійок: KPI — про
-  // масштаб, точна сума — у картках нижче. До першого читання — нічого (нуль
-  // до завантаження збрехав би). Тап по доходах/витратах — стрічка з
-  // відповідним фільтром типу.
-  const kpiCode = finFilter.filter.currency || primaryCurrency;
-  const kpiTotals = totalsByCurrency[kpiCode];
-  const kpiMoney = (n: number) => fmtCur(Math.round(n), { ...curOf(kpiCode), decimals: 0 });
-  const kpiNet = (kpiTotals?.income ?? 0) - (kpiTotals?.expense ?? 0);
+  // ─── KPI розділу: залишки на рахунках (11.2026, рішення власника) ──────────
+  // Картку «Залишки» над стрічкою прибрано — її цифра стала великим числом під
+  // заголовком «Фінанси»: «На рахунках» по кожній валюті (основна першою), та
+  // сама сума й точність валюти, що були в картці (financeOverview), а під нею
+  // — «Перенесено з минулого» за період фільтра. Курсів немає, тож суми між
+  // валютами немає свідомо. Тап — усі рахунки. До першого читання — нічого
+  // (нуль до завантаження збрехав би).
+  const balanceCodes = orderCurrencies(Object.keys(overview.totalByCurrency), primaryCurrency);
   const headerKpis = initialized && !loadFailed ? (
-    <>
+    visibleAccounts.length > 0 ? (
+      <>
+        {(balanceCodes.length > 0 ? balanceCodes : [primaryCurrency]).map(code => {
+          const value = overview.totalByCurrency[code] ?? 0;
+          const carry = totalsByCurrency[code]?.carryover ?? 0;
+          const carryText = carry !== 0 ? `${tr.carryover}: ${carry > 0 ? '+' : ''}${fmtCode(carry, code)}` : null;
+          return (
+            <View key={code} testID={`fin-balance-${code}`}>
+              <KpiCounter
+                value={fmtCode(value, code)}
+                label={tr.totalOnAccounts}
+                valueColor={value < 0 ? t.status.danger : undefined}
+                onPress={openAccountsTab}
+                accessibilityLabel={[`${tr.totalOnAccounts} ${fmtCode(value, code)}`, carryText, tr.finOpenAccounts].filter(Boolean).join('. ')}
+              />
+              {/* Перенесений залишок — підписом ПІД сумою, як і в картці. */}
+              {carryText ? (
+                <Text
+                  numberOfLines={1}
+                  importantForAccessibility="no-hide-descendants"
+                  accessibilityElementsHidden
+                  maxFontSizeMultiplier={1.3}
+                  style={[s.kpiCaption, { color: t.text.secondary }]}>
+                  {carryText}
+                </Text>
+              ) : null}
+            </View>
+          );
+        })}
+      </>
+    ) : (
       <KpiCounter
-        value={kpiMoney(kpiTotals?.income ?? 0)}
-        label={tr.incomes}
-        onPress={() => { changeTab('transactions'); setFilter('income'); }}
+        value={fmtCode(0, primaryCurrency)}
+        label={tr.noAccounts}
+        delta={tr.newAccount}
+        onPress={() => openAccountForm(null)}
+        accessibilityLabel={`${tr.noAccounts}. ${tr.newAccount}`}
       />
-      <KpiCounter
-        value={kpiMoney(kpiTotals?.expense ?? 0)}
-        label={tr.expenses}
-        onPress={() => { changeTab('transactions'); setFilter('expense'); }}
-      />
-      <KpiCounter
-        value={`${kpiNet < 0 ? '−' : ''}${kpiMoney(Math.abs(kpiNet))}`}
-        label={tr.finNet}
-        valueColor={kpiNet < 0 ? t.status.danger : undefined}
-      />
-    </>
+    )
   ) : undefined;
+
+  /**
+   * Бургер (☰) навпроти заголовка «Фінанси» (11.2026): дії розділу — колишнє
+   * меню «⋯». Перемикач «Компактний вигляд» з шапки прибрано — він тепер
+   * пункт-галочка цього меню (лише на «Операціях», як і раніше). Наступну
+   * модалку відкриваємо після зникнення поповера (NAT-02, sheetHandoff).
+   */
+  const titleMenuItems: TitleMenuItem[] = [
+    { key: 'stats', label: tr.statistics, icon: 'chart.bar.fill', onPress: () => router.push('/finance-stats') },
+    { key: 'cats', label: tr.categories, icon: 'tag.fill', onPress: () => afterModalExit(() => setShowCats(true)) },
+    {
+      key: 'accounts', label: tr.accounts, icon: 'banknote',
+      onPress: () => afterModalExit(() => { setAccForm(null); setShowAccounts(true); }),
+    },
+    { key: 'banks', label: tr.piggyBanks, icon: 'building.columns.fill', onPress: () => router.push('/banks') },
+    ...(tab === 'transactions' ? [
+      {
+        key: 'calendar',
+        label: dateFilter
+          ? `${tr.calendar} · ${dateFilter.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}`
+          : tr.calendar,
+        icon: 'calendar' as const,
+        separatorBefore: true,
+        onPress: () => afterModalExit(() => setShowCal(true)),
+      },
+      {
+        key: 'compact',
+        label: tr.compactView,
+        icon: 'rectangle.stack' as const,
+        checked: compact,
+        onPress: () => setCompact(v => !v),
+      },
+    ] : []),
+  ];
 
   // FAB «+ Операція». На «Бюджеті» й «Підписках» у вкладки своя дія
   // «додати», і друга кнопка поверх неї лише заступала б список. Під час
@@ -1716,14 +1755,14 @@ export default function FinanceScreen() {
   ) : null;
 
   /**
-   * Статична зона (лише вікно ≥ 1280 і лише «Операції»): залишки й
+   * Статична зона (лише вікно ≥ 1280 і лише «Операції»): плашки стрічки й
    * сьогоднішні оплати — контекст, що не залежить від вибору. Поки сховище
    * не прочитане — скелет у формі вмісту, а не нулі.
    */
   const staticPane = tab === 'transactions' ? (
     initialized ? (
       <View style={{ paddingRight: 4 }}>
-        {opsSummary}
+        {opsNotices}
         {todayDueCard({ marginTop: 16, marginBottom: 0 })}
       </View>
     ) : <ZoneSkeleton variant="static" />
@@ -1733,7 +1772,7 @@ export default function FinanceScreen() {
     <View style={{ flex: 1 }}>
       <MeshBackground />
       {/*
-        Layout System v2.4 — зони «Операцій»: [статична «Залишки» (≥1280)]
+        Layout System v2.4 — зони «Операцій»: [статична «плашки + оплати» (≥1280)]
         [стрічка — завжди найширша] [деталь операції — панель праворуч з ✕ /
         нижній аркуш ~60% на телефоні]. Інші вкладки (Рахунки, Бюджет,
         Підписки, Звіти) — лише головна зона: деталі в них мають власні
@@ -1745,26 +1784,12 @@ export default function FinanceScreen() {
       <View style={{ flex: 1 }}>
 
         {/* Omni: глобальна шапка (☰ · дзвіник · акаунт; на планшеті — рядок
-            інструментів) + KPI обороту періоду; під нею — вкладки й фільтр. */}
+            інструментів) + KPI залишків на рахунках і бургер дій навпроти
+            заголовка; під нею — вкладки й фільтр. */}
         <AppHeader
           title={tr.finance}
           kpis={headerKpis}
-          actions={tab !== 'transactions' ? undefined :
-            <>
-              <HeaderButton
-                onPress={() => setCompact(v => !v)}
-                accessibilityLabel={compact ? tr.listMode : tr.compactView}
-                style={{ backgroundColor: compact ? c.accent : c.card }}>
-                <IconSymbol name={compact ? 'rectangle.stack.fill' : 'rectangle.stack'} size={18} color={compact ? c.onAccent : c.sub} />
-              </HeaderButton>
-              <HeaderButton
-                onPress={() => setShowMenu(true)}
-                accessibilityLabel={tr.filtersAndSort}
-                style={{ backgroundColor: dateFilter ? c.accent : c.card }}>
-                <IconSymbol name="ellipsis" size={18} color={dateFilter ? c.onAccent : c.sub} />
-              </HeaderButton>
-            </>
-          }>
+          titleMenu={{ items: titleMenuItems, active: !!dateFilter, accessibilityLabel: tr.filtersAndSort }}>
           {/* Один ряд навігації: сегменти вкладок (+ «Ще») і, на планшеті,
               фільтр періоду поруч. Раніше тут було три ряди «табів». */}
           <View style={isWide ? s.navRowWide : undefined}>
@@ -1897,108 +1922,6 @@ export default function FinanceScreen() {
 
       {/* Undo-тост */}
       {undoElement}
-
-      {/* ─── Context Menu Modal ─── */}
-      <Modal visible={showMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowMenu(false)}>
-        <Pressable accessible={false}
-          style={{ flex: 1 }}
-          onPress={() => setShowMenu(false)}>
-          <OverlayScrim />
-            {/* NAT-03: Pressable з onPress на iOS сам стає елементом
-                доступності й склеює ВСЕ піддерево в один вузол — VoiceOver
-                читає аркуш однією фразою й не має в ньому жодного контролу.
-                Тут Pressable існує лише заради stopPropagation. Модальну
-                ізоляцію (accessibilityViewIsModal) при цьому лишаємо. */}
-          <Pressable
-            onPress={e => e.stopPropagation()}
-            accessible={false}
-            accessibilityViewIsModal
-            importantForAccessibility="yes"
-            style={{ position: 'absolute', top: insets.top + 62, right: 16, width: 220 }}>
-            <View style={[s.menuBox, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
-              <OverlayMaterial isDark={isDark} />
-
-              {/* Статистика */}
-              <TouchableOpacity
-                onPress={() => { setShowMenu(false); router.push('/finance-stats'); }}
-                style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: c.info + '22' }]}>
-                  <IconSymbol name="chart.bar.fill" size={16} color={c.info} />
-                </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>{tr.statistics}</Text>
-                <IconSymbol name="chevron.right" size={14} color={c.sub} />
-              </TouchableOpacity>
-
-              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-              {/* Категорії */}
-              <TouchableOpacity
-                onPress={() => openAfterModalExit(() => setShowMenu(false), () => setShowCats(true))}
-                style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: t.accent.amber + '26' }]}>
-                  <IconSymbol name="tag.fill" size={16} color={t.accent.amber} />
-                </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>{tr.categories}</Text>
-                <IconSymbol name="chevron.right" size={14} color={c.sub} />
-              </TouchableOpacity>
-
-              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-              {/* Бюджет і Підписки тут більше не дублюються: це вкладки
-                  розділу (меню «Ще»), і вимкнений підмодуль ховає їх там. */}
-
-              {/* Рахунки. Замінили «розподіл балансу»: початковий залишок
-                  тепер живе в самому рахунку, а не окремою поправкою. */}
-              <TouchableOpacity
-                onPress={() => openAfterModalExit(
-                  () => setShowMenu(false),
-                  () => { setAccForm(null); setShowAccounts(true); },
-                )}
-                style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: t.accent.lavender + '33' }]}>
-                  <IconSymbol name="banknote" size={16} color={dsGlass(isDark).accent.lavender.ink} />
-                </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>{tr.accounts}</Text>
-                <IconSymbol name="chevron.right" size={14} color={c.sub} />
-              </TouchableOpacity>
-
-              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-              {/* Банки */}
-              <TouchableOpacity
-                onPress={() => { setShowMenu(false); router.push('/banks'); }}
-                style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: c.green + '22' }]}>
-                  <IconSymbol name="building.columns.fill" size={16} color={c.green} />
-                </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>{tr.piggyBanks}</Text>
-                <IconSymbol name="chevron.right" size={14} color={c.sub} />
-              </TouchableOpacity>
-
-              <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-              {/* Календар */}
-              <TouchableOpacity
-                onPress={() => openAfterModalExit(() => setShowMenu(false), () => setShowCal(true))}
-                style={s.menuItem}>
-                <View style={[s.menuIconBox, { backgroundColor: dateFilter ? c.accent + '25' : c.dim }]}>
-                  <IconSymbol name="calendar" size={16} color={dateFilter ? c.onAccent : c.sub} />
-                </View>
-                <Text style={[s.menuLabel, { color: c.text }]}>Календар</Text>
-                {dateFilter
-                  ? <View style={[s.menuPill, { backgroundColor: c.dim }]}>
-                      <Text style={[s.menuPillText, { color: c.text }]}>
-                        {dateFilter.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-                      </Text>
-                    </View>
-                  : <IconSymbol name="chevron.right" size={14} color={c.sub} />
-                }
-              </TouchableOpacity>
-
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       {/* ─── Calendar Modal ─── */}
       <Modal visible={showCal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowCal(false)}>
@@ -2863,6 +2786,8 @@ const s = StyleSheet.create({
   feedHead:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 },
   feedTitle:   { fontSize: 16, fontFamily: fontFamily.semibold, flexShrink: 1 },
   summaryRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' },
+  // «Перенесено з минулого» під KPI залишку — як дельта KpiCounter, але без стелі ширини.
+  kpiCaption:  { marginTop: 2, fontSize: 12, lineHeight: 16, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
   summaryCell: { flexGrow: 1, flexBasis: 260, minWidth: 0 },
   // Планшет: вкладки ліворуч, період і «Фільтри (N)» праворуч — один ряд.
   // wrap лишається лише страховкою для найвужчого medium-вікна.
@@ -2894,16 +2819,6 @@ const s = StyleSheet.create({
   dayCell:     { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   daydot:      { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
   clearBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 14, paddingVertical: 12, minHeight: 44, borderRadius: 999 },
-  // Context menu
-  menuBox:     { borderRadius: Atlas.radius.xlarge, overflow: 'hidden', shadowColor: '#111113', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 8 },
-  menuItem:    { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
-  menuIconBox: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  menuLabel:   { flex: 1, fontSize: 14, fontFamily: fontFamily.semibold },
-  menuDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 16 },
-  menuToggle:  { width: 34, height: 20, borderRadius: 10, borderWidth: 1, padding: 2, justifyContent: 'center' },
-  menuToggleDot:{ width: 14, height: 14, borderRadius: 7 },
-  menuPill:    { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
-  menuPillText:{ fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   // Compact rows
   txCompact:   { borderRadius: Atlas.radius.large, paddingRight: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
   txAccentBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginRight: 0 },

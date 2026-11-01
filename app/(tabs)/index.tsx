@@ -134,7 +134,6 @@ import { useZoneState } from '@/hooks/use-zone-state';
 import { BulkActionBar, KanbanPager, SwipeRow, ZoneLayout, zoneWidths, type KanbanColumn, type SwipeAction } from '@/components/layout-zones';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
-import { useTopInset } from '@/hooks/use-top-inset';
 import { useToday } from '@/hooks/use-today';
 import { draftEstimatedMinutes, draftRecurrence, editedDraftFields, taskToDraft, useTaskEditor, type TaskDraft } from '@/hooks/use-task-editor';
 import { useAllProjectMembers, useProjectMembers } from '@/hooks/use-project-members';
@@ -144,6 +143,7 @@ import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
 import { AppHeader } from '@/components/shared/AppHeader';
+import type { TitleMenuConfig } from '@/components/shared/TitleMenu';
 import type { PickerCreateOption } from '@/components/shared/PickerField';
 import { TaskHistoryTab, type HistoryEventType } from '@/components/tasks/TaskHistoryTab';
 import { TaskTimerButton } from '@/components/tasks/TaskTimerButton';
@@ -157,7 +157,7 @@ import { monthGrid } from '@/utils/dateUtils';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
-import { fontFamily, radius, shadow } from '@/constants/theme';
+import { fontFamily, radius } from '@/constants/theme';
 import { BentoArrowButton, BentoCard, KpiCounter, MeshBackground, SectionTabs, SegmentedProgress } from '@/components/ds';
 import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
 
@@ -247,9 +247,6 @@ export default function TasksScreen() {
   const { t, isDark } = useDSTheme();
   useScreenView('tasks');
   const router = useRouter();
-  // Меню опцій живе в окремому Modal і мусить лягти рівно під кнопкою хедера,
-  // тож бере той самий інсет, що й сам хедер.
-  const topInset = useTopInset();
   // «Сьогодні» мусить пережити північ у відкритому застосунку: від нього
   // тепер залежить не лише підпис групи, а й те, чи завдання взагалі
   // потрапить у статусні групи.
@@ -395,7 +392,6 @@ export default function TasksScreen() {
   // Мультивибір P0…P5; порожній = без фільтра.
   const [filterPriorities, setFilterPriorities] = useState<PriorityLevel[]>([]);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
-  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   const [showAdd, setShowAdd] = useState(false);
   /**
@@ -2700,6 +2696,18 @@ export default function TasksScreen() {
     <AddTaskFab label={tr.addTask} onPress={openAddTask} color={c.accent} bottom={tabBarInset + 20} />
   ) : null;
 
+  // Меню розділу (бургер ☰ у рядку заголовка) — пункти колишнього «⋯».
+  const titleMenu: TitleMenuConfig = {
+    active: hasActiveFilters,
+    items: [
+      { key: 'calendar', label: tr.calendar, icon: 'calendar.circle.fill', badge: meetings.length || undefined, onPress: () => router.push('/calendar' as never) },
+      { key: 'archive', label: tr.archive, icon: 'archivebox.fill', onPress: () => router.push('/archive') },
+      { key: 'filters', label: tr.filtersAndSort, icon: 'line.3.horizontal.decrease', onPress: () => setShowFilterSheet(true) },
+      { key: 'projects', label: tr.projects, icon: 'folder.fill', onPress: () => router.push('/projects') },
+      { key: 'notes', label: tr.notes, icon: 'note.text', onPress: () => router.push('/notes') },
+    ],
+  };
+
   const stickyFilters = (
     <View style={[s.stickyFilters, { borderBottomColor: c.border }]}>{filterBar}</View>
   );
@@ -2717,22 +2725,11 @@ export default function TasksScreen() {
           // Планшет: «Список / Колонки» — у смузі інструментів шапки;
           // телефон — унизу шухляди ☰ (SidebarDrawer).
           viewSwitch={isWide ? { value: zoneState.view, onChange: zoneState.setView } : undefined}
-          actions={
-            <>
-              {/* Шапка тримає ОДНУ кнопку дій «⋯» (рішення власника, п. 5):
-                  Календар, Архів, Фільтри й сортування, Проєкти, Нотатки —
-                  у меню. Створення — плаваюча «+» (Layout System v2.4). */}
-              {/* Кнопки фільтрів у хедері немає навмисно: вона переїхала в рядок
-                  із перемикачем «Сьогодні / Усі». Все, що звужує НАБІР
-                  завдань, стоїть в одному рядку — і перемикач, і фільтри. */}
-              <HeaderButton
-                onPress={() => setShowOptionsMenu(v => !v)}
-                accessibilityLabel={tr.a11yOptions}
-                style={{ backgroundColor: hasActiveFilters ? c.primary : c.card }}>
-                <IconSymbol name="ellipsis" size={18} color={hasActiveFilters ? c.onPrimary : c.sub} />
-              </HeaderButton>
-            </>
-          }>
+          // 11.2026: дії розділу — бургер ☰ навпроти заголовка «Завдання»
+          // (TitleMenu шапки). Ті самі пункти, що були в «⋯»: Календар,
+          // Архів, Фільтри й сортування, Проєкти, Нотатки. Кнопка суцільна
+          // action.primary, коли є активні фільтри.
+          titleMenu={titleMenu}>
           <MonthPicker
             month={activeMonth}
             onChange={m => { setActiveMonth(m); setDateFilter(null); }}
@@ -2851,106 +2848,6 @@ export default function TasksScreen() {
       />
 
       {projectTaskSheet}
-
-      {/* ─── Options Dropdown ─── */}
-      <Modal visible={showOptionsMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowOptionsMenu(false)}>
-        <Pressable accessible={false}
-          style={{ flex: 1, backgroundColor: t.surface.overlay }}
-          onPress={() => setShowOptionsMenu(false)}>
-          <View
-            style={[{
-              position: 'absolute',
-              top: topInset + 62,
-              right: 16,
-              borderRadius: Atlas.radius.xlarge,
-              overflow: 'hidden',
-              minWidth: 238,
-              // DS v2: поповер — surface.elevated + shadow.popover, без рамки.
-              ...shadow[isDark ? 'dark' : 'light'].popover,
-            }, { backgroundColor: glassOf(t).sheet, ...glassRim(t, 'strong') }]}>
-              <OverlayMaterial isDark={isDark} />
-            {/* Meetings */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/calendar' as never); }}
-              accessibilityRole="menuitem"
-              accessibilityLabel={tr.calendar}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: c.accent + '20' }]}>
-                <IconSymbol name="calendar.circle.fill" size={16} color={c.accent} />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.calendar}</Text>
-              {meetings.length > 0 && (
-                <View style={{ backgroundColor: c.dim, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, marginRight: 4 }}>
-                  <Text style={{ color: c.text, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>{meetings.length}</Text>
-                </View>
-              )}
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-            {/* Archive */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/archive'); }}
-              accessibilityRole="menuitem"
-              accessibilityLabel={tr.archive}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: t.status.success + '20' }]}>
-                <IconSymbol name="archivebox.fill" size={16} color={t.status.success} />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.archive}</Text>
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-            {/* Filters */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); setShowFilterSheet(true); }}
-              accessibilityRole="menuitem"
-              accessibilityLabel={tr.filtersAndSort}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: hasActiveFilters ? t.accent.amber + '26' : c.dim }]}>
-                <IconSymbol name="line.3.horizontal.decrease" size={16} color={hasActiveFilters ? t.accent.amber : c.sub} />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.filtersAndSort}</Text>
-              {hasActiveFilters
-                ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.accent.amber }} />
-                : <IconSymbol name="chevron.right" size={12} color={c.sub} />}
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-            {/* Projects */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/projects'); }}
-              accessibilityRole="menuitem"
-              accessibilityLabel={tr.projects}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: t.status.info + '20' }]}>
-                <IconSymbol name="folder.fill" size={16} color={t.status.info} />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.projects}</Text>
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </TouchableOpacity>
-
-            <View style={[s.menuDivider, { backgroundColor: c.border }]} />
-
-            {/* Notes */}
-            <TouchableOpacity
-              onPress={() => { setShowOptionsMenu(false); router.push('/notes'); }}
-              accessibilityRole="menuitem"
-              accessibilityLabel={tr.notes}
-              style={s.menuItem}>
-              <View style={[s.menuIconBox, { backgroundColor: t.accent.amber + '26' }]}>
-                <IconSymbol name="note.text" size={16} color={t.accent.amber} />
-              </View>
-              <Text style={[s.menuItemLabel, { color: c.text }]}>{tr.notes}</Text>
-              <IconSymbol name="chevron.right" size={12} color={c.sub} />
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
 
       {/* ─── Filter & Sort Bottom Sheet ─── */}
       <Modal visible={showFilterSheet} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowFilterSheet(false)}>
@@ -3399,10 +3296,6 @@ const s = StyleSheet.create({
   dropdownBtn:    { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.medium, paddingHorizontal: 14, paddingVertical: 12 },
   dropdownList:   { borderRadius: Atlas.radius.medium, marginTop: 6, overflow: 'hidden' },
   dropdownItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
-  menuItem:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, minHeight: 48 },
-  menuIconBox:    { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  menuItemLabel:  { fontSize: 14, fontFamily: fontFamily.semibold, flex: 1 },
   menuPill:       { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   menuPillText:   { fontSize: 11, fontFamily: fontFamily.semibold },
-  menuDivider:    { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
 });

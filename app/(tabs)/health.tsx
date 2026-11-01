@@ -15,7 +15,7 @@ import { fontFamily } from '@/constants/theme';
  * нагадування, закладки й нотифікації.
  *
  * Профіль і джерела даних (Apple Health) — НЕ вкладка, а налаштування розділу
- * за шестернею: туди ходять раз на місяць, а вкладка коштує стільки ж місця,
+ * у бургер-меню (☰) навпроти заголовка: туди ходять раз на місяць, а вкладка коштує стільки ж місця,
  * скільки щоденна.
  *
  * Тренування лишились ОКРЕМИМ розділом: це майбутній модуль із групами й
@@ -42,9 +42,10 @@ import { OverviewTab } from '@/components/health/tabs/OverviewTab';
 import { PreventionTab } from '@/components/health/tabs/PreventionTab';
 import { SleepTab } from '@/components/health/tabs/SleepTab';
 import { MonthPicker } from '@/components/shared/MonthPicker';
+import { afterModalExit } from '@/components/finance/sheetHandoff';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
-import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { AppHeader } from '@/components/shared/AppHeader';
+import type { TitleMenuItem } from '@/components/shared/TitleMenu';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { sheetSurfaceStyle } from '@/hooks/use-content-width';
@@ -134,29 +135,40 @@ export default function HealthHubScreen() {
     </>
   ) : undefined;
 
+  /**
+   * Бургер (☰) навпроти заголовка (11.2026, рішення власника): «Історія» й
+   * налаштування розділу — пункти меню, а не окремі кнопки в рядку
+   * інструментів. Журнал — теж модалка, тож відкриваємо його лише після того,
+   * як поповер меню зник (NAT-02, див. sheetHandoff).
+   */
+  const titleMenuItems = useMemo<TitleMenuItem[]>(() => [
+    {
+      key: 'history',
+      label: tr.history,
+      icon: 'clock.arrow.circlepath',
+      testID: 'health-menu-history',
+      onPress: () => afterModalExit(() => setHistoryOpen(true)),
+    },
+    {
+      key: 'profile',
+      label: tr.settings,
+      icon: 'gearshape.fill',
+      testID: 'health-menu-settings',
+      onPress: () => router.push('/health-profile'),
+    },
+  ], [tr.history, tr.settings, router]);
+
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
       <View style={{ flex: 1 }}>
 
-        {/* Omni: глобальна шапка (☰ · дзвіник · акаунт) + KPI дня; під нею —
-            pill-вкладки розділу. */}
+        {/* Omni: глобальна шапка (☰ · дзвіник · акаунт) + KPI дня; навпроти
+            заголовка — бургер дій розділу; під ним — pill-вкладки розділу. */}
         <AppHeader
           title={tr.health}
           kpis={kpis}
-          actions={
-            <>
-              <HeaderButton onPress={() => setHistoryOpen(true)} accessibilityLabel={tr.history}
-                style={{ backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }}>
-                <IconSymbol name="clock.arrow.circlepath" size={18} color={c.text} />
-              </HeaderButton>
-              {/* Налаштування розділу: профіль здоровʼя і джерела даних. */}
-              <HeaderButton onPress={() => router.push('/health-profile')} accessibilityLabel={tr.settings}
-                style={{ backgroundColor: glassOf(t).surface, ...glassRim(t, 'card') }}>
-                <IconSymbol name="gearshape.fill" size={18} color={c.text} />
-              </HeaderButton>
-            </>
-          }>
+          titleMenu={{ items: titleMenuItems }}>
           <HealthTabBar value={tab} onChange={setTab} tr={tr} c={c} preventionBadge={medsDue} layout={tabBarLayout} />
         </AppHeader>
 

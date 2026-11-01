@@ -126,6 +126,8 @@ const MAPPING: Record<string, MaterialIconName> = {
   'arrow.up.down': 'sort',
   'text.alignleft': 'sort-by-alpha',
   'line.3.horizontal.decrease': 'filter-list',
+  // Бургер меню розділу в рядку заголовка (components/shared/TitleMenu).
+  'line.3.horizontal': 'menu',
   'slider.horizontal.3': 'tune',
   // Settings
   // AI / Agent

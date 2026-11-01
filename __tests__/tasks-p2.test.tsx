@@ -201,21 +201,25 @@ describe('шапка картки — додаткові дії', () => {
   });
 });
 
-describe('екран Завдань — одна кнопка «⋯» і одне правило створення', () => {
+describe('екран Завдань — одна кнопка меню (☰ біля заголовка) і одне правило створення', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'app', '(tabs)', 'index.tsx'), 'utf8');
   const header = src.slice(src.indexOf('<ScreenHeader'), src.indexOf('</ScreenHeader>'));
 
-  test('у шапці немає окремої кнопки календаря — лише створення і «⋯»', () => {
+  test('у шапці немає окремих кнопок — лише бургер меню розділу (titleMenu)', () => {
     expect(header).not.toContain("router.push('/calendar'");
-    expect((header.match(/<HeaderButton/g) ?? []).length).toBe(1);
-    expect(header).toContain('name="ellipsis"');
+    expect(header).not.toContain('<HeaderButton');
+    expect(header).not.toContain('actions={');
+    expect(header).toContain('titleMenu={titleMenu}');
   });
 
-  test('календар, архів, фільтри — пункти меню «⋯»', () => {
-    const menu = src.slice(src.indexOf('Options Dropdown'), src.indexOf('Filter & Sort Bottom Sheet'));
+  test('календар, архів, фільтри, проєкти, нотатки — пункти меню розділу', () => {
+    const menu = src.slice(src.indexOf('const titleMenu: TitleMenuConfig'), src.indexOf('const stickyFilters'));
     expect(menu).toContain("router.push('/calendar'");
     expect(menu).toContain("router.push('/archive')");
     expect(menu).toContain('tr.filtersAndSort');
+    expect(menu).toContain("router.push('/projects')");
+    expect(menu).toContain("router.push('/notes')");
+    expect(menu).toContain('active: hasActiveFilters');
   });
 
   test('у групи «Зустрічі» немає власного «+» і інлайн-поля «Додати зустріч»', () => {

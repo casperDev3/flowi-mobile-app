@@ -387,7 +387,8 @@ import {
 } from '@/components/ds';
 
 <AppHeader title eyebrow? subtitle? kpis?={<>{<KpiCounter/>…}</>} actions? showMenu?=true
-           onSearch? searchLabel? back? titleStyle? paddingBottom?>{/* SectionTabs… */}</AppHeader>
+           titleMenu?={{ items?|onPress?, active?, accessibilityLabel?, testID? }}   // 11.2026 — див. «Шапка, KPI й острівець»
+           onSearch? searchLabel? back? titleStyle? paddingBottom? viewSwitch?>{/* SectionTabs… */}</AppHeader>
 // Побудований на ScreenHeader (useTopInset, стеля Dynamic Type) — нові слоти ScreenHeader:
 <ScreenHeader … leading?={<HeaderButton/>} toolbar?={<View/>} />
 
@@ -396,7 +397,7 @@ import {
 <AccountSheet visible onClose />
 
 <PageHeader title? subtitle? kpis? action? bleed? />   // телефон: KPI-стрічка; планшет: ряд
-<KpiCounter value label delta? deltaTone?="up|down|neutral" valueColor? onPress? accessibilityLabel? />
+<KpiCounter value label delta? deltaTone?="up|down|neutral" valueColor? onPress? accessibilityLabel? />   // підпис ПІД числом (11.2026)
 <SectionTabs tabs={[{key,label,icon?,count?,testID?}]} value onChange accessibilityLabel? bleed? />
 
 <BentoGrid columns?={{compact:1,medium:2,expanded:3}} gap?>
@@ -469,7 +470,7 @@ const bc = useBentoColors();                        // text / textSecondary / ne
 
 | Зона | Що | Телефон | iPad (не compact) |
 |---|---|---|---|
-| Header | лого/заголовок, пошук, «Список / Колонки», акаунт | `AppHeader`: `[☰] … [пошук] [дії] [🔔] [аватар]` + H1 | тонка смуга `[пошук] [Список/Колонки] … [акаунт]` (`viewSwitch`) |
+| Header | лого/заголовок, пошук, «Список / Колонки», акаунт | `AppHeader`: `[☰] … [пошук] [🔔] [аватар]` + рядок `H1 ……… [☰ меню розділу]` (11.2026) | тонка смуга `[пошук] [Список/Колонки] … [акаунт]` (`viewSwitch`) |
 | Navigation | меню модулів | 4 вкладки + шухляда ☰ (`SidebarDrawer`) | рейка/сайдбар (`NavSidebar`, app/_layout.tsx) |
 | Static | контекст: KPI, зустрічі дня | вкладка «Сьогодні» | колонка ліворуч від main лише від вікна **1280pt** і коли main за типових ширин лишається ≥ `zone.mainMin`; інакше — «Сьогодні». Ширину тягнуть межею (11.2026) |
 | Main | список / канбан | на весь екран; «+» праворуч над баром | `flex:1`; «+» праворуч унизу; три крапки панелей під нею. Правило «головна завжди найширша» **знято** (11.2026) |
@@ -769,3 +770,88 @@ const v25 = useFiltersV25();
 6. Сторінка зберігає власний стан фільтрів; примітиви — лише подання.
 7. Телефон (compact) — без змін; міграцію робити гілкою `useFiltersV25() ? <FilterBar …/> : <як було/>`.
 8. `ViewModeSwitch` (Список/Колонки в шапці) уже є сегментованою доріжкою 36pt з radiogroup — не змінювався; нові перемикачі вигляду на сторінках — `Segmented`.
+
+
+## Шапка, KPI й острівець (11.2026)
+
+Скарги власника 01.11.2026 (телефон; планшет — там, де ті самі компоненти).
+
+### Меню розділу — бургер у рядку заголовка
+
+На телефоні кнопки розділу (колишні «⋯», «Історія», «Налаштування розділу»)
+більше НЕ стоять у рядку інструментів поруч із 🔔 і аватаром. Розділ дає одну
+кнопку **☰ (`line.3.horizontal`, 44×44, pill)** праворуч у рядку великого
+заголовка — «Фінанси ……… ☰». **Перемикачі режиму/вигляду** (стиснутий
+список, «Список/Колонки» тощо) у шапці телефона не ставимо: це пункти меню
+розділу (або, для «Список/Колонки», — низ шухляди ☰ сайдбара, як і було).
+
+Не плутати з ☰ шухляди сайдбара: та ліворуч у рядку інструментів (іконка
+`sidebar.left`), лишається без змін.
+
+```tsx
+import type { TitleMenuConfig, TitleMenuItem } from '@/components/shared/TitleMenu';
+
+// 1) Меню малює шапка — поповер на OverlaySurface під кнопкою + OverlayScrim.
+<AppHeader
+  title={tr.health}
+  kpis={kpis}
+  titleMenu={{
+    items: [
+      { key: 'history', label: tr.history, icon: 'clock.arrow.circlepath', onPress: () => setHistoryOpen(true) },
+      { key: 'profile', label: tr.settings, icon: 'gearshape.fill', onPress: () => router.push('/health-profile') },
+      // { label, icon?, onPress, destructive?, checked?, badge?, separatorBefore?, disabled?, testID? }
+    ],
+  }}
+/>
+
+// 2) Кнопка відкриває НАЯВНЕ меню екрана (TasksHeaderMenu, меню фільтрів Фінансів).
+<AppHeader title={tr.tasks} titleMenu={{ onPress: () => setShowOptionsMenu(true), active: hasActiveFilters }} />
+```
+
+| Поле `TitleMenuConfig` | Що |
+|---|---|
+| `items?: TitleMenuItem[]` | Пункти: `label`, `icon?` (16, `text.secondary`), `onPress` (меню спершу закривається), `destructive?` (текст `g.accent.coral.ink` ≥ 4.5:1), `checked?` (роль `checkbox` + ✓), `badge?`, `separatorBefore?`, `disabled?`, `key?`, `testID?` |
+| `onPress?` | Замість `items` — відкрити власне меню екрана |
+| `active?` | Суцільна `action.primary` (є активні фільтри) |
+| `accessibilityLabel?` | За замовч. «Опції: <заголовок>» |
+| `testID?` | За замовч. `title-menu-button`; поповер — `title-menu` |
+
+Поповер: `OverlaySurface` (радіус `cardCompact`, min 240 / max 320), правим
+краєм під кнопкою (`measureInWindow`), `maxHeight` до нижнього safe-area з
+прокруткою; ролі `menu`/`menuitem`, `accessibilityViewIsModal`; тап по
+затемненню / «Назад» закривають. Пункт 48pt. На планшеті бургер — праворуч у
+рядку H1 після KPI (`titleRight`, gap 16). `actions` лишається для
+інструментів рівня шапки (SyncBadge тощо) — не для дій розділу.
+
+### KPI: підпис під числом
+
+`KpiCounter` — колонка: **число** (Light 40 телефон / 48 планшет,
+`tabular-nums`) → **підпис** (12/Medium, `text.secondary`, до 2 рядків,
+max 132pt, +4 зверху) → **дельта** (коли є, колір тону, +2). Підпис не
+залежить від ширини числа: «1» і «16» дають той самий лівий край підпису.
+Стрічка/ряд KPI вирівняна по верху (`alignItems: 'flex-start'`), gap 24
+(у рядку H1 планшета — 28). a11y-підпис не змінився: «16, Задачі на тиждень,
+3 прострочено».
+
+### Нижня панель телефона — острівець
+
+| Токен (`constants/nav.ts`) | Значення |
+|---|---|
+| `TAB_ISLAND_HEIGHT` | 64 |
+| `TAB_ISLAND_SIDE` | 16 (+ бічний safe-area в ландшафті) |
+| `TAB_ISLAND_GAP` | 8 — над нижнім safe-area |
+| `tabIslandBottom(safe)` | `safe + 8` — `bottom` панелі |
+| `tabIslandOuterHeight(safe)` | `64 + safe + 8` — скільки знизу займає острівець |
+| `tabBarInsetFor(isWide, timers, safe)` | `tabIslandOuterHeight(safe)` (+52 панелі таймерів); планшет — 0 |
+
+Pill `radius.pill`, Liquid Glass як раніше (`GlassTabBarBackground island` —
+скло обрізане по радіусу, обідок по всьому контуру; «Зменшити прозорість» —
+суцільне `TAB_BAR_BG` + hairline), нейтральна тінь `#111113` (без світіння).
+`paddingBottom: 0` — бібліотека інакше віднімає нижній інсет ізсередини.
+Відступ вмісту й FAB — як і раніше `useTabBarInset()` (тепер із safe-area);
+`ActiveTimersBar bottom={tabIslandOuterHeight(safe)}` стоїть над острівцем;
+`ModuleGate` — так само. Планшет (сайдбар, без нижньої панелі) і панель
+простору проєкту (`TAB_BAR_HEIGHT`, суцільна смуга) — без змін.
+`useSoftSafeAreaInsets()` (`hooks/use-soft-safe-area-insets.ts`) — інсети,
+що не кидають без провайдера (тести).
+

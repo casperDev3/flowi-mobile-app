@@ -658,12 +658,47 @@ export function activeTimersBarVisible(isWide: boolean, timersCount: number): bo
 }
 
 /**
- * Скільки місця знизу з'їдають таб-бар і (коли видно) панель таймерів.
- * Чиста арифметика для useTabBarInset — окремо, щоб перевірити без рендера.
+ * Скільки місця знизу з'їдають таб-бар (острівець + поле + нижній safe-area)
+ * і (коли видно) панель таймерів. Чиста арифметика для useTabBarInset —
+ * окремо, щоб перевірити без рендера.
  */
-export function tabBarInsetFor(isWide: boolean, timersCount: number): number {
+export function tabBarInsetFor(isWide: boolean, timersCount: number, bottomSafe = 0): number {
   if (isWide) return 0;
-  return TAB_BAR_HEIGHT + (activeTimersBarVisible(isWide, timersCount) ? ACTIVE_TIMERS_BAR_HEIGHT : 0);
+  return tabIslandOuterHeight(bottomSafe) + (activeTimersBarVisible(isWide, timersCount) ? ACTIVE_TIMERS_BAR_HEIGHT : 0);
+}
+
+// ─── Острівець табів (телефон, 11.2026) ───────────────────────────────────────
+
+/**
+ * Нижня панель табів телефона — «острівець»: відокремлена pill над нижнім
+ * краєм із полями з боків (рішення власника 01.11.2026, «як було раніше»).
+ * Панель простору проєкту (app/project/[id]/_layout) лишається на
+ * TAB_BAR_HEIGHT — її острівець не стосується.
+ *
+ *   ┌──────────── екран ────────────┐
+ *   │ 16 ╭────── 64pt pill ──────╮ 16│
+ *   │    ╰───────────────────────╯   │
+ *   │      8pt                       │
+ *   │      safe-area bottom          │
+ *   └────────────────────────────────┘
+ */
+export const TAB_ISLAND_HEIGHT = 64;
+/** Поле острівця від бічних країв екрана (+ бічний safe-area в ландшафті). */
+export const TAB_ISLAND_SIDE = 16;
+/** Проміжок між острівцем і нижнім safe-area. */
+export const TAB_ISLAND_GAP = 8;
+
+/** `bottom` острівця від нижнього краю екрана. */
+export function tabIslandBottom(bottomSafe: number): number {
+  return Math.max(0, bottomSafe || 0) + TAB_ISLAND_GAP;
+}
+
+/**
+ * Скільки знизу займає острівець разом із полем під ним: саме стільки
+ * мусить відступити вміст, щоб останній рядок не ховався під панеллю.
+ */
+export function tabIslandOuterHeight(bottomSafe: number): number {
+  return TAB_ISLAND_HEIGHT + tabIslandBottom(bottomSafe);
 }
 
 // ─── Кольори й кегль підписів табів ───────────────────────────────────────────

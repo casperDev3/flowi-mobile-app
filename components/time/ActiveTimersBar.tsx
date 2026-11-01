@@ -51,7 +51,12 @@ import { useGlassStyles } from '@/components/finance/finPalette';
 
 const BAR_BODY_HEIGHT = 44;
 
-export function ActiveTimersBar() {
+/**
+ * `bottom` — де закінчується панель табів під смугою. Типово TAB_BAR_HEIGHT
+ * (суцільна панель простору проєкту); особисті таби телефона — острівець, тож
+ * app/(tabs)/_layout передає tabIslandOuterHeight(safe-area).
+ */
+export function ActiveTimersBar({ bottom = TAB_BAR_HEIGHT }: { bottom?: number } = {}) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const isDark = useColorScheme() === 'dark';
@@ -105,7 +110,7 @@ export function ActiveTimersBar() {
         style={[
           st.wrap,
           {
-            bottom: TAB_BAR_HEIGHT,
+            bottom,
             height: ACTIVE_TIMERS_BAR_HEIGHT,
             left: insets.left + 10,
             right: insets.right + 10,

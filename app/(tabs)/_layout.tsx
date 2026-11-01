@@ -1,23 +1,24 @@
 import {Tabs, usePathname} from 'expo-router';
 import React from 'react';
-import {LinearGradient} from 'expo-linear-gradient';
-import {Platform, StyleSheet, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 
 import {HapticTab} from '@/components/haptic-tab';
 import {ModuleGate} from '@/components/shared/ModuleGate';
 import {NotificationBadge} from '@/components/notifications/NotificationBadge';
 import {ActiveTimersBar} from '@/components/time/ActiveTimersBar';
 import {type IconSymbolName} from '@/components/ui/icon-symbol';
-import {GlassBackdrop} from '@/components/ds/Glass';
-import {GlassTabIcon} from '@/components/shared/GlassTabBar';
+import {GlassTabBarBackground, GlassTabIcon} from '@/components/shared/GlassTabBar';
 import {useDS} from '@/hooks/use-ds';
-import {fontFamily, moduleAccent, type GlassAccent} from '@/constants/theme';
+import {fontFamily, moduleAccent, radius, type GlassAccent} from '@/constants/theme';
 import {useI18n} from '@/store/i18n';
 import {useResponsive} from '@/hooks/use-responsive';
+import {useSoftSafeAreaInsets} from '@/hooks/use-soft-safe-area-insets';
 import {
-    TAB_BAR_BG,
-    TAB_BAR_HEIGHT,
     TAB_BAR_TINT,
+    TAB_ISLAND_HEIGHT,
+    TAB_ISLAND_SIDE,
+    tabIslandBottom,
+    tabIslandOuterHeight,
     TAB_LABEL_FONT_SIZE,
     TAB_LABEL_MAX_FONT_SCALE,
 } from '@/constants/nav';
@@ -91,43 +92,28 @@ function tabIcon(name: IconSymbolName, accent: GlassAccent, badge?: boolean) {
 }
 
 /**
- * Тло панелі табів — Liquid Glass:
- *   iOS 26+  — нативне скло (через GlassSurface-логіку: isNativeLiquidGlass);
- *   iOS      — BlurView ultra-thin + щільна заливка glass.surfaceStrong (під
- *              підписи 11pt: композит ≈ #F3F0F8 / #24222E, text.secondary ≥ 4.5:1);
- *   Android  — майже непрозора заливка (блюру немає, а вміст під панеллю не
- *              має «просвічувати» крізь підписи);
+ * Тло панелі табів — Liquid Glass, форма острівця (GlassTabBarBackground island):
+ *   iOS 26+  — нативне скло;
+ *   iOS      — BlurView + щільна заливка glass.surfaceStrong (під підписи 11pt:
+ *              композит ≈ #F3F0F8 / #24222E, text.secondary ≥ 4.5:1);
+ *   Android  — майже непрозора заливка (вміст не «просвічує» крізь підписи);
  *   «Зменшити прозорість» — суцільне TAB_BAR_BG (як у DS v2).
- * Згори — спекулярний обідок (glass.rim) і внутрішній відблиск.
+ * Обідок по всьому контуру pill, скло обрізане по радіусу.
  */
 function TabBarGlass() {
-    const {g, isDark, reduceTransparency} = useDS();
-    if (reduceTransparency) {
-        return <View style={[StyleSheet.absoluteFill, {backgroundColor: isDark ? TAB_BAR_BG.dark : TAB_BAR_BG.light}]}/>;
-    }
-    return (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <GlassBackdrop intensityBoost={20}/>
-            <View
-                style={[
-                    StyleSheet.absoluteFill,
-                    {backgroundColor: Platform.OS === 'android' ? (isDark ? 'rgba(23,23,26,0.92)' : 'rgba(255,255,255,0.9)') : g.surfaceStrong},
-                ]}
-            />
-            <LinearGradient
-                colors={[g.highlight, 'rgba(255,255,255,0)']}
-                style={{position: 'absolute', top: 0, left: 0, right: 0, height: 18, opacity: isDark ? 0.35 : 0.6}}
-            />
-            <View style={{position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: isDark ? g.rim : g.rimShade}}/>
-        </View>
-    );
+    return <GlassTabBarBackground island/>;
 }
 
 export default function TabLayout() {
-    const {isDark} = useDS();
+    const {isDark, reduceTransparency} = useDS();
     const {tr} = useI18n();
     const {isWide} = useResponsive();
     const pathname = usePathname();
+    // «М'які» інсети: без провайдера (тести шару вкладок) — нулі, не виняток.
+    const insets = useSoftSafeAreaInsets();
+    // Острівець: скільки знизу займає панель разом із полем і safe-area —
+    // заглушці модуля й панелі таймерів, щоб не налазили на неї.
+    const islandOuter = tabIslandOuterHeight(insets.bottom);
 
     /**
      * Вимкнений модуль НЕ прибирає свою вкладку з панелі.
@@ -160,25 +146,43 @@ export default function TabLayout() {
                 tabBarShowLabel: true,
                 // Стилю підпису тут немає навмисно: кожен екран віддає підпис
                 // через tabLabel() — див. коментар до нього.
+                // Телефон (11.2026): острівець — відокремлена pill над нижнім
+                // краєм, поля 16 з боків (+ бічний safe-area в ландшафті),
+                // `safe-area + 8` знизу (constants/nav.ts → TAB_ISLAND_*).
+                // paddingBottom: 0 — @react-navigation інакше віднімає нижній
+                // інсет ізсередини панелі (BottomTabBar.js:251), а острівець
+                // уже стоїть НАД ним. Відступ вмісту — useTabBarInset().
                 tabBarStyle: isWide ? {display: 'none'} : {
                     position: 'absolute',
+                    left: TAB_ISLAND_SIDE + insets.left,
+                    right: TAB_ISLAND_SIDE + insets.right,
+                    bottom: tabIslandBottom(insets.bottom),
+                    height: TAB_ISLAND_HEIGHT,
+                    paddingBottom: 0,
+                    paddingHorizontal: 4,
                     borderTopWidth: 0,
-                    elevation: 0,
+                    borderRadius: radius.pill,
                     backgroundColor: 'transparent',
-                    height: TAB_BAR_HEIGHT,
-                    // paddingTop тут був 10 і створював мертву смугу: висота
-                    // панелі задана числом, тож @react-navigation НЕ додає до
-                    // неї нижній інсет, а віднімає його зсередини
-                    // (BottomTabBar.js:87-90 + :250-252). Виходило
-                    // 88 − 10 − 34 = 44pt кнопки при 88pt видимої панелі —
-                    // верхні 10pt було видно, але не натиснути. Без paddingTop
-                    // кнопка займає всі 54pt над home-indicator.
+                    elevation: 0,
+                    // Нейтральна тінь скла (unslop: без кольорового світіння).
+                    ...(reduceTransparency ? null : {
+                        shadowColor: '#111113',
+                        shadowOpacity: isDark ? 0.4 : 0.12,
+                        shadowRadius: 16,
+                        shadowOffset: {width: 0, height: 6},
+                    }),
                 },
+                // Кнопка таба має власний padding 5 (BottomTabItem tabVerticalUiKit):
+                // paddingVertical тут з'їдав висоту, і підпис обрізало до ~10pt.
+                // Без нього кнопка по вмісту (іконка 30 + підпис), по центру pill.
+                tabBarItemStyle: {height: TAB_ISLAND_HEIGHT, paddingVertical: 0, justifyContent: 'center'},
                 // DS v2.1: Liquid Glass (TabBarGlass вище). Суцільне TAB_BAR_BG
                 // (constants/nav.ts, проти нього рахує контраст тест
                 // audit-tabbar-a11y) — фолбек «Зменшити прозорість».
                 tabBarBackground: () => <TabBarGlass/>,
-                tabBarIconStyle: {marginTop: 2},
+                // Кнопка розтягнута на 64 і притиснута догори (padding 5): +6 зверху
+                // центрує іконку з підписом у pill (~11 / ~12pt поля).
+                tabBarIconStyle: {marginTop: 6},
             }}>
 
             <Tabs.Screen
@@ -236,8 +240,8 @@ export default function TabLayout() {
                 options={{ href: null }}
             />
         </Tabs>
-        <ModuleGate pathname={pathname} scope="tab" bottomInset={isWide ? 0 : TAB_BAR_HEIGHT}/>
-        <ActiveTimersBar/>
+        <ModuleGate pathname={pathname} scope="tab" bottomInset={isWide ? 0 : islandOuter}/>
+        <ActiveTimersBar bottom={islandOuter}/>
         </View>
     );
 }

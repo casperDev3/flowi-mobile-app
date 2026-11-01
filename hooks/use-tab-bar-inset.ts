@@ -11,13 +11,18 @@
  * Коли йде хоч один таймер, над табами стоїть ще й панель активних таймерів
  * (components/time/ActiveTimersBar) — її висота теж додається, інакше FAB і
  * останній рядок сховались би під нею.
+ *
+ * Телефон (11.2026): панель — острівець (constants/nav.ts → TAB_ISLAND_*), що
+ * стоїть на `safe-area + 8` над краєм, тож у відступ іде і нижній safe-area.
  */
 import { tabBarInsetFor } from '@/constants/nav';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useSoftSafeAreaInsets } from '@/hooks/use-soft-safe-area-insets';
 import { useTimerContext } from '@/store/timer-context';
 
 export function useTabBarInset(): number {
   const { isWide } = useResponsive();
   const { activeTimers } = useTimerContext();
-  return tabBarInsetFor(isWide, activeTimers.length);
+  const bottom = useSoftSafeAreaInsets().bottom || 0;
+  return tabBarInsetFor(isWide, activeTimers.length, bottom);
 }

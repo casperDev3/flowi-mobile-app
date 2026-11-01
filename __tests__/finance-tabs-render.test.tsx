@@ -151,13 +151,34 @@ describe('Фінанси: вкладки розділу', () => {
       tr.finTabTransactions, tr.finTabAccounts, tr.finTabReports, tr.finTabMore,
     ]);
     expect(selectedTab(tree).filter(l => SECTION_TABS.has(l))).toEqual([tr.finTabTransactions]);
-    // «Операції»: одразу залишки й стрічка — без стрічки карток рахунків і
-    // без обороту місяця (вони у «Рахунках»).
-    expect(hasText(tree, tr.finBalances)).toBe(true);
+    // «Операції»: залишки — KPI під заголовком (картки «Залишки» більше
+    // немає), стрічка — одразу; без обороту місяця (він у «Рахунках»).
+    expect(hasText(tree, tr.finBalances)).toBe(false);
+    expect(hasText(tree, tr.totalOnAccounts)).toBe(true);
+    expect(tree.root.findAll((n: any) => n.props?.testID === 'fin-balance-UAH').length).toBeGreaterThan(0);
     expect(hasText(tree, 'Зарплата')).toBe(true);
     expect(hasText(tree, tr.finPeriodFlow)).toBe(false);
     // Рідші розділи — у меню «Ще».
     expect(await moreItems(tree)).toEqual([tr.finTabBudget, tr.finTabSubscriptions]);
+  });
+
+  it('бургер навпроти заголовка: дії розділу й «Компактний вигляд» — пункти меню, не кнопки шапки', async () => {
+    seed();
+    const tree = await mount();
+    // Перемикача режиму в шапці більше немає.
+    const modeBtn = tree.root.findAll((n: any) => typeof n.props?.onPress === 'function'
+      && (n.props?.accessibilityLabel === tr.compactView || n.props?.accessibilityLabel === tr.listMode));
+    expect(modeBtn).toHaveLength(0);
+    const burger = tree.root.findAll((n: any) => n.props?.testID === 'title-menu-button' && typeof n.props?.onPress === 'function');
+    expect(burger.length).toBeGreaterThan(0);
+    // Пункти меню — те, що екран віддає шапці (поповер малює TitleMenu,
+    // його розкладку перевіряє title-menu.test.tsx).
+    const header = tree.root.findAll((n: any) => Array.isArray(n.props?.titleMenu?.items));
+    expect(header.length).toBeGreaterThan(0);
+    const items = header[0].props.titleMenu.items as { label: string; checked?: boolean }[];
+    const labels = items.map(i => i.label);
+    expect(items.find(i => i.label === tr.compactView)?.checked).toBe(false);
+    expect(labels).toEqual(expect.arrayContaining([tr.statistics, tr.categories, tr.accounts, tr.piggyBanks, tr.calendar, tr.compactView]));
   });
 
   it('«Операції» не показують підписок, крім оплат на сьогодні', async () => {
@@ -269,7 +290,7 @@ describe('Фінанси: вкладки розділу', () => {
     expect(selectedTab(tree).filter(l => SECTION_TABS.has(l))).toEqual([tr.finTabTransactions]);
   });
 
-  it('планшет-ландшафт: ті самі вкладки + «Ще», фільтри — один ряд FilterBar, залишки над стрічкою', async () => {
+  it('планшет-ландшафт: ті самі вкладки + «Ще», фільтри — один ряд FilterBar, залишки — KPI шапки', async () => {
     seed();
     mockWindow = { width: 1194, height: 834 };
     const tree = await mount();
@@ -283,14 +304,15 @@ describe('Фінанси: вкладки розділу', () => {
     const inlineScope = tree.root.findAll((n: any) => n.props?.accessibilityRole === 'radiogroup'
       && n.props?.accessibilityLabel === tr.budgetScopeLabel);
     expect(inlineScope).toHaveLength(0);
-    expect(hasText(tree, tr.finBalances)).toBe(true);
+    expect(hasText(tree, tr.finBalances)).toBe(false);
+    expect(hasText(tree, tr.totalOnAccounts)).toBe(true);
     // Layout System v2.4: на планшеті (< 1280) статичної зони немає, а панель
     // деталей з'являється лише ПІСЛЯ вибору операції — порожньої колонки
     // «оберіть операцію» поруч зі стрічкою більше немає.
     expect(hasText(tree, tr.txEmptyTitle)).toBe(false);
   });
 
-  it('планшет-портрет: три вкладки + «Ще», залишки над стрічкою', async () => {
+  it('планшет-портрет: три вкладки + «Ще», залишки — KPI шапки', async () => {
     seed();
     mockWindow = { width: 744, height: 1133 };
     const tree = await mount();
@@ -298,6 +320,6 @@ describe('Фінанси: вкладки розділу', () => {
       tr.finTabTransactions, tr.finTabAccounts, tr.finTabReports,
     ]);
     expect(hasMoreSelect(tree)).toBe(true);
-    expect(hasText(tree, tr.finBalances)).toBe(true);
+    expect(hasText(tree, tr.totalOnAccounts)).toBe(true);
   });
 });

@@ -4,8 +4,10 @@
  * Будується НА ScreenHeader (верхній інсет у JS, стеля Dynamic Type для
  * заголовка, «Назад»/крихти) — лише додає Omni-набір кнопок:
  *
- *   Телефон (compact): рядок [☰ меню] ……… [пошук] [дії] [🔔] [аватар], під ним —
- *     великий заголовок на всю ширину (з «Назад», якщо є).
+ *   Телефон (compact): рядок [☰ шухляда] ……… [пошук] [дії] [🔔] [аватар], під
+ *     ним — великий заголовок (з «Назад», якщо є) і, навпроти нього праворуч,
+ *     бургер меню розділу (`titleMenu`, 11.2026). Перемикачів режиму/вигляду
+ *     в шапці телефона немає — вони пункти меню розділу.
  *     ☰ відкриває сайдбар-шухляду (SidebarDrawer) з усіма модулями;
  *     аватар — меню акаунта (AccountSheet).
  *   Планшет (не compact): рядок інструментів над заголовком —
@@ -28,6 +30,7 @@ import { NotificationBadge } from '@/components/notifications/NotificationBadge'
 import { AccountSheet } from '@/components/shared/AccountSheet';
 import { HEADER_BUTTON_HIT_SLOP, HeaderButton, ScreenHeader, type ScreenBack } from '@/components/shared/ScreenHeader';
 import { SidebarDrawer } from '@/components/shared/SidebarDrawer';
+import { TitleMenuButton, type TitleMenuConfig } from '@/components/shared/TitleMenu';
 import { ViewModeSwitch } from '@/components/layout-zones/ViewModeSwitch';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius } from '@/constants/theme';
@@ -44,8 +47,18 @@ export type AppHeaderProps = {
   eyebrow?: React.ReactNode;
   /** Однорядковий підзаголовок під заголовком (Omni: «Welcome back…»). */
   subtitle?: string;
-  /** Додаткові кнопки праворуч (перед дзвіником), напр. SyncBadge. */
+  /**
+   * Додаткові кнопки в рядку інструментів (перед дзвіником), напр. SyncBadge.
+   * Дії РОЗДІЛУ (колишнє «⋯», історія, налаштування розділу) — у `titleMenu`;
+   * перемикачі режиму/вигляду сюди не ставимо (рішення власника 01.11.2026).
+   */
   actions?: React.ReactNode;
+  /**
+   * Бургер (☰, 44×44) праворуч у рядку великого заголовка — меню дій розділу.
+   * `items` — меню малює шапка (поповер на OverlaySurface); `onPress` —
+   * відкрити наявне меню екрана. Див. components/shared/TitleMenu.tsx.
+   */
+  titleMenu?: TitleMenuConfig;
   /** Кнопка ☰ (шухляда сайдбара) на телефоні. За замовч. — так. */
   showMenu?: boolean;
   /** Поле пошуку в рядку інструментів планшета (лише якщо екран має пошук). */
@@ -105,7 +118,7 @@ function TimerPill() {
 
 export function AppHeader({
   title, eyebrow, subtitle, kpis, actions, showMenu = true, onSearch, searchLabel,
-  back, titleStyle, children, paddingBottom, viewSwitch,
+  back, titleStyle, children, paddingBottom, viewSwitch, titleMenu,
 }: AppHeaderProps) {
   const { t, g, reduceTransparency } = useDS();
   const { tr } = useI18n();
@@ -159,6 +172,8 @@ export function AppHeader({
   );
 
   const kpiBlock = kpis && !kpisInRow ? <PageHeader kpis={kpis} bleed={isCompact ? sidePad : 0} /> : null;
+  const titleMenuButton = titleMenu ? <TitleMenuButton menu={titleMenu} title={title} /> : null;
+
   const below = (subtitle || children || kpiBlock) ? (
     <View style={{ gap: 16 }}>
       {subtitle ? <Text numberOfLines={2} style={[st.subtitle, { color: t.text.secondary }]}>{subtitle}</Text> : null}
@@ -205,7 +220,8 @@ export function AppHeader({
           back={back}
           titleStyle={titleStyle}
           paddingBottom={paddingBottom}
-          toolbar={compactToolbar}>
+          toolbar={compactToolbar}
+          actions={titleMenuButton ?? undefined}>
           {below}
         </ScreenHeader>
         {sheets}
@@ -257,7 +273,12 @@ export function AppHeader({
         titleStyle={titleStyle}
         paddingBottom={paddingBottom}
         toolbar={toolbar}
-        actions={kpisInRow && kpis ? <View style={st.kpiRow}>{kpis}</View> : undefined}>
+        actions={(kpisInRow && kpis) || titleMenuButton ? (
+          <View style={st.titleRight}>
+            {kpisInRow && kpis ? <View style={st.kpiRow}>{kpis}</View> : null}
+            {titleMenuButton}
+          </View>
+        ) : undefined}>
         {below}
       </ScreenHeader>
       </View>
@@ -270,7 +291,9 @@ export function AppHeader({
 const KPI_ROW_MIN_WIDTH = 860;
 
 const st = StyleSheet.create({
-  kpiRow: { flexDirection: 'row', alignItems: 'center', gap: 28 },
+  // Лічильники — підпис під числом (KpiCounter), тож вирівнювання по верху.
+  kpiRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 28 },
+  titleRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   bellDot: { position: 'absolute', top: 8, right: 8 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   toolbarRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },

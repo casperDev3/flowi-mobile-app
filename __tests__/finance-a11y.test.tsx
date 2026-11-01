@@ -73,15 +73,19 @@ async function mountFinance() {
   return tree;
 }
 
-function pressableWithText(tree: any, text: string): any {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Text } = require('react-native');
-  const hits = tree.root.findAll((n: any) => {
-    if (typeof n.props?.onPress !== 'function') return false;
-    return n.findAllByType(Text).some((t: any) => t.props.children === text);
-  });
-  if (hits.length === 0) throw new Error(`не знайдено кнопки з написом «${text}»`);
-  return hits[hits.length - 1];
+/**
+ * Пункт бургер-меню навпроти заголовка (titleMenu шапки). Поповер малює
+ * TitleMenu (його розкладку перевіряє title-menu.test.tsx) — тут беремо пункт
+ * з того, що екран віддає шапці, і натискаємо його.
+ */
+async function pressTitleMenuItem(tree: any, label: string) {
+  const header = tree.root.findAll((n: any) => Array.isArray(n.props?.titleMenu?.items));
+  expect(header.length).toBeGreaterThan(0);
+  const item = header[0].props.titleMenu.items.find((i: any) => i.label === label);
+  expect(item).toBeTruthy();
+  await act(async () => { item.onPress(); });
+  // Наступна модалка відкривається після зникнення поповера (NAT-02).
+  await act(async () => { await new Promise(r => setTimeout(r, 400)); });
 }
 
 /** Вузли з onPress, тобто те, що людина натискає. */
@@ -145,9 +149,9 @@ describe('Фінанси: дерево доступності', () => {
 
   it('обгортки аркушів не злипаються в один елемент (NAT-03)', async () => {
     const tree = await mountFinance();
-    // Відкриваємо меню «…»: його вміст теж живе в обгортці зі stopPropagation.
-    const menuBtn = pressables(tree).find((n: any) => n.props.accessibilityLabel === tr.filtersAndSort);
-    await act(async () => { menuBtn.props.onPress(); });
+    // Відкриваємо календар-фільтр із бургер-меню: його аркуш живе в обгортці
+    // зі stopPropagation.
+    await pressTitleMenuItem(tree, tr.calendar);
 
     const wrappers = tree.root.findAll(
       (n: any) => n.props?.accessibilityViewIsModal === true && typeof n.props?.onPress === 'function',
@@ -161,14 +165,8 @@ describe('Фінанси: дерево доступності', () => {
   it('клітинки календаря-фільтра мають дату, роль і стан вибору', async () => {
     const tree = await mountFinance();
 
-    // Меню «…» → «Календар» (через чергу аркушів, див. NAT-02).
-    const menuBtn = pressables(tree).find((n: any) => n.props.accessibilityLabel === tr.filtersAndSort);
-    expect(menuBtn).toBeTruthy();
-    await act(async () => { menuBtn.props.onPress(); });
-
-    const calItem = pressableWithText(tree, tr.calendar);
-    await act(async () => { calItem.props.onPress(); });
-    await act(async () => { await new Promise(r => setTimeout(r, 400)); });
+    // Бургер ☰ → «Календар» (через чергу аркушів, див. NAT-02).
+    await pressTitleMenuItem(tree, tr.calendar);
 
     // Клітинка дня: підпис — повна дата, а не самотнє «15».
     const days = pressables(tree).filter(

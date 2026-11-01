@@ -68,3 +68,32 @@ describe('TaskCompactCard — місце бейджа пріоритету', () 
     expect(tree.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === 'task-card-priority-footer')).toHaveLength(0);
   });
 });
+
+describe('TaskCompactCard — підзавдання й дата праворуч одним рядком (11.2026)', () => {
+  const metaRight = (tree: any) =>
+    tree.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === 'task-card-meta-right');
+  const textOf = (node: any): string =>
+    (node.children ?? []).map((ch: any) => (typeof ch === 'string' ? ch : textOf(ch))).join('');
+
+  it('«1/2» і «12 лис» — один рядок праворуч, без смужки прогресу', () => {
+    const tree = renderCard({
+      deadline: '2026-11-12',
+      subtasks: [{ id: 's1', title: 'a', done: true }, { id: 's2', title: 'b', done: false }],
+    } as Partial<Task>);
+    const meta = metaRight(tree);
+    expect(meta).toHaveLength(1);
+    expect(meta[0].props.numberOfLines).toBe(1);
+    expect(textOf(meta[0]).replace(/\s+/g, ' ')).toBe('1/2 · 12 лис');
+    expect(tree.root.findAll((n: any) => n.type?.name === 'SegmentedProgress')).toHaveLength(0);
+  });
+
+  it('без підзавдань і дедлайну нічого не малює', () => {
+    expect(metaRight(renderCard({}))).toHaveLength(0);
+  });
+
+  it('дата озвучується у підписі картки', () => {
+    const tree = renderCard({ deadline: '2026-11-12' } as Partial<Task>);
+    const row = tree.root.findAll((n: any) => typeof n.type === 'string' && n.props.accessibilityRole === 'button' && typeof n.props.accessibilityLabel === 'string');
+    expect(row.some((n: any) => n.props.accessibilityLabel.includes('12 листопада'))).toBe(true);
+  });
+});

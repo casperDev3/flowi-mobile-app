@@ -5,6 +5,7 @@
  *   iOS 26+ — нативне скло, iOS — BlurView + glass.surfaceStrong,
  *   Android — майже непрозора заливка, «Зменшити прозорість» — суцільне TAB_BAR_BG.
  * Активна вкладка — скляна pill, тонована акцентом, іконка ink (+ світіння на iOS).
+ * `island` — форма острівця особистих табів телефона (app/(tabs)/_layout.tsx).
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
@@ -16,13 +17,30 @@ import { TAB_BAR_BG } from '@/constants/nav';
 import { radius, type GlassAccent } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 
-export function GlassTabBarBackground() {
+export function GlassTabBarBackground({ island = false }: {
+  /**
+   * Острівець (особисті таби телефона, 11.2026): уся панель — pill з повним
+   * обідком; скло обрізане по радіусу. Без острівця — суцільна смуга від краю
+   * до краю з обідком лише згори (простір проєкту).
+   */
+  island?: boolean;
+} = {}) {
   const { g, isDark, reduceTransparency } = useDS();
+  const shape = island ? st.island : null;
   if (reduceTransparency) {
-    return <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? TAB_BAR_BG.dark : TAB_BAR_BG.light }]} />;
+    return (
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          shape,
+          { backgroundColor: isDark ? TAB_BAR_BG.dark : TAB_BAR_BG.light },
+          island ? { borderWidth: StyleSheet.hairlineWidth, borderColor: isDark ? g.rim : g.rimShade } : null,
+        ]}
+      />
+    );
   }
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, shape]} pointerEvents="none">
       <GlassBackdrop intensityBoost={20} />
       <View
         style={[
@@ -34,7 +52,18 @@ export function GlassTabBarBackground() {
         colors={[g.highlight, 'rgba(255,255,255,0)']}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, opacity: isDark ? 0.35 : 0.6 }}
       />
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: isDark ? g.rim : g.rimShade }} />
+      {island ? (
+        // Спекулярний обідок по всьому контуру: світліший згори, тінь знизу.
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            st.island,
+            { borderWidth: 1, borderColor: g.rim, borderTopColor: g.rim, borderBottomColor: g.rimShade },
+          ]}
+        />
+      ) : (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: isDark ? g.rim : g.rimShade }} />
+      )}
     </View>
   );
 }
@@ -69,5 +98,6 @@ export function GlassTabIcon({ name, color, focused, accent, badge }: {
 }
 
 const st = StyleSheet.create({
+  island: { borderRadius: radius.pill, overflow: 'hidden' },
   iconPill: { width: 52, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });

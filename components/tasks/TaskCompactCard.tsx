@@ -22,11 +22,24 @@ import { useI18n } from '@/store/i18n';
 import { findSprint, sprintBadgeLabel, type Sprint } from '@/utils/sprintUtils';
 import type { TaskStatusColumn } from '@/utils/taskStatuses';
 import { isOverdue, normalizePriority, type Task } from '@/utils/taskUtils';
-import { SegmentedProgress } from '@/components/ds/SegmentedProgress';
 import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 
 const AnimatedText = Animated.createAnimatedComponent(Text);
+
+/**
+ * День і місяць дедлайну для правого мета-рядка картки. 'YYYY-MM-DD'
+ * розбирається вручну: new Date() зробив би з нього північ UTC і в західних
+ * поясах показав би попередній день (як formatDeadlineDayMonth).
+ */
+function deadlineDayMonth(value: string | null | undefined): { day: number; month: number } | null {
+  if (!value) return null;
+  const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (plain) return { day: Number(plain[3]), month: Number(plain[2]) - 1 };
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return { day: d.getDate(), month: d.getMonth() };
+}
 
 export interface TaskCompactCardProject {
   id: string;
@@ -109,6 +122,10 @@ function TaskCompactCardInner<T extends Task>({
   const isDone = task.status === 'done';
   const doneSubtasks = task.subtasks.filter(sub => sub.done).length;
   const allSubtasksDone = task.subtasks.length > 0 && doneSubtasks === task.subtasks.length;
+  const hasSubtasks = task.subtasks.length > 0;
+  const deadlineParts = deadlineDayMonth(task.deadline);
+  const deadlineShort = deadlineParts ? `${deadlineParts.day} ${(tr.monthsShort[deadlineParts.month] ?? '').toLowerCase()}` : '';
+  const deadlineSpoken = deadlineParts ? `${tr.deadline}: ${deadlineParts.day} ${tr.monthsGenitive[deadlineParts.month] ?? ''}` : null;
 
   /* Animate text opacity when done state changes */
   const titleOpacity = useSharedValue(isDone ? 0.45 : 1);
@@ -124,13 +141,13 @@ function TaskCompactCardInner<T extends Task>({
 
   // Опис рядка для VoiceOver: інакше озвучувалась лише назва, а статус,
   // дедлайн, пріоритет і проєкт передавались виключно кольором.
-  // Дата тут не озвучується, бо її не видно: опис має відповідати тому, що
-  // на екрані. Прострочення лишається — це стан, а не дата, і саме воно
-  // потребує уваги.
+  // Дата озвучується, бо тепер її видно праворуч у мета-рядку («12 лис»):
+  // опис має відповідати тому, що на екрані. Прострочення — окремо, це стан.
   const a11ySummary = [
     task.title,
     statusColumn.name,
-    task.subtasks.length > 0 ? `${subtasksLabel}: ${doneSubtasks}/${task.subtasks.length}` : null,
+    hasSubtasks ? `${subtasksLabel}: ${doneSubtasks}/${task.subtasks.length}` : null,
+    deadlineSpoken,
     overdue ? overdueLabel : null,
     priorityLabel,
     badgeLabel,
@@ -193,8 +210,8 @@ function TaskCompactCardInner<T extends Task>({
 
         {/* Два рядки: назва зверху на всю ширину, статус і проєкт під нею.
             В один рядок назва змагалася за місце з рештою і обрізалась першою,
-            хоча вона тут найважливіша. Дату свідомо не показуємо — компактний
-            вигляд для швидкого перегляду списку, дедлайн видно в повному. */}
+            хоча вона тут найважливіша. Дата дедлайну (день + місяць) — коротко
+            праворуч у мета-рядку, поруч із лічильником підзавдань. */}
         <View
           style={{ flex: 1, marginRight: 10, gap: 4 }}
           accessible
@@ -210,8 +227,8 @@ function TaskCompactCardInner<T extends Task>({
             {task.title}
           </AnimatedText>
 
-          {/* Нижній мета-рядок: зліва статус/проєкт/виконавець/підзавдання,
-              справа (лише 'footer') — бейдж пріоритету. alignItems flex-end:
+          {/* Нижній мета-рядок: зліва статус/проєкт/виконавець, справа —
+              «1/2 · 12 лис» і (лише 'footer') бейдж пріоритету. alignItems flex-end:
               коли ліві чипи переносяться в кілька рядків, бейдж лишається в
               правому НИЖНЬОМУ куті картки. */}
           <View
@@ -250,24 +267,26 @@ function TaskCompactCardInner<T extends Task>({
                 </View>
               )}
 
-              {/* Виконані підзавдання. Показуємо лише коли вони є: «0/0» на
-                  завданні без підзавдань — це шум, а не інформація. */}
-              {task.subtasks.length > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <IconSymbol
-                    name={allSubtasksDone ? 'checkmark.circle.fill' : 'list.bullet'}
-                    size={10}
-                    color={allSubtasksDone ? t.status.success : c.sub}
-                  />
-                  <Text style={{
-                    color: allSubtasksDone ? t.status.success : c.sub,
-                    fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'],
-                  }}>
+            </View>
+            {/* Праворуч одним рядком — підзавдання простими цифрами «1/2» і
+                дата дедлайну з місяцем («12 лис»), без іконок і смужок
+                (11.2026, рішення власника). Нічого з цього нема — нічого не
+                малюємо: «0/0» чи порожня дата — шум. */}
+            {(hasSubtasks || deadlineShort) ? (
+              <Text
+                testID="task-card-meta-right"
+                numberOfLines={1}
+                style={{ flexShrink: 0, color: c.sub, fontSize: 11, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
+                {hasSubtasks ? (
+                  <Text style={{ color: allSubtasksDone ? t.status.success : c.sub }}>
                     {doneSubtasks}/{task.subtasks.length}
                   </Text>
-                </View>
-              )}
-            </View>
+                ) : null}
+                {/* « · » — два пробіли згортались (web) і «1/2 31 жов» читалось як одне число. */}
+                {hasSubtasks && deadlineShort ? ' · ' : null}
+                {deadlineShort}
+              </Text>
+            ) : null}
             {/* Пріоритет — бейдж P0–P5. Озвучується в a11ySummary картки, тож
                 сам бейдж від VoiceOver схований разом із рядком. */}
             {priorityInFooter && priorityLevel !== null && (
@@ -277,19 +296,6 @@ function TaskCompactCardInner<T extends Task>({
             )}
           </View>
 
-          {/* Omni: сегментний прогрес підзавдань (градієнт підпису). Лише
-              поки завдання не закрите — на виконаному він нічого не каже.
-              Число вже озвучене в a11ySummary, тож смужка від VoiceOver
-              схована. */}
-          {task.subtasks.length > 0 && !isDone && (
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ marginTop: 4 }}>
-              <SegmentedProgress
-                value={doneSubtasks / task.subtasks.length}
-                segments={Math.min(12, Math.max(4, task.subtasks.length))}
-                height={6}
-              />
-            </View>
-          )}
         </View>
 
         {/* Старе місце бейджа — правий верхній кут (картки простору проєкту). */}

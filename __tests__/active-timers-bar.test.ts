@@ -6,9 +6,12 @@
  */
 import {
   ACTIVE_TIMERS_BAR_HEIGHT,
-  TAB_BAR_HEIGHT,
+  TAB_ISLAND_GAP,
+  TAB_ISLAND_HEIGHT,
   activeTimersBarVisible,
   tabBarInsetFor,
+  tabIslandBottom,
+  tabIslandOuterHeight,
 } from '../constants/nav';
 import { allTranslations } from '../store/translations';
 import type { ActiveTimer } from '../utils/activeTimers';
@@ -26,10 +29,19 @@ describe('видимість і відступ', () => {
   });
 
   it('відступ таб-бару додає висоту панелі лише коли вона видна', () => {
-    expect(tabBarInsetFor(false, 0)).toBe(TAB_BAR_HEIGHT);
-    expect(tabBarInsetFor(false, 2)).toBe(TAB_BAR_HEIGHT + ACTIVE_TIMERS_BAR_HEIGHT);
+    expect(tabBarInsetFor(false, 0)).toBe(tabIslandOuterHeight(0));
+    expect(tabBarInsetFor(false, 2)).toBe(tabIslandOuterHeight(0) + ACTIVE_TIMERS_BAR_HEIGHT);
     expect(tabBarInsetFor(true, 0)).toBe(0);
     expect(tabBarInsetFor(true, 2)).toBe(0);
+  });
+
+  it('острівець: safe-area + 8 під панеллю 64pt входить у відступ', () => {
+    expect(tabIslandBottom(34)).toBe(34 + TAB_ISLAND_GAP);
+    expect(tabIslandBottom(0)).toBe(TAB_ISLAND_GAP);
+    expect(tabIslandOuterHeight(34)).toBe(TAB_ISLAND_HEIGHT + 34 + TAB_ISLAND_GAP);
+    expect(tabBarInsetFor(false, 0, 34)).toBe(TAB_ISLAND_HEIGHT + 34 + TAB_ISLAND_GAP);
+    expect(tabBarInsetFor(false, 1, 34)).toBe(TAB_ISLAND_HEIGHT + 34 + TAB_ISLAND_GAP + ACTIVE_TIMERS_BAR_HEIGHT);
+    expect(tabBarInsetFor(true, 1, 34)).toBe(0);
   });
 
   it('биті лічильники не показують панель', () => {

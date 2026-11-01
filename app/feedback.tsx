@@ -100,7 +100,7 @@ import { hasStorageReadFailure, subscribeToStorage } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
 import { fontFamily } from '@/constants/theme';
 import { glassStyles } from '@/components/finance/finPalette';
-import { KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
+import { FilterBar, FilterSelect, KpiCounter, MeshBackground, SectionTabs, Segmented, useFiltersV25 } from '@/components/ds';
 
 /** Між закриттям одного аркуша й відкриттям наступного (NEW-02 у CLAUDE.md). */
 const SHEET_HANDOFF_MS = 260;
@@ -117,6 +117,8 @@ export default function FeedbackScreen() {
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
   const { width, height, isWide } = useResponsive();
+  // DS v2.5: на планшеті стан + сортування — один ряд FilterBar; телефон — як було.
+  const filtersV25 = useFiltersV25();
   const screenWidth = useScreenWidth();
   /**
    * Layout System v2.4: деталь — панель праворуч (планшет, коли вміщається)
@@ -593,6 +595,47 @@ export default function FeedbackScreen() {
           </AppHeader>
 
           <View style={[contentWidth, { paddingHorizontal: 20 }]}>
+            {filtersV25 ? (
+              <FilterBar
+                label={tr.filters}
+                style={{ marginTop: 4, marginBottom: 8 }}
+                items={[
+                  {
+                    id: 'state',
+                    pinned: true,
+                    active: filter !== 'all',
+                    node: (
+                      <Segmented<FeedbackFilter>
+                        label={tr.status}
+                        value={filter}
+                        onChange={setFilter}
+                        options={(['all', 'open', 'done', 'sent'] as const).map(f => ({
+                          value: f,
+                          label: filterLabels[f],
+                          count: f === 'all' ? undefined : counts[f],
+                        }))}
+                      />
+                    ),
+                  },
+                  {
+                    id: 'sort',
+                    active: sort !== 'newest',
+                    node: (
+                      <FilterSelect<FeedbackSort>
+                        label={tr.sorting}
+                        value={sort}
+                        neutralValue="newest"
+                        onChange={v => setSort(v ?? 'newest')}
+                        options={sortOptions.map(opt => ({ value: opt.key, label: opt.label, icon: opt.icon as never }))}
+                      />
+                    ),
+                  },
+                ]}
+                onReset={() => { setFilter('all'); setSort('newest'); }}
+                resetLabel={tr.priorityFilterReset}
+              />
+            ) : (
+            <>
             {/* Фільтр стану — тиха pill-група (вторинна до вкладок типу). */}
             <View style={[st.filterRow, { backgroundColor: k.surface.card, borderWidth: 1, borderColor: c.border }]}>
               {(['all', 'open', 'done', 'sent'] as const).map(f => (
@@ -624,6 +667,8 @@ export default function FeedbackScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            </>
+            )}
 
             {forwardingOff ? (
               <View style={[st.banner, { backgroundColor: k.surface.card }]}>

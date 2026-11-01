@@ -34,7 +34,7 @@ import { MeetingFormSheet, MeetingFormData, RecurrenceRule } from '@/components/
 import { SheetHandle, SheetModal } from '@/components/shared/SheetModal';
 import { SkeletonRow } from '@/components/shared/Skeleton';
 import { useUndoToast } from '@/components/shared/UndoToast';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { useDSTheme } from '@/components/shared/useDSTheme';
 import { useScreenView } from '@/hooks/use-screen-view';
 import { useSyncedList } from '@/hooks/use-synced-list';
@@ -80,8 +80,9 @@ import {
   type Task as BaseTask,
 } from '@/utils/taskUtils';
 import { PriorityBadge } from '@/components/tasks/PriorityBadge';
-import { PriorityFilterChips } from '@/components/tasks/PriorityFilterChips';
-import { TaskPeriodMenu, UrgentFilterToggle } from '@/components/tasks/TaskPeriodMenu';
+import { PriorityFilterChips, PriorityFilterSelect } from '@/components/tasks/PriorityFilterChips';
+import { TaskFilterPill, TaskPeriodMenu, UrgentFilterToggle } from '@/components/tasks/TaskPeriodMenu';
+import { FilterBar, FilterSearch, FilterSelect, useFiltersV25 } from '@/components/ds/filters';
 import {
   URGENT_PRIORITIES,
   isUrgentFilter,
@@ -239,6 +240,8 @@ const EMPTY_MEMBERS_LIST: MemberOut[] = [];
 export default function TasksScreen() {
   const tabBarInset = useTabBarInset();
   const { width, height, isMedium, isWide } = useResponsive();
+  /** Filters v2.5 — лише не-compact (= isWide); телефон — старий UI фільтрів. */
+  const filtersV25 = useFiltersV25();
   const screenWidth = useScreenWidth();
   // DS v2: нейтральна палітра; акцент завдань — глибока лаванда; головні дії — action.primary (c.primary).
   const { t, isDark } = useDSTheme();
@@ -2121,7 +2124,86 @@ export default function TasksScreen() {
   // На телефоні гортаються разом зі списком (ListHeaderComponent), на
   // планшеті стоять над списком нерухомо — «липкі» (рішення власника, п. 3):
   // у двоколонковій розкладці список довгий, а перемикач потрібен завжди.
-  const filterBar = (
+  // Планшет (Filters v2.5): УСІ фільтри списку — ОДИН ряд FilterBar
+  // (пошук · «Термінові» · період · статус · пріоритет · проєкт · дата ·
+  // сортування); те, що не влізло, — у «Фільтри · N». Шторка фільтрів і ряд
+  // активних чипів лишаються телефону.
+  const selectedFilterProject = filterProject && !pickableProjects.some(p => p.id === filterProject)
+    ? projects.find(p => p.id === filterProject)
+    : undefined;
+  const filterBar = filtersV25 && periodCountMap ? (
+    <FilterBar
+      label={tr.filtersAndSort}
+      overflowLabel={tr.filters}
+      resetLabel={tr.resetAll}
+      onReset={clearAllFilters}
+      search={<FilterSearch label={tr.searchPlaceholder} placeholder={tr.searchPlaceholder} value={search} onChangeText={setSearch} />}
+      items={[
+        { id: 'urgent', pinned: true, node: (
+          <UrgentFilterToggle
+            value={urgentOn}
+            onChange={on => { haptic.light(); setFilterPriorities(on ? [...URGENT_PRIORITIES] : []); }}
+          />
+        ) },
+        { id: 'period', pinned: true, node: (
+          <TaskPeriodMenu
+            value={period}
+            counts={periodCountMap}
+            onChange={next => { haptic.light(); selectPeriod(next); }}
+          />
+        ) },
+        { id: 'status', active: filter !== 'active', menuLabel: tr.status, node: (
+          <FilterSelect<Filter>
+            label={tr.status}
+            value={filter}
+            neutralValue="active"
+            searchable={false}
+            onChange={v => setFilter(v ?? 'active')}
+            options={[
+              { value: 'all', label: tr.allTasks, icon: 'tray' },
+              { value: 'active', label: tr.allActive, icon: 'circle.dotted' },
+              { value: 'done', label: tr.allCompleted, icon: 'checkmark.circle.fill' },
+            ]}
+          />
+        ) },
+        { id: 'priority', active: filterPriorities.length, menuLabel: tr.priority, node: (
+          <PriorityFilterSelect value={filterPriorities} onChange={setFilterPriorities} />
+        ) },
+        ...(pickableProjects.length > 0 || selectedFilterProject ? [{ id: 'project', active: !!filterProject, menuLabel: tr.project, node: (
+          <FilterSelect<string>
+            label={tr.project}
+            value={filterProject}
+            emptyOption={{ label: tr.allProjects }}
+            onChange={setFilterProject}
+            options={[...pickableProjects, ...(selectedFilterProject ? [selectedFilterProject] : [])]
+              .map(proj => ({ value: proj.id, label: proj.name, color: proj.color }))}
+          />
+        ) }] : []),
+        { id: 'created', active: !!dateFilter, menuLabel: tr.creationDate, node: (
+          <TaskFilterPill
+            label={tr.creationDate}
+            value={dateFilter
+              ? new Date(dateFilter).toLocaleDateString(lang === 'uk' ? 'uk-UA' : 'en-US', { day: 'numeric', month: 'short' })
+              : tr.select}
+            icon="calendar"
+            active={!!dateFilter}
+            onPress={() => setShowCal(true)}
+          />
+        ) },
+        { id: 'sort', active: sort !== 'status', menuLabel: tr.sorting, node: (
+          <FilterSelect<SortBy>
+            label={tr.sorting}
+            value={sort}
+            neutralValue="status"
+            searchable={false}
+            icon="arrow.up.arrow.down"
+            onChange={v => setSort(v ?? 'status')}
+            options={SORT_OPTIONS.map(o => ({ value: o.key, label: o.label, icon: o.icon as IconSymbolName }))}
+          />
+        ) },
+      ]}
+    />
+  ) : (
     <>
             {/* Скоуп: денна робота чи весь список. Окремо від чипів фільтрів
                 і завжди на очах — це головний перемикач вкладки, а не одна з
@@ -2135,22 +2217,6 @@ export default function TasksScreen() {
                 {/* Omni: вкладки розділу — pill-таби з іконками й лічильниками
                     (активна — чорна pill). Прокручуються вбік, коли при
                     великому Dynamic Type не вміщаються (NAT-06). */}
-                {isWide && periodCountMap ? (
-                  // Планшет (Layout System): «Термінові» — ПЕРШОЮ, далі ОДИН
-                  // випадний список періоду замість ряду чипів (як на вебі).
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
-                    style={{ flex: 1, minWidth: 0 }} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}>
-                    <UrgentFilterToggle
-                      value={urgentOn}
-                      onChange={on => { haptic.light(); setFilterPriorities(on ? [...URGENT_PRIORITIES] : []); }}
-                    />
-                    <TaskPeriodMenu
-                      value={period}
-                      counts={periodCountMap}
-                      onChange={next => { haptic.light(); selectPeriod(next); }}
-                    />
-                  </ScrollView>
-                ) : (
                 <SectionTabs
                   tabs={[
                     { key: 'today' as const, label: tr.today, icon: 'sun.max', count: scopeCounts.today },
@@ -2162,7 +2228,6 @@ export default function TasksScreen() {
                   accessibilityLabel={tr.tasks}
                   style={{ flex: 1, minWidth: 0 }}
                 />
-                )}
 
                 {/* Фільтри й скидання — поруч із перемикачем, а не в хедері:
                     обидва органи керування звужують ОДИН набір завдань, і

@@ -99,6 +99,13 @@ function selectedTab(tree: any): string[] {
     .map((n: any) => n.props.accessibilityLabel))];
 }
 
+/** Планшет (DS v2.5): «Ще» — FilterSelect, тригер «Інші розділи: Ще». */
+function hasMoreSelect(tree: any): boolean {
+  return tree.root.findAll((n: any) => n.props?.accessibilityRole === 'button'
+    && typeof n.props?.onPress === 'function'
+    && String(n.props?.accessibilityLabel ?? '').startsWith(`${tr.finMoreSections}: `)).length > 0;
+}
+
 /** Підписи вкладок розділу (на «Операціях» є ще role=tab сегмента стрічки). */
 const SECTION_TABS = new Set<string>([
   tr.finTabTransactions, tr.finTabAccounts, tr.finTabReports,
@@ -262,14 +269,16 @@ describe('Фінанси: вкладки розділу', () => {
     expect(selectedTab(tree).filter(l => SECTION_TABS.has(l))).toEqual([tr.finTabTransactions]);
   });
 
-  it('планшет-ландшафт: ті самі вкладки + «Ще», один чип «Фільтри», залишки над стрічкою', async () => {
+  it('планшет-ландшафт: ті самі вкладки + «Ще», фільтри — один ряд FilterBar, залишки над стрічкою', async () => {
     seed();
     mockWindow = { width: 1194, height: 834 };
     const tree = await mount();
+    // DS v2.5: вкладки — Segmented (tablist), «Ще» — FilterSelect поруч.
     expect(tabLabels(tree).filter(l => SECTION_TABS.has(l))).toEqual([
-      tr.finTabTransactions, tr.finTabAccounts, tr.finTabReports, tr.finTabMore,
+      tr.finTabTransactions, tr.finTabAccounts, tr.finTabReports,
     ]);
-    // Валюта, ракурс і тип — за одним чипом, а не радіо в ряду навігації.
+    expect(hasMoreSelect(tree)).toBe(true);
+    // Валюта, ракурс і тип — у FilterBar (переповнення «Фільтри · N»), а не радіо ракурсу.
     expect(hasText(tree, tr.filters)).toBe(true);
     const inlineScope = tree.root.findAll((n: any) => n.props?.accessibilityRole === 'radiogroup'
       && n.props?.accessibilityLabel === tr.budgetScopeLabel);
@@ -286,8 +295,9 @@ describe('Фінанси: вкладки розділу', () => {
     mockWindow = { width: 744, height: 1133 };
     const tree = await mount();
     expect(tabLabels(tree).filter(l => SECTION_TABS.has(l))).toEqual([
-      tr.finTabTransactions, tr.finTabAccounts, tr.finTabReports, tr.finTabMore,
+      tr.finTabTransactions, tr.finTabAccounts, tr.finTabReports,
     ]);
+    expect(hasMoreSelect(tree)).toBe(true);
     expect(hasText(tree, tr.finBalances)).toBe(true);
   });
 });

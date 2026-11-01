@@ -703,3 +703,69 @@ System лишаються; виправлено те, що аудит знайш
   замість стандартного `FadeInDown` (25 px). `Motion.spring.bouncy` — `@deprecated`;
   `AnimatedCheck` підтверджує коротким натиском 1 → 1.06 → 1 без перебігу.
 
+
+## Filters (v2.5)
+
+Скарга власника (11.2026): фільтри у два-три ряди, різної висоти, нативні
+пікери з підписом над полем. Правило тепер одне для вебу й планшета — API
+дзеркальне до вебового `@/components/ui` (`flowi-web-app/components/ui/filters.tsx`).
+
+**Лише НЕ компактні вікна.** Сторінка вмикає нові фільтри через
+`useFiltersV25()` (= `useResponsive().isWide`). Телефон / compact лишає свій
+наявний UI без жодної зміни; самі примітиви існуючих екранів не чіпають.
+
+```tsx
+import {
+  FilterBar, FilterSelect, FilterSearch, Segmented, useFiltersV25, isFilterSelectActive,
+  FILTER_CONTROL_H, FILTER_HIT_H, FILTER_GAP,
+} from '@/components/ds';            // або '@/components/ds/filters'
+
+const v25 = useFiltersV25();
+{v25 ? (
+  <FilterBar
+    label={tr.projectListFilterLabel}
+    search={<FilterSearch label={tr.search} value={q} onChangeText={setQ} />}
+    items={[
+      { id: 'scope', pinned: true, node: (
+        <Segmented label={tr.projects} value={scope} onChange={setScope}
+          options={[{ value: 'live', label: 'Живі', icon: 'folder', count: 13 },
+                    { value: 'archive', label: 'Архів', icon: 'archivebox', count: 14 }]} />) },
+      { id: 'sort', active: sort !== 'smart', node: (
+        <FilterSelect label="Сортування" value={sort} neutralValue="smart" onChange={v => setSort(v ?? 'smart')}
+          options={SORT_OPTIONS} />) },
+      { id: 'status', active: statuses.length, node: (
+        <FilterSelect label="Статус" multiple value={statuses} onChange={setStatuses} options={STATUS_OPTIONS} />) },
+    ]}
+    onReset={resetAll}
+  />
+) : (
+  <OldPhoneFilters />   // як було
+)}
+```
+
+| Примітив | Пропси | Правило |
+|---|---|---|
+| `FilterBar` | `label`, `items: {id, node, active?: boolean\|number, pinned?, menuLabel?}[]`, `search?`, `actions?`, `overflowLabel?` («Фільтри»), `onReset?`, `resetLabel?` («Скинути»), `style?`, `testID?` | ОДИН ряд, без переносу, gap 8. Міряє елементи в невидимому ряду (`importantForAccessibility="no-hide-descendants"`), ділить `partitionFilterItems`; хвіст, що не вліз, — у тригер «Фільтри · N» (N — сума `active` схованих), який відкриває меню на «брудному склі» з цими ж контролами стовпчиком. `pinned` не ховається ніколи. `search` ліворуч і `actions` праворуч не ховаються. «Скинути» — коли хоч один `active` |
+| `Segmented` | `label`, `value`, `options: {value, label, icon?: IconSymbolName\|ReactNode, count?, disabled?, testID?}[]`, `onChange`, `semantics?: 'radiogroup'\|'tablist'\|'pressed'`, `stretch?`, `iconOnly?`, `style?`, `testID?` | ОДНА pill-доріжка 36pt з внутрішнім бігунком (`action.primary`), анімація 180 мс, без анімації за «Зменшенням руху». 2–4 взаємовиключні варіанти: Живі/Архів, Список/Дошка/Таблиця, період ≤ 4. Ролі: radiogroup/radio+checked · tablist/tab+selected · button+selected |
+| `FilterSelect` | `label`, `options: {value, label, icon?, color?, count?, description?, disabled?}[]`; одиночний — `value: V\|null`, `onChange(V\|null)`, `emptyOption?: {label}`, `neutralValue?`; мульти — `multiple: true`, `value: V[]`, `onChange(V[])`; спільні — `allLabel?` («Усі»), `placeholder?`, `searchable?` (типово > 8), `resetLabel?`, `hideLabel?`, `icon?`, `disabled?`, `stretch?`, `style?`, `testID?` | Тригер-pill «Підпис: Значення ⌄» — підпис `text.secondary` ВСЕРЕДИНІ кнопки. Мульти: 0 → «Статус: Усі», 1 → «Статус: Прострочені», ≥ 2 → «Статус · 2». Меню — `OverlaySurface` під тригером (`measureInWindow`), фліп угору біля нижнього краю, тап поза меню закриває. Одиночний — ✓ і закриття; мульти — чекбокси, футер «Скинути» / «Готово» |
+| `FilterSearch` | `label`, `value`, `onChangeText`, `placeholder?` («Пошук»), `style?`, `testID?` | Поле пошуку тієї ж висоти, 160–280pt, кнопка очищення |
+| `useFiltersV25()` | — | `true` лише на не-compact |
+| `isFilterSelectActive(props)` | — | для `active` у FilterBar |
+
+Чиста логіка — `components/ds/filters/filterLogic.ts` (тести
+`__tests__/filter-logic.test.ts`), семантика ідентична вебовій
+`lib/filters.ts`: `partitionFilterItems`, `countHiddenActive`,
+`filterTriggerText`, `overflowTriggerText`, `typeaheadIndex`, `matchesQuery`,
+`placeFilterMenu`; константи `FILTER_CONTROL_H` 36, `FILTER_HIT_H` 44,
+`FILTER_GAP` 8, `FILTER_SEARCH_THRESHOLD` 8, `FILTER_HIT_SLOP`.
+
+### Правила
+
+1. **Один ряд.** Жодного другого ряду фільтрів на планшеті: те, що не влізло, — у «Фільтри · N».
+2. **Одна висота.** Видимо 36pt, рамка контролу 44pt — справжня зона дотику, а не `hitSlop` (він обрізається межами предка, A11Y-08).
+3. **Segmented** — для 2–4 взаємовиключних варіантів; **FilterSelect** — для всього іншого (сортування, статус, проєкт, задача, теги, період > 4).
+4. **Підпис усередині** тригера («Сортування: Розумне ⌄»), ніколи не над полем; жодних підписів-рядків «Сортування» перед рядом чипів.
+5. **Без нативних / «поле з підписом над ним» пікерів** (`PickerField`, `Segment` з FormBits) у рядах фільтрів — вони лишаються для форм.
+6. Сторінка зберігає власний стан фільтрів; примітиви — лише подання.
+7. Телефон (compact) — без змін; міграцію робити гілкою `useFiltersV25() ? <FilterBar …/> : <як було/>`.
+8. `ViewModeSwitch` (Список/Колонки в шапці) уже є сегментованою доріжкою 36pt з radiogroup — не змінювався; нові перемикачі вигляду на сторінках — `Segmented`.

@@ -1,6 +1,7 @@
 import { Atlas } from '@/constants/atlas';
 import { fontFamily, shadow } from '@/constants/theme';
 import { KpiCounter, PageHeader } from '@/components/ds/PageHeader';
+import { FilterBar, FilterSearch, FilterSelect, Segmented, useFiltersV25 } from '@/components/ds/filters';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AdSlot } from '@/components/advertising/Advertising';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
@@ -120,6 +121,7 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
   const [scope, setScope] = useState<NoteScope>('all');
   const [sort, setSort] = useState<'newest' | 'oldest' | 'title'>('newest');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const v25 = useFiltersV25();
   const [selected, setSelected] = useState<Note | null>(null);
   const [mode, setMode] = useState<'read' | 'edit'>('read');
   const [isNew, setIsNew] = useState(false);
@@ -770,32 +772,80 @@ export function NotesWorkspace({ projectId, isDark, createRequested, onCreateHan
               }
             />
           ) : null}
-          <View style={s.toolbar}>
-            {canCreate && button(tr.addNote, add, 'notes-add', !ready || readError || saving)}
-            {button(sort === 'title' ? tr.notesSortTitle : sort === 'oldest' ? tr.sortOldest : tr.sortNewest, () => setSort(v => v === 'newest' ? 'oldest' : v === 'oldest' ? 'title' : 'newest'), 'notes-sort')}
-          </View>
-          <TextInput testID="notes-search" accessibilityLabel={tr.notesSearch} placeholder={tr.notesSearch}
-            placeholderTextColor={c.sub} value={query} onChangeText={setQuery}
-            style={[s.search, { color: c.text, backgroundColor: tk.surface.card }]} />
-          {!projectId && <View style={s.toolbar}>{(['all', 'personal', 'projects'] as const).map(value => (
-            <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: scope === value }}
-              testID={`notes-scope-${value}`} onPress={() => setScope(value)} style={[s.button, scope === value
-                ? { backgroundColor: tk.action.primary }
-                : { backgroundColor: tk.surface.card }]}>
-              <Text style={{ color: scope === value ? tk.text.onAction : tk.text.secondary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{value === 'all' ? tr.all : value === 'personal' ? tr.notesPersonal : tr.projects}</Text>
-            </TouchableOpacity>
-          ))}</View>}
-          {tagChips.length > 0 && (
-            <ScrollView testID="notes-tag-filter" horizontal showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.tagRow} keyboardShouldPersistTaps="handled">
-              {button(tr.notesTagsAll, () => setTagFilter(null), 'notes-tag-all', false, tagFilter === null)}
-              {tagChips.map(chip => (
-                <React.Fragment key={tagKey(chip.tag)}>
-                  {button(`#${chip.tag} · ${chip.count}`, () => setTagFilter(chip.tag), `notes-tag-${chip.tag}`, false,
-                    tagFilter !== null && tagKey(tagFilter) === tagKey(chip.tag))}
-                </React.Fragment>
-              ))}
-            </ScrollView>
+          {v25 ? (
+            <FilterBar
+              testID="notes-filter-bar"
+              label={tr.filters}
+              overflowLabel={tr.filters}
+              resetLabel={tr.reset}
+              style={{ marginBottom: 8 }}
+              search={<FilterSearch testID="notes-search" label={tr.notesSearch} placeholder={tr.notesSearch}
+                value={query} onChangeText={setQuery} />}
+              items={[
+                ...(!projectId ? [{
+                  id: 'scope', pinned: true, node: (
+                    <Segmented<NoteScope> label={tr.notes} value={scope} onChange={setScope}
+                      options={[
+                        { value: 'all', label: tr.all, testID: 'notes-scope-all' },
+                        { value: 'personal', label: tr.notesPersonal, testID: 'notes-scope-personal' },
+                        { value: 'projects', label: tr.projects, testID: 'notes-scope-projects' },
+                      ]} />
+                  ),
+                }] : []),
+                {
+                  id: 'sort', active: sort !== 'newest', node: (
+                    <FilterSelect<'newest' | 'oldest' | 'title'> testID="notes-sort" label={tr.sorting} value={sort}
+                      neutralValue="newest" onChange={v => setSort(v ?? 'newest')}
+                      options={[
+                        { value: 'newest', label: tr.sortNewest },
+                        { value: 'oldest', label: tr.sortOldest },
+                        { value: 'title', label: tr.notesSortTitle },
+                      ]} />
+                  ),
+                },
+                ...(tagChips.length > 0 ? [{
+                  id: 'tag', active: tagFilter !== null, menuLabel: tr.notesTagsLabel, node: (
+                    <FilterSelect testID="notes-tag-filter" label={tr.notesTagsLabel}
+                      value={tagFilter === null ? null : tagChips.find(chip => tagKey(chip.tag) === tagKey(tagFilter))?.tag ?? tagFilter}
+                      emptyOption={{ label: tr.notesTagsAll }} allLabel={tr.notesTagsAll}
+                      onChange={v => setTagFilter(v)}
+                      options={tagChips.map(chip => ({ value: chip.tag, label: `#${chip.tag}`, count: chip.count }))} />
+                  ),
+                }] : []),
+              ]}
+              onReset={() => { setSort('newest'); setTagFilter(null); }}
+              actions={canCreate ? button(tr.addNote, add, 'notes-add', !ready || readError || saving) : undefined}
+            />
+          ) : (
+            <>
+            <View style={s.toolbar}>
+              {canCreate && button(tr.addNote, add, 'notes-add', !ready || readError || saving)}
+              {button(sort === 'title' ? tr.notesSortTitle : sort === 'oldest' ? tr.sortOldest : tr.sortNewest, () => setSort(v => v === 'newest' ? 'oldest' : v === 'oldest' ? 'title' : 'newest'), 'notes-sort')}
+            </View>
+            <TextInput testID="notes-search" accessibilityLabel={tr.notesSearch} placeholder={tr.notesSearch}
+              placeholderTextColor={c.sub} value={query} onChangeText={setQuery}
+              style={[s.search, { color: c.text, backgroundColor: tk.surface.card }]} />
+            {!projectId && <View style={s.toolbar}>{(['all', 'personal', 'projects'] as const).map(value => (
+              <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: scope === value }}
+                testID={`notes-scope-${value}`} onPress={() => setScope(value)} style={[s.button, scope === value
+                  ? { backgroundColor: tk.action.primary }
+                  : { backgroundColor: tk.surface.card }]}>
+                <Text style={{ color: scope === value ? tk.text.onAction : tk.text.secondary, fontFamily: fontFamily.semibold, fontSize: 13 }}>{value === 'all' ? tr.all : value === 'personal' ? tr.notesPersonal : tr.projects}</Text>
+              </TouchableOpacity>
+            ))}</View>}
+            {tagChips.length > 0 && (
+              <ScrollView testID="notes-tag-filter" horizontal showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.tagRow} keyboardShouldPersistTaps="handled">
+                {button(tr.notesTagsAll, () => setTagFilter(null), 'notes-tag-all', false, tagFilter === null)}
+                {tagChips.map(chip => (
+                  <React.Fragment key={tagKey(chip.tag)}>
+                    {button(`#${chip.tag} · ${chip.count}`, () => setTagFilter(chip.tag), `notes-tag-${chip.tag}`, false,
+                      tagFilter !== null && tagKey(tagFilter) === tagKey(chip.tag))}
+                  </React.Fragment>
+                ))}
+              </ScrollView>
+            )}
+            </>
           )}
           <SectionList sections={readError ? [] : sections} keyExtractor={n => n.id} keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 16 }} stickySectionHeadersEnabled={false}

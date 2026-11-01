@@ -101,8 +101,16 @@ test('очищення з фільтром видаляє лише показа�
   ]));
   const tree = await mount();
 
-  const chips = tree.root.findByType(PriorityFilterChips);
-  await act(async () => { chips.props.onChange([0]); });
+  // Телефон — PriorityFilterChips; планшет (DS v2.5) — FilterSelect «Пріоритет»
+  // (FilterBar малює вузол двічі — вимірювальний ряд і видимий, беремо перший).
+  const chips = tree.root.findAllByType(PriorityFilterChips)[0];
+  if (chips) {
+    await act(async () => { chips.props.onChange([0]); });
+  } else {
+    const select = tree.root.findAll((n: any) => n.props?.label === tr.priority && n.props?.multiple === true
+      && typeof n.props?.onChange === 'function')[0];
+    await act(async () => { select.props.onChange(['0']); });
+  }
 
   await pressByLabel(tree, tr.clearArchive);
   const message = alertSpy.mock.calls[0][1] as string;

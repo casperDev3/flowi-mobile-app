@@ -9,6 +9,10 @@
  * Набір і значення перемикачів — ті самі, що у вебі (`lib/time-entries.ts`):
  * фільтр, який є лише на одній платформі, робить із двох клієнтів два різні
  * продукти.
+ *
+ * Планшет (Filters v2.5) шухляди не відкриває: `TimeFilterBar` — ті самі
+ * перемикачі ОДНИМ рядом FilterBar (період і режим — Segmented, порядок,
+ * проєкт і задача — FilterSelect). Телефон — шухляда, як і була.
  */
 
 import React from 'react';
@@ -38,6 +42,7 @@ import {
   type TimeSort,
 } from '@/utils/timeEntries';
 import { OverlayMaterial } from '@/components/ds';
+import { FilterBar, FilterSelect, Segmented } from '@/components/ds/filters';
 
 export interface TimeFilterSheetProps {
   visible: boolean;
@@ -195,6 +200,76 @@ export function TimeFilterSheet({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+export type TimeFilterBarProps = Pick<
+  TimeFilterSheetProps,
+  'period' | 'sort' | 'grouping' | 'projectId' | 'taskKey' | 'projects' | 'tasks' | 'periodLabels' | 'tr' | 'onChange' | 'onReset'
+>;
+
+/** Планшет: усі фільтри історії часу — один ряд FilterBar. */
+export function TimeFilterBar({
+  period, sort, grouping, projectId, taskKey, projects, tasks, periodLabels, tr, onChange, onReset,
+}: TimeFilterBarProps) {
+  return (
+    <FilterBar
+      label={tr.filtersAndSort}
+      overflowLabel={tr.filters}
+      resetLabel={tr.reset}
+      onReset={onReset}
+      items={[
+        { id: 'period', pinned: true, active: period !== 'week', node: (
+          <Segmented<TimePeriod>
+            label={tr.timePeriodGroup}
+            value={period}
+            onChange={value => onChange({ period: value })}
+            options={TIME_PERIODS.map(value => ({ value, label: periodLabels[value] }))}
+          />
+        ) },
+        { id: 'grouping', active: grouping !== 'list', menuLabel: tr.timeModeGroup, node: (
+          <Segmented<TimeGrouping>
+            label={tr.timeModeGroup}
+            value={grouping}
+            onChange={value => onChange({ grouping: value })}
+            options={[
+              { value: 'list', label: tr.timeGroupingList, icon: 'list.bullet' },
+              { value: 'project', label: tr.timeGroupingProject, icon: 'folder' },
+            ]}
+          />
+        ) },
+        ...(projects.length > 0 || projectId ? [{ id: 'project', active: !!projectId, menuLabel: tr.project, node: (
+          <FilterSelect<string>
+            label={tr.project}
+            value={projectId}
+            emptyOption={{ label: tr.all }}
+            // Задача належить проєкту, тож зміна проєкту скидає вибрану задачу.
+            onChange={value => onChange({ projectId: value, taskKey: null })}
+            options={projects.map(project => ({ value: project.id, label: project.name, color: project.color }))}
+          />
+        ) }] : []),
+        ...(tasks.length > 1 || taskKey ? [{ id: 'task', active: !!taskKey, menuLabel: tr.tasks, node: (
+          <FilterSelect<string>
+            label={tr.tasks}
+            value={taskKey}
+            emptyOption={{ label: tr.all }}
+            onChange={value => onChange({ taskKey: value })}
+            options={tasks.map(task => ({ value: task.key, label: task.label }))}
+          />
+        ) }] : []),
+        { id: 'sort', active: sort !== 'date-desc', menuLabel: tr.sorting, node: (
+          <FilterSelect<TimeSort>
+            label={tr.sorting}
+            value={sort}
+            neutralValue="date-desc"
+            searchable={false}
+            icon="arrow.up.arrow.down"
+            onChange={value => onChange({ sort: value ?? 'date-desc' })}
+            options={TIME_SORTS.map(value => ({ value, label: sortLabel(value, tr) }))}
+          />
+        ) },
+      ]}
+    />
   );
 }
 

@@ -9,6 +9,7 @@ import React, { useCallback, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { BentoCard, SectionTabs } from '@/components/ds';
+import { FilterBar, Segmented, useFiltersV25 } from '@/components/ds/filters';
 import { GroupScreenShell } from '@/components/training/GroupScreenShell';
 import { useGroupSummary, useTrainingScope, type LoadIssue } from '@/components/training/hooks';
 import { LeaderboardList } from '@/components/training/LeaderboardList';
@@ -29,6 +30,7 @@ export default function LeaderboardScreen() {
   const { online } = useTrainingScope();
   const { group } = useGroupSummary(groupId);
   const [period, setPeriod] = useState<'week' | 'all'>('week');
+  const v25 = useFiltersV25();
   const thisMonday = isoWeekMonday(dayKeyInZone(new Date(), group?.timezone));
   const [monday, setMonday] = useState<string | null>(null);
   const weekMonday = monday ?? thisMonday;
@@ -75,33 +77,71 @@ export default function LeaderboardScreen() {
           </View>
         </BentoCard>
       ) : undefined}>
-      {/* Omni SectionTabs: період лідерборда (чорна pill = обраний). */}
-      <SectionTabs
-        tabs={[{ key: 'week' as const, label: tr.tgPeriodWeek }, { key: 'all' as const, label: tr.tgPeriodAll }]}
-        value={period}
-        onChange={setPeriod}
-        accessibilityLabel={tr.tgLeaderboard}
-        style={{ marginBottom: 12 }}
-      />
-      {period === 'week' ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <TouchableOpacity onPress={() => setMonday(addDays(weekMonday, -7))} accessibilityRole="button" accessibilityLabel={tr.tgPrevWeek}
-            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-            <IconSymbol name="chevron.left" size={16} color={c.text} />
-          </TouchableOpacity>
-          <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
-            {`${data?.from ?? weekMonday} — ${data?.to ?? addDays(weekMonday, 6)}`}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setMonday(addDays(weekMonday, 7))}
-            disabled={weekMonday >= thisMonday}
-            accessibilityRole="button"
-            accessibilityLabel={tr.tgNextWeek}
-            style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: weekMonday >= thisMonday ? 0.3 : 1 }}>
-            <IconSymbol name="chevron.right" size={16} color={c.text} />
-          </TouchableOpacity>
-        </View>
-      ) : null}
+      {v25 ? (
+        <FilterBar
+          label={tr.tgLeaderboard}
+          style={{ marginBottom: 12 }}
+          items={[{
+            id: 'period', pinned: true, node: (
+              <Segmented<'week' | 'all'>
+                label={tr.tgLeaderboard}
+                value={period}
+                onChange={setPeriod}
+                options={[{ value: 'week', label: tr.tgPeriodWeek }, { value: 'all', label: tr.tgPeriodAll }]}
+              />
+            ),
+          }]}
+          actions={period === 'week' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity onPress={() => setMonday(addDays(weekMonday, -7))} accessibilityRole="button" accessibilityLabel={tr.tgPrevWeek}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <IconSymbol name="chevron.left" size={16} color={c.text} />
+              </TouchableOpacity>
+              <Text style={{ color: c.text, fontSize: 14, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
+                {`${data?.from ?? weekMonday} — ${data?.to ?? addDays(weekMonday, 6)}`}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setMonday(addDays(weekMonday, 7))}
+                disabled={weekMonday >= thisMonday}
+                accessibilityRole="button"
+                accessibilityLabel={tr.tgNextWeek}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: weekMonday >= thisMonday ? 0.3 : 1 }}>
+                <IconSymbol name="chevron.right" size={16} color={c.text} />
+              </TouchableOpacity>
+            </View>
+          ) : undefined}
+        />
+      ) : (
+        <>
+        {/* Omni SectionTabs: період лідерборда (чорна pill = обраний). */}
+        <SectionTabs
+          tabs={[{ key: 'week' as const, label: tr.tgPeriodWeek }, { key: 'all' as const, label: tr.tgPeriodAll }]}
+          value={period}
+          onChange={setPeriod}
+          accessibilityLabel={tr.tgLeaderboard}
+          style={{ marginBottom: 12 }}
+        />
+        {period === 'week' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <TouchableOpacity onPress={() => setMonday(addDays(weekMonday, -7))} accessibilityRole="button" accessibilityLabel={tr.tgPrevWeek}
+              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+              <IconSymbol name="chevron.left" size={16} color={c.text} />
+            </TouchableOpacity>
+            <Text style={{ color: c.text, fontSize: 15, fontFamily: fontFamily.semibold }}>
+              {`${data?.from ?? weekMonday} — ${data?.to ?? addDays(weekMonday, 6)}`}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setMonday(addDays(weekMonday, 7))}
+              disabled={weekMonday >= thisMonday}
+              accessibilityRole="button"
+              accessibilityLabel={tr.tgNextWeek}
+              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: weekMonday >= thisMonday ? 0.3 : 1 }}>
+              <IconSymbol name="chevron.right" size={16} color={c.text} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        </>
+      )}
       {data && !rows.length ? <EmptyState c={c} icon="star.fill" title={tr.tgNoLeaderboard} /> : null}
       {rows.length ? <Card c={c}><LeaderboardList c={c} rows={rows} /></Card> : null}
     </GroupScreenShell>

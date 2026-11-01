@@ -33,3 +33,5 @@ export { HatchedBars, type HatchedBar, type HatchedBarsProps } from './HatchedBa
 export { Tag, PriorityFlag, type TagProps, type PriorityFlagProps, type Priority } from './Tag';
 export { Avatar, AvatarStack, initialsOf, type AvatarPerson, type AvatarProps, type AvatarStackProps } from './AvatarStack';
 export { OverlaySurface, OverlayScrim, OverlayMaterial, overlayFillStyle, type OverlaySurfaceProps } from './OverlaySurface';
+// ── Filters (DS v2.5, лише не-compact) ──
+export * from './filters';

@@ -78,7 +78,10 @@ import { removeProjectMember } from '@/store/project-team';
 import { useProjectRoles } from '@/hooks/use-project-roles';
 import { fontFamily, radius, shadow, theme, type } from '@/constants/theme';
 import { dsTokens, useDS } from '@/hooks/use-ds';
-import { BentoCard, KpiCounter, MeshBackground, PageHeader, SectionTabs, SegmentedProgress } from '@/components/ds';
+import {
+  BentoCard, FilterBar, FilterSelect, KpiCounter, MeshBackground, PageHeader, SectionTabs, Segmented, SegmentedProgress,
+  useFiltersV25,
+} from '@/components/ds';
 import { glassOf, glassRim, glassRimFor } from '@/components/shared/dsTheme';
 import { AccentIcon } from '@/components/shared/GlassBits';
 import {
@@ -524,6 +527,7 @@ export default function ProjectsScreen() {
   // Планшет: стелю читабельної колонки (720pt) тут знято — картки лягають у
   // колонки на всю ширину екрана (вікно мінус сайдбар), як дашборд «Сьогодні».
   const { isWide, width: windowWidth } = useResponsive();
+  const filtersV25 = useFiltersV25();
   const screenWidth = useScreenWidth();
   // Планшет, три зони: колонки masonry рахуються від РЕАЛЬНОЇ ширини головної
   // зони (поруч можуть стояти «Портфель» і панель деталей, межі тягнуться).
@@ -1123,59 +1127,118 @@ export default function ProjectsScreen() {
         />
       ) : null}
 
-      {/* Живі / Архів — Omni pill-вкладки. З'являються лише коли архів не
-          порожній — інакше це вкладка, яка нікуди не веде. */}
-      {archivedProjects.length > 0 && (
-        <SectionTabs
-          tabs={[
-            { key: 'live', label: tr.filterActive, icon: 'folder', count: liveProjects.length },
-            { key: 'archive', label: tr.archive, icon: 'archivebox', count: archivedProjects.length },
-          ]}
-          value={showArchived ? 'archive' : 'live'}
-          onChange={key => setShowArchived(key === 'archive')}
-          bleed={isWide ? 0 : 20}
-          style={{ marginBottom: 12 }}
-        />
-      )}
+      {/* DS v2.5 (планшет): Живі/Архів, сортування й статус — ОДИН ряд FilterBar. */}
+      {filtersV25 ? (
+        (archivedProjects.length > 0 || scopedStats.length > 0) ? (
+          <FilterBar
+            label={tr.projectListFilterLabel}
+            overflowLabel={tr.filters}
+            resetLabel={tr.reset}
+            onReset={() => updateListPrefs(DEFAULT_PROJECT_LIST_PREFS)}
+            style={{ marginBottom: 16 }}
+            items={[
+              ...(archivedProjects.length > 0 ? [{
+                id: 'scope', pinned: true, node: (
+                  <Segmented
+                    label={tr.projects}
+                    value={showArchived ? 'archive' : 'live'}
+                    onChange={key => setShowArchived(key === 'archive')}
+                    options={[
+                      { value: 'live' as const, label: tr.filterActive, icon: 'folder' as const, count: liveProjects.length },
+                      { value: 'archive' as const, label: tr.archive, icon: 'archivebox' as const, count: archivedProjects.length },
+                    ]}
+                  />
+                ),
+              }] : []),
+              ...(scopedStats.length > 0 ? [
+                {
+                  id: 'sort', active: listPrefs.sort !== DEFAULT_PROJECT_LIST_PREFS.sort, menuLabel: tr.projectSortLabel, node: (
+                    <FilterSelect<ProjectSortKey>
+                      label={tr.projectSortLabel}
+                      value={listPrefs.sort}
+                      neutralValue={DEFAULT_PROJECT_LIST_PREFS.sort}
+                      onChange={key => updateListPrefs({ ...listPrefs, sort: key ?? DEFAULT_PROJECT_LIST_PREFS.sort })}
+                      options={PROJECT_SORT_KEYS.map(key => ({ value: key, label: tr[SORT_LABEL_KEY[key]] as string }))}
+                    />
+                  ),
+                },
+                {
+                  id: 'status', active: listPrefs.statuses.length, menuLabel: tr.projectSortStatus, node: (
+                    <FilterSelect<ProjectListStatus>
+                      label={tr.projectSortStatus}
+                      multiple
+                      value={listPrefs.statuses}
+                      onChange={picked => updateListPrefs({
+                        ...listPrefs, statuses: PROJECT_LIST_STATUSES.filter(st2 => picked.includes(st2)),
+                      })}
+                      resetLabel={tr.reset}
+                      options={PROJECT_LIST_STATUSES.map(status => ({
+                        value: status, label: tr[STATUS_LABEL_KEY[status]] as string, count: statusCounts[status],
+                      }))}
+                    />
+                  ),
+                },
+              ] : []),
+            ]}
+          />
+        ) : null
+      ) : (
+        <>
+        {/* Живі / Архів — Omni pill-вкладки. З'являються лише коли архів не
+            порожній — інакше це вкладка, яка нікуди не веде. */}
+        {archivedProjects.length > 0 && (
+          <SectionTabs
+            tabs={[
+              { key: 'live', label: tr.filterActive, icon: 'folder', count: liveProjects.length },
+              { key: 'archive', label: tr.archive, icon: 'archivebox', count: archivedProjects.length },
+            ]}
+            value={showArchived ? 'archive' : 'live'}
+            onChange={key => setShowArchived(key === 'archive')}
+            bleed={isWide ? 0 : 20}
+            style={{ marginBottom: 12 }}
+          />
+        )}
 
-      {/* Сортування й фільтр статусу — лише коли в зрізі є що сортувати. */}
-      {scopedStats.length > 0 && (
-        <View style={{ marginBottom: 16, gap: 8 }}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            accessibilityLabel={tr.projectSortLabel}
-            contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
-            <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginRight: 2 }}>{tr.projectSortLabel}</Text>
-            {PROJECT_SORT_KEYS.map(key => (
-              <ListChip
-                key={key}
-                label={tr[SORT_LABEL_KEY[key]] as string}
-                selected={listPrefs.sort === key}
-                onPress={() => updateListPrefs({ ...listPrefs, sort: key })}
-                accent={c.accent} sub={c.sub} dim={c.dim} border={c.border}
-              />
-            ))}
-          </ScrollView>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            accessibilityLabel={tr.projectListFilterLabel}
-            contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
-            {PROJECT_LIST_STATUSES.map(status => (
-              <ListChip
-                key={status}
-                label={tr[STATUS_LABEL_KEY[status]] as string}
-                count={statusCounts[status]}
-                selected={listPrefs.statuses.includes(status)}
-                onPress={() => toggleStatus(status)}
-                accent={c.accent} sub={c.sub} dim={c.dim} border={c.border}
-              />
-            ))}
-          </ScrollView>
-        </View>
+        {/* Сортування й фільтр статусу — лише коли в зрізі є що сортувати. */}
+        {scopedStats.length > 0 && (
+          <View style={{ marginBottom: 16, gap: 8 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              accessibilityLabel={tr.projectSortLabel}
+              contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+              <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.medium, marginRight: 2 }}>{tr.projectSortLabel}</Text>
+              {PROJECT_SORT_KEYS.map(key => (
+                <ListChip
+                  key={key}
+                  label={tr[SORT_LABEL_KEY[key]] as string}
+                  selected={listPrefs.sort === key}
+                  onPress={() => updateListPrefs({ ...listPrefs, sort: key })}
+                  accent={c.accent} sub={c.sub} dim={c.dim} border={c.border}
+                />
+              ))}
+            </ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              accessibilityLabel={tr.projectListFilterLabel}
+              contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+              {PROJECT_LIST_STATUSES.map(status => (
+                <ListChip
+                  key={status}
+                  label={tr[STATUS_LABEL_KEY[status]] as string}
+                  count={statusCounts[status]}
+                  selected={listPrefs.statuses.includes(status)}
+                  onPress={() => toggleStatus(status)}
+                  accent={c.accent} sub={c.sub} dim={c.dim} border={c.border}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        </>
       )}
 
       {/* Портфель — над списком: KPI і «виконано за тиждень» по видимому

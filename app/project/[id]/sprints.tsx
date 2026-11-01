@@ -56,7 +56,9 @@ import {
 import { isSprintOverdue, sprintBurndown, velocityWindow } from '@/utils/projectStatsMetrics';
 import { fontFamily, radius, shadow, theme, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { KpiCounter, SectionTabs, SegmentedProgress } from '@/components/ds';
+import {
+  FilterBar, FilterSelect, KpiCounter, SectionTabs, Segmented, SegmentedProgress, useFiltersV25,
+} from '@/components/ds';
 import { useResponsive } from '@/hooks/use-responsive';
 import { glassOf } from '@/components/shared/dsTheme';
 
@@ -99,6 +101,7 @@ export default function ProjectSprintsScreen() {
   const c = projectShellColors(isDark, project?.color ?? '#7C3AED',project?.appearance);
   const tk = dsTokens(isDark);
   const { isWide } = useResponsive();
+  const filtersV25 = useFiltersV25();
 
   const { items: allSprints, setItems: setSprints, reload: reloadSprints } = useSyncedList<Sprint>('sprints', { enabled: true });
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -605,7 +608,56 @@ export default function ProjectSprintsScreen() {
           />
         </>
       ) : undefined}
-      tabs={projectSprints.length > 0 ? (
+      tabs={projectSprints.length > 0 ? (filtersV25 ? (
+        // DS v2.5 (планшет): статус · сортування · архівні — ОДИН ряд.
+        <FilterBar
+          label={tr.sprintListMenu}
+          overflowLabel={tr.filters}
+          resetLabel={tr.sprintResetFilters}
+          onReset={() => setView(prev => ({ ...prev, status: 'all', showArchived: false, sort: DEFAULT_VIEW.sort }))}
+          items={[
+            {
+              id: 'status', pinned: true, active: statusFilter !== 'all', node: (
+                <Segmented<SprintStatusFilter>
+                  label={tr.sprintStatusFilterA11y}
+                  value={statusFilter}
+                  onChange={key => setView(prev => ({ ...prev, status: key }))}
+                  options={STATUS_FILTERS.map(key => ({ value: key, label: statusLabel(key), count: statusCounts[key] }))}
+                />
+              ),
+            },
+            {
+              id: 'sort', active: sort !== DEFAULT_VIEW.sort, menuLabel: tr.projectSortLabel, node: (
+                <FilterSelect<SprintSort>
+                  label={tr.projectSortLabel}
+                  value={sort}
+                  neutralValue={DEFAULT_VIEW.sort}
+                  onChange={key => setView(prev => ({ ...prev, sort: key ?? DEFAULT_VIEW.sort }))}
+                  options={[
+                    { value: 'start-desc', label: tr.sprintSortStartDesc },
+                    { value: 'start-asc', label: tr.sprintSortStartAsc },
+                    { value: 'name', label: tr.sprintSortName },
+                    { value: 'progress', label: tr.sprintSortProgress },
+                  ]}
+                />
+              ),
+            },
+            ...(archivedCount > 0 || showArchived ? [{
+              id: 'archived', active: showArchived, menuLabel: tr.sprintShowArchived, node: (
+                <Segmented<'hide' | 'show'>
+                  label={tr.archive}
+                  value={showArchived ? 'show' : 'hide'}
+                  onChange={v => setView(prev => ({ ...prev, showArchived: v === 'show' }))}
+                  options={[
+                    { value: 'hide', label: tr.filterActive },
+                    { value: 'show', label: tr.sprintShowArchived, icon: 'archivebox', count: archivedCount },
+                  ]}
+                />
+              ),
+            }] : []),
+          ]}
+        />
+      ) : (
         // Omni: фільтр статусу — pill-вкладки з лічильниками (той самий
         // view.status, що й раніше давали чипи).
         <SectionTabs
@@ -615,7 +667,7 @@ export default function ProjectSprintsScreen() {
           accessibilityLabel={tr.sprintStatusFilterA11y}
           bleed={isWide ? 0 : 20}
         />
-      ) : undefined}
+      )) : undefined}
       actions={(
         <>
           {canEdit ? (
@@ -643,7 +695,7 @@ export default function ProjectSprintsScreen() {
             {renderDraftForm(tr.create)}
           </View>
         )}
-        {archivedCount > 0 ? (
+        {archivedCount > 0 && !filtersV25 ? (
           <View style={{ flexDirection: 'row', marginBottom: 12 }}>
             <ActionChip
               icon="archivebox"

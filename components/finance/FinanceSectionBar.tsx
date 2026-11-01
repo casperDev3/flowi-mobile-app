@@ -7,6 +7,8 @@
  * у шторці за одним чипом. На планшеті вкладки, період і чип «Фільтри (N)»
  * стоять в одному ряду (раніше валюти й радіо ракурсу розповзались на 2–3
  * ряди — скарга власника 2026-10-07).
+ * DS v2.5 (планшет, useFiltersV25): вкладки — Segmented + «Ще» FilterSelect,
+ * фільтри — FilterBar 36pt; телефон — без змін (…Legacy).
  */
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { dsTheme, glassOf } from '@/components/shared/dsTheme';
@@ -31,6 +33,7 @@ import {
   financeTabLabel, moneyScopeText, periodPresetLabel, type FinColors,
 } from './financeLabels';
 import { useGlassStyles } from '@/components/finance/finPalette';
+import { FILTER_CONTROL_H, FILTER_GAP, FILTER_HIT_H, FilterBar, FilterSelect, Segmented, useFiltersV25 } from '@/components/ds/filters';
 
 const HIT = { top: 8, bottom: 8, left: 4, right: 4 } as const;
 
@@ -39,7 +42,52 @@ const HIT = { top: 8, bottom: 8, left: 4, right: 4 } as const;
  * Рахунки · Звіти · Ще ▾» (рішення власника 2026-10-07). Вибрана вкладка з
  * меню «Ще» підписує саму кнопку («Бюджет ▾»), тож видно, де ти є.
  */
-export function FinanceTabBar({ tabs, active, onChange, c, tr, stretch = true }: {
+type FinanceTabBarProps = {
+  tabs: readonly FinanceTab[];
+  active: FinanceTab;
+  onChange: (tab: FinanceTab) => void;
+  c: FinColors;
+  tr: Translations;
+  /** Телефон: сегменти на всю ширину. Планшет: за вмістом, поруч із фільтром. */
+  stretch?: boolean;
+};
+
+/**
+ * Планшет (DS v2.5): вкладки — `Segmented` (tablist) 36pt, «Ще» — `FilterSelect`
+ * з рештою розділів (тригер підписаний вибраною вкладкою). Телефон — як було.
+ */
+export function FinanceTabBar(props: FinanceTabBarProps) {
+  return useFiltersV25() ? <FinanceTabBarV25 {...props} /> : <FinanceTabBarLegacy {...props} />;
+}
+
+function FinanceTabBarV25({ tabs, active, onChange, tr }: FinanceTabBarProps) {
+  const { inline, more } = splitFinanceTabs(tabs);
+  const moreActive = more.includes(active);
+  return (
+    <View style={[st.v25Row, { marginTop: 10 }]}>
+      <Segmented<FinanceTab>
+        label={tr.finTabsLabel}
+        semantics="tablist"
+        value={active}
+        onChange={onChange}
+        options={inline.map(tab => ({ value: tab, label: financeTabLabel(tab, tr), icon: TAB_ICON[tab] }))}
+      />
+      {more.length > 0 ? (
+        <FilterSelect<FinanceTab>
+          label={tr.finMoreSections}
+          hideLabel
+          placeholder={tr.finTabMore}
+          icon={moreActive ? TAB_ICON[active] : 'ellipsis'}
+          value={moreActive ? active : null}
+          onChange={v => { if (v) onChange(v); }}
+          options={more.map(tab => ({ value: tab, label: financeTabLabel(tab, tr), icon: TAB_ICON[tab] }))}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function FinanceTabBarLegacy({ tabs, active, onChange, c, tr, stretch = true }: {
   tabs: readonly FinanceTab[];
   active: FinanceTab;
   onChange: (tab: FinanceTab) => void;
@@ -149,10 +197,7 @@ function txTypeText(type: FinanceTxType, tr: Translations): string {
   return type === 'income' ? tr.incomes : type === 'expense' ? tr.expenses : tr.all;
 }
 
-export function FinanceFilterBar({
-  filter, currencies, onPeriod, onCurrency, onScope, showScope = true, c, tr, isDark,
-  txType, onTxType,
-}: {
+type FinanceFilterBarProps = {
   filter: FinanceFilter;
   /**
    * Тип операцій (Всі/Доходи/Витрати) — лише на «Операціях». Раніше це був
@@ -174,7 +219,128 @@ export function FinanceFilterBar({
   /** Зарезервовано: підпис періоду береться з перекладів (tr.months). */
   locale?: string;
   isDark: boolean;
-}) {
+};
+
+/**
+ * Планшет (DS v2.5): період · валюта · ракурс · тип — ОДИН ряд `FilterBar`
+ * (36pt), що не вліз — у «Фільтри · N». Телефон — чип і шторка, як було.
+ */
+export function FinanceFilterBar(props: FinanceFilterBarProps) {
+  return useFiltersV25() ? <FinanceFilterBarV25 {...props} /> : <FinanceFilterBarLegacy {...props} />;
+}
+
+function FinanceFilterBarV25({
+  filter, currencies, onPeriod, onCurrency, onScope, showScope = true, c, tr, isDark,
+  txType, onTxType,
+}: FinanceFilterBarProps) {
+  const { t } = useDS();
+  const gs = useGlassStyles();
+  const [periodOpen, setPeriodOpen] = useState(false);
+  const periodLabel = labelPeriodLocalized(filter.period, tr.months, tr.monthsShort);
+  const primary = currencies[0];
+  const scopeOptions = MONEY_SCOPES.map(o => ({ value: o, label: moneyScopeText(o, tr) }));
+  const typeOptions = (['all', 'income', 'expense'] as const).map(o => ({ value: o, label: txTypeText(o, tr) }));
+
+  return (
+    <>
+      <FilterBar
+        label={tr.finFilterButton}
+        overflowLabel={tr.filters}
+        style={{ flex: 1, minWidth: 0, marginTop: 10 }}
+        items={[
+          {
+            id: 'period',
+            pinned: true,
+            node: (
+              <View style={st.v25Hit}>
+                <View style={[st.periodBox, st.v25Period, { ...gs.card }]}>
+                  <TouchableOpacity
+                    onPress={() => onPeriod(shiftPeriod(filter.period, -1))}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.finPeriodPrev}
+                    style={st.v25Arrow}>
+                    <IconSymbol name="chevron.left" size={14} color={t.text.secondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setPeriodOpen(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${tr.finFilterPeriod}: ${periodLabel}`}
+                    style={st.v25PeriodBtn}>
+                    <Text numberOfLines={1} style={{ color: t.text.primary, fontSize: 13, fontFamily: fontFamily.medium, maxWidth: 180, ...dsType.numeric }}>{periodLabel}</Text>
+                    <IconSymbol name="chevron.down" size={14} color={t.text.secondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => onPeriod(shiftPeriod(filter.period, 1))}
+                    accessibilityRole="button"
+                    accessibilityLabel={tr.finPeriodNext}
+                    style={st.v25Arrow}>
+                    <IconSymbol name="chevron.right" size={14} color={t.text.secondary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ),
+          },
+          ...(currencies.length > 0 ? [{
+            id: 'currency',
+            active: Boolean(primary) && filter.currency !== primary,
+            menuLabel: tr.finFilterCurrency,
+            node: (
+              <FilterSelect<string>
+                label={tr.finFilterCurrency}
+                value={filter.currency}
+                neutralValue={primary}
+                onChange={v => onCurrency(v ?? primary)}
+                options={currencies.map(code => ({ value: code, label: code }))}
+              />
+            ),
+          }] : []),
+          ...(showScope ? [{
+            id: 'scope',
+            active: filter.scope !== 'all',
+            menuLabel: tr.budgetScopeLabel,
+            node: (
+              <FilterSelect<MoneyScope>
+                label={tr.budgetScopeLabel}
+                value={filter.scope}
+                neutralValue="all"
+                onChange={v => onScope(v ?? 'all')}
+                options={scopeOptions}
+              />
+            ),
+          }] : []),
+          ...(txType && onTxType ? [{
+            id: 'type',
+            active: txType !== 'all',
+            menuLabel: tr.finTxTypeLabel,
+            node: (
+              <Segmented<FinanceTxType>
+                label={tr.finTxTypeLabel}
+                value={txType}
+                onChange={onTxType}
+                options={typeOptions}
+              />
+            ),
+          }] : []),
+        ]}
+      />
+      <PeriodSheet
+        visible={periodOpen}
+        onClose={() => setPeriodOpen(false)}
+        period={filter.period}
+        onPick={p => { onPeriod(p); setPeriodOpen(false); }}
+        c={c}
+        tr={tr}
+        isWide
+        isDark={isDark}
+      />
+    </>
+  );
+}
+
+function FinanceFilterBarLegacy({
+  filter, currencies, onPeriod, onCurrency, onScope, showScope = true, c, tr, isDark,
+  txType, onTxType,
+}: FinanceFilterBarProps) {
   const { isWide, height } = useResponsive();
   const { t } = useDS();
   const gs = useGlassStyles();
@@ -462,4 +628,10 @@ const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', minHeight: touchTarget, borderRadius: radius.pill, paddingHorizontal: 16 },
   input: { flex: 1, minHeight: touchTarget, borderRadius: radius.control, paddingHorizontal: space[4], fontSize: 15, fontFamily: fontFamily.regular, ...dsType.numeric },
   primaryBtn: { minHeight: 48, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  // DS v2.5 (планшет): видимо 36pt, рамка дотику 44pt — без hitSlop (A11Y-08).
+  v25Row: { flexDirection: 'row', alignItems: 'center', gap: FILTER_GAP },
+  v25Hit: { height: FILTER_HIT_H, justifyContent: 'center' },
+  v25Period: { height: FILTER_CONTROL_H, paddingHorizontal: 0 },
+  v25Arrow: { width: 36, height: FILTER_HIT_H, alignItems: 'center', justifyContent: 'center' },
+  v25PeriodBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, height: FILTER_HIT_H },
 });

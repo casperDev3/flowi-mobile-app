@@ -25,7 +25,7 @@
  */
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ActionBar, ActionButton, ActionChip } from '@/components/shared/ActionBar';
 import { ResponsiveGrid } from '@/components/shared/ResponsiveGrid';
@@ -55,11 +55,42 @@ import { saveProjectRecord, useProjectRecords, useProjectRecordsState } from './
 import { SwipeRow, ZoneEmpty, ZoneError, ZoneSkeleton, useZoneState, type SwipeAction } from '@/components/layout-zones';
 import { fontFamily, radius, shadow, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { BentoCard, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
+import {
+  BentoCard, FILTER_CONTROL_H, FILTER_HIT_H, FilterBar, FilterSearch, FilterSelect, KpiCounter, MeshBackground, SectionTabs,
+  Segmented, useFiltersV25,
+} from '@/components/ds';
 import { useResponsive } from '@/hooks/use-responsive';
 
 type Tab = 'backlog' | 'idea' | 'bug';
 interface Choice { id: string; name: string }
+
+/**
+ * DS v2.5 (планшет): поле дати «Завершено від/до» тієї ж висоти 36pt, що й
+ * решта контролів FilterBar (рамка 44pt — зона дотику).
+ */
+function BacklogDateFilter({ label, value, onChange, tk }: {
+  label: string; value: string; onChange: (v: string) => void; tk: ReturnType<typeof dsTokens>;
+}) {
+  return (
+    <View style={{ height: FILTER_HIT_H, justifyContent: 'center' }}>
+      <View style={{
+        height: FILTER_CONTROL_H, width: 220, flexDirection: 'row', alignItems: 'center', gap: 6,
+        paddingHorizontal: 12, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth,
+        borderColor: value ? tk.text.secondary : tk.border.hairline, backgroundColor: tk.surface.subtle,
+      }}>
+        <IconSymbol name="calendar" size={14} color={tk.text.secondary} />
+        <TextInput
+          accessibilityLabel={label}
+          placeholder={label}
+          placeholderTextColor={tk.text.muted}
+          value={value}
+          onChangeText={onChange}
+          style={{ flex: 1, color: tk.text.primary, fontSize: 13, fontFamily: fontFamily.medium, paddingVertical: 0 }}
+        />
+      </View>
+    </View>
+  );
+}
 
 export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
   const id = useProjectRouteId() as string;
@@ -70,6 +101,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
   const { tr } = useI18n();
   const dark = useColorScheme() === 'dark';
   const { isWide } = useResponsive();
+  const filtersV25 = useFiltersV25();
   const c = projectShellColors(dark, project?.color ?? '#7C3AED', project?.appearance);
   const tk = dsTokens(dark);
 
@@ -264,7 +296,106 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
       kpis={<KpiCounter value={filtered.length} label={archive ? tr.projectArchive : sectionLabel} />}
       // Omni: розділ беклогу — pill-вкладки (той самий стан `tab`, що й
       // колишній рядок чипів «Розділ»: зміна скидає фільтри так само).
-      tabs={!archive ? (
+      tabs={filtersV25 ? (
+        // DS v2.5 (планшет): розділ, пошук і всі фільтри — ОДИН ряд FilterBar.
+        <FilterBar
+          label={tr.pbFilters}
+          overflowLabel={tr.filters}
+          resetLabel={tr.pbResetFilters}
+          onReset={resetFilters}
+          search={<FilterSearch label={tr.pbSearch} placeholder={tr.pbSearch} value={search} onChangeText={setSearch} />}
+          actions={!archive && role !== 'viewer' && (tasksStatus !== 'ready' || filtered.length > 0)
+            ? <ActionButton label={newLabel} icon="plus" tone="primary" onPress={onNew} colors={c} />
+            : undefined}
+          items={[
+            ...(!archive ? [{
+              id: 'section', pinned: true, node: (
+                <Segmented<Tab>
+                  label={tr.pbSection}
+                  value={tab}
+                  onChange={v => { setTab(v); setSprint('all'); setPerson('all'); setPriority('all'); }}
+                  options={[
+                    { value: 'backlog', label: tr.projectBacklogNav, icon: 'tray' },
+                    { value: 'idea', label: tr.pbIdeas, icon: 'lightbulb.fill' },
+                    { value: 'bug', label: tr.pbBugs, icon: 'exclamationmark.circle' },
+                  ]}
+                />
+              ),
+            }] : []),
+            {
+              id: 'mine', active: mine, node: (
+                <Segmented<'all' | 'mine'>
+                  label={tr.pbAssignedToMe}
+                  value={mine ? 'mine' : 'all'}
+                  onChange={v => setMine(v === 'mine')}
+                  options={[
+                    { value: 'all', label: tr.pbAll },
+                    { value: 'mine', label: tr.pbAssignedToMe, icon: 'person.fill' },
+                  ]}
+                />
+              ),
+            },
+            {
+              id: 'sprint', active: sprint !== 'all', menuLabel: tr.pbSprint, node: (
+                <FilterSelect
+                  label={tr.pbSprint}
+                  value={sprint}
+                  neutralValue="all"
+                  onChange={v => setSprint(v ?? 'all')}
+                  options={[{ id: 'all', name: tr.pbAllSprints }, ...sprintChoices].map(o => ({ value: o.id, label: o.name }))}
+                />
+              ),
+            },
+            {
+              id: 'person', active: person !== 'all', menuLabel: tr.pbAssignee, node: (
+                <FilterSelect
+                  label={tr.pbAssignee}
+                  value={person}
+                  neutralValue="all"
+                  onChange={v => setPerson(v ?? 'all')}
+                  options={[
+                    { value: 'all', label: tr.pbAll }, { value: 'none', label: tr.pbUnassigned },
+                    ...members.map(m => ({ value: String(m.user.id), label: m.user.name || m.user.email })),
+                  ]}
+                />
+              ),
+            },
+            {
+              id: 'priority', active: priority !== 'all', menuLabel: tr.pbPriority, node: (
+                <FilterSelect
+                  label={tr.pbPriority}
+                  value={priority}
+                  neutralValue="all"
+                  onChange={v => setPriority(v ?? 'all')}
+                  options={[
+                    { value: 'all', label: tr.pbAll },
+                    ...Array.from({ length: 6 }, (_, i) => ({ value: String(i), label: `P${i}` })),
+                    { value: 'none', label: tr.pbNoPriority },
+                  ]}
+                />
+              ),
+            },
+            ...(archive ? [
+              {
+                id: 'sort', active: sort !== 'newest', menuLabel: tr.pbSort, node: (
+                  <FilterSelect
+                    label={tr.pbSort}
+                    value={sort}
+                    neutralValue="newest"
+                    onChange={v => setSort(v ?? 'newest')}
+                    options={[
+                      { value: 'newest', label: tr.pbNewest }, { value: 'oldest', label: tr.pbOldest },
+                      { value: 'name', label: tr.pbName }, { value: 'priority', label: tr.pbPriority },
+                    ]}
+                  />
+                ),
+              },
+              { id: 'from', active: !!from, menuLabel: tr.pbDoneFrom, node: <BacklogDateFilter label={tr.pbDoneFrom} value={from} onChange={setFrom} tk={tk} /> },
+              { id: 'to', active: !!to, menuLabel: tr.pbDoneTo, node: <BacklogDateFilter label={tr.pbDoneTo} value={to} onChange={setTo} tk={tk} /> },
+            ] : []),
+          ]}
+        />
+      ) : !archive ? (
         <SectionTabs
           tabs={[
             { key: 'backlog', label: tr.projectBacklogNav, icon: 'tray' },
@@ -281,7 +412,9 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 12, width: '100%', maxWidth: Layout.wideMaxWidth, alignSelf: 'center' }}>
-        {/* Omni: пошук і фільтри — одна суцільна картка над списком. */}
+        {/* Omni: пошук і фільтри — одна суцільна картка над списком
+            (телефон; на планшеті — FilterBar у шапці). */}
+        {filtersV25 ? null : (
         <BentoCard compact style={{ gap: 12 }}>
         <TeamInput label={tr.pbSearch} value={search} onChange={setSearch} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -311,6 +444,7 @@ export function ProjectBacklog({ archive = false }: { archive?: boolean }) {
           {!archive && role !== 'viewer' && (tasksStatus !== 'ready' || filtered.length > 0) ? <ActionButton label={newLabel} icon="plus" tone="primary" onPress={onNew} colors={c} /> : null}
         </ActionBar>
         </BentoCard>
+        )}
         {!!error && <Text accessibilityRole="alert" style={{ color: tk.status.danger, fontFamily: fontFamily.medium }}>{error}</Text>}
         {/* Стани головної зони (Layout System v2.4): скелет, помилка з
             «Повторити», порожньо з однією дією. Фільтри вище лишаються робочими. */}

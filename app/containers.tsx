@@ -32,7 +32,7 @@ import { useZoneState } from '@/hooks/use-zone-state';
 // Omni (DS v2.2): шапка — AppHeader поверх ScreenHeader (інсет, «Назад», 🔔, аватар).
 import { AppHeader } from '@/components/shared/AppHeader';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
-import { EmptyState, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
+import { EmptyState, FilterBar, FilterSearch, KpiCounter, MeshBackground, Segmented, SectionTabs, useFiltersV25 } from '@/components/ds';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius, shadow, type as dsType } from '@/constants/theme';
 import { sizeClassFor } from '@/constants/tokens';
@@ -75,6 +75,8 @@ export default function ContainersScreen() {
   const params = useLocalSearchParams<{ open?: string; slug?: string; qr?: string; scan?: string; q?: string }>();
   const contentWidth = useContentWidth();
   const { width, isWide, isExpanded } = useResponsive();
+  // DS v2.5: на планшеті пошук + вигляд — один ряд FilterBar; телефон — як було.
+  const filtersV25 = useFiltersV25();
   const screenWidth = useScreenWidth();
   const data = useContainersData();
   useUploadQueueRunner();
@@ -461,6 +463,34 @@ export default function ContainersScreen() {
                 </HeaderButton>
               </>
             }>
+            {filtersV25 ? (
+              <FilterBar
+                label={tr.containers}
+                search={<FilterSearch label={tr.searchItems} placeholder={tr.searchItems} value={search} onChangeText={setSearch} />}
+                items={!isSearching && data.status !== 'failed' ? [{
+                  id: 'view',
+                  pinned: true,
+                  node: (
+                    <Segmented<ViewMode>
+                      label={tr.containers}
+                      value={view}
+                      onChange={setView}
+                      options={viewTabs.map(tab => ({ value: tab.key, label: tab.label, icon: tab.icon }))}
+                    />
+                  ),
+                }] : []}
+                actions={
+                  <TouchableOpacity onPress={() => setPrintIds([])} accessibilityRole="button" accessibilityLabel={tr.ctrPrint}
+                    style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: c.t.surface.card, borderWidth: 1, borderColor: c.t.border.hairline }}>
+                      <IconSymbol name="doc.text" size={16} color={c.text} />
+                    </View>
+                  </TouchableOpacity>
+                }
+              />
+            ) : (
+            <>
             {/* Пошук + «Друк» — інструменти вмісту, не шапки (на телефоні в шапці вже 🔔 і аватар). */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill,
@@ -486,6 +516,8 @@ export default function ContainersScreen() {
             {!isSearching && data.status !== 'failed' ? (
               <SectionTabs tabs={viewTabs} value={view} onChange={setView} accessibilityLabel={tr.containers} />
             ) : null}
+            </>
+            )}
           </AppHeader>
 
           {body}

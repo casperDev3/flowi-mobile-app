@@ -136,7 +136,9 @@ import { fontFamily, radius, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
 import { glassOf } from '@/components/shared/dsTheme';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
-import { KpiCounter, SectionTabs } from '@/components/ds';
+import {
+  FilterBar, FilterSearch, FilterSelect, KpiCounter, SectionTabs, Segmented, useFiltersV25,
+} from '@/components/ds';
 
 type ViewMode = 'list' | 'board' | 'calendar' | 'timeline';
 
@@ -172,6 +174,7 @@ export default function ProjectTasksScreen() {
   const canEdit = teamRole !== 'viewer';
   const { stopTimerForTask, activeTimers } = useTimerContext();
   const { isWide, width: windowWidth } = useResponsive();
+  const filtersV25 = useFiltersV25();
   const screenWidth = useScreenWidth();
   /**
    * Layout System v2.4 — стан зон розділу: режим «Список / Колонки»
@@ -875,6 +878,12 @@ export default function ProjectTasksScreen() {
    * групування списку, «лише призначені мені», календар і архів проєкту.
    * Окремих іконок у шапці більше немає.
    */
+  const groupByOptionLabel = (key: ProjectListGroupBy) => (key === 'none' ? tr.projectGroupByNone
+    : key === 'status' ? tr.sortStatus
+    : key === 'priority' ? tr.sortPriority
+    : tr.sprints);
+  /** Підпис усередині тригера — без двокрапки «Групувати:». */
+  const groupByLabel = tr.projectGroupByLabel.replace(/[:\s]+$/, '');
   const menuItems: TasksMenuItem[] = [
     { key: 'view-list', icon: 'list.bullet', label: tr.projectViewList, checked: view === 'list', onPress: () => setView('list'), color: c.accent },
     { key: 'view-board', icon: 'square.grid.2x2', label: tr.projectViewBoard, checked: view === 'board', onPress: () => setView('board'), color: c.accent },
@@ -1206,7 +1215,7 @@ export default function ProjectTasksScreen() {
           <KpiCounter value={headerStats.done} label={tr.completed} />
         </>
       }
-      tabs={
+      tabs={filtersV25 ? undefined : (
         // Omni: вид розділу — pill-вкладки (Список · Дошка). Той самий стан
         // `view`, що й пункти меню «⋯»: меню лишається, вкладки — коротший шлях.
         <SectionTabs
@@ -1219,8 +1228,63 @@ export default function ProjectTasksScreen() {
           accessibilityLabel={tr.projectTasksMenu}
           bleed={isWide ? 0 : 20}
         />
-      }
-      headerChildren={
+      )}
+      headerChildren={filtersV25 ? (
+        // DS v2.5 (планшет): вигляд · пошук · групування · «лише мої» — ОДИН ряд.
+        <FilterBar
+          label={tr.projectTasksMenu}
+          overflowLabel={tr.filters}
+          resetLabel={tr.resetFilter}
+          onReset={() => { setQuery(''); setMineOnly(false); setGroupBy('none'); }}
+          search={(
+            <FilterSearch
+              label={tr.projectTasksSearch}
+              placeholder={tr.projectTasksSearch}
+              value={query}
+              onChangeText={setQuery}
+            />
+          )}
+          items={[
+            {
+              id: 'view', pinned: true, node: (
+                <Segmented
+                  label={tr.projectTasksMenu}
+                  value={view === 'board' ? 'board' : 'list'}
+                  onChange={key => setView(key)}
+                  options={[
+                    { value: 'list' as const, label: tr.projectViewList, icon: 'list.bullet' as const },
+                    { value: 'board' as const, label: tr.projectViewBoard, icon: 'square.grid.2x2' as const },
+                  ]}
+                />
+              ),
+            },
+            ...(view === 'list' ? [{
+              id: 'group', active: groupBy !== 'none', menuLabel: groupByLabel, node: (
+                <FilterSelect<ProjectListGroupBy>
+                  label={groupByLabel}
+                  value={groupBy}
+                  neutralValue="none"
+                  onChange={key => setGroupBy(key ?? 'none')}
+                  options={GROUP_BY_OPTIONS.map(opt => ({ value: opt.key, label: groupByOptionLabel(opt.key) }))}
+                />
+              ),
+            }] : []),
+            {
+              id: 'mine', active: mineOnly, node: (
+                <Segmented
+                  label={tr.projectTasksMine}
+                  value={mineOnly ? 'mine' : 'all'}
+                  onChange={key => setMineOnly(key === 'mine')}
+                  options={[
+                    { value: 'all' as const, label: tr.allTasks },
+                    { value: 'mine' as const, label: tr.projectTasksMine, icon: 'person.fill' as const },
+                  ]}
+                />
+              ),
+            },
+          ]}
+        />
+      ) : (
         // Пошук — під заголовком, нерухомо над списком (як фільтр-рядок
         // особистих Завдань на планшеті). «Лише мої» видно чипом, поки увімкнено.
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1252,7 +1316,7 @@ export default function ProjectTasksScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-      }
+      )}
       zone={{
         ...taskCardZone({
           card,

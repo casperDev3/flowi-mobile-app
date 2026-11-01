@@ -100,7 +100,8 @@ describe('Фінанси: дерево доступності', () => {
 
     // Перемикач переїхав із рядка заголовка стрічки у фільтр-чип ряду періоду
     // (аудит 2026-10: «три ряди контролів»). На телефоні — в аркуші фільтра.
-    // На планшеті (ширина тестового вікна) він стоїть у ряду одразу.
+    // На планшеті (ширина тестового вікна) він стоїть у ряду одразу —
+    // Segmented у FilterBar (DS v2.5).
     const chip = pressables(tree).find((n: any) => n.props.accessibilityLabel === tr.finFilterButton);
     if (chip) await act(async () => { chip.props.onPress(); });
 
@@ -114,7 +115,8 @@ describe('Фінанси: дерево доступності', () => {
     // Вибраний рівно один — і це «Всі» за замовчуванням. Рахуємо за
     // підписами: findAll віддає і композит, і його host-вузол з тими ж пропсами.
     const selected = [...new Set(
-      radios.filter((n: any) => n.props.accessibilityState?.selected)
+      // Телефон — selected (радіо в аркуші); планшет (DS v2.5 Segmented) — checked.
+      radios.filter((n: any) => n.props.accessibilityState?.selected || n.props.accessibilityState?.checked)
         .map((n: any) => n.props.accessibilityLabel),
     )];
     expect(selected).toEqual([tr.all]);

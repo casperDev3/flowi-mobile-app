@@ -3,10 +3,14 @@
  *
  * Мультивибір пріоритетів для фільтра списків завдань: P0…P5 + «Скинути»,
  * коли щось вибрано. Порожній вибір = без фільтра (matchesPriorityFilter).
+ *
+ * `PriorityFilterSelect` — той самий мультивибір для ряду FilterBar на
+ * планшеті (Filters v2.5): «Пріоритет: Усі ⌄» з чекбоксами P0…P5.
  */
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
+import { FilterSelect } from '@/components/ds/filters';
 import { useI18n } from '@/store/i18n';
 import {
   PRIORITY_LEVELS,
@@ -72,6 +76,33 @@ export function PriorityFilterChips({ value, onChange, colors: c }: PriorityFilt
         </TouchableOpacity>
       )}
     </ScrollView>
+  );
+}
+
+/** Планшет: мультивибір пріоритету в ряду FilterBar. */
+export function PriorityFilterSelect({ value, onChange, testID }: {
+  value: readonly PriorityLevel[];
+  onChange: (next: PriorityLevel[]) => void;
+  testID?: string;
+}) {
+  const { tr } = useI18n();
+  return (
+    // FilterSelect працює з рядковими значеннями — рівень як рядок «0»…«5».
+    <FilterSelect<string>
+      testID={testID}
+      label={tr.priority}
+      multiple
+      value={value.map(String)}
+      searchable={false}
+      resetLabel={tr.priorityFilterReset}
+      // Порядок завжди P0→P5, як у togglePriorityLevel.
+      onChange={next => onChange(PRIORITY_LEVELS.filter(l => next.includes(String(l))))}
+      options={PRIORITY_LEVELS.map(level => ({
+        value: String(level),
+        label: priorityLabel(level),
+        color: priorityColor(level) as string,
+      }))}
+    />
   );
 }
 

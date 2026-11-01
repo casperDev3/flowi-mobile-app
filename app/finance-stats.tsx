@@ -34,7 +34,8 @@ import { wideModalStyles } from '@/components/finance/wideModal';
 import { CONTENT_MAX_WIDTH, WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-width';
 import { defaultCategories, type CategoryDef } from '@/utils/financeCategories';
 import {
-  BentoCard, HatchedBars, KpiCounter, MeshBackground, PageHeader, SectionTabs,
+  BentoCard, FilterBar, FilterSelect, HatchedBars, KpiCounter, MeshBackground, PageHeader, SectionTabs,
+  useFiltersV25,
 } from '@/components/ds';
 import { type GlassAccent } from '@/constants/theme';
 
@@ -106,6 +107,15 @@ function makeColors(isDark: boolean, reduceTransparency = false) {
 }
 
 type Period = 'week' | 'month' | '3months' | 'year' | 'all';
+
+/** Періоди для FilterSelect (планшет, DS v2.5) — ті самі, що й SectionTabs телефона. */
+const PERIOD_OPTIONS: readonly { value: Period; label: string }[] = [
+  { value: 'week',    label: 'Тиждень' },
+  { value: 'month',   label: 'Місяць'  },
+  { value: '3months', label: '3 Міс'   },
+  { value: 'year',    label: 'Рік'     },
+  { value: 'all',     label: 'Все'     },
+];
 
 function getPeriodStart(period: Period): Date | null {
   const now = new Date();
@@ -233,6 +243,8 @@ const SparkLine = React.memo(function SparkLine({ data, color, height = 64, widt
 export default function FinanceStatsScreen() {
   const readingWidth = useContentWidth();
   const { isWide, isExpanded } = useResponsive();
+  // DS v2.5: на планшеті період + власний діапазон — один ряд FilterBar; телефон — як було.
+  const filtersV25 = useFiltersV25();
   const screenWidth = useScreenWidth();
   /**
    * Ландшафт планшета: картки статистики у дві колонки в ширшій колонці
@@ -617,8 +629,50 @@ export default function FinanceStatsScreen() {
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: Platform.OS === 'ios' ? 48 : 28 }]}
           showsVerticalScrollIndicator={false}>
 
+          {/* ── Планшет (DS v2.5): період / власний діапазон — один ряд FilterBar ── */}
+          {filtersV25 && (hasCustomRange || !(loaded && txs.length === 0)) ? (
+            <FilterBar
+              label={tr.filters}
+              style={{ marginBottom: 16 }}
+              items={hasCustomRange ? [{
+                id: 'range',
+                pinned: true,
+                active: true,
+                node: (
+                  <TouchableOpacity
+                    onPress={clearRange}
+                    accessibilityRole="button"
+                    style={{ height: 44, justifyContent: 'center' }}>
+                    <View style={[s.rangeChip, { backgroundColor: c.action, marginBottom: 0, height: 36, minHeight: 36, paddingVertical: 0 }]}>
+                      <IconSymbol name="calendar" size={12} color={c.onAction} />
+                      <Text style={{ color: c.onAction, fontSize: 13, fontFamily: fontFamily.semibold, marginHorizontal: 6, fontVariant: ['tabular-nums'] }}>
+                        {rangeStart!.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+                        {' — '}
+                        {rangeEnd!.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </Text>
+                      <IconSymbol name="xmark" size={12} color={c.onAction} />
+                    </View>
+                  </TouchableOpacity>
+                ),
+              }] : [{
+                id: 'period',
+                pinned: true,
+                active: period !== 'month',
+                node: (
+                  <FilterSelect<Period>
+                    label="Період"
+                    value={period}
+                    neutralValue="month"
+                    onChange={v => setPeriod(v ?? 'month')}
+                    options={PERIOD_OPTIONS}
+                  />
+                ),
+              }]}
+            />
+          ) : null}
+
           {/* ── Custom range chip ── */}
-          {hasCustomRange && (
+          {!filtersV25 && hasCustomRange && (
             <TouchableOpacity
               onPress={clearRange}
               style={[s.rangeChip, { backgroundColor: c.action }]}>
@@ -653,7 +707,7 @@ export default function FinanceStatsScreen() {
           <>
 
           {/* ── Period selector (hidden when custom range active) ── */}
-          {!hasCustomRange && (
+          {!filtersV25 && !hasCustomRange && (
             <SectionTabs<Period>
               tabs={[
                 { key: 'week',    label: 'Тиждень' },

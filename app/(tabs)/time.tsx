@@ -69,7 +69,8 @@ import { FullscreenTimers } from '@/components/time/FullscreenTimers';
 import { StartTimerCard } from '@/components/time/StartTimerCard';
 import { TimeEntryForm } from '@/components/time/TimeEntryForm';
 import { TimeEntrySheet } from '@/components/time/TimeEntrySheet';
-import { TimeFilterSheet } from '@/components/time/TimeFilterSheet';
+import { TimeFilterBar, TimeFilterSheet } from '@/components/time/TimeFilterSheet';
+import { useFiltersV25 } from '@/components/ds/filters';
 import { TimeProjectBreakdown } from '@/components/time/TimeKpi';
 import type { TimerCandidateTask } from '@/components/time/timerCandidates';
 import { useTimerProjects } from '@/components/time/useTimerProjects';
@@ -156,6 +157,8 @@ export default function TimeScreen() {
    * потрапляє ніколи: його розмітка й поведінка лишаються як були.
    */
   const zoneMode = isWide;
+  /** Filters v2.5 — лише не-compact (= isWide); телефон — вкладки + шухляда. */
+  const filtersV25 = useFiltersV25();
   const { user } = useAuth();
   const projectRoles = useProjectRoles();
   // DS v2: canvas, білі картки без рамок, головна дія — action.primary.
@@ -725,9 +728,36 @@ export default function TimeScreen() {
     </View>
   );
 
-  // Omni: період — вкладки розділу (pill-таби, активна чорна). На широкому
-  // поруч — «Ще фільтри» (на телефоні та сама дія стоїть у шапці).
-  const periodTabs = (
+  // Omni: період — вкладки розділу (pill-таби, активна чорна); решта
+  // фільтрів на телефоні — у шухляді (кнопка в шапці).
+  // Планшет (Filters v2.5): період, режим, проєкт, задача й порядок — ОДИН
+  // ряд FilterBar замість вкладок + шухляди «Ще фільтри».
+  const onFilterChange = (next: {
+    period?: TimePeriod; sort?: TimeSort; grouping?: TimeGrouping; projectId?: string | null; taskKey?: string | null;
+  }) => {
+    if (next.period !== undefined) { haptic.light(); setPeriod(next.period); }
+    if (next.sort !== undefined) setSort(next.sort);
+    if (next.grouping !== undefined) setGrouping(next.grouping);
+    if (next.projectId !== undefined) setFilterProjectId(next.projectId);
+    if (next.taskKey !== undefined) setFilterTaskKey(next.taskKey);
+  };
+  const periodTabs = filtersV25 ? (
+    <View style={{ marginTop: 10 }}>
+      <TimeFilterBar
+        period={period}
+        sort={sort}
+        grouping={grouping}
+        projectId={filterProjectId}
+        taskKey={filterTaskKey}
+        projects={projectsForFilter}
+        tasks={tasksForFilter}
+        periodLabels={periodLabels}
+        tr={tr}
+        onChange={onFilterChange}
+        onReset={resetFilters}
+      />
+    </View>
+  ) : (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
       <SectionTabs
         tabs={(Object.keys(periodLabels) as TimePeriod[]).map(key => ({ key, label: periodLabels[key] }))}
@@ -736,16 +766,6 @@ export default function TimeScreen() {
         accessibilityLabel={tr.history}
         style={{ flex: 1, minWidth: 0 }}
       />
-      {zoneMode && (
-        <TouchableOpacity
-          onPress={() => setShowFilters(true)}
-          accessibilityRole="button"
-          accessibilityLabel={tr.filtersAndSort}
-          style={[s.periodChip, { borderColor: hasFilters ? c.indigo : 'transparent', backgroundColor: t.surface.card, flexDirection: 'row', gap: 6 }]}>
-          <IconSymbol name="slider.horizontal.3" size={14} color={hasFilters ? c.indigo : c.sub} />
-          <Text style={{ color: hasFilters ? c.indigo : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.timeMoreFilters}</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 
@@ -1243,7 +1263,6 @@ const s = StyleSheet.create({
   entryDur: { fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
   trimBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8 },
   emptyAction: { flexDirection: 'row', alignItems: 'center', marginTop: 16, paddingHorizontal: 20, minHeight: 44, borderRadius: 999 },
-  periodChip: { minHeight: 44, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1.5, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   panelCard: { borderRadius: Atlas.radius.xxlarge, padding: 24 },
   panelEmpty: { flexDirection: 'row', alignItems: 'center', borderRadius: Atlas.radius.xlarge, padding: 16 },
   wideBody: { flex: 1, width: '100%', alignSelf: 'center' },

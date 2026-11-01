@@ -35,6 +35,7 @@ import { fontFamily, shadow } from '@/constants/theme';
 import { dsTokens, glassTokens, useDS } from '@/hooks/use-ds';
 import { glassStyles } from '@/components/finance/finPalette';
 import { BentoCard, HatchedBars, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
+import { FilterBar, Segmented, useFiltersV25 } from '@/components/ds/filters';
 
 type WorkoutType = 'run' | 'bike' | 'swim' | 'gym' | 'yoga' | 'walk' | 'other';
 
@@ -811,6 +812,7 @@ export default function WorkoutsScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'workouts' | 'exercises' | 'programs'>('workouts');
+  const v25 = useFiltersV25();
 
   // Modals
   const [showStats, setShowStats] = useState(false);
@@ -1202,17 +1204,39 @@ export default function WorkoutsScreen() {
             }>
             {/* Вкладки розділу — Omni SectionTabs (чорна pill = «ви тут»).
                 «Мої програми» — щоб не плутались із груповими (§10.1). */}
-            <SectionTabs
-              tabs={TABS.map(t => ({
-                key: t.key,
-                icon: t.icon,
-                label: t.key === 'programs' ? tr.tgPersonalProgramsTab : t.label,
-                count: !initialized ? undefined : t.key === 'exercises' ? exercises.length : t.key === 'programs' ? programs.length : undefined,
-              }))}
-              value={tab}
-              onChange={setTab}
-              accessibilityLabel={tr.workoutsLabel}
-            />
+            {v25 ? (
+              <FilterBar
+                label={tr.workoutsLabel}
+                items={[{
+                  id: 'tab', pinned: true, node: (
+                    <Segmented
+                      label={tr.workoutsLabel}
+                      semantics="tablist"
+                      value={tab}
+                      onChange={setTab}
+                      options={TABS.map(t => ({
+                        value: t.key,
+                        icon: t.icon,
+                        label: t.key === 'programs' ? tr.tgPersonalProgramsTab : t.label,
+                        count: !initialized ? undefined : t.key === 'exercises' ? exercises.length : t.key === 'programs' ? programs.length : undefined,
+                      }))}
+                    />
+                  ),
+                }]}
+              />
+            ) : (
+              <SectionTabs
+                tabs={TABS.map(t => ({
+                  key: t.key,
+                  icon: t.icon,
+                  label: t.key === 'programs' ? tr.tgPersonalProgramsTab : t.label,
+                  count: !initialized ? undefined : t.key === 'exercises' ? exercises.length : t.key === 'programs' ? programs.length : undefined,
+                }))}
+                value={tab}
+                onChange={setTab}
+                accessibilityLabel={tr.workoutsLabel}
+              />
+            )}
           </AppHeader>
         </View>
 

@@ -41,6 +41,9 @@ import {
   comparePriority,
   matchesPriorityFilter,
   normalizePriority,
+  PRIORITY_LEVELS,
+  priorityColor,
+  priorityLabel,
   type LegacyPriority,
   type PriorityLevel,
   type TaskPriority,
@@ -49,7 +52,7 @@ import { WIDE_CONTENT_MAX_WIDTH, useContentWidth } from '@/hooks/use-content-wid
 import { useBreakpointValue } from '@/hooks/use-responsive';
 import { fontFamily, radius, shadow } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { KpiCounter, MeshBackground, PageHeader } from '@/components/ds';
+import { FilterBar, FilterSelect, KpiCounter, MeshBackground, PageHeader, useFiltersV25 } from '@/components/ds';
 import { AccentIcon } from '@/components/shared/GlassBits';
 
 type Status = 'active' | 'done';
@@ -74,6 +77,14 @@ function deadlineLabel(iso: string): string {
 }
 
 type SortBy = 'newest' | 'oldest' | 'priority' | 'name';
+
+/** Сортування архіву для FilterSelect (планшет, DS v2.5) — ті самі варіанти, що й чипи телефона. */
+const ARCHIVE_SORT_OPTIONS: readonly { value: SortBy; label: string; icon: 'arrow.down.circle' | 'arrow.up.circle' | 'exclamationmark.circle' | 'textformat.abc' }[] = [
+  { value: 'newest',   label: 'Нові',      icon: 'arrow.down.circle' },
+  { value: 'oldest',   label: 'Старі',     icon: 'arrow.up.circle' },
+  { value: 'priority', label: 'Пріоритет', icon: 'exclamationmark.circle' },
+  { value: 'name',     label: 'А–Я',       icon: 'textformat.abc' },
+];
 /** Елемент сітки архіву: завдання або порожня комірка-добивка рядка. */
 type GridItem = Task | { padId: string };
 
@@ -218,6 +229,8 @@ export default function ArchiveScreen() {
   // Мультивибір P0…P5; порожній = усі.
   const [filterPriorities, setFilterPriorities] = useState<PriorityLevel[]>([]);
   const [sort, setSort] = useState<SortBy>('newest');
+  // DS v2.5: на планшеті фільтри — один ряд FilterBar; телефон — як було.
+  const filtersV25 = useFiltersV25();
 
   // Колонки статусів — лише щоб знати, куди повертати завдання з архіву
   // (`restoredColumnIdForTask`). Ref, а не стан: мутації архіву йдуть чергою
@@ -479,6 +492,52 @@ export default function ArchiveScreen() {
           ) : null}
         </ScreenHeader>
 
+        {filtersV25 ? (
+          <View style={[contentWidth, { paddingHorizontal: 20, marginBottom: 12 }]}>
+            <FilterBar
+              label={tr.filters}
+              testID="archive-filter-bar"
+              items={[
+                {
+                  id: 'priority',
+                  active: filterPriorities.length,
+                  node: (
+                    <FilterSelect<string>
+                      label={tr.priority}
+                      allLabel={tr.filterAll}
+                      multiple
+                      value={filterPriorities.map(String)}
+                      onChange={next => setFilterPriorities(
+                        PRIORITY_LEVELS.filter(l => next.includes(String(l))),
+                      )}
+                      options={PRIORITY_LEVELS.map(level => ({
+                        value: String(level),
+                        label: priorityLabel(level),
+                        color: priorityColor(level) as string,
+                      }))}
+                    />
+                  ),
+                },
+                {
+                  id: 'sort',
+                  active: sort !== 'newest',
+                  node: (
+                    <FilterSelect<SortBy>
+                      label={tr.sorting}
+                      value={sort}
+                      neutralValue="newest"
+                      onChange={v => setSort(v ?? 'newest')}
+                      options={ARCHIVE_SORT_OPTIONS}
+                    />
+                  ),
+                },
+              ]}
+              onReset={() => { setFilterPriorities([]); setSort('newest'); }}
+              resetLabel={tr.priorityFilterReset}
+            />
+          </View>
+        ) : (
+        <>
         {/* Filter by priority — у тій самій колонці, що й картки нижче. */}
         <View style={[contentWidth, { paddingHorizontal: 20, marginBottom: 8 }]}>
           <PriorityFilterChips
@@ -510,6 +569,8 @@ export default function ArchiveScreen() {
             </TouchableOpacity>
           ))}
         </View>
+        </>
+        )}
 
         {/* Архів росте без стелі — список віртуалізований, інакше
             кількасот карток монтуються всі одразу. */}

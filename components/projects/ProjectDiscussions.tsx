@@ -26,7 +26,7 @@ import { TeamInput } from './TeamTaskPanel';
 import { saveProjectRecord, useProjectRecords } from './useProjectRecords';
 import { fontFamily, radius, shadow, type } from '@/constants/theme';
 import { dsTokens } from '@/hooks/use-ds';
-import { MeshBackground } from '@/components/ds';
+import { FilterBar, FilterSearch, MeshBackground, Segmented, useFiltersV25 } from '@/components/ds';
 
 type Filter = 'all' | 'topic' | 'chat' | 'archive';
 
@@ -60,6 +60,7 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
   // Планшет (рішення 6): список обговорень ліворуч, відкрите — колонкою праворуч.
   // Поріг — від ширини ЕКРАНА: у просторі проєкту сайдбар займає 232pt.
   const { width } = useResponsive();
+  const filtersV25 = useFiltersV25();
   const split = useScreenWidth() >= 900;
 
   const watched = !!room && !!prefs?.watchedDiscussionIds?.includes(room.id);
@@ -82,6 +83,34 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
 
   const listPart = (
     <>
+      {filtersV25 ? (
+        // DS v2.5 (планшет): пошук · тип · «Нове» — ОДИН ряд FilterBar.
+        <FilterBar
+          label={tr.projectDiscussions}
+          overflowLabel={tr.filters}
+          search={<FilterSearch label={tr.pdSearch} placeholder={tr.pdSearch} value={search} onChangeText={setSearch} />}
+          actions={role !== 'viewer' ? (
+            <ActionButton
+              label={tr.pdNew}
+              icon="plus"
+              tone="primary"
+              onPress={() => setDraft({ id: `discussion-${Date.now()}`, projectId, title: '', body: '', kind: 'topic', authorId: uid, createdAt: new Date().toISOString(), taskIds: [] })}
+              colors={c}
+            />
+          ) : undefined}
+          items={[{
+            id: 'kind', active: filter !== 'all', node: (
+              <Segmented<Filter>
+                label={tr.projectDiscussions}
+                value={filter}
+                onChange={setFilter}
+                options={filters.map(f => ({ value: f.key, label: f.label }))}
+              />
+            ),
+          }]}
+        />
+      ) : (
+      <>
       <TeamInput label={tr.pdSearch} value={search} onChange={setSearch} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 8 }}>
         {filters.map(f => <ActionChip key={f.key} label={f.label} selected={filter === f.key} onPress={() => setFilter(f.key)} colors={c} />)}
@@ -96,6 +125,8 @@ export function ProjectDiscussions({ projectId, initialId }: { projectId: string
             colors={c}
           />
         </ActionBar>
+      )}
+      </>
       )}
       {!!error && <Text accessibilityRole="alert" style={{ color: tk.status.danger, fontFamily: fontFamily.medium }}>{error}</Text>}
       {visibleRooms.map(d => (

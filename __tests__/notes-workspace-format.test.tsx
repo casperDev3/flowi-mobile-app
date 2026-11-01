@@ -84,7 +84,8 @@ test('одна стара нотатка більше не гасить екра
   expect(find('notes-title').props.value).toBe('');
 });
 
-test('теги фільтрують список, закріплена нотатка йде першою', async () => {
+test('теги фільтрують список, закріплена нотатка йде першою (телефон — чипи)', async () => {
+  mockExpanded = false;
   const base = { createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' };
   mockStore.set('notes', JSON.stringify([
     { id: 'site', title: 'Сайт', body: 'про #сайт', ...base },
@@ -102,6 +103,29 @@ test('теги фільтрують список, закріплена нота�
   expect(find('note-plain')).toBeUndefined();
   expect(find('note-site')).toBeDefined();
   await press('notes-tag-all');
+  expect(find('note-plain')).toBeDefined();
+});
+
+test('планшет: теги — FilterSelect у FilterBar', async () => {
+  const base = { createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' };
+  mockStore.set('notes', JSON.stringify([
+    { id: 'site', title: 'Сайт', body: 'про #сайт', ...base },
+    { id: 'plain', title: 'Інша', body: 'без тегів', ...base, updatedAt: '2026-09-05T00:00:00.000Z' },
+    { id: 'pinned', title: 'Головна', body: 'теж #сайт', ...base, updatedAt: '2026-01-01T00:00:00.000Z', pinned: true },
+  ]));
+  await mount();
+
+  const order = () => tree.root.findAll((n: any) => typeof n.props.testID === 'string' && n.props.testID.startsWith('note-')
+    && !n.props.testID.startsWith('note-pin-') && !n.props.testID.startsWith('note-checklist-')).map((n: any) => n.props.testID);
+  expect(order()[0]).toBe('note-pinned');
+  expect(find('note-pin-pinned')).toBeDefined();
+
+  const tagSelect = () => tree.root.findAll((n: any) => n.props.testID === 'notes-tag-filter' && typeof n.props.onChange === 'function')[0];
+  expect(find('notes-tag-сайт')).toBeUndefined();
+  await act(async () => { tagSelect().props.onChange('сайт'); });
+  expect(find('note-plain')).toBeUndefined();
+  expect(find('note-site')).toBeDefined();
+  await act(async () => { tagSelect().props.onChange(null); });
   expect(find('note-plain')).toBeDefined();
 });
 

@@ -141,7 +141,12 @@ export function resolveTimelineDatePatch(edit: TimelineDateEdit): TimelineDatePa
   if (startInvalid || deadlineInvalid) return { ok: false };
   const patch: TimelineDatePatch = { ok: true };
   if (startTouched) patch.startDate = startDate ? startDate.toISOString() : null;
-  if (deadlineTouched) patch.deadline = deadlineDate ? deadlineDate.toISOString() : null;
+  // Дедлайн лише на день — ЛОКАЛЬНИЙ ПОЛУДЕНЬ доби (контракт C2, як
+  // buildDeadline(key, null)), а не північ: так його доба не з'їжджає в інших поясах.
+  if (deadlineTouched) {
+    if (deadlineDate) deadlineDate.setHours(12, 0, 0, 0);
+    patch.deadline = deadlineDate ? deadlineDate.toISOString() : null;
+  }
   return patch;
 }
 

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Чотири дії віджета (2×2): завдання, витрата, подія, нотатка — як ActionGrid на iOS. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:orientation="vertical">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:orientation="horizontal">
+    <LinearLayout
+      android:id="@+id/flowi_action_task"
+      android:layout_width="0dp"
+      android:layout_height="match_parent"
+      android:layout_weight="1"
+      android:background="@drawable/flowi_action_bg_task"
+      android:gravity="center_vertical"
+      android:orientation="horizontal"
+      android:paddingLeft="10dp"
+      android:paddingRight="10dp">
+
+      <ImageView
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/flowi_ic_task" />
+
+      <TextView
+        android:id="@+id/flowi_action_task_title"
+        android:text="@string/flowi_action_task"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="2"
+        android:textColor="@color/flowi_widget_text"
+        android:textSize="13sp" />
+    </LinearLayout>
+    <FrameLayout android:layout_width="8dp" android:layout_height="match_parent" />
+    <LinearLayout
+      android:id="@+id/flowi_action_expense"
+      android:layout_width="0dp"
+      android:layout_height="match_parent"
+      android:layout_weight="1"
+      android:background="@drawable/flowi_action_bg_expense"
+      android:gravity="center_vertical"
+      android:orientation="horizontal"
+      android:paddingLeft="10dp"
+      android:paddingRight="10dp">
+
+      <ImageView
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/flowi_ic_expense" />
+
+      <TextView
+        android:id="@+id/flowi_action_expense_title"
+        android:text="@string/flowi_action_expense"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="2"
+        android:textColor="@color/flowi_widget_text"
+        android:textSize="13sp" />
+    </LinearLayout>
+  </LinearLayout>
+
+  <FrameLayout android:layout_width="match_parent" android:layout_height="8dp" />
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:orientation="horizontal">
+    <LinearLayout
+      android:id="@+id/flowi_action_event"
+      android:layout_width="0dp"
+      android:layout_height="match_parent"
+      android:layout_weight="1"
+      android:background="@drawable/flowi_action_bg_event"
+      android:gravity="center_vertical"
+      android:orientation="horizontal"
+      android:paddingLeft="10dp"
+      android:paddingRight="10dp">
+
+      <ImageView
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/flowi_ic_event" />
+
+      <TextView
+        android:id="@+id/flowi_action_event_title"
+        android:text="@string/flowi_action_event"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="2"
+        android:textColor="@color/flowi_widget_text"
+        android:textSize="13sp" />
+    </LinearLayout>
+    <FrameLayout android:layout_width="8dp" android:layout_height="match_parent" />
+    <LinearLayout
+      android:id="@+id/flowi_action_note"
+      android:layout_width="0dp"
+      android:layout_height="match_parent"
+      android:layout_weight="1"
+      android:background="@drawable/flowi_action_bg_note"
+      android:gravity="center_vertical"
+      android:orientation="horizontal"
+      android:paddingLeft="10dp"
+      android:paddingRight="10dp">
+
+      <ImageView
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/flowi_ic_note" />
+
+      <TextView
+        android:id="@+id/flowi_action_note_title"
+        android:text="@string/flowi_action_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="2"
+        android:textColor="@color/flowi_widget_text"
+        android:textSize="13sp" />
+    </LinearLayout>
+  </LinearLayout>
+</LinearLayout>

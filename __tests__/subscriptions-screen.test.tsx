@@ -338,6 +338,71 @@ test('«Оплачено»: створює витрату з підписки й
   expect(txs.some(t => t.id === 'tx1')).toBe(true);
 });
 
+const UAH_ACCOUNT = {
+  id: 'acc-uah', name: 'Гривнева', kind: 'card', currency: 'UAH', openingBalance: 0, createdAt: NOW,
+};
+
+test('«Оплачено» з рахунку в іншій валюті: видно рахунок і валюту, списано — у валюті рахунку', async () => {
+  mockParams = { open: 'sub-a', pay: '1' };
+  const paid = { date: addDaysKey(TODAY, -32), amount: 10, currency: 'USD', chargedAmount: 415, chargedCurrency: 'UAH' };
+  seed({
+    subscriptions: [{ ...NETFLIX, accountId: 'acc-uah', history: [paid] }],
+    transactions: [],
+    accounts: [USD_ACCOUNT, UAH_ACCOUNT],
+  });
+  const tree = await mount();
+  await flush();
+
+  const text = allText(tree);
+  expect(text).toContain(tr.payAccountLabel);
+  expect(text).toContain('Гривнева · UAH');
+  expect(text).toContain(tr.payChargedHint);
+  // Ціна — у валюті підписки, списана сума — оцінка з минулої оплати.
+  const price = tree.root.findAll((n: any) => n.props?.accessibilityLabel === tr.payPrice && typeof n.props.onChangeText === 'function')[0];
+  const charged = tree.root.findAll((n: any) => n.props?.accessibilityLabel === tr.payCharged && typeof n.props.onChangeText === 'function')[0];
+  expect(price.props.value).toBe('10');
+  expect(charged.props.value).toBe('415');
+  // Без списаної суми підтвердити не можна.
+  await act(async () => { charged.props.onChangeText(''); });
+  const confirm = () => tree.root.findAll((n: any) => n.props?.accessibilityLabel === tr.payConfirm && typeof n.props.onPress === 'function')[0];
+  expect(confirm().props.disabled).toBe(true);
+  await act(async () => { charged.props.onChangeText('420'); });
+  // Користувач уже правив списану суму — зміна ціни її не перезаписує.
+  await act(async () => { price.props.onChangeText('10'); });
+  expect(allText(tree)).toContain('1 USD ≈ 42 UAH');
+  await pressByLabel(tree, tr.payConfirm);
+  await flush();
+
+  const sub = read<any[]>('subscriptions').find(s => s.id === 'sub-a');
+  expect(sub.amount).toBe(10);
+  expect(sub.accountId).toBe('acc-uah');
+  expect(sub.history[sub.history.length - 1]).toMatchObject({
+    amount: 10, currency: 'USD', accountId: 'acc-uah', chargedAmount: 420, chargedCurrency: 'UAH',
+  });
+  const created = read<any[]>('transactions')[0];
+  expect(created).toMatchObject({ type: 'expense', amount: 420, currency: 'UAH', accountId: 'acc-uah' });
+});
+
+test('«Оплачено» з деталі: зміна рахунку на той самий у валюті підписки — одне поле суми', async () => {
+  mockParams = { open: 'sub-a' };
+  seed({ subscriptions: [{ ...NETFLIX, accountId: 'acc-uah' }], transactions: [], accounts: [USD_ACCOUNT, UAH_ACCOUNT] });
+  const tree = await mount();
+  await pressByLabel(tree, tr.payAction);
+  await act(async () => { await new Promise(r => setTimeout(r, 350)); });
+  await flush();
+  // Своя гривнева картка — типова; історії немає, тож оцінки теж немає.
+  const charged = tree.root.findAll((n: any) => n.props?.accessibilityLabel === tr.payCharged && typeof n.props.onChangeText === 'function')[0];
+  expect(charged.props.value).toBe('');
+  const picker = tree.root.findAll((n: any) => n.props?.label === tr.payAccountLabel && typeof n.props.onSelect === 'function')[0];
+  await act(async () => { picker.props.onSelect('acc-usd'); });
+  expect(tree.root.findAll((n: any) => n.props?.accessibilityLabel === tr.payCharged && typeof n.props.onChangeText === 'function')).toHaveLength(0);
+  await pressByLabel(tree, tr.payConfirm);
+  await flush();
+  const created = read<any[]>('transactions')[0];
+  expect(created).toMatchObject({ amount: 10, currency: 'USD', accountId: 'acc-usd' });
+  expect(read<any[]>('subscriptions').find(s => s.id === 'sub-a').accountId).toBe('acc-usd');
+});
+
 test('«Оплачено»: скасування створеної витрати не повертає дату оплати', async () => {
   mockParams = { open: 'sub-a', pay: '1' };
   seed({ subscriptions: [NETFLIX], transactions: [], accounts: [USD_ACCOUNT] });
@@ -385,4 +450,48 @@ test('блок «Найближчі оплати»: усі рядки, секц�
   // запис витрати й захист від повторної оплати того самого циклу.
   await pressByLabel(tree, `${tr.subPayNow}: Netflix`);
   expect(mockPush).toHaveBeenCalledWith({ pathname: '/subscriptions', params: { open: 'sub-a', pay: '1' } });
+});
+
+test('«Оплачено» в іншій валюті: списана сума округлюється до знаків рахунку', async () => {
+  mockParams = { open: 'sub-a', pay: '1' };
+  seed({ subscriptions: [{ ...NETFLIX, accountId: 'acc-uah' }], transactions: [], accounts: [USD_ACCOUNT, UAH_ACCOUNT] });
+  const tree = await mount();
+  await flush();
+  const charged = tree.root.findAll((n: any) => n.props?.accessibilityLabel === tr.payCharged && typeof n.props.onChangeText === 'function')[0];
+  await act(async () => { charged.props.onChangeText('1 415,555'); });
+  await pressByLabel(tree, tr.payConfirm);
+  await flush();
+  expect(read<any[]>('transactions')[0]).toMatchObject({ amount: 1415.56, currency: 'UAH' });
+  const sub = read<any[]>('subscriptions').find(s => s.id === 'sub-a');
+  expect(sub.history[sub.history.length - 1].chargedAmount).toBe(1415.56);
+});
+
+test('«Оплачено»: рахунки дочитались після відкриття — оцінка списаної суми з’являється', async () => {
+  mockParams = { open: 'sub-a', pay: '1' };
+  const paid = { date: addDaysKey(TODAY, -32), amount: 10, currency: 'USD', chargedAmount: 415, chargedCurrency: 'UAH' };
+  seed({ subscriptions: [{ ...NETFLIX, accountId: 'acc-uah', history: [paid] }], transactions: [] });
+  const tree = await mount();
+  await flush();
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { saveData } = require('@/store/storage');
+  await act(async () => { await saveData('accounts', [USD_ACCOUNT, UAH_ACCOUNT]); });
+  await flush();
+  const charged = tree.root.findAll((n: any) => n.props?.accessibilityLabel === tr.payCharged && typeof n.props.onChangeText === 'function')[0];
+  expect(charged?.props.value).toBe('415');
+});
+
+test('«Оплачено»: валюту підписки змінили деінде, поки діалог відкритий — «застаріло», нічого не пишемо (паритет W3)', async () => {
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  mockParams = { open: 'sub-a', pay: '1' };
+  seed({ subscriptions: [{ ...NETFLIX, accountId: 'acc-usd' }], transactions: [], accounts: [USD_ACCOUNT, UAH_ACCOUNT] });
+  const tree = await mount();
+  await flush();
+  // Синк приніс ту саму підписку, але вже в гривні: ціна з діалогу — для USD.
+  const changed = { ...NETFLIX, accountId: 'acc-usd', currency: 'UAH', updatedAt: '2026-09-02T10:00:00.000Z' };
+  mockStore.set('subscriptions', JSON.stringify([changed]));
+  await pressByLabel(tree, tr.payConfirm);
+  await flush();
+  expect(read<any[]>('subscriptions')).toEqual([changed]);
+  expect(read<any[]>('transactions')).toEqual([]);
+  expect(alertSpy).toHaveBeenCalledWith(tr.payStale);
 });

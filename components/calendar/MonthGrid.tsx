@@ -89,12 +89,12 @@ export function MonthGrid({
                   {labels ? (
                     <View style={{ position: 'absolute', top: contentTop, left: 3, right: 3, gap: 2 }}>
                       {meetings.slice(0, maxLines).map(m => (
-                        <Text key={m.id} numberOfLines={1} style={[st.label, { color: c.text, backgroundColor: m.color + '22', borderLeftColor: m.color }]}>
+                        <Text key={m.id} numberOfLines={1} style={[st.label, { color: c.text, backgroundColor: m.color + '22' }]}>
                           {m.time ? `${m.time} ` : ''}{m.title}
                         </Text>
                       ))}
                       {tasks.slice(0, Math.max(0, maxLines - Math.min(maxLines, meetings.length))).map(t => (
-                        <Text key={t.task.id} numberOfLines={1} style={[st.label, { color: c.text, opacity: t.done ? 0.5 : 1, textDecorationLine: t.done ? 'line-through' : 'none', borderLeftColor: t.color }]}>
+                        <Text key={t.task.id} numberOfLines={1} style={[st.label, { color: c.text, opacity: t.done ? 0.5 : 1, textDecorationLine: t.done ? 'line-through' : 'none', backgroundColor: t.color + '22' }]}>
                           {t.task.title}
                         </Text>
                       ))}
@@ -126,8 +126,6 @@ export function MonthGrid({
                 <View style={{
                   flex: 1,
                   backgroundColor: labels ? seg.bar.project.color + '33' : seg.bar.project.color,
-                  borderLeftWidth: labels && !seg.continuesLeft ? 3 : 0,
-                  borderLeftColor: seg.bar.project.color,
                   borderTopLeftRadius: seg.continuesLeft ? 0 : 4,
                   borderBottomLeftRadius: seg.continuesLeft ? 0 : 4,
                   borderTopRightRadius: seg.continuesRight ? 0 : 4,
@@ -168,5 +166,5 @@ const st = StyleSheet.create({
   dots: { position: 'absolute', flexDirection: 'row', gap: 4, alignSelf: 'center' },
   dot: { width: 6, height: 6, borderRadius: 3 },
   dotSquare: { width: 6, height: 6, borderRadius: 1.5 },
-  label: { fontSize: 10, fontFamily: fontFamily.semibold, paddingHorizontal: 4, paddingVertical: 1, borderLeftWidth: 2, borderRadius: 3, overflow: 'hidden' },
+  label: { fontSize: 10, fontFamily: fontFamily.semibold, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3, overflow: 'hidden' },
 });

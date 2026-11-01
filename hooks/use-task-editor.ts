@@ -21,6 +21,7 @@ import {
   type LegacyPriority,
   type TaskPriority,
 } from '@/utils/taskUtils';
+import { deadlineTimeOf } from '@/utils/taskDeadline';
 
 /**
  * Мінімум, потрібний формі. Навмисно не повний Task: редактор не має
@@ -36,6 +37,9 @@ export interface EditableTask {
   priorityLevel?: TaskPriority;
   estimatedMinutes?: number;
   deadline?: string;
+  /** «З часом» лише разом із `deadlineTimeAt === deadline` (isTimedDeadline, C1). */
+  deadlineHasTime?: boolean;
+  deadlineTimeAt?: string;
   projectId?: string;
   /** Спринт проєкту (utils/sprintUtils.ts); відсутній = беклог. */
   sprintId?: string;
@@ -68,6 +72,11 @@ export interface TaskDraft {
   estHours: string;
   estMins: string;
   deadline: string | null;
+  /**
+   * Дедлайн із часом (utils/taskDeadline.ts). false — лише день; у задачу
+   * пишеться тільки `deadlineHasTime: true`, false — це відсутній ключ.
+   */
+  deadlineHasTime: boolean;
   repeat: boolean;
   repeatFreq: RecurrenceRule['freq'];
   repeatInterval: number;
@@ -86,7 +95,7 @@ export interface TaskDraft {
 function emptyDraft(statusId: string): TaskDraft {
   return {
     title: '', desc: '', priorityLevel: DEFAULT_PRIORITY_LEVEL, statusId, projectId: null, sprintId: null,
-    estHours: '', estMins: '', deadline: null,
+    estHours: '', estMins: '', deadline: null, deadlineHasTime: false,
     repeat: false, repeatFreq: 'weekly', repeatInterval: 1,
     repeatDays: [], repeatEndType: 'never', repeatUntil: '',
     assigneeId: null,
@@ -114,6 +123,8 @@ export function taskToDraft(task: EditableTask, statusId: string): TaskDraft {
     estHours: h > 0 ? String(h) : '',
     estMins:  m > 0 ? String(m) : '',
     deadline: task.deadline ?? null,
+    // Голий `YYYY-MM-DD` чи нерозбірне — лише день, хоч би що казав прапорець.
+    deadlineHasTime: deadlineTimeOf(task) !== null,
     repeat: !!rec,
     repeatFreq: rec?.freq ?? 'weekly',
     repeatInterval: rec?.interval ?? 1,
@@ -151,6 +162,20 @@ export function draftEstimatedMinutes(draft: TaskDraft): number | undefined {
   const h = parseInt(draft.estHours || '0', 10);
   const m = parseInt(draft.estMins || '0', 10);
   return h * 60 + m || undefined;
+}
+
+/**
+ * Поля дедлайну нової задачі з чернетки (C1): `deadlineHasTime: true` разом із
+ * `deadlineTimeAt` = `deadline` лише коли є і дата, і час; інакше обох ключів
+ * немає (ніколи не пишемо false).
+ */
+export function draftDeadlineFields(
+  draft: Pick<TaskDraft, 'deadline' | 'deadlineHasTime'>,
+): { deadline?: string; deadlineHasTime?: true; deadlineTimeAt?: string } {
+  if (!draft.deadline) return {};
+  return draft.deadlineHasTime
+    ? { deadline: draft.deadline, deadlineHasTime: true, deadlineTimeAt: draft.deadline }
+    : { deadline: draft.deadline };
 }
 
 /** Правило повторення з чернетки. undefined, якщо повторення вимкнене. */
@@ -196,7 +221,7 @@ export function editedDraftFields(initial: TaskDraft | null, draft: TaskDraft): 
   if (initial.sprintId !== draft.sprintId) changed.add('sprint');
   if ((initial.assigneeId ?? null) !== (draft.assigneeId ?? null)) changed.add('assignee');
   if (draftEstimatedMinutes(initial) !== draftEstimatedMinutes(draft)) changed.add('estimate');
-  if (initial.deadline !== draft.deadline) changed.add('deadline');
+  if (initial.deadline !== draft.deadline || initial.deadlineHasTime !== draft.deadlineHasTime) changed.add('deadline');
   if (JSON.stringify(draftRecurrence(initial) ?? null) !== JSON.stringify(draftRecurrence(draft) ?? null)) {
     changed.add('recurrence');
   }
@@ -227,7 +252,8 @@ export function useTaskEditor(defaultStatusId: string, today: Date) {
    * `preset` — наперед обраний проєкт/спринт (створення зі спринта в деталі проєкту).
    */
   const reset = useCallback((statusId: string, preset?: Partial<Pick<TaskDraft, 'projectId' | 'sprintId' | 'deadline'>>) => {
-    setDraft({ ...emptyDraft(statusId), ...preset });
+    // Пресет дня (календар) — завжди лише день: час обирає людина.
+    setDraft({ ...emptyDraft(statusId), ...preset, deadlineHasTime: false });
     setOriginal(null);
     setInitial(null);
     setCalYear(today.getFullYear());

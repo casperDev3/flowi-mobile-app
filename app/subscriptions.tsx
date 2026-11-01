@@ -7,9 +7,10 @@
  *    (без конвертації валют);
  *  - «Продовжено» — новий цикл (дата += період) з редагованою сумою й записом в
  *    історію. Фінансових операцій НЕ створює, баланси не чіпає;
- *  - «Оплачено» (з блоку «Найближчі оплати», параметр `pay=1`) — те саме
- *    продовження ПЛЮС витрата у Фінансах: рахунок, категорія й сума беруться з
- *    підписки, сума редагується перед підтвердженням;
+ *  - «Оплачено» (з деталі або з блоку «Найближчі оплати», параметр `pay=1`) —
+ *    те саме продовження ПЛЮС витрата у Фінансах: рахунок обирається в діалозі
+ *    (типовий — з підписки, він же запамʼятовується), ціна редагується, а коли
+ *    валюта рахунку інша — вводиться фактично списана сума;
  *  - статуси: активна / «Прострочено» / архів (зокрема авто — минула дата
  *    завершення), відновлення з архіву;
  *  - телефон: деталь — модальний лист; планшет (expanded): список + колонка.
@@ -53,6 +54,7 @@ import { RecurringIncomesSection } from '@/components/finance/RecurringIncomesSe
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/ScrollHeaderSlot';
 import { AppHeader } from '@/components/shared/AppHeader';
+import { PickerField, type PickerOption } from '@/components/shared/PickerField';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { finPalette } from '@/components/finance/finPalette';
@@ -67,7 +69,7 @@ import type { CategoryRow } from '@/store/migrations';
 import { rescheduleSubscriptionRemindersFromStorage } from '@/store/notifications';
 import { loadData } from '@/store/storage';
 import { updateSynced } from '@/store/synced-storage';
-import { accountById, activeAccounts, defaultAccountId, type Account } from '@/utils/accounts';
+import { accountById, activeAccounts, type Account } from '@/utils/accounts';
 import { expenseCategoryPresets } from '@/utils/financeCategories';
 import { BUILTIN_CURRENCIES, type Currency, type Transaction } from '@/utils/financeUtils';
 import { isProjectArchived, type ProjectLike } from '@/utils/projectUtils';
@@ -78,13 +80,17 @@ import {
   dateKeyOf,
   draftFromSubscription,
   emptySubscriptionDraft,
+  estimateChargedAmount,
   formatDateKey,
   formatSubscriptionMoney,
   formatTotalsLine,
+  isCrossCurrencyPayment,
   mergeSubscriptionWrite,
   normalizeSubscription,
   normalizeSubscriptions,
   parseAmountInput,
+  paymentAccount,
+  roundToCurrencyDecimals,
   paySubscription,
   rebaseSubscriptionDraft,
   renewSubscription,
@@ -250,6 +256,12 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
    */
   const [payFor, setPayFor] = useState<{ id: string; date: string } | null>(null);
   const [payAmountText, setPayAmountText] = useState('');
+  /** Обраний у діалозі рахунок списання (null — рахунків немає). */
+  const [payAccountId, setPayAccountId] = useState<string | null>(null);
+  /** Фактично списано у валюті рахунку — лише коли валюти різні. */
+  const [payChargedText, setPayChargedText] = useState('');
+  /** Користувач уже правив списану суму — зміна ціни її не перезаписує. */
+  const [payChargedTouched, setPayChargedTouched] = useState(false);
   const [form, setForm] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<SubscriptionDraftError | 'save' | null>(null);
   const [busy, setBusy] = useState(false);
@@ -342,17 +354,49 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     detailScrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [subs]);
 
-  /** «Оплачено» з блоку найближчих оплат: підтвердження суми поверх екрана. */
+  /** Знаки валюти рахунку (крипта — до 8, решта — до 2). */
+  const accountDecimals = useCallback((account: Account | null | undefined) => {
+    const cur = account ? currencies.find(x => x.code === account.currency) : undefined;
+    return Math.max(0, Math.min(cur?.kind === 'crypto' ? 8 : 2, cur?.decimals ?? 2));
+  }, [currencies]);
+
+  /** Оцінка списаної суми для поля «Списано з рахунку»: '' — оцінити нема з чого. */
+  const chargedEstimateText = useCallback((sub: Subscription, account: Account | null | undefined, price: number) => {
+    if (!account || !isCrossCurrencyPayment(sub, account.currency)) return '';
+    const est = estimateChargedAmount(sub, account.currency, price, accountDecimals(account));
+    return est == null ? '' : String(est);
+  }, [accountDecimals]);
+
+  /** «Оплачено» (деталь / найближчі оплати): підтвердження поверх екрана. */
   const openPay = useCallback((id: string) => {
     const sub = subs.find(s => s.id === id);
     if (!sub) return;
+    const account = paymentAccount(accounts, sub);
     setPayFor({ id, date: sub.nextPaymentDate });
     setPayAmountText(String(sub.amount));
+    setPayAccountId(account?.id ?? null);
+    setPayChargedText(chargedEstimateText(sub, account, sub.amount));
+    setPayChargedTouched(false);
     setSelectedId(null);
     setRenewOpen(false);
-  }, [subs]);
+  }, [subs, accounts, chargedEstimateText]);
 
   const closePay = useCallback(() => setPayFor(null), []);
+
+  /**
+   * «Оплачено» з деталі. На телефоні деталь — теж модалка: спершу закриваємо
+   * її, потім відкриваємо діалог (дві модалки одночасно iOS не показує) — те
+   * саме правило, що й у openForm. На планшеті колонка просто закривається.
+   */
+  const payFromDetail = useCallback((id: string) => {
+    if (!detailInPanel) {
+      setSelectedId(null);
+      setRenewOpen(false);
+      setTimeout(() => openPay(id), 300);
+      return;
+    }
+    openPay(id);
+  }, [detailInPanel, openPay]);
 
   const onRenewOpenChange = useCallback((open: boolean) => {
     renewForRef.current = open && selected ? { id: selected.id, date: selected.nextPaymentDate } : null;
@@ -480,18 +524,29 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   const paySub = useMemo(() => (payFor ? subs.find(s => s.id === payFor.id) ?? null : null), [payFor, subs]);
 
   /**
-   * З якого рахунку списати: вказаний у підписці → перший активний у ТІЙ САМІЙ
-   * валюті → типовий. Валюта операції визначається рахунком, тож підставити
-   * гривневий гаманець під доларову підписку означало б записати 9.99 ₴.
+   * З якого рахунку списати — те, що обрано в діалозі (попередній вибір —
+   * paymentAccount: свій неархівний → перший активний у валюті підписки →
+   * типовий). Архівний рахунок не пропонуємо й не беремо.
    */
-  const payAccount = useMemo(() => {
-    if (!paySub) return null;
-    const own = accountById(accounts, paySub.accountId);
-    if (own) return own;
-    const sameCurrency = activeAccounts(accounts).find(a => a.currency === paySub.currency);
-    if (sameCurrency) return sameCurrency;
-    return accountById(accounts, defaultAccountId(accounts) ?? undefined) ?? null;
-  }, [paySub, accounts]);
+  const payActiveAccounts = useMemo(() => activeAccounts(accounts), [accounts]);
+  const payAccount = useMemo(
+    // Рахунки могли дочитатись уже після відкриття діалогу (або обраний
+    // заархівували синком): тоді — правило paymentAccount, як у вебі.
+    () => (paySub
+      ? accountById(payActiveAccounts, payAccountId ?? undefined) ?? paymentAccount(accounts, paySub)
+      : null),
+    [paySub, payActiveAccounts, payAccountId, accounts],
+  );
+  const payAccountOptions: PickerOption[] = useMemo(
+    () => payActiveAccounts.map(a => ({
+      id: a.id,
+      label: `${a.name} · ${a.currency}`,
+      icon: (a.icon as IconSymbolName) || 'creditcard.fill',
+      color: a.color,
+    })),
+    [payActiveAccounts],
+  );
+  const payCross = !!paySub && isCrossCurrencyPayment(paySub, payAccount?.currency);
 
   /** Категорія для підписки, у якої її не вказано: «Інше» зі списку витрат. */
   const fallbackCategory = useMemo(() => {
@@ -502,7 +557,42 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
   }, [categoryRows, lang, uiLang]);
 
   const payAmount = parseAmountInput(payAmountText);
-  const payValid = Number.isFinite(payAmount) && payAmount > 0;
+  const payPriceValid = Number.isFinite(payAmount) && payAmount > 0;
+  const payChargedDecimals = accountDecimals(payAccount);
+  const payCharged = parseAmountInput(payChargedText);
+  // 0.004 ₴ округлюється до 0 — такої «списаної суми» немає.
+  const payChargedValid = Number.isFinite(payCharged) && roundToCurrencyDecimals(payCharged, payChargedDecimals) > 0;
+  const payValid = payPriceValid && (!payCross || payChargedValid);
+
+  const onPayAccountChange = useCallback((id: string | null) => {
+    setPayAccountId(id);
+    if (!paySub) return;
+    const account = accountById(payActiveAccounts, id ?? undefined);
+    setPayChargedText(chargedEstimateText(paySub, account, parseAmountInput(payAmountText)));
+    setPayChargedTouched(false);
+  }, [paySub, payActiveAccounts, payAmountText, chargedEstimateText]);
+
+  // Рахунок діалогу змінився сам (рахунки дочитались після відкриття, обраний
+  // заархівували синком) — оцінку списаної суми перераховуємо, доки людина
+  // її не правила: інакше лишалась би порожньою чи від іншого рахунку.
+  const payAccountKey = payAccount ? `${payAccount.id}|${payAccount.currency}` : '';
+  const payAccountKeyRef = useRef(payAccountKey);
+  useEffect(() => {
+    if (payAccountKeyRef.current === payAccountKey) return;
+    payAccountKeyRef.current = payAccountKey;
+    if (!paySub || payChargedTouched) return;
+    setPayChargedText(chargedEstimateText(paySub, payAccount, parseAmountInput(payAmountText)));
+  }, [payAccountKey, paySub, payAccount, payChargedTouched, payAmountText, chargedEstimateText]);
+
+  const onPayPriceChange = useCallback((text: string) => {
+    setPayAmountText(text);
+    if (paySub && !payChargedTouched) setPayChargedText(chargedEstimateText(paySub, payAccount, parseAmountInput(text)));
+  }, [paySub, payAccount, payChargedTouched, chargedEstimateText]);
+
+  const onPayChargedChange = useCallback((text: string) => {
+    setPayChargedText(text);
+    setPayChargedTouched(true);
+  }, []);
 
   /**
    * Витрата + новий цикл. Формулу рахує `paySubscription` — спільна з вебом.
@@ -517,6 +607,12 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     if (!paySub || !payFor || busy) return;
     const amount = parseAmountInput(payAmountText);
     if (!Number.isFinite(amount) || amount <= 0) return;
+    // Рахунок — зі стану пікера на момент підтвердження.
+    const account = payAccount;
+    const cross = isCrossCurrencyPayment(paySub, account?.currency);
+    const chargedDecimals = accountDecimals(account);
+    const charged = parseAmountInput(payChargedText);
+    if (cross && !(Number.isFinite(charged) && roundToCurrencyDecimals(charged, chargedDecimals) > 0)) return;
     const expectedDate = payFor.date;
     const txId = Date.now().toString() + Math.random().toString(36).slice(2);
     let stale = false;
@@ -524,12 +620,16 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     setBusy(true);
     try {
       await updateOne(paySub.id, sub => {
-        if (sub.nextPaymentDate !== expectedDate) { stale = true; return sub; }
+        // Валюту підписки змінили деінде, поки діалог був відкритий: ціна й
+        // «списано» вводились для іншої валюти — як у вебі (W3), це «застаріло».
+        if (sub.nextPaymentDate !== expectedDate || sub.currency !== paySub.currency) { stale = true; return sub; }
         const result = paySubscription(sub, {
           id: txId,
-          accountId: payAccount?.id,
-          currency: payAccount?.currency,
+          accountId: account?.id,
+          currency: account?.currency,
           amount,
+          chargedAmount: cross ? charged : undefined,
+          chargedDecimals,
           fallbackCategory,
           now: new Date(),
         });
@@ -555,7 +655,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
     } finally {
       setBusy(false);
     }
-  }, [paySub, payFor, busy, payAmountText, payAccount, fallbackCategory, updateOne, reportError, tr]);
+  }, [paySub, payFor, busy, payAmountText, payChargedText, payAccount, accountDecimals, fallbackCategory, updateOne, reportError, tr]);
 
   /*
    * Архів / відновлення / видалення — за id: ті самі дії кличе і деталь
@@ -957,6 +1057,7 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
               renewOpen={renewOpen}
               onRenewOpenChange={onRenewOpenChange}
               onRenew={amount => { void renewSelected(amount); }}
+              onPay={() => payFromDetail(selected.id)}
               onArchive={() => { void archiveSelected(); }}
               onRestore={() => { void restoreSelected(); }}
               onDelete={deleteSelected}
@@ -1012,22 +1113,83 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                   {paySub.name}
                 </Text>
 
-                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 16 }}>
-                  {tr.payAmount} ({paySub.currency})
+                <Text style={{ ...dsType.caption, ...dsType.numeric, color: c.sub, marginTop: 4 }}>
+                  {formatDateKey(paySub.nextPaymentDate, locale)} → {formatDateKey(
+                    addPeriod(paySub.nextPaymentDate, paySub.period, paySub.billingDay),
+                    locale,
+                  )}
+                </Text>
+
+                {/* Рахунок списання: видно, звідки й у якій валюті підуть гроші */}
+                <View style={{ marginTop: 16 }}>
+                  {payAccountOptions.length > 0 ? (
+                    <PickerField
+                      label={tr.payAccountLabel}
+                      icon="banknote"
+                      options={payAccountOptions}
+                      value={payAccount?.id ?? null}
+                      onSelect={onPayAccountChange}
+                      colors={{ text: c.text, sub: c.sub, border: c.border, dim: c.dim, accent: c.accent, sheet: c.sheet }}
+                      isDark={isDark}
+                      tr={tr}
+                    />
+                  ) : (
+                    <Text style={{ color: c.sub, fontSize: 13, fontFamily: fontFamily.regular }}>{tr.payNoAccounts}</Text>
+                  )}
+                </View>
+
+                <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 14 }}>
+                  {payCross ? tr.payPrice : tr.payAmount} ({paySub.currency})
                 </Text>
                 <TextInput
                   value={payAmountText}
-                  onChangeText={setPayAmountText}
+                  onChangeText={onPayPriceChange}
                   keyboardType="decimal-pad"
                   autoFocus
-                  accessibilityLabel={tr.payAmount}
-                  style={[st.payInput, { color: c.text, backgroundColor: c.dim, borderColor: payValid ? 'transparent' : c.red }]}
+                  accessibilityLabel={payCross ? tr.payPrice : tr.payAmount}
+                  style={[st.payInput, { color: c.text, backgroundColor: c.dim, borderColor: payPriceValid ? 'transparent' : c.red }]}
                 />
 
-                <Text style={{ color: c.sub, fontSize: 12, lineHeight: 18, marginTop: 10 }}>
+                {payCross && payAccount ? (
+                  <>
+                    <Text style={{ color: c.sub, fontSize: 12, fontFamily: fontFamily.semibold, marginTop: 14 }}>
+                      {tr.payCharged} ({payAccount.currency})
+                    </Text>
+                    <TextInput
+                      value={payChargedText}
+                      onChangeText={onPayChargedChange}
+                      keyboardType="decimal-pad"
+                      accessibilityLabel={tr.payCharged}
+                      accessibilityHint={tr.payChargedHint}
+                      style={[st.payInput, { color: c.text, backgroundColor: c.dim, borderColor: payChargedValid ? 'transparent' : c.red }]}
+                    />
+                    <Text style={{ color: payChargedText.trim() && !payChargedValid ? c.red : c.sub, fontSize: 12, lineHeight: 17, fontFamily: fontFamily.regular, marginTop: 6 }}>
+                      {payChargedText.trim() && !payChargedValid ? tr.payChargedInvalid : tr.payChargedHint}
+                    </Text>
+                    {payPriceValid && payChargedValid ? (
+                      <Text style={{ ...dsType.caption, ...dsType.numeric, color: c.sub, marginTop: 4 }}>
+                        {`${tr.transferRate}: 1 ${paySub.currency} ≈ ${Math.round((payCharged / payAmount) * 10000) / 10000} ${payAccount.currency}`}
+                      </Text>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {/* Підсумок: з якого рахунку, скільки й у якій валюті */}
+                <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, lineHeight: 19, marginTop: 14 }}>
+                  {payAccount
+                    ? tr.paySummary
+                      .replace('{account}', `${payAccount.name} · ${payAccount.currency}`)
+                      .replace('{amount}', formatSubscriptionMoney(
+                        payCross ? (payChargedValid ? payCharged : 0) : (payPriceValid ? payAmount : 0),
+                        payAccount.currency, currencies, locale,
+                      ))
+                    : tr.paySummaryNoAccount.replace('{amount}', formatSubscriptionMoney(
+                      payPriceValid ? payAmount : 0, paySub.currency, currencies, locale,
+                    ))}
+                </Text>
+                <Text style={{ color: c.sub, fontSize: 12, lineHeight: 18, fontFamily: fontFamily.regular, marginTop: 6 }}>
                   {tr.payHint
                     .replace('{category}', (paySub.category ?? '').trim() || fallbackCategory)
-                    .replace('{account}', payAccount ? `${payAccount.name} · ${payAccount.currency}` : tr.payNoAccount)
                     .replace('{date}', formatDateKey(
                       addPeriod(paySub.nextPaymentDate, paySub.period, paySub.billingDay),
                       locale,
@@ -1054,9 +1216,6 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
                     </Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={{ ...dsType.caption, ...dsType.numeric, color: c.sub, marginTop: 10, textAlign: 'center' }}>
-                  {formatSubscriptionMoney(payValid ? payAmount : paySub.amount, payAccount?.currency || paySub.currency, currencies, locale)}
-                </Text>
               </>
             ) : null}
           </ScrollView>

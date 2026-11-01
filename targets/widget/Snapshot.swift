@@ -32,6 +32,72 @@ struct FlowiSnapshot: Codable {
   struct Time: Codable {
     var trackedSec: Double
     var running: Running?
+
+    init(trackedSec: Double, running: Running?) {
+      self.trackedSec = trackedSec
+      self.running = running
+    }
+
+    init(from decoder: Decoder) throws {
+      let c = try decoder.container(keyedBy: CodingKeys.self)
+      trackedSec = try c.decode(Double.self, forKey: .trackedSec)
+      running = (try? c.decodeIfPresent(Running.self, forKey: .running)) ?? nil
+    }
+  }
+  /// Найближча зустріч і перше незавершене завдання дня (spec §8.1).
+  /// Знімки старших версій застосунку цього поля не мають — тоді nil.
+  struct Next: Codable {
+    struct Meeting: Codable {
+      var title: String
+      var startsAt: String
+      var endsAt: String
+      var location: String?
+
+      var startDate: Date? { FlowiSnapshot.parseISO(startsAt) }
+      var endDate: Date? { FlowiSnapshot.parseISO(endsAt) }
+    }
+    struct Task: Codable {
+      var id: String
+      var title: String
+      var deadline: String?
+      var hasTime: Bool
+      var overdue: Bool
+
+      var deadlineDate: Date? { deadline.flatMap { FlowiSnapshot.parseISO($0) } }
+
+      init(id: String, title: String, deadline: String?, hasTime: Bool, overdue: Bool) {
+        self.id = id
+        self.title = title
+        self.deadline = deadline
+        self.hasTime = hasTime
+        self.overdue = overdue
+      }
+
+      /// Прапорці, яких немає чи які зіпсовані, — false, а не відкинуте завдання.
+      init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        deadline = (try? c.decodeIfPresent(String.self, forKey: .deadline)) ?? nil
+        hasTime = ((try? c.decodeIfPresent(Bool.self, forKey: .hasTime)) ?? nil) ?? false
+        overdue = ((try? c.decodeIfPresent(Bool.self, forKey: .overdue)) ?? nil) ?? false
+      }
+    }
+
+    var meeting: Meeting?
+    var task: Task?
+
+    init(meeting: Meeting?, task: Task?) {
+      self.meeting = meeting
+      self.task = task
+    }
+
+    /// Поблажливе декодування: зіпсований член не ламає весь знімок.
+    init(from decoder: Decoder) throws {
+      let c = try decoder.container(keyedBy: CodingKeys.self)
+      meeting = (try? c.decodeIfPresent(Meeting.self, forKey: .meeting)) ?? nil
+      task = (try? c.decodeIfPresent(Task.self, forKey: .task)) ?? nil
+    }
   }
 
   var v: Int
@@ -43,6 +109,7 @@ struct FlowiSnapshot: Codable {
   var steps: Steps
   var tasks: Tasks
   var time: Time
+  var next: Next?
 
   static let empty = FlowiSnapshot(
     v: 1, generatedAt: "", day: "", lang: FlowiSnapshot.deviceLang, authed: false,
@@ -58,7 +125,16 @@ struct FlowiSnapshot: Codable {
     finance: Finance(currency: "UAH", symbol: "₴", decimals: 2, income: 1200, expense: 450),
     steps: Steps(value: 6400, goal: Double(flowiStepsGoal)),
     tasks: Tasks(done: 5, total: 8),
-    time: Time(trackedSec: 2 * 3600 + 15 * 60, running: nil)
+    time: Time(trackedSec: 2 * 3600 + 15 * 60, running: nil),
+    next: Next(
+      meeting: Next.Meeting(
+        title: FlowiSnapshot.deviceLang == "en" ? "Team sync" : "Зустріч команди",
+        startsAt: FlowiSnapshot.isoString(Date().addingTimeInterval(45 * 60)),
+        endsAt: FlowiSnapshot.isoString(Date().addingTimeInterval(105 * 60)),
+        location: nil
+      ),
+      task: nil
+    )
   )
 
   static var deviceLang: String {
@@ -93,16 +169,57 @@ struct FlowiSnapshot: Codable {
     copy.steps.value = 0
     copy.tasks = Tasks(done: 0, total: 0)
     copy.time.trackedSec = 0
+    copy.next = nil
     return copy
   }
 
   var runningStartedAt: Date? {
     guard let running = time.running else { return nil }
+    return FlowiSnapshot.parseISO(running.startedAt)
+  }
+
+  /// Найближча зустріч, що ще не скінчилась на момент `now`.
+  func upcomingMeeting(at now: Date) -> Next.Meeting? {
+    guard let meeting = next?.meeting, let end = meeting.endDate, end > now else { return nil }
+    return meeting
+  }
+
+  /// Моменти, коли треба перемалювати віджет: початок і кінець найближчої зустрічі.
+  func meetingBoundaries(after now: Date) -> [Date] {
+    guard let meeting = next?.meeting else { return [] }
+    return [meeting.startDate, meeting.endDate].compactMap { $0 }.filter { $0 > now }
+  }
+
+  static func parseISO(_ string: String) -> Date? {
     let f = ISO8601DateFormatter()
     f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let d = f.date(from: running.startedAt) { return d }
+    if let d = f.date(from: string) { return d }
     f.formatOptions = [.withInternetDateTime]
-    return f.date(from: running.startedAt)
+    return f.date(from: string)
+  }
+
+  static func isoString(_ date: Date) -> String {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f.string(from: date)
+  }
+}
+
+extension FlowiSnapshot {
+  /// `next` — необовʼязкове й поблажливе: не-обʼєкт (масив, рядок) або зіпсоване
+  /// поле дає nil, а не знищує весь знімок (віджет інакше показав би «порожньо»).
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    v = try c.decode(Int.self, forKey: .v)
+    generatedAt = try c.decode(String.self, forKey: .generatedAt)
+    day = try c.decode(String.self, forKey: .day)
+    lang = try c.decode(String.self, forKey: .lang)
+    authed = try c.decode(Bool.self, forKey: .authed)
+    finance = try c.decode(Finance.self, forKey: .finance)
+    steps = try c.decode(Steps.self, forKey: .steps)
+    tasks = try c.decode(Tasks.self, forKey: .tasks)
+    time = try c.decode(Time.self, forKey: .time)
+    next = (try? c.decodeIfPresent(Next.self, forKey: .next)) ?? nil
   }
 }
 

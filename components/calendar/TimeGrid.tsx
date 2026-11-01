@@ -183,7 +183,6 @@ export function TimeGrid({
                   style={{
                     flex: 1, justifyContent: 'center', paddingHorizontal: 6,
                     backgroundColor: seg.bar.project.color + '33',
-                    borderLeftWidth: seg.continuesLeft ? 0 : 3, borderLeftColor: seg.bar.project.color,
                     borderRadius: 4,
                   }}>
                   <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontFamily: fontFamily.semibold }}>
@@ -204,7 +203,7 @@ export function TimeGrid({
                         accessibilityRole="button"
                         accessibilityLabel={`${tr.calA11yTask}: ${item.task.title}${item.done ? `, ${tr.done}` : ''}`}
                         hitSlop={{ top: 2, bottom: 2 }}
-                        style={[st.taskChip, { borderLeftColor: item.color, backgroundColor: item.color + '1F', opacity: item.done ? 0.5 : 1 }]}>
+                        style={[st.taskChip, { backgroundColor: item.color + '1F', opacity: item.done ? 0.5 : 1 }]}>
                         <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontFamily: fontFamily.semibold, textDecorationLine: item.done ? 'line-through' : 'none' }}>
                           {item.task.title}
                         </Text>
@@ -274,7 +273,7 @@ export function TimeGrid({
                       }]}>
                       <View style={{
                         flex: 1, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2, overflow: 'hidden',
-                        backgroundColor: m.color + (sel ? '55' : '2E'), borderLeftWidth: 3, borderLeftColor: m.color,
+                        backgroundColor: m.color + (sel ? '55' : '2E'),
                       }}>
                         {/* Рядки рахуються від реальної висоти: 45-хвилинна
                             подія (≈37pt) раніше брала два рядки назви + рядок
@@ -316,7 +315,7 @@ const st = StyleSheet.create({
   dayNum: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   allDayRow: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
   gutterCell: { justifyContent: 'center', paddingHorizontal: 2 },
-  taskChip: { height: 20, justifyContent: 'center', borderLeftWidth: 3, borderRadius: 6, paddingHorizontal: 4 },
+  taskChip: { height: 20, justifyContent: 'center', borderRadius: 6, paddingHorizontal: 4 },
   hourLabel: { position: 'absolute', right: 6, fontSize: 10, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] },
   event: { position: 'absolute', paddingHorizontal: 1, paddingVertical: 1 },
   // «Зараз» — тонкий coral-тік (DS: accent.coral для індикаторів).

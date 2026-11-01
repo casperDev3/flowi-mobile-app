@@ -22,6 +22,7 @@ import {
   buildWidgetSnapshot,
   widgetRoleMap,
   widgetSnapshotSignature,
+  type WidgetSnapshot,
 } from '@/utils/widgetSnapshot';
 
 /** Ключі сховища, від яких залежить знімок. */
@@ -38,6 +39,8 @@ export const WIDGET_SOURCE_KEYS = [
   'project_sync_state_v1',
   'workspace_projects',
   'lang_option_v1',
+  // next.meeting (§8.1) — найближча зустріч для екрана блокування.
+  'meetings',
 ] as const;
 
 const DEBOUNCE_MS = 1500;
@@ -77,18 +80,17 @@ export function __setWidgetBridgeForTests(next: WidgetBridge | null | undefined)
 let lastSignature: string | null = null;
 
 /**
- * Перерахувати знімок і, якщо він змінився, записати й перезавантажити віджет.
- * Повертає true, коли запис відбувся.
+ * Зібрати сховище й порахувати знімок — без жодного нативного виклику.
+ * Спільне для iOS-віджета (нижче) і Android-віджетів (store/android-surfaces.ts),
+ * щоб обидві платформи показували ті самі числа.
  */
-export async function writeWidgetSnapshot(session: {
+export async function computeWidgetSnapshot(session: {
   authed: boolean;
   myUserId?: string | null;
-}, now: Date = new Date()): Promise<boolean> {
-  const target = widgetBridge();
-  if (!target) return false;
+}, now: Date = new Date()): Promise<WidgetSnapshot> {
   const [
     tasks, taskStatuses, transactions, accounts, currencies, primaryCurrency,
-    timeEntries, activeTimers, healthEntries, syncState, summaries, lang,
+    timeEntries, activeTimers, healthEntries, syncState, summaries, lang, meetings,
   ] = await Promise.all([
     loadData<unknown>('tasks', []),
     loadData<unknown>('task_statuses', []),
@@ -102,16 +104,30 @@ export async function writeWidgetSnapshot(session: {
     loadData<unknown>('project_sync_state_v1', {}),
     loadData<unknown>('workspace_projects', []),
     loadData<unknown>('lang_option_v1', 'uk'),
+    loadData<unknown>('meetings', []),
   ]);
-  const snapshot = buildWidgetSnapshot({
+  return buildWidgetSnapshot({
     now,
     lang,
     authed: session.authed,
     myUserId: session.myUserId,
     projectRoles: widgetRoleMap(syncState, summaries),
     tasks, taskStatuses, transactions, accounts, currencies, primaryCurrency,
-    timeEntries, activeTimers, healthEntries,
+    timeEntries, activeTimers, healthEntries, meetings,
   });
+}
+
+/**
+ * Перерахувати знімок і, якщо він змінився, записати й перезавантажити віджет.
+ * Повертає true, коли запис відбувся.
+ */
+export async function writeWidgetSnapshot(session: {
+  authed: boolean;
+  myUserId?: string | null;
+}, now: Date = new Date()): Promise<boolean> {
+  const target = widgetBridge();
+  if (!target) return false;
+  const snapshot = await computeWidgetSnapshot(session, now);
   const signature = widgetSnapshotSignature(snapshot);
   if (signature === lastSignature) return false;
   target.write(JSON.stringify(snapshot));
@@ -121,7 +137,7 @@ export async function writeWidgetSnapshot(session: {
 }
 
 /**
- * Монтується один раз у корені (app/_layout.tsx). Нічого не рендерить.
+ * Монтується один раз (components/shared/DeviceSurfaces.tsx). Нічого не рендерить.
  */
 export function useWidgetSnapshotWriter(): void {
   const { status, user } = useAuth();

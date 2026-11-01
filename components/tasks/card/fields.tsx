@@ -19,6 +19,16 @@ import { isSameDay, monthGrid } from '@/utils/dateUtils';
 import { filterPickerOptions, pickerCreateName } from '@/utils/pickerOptions';
 import { initialReminderDraft, resolveReminderMoment } from '@/utils/reminderTime';
 import { priorityColor, priorityLabel, type TaskPriority } from '@/utils/taskUtils';
+import {
+  DEFAULT_DEADLINE_TIME,
+  dayKeyOf,
+  deadlineDayKey,
+  deadlineTimeOf,
+  buildDeadline,
+  moveDeadlineToDay,
+  parseDeadlineTime,
+  deadlineSourceOf,
+} from '@/utils/taskDeadline';
 
 import {
   FieldTrigger,
@@ -322,6 +332,187 @@ export function DateField({ variant, icon = 'calendar', label, value, onChange, 
             c={c}
           />
         </View>
+      </PropertySheet>
+    </>
+  );
+}
+
+// ─── Дедлайн (день + необов'язковий час) ────────────────────────────────────
+
+export interface DeadlineValue {
+  deadline: string | null | undefined;
+  /**
+   * УЖЕ перевірений прапорець (isTimedDeadline(task) або чернетка форми), а
+   * не сирий `task.deadlineHasTime`: застарілий прапорець старої збірки без
+   * `deadlineTimeAt === deadline` — дедлайн лише на день (C1).
+   */
+  deadlineHasTime?: boolean;
+}
+
+/** Зміна дедлайну: `deadlineHasTime` присутній лише як `true` (utils/taskDeadline.ts). */
+export interface DeadlinePatch {
+  deadline: string | null;
+  deadlineHasTime?: true;
+}
+
+export interface DeadlineFieldProps extends Omit<DateFieldProps, 'value' | 'onChange'> {
+  value: DeadlineValue;
+  onChange: (patch: DeadlinePatch) => void;
+}
+
+/**
+ * Дедлайн: день (пресети + календар, як DateField) і рядок «Час» під ним.
+ * Без часу — «Додати час» (поля з 18:00); з часом — поля, «Без часу» і
+ * «Застосувати». Час без дня не ставиться; «Прибрати дату» знімає обидва.
+ * Нагадування планує сервер: з часом — за добу й у момент, без часу —
+ * прострочка о 9:00 наступного дня (підказка під рядком).
+ */
+export function DeadlineField({ variant, icon = 'flag', label, value, onChange, danger, disabled, today, colors: c, isDark, locale }: DeadlineFieldProps) {
+  const { tr } = useI18n();
+  const { t } = useDS();
+  const [open, setOpen] = useState(false);
+  const deadline = value.deadline ?? null;
+  const time = deadlineTimeOf(deadlineSourceOf(deadline, value.deadlineHasTime));
+  const dayKey = deadlineDayKey(deadline);
+  const base = deadline ? parseDay(deadline) : today;
+  const [year, setYear] = useState(base.getFullYear());
+  const [month, setMonth] = useState(base.getMonth());
+  /** Поля «год:хв» відкриті (є час або натиснули «Додати час»). */
+  const [editingTime, setEditingTime] = useState(false);
+  const [hours, setHours] = useState('');
+  const [mins, setMins] = useState('');
+  useEffect(() => {
+    if (!open) return;
+    const b = deadline ? parseDay(deadline) : today;
+    setYear(b.getFullYear()); setMonth(b.getMonth());
+    const [h, m] = (time ?? '').split(':');
+    setEditingTime(!!time); setHours(h ?? ''); setMins(m ?? '');
+  }, [open, deadline, time, today]);
+  const weeks = useMemo(() => monthGrid(year, month), [year, month]);
+  const presets = [
+    { label: tr.dateToday, days: 0 },
+    { label: tr.dateTomorrow, days: 1 },
+    { label: tr.datePlus3, days: 3 },
+    { label: tr.datePlus7, days: 7 },
+  ];
+  const selectedKey = deadline ? parseDay(deadline).toDateString() : null;
+  const emit = (fields: { deadline: string; deadlineHasTime?: true } | null) => {
+    if (!fields) return;
+    onChange(fields.deadlineHasTime ? { deadline: fields.deadline, deadlineHasTime: true } : { deadline: fields.deadline });
+  };
+  // Новий день зберігає обраний час: збережений, або щойно набраний у полях.
+  const pickDay = (d: Date) => {
+    const key = dayKeyOf(d);
+    const pending = editingTime ? parseDeadlineTime(hours, mins) : null;
+    emit(editingTime && pending ? buildDeadline(key, pending) : moveDeadlineToDay(deadlineSourceOf(deadline, value.deadlineHasTime), key));
+    // Аркуш лишається відкритим (як панель на вебі) — щоб одразу додати час.
+  };
+  const clear = () => { onChange({ deadline: null }); setOpen(false); };
+  const addTime = () => {
+    const [h, m] = DEFAULT_DEADLINE_TIME.split(':');
+    setHours(h); setMins(m); setEditingTime(true);
+  };
+  const removeTime = () => {
+    setEditingTime(false); setHours(''); setMins('');
+    if (dayKey && time) emit(buildDeadline(dayKey, null));
+  };
+  const applyTime = () => {
+    if (!dayKey) return;
+    // Порожні години = «без часу». Нерозбірний час (C3: «25», «9 : 05», «-1»)
+    // НЕ зберігаємо мовчки як «лише день» — аркуш лишається відкритим.
+    if (!hours.trim() && !mins.trim()) { emit(buildDeadline(dayKey, null)); setOpen(false); return; }
+    const hhmm = parseDeadlineTime(hours, mins);
+    if (!hhmm) return;
+    emit(buildDeadline(dayKey, hhmm));
+    setOpen(false);
+  };
+  const dayLabel = formatDay(deadline, locale, true);
+  const triggerValue = dayLabel && time ? `${dayLabel}, ${time}` : dayLabel;
+  const timeDisabled = !dayKey;
+  return (
+    <>
+      <FieldTrigger
+        variant={variant}
+        icon={icon}
+        label={label}
+        value={triggerValue}
+        placeholder={tr.cardNotSet}
+        tone={danger ? 'danger' : 'normal'}
+        onPress={disabled ? undefined : () => setOpen(true)}
+        colors={c}
+      />
+      <PropertySheet
+        visible={open}
+        title={label}
+        onClose={() => setOpen(false)}
+        colors={c}
+        isDark={isDark}
+        footer={deadline ? <SheetButtons colors={c} secondary={{ label: tr.cardClearDate, onPress: clear, destructive: true }} /> : undefined}>
+        <View style={st.presetRow}>
+          {presets.map(p => {
+            const day = addDays(today, p.days);
+            const on = !!deadline && isSameDay(parseDay(deadline), day);
+            return (
+              <TouchableOpacity key={p.label} onPress={() => pickDay(day)} accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                style={[cardStyles.chip, { borderColor: 'transparent', backgroundColor: on ? t.action.primary : c.dim }]}>
+                <Text style={{ color: on ? t.text.onAction : c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{p.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <View style={[st.calendar, { backgroundColor: c.dim }]}>
+          <CalendarGrid
+            year={year}
+            month={month}
+            markedDays={new Set()}
+            selectedDate={selectedKey}
+            todayDate={today}
+            weeks={weeks}
+            months={tr.months}
+            weekdays={tr.weekdays}
+            onPrevMonth={() => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); }}
+            onNextMonth={() => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); }}
+            onSelectDay={d => pickDay(d)}
+            c={c}
+          />
+        </View>
+        <Text style={[st.caption, { color: c.sub, marginTop: 16 }]}>{tr.cardDeadlineTime}</Text>
+        {editingTime && !timeDisabled ? (
+          <>
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <TextInput testID="deadline-time-hours" value={hours} onChangeText={v => setHours(v.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad"
+                placeholder={tr.hoursShort} placeholderTextColor={t.text.muted} accessibilityLabel={tr.hoursShort}
+                style={[st.numInput, { backgroundColor: c.dim, color: c.text }]} />
+              <Text style={{ color: c.sub, fontSize: 18, fontFamily: fontFamily.semibold }}>:</Text>
+              <TextInput testID="deadline-time-mins" value={mins} onChangeText={v => setMins(v.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad"
+                placeholder={tr.minutesShort} placeholderTextColor={t.text.muted} accessibilityLabel={tr.minutesShort}
+                style={[st.numInput, { backgroundColor: c.dim, color: c.text }]} />
+            </View>
+            <View style={[st.presetRow, { marginTop: 12, marginBottom: 0 }]}>
+              <TouchableOpacity testID="deadline-no-time" onPress={removeTime} accessibilityRole="button"
+                style={[cardStyles.chip, { borderColor: 'transparent', backgroundColor: c.dim }]}>
+                <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.cardDeadlineNoTime}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="deadline-apply-time" onPress={applyTime} accessibilityRole="button"
+                style={[cardStyles.chip, { borderColor: 'transparent', backgroundColor: t.action.primary }]}>
+                <Text style={{ color: t.text.onAction, fontSize: 13, fontFamily: fontFamily.semibold }}>{tr.cardDeadlineApplyTime}</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <TouchableOpacity testID="deadline-add-time" onPress={timeDisabled ? undefined : addTime} disabled={timeDisabled}
+            accessibilityRole="button" accessibilityState={{ disabled: timeDisabled }}
+            style={[st.create, { backgroundColor: glassOf(t).surfaceSubtle, ...glassRim(t, 'subtle'), marginBottom: 0, opacity: timeDisabled ? 0.5 : 1 }]}>
+            <IconSymbol name="clock" size={16} color={t.action.secondaryText} />
+            <Text style={{ color: t.action.secondaryText, fontSize: 14, fontFamily: fontFamily.semibold }}>{tr.cardDeadlineAddTime}</Text>
+          </TouchableOpacity>
+        )}
+        {dayKey ? (
+          <Text style={{ color: c.sub, fontSize: 12, lineHeight: 17, fontFamily: fontFamily.regular, marginTop: 8 }}>
+            {time ? tr.cardDeadlineTimeHint : tr.cardDeadlineNoTimeHint}
+          </Text>
+        ) : null}
       </PropertySheet>
     </>
   );

@@ -90,6 +90,11 @@ jest.mock('@/store/push', () => ({
   unregisterPushToken:      jest.fn(async () => {}),
 }));
 
+// Черги дій пристроїв (NATIVE CONTRACT): auth лінивим require кличе resetDeviceActions.
+jest.mock('@/store/device-actions', () => ({ resetDeviceActions: jest.fn(async () => {}) }));
+const { resetDeviceActions: mockResetDeviceActions } =
+  jest.requireMock('@/store/device-actions') as { resetDeviceActions: jest.Mock };
+
 const { apiFetch: mockApiFetch } = jest.requireMock('@/store/api') as { apiFetch: jest.Mock };
 const { hasSyncedBefore: mockHasSyncedBefore } =
   jest.requireMock('@/store/sync-engine') as { hasSyncedBefore: jest.Mock };
@@ -151,6 +156,23 @@ describe('auth — logout НЕ перемикає в офлайн', () => {
     ]) {
       expect(removedKeys).toContain(key);
     }
+  });
+});
+
+describe('auth — дії пристроїв не переживають вихід (M4)', () => {
+  it('logout() і switchWorkspace() чистять нативні черги, власника й журнал', async () => {
+    await act(async () => {
+      TestRenderer.create(React.createElement(AuthProvider, null, React.createElement(Probe)));
+    });
+    mockResetDeviceActions.mockClear();
+    await act(async () => { await authApi.logout(true); });
+    expect(mockResetDeviceActions).toHaveBeenCalledTimes(1);
+    const removedKeys = mockAsyncStorage.multiRemove.mock.calls.at(-1)?.[0] as string[];
+    expect(removedKeys).toContain('device_actions_applied_v1');
+
+    mockResetDeviceActions.mockClear();
+    await act(async () => { await authApi.switchWorkspace(true); });
+    expect(mockResetDeviceActions).toHaveBeenCalledTimes(1);
   });
 });
 

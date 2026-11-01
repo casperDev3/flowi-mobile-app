@@ -85,7 +85,7 @@ export function DayActivityTimeline({
                   top, height: h,
                   left: `${(p.col / p.cols) * 100}%`, width: `${100 / p.cols}%`,
                 }]}>
-                <View style={[st.blockFill, { backgroundColor: p.meeting.color + '33', borderLeftColor: p.meeting.color }]}>
+                <View style={[st.blockFill, { backgroundColor: p.meeting.color + '33' }]}>
                   <Text numberOfLines={1} style={{ color: c.text, fontSize: 10, fontFamily: fontFamily.semibold }}>{p.meeting.title}</Text>
                 </View>
               </TouchableOpacity>
@@ -107,7 +107,6 @@ export function DayActivityTimeline({
                 style={[st.block, st.trackFill, {
                   top, height: h, left: 0, right: 0,
                   backgroundColor: TRACK_COLOR + (b.running ? '66' : '40'),
-                  borderLeftColor: TRACK_COLOR,
                 }]}>
                 {h >= 14 && <Text numberOfLines={1} style={{ color: c.text, fontSize: 9, fontFamily: fontFamily.semibold }}>{b.label}</Text>}
               </View>
@@ -147,8 +146,8 @@ const st = StyleSheet.create({
   hourLine:  { position: 'absolute', left: GUTTER, right: 0, height: StyleSheet.hairlineWidth },
   lane:      { position: 'absolute', top: 0, bottom: 0 },
   block:     { position: 'absolute', paddingHorizontal: 1, paddingVertical: 1 },
-  blockFill: { flex: 1, borderLeftWidth: 3, borderRadius: 6, paddingHorizontal: 4, paddingTop: 1, overflow: 'hidden' },
-  trackFill: { borderLeftWidth: 3, borderRadius: 6, paddingHorizontal: 4, overflow: 'hidden' },
+  blockFill: { flex: 1, borderRadius: 6, paddingHorizontal: 4, paddingTop: 1, overflow: 'hidden' },
+  trackFill: { borderRadius: 6, paddingHorizontal: 4, overflow: 'hidden' },
   nowLine:   { position: 'absolute', left: GUTTER - 4, right: 0, height: 8, marginTop: -4, flexDirection: 'row', alignItems: 'center' },
   nowDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: NOW_COLOR },
   nowBar:    { flex: 1, height: 1.5, backgroundColor: NOW_COLOR },

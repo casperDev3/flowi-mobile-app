@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="flowi_widget_large_label">Flowi — day</string>
+  <string name="flowi_widget_large_description">Day rings and four quick actions.</string>
+  <string name="flowi_widget_medium_label">Flowi — actions</string>
+  <string name="flowi_widget_medium_description">Four quick actions.</string>
+  <string name="flowi_widget_small_label">Flowi — action</string>
+  <string name="flowi_widget_small_description">One quick action of your choice.</string>
+  <string name="flowi_widget_metric_label">Flowi — metric</string>
+  <string name="flowi_widget_metric_description">One ring of your choice: tasks, steps, finance or time.</string>
+  <string name="flowi_action_task">Add task</string>
+  <string name="flowi_action_expense">Add expense</string>
+  <string name="flowi_action_event">Add event</string>
+  <string name="flowi_action_note">Take a note</string>
+</resources>

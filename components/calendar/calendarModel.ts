@@ -15,6 +15,7 @@
  */
 import type { Meeting } from '@/utils/meetings';
 import type { Sprint } from '@/utils/sprintUtils';
+import { buildDeadline } from '@/utils/taskDeadline';
 import { isMyTask, normalizePriority, type Task } from '@/utils/taskUtils';
 
 // ─── Вид ──────────────────────────────────────────────────────────────────────
@@ -144,10 +145,12 @@ export function taskDeadlineKey(task: Pick<Task, 'deadline'>): string | null {
 
 /**
  * Дедлайн для параметра `?deadline=` форми створення завдання: повний ISO
- * локальної півночі — у тій самій формі, яку пише календар самої форми.
+ * ЛОКАЛЬНОГО ПОЛУДНЯ доби (контракт C2, buildDeadline(key, null)) — у тій самій
+ * формі, яку пише поле дедлайну самої форми. Невалідний ключ — полудень
+ * сьогодні (як keyToDate).
  */
 export function deadlineIsoForKey(key: string): string {
-  return keyToDate(key).toISOString();
+  return (buildDeadline(key, null) ?? buildDeadline(dateKey(keyToDate(key)), null)!).deadline;
 }
 
 // ─── Проєкти й фільтр ─────────────────────────────────────────────────────────

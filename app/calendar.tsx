@@ -44,8 +44,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CalendarToolbar } from '@/components/calendar/CalendarToolbar';
 import {
-  activeSprints, bucketMeetings, bucketTasks, dateKey, deadlineIsoForKey, defaultCalendarView, keyToDate,
-  mergeCalendarProjects, monthMatrix, periodTitle, PERSONAL_FILTER, shiftAnchor, sprintsOnDay, viewRange,
+  activeSprints, bucketMeetings, bucketTasks, deadlineIsoForKey, defaultCalendarView, keyToDate,
+  mergeCalendarProjects, monthMatrix, periodTitle, PERSONAL_FILTER, shiftAnchor, sprintsOnDay, taskDeadlineKey, viewRange,
   type CalendarProject, type CalendarView, type ProjectFilter, type SprintBar,
 } from '@/components/calendar/calendarModel';
 import { CalendarSearch } from '@/components/calendar/CalendarSearch';
@@ -429,10 +429,9 @@ export default function CalendarScreen() {
 
   const createTask = useCallback((task: Task, openFull: boolean) => {
     setTaskCreateDay(null);
-    if (task.deadline) {
-      const d = new Date(task.deadline);
-      if (Number.isFinite(d.getTime())) setAnchor(dateKey(d));
-    }
+    // Доба дедлайну — локальна; голий `YYYY-MM-DD` — як є (C2).
+    const deadlineKey = taskDeadlineKey(task);
+    if (deadlineKey) setAnchor(deadlineKey);
     void trackWrite(async () => {
       setTasks(await updateSynced<Task>('tasks', list => [task, ...list.filter(t => t.id !== task.id)]));
     }, ['tasks'])

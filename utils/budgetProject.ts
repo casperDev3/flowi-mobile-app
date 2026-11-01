@@ -10,6 +10,7 @@ import { txAmount, type Account } from './accounts';
 import { budgetTxCurrency } from './budgetUtils';
 import type { Transaction } from './financeUtils';
 import { budgetSpentTotal } from './projectOverview';
+import { txDateForDayKey } from './txDate';
 import { uuidV4 } from './uuid';
 
 export interface ProjectMoneyTotals {
@@ -76,6 +77,8 @@ export function buildProjectTransaction(input: {
   projectId: string;
   now: Date;
   id?: string;
+  /** Обраний день 'YYYY-MM-DD'; валідний — день о поточній годині, інакше `now`. */
+  dateKey?: string;
 }): Transaction | null {
   const amount = Number(input.amount.replace(/\s/g, '').replace(',', '.'));
   if (!Number.isFinite(amount) || amount <= 0) return null;
@@ -85,7 +88,7 @@ export function buildProjectTransaction(input: {
     category: input.category.trim(),
     amount,
     note: input.note.trim(),
-    date: input.now.toISOString(),
+    date: input.dateKey ? txDateForDayKey(input.dateKey, undefined, input.now) : input.now.toISOString(),
     accountId: input.account?.id ?? '',
     ...(input.account?.currency ? { currency: input.account.currency } : {}),
     projectId: input.projectId,

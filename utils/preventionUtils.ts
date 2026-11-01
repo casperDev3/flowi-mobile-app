@@ -65,7 +65,14 @@ export interface Habit {
 let _seq = 0;
 export function genId() { _seq = (_seq + 1) % 100000; return `${Date.now()}_${_seq}`; }
 
-const dayKey = (d: Date | string) => new Date(d).toDateString();
+/**
+ * Доба запису: ISO → локальна доба; голий `YYYY-MM-DD` — саме ця доба (а не
+ * UTC-північ, що на захід від Гринвіча — ще вчора), як серверний local_day.
+ */
+const dayKey = (d: Date | string) => {
+  const bare = typeof d === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(d.trim()) : null;
+  return (bare ? new Date(Number(bare[1]), Number(bare[2]) - 1, Number(bare[3])) : new Date(d)).toDateString();
+};
 
 // ─── Ліки ────────────────────────────────────────────────────────────────────
 export function medTakenToday(med: Medication): number {

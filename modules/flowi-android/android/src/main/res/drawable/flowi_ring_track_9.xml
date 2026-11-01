@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Доріжка кільця (9dp): малюється ресурсом, а не в Bitmap, тож хост віджета
+  бере @color/flowi_widget_ring_track з поточної теми (світла/темна) сам.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+  <stroke android:width="9dp" android:color="@color/flowi_widget_ring_track" />
+</shape>

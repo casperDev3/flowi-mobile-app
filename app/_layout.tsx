@@ -15,6 +15,7 @@ import { Alert, AppState, View } from 'react-native';
 import 'react-native-reanimated';
 
 import { startFeedbackQueue } from '@/api/feedback';
+import { DeviceSurfaces } from '@/components/shared/DeviceSurfaces';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { NavSidebar } from '@/components/shared/NavSidebar';
 import { ModuleGate } from '@/components/shared/ModuleGate';
@@ -48,7 +49,6 @@ import { clearPendingInvite, getPendingInvite } from '@/store/invite-link';
 import { subscribeToStorage } from '@/store/storage';
 import { ThemeProvider } from '@/store/theme-context';
 import { TimerProvider } from '@/store/timer-context';
-import { useWidgetSnapshotWriter } from '@/store/widget-sync';
 import {
   cachedWorkspaceConfig,
   getWorkspaceIncompatibility,
@@ -389,9 +389,6 @@ function RootLayoutContent() {
   // виводить на екран, що встановлює потрібний workspace.
   useIncomingInviteLinks();
   usePendingMenuInvite();
-  // Знімок для iOS-віджета (App Group) — поза AuthGate, щоб і вихід з
-  // акаунта прибрав цифри з віджета. На Android/вебі — no-op.
-  useWidgetSnapshotWriter();
 
   // Сайдбар живе ТУТ, а не в (tabs)/_layout: інакше Stack-екрани
   // (Проєкти, Нотатки, Контейнери…) відкривалися б поверх нього, і
@@ -404,6 +401,9 @@ function RootLayoutContent() {
 
   return (
     <NavigationThemeProvider value={isDark ? NAV_THEME_DARK : NAV_THEME_LIGHT}>
+      {/* Віджети, годинник, Live Activity, Android-поверхні — листовий
+          компонент поза AuthGate: їхні оновлення не перемальовують корінь. */}
+      <DeviceSurfaces />
       <AuthGate>
         <View style={{ flex: 1, flexDirection: 'row' }}>
         {/* DS v2.1: кольоровий mesh під усім застосунком — його заломлює скляний
@@ -427,6 +427,7 @@ function RootLayoutContent() {
           <Stack.Screen name="admin-workspace" options={{ headerShown: false }} />
           <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
           <Stack.Screen name="account" options={{ headerShown: false }} />
+          <Stack.Screen name="devices" options={{ headerShown: false }} />
           <Stack.Screen name="projects" options={{ headerShown: false }} />
           <Stack.Screen name="notes" options={{ headerShown: false }} />
           <Stack.Screen name="archive" options={{ headerShown: false }} />

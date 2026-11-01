@@ -158,6 +158,14 @@ describe('гроші проєкту за весь час', () => {
       projectId: 'p',
     });
   });
+
+  test('операція проєкту з обраним днем — цей день о поточній годині', () => {
+    const now = new Date(2026, 8, 23, 14, 30);
+    const made = buildProjectTransaction({ type: 'expense', amount: '5', category: '', note: '', account: accounts[0], projectId: 'p', now, dateKey: '2026-09-20' });
+    expect(made?.date).toBe(new Date(2026, 8, 20, 14, 30).toISOString());
+    const bad = buildProjectTransaction({ type: 'expense', amount: '5', category: '', note: '', account: accounts[0], projectId: 'p', now, dateKey: '2026-13-40' });
+    expect(bad?.date).toBe(now.toISOString());
+  });
 });
 
 describe('оборот стрічки за періодом', () => {

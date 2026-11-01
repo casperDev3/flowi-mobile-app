@@ -30,6 +30,8 @@ import { isExecutableTask } from './task-contract';
  */
 
 import { taskColumnId, type TaskStatusColumn } from './taskStatuses';
+import { localDateKey } from './dateUtils';
+import { buildDeadline, deadlineDayKey, moveDeadlineToDay, type DeadlineFields } from './taskDeadline';
 import type { Status } from './taskUtils';
 
 /**
@@ -696,6 +698,8 @@ export function buildGantt(
 export interface GanttEdgeDragTask {
   startDate?: string;
   deadline?: string;
+  deadlineHasTime?: boolean;
+  deadlineTimeAt?: string;
   createdAt: string;
 }
 
@@ -712,12 +716,25 @@ export function shiftGanttEdge(
   task: GanttEdgeDragTask,
   edge: 'start' | 'end',
   deltaDays: number,
-): { startDate: string } | { deadline: string } | null {
+): { startDate: string } | DeadlineFields | null {
   if (!deltaDays) return null;
   const baseIso = edge === 'start' ? (task.startDate ?? task.createdAt) : (task.deadline ?? task.startDate ?? task.createdAt);
-  const base = new Date(baseIso);
+  // C2: доба дедлайну — deadlineDayKey (голий `YYYY-MM-DD` з імпорту — ця дата,
+  // а не UTC-північ, яка на захід від UTC — уже попередня доба).
+  const endDay = edge === 'end' && task.deadline ? deadlineDayKey(task.deadline) : null;
+  const endAnchor = endDay ? buildDeadline(endDay, null) : null;
+  const base = new Date(endAnchor ? endAnchor.deadline : baseIso);
   if (Number.isNaN(base.getTime())) return null;
   base.setDate(base.getDate() + deltaDays);
+  // Кінець — це дедлайн (C1/C2): точний переїжджає на нову добу зі своїм
+  // часом і НОВИМ deadlineTimeAt, добовий — полудень нової доби без прапорців.
+  // Інакше `{...t, deadline}` лишав би старий deadlineHasTime/deadlineTimeAt.
+  let endFields: DeadlineFields | null = null;
+  if (edge === 'end') {
+    endFields = moveDeadlineToDay(task.deadline ? task : null, localDateKey(base));
+    if (!endFields) return null;
+    base.setTime(Date.parse(endFields.deadline));
+  }
 
   const otherIso = edge === 'start' ? task.deadline : (task.startDate ?? task.createdAt);
   if (otherIso) {
@@ -728,5 +745,5 @@ export function shiftGanttEdge(
     }
   }
 
-  return edge === 'start' ? { startDate: base.toISOString() } : { deadline: base.toISOString() };
+  return edge === 'start' ? { startDate: base.toISOString() } : endFields;
 }

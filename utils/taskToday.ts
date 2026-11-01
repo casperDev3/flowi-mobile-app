@@ -20,7 +20,8 @@
  *   5. Решта — ні. Зокрема завдання БЕЗ дедлайну: беклог не є денною роботою.
  *      Саме цей пункт і був головною розбіжністю зі списком завдань.
  */
-import { isSameDay } from './dateUtils';
+import { isSameDay, localDateKey } from './dateUtils';
+import { deadlineDayKey } from './taskDeadline';
 import {
   REVIEW_COLUMN_ID,
   personalDisplayColumn,
@@ -42,7 +43,7 @@ import { completedEventAt, isOverdue, type Task } from './taskUtils';
  */
 export type TodayScopeTask = Pick<
   Task,
-  'status' | 'kanbanColumnId' | 'deadline' | 'history' | 'updatedAt' | 'projectId'
+  'status' | 'kanbanColumnId' | 'deadline' | 'deadlineHasTime' | 'deadlineTimeAt' | 'history' | 'updatedAt' | 'projectId'
 >;
 
 export function isTodayTask(
@@ -73,14 +74,12 @@ export function isTodayTask(
 
   if (!task.deadline) return false;
 
-  // Зіпсований рядок дати (трапляється в даних із синхронізації) не має права
-  // вважатись сьогоднішнім: усі порівняння з Invalid Date дають false, тож без
-  // цієї перевірки нижче спрацював би isSameDay і повернув false — але вже
-  // після NaN-арифметики. Перевіряємо явно, щоб намір читався.
-  const deadline = new Date(task.deadline);
-  if (Number.isNaN(deadline.getTime())) return false;
-
-  return isSameDay(deadline, now);
+  // Доба дедлайну (контракт C2): ISO → локальна доба, голий `YYYY-MM-DD`
+  // (імпорти) — саме ця доба. `new Date('2026-10-20')` — UTC-північ, і на
+  // захід від Гринвіча задача «на сьогодні» потрапляла б на вчора. Зіпсований
+  // рядок дає null і «сьогоднішнім» не вважається.
+  const day = deadlineDayKey(task.deadline);
+  return day !== null && day === localDateKey(now);
 }
 
 /**
@@ -90,10 +89,11 @@ export function isTodayTask(
 export function isWeekTask(task: TodayScopeTask, columns: TaskStatusColumn[], now: Date): boolean {
   if (isTodayTask(task, columns, now)) return true;
   if (task.status === 'done' || !task.deadline) return false;
-  const deadline = new Date(task.deadline);
-  if (Number.isNaN(deadline.getTime())) return false;
-  const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const diffDays = Math.round((dayStart(deadline) - dayStart(now)) / 86400000);
+  const day = deadlineDayKey(task.deadline);
+  if (!day) return false;
+  const [y, m, d] = day.split('-').map(Number);
+  const dayStart = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((new Date(y, m - 1, d).getTime() - dayStart(now)) / 86400000);
   return diffDays > 0 && diffDays <= 7;
 }
 

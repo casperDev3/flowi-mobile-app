@@ -23,6 +23,7 @@ import type { TaskPriority } from '@/utils/taskUtils';
 
 import {
   DateField,
+  DeadlineField,
   EstimateField,
   InlineTextArea,
   OptionField,
@@ -30,6 +31,7 @@ import {
   ReminderField,
   RepeatField,
   formatDay,
+  type DeadlinePatch,
   type FieldOption,
 } from './fields';
 import { FieldTrigger, PropertyGroup, SectionTitle, type CardColors } from './primitives';
@@ -42,8 +44,11 @@ export interface TaskCardMainProps {
   priority: TaskPriority;
   onPriority: (level: TaskPriority) => void;
   deadline: string | undefined;
+  /** Лише `true` — дедлайн із часом (utils/taskDeadline.ts). */
+  deadlineHasTime?: boolean;
   overdue: boolean;
-  onDeadline: (iso: string | null) => void;
+  /** Зміна дня/часу; `deadline: null` — зняти дедлайн разом із часом. */
+  onDeadline: (patch: DeadlinePatch) => void;
   project: {
     options: FieldOption[];
     value: string | null;
@@ -68,7 +73,7 @@ export interface TaskCardMainProps {
 }
 
 export function TaskCardMain({
-  status, priority, onPriority, deadline, overdue, onDeadline, project,
+  status, priority, onPriority, deadline, deadlineHasTime, overdue, onDeadline, project,
   canExecute, canPlan, subtasksSlot, actionsSlot, today, colors: c, isDark, locale,
 }: TaskCardMainProps) {
   const { tr } = useI18n();
@@ -87,10 +92,10 @@ export function TaskCardMain({
           isDark={isDark}
         />
         <PriorityField value={priority} onChange={onPriority} disabled={!canPlan} colors={c} isDark={isDark} />
-        <DateField
+        <DeadlineField
           icon="flag"
           label={tr.deadline}
-          value={deadline}
+          value={{ deadline, deadlineHasTime }}
           onChange={onDeadline}
           danger={overdue}
           disabled={!canPlan}

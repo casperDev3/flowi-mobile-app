@@ -195,7 +195,7 @@ export function SubscriptionDetailHeader({ sub, onEdit, onClose, colors: c, tr }
 
 export function SubscriptionDetailBody({
   sub, today, currencies, locale, lang, project, categoryLabel, accountLabel,
-  renewOpen, onRenewOpenChange, onRenew, onArchive, onRestore, onDelete, busy, colors: c, tr,
+  renewOpen, onRenewOpenChange, onRenew, onPay, onArchive, onRestore, onDelete, busy, colors: c, tr,
 }: {
   sub: Subscription;
   today: string;
@@ -208,6 +208,8 @@ export function SubscriptionDetailBody({
   renewOpen: boolean;
   onRenewOpenChange: (open: boolean) => void;
   onRenew: (amount: number) => void;
+  /** «Оплачено» — витрата + новий цикл; діалог відкриває екран. */
+  onPay?: () => void;
   onArchive: () => void;
   onRestore: () => void;
   onDelete: () => void;
@@ -302,14 +304,28 @@ export function SubscriptionDetailBody({
             </View>
           </View>
         ) : (
-          <TouchableOpacity
-            onPress={() => onRenewOpenChange(true)}
-            accessibilityRole="button"
-            accessibilityLabel={tr.subPayNow}
-            style={[st.btn, { marginTop: 16, minHeight: 52, backgroundColor: ds.action.primary }]}>
-            <IconSymbol name="checkmark.circle" size={16} color={ds.text.onAction} />
-            <Text style={{ ...dsType.label, fontSize: 15, color: ds.text.onAction }}>{tr.subPayNow}</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+            <TouchableOpacity
+              onPress={() => onRenewOpenChange(true)}
+              accessibilityRole="button"
+              accessibilityLabel={tr.subPayNow}
+              style={[st.btn, { flex: 1, minHeight: 52, backgroundColor: ds.action.primary }]}>
+              <IconSymbol name="checkmark.circle" size={16} color={ds.text.onAction} />
+              <Text style={{ ...dsType.label, fontSize: 15, color: ds.text.onAction }}>{tr.subPayNow}</Text>
+            </TouchableOpacity>
+            {onPay ? (
+              <TouchableOpacity
+                onPress={onPay}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: busy }}
+                accessibilityLabel={tr.payAction}
+                style={[st.btn, { ...gs.card, flex: 1, minHeight: 52 }]}>
+                <IconSymbol name="creditcard.fill" size={15} color={ds.action.secondaryText} />
+                <Text style={{ ...dsType.label, fontSize: 15, color: ds.action.secondaryText }}>{tr.payAction}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         )
       ) : null}
 
@@ -354,6 +370,11 @@ export function SubscriptionDetailBody({
           <Text style={{ flex: 1, color: ds.text.primary, fontSize: 13, fontFamily: fontFamily.regular, ...dsType.numeric }}>{formatDateKey(h.date, locale)}</Text>
           <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
             {money(h.amount, h.currency || sub.currency)}
+            {h.chargedCurrency && Number(h.chargedAmount) > 0 && h.chargedCurrency !== (h.currency || sub.currency) ? (
+              <Text style={{ color: c.sub, fontFamily: fontFamily.regular }}>
+                {` · ${tr.subHistoryCharged.replace('{amount}', money(Number(h.chargedAmount), h.chargedCurrency))}`}
+              </Text>
+            ) : null}
           </Text>
         </View>
       ))}

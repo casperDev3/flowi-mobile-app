@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -394,6 +394,23 @@ export default function AccountScreen() {
                 <Text style={[st.btnText, { color: k.text.onAction }]}>{tr.accountChangePassword}</Text>
               )}
             </TouchableOpacity>
+            </BentoCard>
+
+            {/* Пристрої та сесії (watch-lockscreen-v1.md §11.1): входи акаунта + Apple Watch. */}
+            <BentoCard title={tr.devicesTitle} icon="laptopcomputer" accent="info">
+            <View style={[st.card, { backgroundColor: k.surface.subtle }]}>
+              <TouchableOpacity
+                style={[st.fieldWrap, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}
+                onPress={() => router.push('/devices' as Href)}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityLabel={tr.devicesRow}
+              >
+                <IconSymbol name="laptopcomputer" size={17} color={c.accent} />
+                <Text style={[st.input, { color: c.text, flex: 1 }]}>{tr.devicesRow}</Text>
+                <IconSymbol name="chevron.right" size={16} color={c.sub} />
+              </TouchableOpacity>
+            </View>
             </BentoCard>
 
             {/* Workspace */}

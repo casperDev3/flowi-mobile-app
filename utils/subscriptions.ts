@@ -15,10 +15,11 @@
  *    поясів і стрибків на переході літнього часу.
  *  - Історія append-only.
  *
- * Модуль лишається чистим: із фінансів імпортується ЛИШЕ тип операції (import
- * type стирається при компіляції), тож ані RN, ані сховище сюди не приходять.
+ * Модуль лишається чистим: із фінансів і рахунків імпортуються лише чисті
+ * функції й типи, тож ані RN, ані сховище сюди не приходять.
  */
 
+import { accountById, activeAccounts, defaultAccountId, type Account } from '@/utils/accounts';
 import { fiatFractionDigits, type Transaction } from '@/utils/financeUtils';
 
 // ─── Типи (G.1) ───────────────────────────────────────────────────────────────
@@ -40,6 +41,15 @@ export interface SubscriptionRenewal {
   currency?: string;
   /** ISO-час натискання. */
   renewedAt?: string;
+  /** Рахунок, з якого списали («Оплачено»). Пише лише paySubscription. */
+  accountId?: string;
+  /**
+   * Фактично списано у валюті рахунку — лише коли валюта рахунку ≠ валюті
+   * підписки. `amount`/`currency` лишаються ЦІНОЮ у валюті підписки.
+   */
+  chargedAmount?: number;
+  /** Валюта рахунку; присутня лише разом із chargedAmount. */
+  chargedCurrency?: string;
 }
 
 export interface Subscription {
@@ -260,8 +270,12 @@ export interface SubscriptionPaymentOptions {
   accountId?: string;
   /** Валюта операції: валюта РАХУНКУ, якщо вона відома, інакше валюта підписки. */
   currency?: string;
-  /** Сума, підтверджена в діалозі (ціна могла змінитися). */
+  /** Ціна у валюті ПІДПИСКИ, підтверджена в діалозі (ціна могла змінитися). */
   amount?: number;
+  /** Сума у валюті рахунку; обов'язкова, коли currency задана й ≠ sub.currency; інакше ігнорується. */
+  chargedAmount?: number;
+  /** Знаки валюти рахунку: chargedAmount округлюється до них (415.555 ₴ → 415.56). */
+  chargedDecimals?: number;
   /** Категорія, коли в підписці її не вказано. */
   fallbackCategory: string;
   /**
@@ -271,6 +285,53 @@ export interface SubscriptionPaymentOptions {
    */
   paidOn?: string;
   now?: Date;
+}
+
+/** Оплата в іншій валюті: валюта рахунку відома й відрізняється від валюти підписки. */
+export function isCrossCurrencyPayment(sub: Subscription, accountCurrency?: string): boolean {
+  return typeof accountCurrency === 'string' && accountCurrency !== '' && accountCurrency !== sub.currency;
+}
+
+/**
+ * Оцінка списаної суми у валюті рахунку — за власною історією підписки.
+ *
+ * Курсів у застосунку немає, тож єдине джерело «конвертації» — найсвіжіша
+ * оплата з того самого типу рахунку: chargedAmount / amount × ціна.
+ * null — оцінити нема з чого (або ціна бита).
+ */
+export function estimateChargedAmount(
+  sub: Subscription,
+  accountCurrency: string,
+  price: number,
+  decimals = 2,
+): number | null {
+  if (!Number.isFinite(price) || price <= 0) return null;
+  const history = Array.isArray(sub.history) ? sub.history : [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const row = history[i];
+    if (!row || row.chargedCurrency !== accountCurrency) continue;
+    const charged = Number(row.chargedAmount);
+    const amount = Number(row.amount);
+    if (!(charged > 0) || !(amount > 0)) continue;
+    if ((row.currency || sub.currency) !== sub.currency) continue;
+    const factor = 10 ** decimals;
+    return Math.round((charged / amount) * price * factor) / factor;
+  }
+  return null;
+}
+
+/** Округлення суми до знаків валюти (0–8; биті знаки — 2). */
+export function roundToCurrencyDecimals(amount: number, decimals: number): number {
+  const digits = Number.isFinite(decimals) ? Math.max(0, Math.min(8, Math.floor(decimals))) : 2;
+  const scale = 10 ** digits;
+  return Math.round(amount * scale) / scale;
+}
+
+/** Списана сума, округлена до знаків валюти рахунку (якщо їх передано). */
+function roundedCharged(opts: Pick<SubscriptionPaymentOptions, 'chargedAmount' | 'chargedDecimals'>): number | undefined {
+  const charged = opts.chargedAmount;
+  if (typeof charged !== 'number' || !Number.isFinite(charged) || opts.chargedDecimals === undefined) return charged;
+  return roundToCurrencyDecimals(charged, opts.chargedDecimals);
 }
 
 /**
@@ -283,11 +344,17 @@ export interface SubscriptionPaymentOptions {
  */
 export function subscriptionPaymentTx(sub: Subscription, opts: SubscriptionPaymentOptions): Transaction {
   const now = opts.now ?? new Date();
+  const cross = isCrossCurrencyPayment(sub, opts.currency);
+  const charged = roundedCharged(opts);
+  if (cross && !(typeof charged === 'number' && Number.isFinite(charged) && charged > 0)) {
+    // UI цього не допускає; витрату в чужій валюті не пишемо ніколи.
+    throw new RangeError('chargedAmount required for cross-currency payment');
+  }
   return {
     id: opts.id,
     type: 'expense',
     category: (sub.category ?? '').trim() || opts.fallbackCategory,
-    amount: subscriptionPaymentAmount(sub, opts.amount),
+    amount: cross ? (charged as number) : subscriptionPaymentAmount(sub, opts.amount),
     note: sub.name,
     date: dateKeyAtTime(
       opts.paidOn && isDateKey(opts.paidOn)
@@ -322,11 +389,37 @@ export interface SubscriptionPaymentResult {
  */
 export function paySubscription(sub: Subscription, opts: SubscriptionPaymentOptions): SubscriptionPaymentResult {
   const now = opts.now ?? new Date();
-  const amount = subscriptionPaymentAmount(sub, opts.amount);
-  return {
-    subscription: renewSubscription(sub, { amount, now }),
-    transaction: subscriptionPaymentTx(sub, { ...opts, amount, now }),
+  const price = subscriptionPaymentAmount(sub, opts.amount);
+  const cross = isCrossCurrencyPayment(sub, opts.currency);
+  // Транзакцію рахуємо першою: без списаної суми в іншій валюті вона кидає,
+  // і тоді підписка теж не зсувається.
+  const transaction = subscriptionPaymentTx(sub, { ...opts, amount: price, now });
+  // Ціна — у валюті підписки, тож sub.amount лишається у валюті підписки.
+  const renewed = renewSubscription(sub, { amount: price, now });
+  const history = [...(renewed.history ?? [])];
+  const last = history[history.length - 1];
+  history[history.length - 1] = {
+    ...last,
+    ...(opts.accountId ? { accountId: opts.accountId } : {}),
+    ...(cross ? { chargedAmount: transaction.amount, chargedCurrency: opts.currency } : {}),
   };
+  return {
+    subscription: { ...renewed, history, ...(opts.accountId ? { accountId: opts.accountId } : {}) },
+    transaction,
+  };
+}
+
+/**
+ * Рахунок, який діалог «Оплачено» пропонує першим: свій (якщо не в архіві) →
+ * перший активний у валюті підписки → типовий → null. Дзеркало веб
+ * paymentAccount() (components/finance/upcoming-payments-pay.tsx).
+ */
+export function paymentAccount(accounts: Account[], sub: Pick<Subscription, 'accountId' | 'currency'>): Account | null {
+  const own = accountById(accounts, sub.accountId);
+  if (own && !own.archived) return own;
+  const sameCurrency = activeAccounts(accounts).find(a => a.currency === sub.currency);
+  if (sameCurrency) return sameCurrency;
+  return accountById(accounts, defaultAccountId(accounts) ?? undefined) ?? null;
 }
 
 export function archiveSubscription(sub: Subscription, now: Date = new Date()): Subscription {

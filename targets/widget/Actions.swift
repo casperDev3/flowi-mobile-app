@@ -23,6 +23,16 @@ struct FlowiStrings {
   var hoursShort: String { en ? "h" : "г" }
   var minutesShort: String { en ? "m" : "хв" }
   var thousandShort: String { en ? "k" : "тис" }
+  // Заблокований екран і Live Activity.
+  var tasksOfDay: String { en ? "tasks" : "завдань" }
+  var stop: String { en ? "Stop" : "Зупинити" }
+  var stopTimer: String { en ? "Stop timer" : "Зупинити таймер" }
+  var timer: String { en ? "Timer" : "Таймер" }
+  var now: String { en ? "Now" : "Зараз" }
+  var tomorrow: String { en ? "Tomorrow" : "Завтра" }
+  var overdue: String { en ? "Overdue" : "Прострочено" }
+  var nothingPlanned: String { en ? "Nothing planned" : "Нічого не заплановано" }
+  func more(_ n: Int) -> String { en ? "+\(n) more" : "+\(n) ще" }
 
   var locale: Locale { Locale(identifier: en ? "en_US" : "uk_UA") }
 }

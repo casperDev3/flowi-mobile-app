@@ -65,7 +65,8 @@ import { TASK_CARD_SHEET_RATIO } from '@/components/tasks/card/primitives';
 import { TasksHeaderMenu, TasksMenuButton, type TasksMenuItem } from '@/components/tasks/TasksHeaderMenu';
 import { BlurView } from 'expo-blur';
 import { ActionButton } from '@/components/shared/ActionBar';
-import { useTaskEditor } from '@/hooks/use-task-editor';
+import { draftDeadlineFields, useTaskEditor } from '@/hooks/use-task-editor';
+import { applyDeadlineFields, deadlineDayKey, moveDeadlineToDay } from '@/utils/taskDeadline';
 import { useToday } from '@/hooks/use-today';
 import { appendHistory, makeHistoryEvent } from '@/utils/taskHistory';
 import { reopenColumnId, reopenSubtasks, withReopenInfo } from '@/utils/taskCompletion';
@@ -499,7 +500,8 @@ export default function ProjectTasksScreen() {
       kanbanColumnId: column?.id,
       subtasks: [],
       createdAt: new Date().toISOString(),
-      deadline: draft.deadline ?? undefined,
+      // Без часу — ключа deadlineHasTime немає (ніколи не пишемо false).
+      ...draftDeadlineFields(draft),
       projectId,
       createdBy: me,
       // Як в особистому екрані: нова задача — на мені (у «Команді» її
@@ -569,7 +571,15 @@ export default function ProjectTasksScreen() {
           if (t.id !== id) return t;
           const next = { ...t };
           if ('startDate' in patch) next.startDate = patch.startDate ?? undefined;
-          if ('deadline' in patch) next.deadline = patch.deadline ?? undefined;
+          if ('deadline' in patch) {
+            // Текстове поле міняє лише ДЕНЬ: час задачі (якщо був) лишається,
+            // а зняття дати знімає й прапорець часу.
+            // C1/C2: точний дедлайн переїжджає зі своїм часом і НОВИМ
+            // deadlineTimeAt; добовий — локальний полудень без прапорців.
+            const day = patch.deadline ? deadlineDayKey(patch.deadline) : null;
+            const moved = day ? moveDeadlineToDay(t, day) : null;
+            applyDeadlineFields(next, moved ?? { deadline: null });
+          }
           return next;
         }));
         setTasks(updated);
@@ -594,7 +604,13 @@ export default function ProjectTasksScreen() {
     if (!patch) return; // 0 днів, зіпсована дата, або зробило б тривалість від'ємною
     try {
       await trackWrite(async () => {
-        const updated = await updateSynced<Task>('tasks', fresh => fresh.map(t => (t.id !== taskId ? t : { ...t, ...patch })));
+        const updated = await updateSynced<Task>('tasks', fresh => fresh.map(t => {
+          if (t.id !== taskId) return t;
+          if ('startDate' in patch) return { ...t, startDate: patch.startDate };
+          // Кінець смуги — дедлайн: точний переїжджає зі своїм часом і новим
+          // deadlineTimeAt (C1), добовий — полудень нової доби (C2).
+          return applyDeadlineFields({ ...t }, patch);
+        }));
         setTasks(updated);
       }, TASKS_KEY_ONLY);
       haptic.light();
@@ -1018,9 +1034,9 @@ export default function ProjectTasksScreen() {
                         // (review finding — поле переднаповнювалось на день
                         // раніше, і «Зберегти» без правок відкочувало дату).
                         start: task.startDate ? localDateKey(new Date(task.startDate)) : '',
-                        deadline: task.deadline ? localDateKey(new Date(task.deadline)) : '',
+                        deadline: deadlineDayKey(task.deadline) ?? '',
                         origStart: task.startDate ? localDateKey(new Date(task.startDate)) : '',
-                        origDeadline: task.deadline ? localDateKey(new Date(task.deadline)) : '',
+                        origDeadline: deadlineDayKey(task.deadline) ?? '',
                       }) : undefined}
                       accessibilityRole="button"
                       accessibilityLabel={task.title}

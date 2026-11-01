@@ -320,7 +320,7 @@ export function MeetingFormSheet({
 
                 {/* Preview strip */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 13, backgroundColor: fColor + '12',
-                  borderLeftWidth: 3.5, borderLeftColor: fColor, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 12, gap: 10 }}>
+                  paddingVertical: 9, paddingHorizontal: 12, marginBottom: 12, gap: 10 }}>
                   <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
                     {MEETING_COLORS.map(col => (
                       <TouchableOpacity key={col} onPress={() => setFColor(col)}

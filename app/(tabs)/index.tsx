@@ -122,7 +122,9 @@ import { useResponsive } from '@/hooks/use-responsive';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useTopInset } from '@/hooks/use-top-inset';
 import { useToday } from '@/hooks/use-today';
-import { draftEstimatedMinutes, draftRecurrence, editedDraftFields, taskToDraft, useTaskEditor, type TaskDraft } from '@/hooks/use-task-editor';
+import { draftDeadlineFields, draftEstimatedMinutes, draftRecurrence, editedDraftFields, taskToDraft, useTaskEditor, type TaskDraft } from '@/hooks/use-task-editor';
+import { applyDeadlineFields, dayKeyOf, deadlineDayKey, isTimedDeadline, nextOccurrenceDeadline } from '@/utils/taskDeadline';
+import { nextOccurrenceId, nextRecurrenceDate } from '@/utils/taskRecurrence';
 import { useAllProjectMembers, useProjectMembers } from '@/hooks/use-project-members';
 import type { MemberOut } from '@/store/project-team';
 import { useProjectRole } from '@/hooks/use-project-role';
@@ -158,18 +160,6 @@ interface Task extends BaseTask {
 }
 
 
-/**
- * Локальний `YYYY-MM-DD` — той самий ключ, яким живе `meeting.date`
- * (`utils/meetings.ts` будує його з getFullYear/getMonth/getDate).
- *
- * Свідомо НЕ `toISOString().slice(0, 10)`: на схід від UTC локальна північ у
- * ISO дає ПОПЕРЕДНЮ добу, тож попап дня шукав зустрічі за вчорашнім ключем
- * (крапка «є зустріч» на дні раніше, «нічого не заплановано» на правильному
- * числі), а створена з календаря зустріч зберігалась учорашнім числом.
- */
-function localDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 
 
@@ -181,41 +171,6 @@ function getProgress(t: Task) {
 
 // ─── Timer helpers ────────────────────────────────────────────────────────────
 
-function nextRecurrenceDate(fromDateStr: string, rule: RecurrenceRule): string | null {
-  const d = new Date(fromDateStr + 'T00:00');
-  const { freq, interval, daysOfWeek, until } = rule;
-  let next: Date;
-  if (freq === 'weekly' && daysOfWeek && daysOfWeek.length > 0) {
-    // Find next matching day-of-week after `d`
-    const sortedDays = [...daysOfWeek].sort((a, b) => a - b);
-    const curDow = d.getDay() === 0 ? 6 : d.getDay() - 1; // Mon=0
-    // Look in the same week first, then next interval weeks
-    let found: Date | null = null;
-    for (let week = 0; week < 200 && !found; week++) {
-      for (const day of sortedDays) {
-        const candidate = new Date(d);
-        const weekOffset = week * interval * 7;
-        const dayOffset = day - curDow + weekOffset;
-        if (dayOffset <= 0 && week === 0) continue;
-        candidate.setDate(d.getDate() + (week === 0 ? day - curDow : weekOffset - curDow + day));
-        if (candidate > d) { found = candidate; break; }
-      }
-    }
-    if (!found) return null;
-    next = found;
-  } else {
-    next = new Date(d);
-    switch (freq) {
-      case 'daily':   next.setDate(next.getDate() + interval); break;
-      case 'weekly':  next.setDate(next.getDate() + interval * 7); break;
-      case 'monthly': next.setMonth(next.getMonth() + interval); break;
-      case 'yearly':  next.setFullYear(next.getFullYear() + interval); break;
-    }
-  }
-  const nextStr = localDateStr(next);
-  if (until && nextStr > until) return null;
-  return nextStr;
-}
 
 /** Стабільне посилання для проєктів без кешу команди (соло) — щоб
  *  assigneeLabelFor не створював новий масив щоразу. */
@@ -613,7 +568,8 @@ export default function TasksScreen() {
   const activeTimer = selected ? getTimerForTask(selected.id) : undefined;
   const isTimerRunning = !!activeTimer;
 
-  const todayStr = today.toDateString();
+  // Доба дедлайну — локальна; голий `YYYY-MM-DD` (імпорти) — як є (C2).
+  const todayKey = dayKeyOf(today);
   // Tasks due today (deadline = today) — both done and not done
   // Лише МОЄ (isMyTask): у шапці не має рахуватись робота інших учасників
   // проєктів, якої немає в самому списку нижче.
@@ -621,7 +577,7 @@ export default function TasksScreen() {
   // клавіші, а тут — Date + рядок на кожне завдання.
   const userId = user?.id;
   const { dueTodayTasks, doneCount, activeCount, effTotalUnits, effDoneUnits, totalSubtasks, doneSubtasks } = useMemo(() => {
-    const due = tasks.filter(t => t.deadline && new Date(t.deadline).toDateString() === todayStr
+    const due = tasks.filter(t => t.deadline && deadlineDayKey(t.deadline) === todayKey
       && (userId === undefined || isMyTask(t, userId, projectRoles)));
     return {
       dueTodayTasks: due,
@@ -634,7 +590,7 @@ export default function TasksScreen() {
       totalSubtasks: due.reduce((acc, t) => acc + t.subtasks.length, 0),
       doneSubtasks: due.reduce((acc, t) => acc + t.subtasks.filter(s => s.done).length, 0),
     };
-  }, [tasks, todayStr, userId, projectRoles]);
+  }, [tasks, todayKey, userId, projectRoles]);
   // Today's meetings — past meetings count as completed units in efficiency
   // Екземпляри повторів теж рахуються — так само, як у секції зустрічей нижче.
   const todayMeetings     = useMemo(() => meetingsOnDate(meetings, today), [meetings, today]);
@@ -750,7 +706,8 @@ export default function TasksScreen() {
       subtasks: [],
       createdAt: new Date().toISOString(),
       estimatedMinutes: draftEstimatedMinutes(draft),
-      deadline: draft.deadline ?? undefined,
+      // Без часу — ключа deadlineHasTime немає (ніколи не пишемо false).
+      ...draftDeadlineFields(draft),
       projectId: draft.projectId ?? undefined,
       // §3.3 «createdBy — клієнт ставить при створенні в проєкті».
       createdBy: draft.projectId ? user?.id : undefined,
@@ -949,18 +906,37 @@ export default function TasksScreen() {
       const task = p.find(t => t.id === id);
       // Auto-create next occurrence if recurring task is being marked done
       if (task && task.status === 'active' && task.recurrence && task.deadline) {
-        const nextDeadline = nextRecurrenceDate(task.deadline, task.recurrence);
-        if (nextDeadline) {
+        // Доба — з ЛОКАЛЬНОГО дня дедлайну, а не з сирого ISO (той давав
+        // Invalid Date). Наступна копія зберігає час дедлайну (якщо він був);
+        // без часу — без прапорця.
+        const rule = task.recurrence;
+        const nextFields = nextOccurrenceDeadline(task, day => nextRecurrenceDate(day, rule));
+        // Детермінований id (як веб): повторне «Готово» після «Скасувати» чи
+        // закриття тієї ж задачі на вебі дає ту саму копію, а не другу.
+        const nextDay = nextFields ? deadlineDayKey(nextFields.deadline) : null;
+        const nextId = nextDay ? nextOccurrenceId(task.id, nextDay) : null;
+        if (nextFields && nextId && !p.some(t => t.id === nextId)) {
+          const created = makeHistoryEvent('created');
           const nextTask: Task = {
             ...task,
-            id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+            id: nextId,
             status: 'active',
             kanbanColumnId: scopedColumnFor(storedTaskStatuses, task.projectId, 'todo')?.id ?? ACTIVE_COLUMN_ID,
-            deadline: nextDeadline,
             subtasks: task.subtasks.map(s => ({ ...s, done: false })),
             timeEntries: [],
-            history: [makeHistoryEvent('created')],
+            history: [created],
+            // Створена зараз — як nextOccurrenceRecord (device-actions), веб і сервер.
+            createdAt: created.at,
           };
+          // C5: нова копія не несе завершення попередньої (як device-actions і сервер),
+          // ні відмітки редагування чи здачі результату попередньої копії.
+          delete nextTask.completedAt;
+          delete nextTask.updatedAt;
+          for (const field of ['reviewState', 'reviewFeedback', 'resultSummary', 'resultLinks', 'resultFiles'] as const) {
+            delete (nextTask as Partial<Task>)[field];
+          }
+          // C1: точний дедлайн копії — з НОВИМ deadlineTimeAt; добовий — без прапорців.
+          applyDeadlineFields(nextTask, nextFields);
           return [...updated, nextTask];
         }
       }
@@ -1329,7 +1305,8 @@ export default function TasksScreen() {
         next.status = target.isDone ? 'done' : 'active';
       }
       if (edited.has('estimate')) next.estimatedMinutes = estimatedMinutes;
-      if (edited.has('deadline')) next.deadline = draft.deadline ?? undefined;
+      // Дата й час — одна група: зняття дати знімає й прапорець часу.
+      if (edited.has('deadline')) applyDeadlineFields(next, draft);
       if (edited.has('recurrence')) next.recurrence = recurrence;
       // §4.5 — null (у формі: «Без виконавця») пишемо явно, а не пропускаємо:
       // призначення треба вміти й ЗНЯТИ, а не лише поставити.
@@ -1669,7 +1646,8 @@ export default function TasksScreen() {
         onPriority={level => editTaskFields(selectedTask.id, { priorityLevel: level })}
         deadline={selectedTask.deadline}
         overdue={isOverdue(selectedTask)}
-        onDeadline={iso => editTaskFields(selectedTask.id, { deadline: iso })}
+        deadlineHasTime={isTimedDeadline(selectedTask)}
+        onDeadline={p => editTaskFields(selectedTask.id, { deadline: p.deadline, deadlineHasTime: !!p.deadline && p.deadlineHasTime === true })}
         project={{
           options: projectOptions,
           value: selectedTask.projectId ?? null,

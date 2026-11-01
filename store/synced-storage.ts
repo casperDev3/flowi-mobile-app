@@ -611,7 +611,12 @@ export async function saveSynced<T extends { id: string }>(
 export async function updateSynced<T extends { id: string }>(
   key: string,
   mutate: (fresh: T[]) => T[],
+  options?: { checked?: boolean },
 ): Promise<T[]> {
+  // `checked` — збій запису (сховище чи outbox) летить нагору, а не ковтається
+  // в saveData. Для дій пристроїв (store/device-actions.ts): «ack» за
+  // незаписане віддавати не можна. Звичайні записи застосунку — як і були.
+  const checked = options?.checked === true;
   // Зберігаємо дані та обчислюємо diff — під блокуванням ключа, щоб між
   // читанням і записом сюди не вклинився рушій синку зі своїм масивом.
   const { stored, changed, deleted, touchedStreams } = await withStorageLock(key, async () => {
@@ -631,7 +636,7 @@ export async function updateSynced<T extends { id: string }>(
       new Date().toISOString(),
       key,
     ) as unknown as T[];
-    await saveData(key, stamped);
+    await (checked ? saveDataChecked : saveData)(key, stamped);
     // В outbox — ще під блокуванням колекції: рушій синку перечитує outbox під
     // тим самим блокуванням перед застосуванням серверних змін, і правка має
     // бути для нього «брудною» з тієї ж миті, як лягла в сховище.
@@ -643,6 +648,7 @@ export async function updateSynced<T extends { id: string }>(
       key, diff.changed, diff.deleted,
       recordsById(stamped as unknown as { id: string }[]),
       recordsById(existing as unknown as { id: string }[]),
+      checked,
     );
     return { stored: stamped, ...diff, touchedStreams };
   });

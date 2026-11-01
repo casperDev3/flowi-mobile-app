@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flowi",
     "slug": "f-tracking-app",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "orientation": "default",
     "icon": "./assets/logo_app.png",
     "scheme": "ftrackingapp",
@@ -20,6 +20,9 @@
         "com.apple.security.application-groups": [
           "group.com.casper3.f-tracking-app"
         ]
+      },
+      "infoPlist": {
+        "NSSupportsLiveActivities": true
       }
     },
     "android": {
@@ -125,6 +128,7 @@
       "expo-font",
       "expo-web-browser",
       "@bacons/apple-targets",
+      "./modules/flowi-ios-bridge/app.plugin.js",
       "@sentry/react-native/expo"
     ],
     "experiments": {

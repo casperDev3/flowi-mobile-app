@@ -24,6 +24,7 @@ import { STEPS_GOAL, sumForDay, type HealthEntry } from './healthUtils';
 import type { TaskStatusColumn } from './taskStatuses';
 import { isTodayTask } from './taskToday';
 import { isMyTask, type Task } from './taskUtils';
+import { meetingOccurrences, myTodayTasks, orderTodayTasks, snapshotTaskHasTime, snapshotTaskOverdue } from './watchSnapshot';
 
 /** App Group, спільна для застосунку й віджета (app.json → ios.entitlements). */
 export const WIDGET_APP_GROUP = 'group.com.casper3.f-tracking-app';
@@ -57,6 +58,16 @@ export interface WidgetSnapshot {
     /** Таймер, що йде зараз (найсвіжіший), або null. */
     running: { label: string; startedAt: string; count: number } | null;
   };
+  /**
+   * Найближче (watch-lockscreen-v1.md §8.1) — для віджетів екрана блокування.
+   * Адитивне поле: `v` лишається 1, старий віджет його просто не читає.
+   */
+  next: {
+    /** Найближча зустріч сьогодні/завтра, що ще не скінчилась. */
+    meeting: { title: string; startsAt: string; endsAt: string; location: string | null } | null;
+    /** Перше незавершене з «моїх на сьогодні» в порядку годинника (§4). */
+    task: { id: string; title: string; deadline: string | null; hasTime: boolean; overdue: boolean } | null;
+  };
 }
 
 export interface WidgetSnapshotInput {
@@ -75,6 +86,7 @@ export interface WidgetSnapshotInput {
   timeEntries?: unknown;
   activeTimers?: unknown;
   healthEntries?: unknown;
+  meetings?: unknown;
 }
 
 /** Сховище й синк інколи приносять не масив — знімок мусить пережити це мовчки. */
@@ -153,6 +165,36 @@ function timeToday(input: WidgetSnapshotInput): WidgetSnapshot['time'] {
   };
 }
 
+function nextUp(input: WidgetSnapshotInput): WidgetSnapshot['next'] {
+  const nowMs = input.now.getTime();
+  const meeting = meetingOccurrences(input.meetings, input.now)
+    .find(m => m.startsAtMs + m.durationMinutes * 60_000 > nowMs);
+  const task = orderTodayTasks(
+    myTodayTasks(input.tasks, input.taskStatuses, input.now, input.myUserId, input.projectRoles),
+    input.now,
+  ).find(t => t.status !== 'done');
+  const deadline = task && typeof task.deadline === 'string' && task.deadline ? task.deadline : null;
+  return {
+    meeting: meeting
+      ? {
+          title: meeting.title.trim().slice(0, 80),
+          startsAt: new Date(meeting.startsAtMs).toISOString(),
+          endsAt: new Date(meeting.startsAtMs + meeting.durationMinutes * 60_000).toISOString(),
+          location: meeting.location ? meeting.location.slice(0, 80) : null,
+        }
+      : null,
+    task: task
+      ? {
+          id: task.id,
+          title: (typeof task.title === 'string' ? task.title : '').trim().slice(0, 80),
+          deadline,
+          hasTime: snapshotTaskHasTime(task),
+          overdue: snapshotTaskOverdue(task, input.now),
+        }
+      : null,
+  };
+}
+
 /**
  * Ролі в проєктах для isMyTask — та сама зводка, що й useProjectRoles:
  * `project_sync_state_v1` точніше за кеш `workspace_projects`.
@@ -188,6 +230,7 @@ export function buildWidgetSnapshot(input: WidgetSnapshotInput): WidgetSnapshot 
       steps: { value: 0, goal: STEPS_GOAL },
       tasks: { done: 0, total: 0 },
       time: { trackedSec: 0, running: null },
+      next: { meeting: null, task: null },
     };
   }
   return {
@@ -200,6 +243,7 @@ export function buildWidgetSnapshot(input: WidgetSnapshotInput): WidgetSnapshot 
     },
     tasks: tasksToday(input),
     time: timeToday(input),
+    next: nextUp(input),
   };
 }
 

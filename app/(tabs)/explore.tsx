@@ -28,6 +28,7 @@ import { UpcomingPaymentsCard, useUpcomingPayments } from '@/components/finance/
 import { TransactionGroup } from '@/components/finance/TransactionGroup';
 import { FAB_LIST_CLEARANCE } from '@/components/tasks/AddTaskButton';
 import { PickerField, type PickerOption } from '@/components/shared/PickerField';
+import { TxDateField } from '@/components/finance/TxDateField';
 import { PressableScale } from '@/components/shared/PressableScale';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
@@ -90,6 +91,7 @@ import { inRange, monthsOf, resolvePeriod } from '@/utils/finance/period';
 import { calcPeriodTotalsByCurrency } from '@/utils/financePeriod';
 import { parseFinanceTab, reportsFabHidden, visibleFinanceTabs, type FinanceTab } from '@/utils/financeTabs';
 import { formatSubscriptionMoney, parseDateKey } from '@/utils/subscriptions';
+import { txDateForDayKey, txDayKey, txSaveDayKey } from '@/utils/txDate';
 
 /**
  * Категорії існують лише для доходів і витрат. Переказ категорії не має: він
@@ -226,6 +228,11 @@ export default function FinanceScreen() {
   const [formAccountId, setFormAccountId] = useState<string | null>(null);
   const [formToAccountId, setFormToAccountId] = useState<string | null>(null);
   const [toAmount, setToAmount] = useState('');
+  /** День операції 'YYYY-MM-DD' (локальний). Нова — сьогодні, правка — день запису. */
+  const [txDateKey, setTxDateKey] = useState(() => txDayKey(undefined));
+  /** Людина сама обрала день (інакше нова операція бере «сьогодні» на момент збереження). */
+  const [txDatePicked, setTxDatePicked] = useState(false);
+  const pickTxDate = useCallback((key: string) => { setTxDateKey(key); setTxDatePicked(true); }, []);
   /** Категорії має лише дохід і витрата — переказ бере набір витрат ні для чого. */
   const catType: CatType = txType === 'income' ? 'income' : 'expense';
   /** Підставляємо у наступну операцію той рахунок, з якого щойно платили. */
@@ -712,10 +719,16 @@ export default function FinanceScreen() {
     }));
   }, [visibleAccounts, accounts, tr]);
 
-  const parseAmount = (raw: string) => parseFloat(raw.replace(',', '.'));
+  // «1 250» (пробіл/NBSP із вставки) — 1250, а не 1: той самий розбір, що у вебі
+  // (lib/subscriptions.ts parseSubscriptionAmount) і в бюджеті проєкту.
+  const parseAmount = (raw: string) => parseFloat(raw.replace(/\s/g, '').replace(',', '.'));
 
-  const buildEditNote = (before: Transaction, after: { type: FormType; amount: number; category: string; note: string; accountId: string }): string => {
+  const buildEditNote = (before: Transaction, after: { type: FormType; amount: number; category: string; note: string; accountId: string; date: string }): string => {
     const parts: string[] = [];
+    const dayOpts = { day: 'numeric', month: 'short', year: 'numeric' } as const;
+    if (txDayKey(before.date) !== txDayKey(after.date)) {
+      parts.push(`${tr.date}: ${new Date(before.date).toLocaleDateString(locale, dayOpts)} → ${new Date(after.date).toLocaleDateString(locale, dayOpts)}`);
+    }
     if (before.amount !== after.amount) parts.push(`${tr.amount}: ${before.amount} → ${after.amount}`);
     if (before.category !== after.category) parts.push(`${tr.category}: ${before.category} → ${after.category}`);
     if (before.accountId !== after.accountId) parts.push(`${tr.account}: ${accountName(before.accountId)} → ${accountName(after.accountId)}`);
@@ -743,6 +756,8 @@ export default function FinanceScreen() {
     setEditingId(null);
     setTxType(mode);
     setAmount(''); setCategory(''); setNote(''); setToAmount('');
+    setTxDateKey(txDayKey(undefined));
+    setTxDatePicked(false);
     const accId = defaultAccountId(accounts, lastAccountRef.current);
     setFormAccountId(accId);
     // Диплінк `?create=1` відкриває форму ДО того, як рахунки дочитались, і
@@ -789,6 +804,7 @@ export default function FinanceScreen() {
       setFormAccountId(tx.accountId || accountIdForLegacyTx(accounts, tx, lastAccountRef.current));
       setFormToAccountId(tx.toAccountId ?? null);
       setToAmount(typeof tx.toAmount === 'number' ? String(tx.toAmount) : '');
+      setTxDateKey(txDayKey(tx.date));
       setShowAdd(true);
     };
     // На широкому екрані деталь — колонка, а не модалка: мінятись нема з чим.
@@ -856,20 +872,22 @@ export default function FinanceScreen() {
     if (editingId) {
       setTxs(prev => prev.map(t => {
         if (t.id !== editingId) return t;
+        // Той самий день — рядок дати лишається як був (без зайвого запису в синк).
+        const date = txDateForDayKey(txDateKey, t.date);
         const noteText = buildEditNote(t, {
-          type: txType, amount: num, category: nextCategory, note: note.trim(), accountId: formFrom.id,
+          type: txType, amount: num, category: nextCategory, note: note.trim(), accountId: formFrom.id, date,
         });
         const historyEvent: TxHistoryEvent = {
           id: Date.now().toString() + Math.random().toString(36).slice(2),
           at: new Date().toISOString(),
           note: noteText,
         };
-        return appendTransactionHistory({ ...t, ...patch }, historyEvent);
+        return appendTransactionHistory({ ...t, ...patch, date }, historyEvent);
       }));
     } else {
       setTxs(p => [{
         id: Date.now().toString(),
-        date: new Date().toISOString(),
+        date: txDateForDayKey(txSaveDayKey(txDateKey, txDatePicked)),
         ...patch,
       }, ...p]);
     }
@@ -1045,6 +1063,8 @@ export default function FinanceScreen() {
   const resetTxDraft = () => {
     setEditingId(null);
     setAmount(''); setCategory(''); setNote(''); setToAmount('');
+    setTxDateKey(txDayKey(undefined));
+    setTxDatePicked(false);
     setFormToAccountId(null);
   };
 
@@ -1496,7 +1516,7 @@ export default function FinanceScreen() {
                             <InfoRow icon="banknote" label={tr.account} value={fromAccount?.name ?? '—'} color={c.sub} text={c.text} sub={c.sub} border={c.border} last={false} />
                           )}
                           {selected.note ? <InfoRow icon="doc.text" label={tr.note} value={selected.note} color={c.sub} text={c.text} sub={c.sub} border={c.border} last={false} /> : null}
-                          <InfoRow icon="calendar" label={tr.creationDate} value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
+                          <InfoRow icon="calendar" label={tr.date} value={new Date(selected.date).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} color={c.sub} text={c.text} sub={c.sub} border={c.border} last />
                         </View>
 
                         {/* Ручна дія для старих даних, де переказ лежить парою
@@ -2075,6 +2095,15 @@ export default function FinanceScreen() {
                       )}
                     </>
                   )}
+
+                  <TxDateField
+                    value={txDateKey}
+                    onChange={pickTxDate}
+                    locale={locale}
+                    c={pickerColors}
+                    tr={tr}
+                    labelStyle={s.label}
+                  />
 
                   {txType !== 'transfer' && (
                     <PickerField

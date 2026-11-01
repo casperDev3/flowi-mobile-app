@@ -11,13 +11,16 @@ import { Atlas } from '@/constants/atlas';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { TxDateField } from '@/components/finance/TxDateField';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { sheetColumnStyle } from '@/hooks/use-content-width';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useI18n } from '@/store/i18n';
 import type { Translations } from '@/store/translations';
 import { activeAccounts, defaultAccountId, type Account } from '@/utils/accounts';
 import { buildProjectTransaction } from '@/utils/budgetProject';
 import type { Transaction } from '@/utils/financeUtils';
+import { txDayKey, txSaveDayKey } from '@/utils/txDate';
 
 interface Colors {
   text: string;
@@ -45,12 +48,18 @@ export function ProjectTransactionForm({
   error: string | null;
 }) {
   const { isWide, height } = useResponsive();
+  const { lang } = useI18n();
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-US';
   const usable = useMemo(() => activeAccounts([...accounts]), [accounts]);
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
   const [accountId, setAccountId] = useState<string | null>(null);
+  /** День операції; за замовчуванням — сьогодні. */
+  const [dateKey, setDateKey] = useState(() => txDayKey(undefined));
+  /** Людина сама обрала день — інакше «сьогодні» на момент збереження. */
+  const [datePicked, setDatePicked] = useState(false);
   const [invalid, setInvalid] = useState(false);
 
   // Скидаємо поля лише на ВІДКРИТТІ: рахунки перечитуються синком і поки
@@ -60,6 +69,8 @@ export function ProjectTransactionForm({
   useEffect(() => {
     if (!visible) return;
     setType('expense'); setAmount(''); setCategory(''); setNote(''); setInvalid(false);
+    setDateKey(txDayKey(undefined));
+    setDatePicked(false);
     setAccountId(defaultAccountId([...usableRef.current]));
   }, [visible]);
 
@@ -68,7 +79,10 @@ export function ProjectTransactionForm({
   const inputBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
 
   const submit = () => {
-    const tx = buildProjectTransaction({ type, amount, category, note, account, projectId, now: new Date() });
+    const now = new Date();
+    const tx = buildProjectTransaction({
+      type, amount, category, note, account, projectId, now, dateKey: txSaveDayKey(dateKey, datePicked, now),
+    });
     if (!tx) { setInvalid(true); return; }
     onSubmit(tx);
   };
@@ -129,6 +143,8 @@ export function ProjectTransactionForm({
               c={c}
             />
           )}
+
+          <TxDateField value={dateKey} onChange={(key) => { setDateKey(key); setDatePicked(true); }} locale={locale} c={c} tr={tr} labelStyle={st.label} />
 
           {categories[type].length > 0 ? (
             <>

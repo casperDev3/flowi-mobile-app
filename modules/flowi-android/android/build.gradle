@@ -1,0 +1,15 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.casper3.flowi'
+version = '1.0.0'
+
+android {
+  namespace "com.casper3.flowi.surfaces"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}

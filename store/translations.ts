@@ -1910,6 +1910,15 @@ export interface Translations {
   payConfirm: string;
   payStale: string;
   payTxFailed: string;
+  payAccountLabel: string;
+  payPrice: string;
+  payCharged: string;
+  payChargedHint: string;
+  payChargedInvalid: string;
+  paySummary: string;
+  paySummaryNoAccount: string;
+  payNoAccounts: string;
+  subHistoryCharged: string;
 
   // ─── Модулі інтерфейсу (було moduleText() в store/ui-preferences.ts) ─────────
   modulesTitle: string;
@@ -2630,6 +2639,13 @@ export interface Translations {
   cardDone: string;
   cardSelectedCount: string;
   cardClearDate: string;
+  /** Рядок «Час» у редакторі дедлайну (utils/taskDeadline.ts). */
+  cardDeadlineTime: string;
+  cardDeadlineAddTime: string;
+  cardDeadlineNoTime: string;
+  cardDeadlineApplyTime: string;
+  cardDeadlineNoTimeHint: string;
+  cardDeadlineTimeHint: string;
   cardPriorityHint: string;
   cardHourShort: string;
   cardMinShort: string;
@@ -2804,6 +2820,87 @@ export interface Translations {
     fieldDeadline: string; fieldPriority: string; rejected: string; rejectedFallback: string;
   };
   // ── end area: project-team-ui ──
+  // ── area: integrations-errors ──
+  integrationErrors: {
+    invalid_request_body: string;
+    invalid_provider: string;
+    invalid_credentials: string;
+    missing_credentials: string;
+    invalid_provider_host: string;
+    provider_host_unavailable: string;
+    access_denied: string;
+    provider_rejected: string;
+    provider_unavailable: string;
+    rate_limited: string;
+    invalid_provider_response: string;
+    encryption_not_configured: string;
+    oauth_not_configured: string;
+    credentials_unavailable: string;
+    different_source_host: string;
+    use_google_oauth: string;
+    invalid_connection: string;
+    invalid_source: string;
+    calendar_read_only: string;
+    calendar_already_connected: string;
+    status_mapping_required: string;
+    external_user_required: string;
+    invalid_status_target: string;
+    invalid_field_target: string;
+    unknown_project_member: string;
+    invalid_configuration: string;
+    invalid_mapping: string;
+    invalid_scope: string;
+    invalid_exports: string;
+    invalid_period: string;
+    invalid_timezone: string;
+    preview_required: string;
+    preview_expired: string;
+    disconnected: string;
+    connection_owner_access_lost: string;
+    transition_unavailable: string;
+    calendar_scheduling_requires_provider: string;
+    conflict_changed: string;
+    task_deadline_authoritative: string;
+    invalid_resolution: string;
+    conflicts_pending: string;
+    invalid_oauth_state: string;
+    integration_internal_error: string;
+    generic: string;
+    attention: string;
+  };
+  integrationForm: { connectionLabel: string; connectionLabelPlaceholder: string };
+  // ── end area: integrations-errors ──
+  // ── area: watch-devices (docs/specs/watch-lockscreen-v1.md §13.1) ──
+  devicesTitle: string;
+  devicesRow: string;
+  devicesThisDevice: string;
+  devicesKindMobile: string;
+  devicesKindWeb: string;
+  devicesKindWatch: string;
+  devicesKindOther: string;
+  devicesLastSeen: string;
+  devicesRevoke: string;
+  devicesRevokeConfirmTitle: string;
+  devicesRevokeConfirmBody: string;
+  devicesLegacyNote: string;
+  devicesEmpty: string;
+  devicesLoadError: string;
+  devicesRevokeError: string;
+  /** session_not_found при «Завершити» — те саме повідомлення, що на вебі. */
+  devicesSessionGone: string;
+  watchSectionTitle: string;
+  watchConnect: string;
+  watchReconnect: string;
+  watchConnected: string;
+  watchNotPaired: string;
+  watchAppNotInstalled: string;
+  watchDisconnected: string;
+  watchConnectError: string;
+  timerNotifChannel: string;
+  timerNotifStop: string;
+  timerNotifMore: string;
+  timerNotifTitle: string;
+  // ── end area: watch-devices ──
 }
 
 const uk: Translations = {
@@ -4199,7 +4296,7 @@ const uk: Translations = {
   subColor: 'Колір',
   subNoCategory: 'Без категорії',
   subNoAccount: 'Без рахунку',
-  subAccountHint: 'Лише для довідки — баланс рахунку не змінюється',
+  subAccountHint: 'Типовий рахунок для «Оплачено». «Продовжено» баланс не змінює',
   subUrl: 'Посилання',
   subRenew: 'Продовжено',
   subRenewConfirm: 'Підтвердити',
@@ -4576,11 +4673,20 @@ const uk: Translations = {
   payAction: 'Оплачено',
   payTitle: 'Оплата підписки',
   payAmount: 'Сплачено',
-  payHint: 'Створимо витрату «{category}» на {account} і перенесемо оплату на {date}.',
+  payHint: 'Створимо витрату «{category}» і перенесемо оплату на {date}.',
   payNoAccount: 'без рахунку',
   payConfirm: 'Створити витрату',
   payStale: 'Цей цикл уже оплачено на іншому пристрої. Перевірте дату наступної оплати.',
   payTxFailed: 'Оплату зараховано, але витрату у Фінансах не створено. Додайте її вручну.',
+  payAccountLabel: 'Списати з рахунку',
+  payPrice: 'Ціна підписки',
+  payCharged: 'Списано з рахунку',
+  payChargedHint: 'Валюта рахунку відрізняється від валюти підписки — вкажіть, скільки фактично списано.',
+  payChargedInvalid: 'Вкажіть списану суму більшу за нуль',
+  paySummary: 'З рахунку «{account}» буде списано {amount}',
+  paySummaryNoAccount: 'Витрату {amount} буде записано без рахунку',
+  payNoAccounts: 'Рахунків ще немає — витрату буде записано без рахунку',
+  subHistoryCharged: 'списано {amount}',
 
   // Модулі інтерфейсу (було moduleText())
   modulesTitle: 'Модулі',
@@ -5301,6 +5407,12 @@ const uk: Translations = {
   cardDone: 'Готово',
   cardSelectedCount: 'Обрано: {n}',
   cardClearDate: 'Прибрати дату',
+  cardDeadlineTime: 'Час',
+  cardDeadlineAddTime: 'Додати час',
+  cardDeadlineNoTime: 'Без часу',
+  cardDeadlineApplyTime: 'Застосувати',
+  cardDeadlineNoTimeHint: 'Без часу — нагадаємо про прострочення о 9:00 наступного дня',
+  cardDeadlineTimeHint: 'Нагадаємо за добу до дедлайну і в момент дедлайну',
   cardPriorityHint: 'P0 — найвищий, P5 — найнижчий.',
   cardHourShort: 'год',
   cardMinShort: 'хв',
@@ -5478,6 +5590,86 @@ const uk: Translations = {
     fieldDeadline: 'Дедлайн', fieldPriority: 'Пріоритет', rejected: 'Зміну не застосовано: {detail}', rejectedFallback: 'перевірте права та стан завдання',
   },
   // ── end area: project-team-ui ──
+  // ── area: integrations-errors ──
+  integrationErrors: {
+    invalid_request_body: 'Некоректний запит. Оновіть сторінку й спробуйте ще раз.',
+    invalid_provider: 'Оберіть сервіс зі списку.',
+    invalid_credentials: 'Дані доступу мають неправильний формат.',
+    missing_credentials: 'Заповніть усі поля доступу.',
+    invalid_provider_host: 'Невірна адреса сервісу. Вкажіть адресу вашого простору, наприклад {example}.',
+    provider_host_unavailable: 'Адресу сервісу не знайдено. Перевірте написання.',
+    access_denied: 'Сервіс відхилив доступ. Перевірте ключ або токен.',
+    provider_rejected: 'Сервіс відхилив запит. Перевірте адресу й ключ API.',
+    provider_unavailable: 'Сервіс тимчасово недоступний. Спробуйте пізніше.',
+    rate_limited: 'Забагато запитів до сервісу. Спробуйте за кілька хвилин.',
+    invalid_provider_response: 'Сервіс повернув неочікувану відповідь. Спробуйте пізніше.',
+    encryption_not_configured: 'Захищене сховище ще не налаштоване адміністратором.',
+    oauth_not_configured: 'Підключення Google Calendar ще не налаштоване адміністратором.',
+    credentials_unavailable: 'Дані доступу недоступні. Відновіть доступ.',
+    different_source_host: 'Відновити доступ можна лише для того самого простору сервісу.',
+    use_google_oauth: 'Google Calendar відновлюється через вхід у Google.',
+    invalid_connection: 'Підключення не знайдено. Оновіть сторінку.',
+    invalid_source: 'Джерело недоступне. Оновіть список джерел.',
+    calendar_read_only: 'Цей календар доступний лише для читання.',
+    calendar_already_connected: 'Цей календар уже пов’язаний з іншим підключенням. Спочатку відключіть його.',
+    status_mapping_required: 'Зіставте всі статуси перед попереднім переглядом.',
+    external_user_required: 'Для режиму «Лише мої» вкажіть ваш ідентифікатор у вихідному сервісі.',
+    invalid_status_target: 'Обрано статус, якого немає в джерелі.',
+    invalid_field_target: 'Обрано поле, якого немає в джерелі.',
+    unknown_project_member: 'Виконавця зіставлено з людиною поза проєктом.',
+    invalid_configuration: 'Перевірте правила синхронізації.',
+    invalid_mapping: 'Перевірте правила синхронізації.',
+    invalid_scope: 'Перевірте правила синхронізації.',
+    invalid_exports: 'Перевірте правила синхронізації.',
+    invalid_period: 'Період має бути від 0 до 3650 днів.',
+    invalid_timezone: 'Невідомий часовий пояс.',
+    preview_required: 'Спершу підтвердьте попередній перегляд джерела.',
+    preview_expired: 'Попередній перегляд застарів. Оновіть його.',
+    disconnected: 'Підключення відключене. Відновіть доступ.',
+    connection_owner_access_lost: 'Відповідальний втратив доступ до проєкту. Потрібне нове підключення.',
+    transition_unavailable: 'Зовнішній сервіс не дозволяє цей перехід статусу.',
+    calendar_scheduling_requires_provider: 'Цю подію з учасниками потрібно редагувати у вихідному календарі.',
+    conflict_changed: 'Зовнішні дані знову змінилися. Оновіть синхронізацію.',
+    task_deadline_authoritative: 'Дедлайн визначається завданням. Відновіть дату календарної події.',
+    invalid_resolution: 'Оберіть варіант розв’язання конфлікту.',
+    conflicts_pending: 'Спершу синхронізуйте зміни, що очікують',
+    invalid_oauth_state: 'Сеанс авторизації застарів — спробуйте ще раз',
+    integration_internal_error: 'Внутрішня помилка сервера інтеграцій. Спробуйте пізніше.',
+    generic: 'Не вдалося виконати дію інтеграції. Спробуйте ще раз.',
+    attention: 'Потрібно перевірити підключення.',
+  },
+  integrationForm: { connectionLabel: 'Назва підключення', connectionLabelPlaceholder: 'Наприклад, команда продукту' },
+  // ── end area: integrations-errors ──
+  // ── area: watch-devices ──
+  devicesTitle: 'Пристрої та сесії',
+  devicesRow: 'Пристрої та сесії',
+  devicesThisDevice: 'Цей пристрій',
+  devicesKindMobile: 'Телефон',
+  devicesKindWeb: 'Браузер',
+  devicesKindWatch: 'Apple Watch',
+  devicesKindOther: 'Інший пристрій',
+  devicesLastSeen: 'Активність: {when}',
+  devicesRevoke: 'Завершити сесію',
+  devicesRevokeConfirmTitle: 'Завершити сесію?',
+  devicesRevokeConfirmBody: 'Пристрій «{name}» вийде з акаунта.',
+  devicesLegacyNote: 'Старіші входи тут не показані — для них є «Вийти з усіх пристроїв».',
+  devicesEmpty: 'Активних сесій немає',
+  devicesLoadError: 'Не вдалося завантажити сесії',
+  devicesRevokeError: 'Не вдалося завершити сесію. Повторіть спробу.',
+  devicesSessionGone: 'Цю сесію вже завершено.',
+  watchSectionTitle: 'Apple Watch',
+  watchConnect: 'Підключити Apple Watch',
+  watchReconnect: 'Підключити знову',
+  watchConnected: 'Підключено',
+  watchNotPaired: 'Годинник не спарено',
+  watchAppNotInstalled: 'Встановіть Flowi на годиннику',
+  watchDisconnected: 'Сесію годинника завершено',
+  watchConnectError: 'Не вдалося підключити годинник',
+  timerNotifChannel: 'Таймер',
+  timerNotifStop: 'Зупинити',
+  timerNotifMore: '+{n} ще',
+  timerNotifTitle: 'Таймер іде',
+  // ── end area: watch-devices ──
 };
 
 const en: Translations = {
@@ -6870,7 +7062,7 @@ const en: Translations = {
   subColor: 'Color',
   subNoCategory: 'No category',
   subNoAccount: 'No account',
-  subAccountHint: 'Reference only — the account balance is not changed',
+  subAccountHint: 'Default account for “Paid”. “Renewed” does not change the balance',
   subUrl: 'Link',
   subRenew: 'Renewed',
   subRenewConfirm: 'Confirm',
@@ -7247,11 +7439,20 @@ const en: Translations = {
   payAction: 'Paid',
   payTitle: 'Subscription payment',
   payAmount: 'Paid amount',
-  payHint: 'We will add a «{category}» expense on {account} and move the payment to {date}.',
+  payHint: 'We will add a «{category}» expense and move the payment to {date}.',
   payNoAccount: 'no account',
   payConfirm: 'Create expense',
   payStale: 'This cycle was already paid on another device. Check the next payment date.',
   payTxFailed: 'The payment was recorded, but the expense was not created. Add it manually.',
+  payAccountLabel: 'Pay from account',
+  payPrice: 'Subscription price',
+  payCharged: 'Charged to account',
+  payChargedHint: 'The account currency differs from the subscription currency — enter the amount actually charged.',
+  payChargedInvalid: 'Enter a charged amount greater than zero',
+  paySummary: '{amount} will be debited from «{account}»',
+  paySummaryNoAccount: 'The {amount} expense will be recorded without an account',
+  payNoAccounts: 'No accounts yet — the expense will be recorded without an account',
+  subHistoryCharged: 'charged {amount}',
 
   // Interface modules (was moduleText())
   modulesTitle: 'Modules',
@@ -7971,6 +8172,12 @@ const en: Translations = {
   cardDone: 'Done',
   cardSelectedCount: '{n} selected',
   cardClearDate: 'Clear date',
+  cardDeadlineTime: 'Time',
+  cardDeadlineAddTime: 'Add time',
+  cardDeadlineNoTime: 'No time',
+  cardDeadlineApplyTime: 'Apply',
+  cardDeadlineNoTimeHint: 'No time set — we will remind you it is overdue at 9:00 the next day',
+  cardDeadlineTimeHint: 'We will remind you a day before and at the deadline',
   cardPriorityHint: 'P0 is the highest, P5 the lowest.',
   cardHourShort: 'h',
   cardMinShort: 'min',
@@ -8148,6 +8355,86 @@ const en: Translations = {
     fieldDeadline: 'Deadline', fieldPriority: 'Priority', rejected: 'Change not applied: {detail}', rejectedFallback: 'check your permissions and the task state',
   },
   // ── end area: project-team-ui ──
+  // ── area: integrations-errors ──
+  integrationErrors: {
+    invalid_request_body: 'Invalid request. Refresh the page and try again.',
+    invalid_provider: 'Choose a service from the list.',
+    invalid_credentials: 'Access details have an invalid format.',
+    missing_credentials: 'Fill in all access fields.',
+    invalid_provider_host: 'Invalid service address. Enter your workspace address, e.g. {example}.',
+    provider_host_unavailable: 'Service address not found. Check the spelling.',
+    access_denied: 'The service denied access. Check the key or token.',
+    provider_rejected: 'The service rejected the request. Check the address and API key.',
+    provider_unavailable: 'The service is temporarily unavailable. Try again later.',
+    rate_limited: 'Too many requests to the service. Try again in a few minutes.',
+    invalid_provider_response: 'The service returned an unexpected response. Try again later.',
+    encryption_not_configured: 'Secure credential storage is not configured by the administrator yet.',
+    oauth_not_configured: 'Google Calendar connection is not configured by the administrator yet.',
+    credentials_unavailable: 'Access details are unavailable. Reconnect the service.',
+    different_source_host: 'You can only reconnect to the same service workspace.',
+    use_google_oauth: 'Reconnect Google Calendar by signing in with Google.',
+    invalid_connection: 'Connection not found. Refresh the page.',
+    invalid_source: 'The source is unavailable. Refresh the source list.',
+    calendar_read_only: 'This calendar is read-only.',
+    calendar_already_connected: 'This calendar is already linked to another connection. Disconnect it first.',
+    status_mapping_required: 'Map all statuses before previewing.',
+    external_user_required: 'For “Only mine”, enter your user ID in the source service.',
+    invalid_status_target: 'A selected status does not exist in the source.',
+    invalid_field_target: 'A selected field does not exist in the source.',
+    unknown_project_member: 'An assignee is mapped to someone outside the project.',
+    invalid_configuration: 'Check the synchronization rules.',
+    invalid_mapping: 'Check the synchronization rules.',
+    invalid_scope: 'Check the synchronization rules.',
+    invalid_exports: 'Check the synchronization rules.',
+    invalid_period: 'The period must be between 0 and 3650 days.',
+    invalid_timezone: 'Unknown time zone.',
+    preview_required: 'Confirm a source preview first.',
+    preview_expired: 'The preview is outdated. Refresh it.',
+    disconnected: 'The connection is disconnected. Reconnect it.',
+    connection_owner_access_lost: 'The responsible person lost project access. A new connection is required.',
+    transition_unavailable: 'The external service does not allow this status transition.',
+    calendar_scheduling_requires_provider: 'Edit this event with attendees in the source calendar.',
+    conflict_changed: 'External data changed again. Refresh the sync.',
+    task_deadline_authoritative: 'The task sets the deadline. Restore the calendar event date.',
+    invalid_resolution: 'Choose how to resolve the conflict.',
+    conflicts_pending: 'Sync pending changes first',
+    invalid_oauth_state: 'Authorization session expired — try again',
+    integration_internal_error: 'Integration server error. Try again later.',
+    generic: 'The integration action failed. Try again.',
+    attention: 'Check the connection.',
+  },
+  integrationForm: { connectionLabel: 'Connection name', connectionLabelPlaceholder: 'For example, product team' },
+  // ── end area: integrations-errors ──
+  // ── area: watch-devices ──
+  devicesTitle: 'Devices & sessions',
+  devicesRow: 'Devices & sessions',
+  devicesThisDevice: 'This device',
+  devicesKindMobile: 'Phone',
+  devicesKindWeb: 'Browser',
+  devicesKindWatch: 'Apple Watch',
+  devicesKindOther: 'Other device',
+  devicesLastSeen: 'Last active: {when}',
+  devicesRevoke: 'End session',
+  devicesRevokeConfirmTitle: 'End this session?',
+  devicesRevokeConfirmBody: '“{name}” will be signed out.',
+  devicesLegacyNote: 'Older sign-ins aren’t listed — use “Sign out of all devices”.',
+  devicesEmpty: 'No active sessions',
+  devicesLoadError: 'Couldn’t load sessions',
+  devicesRevokeError: 'Couldn’t end the session. Please try again.',
+  devicesSessionGone: 'This session has already ended.',
+  watchSectionTitle: 'Apple Watch',
+  watchConnect: 'Connect Apple Watch',
+  watchReconnect: 'Reconnect',
+  watchConnected: 'Connected',
+  watchNotPaired: 'No paired watch',
+  watchAppNotInstalled: 'Install Flowi on your watch',
+  watchDisconnected: 'Watch session ended',
+  watchConnectError: 'Couldn’t connect the watch',
+  timerNotifChannel: 'Timer',
+  timerNotifStop: 'Stop',
+  timerNotifMore: '+{n} more',
+  timerNotifTitle: 'Timer running',
+  // ── end area: watch-devices ──
 };
 
 export const allTranslations: Record<Lang, Translations> = { uk, en };

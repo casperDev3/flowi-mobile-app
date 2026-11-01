@@ -19,7 +19,7 @@ import { SheetModal } from '@/components/shared/SheetModal';
 import { Atlas } from '@/constants/atlas';
 import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { useResponsive } from '@/hooks/use-responsive';
-import { draftEstimatedMinutes, draftRecurrence, useTaskEditor, type TaskDraft } from '@/hooks/use-task-editor';
+import { draftDeadlineFields, draftEstimatedMinutes, draftRecurrence, useTaskEditor, type TaskDraft } from '@/hooks/use-task-editor';
 import { useToday } from '@/hooks/use-today';
 import { applyFormSprint, type Sprint } from '@/utils/sprintUtils';
 import { makeHistoryEvent } from '@/utils/taskHistory';
@@ -58,7 +58,8 @@ export function buildQuickTask(
     subtasks: [],
     createdAt: now.toISOString(),
     estimatedMinutes: draftEstimatedMinutes(draft),
-    deadline: draft.deadline ?? undefined,
+    // День із календаря — без часу; час додає лише людина у формі.
+    ...draftDeadlineFields(draft),
     projectId: draft.projectId ?? undefined,
     createdBy: draft.projectId ? (userId as Task['createdBy']) : undefined,
     assigneeId: assigneeForPersonalProjectTask(

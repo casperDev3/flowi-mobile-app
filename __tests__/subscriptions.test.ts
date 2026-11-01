@@ -22,9 +22,11 @@ import {
   daysInMonth,
   draftFromSubscription,
   emptySubscriptionDraft,
+  estimateChargedAmount,
   formatPeriod,
   formatSubscriptionMoney,
   formatTotalsLine,
+  isCrossCurrencyPayment,
   limitSubscriptionReminders,
   mergeSubscriptionWrite,
   monthlyEquivalent,
@@ -32,6 +34,7 @@ import {
   normalizeSubscription,
   normalizeSubscriptions,
   parseAmountInput,
+  paymentAccount,
   paySubscription,
   rebaseSubscriptionDraft,
   renewSubscription,
@@ -47,6 +50,7 @@ import {
   yearlyEquivalent,
   type Subscription,
 } from '@/utils/subscriptions';
+import type { Account } from '@/utils/accounts';
 
 function sub(over: Partial<Subscription> = {}): Subscription {
   return {
@@ -204,6 +208,101 @@ describe('renew / archive / restore', () => {
     expect(transaction.amount).toBe(10);
     expect(transaction.currency).toBe('USD');
     expect(transaction.accountId).toBe('');
+  });
+
+  // ─── Оплата з вибором рахунку й іншою валютою (спільна специфікація 1.6) ───
+
+  it('оплата в тій самій валюті: сума = ціна, без chargedAmount, рахунок запамʼятовується', () => {
+    const at = new Date('2026-09-22T14:30:00');
+    const { subscription, transaction } = paySubscription(sub({ accountId: 'old' }), {
+      id: 'tx-3', accountId: 'acc-usd', currency: 'USD', amount: 11, fallbackCategory: 'Інше', now: at,
+    });
+    expect(transaction).toMatchObject({ amount: 11, currency: 'USD', accountId: 'acc-usd' });
+    const last = subscription.history[subscription.history.length - 1];
+    expect(last).toMatchObject({ amount: 11, currency: 'USD', accountId: 'acc-usd' });
+    expect('chargedAmount' in last).toBe(false);
+    expect('chargedCurrency' in last).toBe(false);
+    expect(subscription.accountId).toBe('acc-usd');
+    expect(subscription.amount).toBe(11);
+  });
+
+  it('оплата USD-підписки з гривневого рахунку: витрата в UAH, ціна лишається в USD', () => {
+    const at = new Date('2026-09-22T14:30:00');
+    const { subscription, transaction } = paySubscription(sub(), {
+      id: 'tx-4', accountId: 'acc-uah', currency: 'UAH', amount: 10, chargedAmount: 415,
+      fallbackCategory: 'Інше', now: at,
+    });
+    expect(transaction).toMatchObject({ amount: 415, currency: 'UAH', accountId: 'acc-uah' });
+    expect(subscription.amount).toBe(10);
+    expect(subscription.accountId).toBe('acc-uah');
+    expect(subscription.history[subscription.history.length - 1]).toEqual({
+      date: '2026-09-20', amount: 10, currency: 'USD', renewedAt: at.toISOString(),
+      accountId: 'acc-uah', chargedAmount: 415, chargedCurrency: 'UAH',
+    });
+  });
+
+  it('списана сума округлюється до знаків валюти рахунку — і в операції, і в історії', () => {
+    const { subscription, transaction } = paySubscription(sub(), {
+      id: 'tx-r', accountId: 'acc-uah', currency: 'UAH', amount: 10, chargedAmount: 415.555, chargedDecimals: 2,
+      fallbackCategory: 'Інше', now,
+    });
+    expect(transaction.amount).toBe(415.56);
+    expect(subscription.history[subscription.history.length - 1].chargedAmount).toBe(415.56);
+    expect(() => paySubscription(sub(), {
+      id: 'tx-r0', accountId: 'acc-uah', currency: 'UAH', amount: 10, chargedAmount: 0.004, chargedDecimals: 2,
+      fallbackCategory: 'Інше', now,
+    })).toThrow(RangeError);
+  });
+
+  it('parseAmountInput: пробіли й нерозривні пробіли в тисячах', () => {
+    expect(parseAmountInput('1 250')).toBe(1250);
+    expect(parseAmountInput('1\u00A0250,50')).toBe(1250.5);
+    expect(parseAmountInput('1\u202F250')).toBe(1250);
+  });
+
+  it('оплата в іншій валюті без списаної суми кидає RangeError', () => {
+    expect(() => paySubscription(sub(), {
+      id: 'tx-5', accountId: 'acc-uah', currency: 'UAH', amount: 10, fallbackCategory: 'Інше', now,
+    })).toThrow(RangeError);
+    expect(() => paySubscription(sub(), {
+      id: 'tx-5', accountId: 'acc-uah', currency: 'UAH', amount: 10, chargedAmount: 0, fallbackCategory: 'Інше', now,
+    })).toThrow(RangeError);
+  });
+
+  it('без рахунку: sub.accountId не змінюється, в історії немає accountId', () => {
+    const { subscription } = paySubscription(sub({ accountId: 'keep' }), { id: 'tx-6', fallbackCategory: 'Інше', now });
+    expect(subscription.accountId).toBe('keep');
+    expect('accountId' in subscription.history[0]).toBe(false);
+  });
+
+  it('isCrossCurrencyPayment: лише відома й інша валюта', () => {
+    expect(isCrossCurrencyPayment(sub(), 'UAH')).toBe(true);
+    expect(isCrossCurrencyPayment(sub(), 'USD')).toBe(false);
+    expect(isCrossCurrencyPayment(sub(), '')).toBe(false);
+    expect(isCrossCurrencyPayment(sub(), undefined)).toBe(false);
+  });
+
+  it('estimateChargedAmount: курс із найсвіжішої відповідної оплати', () => {
+    const row = { date: '2026-08-20', amount: 10, currency: 'USD', chargedAmount: 415, chargedCurrency: 'UAH' };
+    expect(estimateChargedAmount(sub({ history: [row] }), 'UAH', 12)).toBe(498);
+    expect(estimateChargedAmount(sub({ history: [] }), 'UAH', 12)).toBeNull();
+    expect(estimateChargedAmount(sub({ history: [{ date: '2026-08-20', amount: 10 }] }), 'UAH', 12)).toBeNull();
+    expect(estimateChargedAmount(sub({ history: [row] }), 'EUR', 12)).toBeNull();
+    expect(estimateChargedAmount(sub({ history: [row] }), 'UAH', 0)).toBeNull();
+    const newer = { date: '2026-09-20', amount: 10, currency: 'USD', chargedAmount: 420, chargedCurrency: 'UAH' };
+    expect(estimateChargedAmount(sub({ history: [row, newer] }), 'UAH', 12)).toBe(504);
+  });
+
+  it('paymentAccount пропускає власний архівний рахунок', () => {
+    const accounts = [
+      { id: 'own', name: 'Old', currency: 'USD', archived: true },
+      { id: 'uah', name: 'Card', currency: 'UAH' },
+      { id: 'usd', name: 'Wallet', currency: 'USD' },
+    ] as unknown as Account[];
+    expect(paymentAccount(accounts, { accountId: 'own', currency: 'USD' })?.id).toBe('usd');
+    expect(paymentAccount(accounts, { accountId: 'uah', currency: 'USD' })?.id).toBe('uah');
+    expect(paymentAccount(accounts, { accountId: undefined, currency: 'EUR' })?.id).toBe('uah');
+    expect(paymentAccount([], { accountId: 'own', currency: 'USD' })).toBeNull();
   });
 
   it('архівування і відновлення', () => {

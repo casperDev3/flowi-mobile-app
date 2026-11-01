@@ -94,10 +94,7 @@ const ArchiveCard = React.memo(function ArchiveCard({
       intensity={isDark ? 18 : 35}
       tint={isDark ? 'dark' : 'light'}
       style={[ar.card, { borderColor: c.border }]}>
-      {/* Green left stripe */}
-      <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: c.accent, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 }} />
-
-      <View style={{ marginLeft: 8, flex: 1 }}>
+      <View style={{ flex: 1 }}>
         {/* Title row */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7 }}>
           <AnimatedCheck

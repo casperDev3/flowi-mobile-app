@@ -17,6 +17,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
@@ -99,6 +100,46 @@ export class UnsyncedOutboxError extends Error {
  * §2: такі дані «зберігаються й вивантажуються в акаунт» ПІСЛЯ входу — вихід
  * чи зміна workspace не мають права їх стерти без попередження.
  */
+/**
+ * Назва пристрою для списку сесій (watch-lockscreen-v1.md §5.2): модель
+ * («iPhone 15 Pro»), а не User-Agent. Немає — сервер підставить свою.
+ */
+function deviceNameForSession(): string | undefined {
+  try {
+    const name = (Device.modelName ?? '').trim();
+    return name ? name.slice(0, 100) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Сесія годинника видана ЦИМ входом (store/watch-link.ts §6.4): на вихід і
+ * зміну workspace її треба завершити, поки токени телефона ще живі, і сказати
+ * годиннику «signout». Best-effort — вихід ніколи не чекає на годинник.
+ * Лінивий require: watch-link сам імпортує useAuth звідси.
+ */
+async function teardownWatch(reason: 'logout' | 'workspace_switch'): Promise<void> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { teardownWatchLink } = require('./watch-link') as typeof import('./watch-link');
+    await teardownWatchLink(reason);
+  } catch (e) {
+    if (__DEV__) console.warn('[auth] watch teardown failed:', e);
+  }
+}
+
+/** Лінивий require: device-actions сам імпортує useAuth звідси. Best-effort. */
+async function resetDeviceActionQueues(): Promise<void> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { resetDeviceActions } = require('./device-actions') as typeof import('./device-actions');
+    await resetDeviceActions();
+  } catch (e) {
+    if (__DEV__) console.warn('[auth] черги дій пристроїв не очищено:', e);
+  }
+}
+
 async function hasUnprotectedLocalChanges(): Promise<boolean> {
   const remaining = await loadOutbox().catch(() => [] as OutboxItem[]);
   if (remaining.length > 0) return true;
@@ -291,6 +332,9 @@ const WORKSPACE_SWITCH_STORAGE_KEYS = [
   'media_upload_queue',
   'containers_migrated_v2',
   'containers_open_counts',
+  // Журнал ідемпотентності дій годинника / Live Activity / Android-сповіщення
+  // (store/device-actions.ts APPLIED_LOG_KEY) — id дій цього акаунта.
+  'device_actions_applied_v1',
 ] as const;
 
 /**
@@ -356,6 +400,10 @@ async function closeSyncSessionBeforeWipe(): Promise<void> {
  * чистий `null` від AsyncStorage — кожен falls back на своє коректне значення.
  */
 async function clearLocalDataForWorkspaceSwitch(): Promise<void> {
+  // Спершу — нативні черги дій поза застосунком і їхній власник (NATIVE
+  // CONTRACT): «Стоп», натиснутий до виходу, не має застосуватись до даних
+  // наступного акаунта чи workspace.
+  await resetDeviceActionQueues();
   await AsyncStorage.multiRemove([...WORKSPACE_SWITCH_STORAGE_KEYS]);
   // Слухачі (useStorageRefresh) чекають сигналу на кожен ключ, а
   // multiRemove такого сигналу сам не шле.
@@ -604,7 +652,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const data = await apiFetch<{ user: UserOut; access: string; refresh: string }>(
       '/auth/login/',
-      { method: 'POST', body: { email, password }, auth: false, allowOffline: true },
+      {
+        method: 'POST',
+        body: { email, password, ...(deviceNameForSession() ? { device_name: deviceNameForSession() } : {}) },
+        auth: false,
+        allowOffline: true,
+      },
     );
     await completeSession(data.user, data.access, data.refresh);
   }, [completeSession]);
@@ -622,6 +675,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const body: Record<string, string> = { email, password };
     if (name?.trim()) body.name = name.trim();
     if (inviteToken?.trim()) body.invite_token = inviteToken.trim();
+    const deviceName = deviceNameForSession();
+    if (deviceName) body.device_name = deviceName;
     const workspaceId = cachedWorkspaceConfig()?.workspaceId ?? '';
 
     // Контракт §2.4: `push_token`/`push_platform` опційні — заявник у режимі
@@ -696,6 +751,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Знімаємо push-токен, поки ще авторизовані (контракт §2.8).
     await unregisterPushToken();
+    // Сесію годинника — теж, поки токени телефона ще живі.
+    await teardownWatch('logout');
 
     if (allDevices) await apiFetch('/auth/logout-all/', { method: 'POST' });
 
@@ -770,6 +827,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!force && await hasUnprotectedLocalChanges()) throw new UnsyncedOutboxError();
 
     await unregisterPushToken();
+    await teardownWatch('workspace_switch');
 
     try {
       if (isOnlineMode()) {

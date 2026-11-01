@@ -26,82 +26,31 @@ import { useI18n } from './i18n';
 
 import { ensureStorageMigrations } from './migrations';
 import { loadData, subscribeToStorage } from './storage';
-import { updateSynced } from './synced-storage';
 import {
-  adHocTimerId,
+  TIMERS_KEY,
+  startAdHocTimerOp,
+  startMeetingTimerOp,
+  startTaskTimerOp,
+  stopTimerOp,
+  subscribeExternalTimerChanges,
+  type TimerMeetingInput,
+  type TimerOpHooks,
+  type TimerTaskInput,
+} from './timer-ops';
+import {
   findTimerForTask,
   sortTimers,
   taskTimerId,
   type ActiveTimer,
 } from '@/utils/activeTimers';
 import {
-  buildMeetingTimer,
-  closeMeetingSession,
   findTimerForMeeting,
   meetingTimerId,
-  type Meeting,
 } from '@/utils/meetings';
-import { appendHistory } from '@/utils/taskHistory';
-import { DEFAULT_TASK_STATUS_COLUMNS, IN_PROGRESS_COLUMN_ID, REVIEW_COLUMN_ID, mergeTaskStatusColumns, resolvedStatusType, type TaskStatusColumn } from '@/utils/taskStatuses';
-import type { Task } from '@/utils/taskUtils';
 
-const TIMERS_KEY = 'active_timers';
-const TASKS_KEY = 'tasks';
-const MEETINGS_KEY = 'meetings';
-const TIME_ENTRIES_KEY = 'time_entries';
-
-/**
- * Запис дзеркала у 'time_entries' — підмножина `TimeRecord` (utils/timeEntries).
- *
- * `shift` тут більше немає: поділу на ранок/день/вечір/ніч у продукті не
- * лишилось, жоден підсумок за ним не рахується, і писати його в НОВІ записи
- * означало б плодити дані, які ніхто не читає. У `TimeRecord` поле збережене
- * лише для читання старих записів.
- *
- * Натомість дзеркало пише `taskId`, `startedAt` і `endedAt` — те, чим воно
- * відрізнялося від записів, перенесених `utils/timeMigration.ts`:
- *   • `taskId` — щоб фільтр за задачею (`recordTaskKey`) і відсів дублів
- *     (`sessionKeys`) працювали за id, а не за збігом НАЗВИ задачі;
- *   • `startedAt`/`endedAt` — щоб блок аномалій бачив справжні межі сесії.
- *     Без `startedAt` `entryStartMs` відлічує початок від кінця на тривалість,
- *     а це вгадування: сесію, що перетнула північ, воно показує вірно лише
- *     випадково, і «Перетинає північ» для дзеркала таймера не спрацьовувало.
- */
-interface MirroredTimeEntry {
-  id: string;
-  task: string;
-  /** Задача, з якої пішла сесія. Немає — вільний таймер або нарада. */
-  taskId?: string;
-  duration: number;
-  /** ISO кінця сесії — те саме, що `endedAt`; лишається, бо за ним сортують. */
-  date: string;
-  startedAt: string;
-  endedAt: string;
-  /** Проєкт сесії (WORKSPACE_PROJECTS_PLAN §3 «години за тиждень» на Огляді). */
-  projectId?: string;
-}
-
-/** Мінімум, потрібний сторy для старту: решту полів завдання він не читає. */
-export interface TimerTaskInput {
-  id: string;
-  title: string;
-  kanbanColumnId?: string;
-  status: 'active' | 'done';
-  projectId?: string;
-}
-
-/**
- * Мінімум, потрібний для старту таймера наради.
- *
- * Колонки й статусу тут немає й не може бути: наради не живуть на дошці, тож
- * старт нікуди її не пересуває, а стоп нікуди не повертає. Це не спрощення
- * заради стислості — це вся різниця між двома видами таймера.
- */
-export interface TimerMeetingInput {
-  id: string;
-  title: string;
-  projectId?: string;
-}
+// Типи входу старту живуть у store/timer-ops.ts (спільні з діями пристроїв);
+// тут — реекспорт для наявних імпортів.
+export type { TimerMeetingInput, TimerTaskInput } from './timer-ops';
 
 export interface TimerContextValue {
   pendingTask: string;
@@ -154,12 +103,6 @@ const TimerContext = createContext<TimerContextValue>({
   timeEntriesRevision: 0,
 });
 
-function elapsedSeconds(startedAt: string, now: number): number {
-  // Годинник пристрою може зʼїхати назад (зміна поясу, ручне переведення) —
-  // відʼємна тривалість сесії зіпсувала б усю статистику часу.
-  return Math.max(0, Math.floor((now - new Date(startedAt).getTime()) / 1000));
-}
-
 /** Реєстр, як він лежить у сховищі просто зараз. Биті записи відкидаємо. */
 async function readStoredTimers(): Promise<ActiveTimer[]> {
   const stored = await loadData<ActiveTimer[]>(TIMERS_KEY, []);
@@ -182,46 +125,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const initialized = useRef(false);
   /** Скільки записів у польоті. Поки їх >0, перечитувати сховище не можна. */
   const writesInFlight = useRef(0);
-
-  /**
-   * Read-modify-write реєстру: мутація рахується від СХОВИЩА, не від власного
-   * стану.
-   *
-   * Стан провайдера систематично відстає від сховища, і це не помилка окремого
-   * місця, а норма: рушій синхронізації застосовує чужі записи прямо в ключ
-   * (saveData повз наш стан), міграція дописує туди перенесений таймер,
-   * відновлення бекапу підмінює ключ цілком, «очистити все» його стирає. Якби
-   * ми зібрали повний масив зі свого застарілого списку, saveSynced віддифив
-   * би його проти сховища, побачив чужий таймер як зниклий — і видалив би його
-   * локально та відправив delete на сервер. Тобто старт власного таймера вбивав
-   * би таймер, що йде на іншому пристрої.
-   */
-  const mutateTimers = useCallback(
-    async (mutate: (current: ActiveTimer[]) => ActiveTimer[]) => {
-      writesInFlight.current += 1;
-      try {
-        // Читання й запис — одна операція під блокуванням ключа, інакше pull,
-        // що ліг між ними, пішов би на сервер як DELETE.
-        await updateSynced<ActiveTimer>(TIMERS_KEY, raw => {
-          const current = sortTimers(raw.filter(t => t?.id && t.startedAt));
-          const mutated = mutate(current);
-          const next = sortTimers(mutated);
-          timersRef.current = next;
-          setActiveTimers(next);
-          // mutate повернув той самий масив — робити нічого, але свіжий стан зі
-          // сховища ми вже підхопили.
-          return mutated === current ? raw : next;
-        });
-      } catch (e) {
-        // Мовчки ковтати не можна: таймер лишиться на екрані, але не переживе
-        // перезапуск, і причина має бути видимою.
-        if (__DEV__) console.warn('[timers] запис active_timers не вдався:', e);
-      } finally {
-        writesInFlight.current -= 1;
-      }
-    },
-    [],
-  );
 
   const readTimers = useCallback(async () => {
     const usable = await readStoredTimers();
@@ -264,6 +167,20 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, [readTimers]);
 
+  // Дії пристроїв (годинник, Live Activity, Android-нотифікація) пишуть у ті
+  // самі ключі через store/timer-ops.ts повз провайдер — перечитуємо реєстр і
+  // піднімаємо ревізії, як після власного старту/стопу.
+  useEffect(() => subscribeExternalTimerChanges(change => {
+    if (change.tasks) setTasksRevision(n => n + 1);
+    if (change.meetings) setMeetingsRevision(n => n + 1);
+    if (change.timeEntries) setTimeEntriesRevision(n => n + 1);
+    if (change.timers && initialized.current && writesInFlight.current === 0) {
+      void readTimers().catch(e => {
+        if (__DEV__) console.warn('[timers] refresh failed:', e);
+      });
+    }
+  }), [readTimers]);
+
   // Синк застосовує чужі зміни прямо в сховище, повз наш стан: інший пристрій
   // міг запустити або зупинити таймер, поки застосунок був у фоні. Повернення
   // з фону — найдешевший момент перечитати, не заводячи поллінг.
@@ -293,174 +210,44 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   );
 
   /**
-   * Read-modify-write 'tasks' — наявна конвенція репозиторію (так само роблять
-   * archive.tsx, subtasks.tsx, today.tsx). Стор не має власного стану завдань,
-   * а екран, з якого прийшов виклик, може бути навіть не змонтованим.
+   * Хуки операцій (store/timer-ops.ts): стан провайдера, ревізії для екранів,
+   * Alert про відсутню колонку робочого процесу. Помилки сховища логуються й
+   * ковтаються покроково — таймер лишається на екрані, але не переживе
+   * перезапуск, і причина має бути видимою.
    */
-  const patchTask = useCallback(
-    async (taskId: string, patch: (task: Task) => Task) => {
-      try {
-        // Читання, патч і запис — одна операція під блокуванням ключа: pull,
-        // що встиг би лягти між loadData і saveSynced, пішов би на сервер як DELETE.
-        let found = false;
-        await updateSynced<Task>(TASKS_KEY, tasks => {
-          const index = tasks.findIndex(t => t.id === taskId);
-          if (index < 0) return tasks;
-          found = true;
-          const next = [...tasks];
-          next[index] = patch(tasks[index]);
-          return next;
-        });
-        if (found) setTasksRevision(n => n + 1);
-      } catch (e) {
-        if (__DEV__) console.warn(`[timers] запис 'tasks' не вдався (${taskId}):`, e);
-      }
+  const hooks = useMemo<TimerOpHooks>(() => ({
+    onTimers: next => {
+      timersRef.current = next;
+      setActiveTimers(next);
     },
-    [],
-  );
-
-  /**
-   * Read-modify-write 'meetings' — дзеркало patchTask.
-   *
-   * Окремий прохід по сховищу, а не спільна функція із завданнями: ключі різні,
-   * а спроба узагальнити «патч запису в масиві» дала б параметризовану функцію,
-   * яку однаково довелось би читати з обома ключами в голові.
-   */
-  const patchMeeting = useCallback(
-    async (meetingId: string, patch: (meeting: Meeting) => Meeting) => {
-      try {
-        let found = false;
-        await updateSynced<Meeting>(MEETINGS_KEY, meetings => {
-          const index = meetings.findIndex(m => m.id === meetingId);
-          // Нараду могли видалити, поки таймер ішов. Сесії немає куди класти —
-          // але в 'time_entries' вона все одно потрапить, тож час не зникне.
-          if (index < 0) return meetings;
-          found = true;
-          const next = [...meetings];
-          next[index] = patch(meetings[index]);
-          return next;
-        });
-        if (found) setMeetingsRevision(n => n + 1);
-      } catch (e) {
-        if (__DEV__) console.warn(`[timers] запис 'meetings' не вдався (${meetingId}):`, e);
-      }
-    },
-    [],
-  );
-
-  /** Дзеркало завершеної сесії для екранів часу — вони читають лише 'time_entries'. */
-  const mirrorToTimeEntries = useCallback(
-    async (timer: ActiveTimer, duration: number, endedAt: Date) => {
-      if (duration <= 0) return;
-      try {
-        const endedAtIso = endedAt.toISOString();
-        // Таймер без проєкту (запущений у вебі чи старою версією) — беремо
-        // проєкт задачі або наради, інакше сесія впала б в «Особисте».
-        let projectId = timer.projectId;
-        if (!projectId && timer.taskId) {
-          const tasks = await loadData<Task[]>(TASKS_KEY, []);
-          projectId = tasks.find(task => task.id === timer.taskId)?.projectId;
-        } else if (!projectId && timer.meetingId) {
-          const meetings = await loadData<Meeting[]>(MEETINGS_KEY, []);
-          projectId = meetings.find(meeting => meeting.id === timer.meetingId)?.projectId;
-        }
-        const entry: MirroredTimeEntry = {
-          id: `timer_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-          task: timer.label,
-          taskId: timer.taskId,
-          duration,
-          date: endedAtIso,
-          startedAt: timer.startedAt,
-          endedAt: endedAtIso,
-          ...(projectId ? { projectId } : {}),
-        };
-        await updateSynced<MirroredTimeEntry>(TIME_ENTRIES_KEY, existing => [entry, ...existing]);
-        setTimeEntriesRevision(n => n + 1);
-      } catch (e) {
-        if (__DEV__) console.warn('[timers] дзеркало у time_entries не вдалося:', e);
-      }
-    },
-    [],
-  );
-
-  // Проєктні колонки мають власні id. «Перевірка» має той самий type,
-  // що й «До роботи», тому підбір лише за type повертав би не ту колонку.
-  const resolveTimerColumn = useCallback(async (taskId: string, target: string) => {
-    const tasks = await loadData<Task[]>(TASKS_KEY, []);
-    const task = tasks.find(task => task.id === taskId);
-    if (task?.status === 'done') return task.kanbanColumnId;
-    const projectId = task?.projectId;
-    if (!projectId) return target;
-    const columns = await loadData<TaskStatusColumn[]>('task_statuses', []);
-    const scoped = mergeTaskStatusColumns(columns, projectId);
-    if (!scoped.length) return target;
-    const source = DEFAULT_TASK_STATUS_COLUMNS.find(column => column.id === target)!;
-    const match = scoped.find(column => !column.isDone && column.sourceStatusId === target)
-      ?? scoped.find(column => !column.isDone && column.name === source.name)
-      ?? (target === IN_PROGRESS_COLUMN_ID
-        ? scoped.find(column => !column.isDone && resolvedStatusType(column) === 'in_progress') : undefined);
-    if (match) return match.id;
+    onTimersWriteStart: () => { writesInFlight.current += 1; },
+    onTimersWriteEnd: () => { writesInFlight.current -= 1; },
+    onTasksChanged: () => setTasksRevision(n => n + 1),
+    onMeetingsChanged: () => setMeetingsRevision(n => n + 1),
+    onTimeEntriesChanged: () => setTimeEntriesRevision(n => n + 1),
     // Workflow changes are owner-only on the server. Never create a local
     // column that a member cannot synchronize, or silently select Todo.
-    Alert.alert(tr.timerWorkflowMissingTitle, tr.timerWorkflowMissingMessage);
-    return undefined;
-  }, [tr.timerWorkflowMissingTitle, tr.timerWorkflowMissingMessage]);
+    onWorkflowMissing: () => Alert.alert(tr.timerWorkflowMissingTitle, tr.timerWorkflowMissingMessage),
+    onWriteError: (scope, e, id) => {
+      if (!__DEV__) return;
+      if (scope === 'active_timers') console.warn('[timers] запис active_timers не вдався:', e);
+      else if (scope === 'time_entries') console.warn('[timers] дзеркало у time_entries не вдалося:', e);
+      else console.warn(`[timers] запис '${scope}' не вдався (${id}):`, e);
+    },
+  }), [tr.timerWorkflowMissingTitle, tr.timerWorkflowMissingMessage]);
 
   const startTaskTimer = useCallback(
     async (task: TimerTaskInput) => {
-      // Завершене завдання не трекають: сесія на ньому нікуди не веде, а
-      // колонку done автоматика чіпати не сміє.
-      if (task.status === 'done') return;
-
-      const columnId = await resolveTimerColumn(task.id, IN_PROGRESS_COLUMN_ID);
-      if (!columnId) return;
-      const now = new Date();
-
-      const timer: ActiveTimer = {
-        id: taskTimerId(task.id),
-        taskId: task.id,
-        label: task.title,
-        startedAt: now.toISOString(),
-        projectId: task.projectId,
-      };
-
-      let created = false;
-      await mutateTimers(current => {
-        // Перевірка на СВІЖОМУ списку: таймер на це завдання міг зʼявитися з
-        // іншого пристрою. Другий запис створив би дубль, який неможливо
-        // зупинити разом.
-        if (findTimerForTask(current, task.id)) return current;
-        created = true;
-        return [...current, timer];
-      });
-      // Таймер уже йшов — історію та колонку чіпати не за що.
-      if (!created) return;
-
-      await patchTask(task.id, t => ({
-        ...t,
-        // Старт ЗАВЖДИ переводить у «У процесі», з якої б колонки завдання не
-        // прийшло. Робота почалась — і на дошці це має бути видно однаково,
-        // незалежно від того, чи лежало завдання в «До роботи», чи у власній
-        // колонці користувача.
-        kanbanColumnId: columnId,
-        history: appendHistory(t, 'timer_start'),
-      }));
+      await startTaskTimerOp(task, {}, hooks);
     },
-    [mutateTimers, patchTask, resolveTimerColumn],
+    [hooks],
   );
 
   const startAdHocTimer = useCallback(
     async (label: string) => {
-      // Частини доби (shift) більше не пишемо: поділ на ранок/день/вечір/ніч
-      // прибрано з продукту, мітка таймера тепер — проєкт (timerProject).
-      const timer: ActiveTimer = {
-        id: adHocTimerId(),
-        label,
-        startedAt: new Date().toISOString(),
-      };
-      await mutateTimers(current => [...current, timer]);
+      await startAdHocTimerOp(label, {}, hooks);
     },
-    [mutateTimers],
+    [hooks],
   );
 
   /**
@@ -473,78 +260,17 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
    */
   const startMeetingTimer = useCallback(
     async (meeting: TimerMeetingInput) => {
-      const timer = buildMeetingTimer(meeting);
-      await mutateTimers(current =>
-        findTimerForMeeting(current, meeting.id) ? current : [...current, timer],
-      );
+      await startMeetingTimerOp(meeting, {}, hooks);
     },
-    [mutateTimers],
+    [hooks],
   );
 
+  /** Реєстр → завдання/нарада → дзеркало в time_entries (store/timer-ops.ts). */
   const stopTimer = useCallback(
     async (id: string) => {
-      const endedAt = new Date();
-
-      // 1. Прибрати з реєстру — після цього таймер більше ніде не «йде».
-      //    Джерело правди про сесію — сховище, а не власний стан: він міг
-      //    відстати, і тоді ми або не знайшли б живий таймер, або записали б
-      //    сесію, яку вже записав інший пристрій.
-      let removed: ActiveTimer | undefined;
-      await mutateTimers(current => {
-        removed = current.find(t => t.id === id);
-        if (!removed) return current;
-        return current.filter(t => t.id !== id);
-      });
-      // Таймера в сховищі немає — його вже зупинили деінде, і сесія там
-      // записана. Другий запис дав би дубль у завданні та в 'time_entries'.
-      const timer = removed;
-      if (!timer) return;
-
-      const duration = elapsedSeconds(timer.startedAt, endedAt.getTime());
-
-      // 2. Завершена сесія переїжджає в timeEntries завдання. endedAt тут є
-      //    ЗАВЖДИ: відкритих записів у timeEntries більше не буває.
-      if (timer.taskId) {
-        const columnId = await resolveTimerColumn(timer.taskId, REVIEW_COLUMN_ID);
-        await patchTask(timer.taskId, t => ({
-          ...t,
-          // Зупинка ЗАВЖДИ переводить у «На перевірці»: робота скінчилась, але
-          // результат ще не приймали. Пара «старт → у процесі, стоп → на
-          // перевірці» мусить працювати однаково з будь-якого місця, тож
-          // винятків за колонкою тут немає.
-          //
-          // Єдиний виняток — завершене завдання. «Готово» САМО зупиняє таймер,
-          // і цей запис прилітає сюди вже ПІСЛЯ того, як екран переставив
-          // завдання в «Готово»; безумовний перенос скасував би щойно
-          // завершену роботу й повернув її на дошку.
-          kanbanColumnId: t.status === 'done' ? t.kanbanColumnId : (columnId ?? t.kanbanColumnId),
-          timeEntries: [
-            ...(t.timeEntries ?? []),
-            {
-              id: `${timer.id}-${endedAt.getTime().toString(36)}`,
-              startedAt: timer.startedAt,
-              endedAt: endedAt.toISOString(),
-              duration,
-            },
-          ],
-          history: appendHistory(t, 'timer_stop'),
-        }));
-      }
-
-      // 2б. Сесія наради лягає в timeEntries САМОЇ наради — та сама структура,
-      //     що в завдання. Колонки дошки в наради немає, тож увесь блок вище
-      //     (перенос у «На перевірці», історія) до неї не застосовується: не
-      //     через недогляд, а тому, що переносити нема куди.
-      if (timer.meetingId) {
-        await patchMeeting(timer.meetingId, m =>
-          closeMeetingSession(m, timer, endedAt, duration),
-        );
-      }
-
-      // 3. Дзеркало для екранів часу.
-      await mirrorToTimeEntries(timer, duration, endedAt);
+      await stopTimerOp(id, {}, hooks);
     },
-    [mutateTimers, mirrorToTimeEntries, patchTask, patchMeeting, resolveTimerColumn],
+    [hooks],
   );
 
   const stopTimerForTask = useCallback(
@@ -609,3 +335,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useTimerContext = () => useContext(TimerContext);
+/**
+ * Аліас для коду поверхонь поза екранами (store/android-surfaces.ts тощо —
+ * watch-lockscreen-v1.md §10 називає хук саме так).
+ */
+export const useTimer = useTimerContext;

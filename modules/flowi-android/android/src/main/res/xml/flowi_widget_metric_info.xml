@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+  android:description="@string/flowi_widget_metric_description"
+  android:initialLayout="@layout/flowi_widget_metric"
+  android:minWidth="110dp"
+  android:minHeight="110dp"
+  android:minResizeWidth="110dp"
+  android:minResizeHeight="110dp"
+  android:previewLayout="@layout/flowi_widget_metric"
+  android:resizeMode="horizontal|vertical"
+  android:targetCellWidth="2"
+  android:targetCellHeight="2"
+  android:updatePeriodMillis="0"
+  android:configure="com.casper3.flowi.surfaces.FlowiMetricWidgetConfigActivity"
+  android:widgetFeatures="reconfigurable|configuration_optional"
+  android:widgetCategory="home_screen" />

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Поверхні Flowi на Android (spec §10). Зливається в маніфест застосунку при
+  збиранні — app.json і config plugin не потрібні. POST_NOTIFICATIONS уже
+  додає expo-notifications.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <application>
+    <receiver
+      android:name="com.casper3.flowi.surfaces.FlowiLargeWidgetProvider"
+      android:exported="true"
+      android:label="@string/flowi_widget_large_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/flowi_widget_large_info" />
+    </receiver>
+
+    <receiver
+      android:name="com.casper3.flowi.surfaces.FlowiMediumWidgetProvider"
+      android:exported="true"
+      android:label="@string/flowi_widget_medium_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/flowi_widget_medium_info" />
+    </receiver>
+
+    <receiver
+      android:name="com.casper3.flowi.surfaces.FlowiSmallWidgetProvider"
+      android:exported="true"
+      android:label="@string/flowi_widget_small_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/flowi_widget_small_info" />
+    </receiver>
+
+    <receiver
+      android:name="com.casper3.flowi.surfaces.FlowiMetricWidgetProvider"
+      android:exported="true"
+      android:label="@string/flowi_widget_metric_label">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/flowi_widget_metric_info" />
+    </receiver>
+
+    <!-- Півночі (власний будильник) і зміна дати/часу/поясу → перемалювати віджети. -->
+    <receiver
+      android:name="com.casper3.flowi.surfaces.FlowiWidgetRefreshReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.DATE_CHANGED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="android.intent.action.LOCALE_CHANGED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
+
+    <!-- «Зупинити» у сповіщенні таймера: лише явний PendingIntent самого застосунку. -->
+    <receiver
+      android:name="com.casper3.flowi.surfaces.FlowiTimerStopReceiver"
+      android:exported="false" />
+
+    <!-- Сповіщення таймера змахнули (deleteIntent) — JS перестає вважати його показаним. -->
+    <receiver
+      android:name="com.casper3.flowi.surfaces.FlowiTimerDismissReceiver"
+      android:exported="false" />
+
+    <activity
+      android:name="com.casper3.flowi.surfaces.FlowiSmallWidgetConfigActivity"
+      android:excludeFromRecents="true"
+      android:exported="true"
+      android:taskAffinity=""
+      android:theme="@style/FlowiWidgetConfigTheme">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+      </intent-filter>
+    </activity>
+
+    <activity
+      android:name="com.casper3.flowi.surfaces.FlowiMetricWidgetConfigActivity"
+      android:excludeFromRecents="true"
+      android:exported="true"
+      android:taskAffinity=""
+      android:theme="@style/FlowiWidgetConfigTheme">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

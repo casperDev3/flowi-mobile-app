@@ -7,3 +7,17 @@
 "Віджет Flowi" = "Flowi widget";
 "Оберіть дію для малого віджета." = "Choose the action for the small widget.";
 "Швидкі дії, а у великому розмірі — кільця дня." = "Quick actions; the large size also shows today's rings.";
+"Вміст" = "Content";
+"Кільце: завдання" = "Ring: tasks";
+"Кільце: кроки" = "Ring: steps";
+"Кільце: фінанси" = "Ring: finance";
+"Кільце: час" = "Ring: time";
+"Дія: завдання" = "Action: task";
+"Дія: витрата" = "Action: expense";
+"Дія: подія" = "Action: event";
+"Дія: нотатка" = "Action: note";
+"Flowi на заблокованому екрані" = "Flowi on the Lock Screen";
+"Оберіть кільце або дію для круглого віджета." = "Choose a ring or an action for the circular widget.";
+"Кільце дня або швидка дія, найближча подія та прогрес завдань." = "A ring or a quick action, your next event and task progress.";
+"Stop timer" = "Stop timer";
+"Timer ID" = "Timer ID";

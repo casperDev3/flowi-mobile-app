@@ -1,4 +1,5 @@
 import { isExecutableTask } from './task-contract';
+import { deadlineDayKey, isDeadlinePast } from './taskDeadline';
 /**
  * utils/projectStats.ts — метрики проєкту.
  *
@@ -97,7 +98,11 @@ function dayNumber(date: Date): number {
 
 function deadlineTime(task: Pick<ProjectTaskLike, 'deadline'>): number | null {
   if (!task.deadline) return null;
-  const parsed = new Date(task.deadline);
+  // Голий `YYYY-MM-DD` (імпорти) — локальний полудень доби, а не UTC-північ (C2).
+  const bare = /^\d{4}-\d{2}-\d{2}$/.test(task.deadline.trim()) ? deadlineDayKey(task.deadline) : null;
+  const parsed = bare
+    ? new Date(Number(bare.slice(0, 4)), Number(bare.slice(5, 7)) - 1, Number(bare.slice(8, 10)), 12)
+    : new Date(task.deadline);
   return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
 }
 
@@ -128,7 +133,8 @@ export function projectStats(
     if (task.status === 'done') continue;
     const at = deadlineTime(task);
     if (at === null) continue;
-    if (dayNumber(new Date(at)) < today) overdue += 1;
+    // C2: точний — з моменту, добовий — з наступної локальної доби.
+    if (isDeadlinePast(task, now)) overdue += 1;
     if (!nearest || at < nearest.at) nearest = { iso: task.deadline as string, at };
   }
 

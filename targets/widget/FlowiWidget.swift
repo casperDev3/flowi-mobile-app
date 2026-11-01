@@ -369,5 +369,9 @@ struct FlowiWidget: Widget {
 struct FlowiWidgetBundle: WidgetBundle {
   var body: some Widget {
     FlowiWidget()
+    FlowiLockWidget()
+    #if canImport(ActivityKit)
+    TimerLiveActivity()
+    #endif
   }
 }

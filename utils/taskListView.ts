@@ -13,6 +13,7 @@
  */
 import { mergeTaskStatusColumns, orderColumnsForList, taskVisibleInList, type TaskStatusColumn } from './taskStatuses';
 import { buildStatusListSections, type TaskListScope } from './taskListSections';
+import { deadlineDayKey } from './taskDeadline';
 import { inTaskScope, isTodayTask } from './taskToday';
 import {
   comparePriority,
@@ -264,10 +265,10 @@ export function buildProjectCalendarDays<T extends ListViewTask, M extends { dat
     return entry;
   };
   tasksInMonth.forEach(t => {
-    if (!t.deadline) return;
-    const date = new Date(t.deadline);
-    if (Number.isNaN(date.getTime())) return;
-    ensure(date).tasks.push(t);
+    // Доба дедлайну — локальна; голий `YYYY-MM-DD` — як є (C2), не UTC-північ.
+    const day = deadlineDayKey(t.deadline);
+    if (!day) return;
+    ensure(new Date(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)))).tasks.push(t);
   });
   meetingsInMonth.forEach(m => {
     // 'YYYY-MM-DD' + локальна північ — як в усіх утилітах нарад.

@@ -1,9 +1,11 @@
+import { localDateKey } from './dateUtils';
 import { isExecutableTask } from './task-contract';
+import { deadlineDayKey, isDeadlinePast } from './taskDeadline';
 export type TeamRole = 'owner' | 'manager' | 'member' | 'viewer';
 export interface TeamTask {
   backlogKind?: string; archivedAt?: string | null; deleted?: boolean;
   id: string; title: string; projectId?: string; status: string;
-  assigneeId?: string | null; createdBy?: string; deadline?: string; priorityLevel?: number | null;
+  assigneeId?: string | null; createdBy?: string; deadline?: string; deadlineHasTime?: boolean; deadlineTimeAt?: string; priorityLevel?: number | null;
   estimatedMinutes?: number; reviewRequired?: boolean; reviewerId?: string | null;
   reviewState?: 'none' | 'pending' | 'approved' | 'changes_requested' | 'needs_reviewer'; reviewFeedback?: string;
   resultRequirements?: ('summary' | 'link' | 'file')[]; resultSummary?: string;
@@ -43,7 +45,9 @@ export function progress(tasks: readonly TeamTask[], now = new Date()) {
   return { total: tasks.length, done: tasks.length - active.length,
     blocked: active.filter(t => t.blocked).length,
     pending: active.filter(t => t.reviewState === 'pending').length,
-    overdue: active.filter(t => t.deadline && new Date(t.deadline).getTime() < now.getTime()).length };
+    // Канонічне правило C2 (як isOverdue/веб lib/teamwork.ts): точний дедлайн —
+    // з моменту, добовий — лише з наступної локальної доби.
+    overdue: active.filter(t => isDeadlinePast(t, now)).length };
 }
 export function dependencyWarnings(task: TeamTask, tasks: readonly TeamTask[]) {
   return tasks.filter(t => task.dependencyIds?.includes(t.id) && !isComplete(t));
@@ -62,6 +66,8 @@ export function teamPreferencesId(projectId: string, userId: string): string {
 export function projectedRemaining(row: WorkloadRow, before: TeamTask, after: TeamTask, now = new Date()): number | null {
   if (row.remainingMinutes === null) return null;
   const end = new Date(now); end.setDate(end.getDate() + (7 - ((end.getDay() + 6) % 7))); end.setHours(0,0,0,0);
-  const minutes = (task: TeamTask) => isExecutableTask(task) && task.assigneeId === row.userId && !isComplete(task) && task.deadline && new Date(task.deadline).getTime() < end.getTime() ? (task.estimatedMinutes ?? 0) : 0;
+  // Доба дедлайну — локальна (голий YYYY-MM-DD як є), тиждень до понеділка.
+  const endKey = localDateKey(end);
+  const minutes = (task: TeamTask) => { const day = deadlineDayKey(task.deadline); return isExecutableTask(task) && task.assigneeId === row.userId && !isComplete(task) && day && day < endKey ? (task.estimatedMinutes ?? 0) : 0; };
   return row.remainingMinutes + minutes(before) - minutes(after);
 }

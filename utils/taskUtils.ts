@@ -1,5 +1,6 @@
 import { isPersonalTask } from './task-contract';
 import { isSameMonth } from './dateUtils';
+import { exactDeadlineMs, isDeadlinePast } from './taskDeadline';
 
 /** Легасі-пріоритет: досі пишеться КОЖНИМ збереженням (dual-write, CONTRACT §B). */
 export type LegacyPriority = 'high' | 'medium' | 'low';
@@ -84,6 +85,15 @@ export interface Task {
   startDate?: string;
   estimatedMinutes?: number;
   deadline?: string;
+  /**
+   * Дедлайн має час, обраний людиною (utils/taskDeadline.ts). Пишеться ЛИШЕ
+   * `true`; відсутній (або будь-що інше) = дедлайн лише на день — сервер тоді
+   * нагадує про прострочку о 9:00 наступного дня. Чинний ЛИШЕ разом із
+   * `deadlineTimeAt === deadline` (isTimedDeadline, контракт C1).
+   */
+  deadlineHasTime?: boolean;
+  /** Копія `deadline`, записана разом із `deadlineHasTime: true` (C1). */
+  deadlineTimeAt?: string;
   projectId?: string;
   /**
    * Спринт проєкту (utils/sprintUtils.ts). Порожній/відсутній = беклог
@@ -335,22 +345,46 @@ export function assigneeDisplayName(
  * інтерфейси завдання (з recurrence, recordings тощо), і номінально
  * несумісний тип змушував би або кастити, або тримати локальну копію правила.
  */
-export function isOverdue(task: Pick<Task, 'deadline' | 'status'>, now: Date = new Date()): boolean {
+export function isOverdue(
+  task: Pick<Task, 'deadline' | 'status'> & { deadlineHasTime?: boolean | null; deadlineTimeAt?: string | null },
+  now: Date = new Date(),
+): boolean {
   if (!task.deadline || task.status === 'done') return false;
-  const d = new Date(task.deadline);
-  d.setHours(23, 59, 59, 999);
-  return d < now;
+  // Контракт C2 (той самий isDeadlinePast, що у вебі й у знімку годинника):
+  // точний дедлайн (isTimedDeadline) — з моменту; добовий — з наступної
+  // ЛОКАЛЬНОЇ доби; голий `YYYY-MM-DD` — саме ця доба, без UTC-зсуву.
+  return isDeadlinePast(task, now);
 }
 
-export function deadlineDiff(iso: string): number {
-  const d = new Date(iso);
+/**
+ * Кінець локальної доби дедлайну. Голий `YYYY-MM-DD` — саме цей день (як у
+ * вебі isDeadlinePast і в знімку годинника), а не UTC-північ: `new Date('2026-10-18')`
+ * на захід від UTC — це ще 17-те, і задача «прострочувалась» на день раніше.
+ */
+function endOfDeadlineDay(deadline: string): Date {
+  const bare = /^(\d{4})-(\d{2})-(\d{2})$/.exec(deadline.trim());
+  const d = bare ? new Date(Number(bare[1]), Number(bare[2]) - 1, Number(bare[3])) : new Date(deadline);
   d.setHours(23, 59, 59, 999);
-  return Math.ceil((d.getTime() - Date.now()) / 86400000);
+  return d;
+}
+
+export function deadlineDiff(
+  iso: string,
+  hasTime?: boolean | null,
+  timeAt?: string | null,
+): number {
+  const exact = exactDeadlineMs({ deadline: iso, deadlineHasTime: hasTime, deadlineTimeAt: timeAt });
+  if (exact !== null) {
+    const ms = exact - Date.now();
+    // Момент минув — уже «прострочено», навіть якщо до кінця доби ще є час.
+    return ms < 0 ? Math.min(-1, Math.floor(ms / 86400000)) : Math.ceil(ms / 86400000);
+  }
+  return Math.ceil((endOfDeadlineDay(iso).getTime() - Date.now()) / 86400000);
 }
 
 export function deadlineColor(task: Task, fallback: string): string {
   if (!task.deadline || task.status === 'done') return fallback;
-  const diff = deadlineDiff(task.deadline);
+  const diff = deadlineDiff(task.deadline, task.deadlineHasTime, task.deadlineTimeAt);
   if (diff < 0) return '#EF4444';
   if (diff <= 1) return '#F59E0B';
   return fallback;

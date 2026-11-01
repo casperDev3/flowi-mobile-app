@@ -1,7 +1,7 @@
 import { Atlas } from '@/constants/atlas';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -386,6 +386,22 @@ export default function AccountScreen() {
                 <Text style={st.btnText}>{tr.accountChangePassword}</Text>
               )}
             </TouchableOpacity>
+
+            {/* Пристрої та сесії (watch-lockscreen-v1.md §11.1): входи акаунта + Apple Watch. */}
+            <SectionLabel label={tr.devicesTitle} color={c.sub} />
+            <BlurView intensity={isDark ? 20 : 40} tint={isDark ? 'dark' : 'light'} style={[st.card, { borderColor: c.border }]}>
+              <TouchableOpacity
+                style={[st.fieldWrap, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}
+                onPress={() => router.push('/devices' as Href)}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityLabel={tr.devicesRow}
+              >
+                <IconSymbol name="laptopcomputer" size={17} color={c.accent} />
+                <Text style={[st.input, { color: c.text, flex: 1 }]}>{tr.devicesRow}</Text>
+                <IconSymbol name="chevron.right" size={16} color={c.sub} />
+              </TouchableOpacity>
+            </BlurView>
 
             {/* Workspace */}
             <SectionLabel label={tr.workspaceScreenTitle} color={c.sub} />

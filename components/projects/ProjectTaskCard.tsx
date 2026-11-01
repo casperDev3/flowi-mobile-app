@@ -46,6 +46,7 @@ import { useTimerContext } from '@/store/timer-context';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { haptic } from '@/utils/haptics';
+import { deadlinePatch, isTimedDeadline } from '@/utils/taskDeadline';
 import { appendHistory } from '@/utils/taskHistory';
 import { applyFormSprint, retargetTaskProject, sprintFieldVisible, sprintOptionLabel, sprintOptionsForTask, type Sprint } from '@/utils/sprintUtils';
 import {
@@ -484,8 +485,11 @@ export function useProjectTaskCard({
       priority={normalizePriority(task)}
       onPriority={level => edit(priorityFields(level))}
       deadline={task.deadline}
+      deadlineHasTime={isTimedDeadline(task)}
       overdue={isOverdue(task)}
-      onDeadline={iso => edit({ deadline: iso ?? undefined })}
+      // C1: точний — прапорець + deadlineTimeAt (той самий рядок); добовий —
+      // обидва undefined (JSON їх відкидає, старий `true` не лишається).
+      onDeadline={p => edit(deadlinePatch(p.deadline, p.deadlineHasTime === true))}
       // Лід переносить задачу в інший свій проєкт прямо тут (паритет з
       // особистою карткою); решта бачить проєкт лише для читання.
       project={{

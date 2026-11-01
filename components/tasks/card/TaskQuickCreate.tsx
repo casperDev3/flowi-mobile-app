@@ -23,7 +23,7 @@ import {
   type Sprint,
 } from '@/utils/sprintUtils';
 
-import { DateField, OptionField, PriorityField } from './fields';
+import { DeadlineField, OptionField, PriorityField } from './fields';
 import { cardStyles, type CardColors } from './primitives';
 
 export interface QuickCreateProject {
@@ -107,12 +107,12 @@ export function TaskQuickCreate({
       {/* Чипи переносяться на новий рядок, а не їдуть горизонтальним
           скролом: їх три-чотири, і схований за краєм «Проєкт» ніхто не знайде. */}
       <View style={st.chips}>
-        <DateField
+        <DeadlineField
           variant="chip"
           icon="flag"
           label={tr.deadline}
-          value={editor.draft.deadline}
-          onChange={iso => editor.patch({ deadline: iso })}
+          value={{ deadline: editor.draft.deadline, deadlineHasTime: editor.draft.deadlineHasTime }}
+          onChange={p => editor.patch({ deadline: p.deadline, deadlineHasTime: !!p.deadline && p.deadlineHasTime === true })}
           today={today}
           colors={c}
           isDark={isDark}

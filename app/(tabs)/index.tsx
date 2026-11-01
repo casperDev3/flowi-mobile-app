@@ -159,7 +159,7 @@ import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { useStorageRefresh } from '@/hooks/use-storage-refresh';
 import { formatClock, formatDuration } from '@/utils/durationFormat';
 import { fontFamily, radius } from '@/constants/theme';
-import { BentoArrowButton, BentoCard, KpiCounter, MeshBackground, SectionTabs, SegmentedProgress } from '@/components/ds';
+import { BentoArrowButton, BentoCard, KpiCounter, MeshBackground, SectionTabs } from '@/components/ds';
 import { glassOf, glassRim, dsGlass } from '@/components/shared/dsTheme';
 
 
@@ -2418,24 +2418,8 @@ export default function TasksScreen() {
                 переїхали в KPI шапки (Omni); тут лишається те, чого там немає:
                 підзавдання сьогоднішніх завдань — сегментним прогресом. */}
             <View style={{ marginTop: hasActiveFilters ? 12 : 16, marginBottom: 16, gap: 8 }}>
-              {totalSubtasks > 0 && (
-                <BentoCard
-                  compact
-                  title={tr.subtasksToday}
-                  icon="list.bullet.circle.fill"
-                  accent="lavender"
-                  headerRight={
-                    <Text style={{ color: c.text, fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] }}>
-                      {doneSubtasks}/{totalSubtasks}
-                    </Text>
-                  }>
-                  <SegmentedProgress
-                    value={doneSubtasks / totalSubtasks}
-                    showValue
-                    accessibilityLabel={`${tr.subtasksToday}: ${doneSubtasks}/${totalSubtasks}`}
-                  />
-                </BentoCard>
-              )}
+              {/* 11.2026: картку «Підзавдання на сьогодні» прибрано — лічильник
+                  «виконано/усього» стоїть праворуч у рядку місяця (шапка). */}
               {dueTodayTasks.length === 0 && (
                 <View style={[s.subtaskStatRow, { backgroundColor: t.surface.card, justifyContent: 'center' }]}>
                   <IconSymbol name="checkmark.seal" size={14} color={c.sub} />
@@ -2725,6 +2709,7 @@ export default function TasksScreen() {
     // коли є активні фільтри.
     titleMenu,
     children: (
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
       <MonthPicker
         month={activeMonth}
         onChange={m => { setActiveMonth(m); setDateFilter(null); }}
@@ -2737,6 +2722,14 @@ export default function TasksScreen() {
         dimColor={c.dim}
         borderColor={c.border}
       />
+      {totalSubtasks > 0 ? (
+        <Text
+          accessibilityLabel={`${tr.subtasksToday}: ${doneSubtasks}/${totalSubtasks}`}
+          style={{ color: doneSubtasks === totalSubtasks ? t.status.success : c.sub, fontSize: 15, fontFamily: fontFamily.medium, fontVariant: ['tabular-nums'] }}>
+          {doneSubtasks}/{totalSubtasks}
+        </Text>
+      ) : null}
+      </View>
     ),
   };
   // Заголовок гортається зі списком лише у «Списку» (у «Колонках» — вбік).

@@ -16,7 +16,8 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { HealthCard } from '@/components/health/HealthBits';
-import { useHealthTabGrid } from '@/components/health/HealthLayout';
+import { HEALTH_TAB_GUTTER, useHealthTabGrid } from '@/components/health/HealthLayout';
+import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/ScrollHeaderSlot';
 import { LoadErrorNotice } from '@/components/health/HealthNotices';
 import { ChartTypeToggle, PeriodSelector, TrendChart } from '@/components/health/PeriodChart';
 import { RingCell } from '@/components/health/RingCell';
@@ -58,6 +59,7 @@ function fmtMetric(m: Metric, v: number): string {
 
 export function OverviewTab({ h }: HealthTabProps) {
   const grid = useHealthTabGrid();
+  const onHeaderScroll = useScrollHeaderScroll();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -158,7 +160,11 @@ export function OverviewTab({ h }: HealthTabProps) {
     <ScrollView
       contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
       showsVerticalScrollIndicator={false}
+      // Телефон (11.2026): заголовок розділу гортається з вмістом вкладки.
+      onScroll={onHeaderScroll}
+      scrollEventThrottle={16}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
+      <ScrollHeaderSlot insetX={HEALTH_TAB_GUTTER} />
 
       {/* ERR-01: якщо читання провалилось, initialized НЕ вмикається — без
           цієї гілки екран крутив би скелетони нескінченно. */}

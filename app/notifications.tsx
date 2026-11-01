@@ -237,15 +237,13 @@ export default function NotificationsScreen() {
           {tab === 'inbox' && unread > 0 ? (
             <HeaderButton
               onPress={() => { void markAllNotificationsRead(); }}
-              accessibilityLabel={tr.ncMarkAllRead}
-              style={{ backgroundColor: c.card, borderColor: 'transparent' }}>
+              accessibilityLabel={tr.ncMarkAllRead}>
               <IconSymbol name="checkmark.circle" size={18} color={c.text} />
             </HeaderButton>
           ) : null}
           <HeaderButton
             onPress={() => router.push('/settings-notifications' as never)}
-            accessibilityLabel={tr.ncOpenSettings}
-            style={{ backgroundColor: c.card, borderColor: 'transparent' }}>
+            accessibilityLabel={tr.ncOpenSettings}>
             <IconSymbol name="gearshape.fill" size={18} color={c.sub} />
           </HeaderButton>
         </View>

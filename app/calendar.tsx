@@ -776,19 +776,17 @@ export default function CalendarScreen() {
             <HeaderButton
               onPress={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
               accessibilityLabel={tr.calSearch}
-              style={{ borderColor: 'transparent', backgroundColor: searchOpen ? c.action : c.card }}>
-              <IconSymbol name="magnifyingglass" size={18} color={searchOpen ? c.onAction : c.text} />
+              accessibilityState={{ expanded: searchOpen }}>
+              <IconSymbol name={searchOpen ? 'xmark' : 'magnifyingglass'} size={18} color={c.text} />
             </HeaderButton>
             <HeaderButton
               onPress={() => { closeSearch(); goToday(); }}
-              accessibilityLabel={tr.today}
-              style={{ borderColor: 'transparent', backgroundColor: c.card }}>
+              accessibilityLabel={tr.today}>
               <IconSymbol name="calendar" size={18} color={isCurrentPeriod ? c.accent : c.text} />
             </HeaderButton>
             <HeaderButton
               onPress={() => setShowGcalSheet(true)}
-              accessibilityLabel="Google Calendar"
-              style={{ borderColor: 'transparent', backgroundColor: c.card }}>
+              accessibilityLabel="Google Calendar">
               {gcal.importing
                 ? <ActivityIndicator size="small" color={dsTokens(isDark).status.success} />
                 : <IconSymbol name={gcal.token ? 'checkmark.circle.fill' : 'arrow.triangle.2.circlepath'} size={18} color={gcal.token ? dsTokens(isDark).status.success : c.text} />}

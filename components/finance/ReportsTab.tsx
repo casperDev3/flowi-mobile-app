@@ -22,6 +22,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/ScrollHeaderSlot';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius, space, type as dsType } from '@/constants/theme';
@@ -422,6 +423,7 @@ export function ReportsTab(props: ReportsTabProps) {
   const feed = sections
     .filter((key): key is Exclude<ReportsSection, 'shortfall'> => key !== 'shortfall');
   const rows = reportsRows(feed, isWide ? 2 : 1);
+  const onHeaderScroll = useScrollHeaderScroll();
 
   return (
     <ScrollView
@@ -431,9 +433,11 @@ export function ReportsTab(props: ReportsTabProps) {
         isWide && WIDE_COLUMN,
       ]}
       showsVerticalScrollIndicator={false}
-      onScroll={onScrollY ? e => onScrollY(e.nativeEvent.contentOffset.y) : undefined}
-      scrollEventThrottle={32}
+      onScroll={onScrollY || onHeaderScroll ? e => { onScrollY?.(e.nativeEvent.contentOffset.y); onHeaderScroll?.(e); } : undefined}
+      scrollEventThrottle={16}
       keyboardShouldPersistTaps="handled">
+      {/* Телефон (11.2026): заголовок розділу гортається з вмістом вкладки. */}
+      <ScrollHeaderSlot insetX={20} />
       {/* Попередження — на всю ширину над стрічкою: воно про все нижче. */}
       {sections[0] === 'shortfall' ? warningCard : null}
       {/* Планшет: ряди по дві картки в порядку стрічки (не masonry — той

@@ -12,7 +12,8 @@ import { CalStat, HealthAddButton, HealthCard } from '@/components/health/Health
 import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEntryModal';
 import { LoadErrorNotice, ReminderBlockedNotice } from '@/components/health/HealthNotices';
 import { MetricTrend } from '@/components/health/MetricTrend';
-import { useHealthTabGrid } from '@/components/health/HealthLayout';
+import { HEALTH_TAB_GUTTER, useHealthTabGrid } from '@/components/health/HealthLayout';
+import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/ScrollHeaderSlot';
 import type { HealthTabProps } from '@/components/health/tabs/types';
 import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -29,6 +30,7 @@ import { fontFamily } from '@/constants/theme';
 
 export function NutritionTab({ h }: HealthTabProps) {
   const grid = useHealthTabGrid();
+  const onHeaderScroll = useScrollHeaderScroll();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const { tr, lang } = useI18n();
@@ -218,7 +220,11 @@ export function NutritionTab({ h }: HealthTabProps) {
       <ScrollView
         contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
         showsVerticalScrollIndicator={false}
+        // Телефон (11.2026): заголовок розділу гортається з вмістом вкладки.
+        onScroll={onHeaderScroll}
+        scrollEventThrottle={16}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
+        <ScrollHeaderSlot insetX={HEALTH_TAB_GUTTER} />
 
         {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
         {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}

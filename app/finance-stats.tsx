@@ -595,12 +595,9 @@ export default function FinanceStatsScreen() {
             <HeaderButton
               onPress={openCal}
               accessibilityLabel={tr.calendar}
-              style={{
-                backgroundColor: hasCustomRange ? c.action : c.card,
-                borderColor:     'transparent',
-                borderRadius:    radius.pill,
-              }}>
-              <IconSymbol name="calendar" size={18} color={hasCustomRange ? c.onAction : c.text} />
+              accessibilityState={{ selected: hasCustomRange }}>
+              {/* 11.2026: без кружка — обраний діапазон читається заповненою іконкою. */}
+              <IconSymbol name={hasCustomRange ? 'calendar.circle.fill' : 'calendar'} size={hasCustomRange ? 22 : 18} color={c.text} />
             </HeaderButton>
           }>
           {/* Omni: KPI періоду — великі тонкі числа (колишній ряд із чотирьох

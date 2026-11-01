@@ -53,12 +53,12 @@ export function TasksMenuButton({ onPress, label, active, colors: c }: {
 }) {
   const { t } = useDS();
   return (
+    // 11.2026: проста іконка без кружка; є активні фільтри — крапка поруч.
     <HeaderButton
       onPress={onPress}
-      accessibilityLabel={label}
-      // DS v2: є активні фільтри — кнопка pill action.primary.
-      style={{ backgroundColor: active ? t.action.primary : glassOf(t).surface, borderColor: 'transparent' }}>
-      <IconSymbol name="ellipsis" size={18} color={active ? t.text.onAction : c.text} />
+      accessibilityLabel={label}>
+      <IconSymbol name="ellipsis" size={20} color={c.text} />
+      {active ? <View style={{ position: 'absolute', top: 4, right: 2, width: 8, height: 8, borderRadius: 4, backgroundColor: t.text.primary }} /> : null}
     </HeaderButton>
   );
 }

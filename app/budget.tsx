@@ -61,6 +61,7 @@ import { BudgetMonthsTable } from '@/components/finance/BudgetMonthsTable';
 import { LoadErrorNotice } from '@/components/finance/LoadErrorNotice';
 import { MonthPicker } from '@/components/shared/MonthPicker';
 import { HeaderButton, ScreenHeader } from '@/components/shared/ScreenHeader';
+import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/ScrollHeaderSlot';
 import { isSameMonth as sameMonth } from '@/utils/dateUtils';
 import {
   buildBudgetRows,
@@ -219,6 +220,7 @@ export default function BudgetScreen() {
 
 export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
   const readingWidth = useContentWidth();
+  const onHeaderScroll = useScrollHeaderScroll();
   const { isWide, isExpanded } = useResponsive();
   // Ландшафт планшета: підсумок ліворуч, рядки категорій праворуч — у
   // ширшій колонці (Layout.wideMaxWidth). Портрет і телефон — одна колонка
@@ -600,9 +602,8 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
           actions={
             <HeaderButton
               onPress={openAdd}
-              accessibilityLabel={tr.add}
-              style={{ backgroundColor: c.action, borderColor: 'transparent', borderRadius: radius.pill }}>
-              <IconSymbol name="plus" size={18} color={c.onAction} />
+              accessibilityLabel={tr.add}>
+              <IconSymbol name="plus" size={22} color={c.text} />
             </HeaderButton>
           }>
           <MonthPicker
@@ -628,7 +629,12 @@ export function BudgetPanel({ embedded }: { embedded?: BudgetEmbed } = {}) {
           paddingTop: embedded ? 12 : 0,
           paddingBottom: embedded ? embedded.bottomInset + 24 : 100,
         }]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        // Вкладка Фінансів на телефоні (11.2026): заголовок розділу гортається
+        // з вмістом. Окремий екран /budget провайдера не має — гніздо порожнє.
+        onScroll={onHeaderScroll}
+        scrollEventThrottle={16}>
+        <ScrollHeaderSlot insetX={20} />
 
         {/* Вбудована вкладка: шапка — розділу, тож «+ ліміт» живе тут. */}
         {embedded && !loadFailed ? (

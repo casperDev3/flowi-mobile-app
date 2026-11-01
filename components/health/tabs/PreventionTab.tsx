@@ -14,7 +14,8 @@ import React, { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { HubTile } from '@/components/health/HubTile';
-import { useHealthTabGrid } from '@/components/health/HealthLayout';
+import { HEALTH_TAB_GUTTER, useHealthTabGrid } from '@/components/health/HealthLayout';
+import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/ScrollHeaderSlot';
 import type { HealthTabProps } from '@/components/health/tabs/types';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -34,6 +35,7 @@ import { dsTokens } from '@/hooks/use-ds';
 
 export function PreventionTab({ h }: HealthTabProps) {
   const grid = useHealthTabGrid();
+  const onHeaderScroll = useScrollHeaderScroll();
   const tabBarInset = useTabBarInset();
   const { sizeClass } = useResponsive();
   // Дві плитки на телефоні, три на середньому вікні, чотири на широкому:
@@ -98,7 +100,11 @@ export function PreventionTab({ h }: HealthTabProps) {
     <ScrollView
       contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
       showsVerticalScrollIndicator={false}
+      // Телефон (11.2026): заголовок розділу гортається з вмістом вкладки.
+      onScroll={onHeaderScroll}
+      scrollEventThrottle={16}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
+      <ScrollHeaderSlot insetX={HEALTH_TAB_GUTTER} />
 
       {/* Відʼємні поля сітки гасять padding крайніх комірок, тож на телефоні
           зовнішні відступи лишаються такими самими, як були з gap: 12. */}

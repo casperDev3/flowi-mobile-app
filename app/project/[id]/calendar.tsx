@@ -362,16 +362,14 @@ export default function ProjectCalendar() {
         <>
           <HeaderButton
             onPress={() => setAnchor(todayKey)}
-            accessibilityLabel={tr.today}
-            style={{ borderColor: 'transparent', backgroundColor: c.card }}>
+            accessibilityLabel={tr.today}>
             <IconSymbol name="calendar" size={18} color={isCurrentPeriod ? c.accent : c.text} />
           </HeaderButton>
           {canEdit ? (
             <HeaderButton
               onPress={() => setCreateTarget({ day: anchor })}
-              accessibilityLabel={tr.calProjectAdd}
-              style={{ borderColor: 'transparent', backgroundColor: c.action }}>
-              <IconSymbol name="plus" size={18} color={c.onAction} />
+              accessibilityLabel={tr.calProjectAdd}>
+              <IconSymbol name="plus" size={22} color={c.text} />
             </HeaderButton>
           ) : null}
         </>

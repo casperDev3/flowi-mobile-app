@@ -203,13 +203,15 @@ describe('шапка картки — додаткові дії', () => {
 
 describe('екран Завдань — одна кнопка меню (☰ біля заголовка) і одне правило створення', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'app', '(tabs)', 'index.tsx'), 'utf8');
-  const header = src.slice(src.indexOf('<ScreenHeader'), src.indexOf('</ScreenHeader>'));
+  // Пропси шапки (11.2026): одні й ті самі для нерухомої смуги кнопок
+  // (part="toolbar") і заголовка в прокрутці (part="body").
+  const header = src.slice(src.indexOf('const headerProps = {'), src.indexOf('const headerScrolls'));
 
   test('у шапці немає окремих кнопок — лише бургер меню розділу (titleMenu)', () => {
     expect(header).not.toContain("router.push('/calendar'");
     expect(header).not.toContain('<HeaderButton');
-    expect(header).not.toContain('actions={');
-    expect(header).toContain('titleMenu={titleMenu}');
+    expect(header).not.toContain('actions:');
+    expect(header).toMatch(/^\s*titleMenu,$/m);
   });
 
   test('календар, архів, фільтри, проєкти, нотатки — пункти меню розділу', () => {

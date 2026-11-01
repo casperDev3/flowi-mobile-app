@@ -456,10 +456,9 @@ export default function ContainersScreen() {
                 <HeaderButton onPress={() => setScanning(true)} accessibilityLabel={tr.ctrScan}>
                   <IconSymbol name="viewfinder" size={18} color={c.text} />
                 </HeaderButton>
-                {/* Головна дія екрана — pill action.primary. */}
-                <HeaderButton onPress={openNew} accessibilityLabel={tr.add}
-                  style={{ backgroundColor: c.t.action.primary, borderColor: 'transparent', borderRadius: radius.pill }}>
-                  <IconSymbol name="plus" size={18} color={c.t.text.onAction} />
+                {/* Головна дія екрана — проста іконка «+» (11.2026: без кружків у шапці). */}
+                <HeaderButton onPress={openNew} accessibilityLabel={tr.add}>
+                  <IconSymbol name="plus" size={22} color={c.text} />
                 </HeaderButton>
               </>
             }>

@@ -179,9 +179,8 @@ export default function ProjectTimeScreen() {
       actions={canEdit ? (
         <HeaderButton
           onPress={() => openEntry(null)}
-          accessibilityLabel={tr.timeAddEntry}
-          style={{ backgroundColor: tk.action.primary, borderColor: 'transparent' }}>
-          <IconSymbol name="plus" size={18} color={tk.text.onAction} />
+          accessibilityLabel={tr.timeAddEntry}>
+          <IconSymbol name="plus" size={22} color={tk.text.primary} />
         </HeaderButton>
       ) : undefined}>
       <ScrollView

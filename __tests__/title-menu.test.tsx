@@ -67,6 +67,18 @@ describe('TitleMenuButton', () => {
     const style = StyleSheet.flatten(typeof btn.props.style === 'function' ? btn.props.style({ pressed: false }) : btn.props.style);
     expect(style.width).toBe(TITLE_MENU_BUTTON_SIZE);
     expect(style.height).toBe(44);
+    // 11.2026: лише три риски — без кружка, тла, обідка й скла.
+    expect(style.backgroundColor).toBeUndefined();
+    expect(style.borderWidth).toBeUndefined();
+    expect(byTestId(r, 'title-menu-active-dot')).toHaveLength(0);
+  });
+
+  it('активні фільтри — крапка біля рисок, а не суцільна кнопка', () => {
+    const r = render(<TitleMenuButton title="Завдання" menu={{ onPress: () => {}, active: true }} />);
+    const btn = byTestId(r, 'title-menu-button')[0];
+    const style = StyleSheet.flatten(typeof btn.props.style === 'function' ? btn.props.style({ pressed: false }) : btn.props.style);
+    expect(style.backgroundColor).toBeUndefined();
+    expect(r.root.findAll(n => n.props.testID === 'title-menu-active-dot').length).toBeGreaterThan(0);
   });
 
   it('onPress-режим відкриває меню екрана, власного поповера немає', () => {

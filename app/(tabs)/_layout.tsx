@@ -16,8 +16,8 @@ import {useSoftSafeAreaInsets} from '@/hooks/use-soft-safe-area-insets';
 import {
     TAB_BAR_TINT,
     TAB_ISLAND_HEIGHT,
-    TAB_ISLAND_SIDE,
     tabIslandBottom,
+    tabIslandInsets,
     tabIslandOuterHeight,
     TAB_LABEL_FONT_SIZE,
     TAB_LABEL_MAX_FONT_SCALE,
@@ -64,18 +64,16 @@ function tabLabel(label: string) {
 }
 
 /**
- * Іконка таба — Omni (DS v2.2): активна вкладка — суцільна чорна pill
- * action.primary (у темній — біла) з іконкою text.onAction, той самий знак
- * «ви тут», що й у сайдбарі та SectionTabs. Рецепт — GlassTabIcon
- * (components/shared/GlassTabBar.tsx), спільний із панеллю простору проєкту.
- * Pill 52×28 вкладається в контейнер іконки по висоті — розкладка панелі не
- * змінюється. @react-navigation малює іконку двічі (focused/ні) і перехрещує
- * прозорістю — pill з'являється плавно.
+ * Іконка таба (11.2026): без pill і обводки — виділяється сама іконка:
+ * активна — TAB_BAR_TINT.active + заповнений варіант SF Symbol, неактивна —
+ * приглушена контурна. Рецепт — GlassTabIcon (components/shared/GlassTabBar.tsx),
+ * спільний із панеллю простору проєкту.
  */
-function TabIcon({name, color, focused, badge, accent}: {name: IconSymbolName; color: string; focused: boolean; badge?: boolean; accent: GlassAccent}) {
+function TabIcon({name, activeName, color, focused, badge, accent}: {name: IconSymbolName; activeName?: IconSymbolName; color: string; focused: boolean; badge?: boolean; accent: GlassAccent}) {
     return (
         <GlassTabIcon
             name={name}
+            activeName={activeName}
             color={color}
             focused={focused}
             accent={accent}
@@ -84,9 +82,9 @@ function TabIcon({name, color, focused, badge, accent}: {name: IconSymbolName; c
     );
 }
 
-function tabIcon(name: IconSymbolName, accent: GlassAccent, badge?: boolean) {
+function tabIcon(name: IconSymbolName, activeName: IconSymbolName, accent: GlassAccent, badge?: boolean) {
     function Icon({color, focused}: {color: string; focused: boolean}) {
-        return <TabIcon name={name} color={color} focused={focused} badge={badge} accent={accent}/>;
+        return <TabIcon name={name} activeName={activeName} color={color} focused={focused} badge={badge} accent={accent}/>;
     }
     return Icon;
 }
@@ -107,13 +105,14 @@ function TabBarGlass() {
 export default function TabLayout() {
     const {isDark, reduceTransparency} = useDS();
     const {tr} = useI18n();
-    const {isWide} = useResponsive();
+    const {isWide, width} = useResponsive();
     const pathname = usePathname();
     // «М'які» інсети: без провайдера (тести шару вкладок) — нулі, не виняток.
     const insets = useSoftSafeAreaInsets();
     // Острівець: скільки знизу займає панель разом із полем і safe-area —
     // заглушці модуля й панелі таймерів, щоб не налазили на неї.
     const islandOuter = tabIslandOuterHeight(insets.bottom);
+    const island = tabIslandInsets(width, insets.left, insets.right);
 
     /**
      * Вимкнений модуль НЕ прибирає свою вкладку з панелі.
@@ -147,15 +146,16 @@ export default function TabLayout() {
                 // Стилю підпису тут немає навмисно: кожен екран віддає підпис
                 // через tabLabel() — див. коментар до нього.
                 // Телефон (11.2026): острівець — відокремлена pill над нижнім
-                // краєм, поля 16 з боків (+ бічний safe-area в ландшафті),
+                // краєм, по центру, не ширше TAB_ISLAND_MAX_WIDTH (облягає
+                // 4 вкладки; поля ≥ 16 + бічний safe-area),
                 // `safe-area + 8` знизу (constants/nav.ts → TAB_ISLAND_*).
                 // paddingBottom: 0 — @react-navigation інакше віднімає нижній
                 // інсет ізсередини панелі (BottomTabBar.js:251), а острівець
                 // уже стоїть НАД ним. Відступ вмісту — useTabBarInset().
                 tabBarStyle: isWide ? {display: 'none'} : {
                     position: 'absolute',
-                    left: TAB_ISLAND_SIDE + insets.left,
-                    right: TAB_ISLAND_SIDE + insets.right,
+                    left: island.left,
+                    right: island.right,
                     bottom: tabIslandBottom(insets.bottom),
                     height: TAB_ISLAND_HEIGHT,
                     paddingBottom: 0,
@@ -191,7 +191,7 @@ export default function TabLayout() {
                     title: tr.tabToday,
                     tabBarAccessibilityLabel: tr.tabToday,
                     tabBarLabel: tabLabel(tr.tabToday),
-                    tabBarIcon: tabIcon('house.fill', moduleAccent.today),
+                    tabBarIcon: tabIcon('house', 'house.fill', moduleAccent.today),
                 }}
             />
             <Tabs.Screen
@@ -200,7 +200,7 @@ export default function TabLayout() {
                     title: tr.tabTasks,
                     tabBarAccessibilityLabel: tr.tabTasks,
                     tabBarLabel: tabLabel(tr.tabTasks),
-                    tabBarIcon: tabIcon('checklist', moduleAccent.tasks),
+                    tabBarIcon: tabIcon('checklist', 'checklist.checked', moduleAccent.tasks),
                 }}
             />
             <Tabs.Screen
@@ -209,7 +209,7 @@ export default function TabLayout() {
                     title: tr.tabFinance,
                     tabBarAccessibilityLabel: tr.tabFinance,
                     tabBarLabel: tabLabel(tr.tabFinance),
-                    tabBarIcon: tabIcon('banknote', moduleAccent.finance),
+                    tabBarIcon: tabIcon('banknote', 'banknote.fill', moduleAccent.finance),
                 }}
             />
             <Tabs.Screen
@@ -218,7 +218,7 @@ export default function TabLayout() {
                     title: tr.tabHealth,
                     tabBarAccessibilityLabel: tr.tabHealth,
                     tabBarLabel: tabLabel(tr.tabHealth),
-                    tabBarIcon: tabIcon('figure.run', moduleAccent.health),
+                    tabBarIcon: tabIcon('figure.run', 'figure.run', moduleAccent.health),
                 }}
             />
             {/* Layout System v2.4 (рішення 04): нижній бар — ЧОТИРИ головні

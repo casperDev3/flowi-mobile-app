@@ -77,13 +77,11 @@ function tabLabel(label: string) {
 
 /**
  * Іконка таба DS v2 — той самий прийом, що в `app/(tabs)/_layout.tsx`:
- * активна вкладка — іконка в pill action.primary з text.onAction, неактивна —
- * просто іконка. `forceActive` — для «Ще», поки відкритий розділ із нього
+ * без pill (11.2026) — активна вкладка виділяється самою іконкою (колір
+ * TAB_BAR_TINT.active, товща лінія), неактивна — приглушена. `forceActive` — для «Ще», поки відкритий розділ із нього
  * (навігатор тоді вважає таб не сфокусованим).
  */
 function ProjectTabIcon({ name, color, focused }: { name: IconSymbolName; color: string; focused: boolean }) {
-  // DS v2.1: скляна pill з тоном акценту «Проєктів» (lavender) + іконка ink.
-  // Колір самого проєкту не гарантує контрасту іконки — тому акцент модуля.
   return <GlassTabIcon name={name} color={color} focused={focused} accent="lavender" />;
 }
 

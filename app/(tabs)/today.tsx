@@ -53,6 +53,7 @@ import { FALLBACK_WEIGHT, HealthEntry, HealthProfile, calcCalorieDay, computeGoa
 import { Habit, habitDoneToday, habitStreak } from '@/utils/preventionUtils';
 import { Task, isMyTask, isOverdue } from '@/utils/taskUtils';
 import { haptic } from '@/utils/haptics';
+import { useHeaderScroll } from '@/hooks/use-header-scroll';
 import { useTabBarInset } from '@/hooks/use-tab-bar-inset';
 import { formatDuration } from '@/utils/durationFormat';
 import { BUILTIN_CURRENCIES, formatCurrency, type Currency } from '@/utils/financeUtils';
@@ -129,6 +130,7 @@ const INTRO_ANIMATION_MS = 800;
 
 export default function TodayScreen() {
   const tabBarInset = useTabBarInset();
+  const headerScroll = useHeaderScroll();
   // Колонки дашборду — від ширини самого екрана (вікно мінус сайдбар).
   // Стеля Layout.wideMaxWidth: на 13" iPad у ландшафті дашборд інакше
   // розтягувався на ~1130pt, і три колонки ставали надто широкими для
@@ -832,6 +834,19 @@ export default function TodayScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
+  // Omni: глобальна шапка (☰ шухляда · дзвіник · акаунт на телефоні; рядок
+  // інструментів на планшеті) + KPI-лічильники дня. Телефон ділить її на
+  // нерухому смугу кнопок і заголовок у прокрутці (AppHeader part=…).
+  const headerProps = {
+    title: dateStr.charAt(0).toUpperCase() + dateStr.slice(1),
+    titleStyle: s.title,
+    // Unslop: замість привітання за часом доби — назва контексту.
+    eyebrow: <Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{tr.tabToday}</Text>,
+    actions: <SyncBadge />,
+    kpis,
+    paddingBottom: 14,
+  };
+
   return (
     <View style={{ flex: 1 }} onTouchStart={advertisingActivity}>
       <SponsorPause />
@@ -840,15 +855,7 @@ export default function TodayScreen() {
         {/* Header */}
         {/* Omni: глобальна шапка (☰ шухляда · дзвіник · акаунт на телефоні;
             рядок інструментів на планшеті) + KPI-лічильники дня. */}
-        <AppHeader
-          title={dateStr.charAt(0).toUpperCase() + dateStr.slice(1)}
-          titleStyle={s.title}
-          // Unslop: замість привітання за часом доби — назва контексту.
-          eyebrow={<Text style={{ color: t.text.secondary, fontSize: 13, fontFamily: fontFamily.medium }}>{tr.tabToday}</Text>}
-          actions={<SyncBadge />}
-          kpis={kpis}
-          paddingBottom={14}
-        />
+        <AppHeader {...headerProps} part="toolbar" scrolled={headerScroll.scrolled} />
 
         <ScrollView
           contentContainerStyle={{
@@ -862,7 +869,13 @@ export default function TodayScreen() {
           // Тап по результату пошуку речей при відкритій клавіатурі має
           // спрацювати з першого разу, а не лише сховати клавіатуру.
           keyboardShouldPersistTaps="handled"
+          onScroll={headerScroll.onScroll}
+          scrollEventThrottle={16}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.text.secondary} />}>
+
+          {/* Телефон (11.2026): заголовок дня й KPI гортаються з вмістом,
+              нерухома лише смуга кнопок (part="toolbar" вище). Планшет — null. */}
+          <AppHeader {...headerProps} part="body" insetX={gutter} />
 
           {/* Пошук речей у контейнерах (containers.md §7.2) — під шапкою.
               Сам ховається, коли модуль вимкнено; обгортка — лише для відступу. */}

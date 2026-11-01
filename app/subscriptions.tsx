@@ -51,6 +51,7 @@ import { useZoneState } from '@/hooks/use-zone-state';
 import { useFinanceLayoutStrings } from '@/components/finance/layoutStrings';
 import { RecurringIncomesSection } from '@/components/finance/RecurringIncomesSection';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
+import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/ScrollHeaderSlot';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
@@ -135,6 +136,7 @@ export default function SubscriptionsScreen() {
 
 export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: number } } = {}) {
   const { isDark, reduceTransparency } = useDS();
+  const onHeaderScroll = useScrollHeaderScroll();
   const { tr, lang } = useI18n();
   const uiLang: 'uk' | 'en' = lang === 'en' ? 'en' : 'uk';
   const locale = uiLang === 'uk' ? 'uk-UA' : 'en-US';
@@ -792,9 +794,8 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
             actions={
               <HeaderButton
                 onPress={() => openCreate()}
-                accessibilityLabel={tr.subNew}
-                style={{ backgroundColor: c.action, borderColor: 'transparent', borderRadius: radius.pill }}>
-                <IconSymbol name="plus" size={18} color={c.onAction} />
+                accessibilityLabel={tr.subNew}>
+                <IconSymbol name="plus" size={22} color={c.text} />
               </HeaderButton>
             }
           />
@@ -808,7 +809,12 @@ export function SubscriptionsPanel({ embedded }: { embedded?: { bottomInset: num
             }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            // Вкладка Фінансів на телефоні (11.2026): заголовок розділу гортається
+            // з вмістом. Окремий екран /subscriptions провайдера не має.
+            onScroll={onHeaderScroll}
+            scrollEventThrottle={16}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
+            <ScrollHeaderSlot insetX={20} />
 
             {/* Два списки однієї вкладки (§9.5): спершу платежі, нижче доходи. */}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>

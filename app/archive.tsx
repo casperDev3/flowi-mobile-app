@@ -471,8 +471,7 @@ export default function ArchiveScreen() {
             <>
               <HeaderButton
                 onPress={clearAll}
-                accessibilityLabel={tr.clearArchive}
-                style={{ backgroundColor: c.card, borderColor: 'transparent' }}>
+                accessibilityLabel={tr.clearArchive}>
                 <IconSymbol name="trash" size={18} color={c.danger} />
               </HeaderButton>
             </>

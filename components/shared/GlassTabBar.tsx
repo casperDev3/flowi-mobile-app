@@ -4,7 +4,7 @@
  * що TabBarGlass/TabIcon в app/(tabs)/_layout.tsx:
  *   iOS 26+ — нативне скло, iOS — BlurView + glass.surfaceStrong,
  *   Android — майже непрозора заливка, «Зменшити прозорість» — суцільне TAB_BAR_BG.
- * Активна вкладка — скляна pill, тонована акцентом, іконка ink (+ світіння на iOS).
+ * Активна вкладка — без pill: лише сама іконка (колір + заповнений варіант).
  * `island` — форма острівця особистих табів телефона (app/(tabs)/_layout.tsx).
  */
 import { LinearGradient } from 'expo-linear-gradient';
@@ -69,29 +69,28 @@ export function GlassTabBarBackground({ island = false }: {
 }
 
 /**
- * Іконка вкладки Omni (DS v2.2): активна — суцільна чорна pill action.primary
- * (у темній — біла) з іконкою text.onAction (≥ 15:1), як активний пункт
- * сайдбара й SectionTabs; неактивна — іконка кольору підпису (TAB_BAR_TINT).
- * `accent` лишився в API (акцент модуля вкладки) — Omni тримає таб-бар
- * монохромним, акцент модуля живе на сторінці.
+ * Іконка вкладки (11.2026, рішення власника): БЕЗ pill, обводки й тла —
+ * виділяється сама іконка. Активна — колір `TAB_BAR_TINT.active`
+ * (text.primary, ≥ 15:1) + заповнений варіант SF Symbol (`activeName`) і
+ * трохи товща лінія; неактивна — приглушений `TAB_BAR_TINT.inactive`
+ * (≥ 4.5:1). Колір приходить від навігатора (`color`), підпис — той самий.
+ * `accent` лишився в API — таб-бар монохромний, акцент модуля живе на сторінці.
  */
-export function GlassTabIcon({ name, color, focused, accent, badge }: {
-  name: IconSymbolName; color: string; focused: boolean; accent: GlassAccent; badge?: React.ReactNode;
+export function GlassTabIcon({ name, activeName, color, focused, accent, badge }: {
+  name: IconSymbolName;
+  /** Заповнений варіант для активної вкладки (напр. house → house.fill). */
+  activeName?: IconSymbolName;
+  color: string; focused: boolean; accent: GlassAccent; badge?: React.ReactNode;
 }) {
-  const { t, isDark, reduceTransparency } = useDS();
   void accent;
   return (
-    <View
-      style={[
-        st.iconPill,
-        focused && {
-          backgroundColor: t.action.primary,
-          ...(Platform.OS === 'ios' && !reduceTransparency
-            ? { shadowColor: '#000', shadowOpacity: isDark ? 0.35 : 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }
-            : null),
-        },
-      ]}>
-      <IconSymbol size={20} name={name} color={focused ? t.text.onAction : color} />
+    <View testID={focused ? 'tab-icon-active' : undefined} style={st.iconBox}>
+      <IconSymbol
+        size={focused ? 24 : 22}
+        name={focused && activeName ? activeName : name}
+        color={color}
+        weight={focused ? 'semibold' : 'regular'}
+      />
       {badge}
     </View>
   );
@@ -99,5 +98,6 @@ export function GlassTabIcon({ name, color, focused, accent, badge }: {
 
 const st = StyleSheet.create({
   island: { borderRadius: radius.pill, overflow: 'hidden' },
-  iconPill: { width: 52, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  // Коробка 52×28 — та сама, що була під pill: розкладка панелі не змінюється.
+  iconBox: { width: 52, height: 28, alignItems: 'center', justifyContent: 'center' },
 });

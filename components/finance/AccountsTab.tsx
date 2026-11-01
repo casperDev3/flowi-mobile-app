@@ -12,6 +12,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/ScrollHeaderSlot';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BentoCard, BentoGrid, EmptyState, SegmentedProgress } from '@/components/ds';
@@ -113,6 +114,7 @@ export function AccountsTab({
     </BentoCard>
   ));
 
+  const onHeaderScroll = useScrollHeaderScroll();
   return (
     <ScrollView
       // На планшеті дашборд не розповзається ширше за Layout.wideMaxWidth.
@@ -120,7 +122,11 @@ export function AccountsTab({
         { paddingHorizontal: 20, paddingTop: 12, paddingBottom: bottomInset + 24 },
         isWide && WIDE_COLUMN,
       ]}
-      showsVerticalScrollIndicator={false}>
+      showsVerticalScrollIndicator={false}
+      // Телефон (11.2026): заголовок розділу гортається з вмістом вкладки.
+      onScroll={onHeaderScroll}
+      scrollEventThrottle={16}>
+      <ScrollHeaderSlot insetX={20} />
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <TouchableOpacity
           onPress={onNewAccount}

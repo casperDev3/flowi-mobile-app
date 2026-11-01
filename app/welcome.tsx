@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { brandMark } from '@/constants/brand';
 import { Radius, getScreenColors } from '@/constants/tokens';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { dsTokens } from '@/hooks/use-ds';
@@ -44,7 +45,7 @@ export default function WelcomeScreen() {
           {/* Logo block */}
           <View style={st.logoBlock}>
             <Image
-              source={require('@/assets/logo_app.png')}
+              source={brandMark(isDark)}
               style={st.logo}
               resizeMode="contain"
             />

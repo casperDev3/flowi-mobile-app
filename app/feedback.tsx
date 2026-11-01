@@ -578,9 +578,8 @@ export default function FeedbackScreen() {
             actions={
               <HeaderButton
                 onPress={() => openForm(null)}
-                accessibilityLabel={kind === 'bug' ? tr.fbNewBug : tr.fbNewIdea}
-                style={{ backgroundColor: c.action, borderColor: c.action }}>
-                <IconSymbol name="plus" size={18} color={c.onAction} />
+                accessibilityLabel={kind === 'bug' ? tr.fbNewBug : tr.fbNewIdea}>
+                <IconSymbol name="plus" size={22} color={c.text} />
               </HeaderButton>
             }>
             <SectionTabs

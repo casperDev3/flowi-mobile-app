@@ -19,7 +19,7 @@
  * (іконка sidebar.left), ця — праворуч у рядку заголовка (line.3.horizontal).
  *
  * Ціль дотику 44×44 (сама кнопка 44, без hitSlop — у рядку заголовка поруч
- * нікого немає).
+ * нікого немає). Видно лише три риски (11.2026): без кружка, тла й скла.
  */
 import React, { useCallback, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -57,7 +57,7 @@ export interface TitleMenuConfig {
   onPress?: () => void;
   /** Підпис для VoiceOver; за замовч. «Опції: <заголовок>». */
   accessibilityLabel?: string;
-  /** Підсвічена кнопка (є активні фільтри) — суцільна action.primary. */
+  /** Є активні фільтри — крапка біля рисок (кнопка сама лишається без тла). */
   active?: boolean;
   testID?: string;
 }
@@ -66,7 +66,7 @@ export interface TitleMenuConfig {
 export const TITLE_MENU_BUTTON_SIZE = 44;
 
 export function TitleMenuButton({ menu, title }: { menu: TitleMenuConfig; title: string }) {
-  const { t, g, reduceTransparency } = useDS();
+  const { t, g } = useDS();
   const { tr } = useI18n();
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useResponsive();
@@ -89,8 +89,6 @@ export function TitleMenuButton({ menu, title }: { menu: TitleMenuConfig; title:
 
   const close = useCallback(() => setAnchor(null), []);
 
-  const bg = menu.active ? t.action.primary : (reduceTransparency ? t.surface.card : g.surfaceStrong);
-  const fg = menu.active ? t.text.onAction : t.text.primary;
 
   return (
     <>
@@ -101,12 +99,14 @@ export function TitleMenuButton({ menu, title }: { menu: TitleMenuConfig; title:
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ expanded: anchor != null }}
-        style={({ pressed }) => [
-          st.button,
-          { backgroundColor: bg, opacity: pressed ? 0.7 : 1 },
-          menu.active ? null : { borderWidth: 1, borderColor: g.rim, borderBottomColor: g.rimShade },
-        ]}>
-        <IconSymbol name="line.3.horizontal" size={18} color={fg} />
+        // 11.2026: лише три риски — без кружка, тла, обідка й скла. Кнопка
+        // 44×44 лишається невидимою ціллю дотику.
+        style={({ pressed }) => [st.button, { opacity: pressed ? 0.5 : 1 }]}>
+        <IconSymbol name="line.3.horizontal" size={22} color={t.text.primary} />
+        {/* Є активні фільтри — крапка біля рисок (замість суцільної кнопки). */}
+        {menu.active ? (
+          <View testID="title-menu-active-dot" style={[st.activeDot, { backgroundColor: t.text.primary }]} />
+        ) : null}
       </Pressable>
 
       {menu.items ? (
@@ -174,6 +174,7 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
+  activeDot: { position: 'absolute', top: 10, right: 8, width: 8, height: 8, borderRadius: 4 },
   menu: { position: 'absolute', minWidth: 240, maxWidth: 320, paddingVertical: 8 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 16 },
   itemText: { flex: 1, fontSize: 15, fontFamily: fontFamily.medium },

@@ -16,7 +16,8 @@ import { HealthEntryModal, NewEntryPayload } from '@/components/health/HealthEnt
 import { HealthKitStatus, LoadErrorNotice } from '@/components/health/HealthNotices';
 import { MetricTrend } from '@/components/health/MetricTrend';
 import { MiniBarChart } from '@/components/health/MiniBarChart';
-import { useHealthTabGrid } from '@/components/health/HealthLayout';
+import { HEALTH_TAB_GUTTER, useHealthTabGrid } from '@/components/health/HealthLayout';
+import { ScrollHeaderSlot, useScrollHeaderScroll } from '@/components/shared/ScrollHeaderSlot';
 import type { HealthTabProps } from '@/components/health/tabs/types';
 import { MasonryColumns, type MasonryEntry } from '@/components/shared/MasonryColumns';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -37,6 +38,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function ActivityTab({ h }: HealthTabProps) {
   const grid = useHealthTabGrid();
+  const onHeaderScroll = useScrollHeaderScroll();
   const tabBarInset = useTabBarInset();
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
@@ -196,7 +198,11 @@ export function ActivityTab({ h }: HealthTabProps) {
       <ScrollView
         contentContainerStyle={[grid.contentStyle, { paddingBottom: tabBarInset + 32 }]}
         showsVerticalScrollIndicator={false}
+        // Телефон (11.2026): заголовок розділу гортається з вмістом вкладки.
+        onScroll={onHeaderScroll}
+        scrollEventThrottle={16}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.sub} />}>
+        <ScrollHeaderSlot insetX={HEALTH_TAB_GUTTER} />
 
         {/* ERR-01: сховище віддало помилку — це НЕ «записів немає». */}
         {h.loadFailed && <LoadErrorNotice lang={lang} c={c} isDark={isDark} onRetry={() => { void h.retryLoad(); }} />}

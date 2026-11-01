@@ -4,7 +4,7 @@
     "slug": "f-tracking-app",
     "version": "1.2.0",
     "orientation": "default",
-    "icon": "./assets/logo_app.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "ftrackingapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -24,8 +24,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#163A5F",
-        "foregroundImage": "./assets/logo_app.png"
+        "backgroundColor": "#181818",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -62,14 +63,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/logo_app.png"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-notifications",
         {
-          "icon": "./assets/logo_app.png",
+          "icon": "./assets/images/notification-icon.png",
           "color": "#7C3AED",
           "sounds": []
         }
@@ -77,12 +78,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/logo_app.png",
-          "imageWidth": 200,
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 160,
           "resizeMode": "contain",
-          "backgroundColor": "#163A5F",
+          "backgroundColor": "#F1F1F3",
           "dark": {
-            "backgroundColor": "#163A5F"
+            "image": "./assets/images/splash-icon-dark.png",
+            "backgroundColor": "#0D0D0F"
           }
         }
       ],

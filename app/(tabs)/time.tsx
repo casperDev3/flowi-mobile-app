@@ -62,6 +62,7 @@ import { useFinanceLayoutStrings } from '@/components/finance/layoutStrings';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
 import { AppHeader } from '@/components/shared/AppHeader';
+import { useHeaderScroll } from '@/hooks/use-header-scroll';
 import { ElapsedClock } from '@/components/tasks/ElapsedClock';
 import { AnomalyPanel, anomalyReasonText } from '@/components/time/AnomalyPanel';
 import { TimerProjectTag } from '@/components/time/ActiveTimerRow';
@@ -150,6 +151,7 @@ let migrationRan = false;
 export default function TimeScreen() {
   const contentWidth = useContentWidth();
   const tabBarInset = useTabBarInset();
+  const headerScroll = useHeaderScroll();
   const { width, height, isWide } = useResponsive();
   const screenWidth = useScreenWidth();
   /**
@@ -922,8 +924,13 @@ export default function TimeScreen() {
   // Omni: глобальна шапка (☰ · дзвіник · акаунт; рядок інструментів на
   // планшеті) + KPI обраного періоду. «Середнє на задачу» і «Звичайна
   // сесія» стоять поруч навмисно (див. components/time/TimeKpi.tsx).
-  const appHeader = (
+  // Телефон (11.2026): part="toolbar" — нерухома смуга кнопок, part="body" —
+  // заголовок і KPI першим елементом списку (гортаються з історією).
+  const appHeader = (part?: 'toolbar' | 'body') => (
     <AppHeader
+      part={part}
+      scrolled={part === 'toolbar' && headerScroll.scrolled}
+      insetX={part === 'body' ? 20 : 0}
       title={tr.navTimeTracker}
       paddingBottom={14}
       // Статична зона поруч несе ті самі KPI — шапка їх не дублює.
@@ -944,8 +951,7 @@ export default function TimeScreen() {
           {!zoneMode && (
             <HeaderButton
               onPress={() => setShowFilters(true)}
-              accessibilityLabel={tr.filtersAndSort}
-              style={hasFilters ? { backgroundColor: c.indigo + '20' } : undefined}>
+              accessibilityLabel={tr.filtersAndSort}>
               <IconSymbol name="slider.horizontal.3" size={18} color={hasFilters ? c.indigo : c.sub} />
             </HeaderButton>
           )}
@@ -958,7 +964,7 @@ export default function TimeScreen() {
     // ── Планшет: три зони (Layout System v2.4) ─────────────────────────────
     const mainZone = (
       <View style={{ flex: 1 }}>
-        {appHeader}
+        {appHeader()}
         <SectionList
           sections={sections}
           keyExtractor={item => item.id}
@@ -1026,10 +1032,12 @@ export default function TimeScreen() {
     <View style={{ flex: 1 }}>
       <MeshBackground />
       <View style={{ flex: 1 }}>
-        {appHeader}
+        {appHeader('toolbar')}
         <SectionList
           sections={sections}
           keyExtractor={item => item.id}
+          onScroll={headerScroll.onScroll}
+          scrollEventThrottle={16}
           contentContainerStyle={[contentWidth, { paddingHorizontal: 20, paddingTop: 8, paddingBottom: tabBarInset + 24 }]}
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
@@ -1040,6 +1048,7 @@ export default function TimeScreen() {
           ListEmptyComponent={emptyList}
           ListHeaderComponent={
             <View style={{ gap: 14 }}>
+              {appHeader('body')}
               {/* Період — вкладки розділу одразу під шапкою (Omni). */}
               {periodTabs}
 

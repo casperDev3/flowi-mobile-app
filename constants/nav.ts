@@ -676,15 +676,34 @@ export function tabBarInsetFor(isWide: boolean, timersCount: number, bottomSafe 
  * TAB_BAR_HEIGHT — її острівець не стосується.
  *
  *   ┌──────────── екран ────────────┐
- *   │ 16 ╭────── 64pt pill ──────╮ 16│
- *   │    ╰───────────────────────╯   │
+ *   │  ≥16 ╭─ ≤336pt, 64pt ─╮ ≥16   │
+ *   │      ╰────────────────╯       │
  *   │      8pt                       │
  *   │      safe-area bottom          │
  *   └────────────────────────────────┘
  */
 export const TAB_ISLAND_HEIGHT = 64;
-/** Поле острівця від бічних країв екрана (+ бічний safe-area в ландшафті). */
+/** МІНІМАЛЬНЕ поле острівця від бічних країв екрана (+ бічний safe-area). */
 export const TAB_ISLAND_SIDE = 16;
+/**
+ * Максимальна ширина острівця (11.2026, «зроби вужчим»): панель більше не
+ * тягнеться на всю ширину мінус 16 — вона облягає 4 вкладки (~84pt на
+ * кожну) і стоїть по центру. На 390pt це ~27pt поля з кожного боку.
+ */
+export const TAB_ISLAND_MAX_WIDTH = 336;
+
+/**
+ * Бічні відступи острівця для вікна шириною `windowW`: по центру, не ширше
+ * TAB_ISLAND_MAX_WIDTH і не ближче TAB_ISLAND_SIDE до краю (+ бічний safe-area).
+ */
+export function tabIslandInsets(windowW: number, insetLeft = 0, insetRight = 0): { left: number; right: number } {
+  const l = TAB_ISLAND_SIDE + Math.max(0, insetLeft || 0);
+  const r = TAB_ISLAND_SIDE + Math.max(0, insetRight || 0);
+  const room = Math.max(0, (windowW || 0) - l - r);
+  const width = Math.min(TAB_ISLAND_MAX_WIDTH, room);
+  const extra = (room - width) / 2;
+  return { left: Math.round(l + extra), right: Math.round(r + extra) };
+}
 /** Проміжок між острівцем і нижнім safe-area. */
 export const TAB_ISLAND_GAP = 8;
 

@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { brandMark } from '@/constants/brand';
 import { Image } from 'expo-image';
 /**
  * components/shared/NavSidebar.tsx
@@ -418,7 +419,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
       accessibilityRole="menu">
       {drawer || overlay ? null : glassLayer}
       <View style={st.headRow}>
-        <Image source={require('@/assets/logo_app.png')} style={st.headLogo} accessible={false} />
+        <Image source={brandMark(isDark)} style={st.headLogo} accessible={false} />
         <Text style={[st.brand, { color: c.text, marginBottom: 0, flex: 1 }]}>Flowi</Text>
         {pinControls}
       </View>
@@ -566,7 +567,7 @@ export function NavSidebar({ pathname, isDark, variant = 'docked', width, onNavi
         style={[st.root, st.railRoot, { width: Layout.railWidth, backgroundColor: reduceTransparency ? c.bg : 'transparent', paddingTop: insets.top + 16 }]}
         accessibilityRole="menu">
         {glassLayer}
-        <Image source={require('@/assets/logo_app.png')} style={st.railLogo} accessible={false} />
+        <Image source={brandMark(isDark)} style={st.railLogo} accessible={false} />
         {expandButton}
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16, alignItems: 'center' }}>
           {navGroups.map((group, gi) => {
@@ -666,7 +667,7 @@ const st = StyleSheet.create({
   label:      { fontSize: 14, flex: 1 },
   // ── Рейка ──
   railRoot:   { paddingHorizontal: 0, alignItems: 'center' },
-  railLogo:   { width: 34, height: 34, borderRadius: Atlas.radius.medium, marginBottom: 8 },
+  railLogo:   { width: 34, height: 34, marginBottom: 8 },
   railGroup:  { alignItems: 'center', paddingVertical: 4, gap: 4, alignSelf: 'stretch' },
   railGroupGap: { marginTop: 8 },
   // 44×44 — мінімальний тач-таргет; у рейці підпису немає, тож площа кнопки —
@@ -681,7 +682,7 @@ const st = StyleSheet.create({
   railTimerCount: { position: 'absolute', bottom: 4, right: 8, fontSize: 10, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
   railPin:    { position: 'absolute', top: 5, right: 7 },
   headRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  headLogo:   { width: 34, height: 34, borderRadius: Atlas.radius.medium, marginRight: 4 },
+  headLogo:   { width: 34, height: 34, marginRight: 4 },
   headBtns:   { flexDirection: 'row', alignItems: 'center', marginRight: -8 },
   pinnedRow:  { flexDirection: 'row', alignItems: 'center' },
   // Затемнення під незакріпленим сайдбаром — легше за модальне (вміст видно).

@@ -30,6 +30,8 @@ import { PickerField, type PickerOption } from '@/components/shared/PickerField'
 import { PressableScale } from '@/components/shared/PressableScale';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
 import { AppHeader } from '@/components/shared/AppHeader';
+import { ScrollHeaderProvider, ScrollHeaderSlot } from '@/components/shared/ScrollHeaderSlot';
+import { useHeaderScroll } from '@/hooks/use-header-scroll';
 import type { TitleMenuItem } from '@/components/shared/TitleMenu';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { SkeletonCard } from '@/components/shared/Skeleton';
@@ -155,6 +157,8 @@ function chunk<T>(arr: T[], n: number): T[][] {
 
 export default function FinanceScreen() {
   const tabBarInset = useTabBarInset();
+  const headerScroll = useHeaderScroll();
+  const resetHeaderScroll = headerScroll.reset;
   const { width, height, isWide } = useResponsive();
   // Рукописні модалки (календар, валюта, категорії) — діалогом на планшеті,
   // як і SheetModal-и цього ж екрана.
@@ -180,7 +184,7 @@ export default function FinanceScreen() {
     reportsScrollY.current = y;
     setReportsFabOff(h => reportsFabHidden(prev, y, h));
   }, []);
-  useEffect(() => { reportsScrollY.current = 0; setReportsFabOff(false); }, [tab]);
+  useEffect(() => { reportsScrollY.current = 0; setReportsFabOff(false); resetHeaderScroll(); }, [tab, resetHeaderScroll]);
   useEffect(() => {
     setTab(prev => {
       const next = searchParams.tab ? parseFinanceTab(searchParams.tab, visibleTabs) : prev;
@@ -1513,6 +1517,10 @@ export default function FinanceScreen() {
     groups.length, initialized, isDark, staticShown, isWide, lang, loadFailed, locale, openAdd,
     retryLoad, tr, todayDueCard, opsNotices, hasTodayDue,
   ]);
+  // Телефон (11.2026): заголовок розділу гортається зі стрічкою — гніздо
+  // ScrollHeaderSlot читає його з провайдера, тож сама шапка стрічки лишається
+  // тим самим об'єктом і не перемальовує FlatList на кожну літеру (PERF-4).
+  const feedHeader = useMemo(() => <><ScrollHeaderSlot insetX={20} />{listHeader}</>, [listHeader]);
 
   // Той самий вміст показується модалкою на телефоні й колонкою на
   // планшеті — див. DetailPane.
@@ -1768,30 +1776,13 @@ export default function FinanceScreen() {
     ) : <ZoneSkeleton variant="static" />
   ) : undefined;
 
-  return (
-    <View style={{ flex: 1 }}>
-      <MeshBackground />
-      {/*
-        Layout System v2.4 — зони «Операцій»: [статична «плашки + оплати» (≥1280)]
-        [стрічка — завжди найширша] [деталь операції — панель праворуч з ✕ /
-        нижній аркуш ~60% на телефоні]. Інші вкладки (Рахунки, Бюджет,
-        Підписки, Звіти) — лише головна зона: деталі в них мають власні
-        панелі (Підписки) або не існують.
-      */}
-      <ZoneLayout
-        testID="finance-zones"
-        main={
-      <View style={{ flex: 1 }}>
-
-        {/* Omni: глобальна шапка (☰ · дзвіник · акаунт; на планшеті — рядок
-            інструментів) + KPI залишків на рахунках і бургер дій навпроти
-            заголовка; під нею — вкладки й фільтр. */}
-        <AppHeader
-          title={tr.finance}
-          kpis={headerKpis}
-          titleMenu={{ items: titleMenuItems, active: !!dateFilter, accessibilityLabel: tr.filtersAndSort }}>
-          {/* Один ряд навігації: сегменти вкладок (+ «Ще») і, на планшеті,
-              фільтр періоду поруч. Раніше тут було три ряди «табів». */}
+  const headerProps = {
+    title: tr.finance,
+    kpis: headerKpis,
+    titleMenu: { items: titleMenuItems, active: !!dateFilter, accessibilityLabel: tr.filtersAndSort },
+    // Один ряд навігації: сегменти вкладок (+ «Ще») і, на планшеті, фільтр
+    // періоду поруч. Раніше тут було три ряди «табів».
+    children: (
           <View style={isWide ? s.navRowWide : undefined}>
           <FinanceTabBar tabs={visibleTabs} active={tab} onChange={changeTab} c={finColors} tr={tr} stretch={!isWide} />
           <FinanceFilterBar
@@ -1809,8 +1800,33 @@ export default function FinanceScreen() {
             isDark={isDark}
           />
           </View>
-        </AppHeader>
+    ),
+  };
+  const renderHeaderBody = (insetX: number) => <AppHeader {...headerProps} part="body" insetX={insetX} />;
 
+  return (
+    <View style={{ flex: 1 }}>
+      <MeshBackground />
+      {/*
+        Layout System v2.4 — зони «Операцій»: [статична «плашки + оплати» (≥1280)]
+        [стрічка — завжди найширша] [деталь операції — панель праворуч з ✕ /
+        нижній аркуш ~60% на телефоні]. Інші вкладки (Рахунки, Бюджет,
+        Підписки, Звіти) — лише головна зона: деталі в них мають власні
+        панелі (Підписки) або не існують.
+      */}
+      <ZoneLayout
+        testID="finance-zones"
+        main={
+      <View style={{ flex: 1 }}>
+
+        {/* Omni: глобальна шапка (☰ · дзвіник · акаунт; на планшеті — рядок
+            інструментів) + KPI залишків на рахунках і бургер дій навпроти
+            заголовка; під нею — вкладки й фільтр. Телефон (11.2026): нерухома
+            лише смуга кнопок; заголовок, KPI, вкладки й фільтр — першим
+            елементом прокрутки кожної вкладки (ScrollHeaderSlot). */}
+        <AppHeader {...headerProps} part="toolbar" scrolled={headerScroll.scrolled} />
+
+        <ScrollHeaderProvider render={renderHeaderBody} onScrollY={headerScroll.onScrollY}>
         {tab === 'reports' ? (
           <ReportsTab
             transactions={txs}
@@ -1892,10 +1908,15 @@ export default function FinanceScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
-          ListHeaderComponent={listHeader}
+          onScroll={headerScroll.onScroll}
+          scrollEventThrottle={16}
+          // Заголовок розділу — через гніздо (ScrollHeaderSlot читає провайдер):
+          // сам ListHeaderComponent лишається тим самим об'єктом (PERF-4).
+          ListHeaderComponent={feedHeader}
           renderItem={renderGroup}
         />
         )}
+        </ScrollHeaderProvider>
       </View>
         }
         dynamic={tab === 'transactions' ? txDetailBody : null}

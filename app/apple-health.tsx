@@ -309,8 +309,7 @@ export default function AppleHealthScreen() {
           actions={authorized ? (
             <HeaderButton
               onPress={load}
-              accessibilityLabel={tr.syncNow}
-              style={{ backgroundColor: c.dim }}>
+              accessibilityLabel={tr.syncNow}>
               {syncing
                 ? <ActivityIndicator size="small" color={c.text} />
                 : <IconSymbol name="arrow.clockwise" size={18} color={c.text} />}

@@ -45,6 +45,8 @@ import { MonthPicker } from '@/components/shared/MonthPicker';
 import { afterModalExit } from '@/components/finance/sheetHandoff';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
 import { AppHeader } from '@/components/shared/AppHeader';
+import { ScrollHeaderProvider } from '@/components/shared/ScrollHeaderSlot';
+import { useHeaderScroll } from '@/hooks/use-header-scroll';
 import type { TitleMenuItem } from '@/components/shared/TitleMenu';
 import { SheetModal } from '@/components/shared/SheetModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -68,6 +70,8 @@ import { AccentIcon } from '@/components/shared/GlassBits';
 
 export default function HealthHubScreen() {
   const tabBarInset = useTabBarInset();
+  const headerScroll = useHeaderScroll();
+  const resetHeaderScroll = headerScroll.reset;
   // Layout System v2.4 (стор. 08/09): головна дія «додати» — плаваюча «+» у
   // правому нижньому куті на ВСІХ розмірах, як у Задачах і Фінансах (шапка
   // планшета — тонка смуга без кнопки створення).
@@ -158,26 +162,35 @@ export default function HealthHubScreen() {
     },
   ], [tr.history, tr.settings, router]);
 
+  const headerProps = {
+    title: tr.health,
+    kpis,
+    titleMenu: { items: titleMenuItems },
+    children: <HealthTabBar value={tab} onChange={setTab} tr={tr} c={c} preventionBadge={medsDue} layout={tabBarLayout} />,
+  };
+  // Нова вкладка — новий список, що починається згори.
+  useEffect(() => { resetHeaderScroll(); }, [tab, resetHeaderScroll]);
+  const renderHeaderBody = (insetX: number) => <AppHeader {...headerProps} part="body" insetX={insetX} />;
+
   return (
     <View style={{ flex: 1 }}>
       <MeshBackground />
       <View style={{ flex: 1 }}>
 
         {/* Omni: глобальна шапка (☰ · дзвіник · акаунт) + KPI дня; навпроти
-            заголовка — бургер дій розділу; під ним — pill-вкладки розділу. */}
-        <AppHeader
-          title={tr.health}
-          kpis={kpis}
-          titleMenu={{ items: titleMenuItems }}>
-          <HealthTabBar value={tab} onChange={setTab} tr={tr} c={c} preventionBadge={medsDue} layout={tabBarLayout} />
-        </AppHeader>
+            заголовка — бургер дій розділу; під ним — pill-вкладки розділу.
+            Телефон (11.2026): нерухома лише смуга кнопок; заголовок, KPI й
+            вкладки — першим елементом прокрутки кожної вкладки (ScrollHeaderSlot). */}
+        <AppHeader {...headerProps} part="toolbar" scrolled={headerScroll.scrolled} />
 
-        {tab === 'overview'   && <OverviewTab h={h} />}
-        {tab === 'nutrition'  && <NutritionTab h={h} />}
-        {tab === 'activity'   && <ActivityTab h={h} />}
-        {tab === 'sleep'      && <SleepTab h={h} />}
-        {tab === 'body'       && <BodyTab h={h} />}
-        {tab === 'prevention' && <PreventionTab h={h} />}
+        <ScrollHeaderProvider render={renderHeaderBody} onScrollY={headerScroll.onScrollY}>
+          {tab === 'overview'   && <OverviewTab h={h} />}
+          {tab === 'nutrition'  && <NutritionTab h={h} />}
+          {tab === 'activity'   && <ActivityTab h={h} />}
+          {tab === 'sleep'      && <SleepTab h={h} />}
+          {tab === 'body'       && <BodyTab h={h} />}
+          {tab === 'prevention' && <PreventionTab h={h} />}
+        </ScrollHeaderProvider>
       </View>
 
       {/* FAB → нижній попап швидкого вводу */}

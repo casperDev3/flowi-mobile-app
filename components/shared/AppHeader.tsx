@@ -15,8 +15,17 @@
  *     сайдбар уже на екрані, тож ☰ немає; під рядком — заголовок сторінки
  *     (H1) і підзаголовок; KPI — праворуч від H1 (expanded) або рядком під ним.
  *
- * Скло: кнопки — нейтральні скляні кружки ScreenHeader (функціональний шар).
- * Ціль дотику кожної кнопки ≥ 44 (36 + HEADER_BUTTON_HIT_SLOP).
+ * Кнопки (11.2026) — прості іконки без кружків, обідків і скла (HeaderButton);
+ * аватар — просто кружок з ініціалами. Ціль дотику кожної кнопки ≥ 44
+ * (36 + HEADER_BUTTON_HIT_SLOP).
+ *
+ * Прокрутка (телефон, 11.2026): екран-вкладка ділить шапку на дві частини —
+ *   <AppHeader {...p} part="toolbar" scrolled={scrolled} />  — нерухома смуга
+ *     кнопок над прокруткою (scroll-edge тло лише коли вміст заїхав під неї);
+ *   <AppHeader {...p} part="body" insetX={gutter} />          — заголовок,
+ *     бургер, KPI й фільтри першим елементом прокрутки (гортаються з вмістом).
+ * На планшеті part="toolbar" малює всю шапку як раніше, part="body" — нічого.
+ * Стан прокрутки — useHeaderScroll() (hooks/use-header-scroll.ts).
  */
 import { useRouter, type Href } from 'expo-router';
 import React, { useState } from 'react';
@@ -36,6 +45,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { fontFamily, radius } from '@/constants/theme';
 import { useDS } from '@/hooks/use-ds';
 import { useResponsive } from '@/hooks/use-responsive';
+import { useTopInset } from '@/hooks/use-top-inset';
 import type { ZoneView } from '@/hooks/use-zone-state';
 import { useAuth } from '@/store/auth';
 import { useI18n } from '@/store/i18n';
@@ -81,6 +91,19 @@ export type AppHeaderProps = {
    * не тут, а внизу шухляди ☰ (SidebarDrawer, через useZoneState).
    */
   viewSwitch?: { value: ZoneView; onChange: (v: ZoneView) => void };
+  /**
+   * Розбиття шапки для прокрутки (телефон, 11.2026) — див. шапку файлу.
+   * Без `part` — уся шапка нерухомо, як раніше (стек-екрани).
+   */
+  part?: 'toolbar' | 'body';
+  /** part="toolbar": вміст уже заїхав під смугу — показати scroll-edge тло. */
+  scrolled?: boolean;
+  /**
+   * part="body": горизонтальний відступ, який уже дав контейнер прокрутки
+   * (paddingHorizontal списку) — шапка компенсує його, щоб лишитись на своїх
+   * полях, а стрічка KPI — від краю до краю.
+   */
+  insetX?: number;
 };
 
 function BellButton() {
@@ -118,13 +141,14 @@ function TimerPill() {
 
 export function AppHeader({
   title, eyebrow, subtitle, kpis, actions, showMenu = true, onSearch, searchLabel,
-  back, titleStyle, children, paddingBottom, viewSwitch, titleMenu,
+  back, titleStyle, children, paddingBottom, viewSwitch, titleMenu, part, scrolled = false, insetX = 0,
 }: AppHeaderProps) {
   const { t, g, reduceTransparency } = useDS();
   const { tr } = useI18n();
   const { user } = useAuth();
   const { isCompact, isExpanded } = useResponsive();
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   // Поля ScreenHeader (20 + бічний інсет) — стрічка KPI на телефоні їде від краю до краю.
   const sidePad = 20 + Math.max(insets.left, insets.right);
   // KPI праворуч від H1 — лише коли САМА шапка досить широка. Вікно тут
@@ -143,11 +167,9 @@ export function AppHeader({
       accessibilityRole="button"
       accessibilityLabel={`${tr.accountManage}: ${displayName}`}
       hitSlop={HEADER_BUTTON_HIT_SLOP}
-      style={({ pressed }) => [
-        withName ? st.accountPill : null,
-        withName ? { backgroundColor: reduceTransparency ? t.surface.card : g.surfaceStrong, borderColor: g.rim } : null,
-        { opacity: pressed ? 0.7 : 1 },
-      ]}>
+      // 11.2026: без пігулки-скла й обідка — аватар (кружок з ініціалами) і,
+      // на планшеті, ім'я поруч простим текстом.
+      style={({ pressed }) => [withName ? st.accountPill : null, { opacity: pressed ? 0.7 : 1 }]}>
       {user ? (
         <Avatar person={{ id: user.id, name: displayName }} size={36} ringColor="transparent" />
       ) : (
@@ -211,6 +233,45 @@ export function AppHeader({
         </View>
       </View>
     );
+    if (part === 'toolbar') {
+      // Нерухома тонка смуга кнопок. Заголовок і все під ним — у прокрутці
+      // (part="body"). Тло — лише коли вміст заїхав під смугу (scroll-edge),
+      // щоб текст не «бився» об кнопки; «Зменшити прозорість» — суцільне.
+      return (
+        <>
+          <View
+            testID="app-header-toolbar"
+            style={[
+              st.fixedBar,
+              { paddingTop: topInset + 8, paddingHorizontal: sidePad },
+              scrolled ? {
+                backgroundColor: reduceTransparency ? t.surface.card : g.surfaceStrong,
+                borderBottomColor: t.border.hairline,
+              } : null,
+            ]}>
+            {compactToolbar}
+          </View>
+          {sheets}
+        </>
+      );
+    }
+    if (part === 'body') {
+      return (
+        <View testID="app-header-body" style={insetX ? { marginHorizontal: -insetX } : null}>
+          <ScreenHeader
+            title={title}
+            color={t.text.primary}
+            eyebrow={eyebrow}
+            back={back}
+            titleStyle={titleStyle}
+            paddingTop={4}
+            paddingBottom={paddingBottom}
+            actions={titleMenuButton ?? undefined}>
+            {below}
+          </ScreenHeader>
+        </View>
+      );
+    }
     return (
       <>
         <ScreenHeader
@@ -228,6 +289,9 @@ export function AppHeader({
       </>
     );
   }
+
+  // Планшет: шапка не ділиться — part="toolbar" малює її цілком, "body" — нічого.
+  if (part === 'body') return null;
 
   // Вузька головна зона (iPad у портреті з відкритою панеллю деталей): рядок
   // інструментів не переноситься, тож спершу ховаємо ім'я в акаунт-пілюлі,
@@ -296,6 +360,9 @@ const st = StyleSheet.create({
   titleRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   bellDot: { position: 'absolute', top: 8, right: 8 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  // Нерухома смуга кнопок телефона: 36 + 8 знизу; hairline прозора, доки
+  // вміст не заїхав під смугу (тоді — border.hairline).
+  fixedBar: { paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'transparent' },
   toolbarRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   search: {
     flex: 1, maxWidth: 360, minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -304,10 +371,7 @@ const st = StyleSheet.create({
   searchText: { flex: 1, fontSize: 14, fontFamily: fontFamily.regular },
   timer: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 12, borderRadius: radius.pill },
   timerText: { fontSize: 13, fontFamily: fontFamily.semibold, fontVariant: ['tabular-nums'] },
-  accountPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingLeft: 4, paddingRight: 12,
-    borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, maxWidth: 220,
-  },
+  accountPill: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, maxWidth: 220 },
   accountName: { fontSize: 13, fontFamily: fontFamily.semibold, flexShrink: 1 },
   guest: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   subtitle: { fontSize: 14, lineHeight: 20, fontFamily: fontFamily.regular },

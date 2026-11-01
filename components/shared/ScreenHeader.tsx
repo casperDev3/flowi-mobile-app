@@ -25,6 +25,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  type AccessibilityState,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -35,7 +36,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type HeaderLead, headerLead } from '@/components/shared/ScreenHeaderNav';
 import { useResponsive } from '@/hooks/use-responsive';
 import { useTopInset } from '@/hooks/use-top-inset';
-import { glassRimFor, isGlassFill } from '@/components/shared/dsTheme';
 
 /**
  * Ціль дотику 44×56pt навколо кнопки 36×36.
@@ -64,7 +64,9 @@ export interface HeaderButtonProps {
   /** Обов'язковий: іконка сама по собі скрінрідеру нічого не каже. */
   accessibilityLabel: string;
   accessibilityHint?: string;
-  /** Кольори кнопки — вони в кожного екрана свої. */
+  /** Стан перемикача (обрано / розгорнуто) — тло його більше не показує. */
+  accessibilityState?: AccessibilityState;
+  /** Лише розкладка (margin тощо): тло, рамки й тінь відкидаються (11.2026). */
   style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }
@@ -74,20 +76,16 @@ export function HeaderButton({
   onLongPress,
   accessibilityLabel,
   accessibilityHint,
+  accessibilityState,
   style,
   children,
 }: HeaderButtonProps) {
-  // DS v2.1: кнопка шапки — скляний кружок (заливка + спекулярний обідок).
-  // Екран може перефарбувати тло (активний стан — action.primary): тоді
-  // обідок лише для скляних заливок, суцільна кнопка лишається без рамки.
-  // Без хуків теми: ScreenHeader монтують тести без моків theme-context.
-  // Без тла від екрана — нейтральне «скло» (сірий напівпрозорий кружок +
-  // світлий верхній обідок), що читається в обох темах.
-  const flat = (StyleSheet.flatten(style) ?? {}) as ViewStyle;
-  const bg = typeof flat.backgroundColor === 'string' ? flat.backgroundColor : null;
-  const glassBase = bg == null
-    ? styles.neutralGlass
-    : isGlassFill(bg) ? glassRimFor(bg, 'card') : null;
+  // 11.2026 (рішення власника): кнопка шапки — ПРОСТО іконка. Без кружка,
+  // скла, обідка й тіні — ні нейтральних, ні тих, що передає екран: тло й
+  // рамки зі `style` відкидаються, лишається лише розкладка (margin тощо).
+  // Активний стан екран показує кольором іконки. Ціль дотику — та сама
+  // 36 + HEADER_BUTTON_HIT_SLOP = 44.
+  const layout = plainLayout(style);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -96,10 +94,22 @@ export function HeaderButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
-      style={[styles.button, glassBase, style]}>
+      accessibilityState={accessibilityState}
+      style={[styles.button, layout]}>
       {children}
     </TouchableOpacity>
   );
+}
+
+/** Ключі стилю, що робили з кнопки «кружок»: тло, рамки, тінь, радіус. */
+const CHROME_KEYS = /^(backgroundColor|border.*|shadow.*|elevation|opacity)$/;
+
+/** Лише розкладка зі стилю екрана (margin/align…) — без «хрому» кнопки. */
+export function plainLayout(style: StyleProp<ViewStyle>): ViewStyle {
+  const flat = (StyleSheet.flatten(style) ?? {}) as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(flat)) if (!CHROME_KEYS.test(k)) out[k] = flat[k];
+  return out as ViewStyle;
 }
 
 /**
@@ -227,6 +237,12 @@ export interface ScreenHeaderProps {
    * дзвіник · акаунт). Під верхнім інсетом, над крихтами. Див. AppHeader.
    */
   toolbar?: React.ReactNode;
+  /**
+   * Верхній відступ замість «інсет + 16». Для заголовка, що гортається
+   * всередині прокрутки під нерухомою смугою кнопок (AppHeader part="body"):
+   * інсет тоді вже дала смуга.
+   */
+  paddingTop?: number;
 }
 
 export function ScreenHeader({
@@ -242,6 +258,7 @@ export function ScreenHeader({
   crumbColor,
   leading,
   toolbar,
+  paddingTop,
 }: ScreenHeaderProps) {
   const topInset = useTopInset();
   const insets = useSafeAreaInsets();
@@ -254,7 +271,7 @@ export function ScreenHeader({
   const sidePad = 20 + Math.max(insets.left, insets.right);
 
   return (
-    <View style={{ paddingTop: topInset + 16, paddingHorizontal: sidePad, paddingBottom }}>
+    <View style={{ paddingTop: paddingTop ?? topInset + 16, paddingHorizontal: sidePad, paddingBottom }}>
       {toolbar ? <View style={styles.toolbar}>{toolbar}</View> : null}
       {lead === 'crumbs' && crumbs ? (
         <Breadcrumbs crumbs={crumbs} color={crumbColor ?? color} />
@@ -348,12 +365,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.32,
     lineHeight: 38,
   },
-  // DS v2.1: кругла скляна кнопка (тло — від екрана або скло за замовчуванням).
+  // 11.2026: проста іконка без тла — коробка 36 лише центрує її й тримає ціль.
   button: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -363,12 +378,5 @@ const styles = StyleSheet.create({
   },
   toolbar: {
     marginBottom: 16,
-  },
-  neutralGlass: {
-    backgroundColor: 'rgba(127,127,135,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    borderTopColor: 'rgba(255,255,255,0.45)',
-    borderBottomColor: 'rgba(17,17,19,0.08)',
   },
 });

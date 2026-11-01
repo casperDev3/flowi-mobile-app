@@ -1,4 +1,5 @@
 import { Atlas } from '@/constants/atlas';
+import { brandMark } from '@/constants/brand';
 import { OverlayMaterial } from '@/components/ds/OverlayMaterial';
 import { OverlayScrim } from '@/components/ds/OverlaySurface';
 import { AdvertisingSettings } from '@/components/advertising/Advertising';
@@ -48,6 +49,7 @@ import { fontFamily, type GlassAccent } from '@/constants/theme';
 import { BentoCard, BentoCardHeader, KpiCounter, MeshBackground } from '@/components/ds';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
 import { AppHeader } from '@/components/shared/AppHeader';
+import { useHeaderScroll } from '@/hooks/use-header-scroll';
 import { useUnreadNotificationsCount } from '@/components/notifications/use-notification-center';
 import { glassOf, glassRimFor } from '@/components/shared/dsTheme';
 
@@ -85,6 +87,7 @@ export default function SettingsScreen() {
   // height:auto у Yoga не резолвиться і обмеження просто зникає.
   const sheetSurface = useSheetSurface();
   const tabBarInset = useTabBarInset();
+  const headerScroll = useHeaderScroll();
   const { isWide, isExpanded } = useResponsive();
   // Тема й мова — діалогом посеред екрана на планшеті (як SheetModal), а не
   // смугою на всю ширину, притиснутою до низу.
@@ -601,14 +604,19 @@ export default function SettingsScreen() {
 
       {/* Omni: глобальна шапка (☰ · дзвіник · акаунт; рядок інструментів на
           планшеті) з KPI. Верхній інсет дає ScreenHeader усередині AppHeader —
-          а вміст ScrollView під нею фізично не заходить під статус-бар. */}
-      <AppHeader title={tr.settings} kpis={headerKpis} paddingBottom={12} />
+          а вміст ScrollView під нею фізично не заходить під статус-бар.
+          Телефон (11.2026): нерухома лише смуга кнопок, заголовок і KPI —
+          першим елементом прокрутки. */}
+      <AppHeader title={tr.settings} kpis={headerKpis} paddingBottom={12} part="toolbar" scrolled={headerScroll.scrolled} />
       <View style={{ flex: 1 }}>
         <ScrollView
           // Ландшафт: дві колонки секцій у 720pt — це ~330pt на рядок, і
           // підписи обрізались. На expanded колонці даємо 960.
           contentContainerStyle={[contentWidth, isExpanded && st.wideColumn, { paddingHorizontal: 20, paddingTop: 4, paddingBottom: tabBarInset + 16 }]}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          onScroll={headerScroll.onScroll}
+          scrollEventThrottle={16}>
+          <AppHeader title={tr.settings} kpis={headerKpis} paddingBottom={12} part="body" insetX={20} />
 
           {/* 1. Профіль */}
           <ProfileCard
@@ -641,7 +649,7 @@ export default function SettingsScreen() {
           {/* App footer */}
           <View style={[st.footerCard, { opacity: 0.45 }]}>
             <Image
-              source={require('@/assets/logo_app.png')}
+              source={brandMark(isDark)}
               style={st.footerLogo}
               resizeMode="contain"
             />
@@ -972,7 +980,7 @@ const st = StyleSheet.create({
   rowLabelFixed: { flexGrow: 1, flexShrink: 0 },
   rowValueBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, flexShrink: 1, minWidth: 0 },
   footerCard:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28, marginBottom: 8 },
-  footerLogo:  { width: 26, height: 26, borderRadius: 7 },
+  footerLogo:  { width: 26, height: 26 },
   footerName:  { fontSize: 15, fontFamily: fontFamily.semibold },
   footerBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
   overlay:     { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },

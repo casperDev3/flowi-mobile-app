@@ -143,6 +143,7 @@ import { canEditProjectItem, useProjectRoles } from '@/hooks/use-project-roles';
 import { HeaderButton } from '@/components/shared/ScreenHeader';
 // Верхній інсет рахує ScreenHeader усередині AppHeader (useTopInset у JS).
 import { AppHeader } from '@/components/shared/AppHeader';
+import { useHeaderScroll } from '@/hooks/use-header-scroll';
 import type { TitleMenuConfig } from '@/components/shared/TitleMenu';
 import type { PickerCreateOption } from '@/components/shared/PickerField';
 import { TaskHistoryTab, type HistoryEventType } from '@/components/tasks/TaskHistoryTab';
@@ -239,6 +240,8 @@ const EMPTY_MEMBERS_LIST: MemberOut[] = [];
 
 export default function TasksScreen() {
   const tabBarInset = useTabBarInset();
+  const headerScroll = useHeaderScroll();
+  const resetHeaderScroll = headerScroll.reset;
   const { width, height, isMedium, isWide } = useResponsive();
   /** Filters v2.5 — лише не-compact (= isWide); телефон — старий UI фільтрів. */
   const filtersV25 = useFiltersV25();
@@ -259,6 +262,8 @@ export default function TasksScreen() {
    * (разом із `?view=` і `?panel=` — посилання відкриває той самий стан).
    */
   const zoneState = useZoneState({ section: 'tasks', selectedParam: 'task', columns: true, label: tr.tasks });
+  // Інший вигляд — інша прокрутка, що починається згори: scroll-edge смуги кнопок скидаємо.
+  useEffect(() => { resetHeaderScroll(); }, [zoneState.view, resetHeaderScroll]);
   const zoneFit = zoneWidths({ windowWidth: width, screenWidth, wide: isWide, wantStatic: zoneState.panels.static, wantDynamic: true });
   // Деталь — панель праворуч, коли вона вміщається поруч зі списком (iPad,
   // вікно ≥ ~800pt); інакше — нижній аркуш, як на телефоні (BottomSheet).
@@ -2708,6 +2713,35 @@ export default function TasksScreen() {
     ],
   };
 
+  const headerProps = {
+    title: tr.tasks,
+    kpis: headerKpis,
+    // Планшет: «Список / Колонки» — у смузі інструментів шапки;
+    // телефон — унизу шухляди ☰ (SidebarDrawer).
+    viewSwitch: isWide ? { value: zoneState.view, onChange: zoneState.setView } : undefined,
+    // 11.2026: дії розділу — бургер ☰ навпроти заголовка «Завдання»
+    // (TitleMenu шапки). Ті самі пункти, що були в «⋯»: Календар,
+    // Архів, Фільтри й сортування, Проєкти, Нотатки. Крапка біля рисок,
+    // коли є активні фільтри.
+    titleMenu,
+    children: (
+      <MonthPicker
+        month={activeMonth}
+        onChange={m => { setActiveMonth(m); setDateFilter(null); }}
+        months={tr.months}
+        monthsShort={tr.monthsShort}
+        monthsGenitive={tr.monthsGenitive}
+        accentColor={c.accent}
+        textColor={c.text}
+        subColor={c.sub}
+        dimColor={c.dim}
+        borderColor={c.border}
+      />
+    ),
+  };
+  // Заголовок гортається зі списком лише у «Списку» (у «Колонках» — вбік).
+  const headerScrolls = zoneState.view !== 'columns';
+
   const stickyFilters = (
     <View style={[s.stickyFilters, { borderBottomColor: c.border }]}>{filterBar}</View>
   );
@@ -2718,32 +2752,15 @@ export default function TasksScreen() {
 
         {/* Fixed Header — Omni (DS v2.2): AppHeader поверх <ScreenHeader (верхній
             інсет, стеля Dynamic Type): ☰ · дзвіник · акаунт на телефоні, рядок
-            інструментів на планшеті, KPI дня праворуч від H1 / стрічкою. */}
+            інструментів на планшеті, KPI дня праворуч від H1 / стрічкою.
+            Телефон, «Список» (11.2026): нерухома лише смуга кнопок, заголовок,
+            KPI й місяць — у ListHeaderComponent (гортаються зі списком).
+            «Колонки» гортаються вбік — там шапка лишається нерухомою цілком. */}
         <AppHeader
-          title={tr.tasks}
-          kpis={headerKpis}
-          // Планшет: «Список / Колонки» — у смузі інструментів шапки;
-          // телефон — унизу шухляди ☰ (SidebarDrawer).
-          viewSwitch={isWide ? { value: zoneState.view, onChange: zoneState.setView } : undefined}
-          // 11.2026: дії розділу — бургер ☰ навпроти заголовка «Завдання»
-          // (TitleMenu шапки). Ті самі пункти, що були в «⋯»: Календар,
-          // Архів, Фільтри й сортування, Проєкти, Нотатки. Кнопка суцільна
-          // action.primary, коли є активні фільтри.
-          titleMenu={titleMenu}>
-          <MonthPicker
-            month={activeMonth}
-            onChange={m => { setActiveMonth(m); setDateFilter(null); }}
-            months={tr.months}
-            monthsShort={tr.monthsShort}
-            monthsGenitive={tr.monthsGenitive}
-            accentColor={c.accent}
-            textColor={c.text}
-            subColor={c.sub}
-            dimColor={c.dim}
-            borderColor={c.border}
-          />
-        </AppHeader>
-        {/* кінець шапки (AppHeader → </ScreenHeader>) */}
+          {...headerProps}
+          part={headerScrolls ? 'toolbar' : undefined}
+          scrolled={headerScrolls && headerScroll.scrolled}
+        />
 
         {/* Планшет (і «Колонки» на телефоні): пошук і перемикач скоупу —
             нерухомо над списком/дошкою. */}
@@ -2772,7 +2789,11 @@ export default function TasksScreen() {
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
-          ListHeaderComponent={listHeader}
+          onScroll={headerScroll.onScroll}
+          scrollEventThrottle={16}
+          // Телефон (11.2026): заголовок, KPI й місяць гортаються зі списком
+          // (part="body"); планшет — null (шапка цілком над списком).
+          ListHeaderComponent={<><AppHeader {...headerProps} part="body" insetX={20} />{listHeader}</>}
           ListFooterComponent={tasks.length >= 10 ? <AdSlot slot="M2" hidden={showAdd || showMeetingForm || showFilterSheet} /> : null}
           renderSectionHeader={renderSectionHeader}
           renderSectionFooter={renderSectionFooter}

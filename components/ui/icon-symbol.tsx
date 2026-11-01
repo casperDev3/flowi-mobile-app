@@ -17,6 +17,12 @@ const MAPPING: Record<string, MaterialIconName> = {
   // Tabs
   'checklist': 'checklist',
   'banknote': 'account-balance-wallet',
+  // Пари «неактивна / активна» нижньої панелі (11.2026): активна вкладка —
+  // заповнений варіант SF Symbol. Material-гліфи тих самих форм однакові —
+  // на Android активність читається кольором.
+  'house': 'home',
+  'checklist.checked': 'checklist',
+  'banknote.fill': 'account-balance-wallet',
   'clock.fill': 'access-time',
   'gearshape.fill': 'settings',
   // Actions
@@ -278,6 +284,8 @@ export function IconSymbol({
   size?: number;
   color: string | OpaqueColorValue;
   style?: StyleProp<TextStyle>;
+  /** Товщина SF Symbol (лише iOS); Material-гліфи її не мають. */
+  weight?: 'regular' | 'medium' | 'semibold' | 'bold';
 }) {
   // NAT-05: декоративна іконка — підпис дає батьківський елемент.
   return (

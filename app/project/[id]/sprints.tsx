@@ -673,9 +673,8 @@ export default function ProjectSprintsScreen() {
           {canEdit ? (
             <HeaderButton
               onPress={openCreate}
-              accessibilityLabel={tr.sprintNew}
-              style={{ backgroundColor: tk.action.primary, borderColor: 'transparent' }}>
-              <IconSymbol name="plus" size={18} color={tk.text.onAction} />
+              accessibilityLabel={tr.sprintNew}>
+              <IconSymbol name="plus" size={22} color={tk.text.primary} />
             </HeaderButton>
           ) : null}
           <TasksMenuButton onPress={() => setMenuOpen(true)} label={tr.sprintListMenu} active={filtersActive} colors={c} />

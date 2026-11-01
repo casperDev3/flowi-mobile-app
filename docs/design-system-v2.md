@@ -788,6 +788,11 @@ const v25 = useFiltersV25();
 Не плутати з ☰ шухляди сайдбара: та ліворуч у рядку інструментів (іконка
 `sidebar.left`), лишається без змін.
 
+> **Оновлено 01.11.2026 (друга хвиля):** бургер — **лише три риски**
+> (`line.3.horizontal` 22pt, `text.primary`) без кружка, тла, обідка й скла;
+> 44×44 лишається невидимою ціллю дотику. `active` — крапка 8pt `text.primary`
+> біля рисок (`testID="title-menu-active-dot"`), а не суцільна кнопка.
+
 ```tsx
 import type { TitleMenuConfig, TitleMenuItem } from '@/components/shared/TitleMenu';
 
@@ -812,7 +817,7 @@ import type { TitleMenuConfig, TitleMenuItem } from '@/components/shared/TitleMe
 |---|---|
 | `items?: TitleMenuItem[]` | Пункти: `label`, `icon?` (16, `text.secondary`), `onPress` (меню спершу закривається), `destructive?` (текст `g.accent.coral.ink` ≥ 4.5:1), `checked?` (роль `checkbox` + ✓), `badge?`, `separatorBefore?`, `disabled?`, `key?`, `testID?` |
 | `onPress?` | Замість `items` — відкрити власне меню екрана |
-| `active?` | Суцільна `action.primary` (є активні фільтри) |
+| `active?` | Крапка біля рисок (є активні фільтри) |
 | `accessibilityLabel?` | За замовч. «Опції: <заголовок>» |
 | `testID?` | За замовч. `title-menu-button`; поповер — `title-menu` |
 
@@ -838,7 +843,9 @@ max 132pt, +4 зверху) → **дельта** (коли є, колір тон
 | Токен (`constants/nav.ts`) | Значення |
 |---|---|
 | `TAB_ISLAND_HEIGHT` | 64 |
-| `TAB_ISLAND_SIDE` | 16 (+ бічний safe-area в ландшафті) |
+| `TAB_ISLAND_SIDE` | 16 — МІНІМАЛЬНЕ поле (+ бічний safe-area в ландшафті) |
+| `TAB_ISLAND_MAX_WIDTH` | 336 — острівець облягає 4 вкладки й стоїть по центру |
+| `tabIslandInsets(w, l, r)` | `{ left, right }` острівця: по центру, ≤ 336, ≥ 16 від краю |
 | `TAB_ISLAND_GAP` | 8 — над нижнім safe-area |
 | `tabIslandBottom(safe)` | `safe + 8` — `bottom` панелі |
 | `tabIslandOuterHeight(safe)` | `64 + safe + 8` — скільки знизу займає острівець |
@@ -854,4 +861,46 @@ Pill `radius.pill`, Liquid Glass як раніше (`GlassTabBarBackground islan
 простору проєкту (`TAB_BAR_HEIGHT`, суцільна смуга) — без змін.
 `useSoftSafeAreaInsets()` (`hooks/use-soft-safe-area-insets.ts`) — інсети,
 що не кидають без провайдера (тести).
+
+**Активна вкладка (01.11.2026, друга хвиля): без pill, обводки й тла** — виділяється
+сама іконка: `TAB_BAR_TINT.active` + заповнений варіант SF Symbol
+(`house`→`house.fill`, `checklist`→`checklist.checked`, `banknote`→`banknote.fill`;
+`figure.run` — товща лінія) і `weight="semibold"`; неактивна — контурна
+`TAB_BAR_TINT.inactive`. Підпис — той самий колір. `GlassTabIcon({ name, activeName? })`
+спільна з панеллю простору проєкту.
+
+### Кнопки шапки — прості іконки (01.11.2026)
+
+`HeaderButton` більше не малює скляного кружка: ні нейтрального скла, ні тла чи
+рамок, переданих екраном (`plainLayout(style)` лишає з `style` лише розкладку —
+margin тощо). Активний стан — колір/заповнений варіант іконки (+ `accessibilityState`),
+головна дія «+» — іконка 22pt `text.primary`. Аватар — кружок з ініціалами без
+обідка; на планшеті ім'я поруч простим текстом (без скляної пігулки). Крапка
+непрочитаних на 🔔 лишається. Ціль дотику — 36 + `HEADER_BUTTON_HIT_SLOP` = 44.
+
+### Прокрутка: нерухома лише смуга кнопок (телефон, 01.11.2026)
+
+Великий заголовок, KPI, вкладки/фільтри розділу **гортаються з вмістом**;
+нерухома лише тонка смуга `[☰] … [дії] [🔔] [аватар]`. Бургер меню розділу —
+у рядку заголовка (гортається з ним). Смуга отримує scroll-edge тло
+(`g.surfaceStrong` / «Зменшити прозорість» — `surface.card`, + hairline
+`border.hairline`) лише коли вміст зсунувся > 4pt (`useHeaderScroll`).
+
+```tsx
+const hs = useHeaderScroll();                       // hooks/use-header-scroll.ts
+<AppHeader {...p} part="toolbar" scrolled={hs.scrolled} />   // над прокруткою
+<ScrollView onScroll={hs.onScroll} scrollEventThrottle={16} contentContainerStyle={{ paddingHorizontal: 20 }}>
+  <AppHeader {...p} part="body" insetX={20} />      // першим елементом прокрутки
+```
+
+- Без `part` — уся шапка нерухомо, як раніше (стек-екрани).
+- Планшет: `part="toolbar"` малює всю шапку, `part="body"` — `null`.
+- `insetX` — горизонтальний відступ контейнера: шапка компенсує його, стрічка KPI
+  лишається від краю до краю.
+- Кілька вкладок зі своїми ScrollView (Здоров'я, Фінанси): екран кладе тіло в
+  `<ScrollHeaderProvider render={x => <AppHeader … part="body" insetX={x}/>} onScrollY={hs.onScrollY}>`,
+  а прокрутка вкладки — `<ScrollHeaderSlot insetX={20}/>` першим дитям +
+  `onScroll={useScrollHeaderScroll()}` (`components/shared/ScrollHeaderSlot.tsx`).
+  Без провайдера гніздо порожнє (окремі екрани /budget, /subscriptions).
+- Завдання у «Колонках» (гортаються вбік) — шапка нерухома цілком.
 
